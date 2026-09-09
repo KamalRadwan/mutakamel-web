@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ShieldAlert } from "lucide-react";
 import {
   Card,
@@ -24,14 +24,16 @@ import {
 import type { UseTenantBillingWorkspaceResult } from "../hooks/useTenantBillingWorkspace";
 import { localeForLanguage } from "@/i18n/locale";
 import type {
-  BillingCycle,
   PaymentReconciliationAction,
   PaymentStatusView,
   SubscriptionItemView,
-  SubscriptionPlanChangeOperation,
   WalletAdjustmentDirection,
   WalletLedgerView,
 } from "../types";
+
+import { InitialCommercialWorkspace } from "@/features/admin/subscriptions/initial-commercial/InitialCommercialWorkspace";
+import { CommercialChangeWorkspace } from "@/features/admin/subscriptions/commercial-change/CommercialChangeWorkspace";
+import { SubscriptionCommercialEvidence } from "./SubscriptionCommercialEvidence";
 
 type BillingSection = "subscription" | "wallet" | "payments";
 
@@ -98,17 +100,6 @@ export function TenantBillingPanel({
 
 function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   const copy = billingCopy[lang];
-  const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY");
-  const [trialDays, setTrialDays] = useState(String(DEFAULT_TRIAL_DAYS));
-  const [moduleKey, setModuleKey] = useState("");
-  const [tierKey, setTierKey] = useState("");
-  const [seats, setSeats] = useState("1");
-  const [operation, setOperation] =
-    useState<SubscriptionPlanChangeOperation>("CHANGE");
-  const [itemId, setItemId] = useState("");
-  const [changeModuleKey, setChangeModuleKey] = useState("");
-  const [changeTierKey, setChangeTierKey] = useState("");
-  const [changeSeats, setChangeSeats] = useState("1");
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
 
   if (
@@ -129,69 +120,11 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
       <Card className="p-5">
         <h3 className="font-semibold">{copy.noSubscription}</h3>
         {workspace.permissions.canCreateSubscription ? (
-          <form
-            className="mt-4 grid gap-3 md:grid-cols-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void workspace.seedSubscription({
-                billingCycle,
-                currencyCode: "USD",
-                trialDays: Math.max(1, Math.min(365, Number(trialDays))),
-                items: [
-                  {
-                    moduleKey: moduleKey.trim(),
-                    tierKey: tierKey.trim(),
-                    seats: Math.max(1, Number(seats)),
-                  },
-                ],
-              });
-            }}
-          >
-            <SelectField
-              label={copy.billingCycle}
-              name="billingCycle"
-              value={billingCycle}
-              onChange={(value) => setBillingCycle(value as BillingCycle)}
-              options={["MONTHLY", "ANNUAL"]}
-            />
-            <TextField
-              label={copy.trialDays}
-              name="trialDays"
-              value={trialDays}
-              onChange={setTrialDays}
-              type="number"
-              min="1"
-              max="365"
-            />
-            <TextField
-              label={copy.moduleKey}
-              name="moduleKey"
-              value={moduleKey}
-              onChange={setModuleKey}
-              required
-            />
-            <TextField
-              label={copy.tierKey}
-              name="tierKey"
-              value={tierKey}
-              onChange={setTierKey}
-              required
-            />
-            <TextField
-              label={copy.seats}
-              name="seats"
-              value={seats}
-              onChange={setSeats}
-              type="number"
-              min="1"
-              required
-            />
-            <div className="flex items-end">
-              <Button type="submit" variant="primary" disabled={Boolean(workspace.mutation.name)}>
-                {copy.createSubscription}
-              </Button>
-            </div>
-          </form>
+          <div className="mt-4">
+            <InitialCommercialWorkspace context={{ purpose: "INITIAL_SEED", intentId: workspace.tenantId,
+              targetTenantId: workspace.tenantId, subscriptionId: null, subscriptionRevision: null }}
+              initialTerms={{ billingCycle: "MONTHLY", currencyCode: "USD", applications: [] }} onSeeded={workspace.refresh} />
+          </div>
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
             {copy.noCreatePermission}
@@ -207,38 +140,6 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   const items = workspace.subscriptionItems.length
     ? workspace.subscriptionItems
     : subscription.items;
-  const canChangePlan = header.status === "TRIAL" || header.status === "ACTIVE";
-  const previewIsCurrent = workspace.planPreview
-    ? isFutureInstant(workspace.planPreview.expiresAt)
-    : false;
-  const updatePlanDraft = (update: () => void) => {
-    workspace.clearPlanPreview();
-    update();
-  };
-
-  const submitPreview = (event: FormEvent) => {
-    event.preventDefault();
-    if (operation === "REMOVE") {
-      void workspace.previewPlanChange({ operation, itemId });
-      return;
-    }
-    if (operation === "CHANGE") {
-      void workspace.previewPlanChange({
-        operation,
-        itemId,
-        tierKey: changeTierKey.trim(),
-        seats: Math.max(1, Number(changeSeats)),
-      });
-      return;
-    }
-    void workspace.previewPlanChange({
-      operation,
-      moduleKey: changeModuleKey.trim(),
-      tierKey: changeTierKey.trim(),
-      seats: Math.max(1, Number(changeSeats)),
-    });
-  };
-
   const itemColumns: ColumnDef<SubscriptionItemView>[] = [
     {
       key: "module",
@@ -349,152 +250,10 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
         </div>
       </Card>
 
-      {workspace.permissions.canUpdateSubscription && canChangePlan ? (
-        <Card className="p-5">
-          <h3 className="font-semibold">{copy.planChange}</h3>
-          <p className="text-xs text-muted-foreground">{copy.serverPreview}</p>
-          <form
-            className="mt-4 grid gap-3 md:grid-cols-2"
-            onSubmit={submitPreview}
-          >
-            <SelectField
-              label={copy.operation}
-              name="planChangeOperation"
-              value={operation}
-              onChange={(value) =>
-                updatePlanDraft(() =>
-                  setOperation(value as SubscriptionPlanChangeOperation),
-                )
-              }
-              options={["ADD", "CHANGE", "REMOVE"]}
-            />
-            {operation !== "ADD" ? (
-              <SelectField
-                label={copy.item}
-                name="subscriptionItemId"
-                value={itemId}
-                placeholder={copy.selectItem}
-                required
-                onChange={(value) => updatePlanDraft(() => setItemId(value))}
-                options={items.map((item) => [item.id, `${item.moduleName ?? item.moduleKey ?? item.id} · ${item.tierName ?? item.tierKey}`] as const)}
-              />
-            ) : (
-              <TextField
-                label={copy.moduleKey}
-                name="moduleKey"
-                value={changeModuleKey}
-                onChange={(value) =>
-                  updatePlanDraft(() => setChangeModuleKey(value))
-                }
-                required
-              />
-            )}
-            {operation !== "REMOVE" ? (
-              <TextField
-                label={copy.tierKey}
-                name="tierKey"
-                value={changeTierKey}
-                onChange={(value) =>
-                  updatePlanDraft(() => setChangeTierKey(value))
-                }
-                required
-              />
-            ) : null}
-            {operation !== "REMOVE" ? (
-              <TextField
-                label={copy.seats}
-                name="seats"
-                value={changeSeats}
-                onChange={(value) =>
-                  updatePlanDraft(() => setChangeSeats(value))
-                }
-                type="number"
-                min="1"
-                required
-              />
-            ) : null}
-            <div className="flex items-end">
-              <Button type="submit" variant="primary" disabled={Boolean(workspace.mutation.name)}>
-                {copy.previewChange}
-              </Button>
-            </div>
-          </form>
-          {workspace.planPreview ? (
-            <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-4 text-sm text-info-subtle-foreground">
-              <div className="grid gap-2 md:grid-cols-4">
-                <Metric
-                  label={copy.operation}
-                  value={workspace.planPreview.operation}
-                  compact
-                />
-                <Metric
-                  label={copy.prorated}
-                  value={`USD ${workspace.planPreview.financial.proratedAmountUsd}`}
-                  compact
-                />
-                <Metric
-                  label={copy.walletShortfall}
-                  value={`USD ${workspace.planPreview.financial.walletShortfallUsd}`}
-                  compact
-                />
-                <Metric
-                  label={copy.expires}
-                  value={formatDate(workspace.planPreview.expiresAt, lang)}
-                  compact
-                />
-              </div>
-              <div className="mt-3 grid gap-2 md:grid-cols-4">
-                <Metric
-                  label={copy.module}
-                  value={workspace.planPreview.item.moduleId}
-                  compact
-                />
-                <Metric
-                  label={copy.tierChange}
-                  value={`${workspace.planPreview.item.fromTierId ?? "—"} → ${workspace.planPreview.item.toTierId ?? "—"}`}
-                  compact
-                />
-                <Metric
-                  label={copy.seatChange}
-                  value={`${workspace.planPreview.item.fromSeats ?? "—"} → ${workspace.planPreview.item.toSeats ?? "—"}`}
-                  compact
-                />
-                <Metric
-                  label={copy.lineDelta}
-                  value={`USD ${workspace.planPreview.item.previousLineTotalUsd} → ${workspace.planPreview.item.nextLineTotalUsd}`}
-                  compact
-                />
-              </div>
-              {!previewIsCurrent ? (
-                <p className="mt-3 text-sm text-destructive-subtle-foreground">
-                  {copy.previewExpired}
-                </p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {workspace.permissions.canApplySubscriptionUpdate ? (
-                  <Button
-                    type="button"
-                    variant="primary"
-                    disabled={
-                      !previewIsCurrent ||
-                      !workspace.planPreview.financial.canApply ||
-                      Boolean(workspace.mutation.name)
-                    }
-                    onClick={() => void workspace.applyPlanChange()}
-                  >
-                    {copy.applyReviewedChange}
-                  </Button>
-                ) : null}
-                <Button type="button" variant="outline" onClick={workspace.clearPlanPreview}>
-                  {copy.dismiss}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </Card>
-      ) : workspace.permissions.canUpdateSubscription ? (
-        <StateCard>{copy.planChangeUnavailable}</StateCard>
-      ) : null}
+      {subscription.commercial && <>
+        <SubscriptionCommercialEvidence value={subscription.commercial} lang={lang} />
+        <CommercialChangeWorkspace source={subscription.commercial} lang={lang} onCommitted={workspace.refresh} />
+      </>}
     </div>
   );
 }
@@ -1422,12 +1181,6 @@ function TextField({
 }
 
 const EMPTY_SELECT_VALUE = "__none__";
-/**
- * Prefill for the manual trial length. Core's `tenants.trial_days` setting is
- * what applies when no explicit value is sent; this only seeds the input an
- * admin is about to override.
- */
-const DEFAULT_TRIAL_DAYS = 7;
 
 function SelectField({
   label,

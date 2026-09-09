@@ -58,7 +58,7 @@ function describeDecorators(decorators) {
       case "IsEmail": type = "email"; break;
       case "IsDateString": type = "ISO date string"; break;
       case "IsUUID":
-        type = arg.includes("7") ? "UUIDv7" : "UUID";
+        type = `${arg.includes("7") ? "UUIDv7" : "UUID"}${/each:\s*true/u.test(arg) ? "[]" : ""}`;
         break;
       case "IsEnum":
         type = `enum ${arg.replace(/[()'"]/gu, "")}`;
@@ -87,6 +87,7 @@ function describeDecorators(decorators) {
       case "Max": rules.push(`<= ${arg}`); break;
       case "ArrayMaxSize": rules.push(`max ${arg} items`); break;
       case "ArrayMinSize": rules.push(`min ${arg} items`); break;
+      case "ArrayUnique": rules.push("unique items"); break;
       case "ValidateNested": rules.push("nested"); break;
       case "Type": {
         const m = arg.match(/=>\s*([A-Za-z0-9_]+)/u);

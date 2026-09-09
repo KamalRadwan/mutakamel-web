@@ -94,7 +94,10 @@ export function ConfirmActionModal({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
-      <AlertDialogContent className="relative" aria-busy={isLoading || undefined}>
+      <AlertDialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
+        aria-busy={isLoading || undefined}
+      >
         <AlertDialogCancel
           disabled={isLoading}
           aria-label={lang === "ar" ? "إغلاق" : "Close"}

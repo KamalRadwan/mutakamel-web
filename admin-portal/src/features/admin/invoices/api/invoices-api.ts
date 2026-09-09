@@ -1,5 +1,6 @@
 import { axiosClient } from "@/lib/api/axiosClient";
 import { readInvoicePage, readInvoiceSnapshot } from "../model/invoice-readers";
+import { readInvoiceCommercialSnapshot } from "../model/invoice-commercial";
 import type {
   GenerateInvoiceDto,
   InvoiceListQuery,
@@ -11,6 +12,14 @@ const BASE_URL = "/api/admin/core/v1/invoices";
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Canonical purpose-based invoice detail through the shared authenticated client. */
+export async function getRetainedInvoiceDetail(id: string, signal?: AbortSignal) {
+  const response = await axiosClient.get<unknown>(invoiceUrl(id), {
+    cache: "no-store", ...(signal ? { signal } : {}),
+  });
+  return readInvoiceCommercialSnapshot(response, id);
+}
+
 export const invoicesApi = {
   list: async (query: InvoiceListQuery, signal?: AbortSignal) => {
     const response = await axiosClient.get<unknown>(
@@ -20,13 +29,7 @@ export const invoicesApi = {
     return readInvoicePage(response.data);
   },
 
-  get: async (id: string, signal?: AbortSignal) => {
-    const response = await axiosClient.get<unknown>(invoiceUrl(id), {
-      cache: "no-store",
-      ...(signal ? { signal } : {}),
-    });
-    return readInvoiceForId(response.data, id);
-  },
+  get: getRetainedInvoiceDetail,
 
   generate: async (dto: GenerateInvoiceDto, idempotencyKey: string) => {
     const response = await axiosClient.post<unknown>(

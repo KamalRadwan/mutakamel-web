@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   BRAND_RAMP_STEPS,
+  SYSTEM_CHROME,
   contrastRatio,
   deriveBrandRamp,
+  deriveChrome,
   evaluateBrandColor,
   formatOklch,
   hexToOklch,
@@ -100,6 +102,45 @@ describe("evaluateBrandColor", () => {
     const ids = verdict!.failures.map((failure) => failure.id);
     expect(ids).not.toContain("primaryFillDark");
     expect(ids).not.toContain("ringLight");
+  });
+});
+
+describe("deriveChrome", () => {
+  it("reproduces --color-chrome at the system hue", () => {
+    const chrome = deriveChrome(SYSTEM_CHROME.h);
+    expect(chrome.l).toBeCloseTo(SYSTEM_CHROME.l, 5);
+    expect(chrome.c).toBeCloseTo(SYSTEM_CHROME.c, 5);
+    const rgb = oklchToLinearSrgb(chrome);
+    expect(rgb.b).toBeGreaterThan(rgb.r);
+    expect(rgb.b).toBeGreaterThan(rgb.g);
+  });
+
+  it("keeps white legible on the bar at every hue on the wheel", () => {
+    // The bar's text, its icons and its focus ring are all white. A hue that
+    // lifted the surface above 4.5:1 would not be a styling problem, it would
+    // be an unreadable global nav — so this is swept, not sampled.
+    for (let hue = 0; hue < 360; hue += 1) {
+      expect(contrastRatio(WHITE, deriveChrome(hue))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("stays inside sRGB at every hue, so the browser never clips the bar", () => {
+    // A clipped colour is one nothing measured: the ratio above would then
+    // describe a colour the user never sees.
+    for (let hue = 0; hue < 360; hue += 1) {
+      const { r, g, b } = oklchToLinearSrgb(deriveChrome(hue));
+      for (const channel of [r, g, b]) {
+        expect(channel).toBeGreaterThanOrEqual(-1e-4);
+        expect(channel).toBeLessThanOrEqual(1 + 1e-4);
+      }
+    }
+  });
+
+  it("is measured as part of the verdict, not after it", () => {
+    const verdict = evaluateBrandColor("#066de9");
+    expect(verdict!.chrome.h).toBeCloseTo(verdict!.ramp[600].h, 5);
+    // brand-300 is the active marker and the bar is what it sits on.
+    expect(contrastRatio(verdict!.ramp[300], verdict!.chrome)).toBeGreaterThanOrEqual(3);
   });
 });
 

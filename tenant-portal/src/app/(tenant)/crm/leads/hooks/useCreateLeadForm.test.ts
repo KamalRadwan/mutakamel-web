@@ -12,10 +12,13 @@ const messages: LeadCreateMessages = {
   duplicatePhone: "Already listed.",
   url: "Bad URL.",
   contactRequired: "Add a contact.",
+  tagsLimit: "At most {max} tags.",
+  tagsInvalid: "Choose valid tags.",
 };
 
 const COMPANY_A = "01900100-0000-7000-8000-0000000000c1";
 const CONTACT_A = "01900100-0000-7000-8000-0000000000c2";
+const TAG_A = "01900100-0000-7000-8000-0000000000c3";
 
 function setup(requiredCustomFieldKeys: string[] = []) {
   return renderHook(() => useCreateLeadForm(messages, requiredCustomFieldKeys));
@@ -112,6 +115,23 @@ describe("phone rows", () => {
       act(() => result.current.addPhone("phones"));
     }
     expect(result.current.form.phones).toHaveLength(10);
+  });
+});
+
+describe("tags", () => {
+  it("tracks the selection as form state, preserves it across profile changes, and clears it on reset", () => {
+    const { result } = setup();
+
+    act(() => result.current.setField("tagIds", [TAG_A]));
+    expect(result.current.form.tagIds).toEqual([TAG_A]);
+    expect(result.current.isDirty).toBe(true);
+
+    act(() => result.current.setProfileType("CORPORATE"));
+    expect(result.current.form.tagIds).toEqual([TAG_A]);
+
+    act(() => result.current.reset());
+    expect(result.current.form.tagIds).toEqual([]);
+    expect(result.current.isDirty).toBe(false);
   });
 });
 

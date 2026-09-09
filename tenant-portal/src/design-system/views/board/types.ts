@@ -11,6 +11,22 @@ export interface BoardColumnSegment {
   tone: "negative" | "caution" | "positive" | "neutral";
 }
 
+// The strings a column header's own controls need. Declared here rather than
+// in BoardView so the column can type them without importing the view that
+// renders it. `BoardViewLabels` extends this, so a screen still fills one
+// object.
+export interface BoardColumnLabels {
+  // Both name the ACTION; the column appends its own label, so a screen reader
+  // hears "Collapse column: Qualifying" rather than five identical buttons.
+  // Required, because an icon-only control with no accessible name is
+  // announced as "button", and collapsing is a property of every board rather
+  // than a choice a screen makes.
+  collapseColumn: string;
+  expandColumn: string;
+  // Paired with BoardView's `onAddToColumn`: supply both or neither.
+  addToColumn?: string;
+}
+
 export interface BoardColumnDef {
   id: string;
   label: string;

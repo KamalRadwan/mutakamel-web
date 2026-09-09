@@ -47,4 +47,9 @@ describe("creating a lead", () => {
     expect(handleCreate).toContain("outcome.kind === \"failed\"");
     expect(handleCreate).toContain("setIsCreateOpen(false)");
   });
+
+  it("keeps tags inside the one idempotent create write", () => {
+    expect(handleCreate).toContain("buildCreateLeadRequest(form, branchId)");
+    expect(handleCreate).not.toContain("/tags");
+  });
 });

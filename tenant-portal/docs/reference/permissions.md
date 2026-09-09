@@ -141,6 +141,14 @@ see [../design/patterns.md](../design/patterns.md#permissiongate).
 
 ## Core tenant permissions
 
+**Planned additions, aligned 2026-09-07:** see the exact target keys and scopes
+in [Application Addons](../api/application-addons-target.md#4-proposed-browser-families-and-authority).
+Those keys are not asserted to be currently seeded or emitted by `/auth/me`.
+Addon seats require Tenant-wide management authority; Company discovery is
+not Company-wide management, and owner administration does not supply an
+uncounted operational addon seat. Keep this target separate from the
+historically verified catalogue below.
+
 **64 permissions across 14 groups**, extracted from `@RequirePermissions`
 decorators on `core-app/src/tenant/**/*.controller.ts` (2026-08-28).
 

@@ -20,6 +20,7 @@ export interface LeadDetailCapabilities {
   update: CrmActionCapability | null;
   delete: CrmActionCapability | null;
   convert: CrmActionCapability | null;
+  opportunitiesCreate: CrmActionCapability | null;
   notesCreate: CrmActionCapability | null;
   notesDelete: CrmActionCapability | null;
   attachmentsCreate: CrmActionCapability | null;
@@ -30,6 +31,7 @@ const NO_LEAD_DETAIL_CAPABILITIES: LeadDetailCapabilities = {
   update: null,
   delete: null,
   convert: null,
+  opportunitiesCreate: null,
   notesCreate: null,
   notesDelete: null,
   attachmentsCreate: null,
@@ -57,6 +59,7 @@ export function parseLeadDetailCapabilities(
     update: parseCrmActionCapability(leads.update, "leads"),
     delete: parseCrmActionCapability(leads.delete, "leads"),
     convert: parseCrmActionCapability(leads.convert, "leads"),
+    opportunitiesCreate: parseCrmActionCapability(crmRecord(response.opportunities)?.create ?? null, "opportunities"),
     notesCreate: parseCrmActionCapability(notes.create, "leads"),
     notesDelete: parseCrmActionCapability(notes.delete, "leads"),
     attachmentsCreate: parseCrmActionCapability(attachments.create, "leads"),

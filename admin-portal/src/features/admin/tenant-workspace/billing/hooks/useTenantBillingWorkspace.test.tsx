@@ -7,9 +7,6 @@ import type { TenantBillingPermissions } from "../types";
 
 const api = vi.hoisted(() => ({
   getSubscription: vi.fn(),
-  seedSubscription: vi.fn(),
-  previewPlanChange: vi.fn(),
-  applyPlanChange: vi.fn(),
   cancelSubscription: vi.fn(),
   getWallet: vi.fn(),
   getInputCurrencies: vi.fn(),
@@ -25,6 +22,8 @@ const api = vi.hoisted(() => ({
   decideReconciliation: vi.fn(),
 }));
 
+const commercialApi = vi.hoisted(() => ({ prepare: vi.fn(), preview: vi.fn(), apply: vi.fn(), getOperation: vi.fn(), getReceipt: vi.fn(), recover: vi.fn() }));
+vi.mock("@/features/admin/subscriptions/commercial-change/commercial-change.api", () => ({ commercialChangeApi: commercialApi }));
 const permissionState = vi.hoisted(() => ({
   current: {} as TenantBillingPermissions,
 }));
@@ -41,6 +40,9 @@ vi.mock("../model/permissions", () => ({
 }));
 
 import { useTenantBillingWorkspace } from "./useTenantBillingWorkspace";
+import { useCommercialChangeWorkspace } from "@/features/admin/subscriptions/commercial-change/hooks/useCommercialChangeWorkspace";
+import { commercialFixture, commercialOperationFixture, commercialPreviewFixture } from "../model/subscription-commercial-fixtures";
+import { adaptSubscriptionCommercial } from "../model/subscription-commercial";
 
 const NONE: TenantBillingPermissions = {
   canReadSubscription: false,
@@ -63,6 +65,8 @@ const tenantId = "019f0000-0000-7000-8000-000000000001";
 describe("useTenantBillingWorkspace", () => {
   beforeEach(() => {
     Object.values(api).forEach((mock) => mock.mockReset());
+    Object.values(commercialApi).forEach((mock) => mock.mockReset());
+    window.sessionStorage.clear();
     permissionState.current = { ...NONE };
     authState.current = {
       user: { id: "admin", permissions: [] },
@@ -78,6 +82,31 @@ describe("useTenantBillingWorkspace", () => {
     expect(api.getSubscription).not.toHaveBeenCalled();
     expect(api.getWallet).not.toHaveBeenCalled();
     expect(api.getPayments).not.toHaveBeenCalled();
+  });
+
+  it("keeps whole-subscription cancellation available independently of aggregate changes", async () => {
+    permissionState.current = { ...NONE, canReadSubscription: true, canCancelSubscription: true, canUpdateSubscription: true, canApplySubscriptionUpdate: true };
+    api.getSubscription.mockResolvedValue(adaptSubscriptionCommercial(commercialFixture()));
+    const receipt = { status: "ACTIVE", scheduled: true, changed: true };
+    api.cancelSubscription.mockResolvedValue(receipt);
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
+    expect("previewPlanChange" in result.current).toBe(false);
+    await act(async () => { expect(await result.current.cancelSubscription()).toEqual(receipt); });
+    expect(api.cancelSubscription).toHaveBeenCalledWith(tenantId, expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));
+    expect(api.getSubscription).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["permission", "already scheduled", "cancelled"])('does not bypass cancellation eligibility for addons: %s', async reason => {
+    permissionState.current = { ...NONE, canReadSubscription: true, canCancelSubscription: reason !== "permission" };
+    const value = commercialFixture();
+    if (reason === "already scheduled") value.subscription.cancelAt = "2026-10-01T00:00:00.000Z";
+    if (reason === "cancelled") value.subscription.status = "CANCELLED";
+    api.getSubscription.mockResolvedValue(adaptSubscriptionCommercial(value));
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
+    await act(async () => { expect(await result.current.cancelSubscription()).toBeNull(); });
+    expect(api.cancelSubscription).not.toHaveBeenCalled();
   });
 
   it("fails closed by resource permission without issuing requests", async () => {
@@ -106,52 +135,19 @@ describe("useTenantBillingWorkspace", () => {
   });
 
   it("reuses an ambiguous command key and rotates it after a definitive outcome", async () => {
-    permissionState.current = {
-      ...NONE,
-      canReadSubscription: true,
-      canUpdateSubscription: true,
-    };
-    api.getSubscription.mockResolvedValue({
-      subscription: { id: "subscription-1", status: "ACTIVE" },
-      items: [],
-    });
-    api.previewPlanChange
-      .mockRejectedValueOnce(normalizedError(503, "HTTP_503"))
-      .mockRejectedValueOnce(normalizedError(422, "PLAN_INVALID"))
+    allowCommercial();
+    commercialApi.prepare.mockRejectedValueOnce(normalizedError(503, "HTTP_503"))
+      .mockRejectedValueOnce(normalizedError(422, "COMMERCIAL_TARGET_INVALID"))
       .mockRejectedValueOnce(normalizedError(503, "HTTP_503"));
-
-    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
-    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
-
-    await act(async () => {
-      await result.current.previewPlanChange({
-        operation: "ADD",
-        moduleKey: "crm",
-        tierKey: "basic",
-        seats: 1,
-      });
-    });
-    const ambiguousKey = api.previewPlanChange.mock.calls[0]?.[2];
-
-    await act(async () => {
-      await result.current.previewPlanChange({
-        operation: "ADD",
-        moduleKey: "crm",
-        tierKey: "basic",
-        seats: 1,
-      });
-    });
-    expect(api.previewPlanChange.mock.calls[1]?.[2]).toBe(ambiguousKey);
-
-    await act(async () => {
-      await result.current.previewPlanChange({
-        operation: "ADD",
-        moduleKey: "crm",
-        tierKey: "basic",
-        seats: 1,
-      });
-    });
-    expect(api.previewPlanChange.mock.calls[2]?.[2]).not.toBe(ambiguousKey);
+    const { result } = await commercialHook();
+    await act(async () => { await result.current.prepare(); });
+    const key = commercialApi.prepare.mock.calls[0]?.[2];
+    expect(result.current.journal.pending?.key).toBe(key);
+    await act(async () => { await result.current.retry(); });
+    expect(commercialApi.prepare.mock.calls[1]?.[2]).toBe(key);
+    expect(result.current.journal.pending).toBeNull();
+    await act(async () => { await result.current.prepare(); });
+    expect(commercialApi.prepare.mock.calls[2]?.[2]).not.toBe(key);
   });
 
   it("ignores a late reconciliation response for a previously selected payment", async () => {
@@ -233,102 +229,39 @@ describe("useTenantBillingWorkspace", () => {
   });
 
   it("rejects a late write result after an A to B to A ownership transition", async () => {
-    permissionState.current = {
-      ...NONE,
-      canReadSubscription: true,
-      canUpdateSubscription: true,
-    };
-    api.getSubscription.mockImplementation(async (id: string) => ({
-      subscription: { id: `subscription-${id}`, status: "ACTIVE" },
-      items: [],
-    }));
-    const preview = deferred<Record<string, unknown>>();
-    api.previewPlanChange.mockReturnValue(preview.promise);
-
-    const { result, rerender } = renderHook(
-      ({ id }) => useTenantBillingWorkspace(id),
-      { initialProps: { id: "tenant-a" } },
-    );
-    await waitFor(() => expect(result.current.subscription?.subscription.id).toBe("subscription-tenant-a"));
-
+    allowCommercial();
+    const pendingResult = deferred<ReturnType<typeof commercialOperationFixture>>();
+    commercialApi.prepare.mockReturnValueOnce(pendingResult.promise);
+    const first = await commercialHook();
     let pending!: Promise<unknown>;
-    act(() => {
-      pending = result.current.previewPlanChange({
-        operation: "ADD",
-        moduleKey: "crm",
-        tierKey: "basic",
-        seats: 1,
-      });
-    });
-    rerender({ id: "tenant-b" });
-    await waitFor(() => expect(result.current.subscription?.subscription.id).toBe("subscription-tenant-b"));
-    rerender({ id: "tenant-a" });
-    await waitFor(() => expect(result.current.subscription?.subscription.id).toBe("subscription-tenant-a"));
-
-    preview.resolve({
-      previewId: "late-preview",
-      expiresAt: "2099-01-01T00:00:00.000Z",
-      financial: { canApply: true },
-    });
-    await act(async () => {
-      await pending;
-    });
-    expect(result.current.planPreview).toBeNull();
+    act(() => { pending = first.result.current.prepare(); });
+    first.unmount();
+    authState.current.user.id = "different-admin";
+    const second = await commercialHook();
+    expect(second.result.current.journal.pending).toBeNull();
+    second.unmount();
+    authState.current.user.id = "admin";
+    const returned = await commercialHook(false);
+    expect(returned.result.current.journal.pending?.kind).toBe("PREPARE");
+    await act(async () => { pendingResult.resolve(commercialOperationFixture()); await pending; });
+    expect(returned.result.current.operation).toBeNull();
+    expect(returned.result.current.preview).toBeNull();
   });
 
-  it("keeps a newer preview when an older same-scope response arrives late", async () => {
-    permissionState.current = {
-      ...NONE,
-      canReadSubscription: true,
-      canUpdateSubscription: true,
-    };
-    api.getSubscription.mockResolvedValue({
-      subscription: { id: "subscription", status: "ACTIVE" },
-      items: [],
-    });
-    const older = deferred<Record<string, unknown>>();
-    const newer = deferred<Record<string, unknown>>();
-    api.previewPlanChange
-      .mockReturnValueOnce(older.promise)
-      .mockReturnValueOnce(newer.promise);
-
-    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
-    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
-    let olderRequest!: Promise<unknown>;
-    let newerRequest!: Promise<unknown>;
-    act(() => {
-      olderRequest = result.current.previewPlanChange({
-        operation: "ADD",
-        moduleKey: "crm",
-        tierKey: "basic",
-        seats: 1,
-      });
-      newerRequest = result.current.previewPlanChange({
-        operation: "ADD",
-        moduleKey: "crm",
-        tierKey: "growth",
-        seats: 2,
-      });
-    });
-    newer.resolve({
-      previewId: "newer-preview",
-      expiresAt: "2099-01-01T00:00:00.000Z",
-      financial: { canApply: true },
-    });
-    await act(async () => {
-      await newerRequest;
-    });
-    expect(result.current.planPreview?.previewId).toBe("newer-preview");
-
-    older.resolve({
-      previewId: "older-preview",
-      expiresAt: "2099-01-01T00:00:00.000Z",
-      financial: { canApply: true },
-    });
-    await act(async () => {
-      await olderRequest;
-    });
-    expect(result.current.planPreview?.previewId).toBe("newer-preview");
+  it("serializes priced previews so a late response cannot overwrite another intent", async () => {
+    allowCommercial();
+    commercialApi.prepare.mockResolvedValueOnce(commercialOperationFixture());
+    const pendingResult = deferred<ReturnType<typeof commercialPreviewFixture>>();
+    commercialApi.preview.mockReturnValueOnce(pendingResult.promise);
+    const { result } = await commercialHook();
+    await act(async () => { await result.current.prepare(); });
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.price(); });
+    await act(async () => { await result.current.price(); });
+    expect(commercialApi.preview).toHaveBeenCalledTimes(1);
+    await act(async () => { pendingResult.resolve(commercialPreviewFixture()); await pending; });
+    expect(result.current.preview?.previewId).toBe(commercialPreviewFixture().previewId);
+    expect(result.current.reviewed).toBe(false);
   });
 
   it("keeps the wallet available when optional currency and ledger reads fail", async () => {
@@ -348,63 +281,29 @@ describe("useTenantBillingWorkspace", () => {
   });
 
   it("blocks lifecycle-invalid financial commands before I/O", async () => {
-    permissionState.current = {
-      ...NONE,
-      canReadSubscription: true,
-      canUpdateSubscription: true,
-      canApplySubscriptionUpdate: true,
-    };
-    api.getSubscription.mockResolvedValue({
-      subscription: { id: "subscription", status: "PAST_DUE" },
-      items: [],
-    });
-
-    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
-    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
-    await act(async () => {
-      await result.current.previewPlanChange({ operation: "REMOVE", itemId: "item" });
-    });
-    expect(api.previewPlanChange).not.toHaveBeenCalled();
-    expect(result.current.mutation.error?.errorCode).toBe("SUBSCRIPTION_UPDATE_NOT_ALLOWED");
+    allowCommercial();
+    const source = commercialFixture(); source.subscription.status = "PAST_DUE";
+    const { result } = renderHook(() => useCommercialChangeWorkspace({ source, lang: "en", onCommitted: vi.fn() }));
+    await waitFor(() => expect(result.current.journalReady).toBe(true));
+    act(() => result.current.updateTarget(result.current.targets[0].selectionKey, { seats: 31 }));
+    await act(async () => { await result.current.prepare(); });
+    expect(commercialApi.prepare).not.toHaveBeenCalled();
+    expect(result.current.lifecycleAllowsChange).toBe(false);
   });
 
   it("refuses to apply an expired server-priced plan preview", async () => {
-    permissionState.current = {
-      ...NONE,
-      canReadSubscription: true,
-      canUpdateSubscription: true,
-      canApplySubscriptionUpdate: true,
-    };
-    api.getSubscription.mockResolvedValue({
-      subscription: { id: "subscription", status: "ACTIVE" },
-      items: [],
-    });
-    api.previewPlanChange.mockResolvedValue({
-      previewId: "019f0000-0000-7000-8000-000000000020",
-      expiresAt: "2000-01-01T00:00:00.000Z",
-      financial: { canApply: true },
-    });
-
-    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
-    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
-    await act(async () => {
-      await result.current.previewPlanChange({
-        operation: "REMOVE",
-        itemId: "019f0000-0000-7000-8000-000000000021",
-      });
-    });
-    expect(result.current.planPreview?.previewId).toBe(
-      "019f0000-0000-7000-8000-000000000020",
-    );
-
-    await act(async () => {
-      await result.current.applyPlanChange();
-    });
-    expect(api.applyPlanChange).not.toHaveBeenCalled();
-    expect(result.current.planPreview).toBeNull();
-    expect(result.current.mutation.error?.errorCode).toBe(
-      "SUBSCRIPTION_PREVIEW_EXPIRED",
-    );
+    allowCommercial();
+    commercialApi.prepare.mockResolvedValueOnce(commercialOperationFixture());
+    const preview = commercialPreviewFixture(); preview.pricedAt = "1999-12-31T23:55:00.000Z"; preview.expiresAt = "2000-01-01T00:00:00.000Z";
+    commercialApi.preview.mockResolvedValueOnce(preview);
+    const { result } = await commercialHook();
+    await act(async () => { await result.current.prepare(); });
+    await act(async () => { await result.current.price(); });
+    act(() => result.current.setReviewed(true));
+    await act(async () => { await result.current.apply(); });
+    expect(commercialApi.apply).not.toHaveBeenCalled();
+    expect(result.current.expired).toBe(true);
+    expect(result.current.preview?.previewId).toBe(preview.previewId);
   });
 
   it("records a normalized offline payment only for the authoritative open invoice", async () => {
@@ -449,56 +348,36 @@ describe("useTenantBillingWorkspace", () => {
     );
   });
 
-  /**
-   * UI-018. The preview commit had no generation, so a preview requested for an
-   * earlier draft could land after the operator edited the draft - and then sat
-   * there confirmable, priced against terms it never saw. Clearing the preview
-   * is what the panel does on an edit, so it has to disown whatever is still in
-   * flight as well.
-   */
-  it("drops a plan preview that lands after the draft was cleared", async () => {
-    permissionState.current = {
-      ...NONE,
-      canReadSubscription: true,
-      canUpdateSubscription: true,
-    };
-    api.getSubscription.mockResolvedValue({
-      subscription: { id: "subscription", status: "ACTIVE" },
-      items: [],
-    });
-    let resolveStale: ((value: unknown) => void) | undefined;
-    api.previewPlanChange.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveStale = resolve;
-        }),
-    );
-
-    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
-    await waitFor(() => expect(result.current.subscriptionState).toBe("ready"));
-
-    let pending: Promise<unknown> | undefined;
-    act(() => {
-      pending = result.current.previewPlanChange({
-        operation: "ADD",
-        moduleKey: "crm",
-        tierKey: "basic",
-        seats: 1,
-      });
-    });
-
-    // The operator edits the draft; the panel clears the preview.
-    act(() => result.current.clearPlanPreview());
-
-    await act(async () => {
-      resolveStale?.({ id: "stale-preview" });
-      await pending;
-    });
-
-    expect(result.current.planPreview).toBeNull();
+  // The canonical intent locks the draft before preparation begins.
+  it("keeps the prepared draft locked while its preview is in flight", async () => {
+    allowCommercial();
+    commercialApi.prepare.mockResolvedValueOnce(commercialOperationFixture());
+    const pendingResult = deferred<ReturnType<typeof commercialPreviewFixture>>();
+    commercialApi.preview.mockReturnValueOnce(pendingResult.promise);
+    const { result } = await commercialHook();
+    await act(async () => { await result.current.prepare(); });
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.price(); });
+    act(() => { result.current.updateTarget(result.current.targets[0].selectionKey, { seats: 50 }); result.current.reset(); });
+    expect(result.current.targets[0].seats).toBe(31);
+    expect(result.current.journal.request?.changes[0]).toMatchObject({ seats: 31 });
+    await act(async () => { pendingResult.resolve(commercialPreviewFixture()); await pending; });
+    expect(result.current.reviewed).toBe(false);
+    expect(result.current.preview?.changes[0].toSeats).toBe(31);
   });
 
 });
+
+function allowCommercial() {
+  authState.current.user.permissions = ["admin.subscriptions.read", "admin.subscriptions.update", "admin.subscriptions.critical"];
+}
+async function commercialHook(edit = true) {
+  const source = commercialFixture(); const onCommitted = vi.fn();
+  const hook = renderHook(() => useCommercialChangeWorkspace({ source, lang: "en", onCommitted }));
+  await waitFor(() => expect(hook.result.current.journalReady).toBe(true));
+  if (edit) act(() => hook.result.current.updateTarget(hook.result.current.targets[0].selectionKey, { seats: 31 }));
+  return hook;
+}
 
 function normalizedError(httpStatus: number, errorCode: string) {
   return {

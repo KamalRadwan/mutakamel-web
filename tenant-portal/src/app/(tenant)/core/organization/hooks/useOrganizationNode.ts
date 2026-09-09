@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
+import { useTenantAuth } from "@/context/AuthContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
@@ -20,6 +21,9 @@ import { ORG_LEVEL_CONFIG } from "../level-config";
  */
 export function useOrganizationNode<L extends OrgLevel>(level: L, id: string) {
   const { t, lang } = useI18n();
+  const { user } = useTenantAuth();
+  const canReadApplicationAccess = !!user && (user.isTenantOwner || user.permissions.some((permission) =>
+    permission === "applications.activation.read" || permission === "applications.activation.manage"));
   const [node, setNode] = useState<OrgNodeOf<L> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
@@ -70,5 +74,6 @@ export function useOrganizationNode<L extends OrgLevel>(level: L, id: string) {
     loadError,
     isMissing,
     reload,
+    canReadApplicationAccess,
   };
 }

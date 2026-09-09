@@ -1,9 +1,10 @@
 "use client";
 
-import { useId } from "react";
+import { useContext, useId } from "react";
 import { cva } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 import { proseMeasure } from "../../lib/variants";
+import { FormDensityContext } from "./form-density";
 
 // One column is the floor at every width: two boxes side by side below `md`
 // leaves neither wide enough for an Arabic label, and a wrapped label is a
@@ -63,6 +64,7 @@ export function FormSection({
   children,
 }: FormSectionProps) {
   const headingId = useId();
+  const compact = useContext(FormDensityContext) === "compact";
 
   return (
     <section
@@ -71,7 +73,7 @@ export function FormSection({
       // Clears the sticky header band when the index scrolls this into view.
       className={cn("scroll-mt-4", className)}
     >
-      <div className="mb-3 flex items-start justify-between gap-3 border-b border-border pb-2">
+      <div className={cn("flex items-start justify-between border-b border-border", compact ? "mb-2 gap-2 pb-1" : "mb-3 gap-3 pb-2")}>
         <div className="flex min-w-0 flex-col gap-0.5">
           <h3
             id={headingId}
@@ -86,7 +88,7 @@ export function FormSection({
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
-      <div className={sectionGrid({ columns })}>{children}</div>
+      <div className={cn(sectionGrid({ columns }), compact && "gap-x-2 gap-y-2")}>{children}</div>
     </section>
   );
 }

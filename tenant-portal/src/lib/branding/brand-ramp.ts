@@ -152,11 +152,40 @@ export function hexToOklch(hex: string): Oklch | null {
 export type BrandRamp = Record<BrandRampStep, Oklch>;
 
 /**
+ * The light theme's global-nav surface, as `--color-chrome` declares it.
+ *
+ * It is not a ramp step — the ramp desaturates as it darkens and this holds the
+ * chroma — but it IS a brand colour, so it has to move with the tenant's hue.
+ * A tenant who sets green must not get the system's navy bar with their green
+ * marker sitting on it.
+ */
+export const SYSTEM_CHROME: Oklch = { l: 0.233811, c: 0.162024, h: 264.051 };
+
+/**
+ * The chrome at one hue. Lightness is held and the chroma ceiling is fitted the
+ * same way every ramp step fits its own: 0.162 is outside sRGB at this
+ * lightness for part of the wheel, and a value the browser clips is a colour
+ * nothing measured.
+ */
+export function deriveChrome(hue: number): Oklch {
+  return {
+    l: SYSTEM_CHROME.l,
+    c: maxChromaInGamut(SYSTEM_CHROME.l, hue, SYSTEM_CHROME.c),
+    h: hue,
+  };
+}
+
+/**
  * The pairs a tenant hue must not break. Each one is a token binding declared in
  * `globals.css`: `--primary` (brand-600 light / brand-400 dark),
- * `--sidebar-active` (brand-700 light / brand-300 dark) and `--ring`
- * (brand-500 light / brand-400 dark). The ring is non-text, so it takes WCAG's
- * 3:1 non-text threshold rather than 4.5:1.
+ * `--sidebar-active` (brand-700 light / brand-300 dark), `--ring` (brand-500
+ * light / brand-400 dark), and the two the nav chrome added — white on the bar,
+ * and the active marker on it. The ring, the marker and every other non-text
+ * mark take WCAG's 3:1 threshold rather than 4.5:1.
+ *
+ * `background: "chrome"` means the derived chrome rather than a fixed colour or
+ * a ramp step, which is why the two nav pairs cannot be written as a plain
+ * `Oklch`: their background depends on the same hue they are measuring.
  */
 const CONTRAST_PAIRS = [
   { id: "primaryFillLight", foreground: WHITE, step: 600, background: null, minimum: 4.5 },
@@ -165,11 +194,13 @@ const CONTRAST_PAIRS = [
   { id: "sidebarActiveDark", foreground: null, step: 300, background: INK_950, minimum: 4.5 },
   { id: "ringLight", foreground: null, step: 500, background: INK_50, minimum: 3 },
   { id: "ringDark", foreground: null, step: 400, background: INK_1000, minimum: 3 },
+  { id: "navTextLight", foreground: WHITE, step: null, background: "chrome", minimum: 4.5 },
+  { id: "navActiveLight", foreground: null, step: 300, background: "chrome", minimum: 3 },
 ] as const satisfies readonly {
   id: string;
   foreground: Oklch | null;
-  step: BrandRampStep;
-  background: Oklch | null;
+  step: BrandRampStep | null;
+  background: Oklch | null | "chrome";
   minimum: number;
 }[];
 
@@ -179,6 +210,8 @@ export interface BrandRampVerdict {
   /** True when every pair above clears its threshold and the ramp may be applied. */
   passes: boolean;
   ramp: BrandRamp;
+  /** The nav surface at this hue — applied beside the ramp, measured with it. */
+  chrome: Oklch;
   /** The pairs that fell short, with the ratio actually measured. */
   failures: { id: BrandContrastPairId; ratio: number; minimum: number }[];
 }
@@ -210,11 +243,22 @@ export function evaluateBrandColor(primaryColor: string): BrandRampVerdict | nul
   const color = hexToOklch(primaryColor);
   if (!color) return null;
   const ramp = deriveBrandRamp(color.h);
+  const chrome = deriveChrome(color.h);
+  // A side is a fixed colour, the chrome, or the ramp step named beside it.
+  // The step is null only where both sides are explicit, so the last branch is
+  // unreachable from the table above — and states that, rather than reaching
+  // for a non-null assertion that would hide a future pair written wrong.
+  const side = (value: Oklch | null | "chrome", step: BrandRampStep | null): Oklch => {
+    if (value === "chrome") return chrome;
+    if (value) return value;
+    if (step === null) throw new Error("a contrast pair with an open side must name a ramp step");
+    return ramp[step];
+  };
   const failures = CONTRAST_PAIRS.flatMap((pair) => {
-    const ratio = contrastRatio(pair.foreground ?? ramp[pair.step], pair.background ?? ramp[pair.step]);
+    const ratio = contrastRatio(side(pair.foreground, pair.step), side(pair.background, pair.step));
     return ratio >= pair.minimum ? [] : [{ id: pair.id, ratio, minimum: pair.minimum }];
   });
-  return { passes: failures.length === 0, ramp, failures };
+  return { passes: failures.length === 0, ramp, chrome, failures };
 }
 
 /** `oklch(L C H)` exactly as `globals.css` writes it, for a CSS custom property. */

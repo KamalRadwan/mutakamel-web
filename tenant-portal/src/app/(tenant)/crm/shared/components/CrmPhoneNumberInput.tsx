@@ -10,6 +10,27 @@ import {
   type CountryOption,
 } from "@/lib/geo/country-data";
 
+/**
+ * The digits of a national number, without the trunk `0`.
+ *
+ * The `0` in front of `010…` is a TRUNK PREFIX: it is how a number is dialled
+ * from inside the country, and it is exactly what the calling code replaces.
+ * With the code in its own control beside this one, a leading zero is either a
+ * duplicate of the code or a number that will not connect — `+20` `010…` is
+ * one digit too long and reaches nobody. So it is stripped wherever it
+ * arrives: typed, where the field simply never accepts a leading `0`, or
+ * pasted out of a contact sheet that wrote it the local way.
+ *
+ * The known cost: a handful of plans keep the trunk zero inside the national
+ * number — Italian landlines are the usual example — and a `+39 06…` pasted
+ * here becomes `+39 6…`. The rule is right for every country this product
+ * sells into and wrong for those; the day one of them signs up, this becomes a
+ * per-country rule rather than a global one.
+ */
+function nationalDigits(raw: string): string {
+  return raw.replace(/[^0-9]/gu, "").replace(/^0+/u, "");
+}
+
 /** The first country by name that dials with `callingCode`, or none. */
 function firstIsoForCode(countries: readonly CountryOption[], callingCode: string): string {
   if (!callingCode) return "";
@@ -21,6 +42,14 @@ export interface CrmPhoneNumberInputProps {
   value: string;
   /** `@MaxLength` on that whole string, which the two parts share. */
   maxLength: number;
+  /**
+   * Names the number box where there is no enclosing `Field` to name it — a
+   * list of numbers under one shared caption, where a `<label>` per row would
+   * repeat that caption N times on screen. Inside a `Field`, leave it off: the
+   * field's own label already names this control and a second name would win
+   * over the visible one.
+   */
+  label?: string;
   disabled?: boolean;
   onChange: (next: string) => void;
   onBlur: () => void;
@@ -43,6 +72,7 @@ export interface CrmPhoneNumberInputProps {
 export function CrmPhoneNumberInput({
   value,
   maxLength,
+  label,
   disabled,
   onChange,
   onBlur,
@@ -142,7 +172,11 @@ export function CrmPhoneNumberInput({
 
   function handleNumberChange(raw: string) {
     // A pasted international number carries its own code; honour it rather
-    // than concatenating it onto whatever the picker happens to show.
+    // than concatenating it onto whatever the picker happens to show. `+20…`
+    // and `0020…` are the same number written two ways, and `splitPhoneNumber`
+    // already reads the `00` as the `+` it stands for — so a pasted
+    // `00201050049899` lands as +20 beside 1050049899 rather than as one long
+    // national number with a code bolted onto it.
     const pasted = splitPhoneNumber(raw);
     if (pasted?.callingCode) {
       // Only re-resolve the country when the pasted code is a different one —
@@ -150,10 +184,10 @@ export function CrmPhoneNumberInput({
       if (pasted.callingCode !== callingCode) {
         setIsoCode(firstIsoForCode(countries, pasted.callingCode));
       }
-      onChange(compose(pasted.callingCode, pasted.nationalNumber));
+      onChange(compose(pasted.callingCode, nationalDigits(pasted.nationalNumber)));
       return;
     }
-    onChange(compose(callingCode, raw.replace(/[^0-9]/gu, "")));
+    onChange(compose(callingCode, nationalDigits(raw)));
   }
 
   return (
@@ -164,11 +198,12 @@ export function CrmPhoneNumberInput({
           opts out of the field rather than claiming the same id, and takes its
           accessible name from its own trigger text. See field-control.tsx. */}
       <FieldControlBoundary>
-        {/* Narrow on purpose: a dial code is four characters at most, and
-            every pixel it does not take is one the number box does. 5rem fits
-            a flag, "+966" and the chevron; the 6rem it used to be was paying
-            for nothing and the number box was the one that went short. */}
-        <div className="w-20 shrink-0">
+        {/* 105px: the 80px this used to be fitted a flag, "+966" and the
+            chevron with nothing to spare, so the longest codes sat against the
+            chevron and a searched country's name had no room to show. The 25px
+            comes out of the number box below rather than out of the row, which
+            is why that one's floor drops by the same 25. */}
+        <div className="w-[105px] shrink-0">
           <Combobox
             value={selected?.isoCode}
             selectedLabel={selected ? `${selected.flag} ${selected.callingCode}` : callingCode}
@@ -190,6 +225,7 @@ export function CrmPhoneNumberInput({
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"
+        aria-label={label}
         dir="ltr"
         value={nationalNumber}
         maxLength={Math.max(1, maxLength - callingCode.length)}
@@ -201,7 +237,11 @@ export function CrmPhoneNumberInput({
         // narrow column, and an eleven-digit number does not fit in what was
         // left. Below the floor the row wraps instead, which is readable; a
         // squeezed number box is not.
-        className="min-w-32 flex-1"
+        //
+        // 103px, down from 128, is the same 25px the code picker gained — so
+        // the two boxes traded width with each other and the point at which
+        // the row gives up and wraps did not move.
+        className="min-w-[103px] flex-1"
       />
     </div>
   );

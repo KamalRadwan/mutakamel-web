@@ -22,11 +22,11 @@ import { useI18n } from "@/i18n/I18nContext";
  * Advisory only. `TenantOwnerGuard` re-checks the tenant database on every
  * request and is the authority.
  */
-export function OwnerGate({ children }: { children: React.ReactNode }) {
+export function OwnerGate({ children, denied = false }: { children: React.ReactNode; denied?: boolean }) {
   const { t } = useI18n();
   const { user } = useTenantAuth();
 
-  if (user?.isTenantOwner) return <>{children}</>;
+  if (!denied && user?.isTenantOwner) return <>{children}</>;
 
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">

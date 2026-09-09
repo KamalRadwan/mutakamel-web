@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { readRouteContracts } from "./route-contract-reader.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const checkOnly = process.argv.includes("--check");
@@ -83,106 +83,6 @@ const policySources = [
     "api-gateway-app/src/routing-proxy/upstream-app.registry.ts",
   ),
 ];
-
-function unwrapExpression(node) {
-  if (
-    ts.isAsExpression(node) ||
-    ts.isSatisfiesExpression(node) ||
-    ts.isParenthesizedExpression(node) ||
-    ts.isTypeAssertionExpression(node)
-  ) {
-    return unwrapExpression(node.expression);
-  }
-  return node;
-}
-
-function propertyName(node) {
-  if (
-    ts.isIdentifier(node) ||
-    ts.isStringLiteral(node) ||
-    ts.isNumericLiteral(node)
-  ) {
-    return node.text;
-  }
-  throw new Error(`Unsupported property name: ${node.getText()}`);
-}
-
-function evaluateExpression(input) {
-  const node = unwrapExpression(input);
-
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-    return node.text;
-  }
-  if (ts.isNumericLiteral(node)) {
-    return Number(node.text);
-  }
-  if (node.kind === ts.SyntaxKind.TrueKeyword) {
-    return true;
-  }
-  if (node.kind === ts.SyntaxKind.FalseKeyword) {
-    return false;
-  }
-  if (node.kind === ts.SyntaxKind.NullKeyword) {
-    return null;
-  }
-  if (ts.isPrefixUnaryExpression(node)) {
-    const value = evaluateExpression(node.operand);
-    if (typeof value !== "number") {
-      throw new Error(`Expected numeric unary operand: ${node.getText()}`);
-    }
-    return node.operator === ts.SyntaxKind.MinusToken ? -value : value;
-  }
-  if (ts.isPropertyAccessExpression(node)) {
-    return node.name.text;
-  }
-  if (ts.isArrayLiteralExpression(node)) {
-    return node.elements.map(evaluateExpression);
-  }
-  if (ts.isObjectLiteralExpression(node)) {
-    const result = {};
-    for (const property of node.properties) {
-      if (!ts.isPropertyAssignment(property)) {
-        throw new Error(`Unsupported object member: ${property.getText()}`);
-      }
-      result[propertyName(property.name)] = evaluateExpression(
-        property.initializer,
-      );
-    }
-    return result;
-  }
-
-  throw new Error(`Unsupported route-contract expression: ${node.getText()}`);
-}
-
-function extractArray(filePath, variableName) {
-  const sourceText = readFileSync(filePath, "utf8");
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-
-  for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (
-        ts.isIdentifier(declaration.name) &&
-        declaration.name.text === variableName &&
-        declaration.initializer
-      ) {
-        const value = evaluateExpression(declaration.initializer);
-        if (!Array.isArray(value)) {
-          throw new Error(`${variableName} is not an array`);
-        }
-        return value;
-      }
-    }
-  }
-
-  throw new Error(`Could not find ${variableName} in ${filePath}`);
-}
 
 function coreRouteBelongsToTenant(route) {
   const path = route.pathPattern;
@@ -304,9 +204,11 @@ function escapeMarkdown(value) {
 }
 
 const routes = [];
+const routeSourceFiles = new Set();
 for (const source of sources) {
   const sourcePath = resolve(routeContractDirectory, source.fileName);
-  const extracted = extractArray(sourcePath, source.variableName);
+  const { routes: extracted, sourceFiles } = readRouteContracts(sourcePath, source.variableName);
+  sourceFiles.forEach((filePath) => routeSourceFiles.add(filePath));
   // crm and trade contracts are wholly tenant-facing; core and webphone both
   // carry admin routes in the same file and must be filtered.
   const tenantRoutes =
@@ -361,9 +263,7 @@ for (const route of routes) {
 const generatedAt = new Date().toISOString();
 const sourceHashes = Object.fromEntries(
   [
-    ...sources.map((source) =>
-      resolve(routeContractDirectory, source.fileName),
-    ),
+    ...routeSourceFiles,
     ...policySources,
   ].map((filePath) => [
     relative(workspaceRoot, filePath).replaceAll("\\", "/"),

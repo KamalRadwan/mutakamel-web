@@ -49,7 +49,9 @@ const LEAD = { id: "01900100-0000-7000-8000-000000000001", name: "Acme Trading" 
 const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function listBody(items: unknown[]) {
-  return { data: { success: true, data: { items, total: items.length }, correlationId: "c" } };
+  return { data: { success: true, data: {
+    items, total: items.length, page: 1, limit: 25, totalPages: 1, hasNext: false,
+  }, correlationId: "c" } };
 }
 
 const PLANNED = {
@@ -58,6 +60,11 @@ const PLANNED = {
   type: "CALL",
   priority: "URGENT",
   dueAt: "2026-09-06T09:00:00.000Z",
+  // `ActivitiesService` selects both on every row it returns. The version is
+  // what the row actions send back as `If-Match`, and a row without one is a
+  // row this dialog refuses rather than one whose Edit and Discard are dead.
+  description: "Ask about the delivery window.",
+  version: 3,
 };
 
 /** `datetime-local` text, in the viewer's own zone, N hours from now. */
@@ -94,6 +101,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("the lead activity dialog", () => {
+  it("opens a rail-selected activity with its existing values in edit mode", () => {
+    render(<I18nProvider><LeadActivityDialog lead={LEAD} initialActivity={PLANNED}
+      onClose={vi.fn()} onCreated={vi.fn()} /></I18nProvider>);
+    expect(screen.getByLabelText(copy.subject, { exact: false })).toHaveValue(PLANNED.subject);
+    expect(screen.getByLabelText(copy.notes, { exact: false })).toHaveValue(PLANNED.description);
+    expect(screen.getByText(copy.editHeading)).toBeInTheDocument();
+    expect(screen.queryByText(copy.createHeading)).not.toBeInTheDocument();
+  });
   it("shows the lead's planned work beside the form that adds more", async () => {
     renderDialog();
 
@@ -200,6 +215,125 @@ describe("the lead activity dialog", () => {
       permissions: ["activities.read", "activities.create"],
       isTenantOwner: false,
     };
+  });
+
+  describe("the row actions", () => {
+    // Every one of the three sends the row's version as `If-Match`. Without it
+    // Core answers 428, and with a stale one it answers 409 rather than
+    // overwriting somebody else's change.
+    const IF_MATCH = { "If-Match": String(PLANNED.version) };
+
+    beforeEach(() => {
+      authMock.user = {
+        permissions: [
+          "activities.read",
+          "activities.create",
+          "activities.update",
+          "activities.complete",
+          "activities.cancel",
+        ],
+        isTenantOwner: false,
+      };
+    });
+
+    async function openRowMenu() {
+      await screen.findByText(PLANNED.subject);
+      // Radix opens on pointerdown or on a key, never on a synthetic click.
+      // Enter is also the path a keyboard user takes, which is the point.
+      fireEvent.keyDown(screen.getByRole("button", { name: `Actions for ${PLANNED.subject}` }), {
+        key: "Enter",
+      });
+    }
+
+    it("opens the form half on the row, with the row's own values in it", async () => {
+      renderDialog();
+      await openRowMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: copy.edit }));
+
+      // The same half, a different mode — and it says so rather than leaving
+      // the user to notice that Add now means Save.
+      expect(screen.getByText(copy.editHeading)).toBeInTheDocument();
+      expect(screen.getByLabelText(copy.subject, { exact: false })).toHaveValue(PLANNED.subject);
+      expect(screen.getByLabelText(copy.notes, { exact: false })).toHaveValue(PLANNED.description);
+      expect(screen.getByRole("button", { name: copy.save })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: copy.saveAndMarkDone })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: copy.cancelEdit })).toBeInTheDocument();
+    });
+
+    it("saves an edit as a PATCH on the row, under If-Match and one key", async () => {
+      api.patch.mockResolvedValue({
+        data: { success: true, data: { ...PLANNED, version: 4 }, correlationId: "c" },
+        headers: new Headers(),
+        status: 200,
+      });
+      const { onCreated } = renderDialog();
+      await openRowMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: copy.edit }));
+      fill(copy.subject, "Ring the buyer again");
+      fireEvent.click(screen.getByRole("button", { name: copy.save }));
+
+      await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
+      const [path, body, config] = api.patch.mock.calls[0];
+      expect(path).toBe(`/api/tenant/core/v1/activities/${PLANNED.id}`);
+      expect(body).toMatchObject({ subject: "Ring the buyer again", type: "CALL" });
+      expect(config.headers).toMatchObject(IF_MATCH);
+      expect(config.headers[IDEMPOTENCY_KEY_HEADER]).toMatch(UUID_V7);
+      // Back to adding, and the board is told: an edited due date moves the
+      // card's next-activity bucket exactly as a new one does.
+      await waitFor(() => expect(screen.getByText(copy.createHeading)).toBeInTheDocument());
+      expect(onCreated).toHaveBeenCalledTimes(1);
+    });
+
+    it("marks a row done without opening the form at all", async () => {
+      api.post.mockResolvedValue({
+        data: { success: true, data: PLANNED, correlationId: "c" },
+        headers: new Headers(),
+        status: 200,
+      });
+      renderDialog();
+      await openRowMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: copy.markDone }));
+
+      await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+      const [path, body, config] = api.post.mock.calls[0];
+      expect(path).toBe(`/api/tenant/core/v1/activities/${PLANNED.id}/complete`);
+      expect(body).toEqual({});
+      expect(config.headers).toMatchObject(IF_MATCH);
+    });
+
+    it("asks before discarding, and cancels the row when told to", async () => {
+      api.post.mockResolvedValue({
+        data: { success: true, data: PLANNED, correlationId: "c" },
+        headers: new Headers(),
+        status: 200,
+      });
+      renderDialog();
+      await openRowMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: copy.discard }));
+
+      // A menu item one press from "Mark as done" does not get to be the last
+      // word on a state change other people can see.
+      expect(await screen.findByText(copy.discardTitle)).toBeInTheDocument();
+      expect(api.post).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: copy.discardConfirm }));
+      await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+      expect(api.post.mock.calls[0][0]).toBe(
+        `/api/tenant/core/v1/activities/${PLANNED.id}/cancel`,
+      );
+    });
+
+    it("shows no menu at all to a user who may only read and create", async () => {
+      authMock.user = {
+        permissions: ["activities.read", "activities.create"],
+        isTenantOwner: false,
+      };
+      renderDialog();
+      await screen.findByText(PLANNED.subject);
+      expect(
+        screen.queryByRole("button", { name: `Actions for ${PLANNED.subject}` }),
+      ).toBeNull();
+    });
   });
 
   // The two halves stack below `md` instead of squeezing — a five-field form

@@ -3,6 +3,7 @@
 import {
   Field,
   FormSection,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -11,9 +12,15 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
+import { formatTemplate } from "@/lib/format/template";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
 import { AcquisitionSourceOption } from "../../../shared/components/AcquisitionSourceIcon";
-import { CRM_PROFILE_TYPES, type CrmProfileType } from "../../lead-create-contract";
+import type { LeadTag } from "../../lead-card-contract";
+import {
+  CRM_PROFILE_TYPES,
+  LEAD_CREATE_LIMITS,
+  type CrmProfileType,
+} from "../../lead-create-contract";
 import type { LeadCreateErrors } from "../../lead-create-validation";
 import type { LeadStage } from "../../hooks/useLeads";
 
@@ -33,8 +40,13 @@ export interface LeadClassificationSectionProps {
   leadProfileType: CrmProfileType;
   stageId: string;
   acquisitionSourceId: string;
+  tagIds: string[];
   stages: LeadStage[];
   sources: AcquisitionSource[];
+  tags: LeadTag[];
+  showTags: boolean;
+  tagsLoading: boolean;
+  tagsUnavailable: boolean;
   errors: LeadCreateErrors;
   disabled: boolean;
   onCompanyChange: (companyId: string) => void;
@@ -42,6 +54,8 @@ export interface LeadClassificationSectionProps {
   onProfileTypeChange: (profileType: CrmProfileType) => void;
   onStageChange: (stageId: string) => void;
   onSourceChange: (acquisitionSourceId: string) => void;
+  onTagsChange: (tagIds: string[]) => void;
+  onTagsBlur: () => void;
 }
 
 /**
@@ -80,8 +94,13 @@ export function LeadClassificationSection({
   leadProfileType,
   stageId,
   acquisitionSourceId,
+  tagIds,
   stages,
   sources,
+  tags,
+  showTags,
+  tagsLoading,
+  tagsUnavailable,
   errors,
   disabled,
   onCompanyChange,
@@ -89,6 +108,8 @@ export function LeadClassificationSection({
   onProfileTypeChange,
   onStageChange,
   onSourceChange,
+  onTagsChange,
+  onTagsBlur,
 }: LeadClassificationSectionProps) {
   const { t, lang } = useI18n();
 
@@ -213,6 +234,49 @@ export function LeadClassificationSection({
           </SelectContent>
         </Select>
       </Field>
+
+      {showTags && (
+        <Field
+          label={t.crmLeads.create.tags}
+          error={errors.tagIds}
+          hint={formatTemplate(t.crmLeads.create.tagsLimitHint, {
+            count: tagIds.length,
+            max: LEAD_CREATE_LIMITS.tags,
+          })}
+        >
+          <MultiSelect
+            values={tagIds}
+            onValuesChange={(next) => {
+              if (next.length <= LEAD_CREATE_LIMITS.tags) onTagsChange(next);
+            }}
+            options={tags.map((tag) => ({
+              value: tag.id,
+              label: tag.name,
+              // At the ceiling, existing selections stay removable while only
+              // choices that would make CreateLeadDto invalid are disabled.
+              disabled:
+                !tagIds.includes(tag.id) &&
+                (tagsUnavailable || tagIds.length >= LEAD_CREATE_LIMITS.tags),
+            }))}
+            placeholder={
+              tagsLoading ? t.common.loading : t.crmLeads.create.tagsPlaceholder
+            }
+            searchPlaceholder={t.crmLeads.create.tagsSearch}
+            emptyLabel={
+              tagsUnavailable
+                ? t.crmLeads.create.tagsUnavailable
+                : t.crmLeads.create.tagsEmpty
+            }
+            clearAllLabel={t.filters.clearAll}
+            moreLabel={t.filters.more}
+            removeLabel={t.filters.remove}
+            overflowLabel={t.crmLeads.create.tagsOverflow}
+            // A degraded catalogue blocks new choices, not chip removal.
+            disabled={disabled || tagsLoading}
+            onBlur={onTagsBlur}
+          />
+        </Field>
+      )}
     </FormSection>
   );
 }

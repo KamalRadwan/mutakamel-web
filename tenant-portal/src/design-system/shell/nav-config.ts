@@ -77,7 +77,7 @@ export interface NavItem {
   // canAccessCrmRoute — only the output shape changes here, from
   // hook-computed booleans to data the nav iterates. Its tests carry
   // over unchanged, which is the proof this did not alter behavior.
-  hasAccess: (permissions: readonly string[]) => boolean;
+  hasAccess: (permissions: readonly string[], isTenantOwner?: boolean) => boolean;
   /**
    * The route is behind `TenantOwnerGuard`, which is not a permission.
    *
@@ -704,6 +704,17 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: ScrollText,
         hasAccess: (permissions) => canAccessCoreRoute(permissions, TENANT_ROUTES.coreAudit),
       },
+      {
+        id: "coreApplicationAccess", labelKey: "coreApplicationAccess", href: TENANT_ROUTES.coreApplicationAccess, icon: Puzzle,
+        // Exact new read-pair administrative exception; not a global owner bypass.
+        hasAccess: (permissions, isTenantOwner = false) => isTenantOwner || permissions.some((permission) =>
+          permission === "applications.activation.read" || permission === "applications.activation.manage" || permission === "applications.addon_definitions.adopt"),
+      },
+      {
+        id: "coreAddonSeats", labelKey: "coreAddonSeats", href: TENANT_ROUTES.coreAddonSeats, icon: Puzzle,
+        hasAccess: (permissions, isTenantOwner) => isTenantOwner === true
+          || permissions.includes("applications.addon_seats.read") || permissions.includes("applications.addon_seats.manage"),
+      },
     ],
   },
   {
@@ -798,6 +809,14 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: "coreSubscription",
         href: TENANT_ROUTES.coreSubscription,
         icon: SquareStack,
+        hasAccess: () => true,
+        requiresTenantOwner: true,
+      },
+      {
+        id: "coreSubscriptionCatalogue",
+        labelKey: "coreSubscriptionCatalogue",
+        href: TENANT_ROUTES.coreSubscriptionCatalogue,
+        icon: Puzzle,
         hasAccess: () => true,
         requiresTenantOwner: true,
       },

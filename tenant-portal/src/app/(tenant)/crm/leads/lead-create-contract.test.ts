@@ -236,6 +236,10 @@ describe("emptyCreateLeadForm", () => {
   it("leaves the branch to the screen until the user picks one", () => {
     expect(emptyCreateLeadForm("contact-1").branchId).toBe("");
   });
+
+  it("starts with no tags selected", () => {
+    expect(emptyCreateLeadForm("contact-1").tagIds).toEqual([]);
+  });
 });
 
 describe("buildCreateLeadRequest — branch", () => {
@@ -259,5 +263,23 @@ describe("buildCreateLeadRequest — branch", () => {
     const request = buildCreateLeadRequest(corporate({ branchId: OTHER_BRANCH_ID }), BRANCH_ID);
     expect(request).not.toHaveProperty("companyId");
     expect(request).not.toHaveProperty("company");
+  });
+
+  it("sends every selected tag in the atomic create request", () => {
+    const secondTag = "01900100-0000-7000-8000-0000000000d2";
+    const request = buildCreateLeadRequest(
+      corporate({
+        tagIds: ["01900100-0000-7000-8000-0000000000d1", secondTag],
+      }),
+      BRANCH_ID,
+    );
+    expect(request.tagIds).toEqual([
+      "01900100-0000-7000-8000-0000000000d1",
+      secondTag,
+    ]);
+  });
+
+  it("omits the optional tag array when the selection is empty", () => {
+    expect(buildCreateLeadRequest(corporate(), BRANCH_ID)).not.toHaveProperty("tagIds");
   });
 });

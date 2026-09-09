@@ -34,6 +34,33 @@ export const LEAD_ACTIVITIES_PATH: CorePath = "/api/tenant/core/v1/activities";
 /** `activities.read` gates the list half; `activities.create` gates the form half. */
 export const LEAD_ACTIVITY_READ_PERMISSION = "activities.read";
 export const LEAD_ACTIVITY_CREATE_PERMISSION = "activities.create";
+/**
+ * One per row action. The controller declares them separately —
+ * `@RequirePermissions('activities.update' | '.complete' | '.cancel')` — so a
+ * user who may reschedule need not be one who may cancel, and each control is
+ * hidden on its own rather than the three sharing a gate.
+ */
+export const LEAD_ACTIVITY_UPDATE_PERMISSION = "activities.update";
+export const LEAD_ACTIVITY_COMPLETE_PERMISSION = "activities.complete";
+export const LEAD_ACTIVITY_CANCEL_PERMISSION = "activities.cancel";
+
+/**
+ * The row's own routes. Every one of the three takes `If-Match: <version>` and
+ * a UUIDv7 `x-idempotency-key`; the version comes off the row this dialog is
+ * already holding, so none of them costs a read first.
+ */
+export function leadActivityPath(activityId: string): CorePath {
+  if (!isUUIDv7(activityId)) invalid();
+  return `${LEAD_ACTIVITIES_PATH}/${activityId}` as CorePath;
+}
+
+export function leadActivityCompletePath(activityId: string): CorePath {
+  return `${leadActivityPath(activityId)}/complete` as CorePath;
+}
+
+export function leadActivityCancelPath(activityId: string): CorePath {
+  return `${leadActivityPath(activityId)}/cancel` as CorePath;
+}
 
 /** `ACTIVITY_TYPES` in @mutakamel/core-app-common — `@IsIn` rejects anything else. */
 export const LEAD_ACTIVITY_TYPES = [
@@ -58,24 +85,28 @@ type LeadActivityPriority = (typeof LEAD_ACTIVITY_PRIORITIES)[number];
 export const LEAD_ACTIVITY_SUBJECT_MAX = 180;
 export const LEAD_ACTIVITY_DESCRIPTION_MAX = 4000;
 
-/**
- * How many planned activities the dialog asks for.
- *
- * One page and no pager: this half answers "what is already booked on this
- * lead", and a lead carrying more than twenty-five open activities is a
- * question for the activities screen, not for a card dialog.
- */
+/** Read in bounded pages; the shared reader follows every remaining page. */
 const LEAD_ACTIVITY_PAGE_SIZE = 25;
 
 export const LEAD_ACTIVITY_RESPONSE_LIMIT_BYTES = 256 * 1024;
 
-/** Only the fields this dialog draws. The row carries a dozen more. */
+/** Only the fields this dialog draws or writes back. The row carries a dozen more. */
 export interface LeadPlannedActivity {
   id: string;
   subject: string;
   type: string;
   priority: string;
   dueAt: string;
+  /** Not drawn in the list — it seeds the edit form, which is why it is read. */
+  description: string;
+  /**
+   * The row's optimistic-lock counter, sent back as `If-Match` by all three
+   * row actions. Reading it here is what lets Edit, Mark as done and Discard
+   * act on a row the dialog already holds instead of re-fetching it, and it is
+   * what turns a stale list into a 409 the user is told about rather than a
+   * silent overwrite of somebody else's change.
+   */
+  version: number;
 }
 
 export interface LeadActivityForm {
@@ -119,10 +150,11 @@ function requiredText(row: Record<string, unknown>, key: string, max: number): s
 }
 
 /** This lead's open work, soonest first. */
-export function leadPlannedActivitiesQuery(leadId: string): string {
+export function leadPlannedActivitiesQuery(leadId: string, page = 1): string {
+  if (!Number.isSafeInteger(page) || page < 1) throw new Error("Invalid activity page.");
   if (!isUUIDv7(leadId)) invalid();
   return new URLSearchParams({
-    page: "1",
+    page: String(page),
     limit: String(LEAD_ACTIVITY_PAGE_SIZE),
     // `ActivityListQueryDto` overrides `sortBy` to `@IsIn(['dueAt'])`; any
     // other column is a 422, so it is a constant rather than a caller's choice.
@@ -140,6 +172,18 @@ function parseActivityRow(value: unknown): LeadPlannedActivity {
   if (!row) invalid();
   const dueAt = row.dueAt;
   if (typeof dueAt !== "string" || Number.isNaN(new Date(dueAt).getTime())) invalid();
+  // A row whose version is missing or not a positive integer cannot be written
+  // back: `If-Match` would carry nothing and the server answers 428. Treating
+  // it as a broken response is the honest failure — the alternative is a list
+  // whose Edit and Discard controls are dead and say nothing about why.
+  const version = row.version;
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) invalid();
+  // Nullable in the database and optional on the DTO. Empty string here, so
+  // the edit form's textarea has something to hold either way.
+  const description = row.description;
+  if (description !== null && description !== undefined && typeof description !== "string") {
+    invalid();
+  }
   return {
     id: requiredText(row, "id", 36),
     subject: requiredText(row, "subject", LEAD_ACTIVITY_SUBJECT_MAX),
@@ -149,20 +193,34 @@ function parseActivityRow(value: unknown): LeadPlannedActivity {
     type: requiredText(row, "type", 32),
     priority: requiredText(row, "priority", 16),
     dueAt,
+    description: (description ?? "").slice(0, LEAD_ACTIVITY_DESCRIPTION_MAX),
+    version,
   };
 }
 
 /**
  * `ActivitiesService.list` answers `{ items, total, page, limit, totalPages,
  * hasNext }` inside Core's `data` envelope — no `hasPrev`, so the envelope
- * interceptor does not treat it as paginated and emits no `meta`. This half
- * needs the rows and nothing else, so only `items` is read.
+ * interceptor does not treat it as paginated and emits no `meta`. This parser
+ * validates the rows; the all-pages reader validates pagination separately.
  */
 export function parseLeadPlannedActivities(payload: unknown): LeadPlannedActivity[] {
   const body = record(payload);
   if (!body || !Array.isArray(body.items)) invalid();
   if (body.items.length > LEAD_ACTIVITY_PAGE_SIZE) invalid();
   return body.items.map(parseActivityRow);
+}
+
+export function parseLeadPlannedActivitiesPage(payload: unknown, expectedPage: number) {
+  const body = record(payload);
+  if (!body || body.page !== expectedPage || body.limit !== LEAD_ACTIVITY_PAGE_SIZE ||
+    typeof body.total !== "number" || !Number.isSafeInteger(body.total) || body.total < 0 ||
+    typeof body.totalPages !== "number" || !Number.isSafeInteger(body.totalPages) ||
+    body.totalPages !== Math.max(1, Math.ceil(body.total / LEAD_ACTIVITY_PAGE_SIZE)) ||
+    expectedPage > body.totalPages || body.hasNext !== (expectedPage < body.totalPages)) invalid();
+  const items = parseLeadPlannedActivities(body);
+  if (body.hasNext && items.length === 0) invalid();
+  return { items, hasNext: body.hasNext === true };
 }
 
 /**
@@ -186,8 +244,18 @@ export function parseCreatedLeadActivity(payload: unknown): LeadPlannedActivity 
  * `@IsNotEmpty() @MaxLength(180)` on `CreateActivityDto`, and the past-due
  * rule is `assertFutureDueAt` in `ActivitiesService.create`. Anything this
  * misses still arrives as the modal's error summary.
+ *
+ * `unchangedDueAt` is how the mirror stays exact on the edit path.
+ * `ActivitiesService.update` re-checks the due date **only when it moved** —
+ * `if (dto.dueAt.getTime() !== activity.dueAt.getTime()) assertFutureDueAt(…)`
+ * — so an overdue activity can still have its subject corrected. Without this
+ * the dialog would refuse a save the server would have accepted, which is a
+ * second opinion and the thing this comment forbids.
  */
-export function validateLeadActivityForm(form: LeadActivityForm): LeadActivityErrors {
+export function validateLeadActivityForm(
+  form: LeadActivityForm,
+  unchangedDueAt?: string,
+): LeadActivityErrors {
   const errors: LeadActivityErrors = {};
 
   const subject = form.subject.trim();
@@ -196,7 +264,10 @@ export function validateLeadActivityForm(form: LeadActivityForm): LeadActivityEr
 
   const dueAt = new Date(form.dueAt);
   if (!form.dueAt || Number.isNaN(dueAt.getTime())) errors.dueAt = "required";
-  else if (dueAt.getTime() <= Date.now()) errors.dueAt = "past";
+  else if (dueAt.getTime() <= Date.now()) {
+    const original = unchangedDueAt ? new Date(unchangedDueAt).getTime() : Number.NaN;
+    if (original !== dueAt.getTime()) errors.dueAt = "past";
+  }
 
   return errors;
 }
@@ -225,5 +296,61 @@ export function buildLeadActivityRequest(
     ...(description ? { description } : {}),
     priority: form.priority,
     dueAt: new Date(form.dueAt).toISOString(),
+  };
+}
+
+/**
+ * `UpdateActivityDto` — the same five fields the form holds, and no `target`:
+ * an activity does not change which lead it belongs to, and the DTO has no
+ * field for it.
+ *
+ * The description is sent as `null` when cleared rather than omitted. Omitting
+ * it means "leave it alone" on a PATCH, so a user who empties the box and
+ * saves would watch the old text come back; `null` is what the DTO accepts for
+ * "there is none".
+ */
+export function buildLeadActivityUpdateRequest(
+  form: LeadActivityForm,
+): Record<string, unknown> {
+  const description = form.description.trim().slice(0, LEAD_ACTIVITY_DESCRIPTION_MAX);
+  return {
+    type: form.type,
+    subject: form.subject.trim(),
+    description: description || null,
+    priority: form.priority,
+    dueAt: new Date(form.dueAt).toISOString(),
+  };
+}
+
+/** A `<input type="datetime-local">` value, in the reader's own zone. */
+function toLocalDateTimeInput(iso: string): string {
+  const due = new Date(iso);
+  if (Number.isNaN(due.getTime())) return "";
+  // `toISOString` would be UTC and the box would show a different clock time
+  // than the list beside it. Offsetting first keeps both on the reader's.
+  const local = new Date(due.getTime() - due.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+/**
+ * A booked row, back into the form that edits it.
+ *
+ * `type` and `priority` are widened to `string` on the row on purpose (a value
+ * this build has never heard of must not take the list down), so they are
+ * narrowed here against the two catalogues and fall back to the form's own
+ * defaults. A row typed `WEBINAR` by a newer server therefore opens as `TODO`
+ * rather than putting a value in the select that the select cannot render.
+ */
+export function leadActivityToForm(activity: LeadPlannedActivity): LeadActivityForm {
+  const type = LEAD_ACTIVITY_TYPES.find((candidate) => candidate === activity.type);
+  const priority = LEAD_ACTIVITY_PRIORITIES.find(
+    (candidate) => candidate === activity.priority,
+  );
+  return {
+    type: type ?? EMPTY_LEAD_ACTIVITY_FORM.type,
+    subject: activity.subject,
+    dueAt: toLocalDateTimeInput(activity.dueAt),
+    priority: priority ?? EMPTY_LEAD_ACTIVITY_FORM.priority,
+    description: activity.description,
   };
 }

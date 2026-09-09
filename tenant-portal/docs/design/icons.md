@@ -7,7 +7,8 @@ Written: **2026-08-31**
 Implementation: `src/design-system/lib/icons.ts`, exported from the
 `@/design-system` barrel.
 
-Icons come from `lucide-react` and nothing else. Emoji are banned outright —
+Ordinary UI icons come from `lucide-react`. The explicitly requested contact
+channel marks below are the narrow exception. Emoji are banned outright —
 see [anti-patterns.md](anti-patterns.md#9-emoji-as-ui). An icon never carries
 meaning alone: it accompanies a label, or it takes an `aria-label` and a
 `Tooltip`.
@@ -44,6 +45,29 @@ two glyph sizes nobody can tell apart. The heights above are whole pixels since
 
 The scale carries `shrink-0`. An icon that shrinks inside a flex row is the
 single most common cause of a squashed chevron next to a long Arabic label.
+
+## Contact channel marks
+
+Updated **2026-09-07**. Import `ContactChannelIcon` from `@/design-system` for
+One Lead phone actions. Its locally vendored SVGs use the authentic WhatsApp
+and Telegram marks from Simple Icons and the solid Bootstrap telephone glyph.
+No icon font, remote image, new icon package, emoji, or generic message/send
+substitute is needed. Sources and licence notices are in
+[Contact icon licences](contact-icon-licenses.md).
+
+These detailed marks stay 16px inside 24px `xs` icon links, with the existing
+coarse-pointer hit-area expansion retained. Logos never mirror in RTL. Each
+surrounding link must name both action and recipient via its localized
+accessible label and provide the visible-on-hover action title.
+
+WhatsApp uses `text-channel-whatsapp` (`#25D366`), Telegram uses
+`text-channel-telegram` (`#26A5E4`), and call uses the theme's green
+`text-success-vivid`. Channel tokens identify the actual destination; they are
+not semantic statuses or permission indicators and must not color text/body
+controls. Retain neutral focus/hover affordances; the logo colors are not
+part of the semantic text-contrast test. The current third phone action is
+Telegram (`t.me`), not Instagram: never put one service's logo on another's
+destination, and do not invent an Instagram account from a phone number.
 
 ## Mirroring
 

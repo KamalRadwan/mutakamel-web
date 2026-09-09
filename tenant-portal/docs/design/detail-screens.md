@@ -4,6 +4,27 @@ Status: **Specification**
 
 Written: **2026-08-28**
 
+**One Lead implementation update — 2026-09-07:** the current lead layout and
+interaction contract are maintained in [Views → Leads](views.md#leads).
+Company contains only organization data; people appear once in the separate
+Contacts collection: two equal-width person cards per row, each with its own
+edit modal. Company also edits in a modal, without contacts.
+The end rail now has History (default), Activities and Attachments icon tabs.
+Activities shares its card template with the lead activity modal; Attachments
+has Add attachment at the top and per-file download. Both lists read all pages.
+There is no duplicate main-column attachments card or standalone notes card.
+Details remains immediately editable for authorized, non-converted leads.
+One Lead uses Small density: 8px card padding/gaps, 28px controls, 24px identity
+avatars, and two-row textareas. Shared patterns opt into compact spacing; other
+screens keep their defaults. The call/WhatsApp/Telegram phone actions use local
+colored glyphs matching their real destinations. See the linked Views contract
+for exact sizing and the contact-icon source/licence reference.
+Corporate identity
+editing additionally uses permission-gated Directory routes; CRM alone updates
+job title/primary selection. That scoped
+specification supersedes the original Lead layout below; Customer Profile is
+unchanged. The conversion section below documents the replacement modal.
+
 Resolves [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md) Q2 and Q3.
 
 Two record detail screens — Lead and Customer Profile — plus the lead
@@ -57,9 +78,9 @@ response — never by permission strings ([D11](../build/DEFECTS.md#d11--actions
 
 | Action | Variant | Gate | Behavior |
 | --- | --- | --- | --- |
-| **Convert** | `primary` | `leads.convert` | Opens the conversion drawer. **The one primary on the screen** |
+| **Convert** | `primary` | `leads.convert` | Opens the centered Small conversion modal |
 | Move stage | `outline` | `leads.update` | `Select` of lead stages, ordered by `sortOrder` |
-| Edit | `outline` | `leads.update` | `FormDrawer` on `UpdateLeadDto` |
+| Card edit | `ghost` | `leads.update` | Company/Contact modal on the relevant card; no top Edit button |
 | Delete | `ghost`, `text-destructive` | `leads.delete` | `AlertDialog` |
 
 Convert is hidden once `status === "CONVERTED"` — the backend returns
@@ -113,126 +134,101 @@ does nothing is the fabricated-behavior failure in
 
 # Lead conversion
 
-`POST /api/tenant/crm/v1/leads/:id/convert` · `crm.leads.convert` (scoped) ·
-returns **201**.
+Updated 2026-09-07 at the product owner's request. The old conversion drawer,
+step UI, page-wide edit drawer and unused edit hook have been removed.
+Company/Contact edit modals and always-editable Details remain unchanged.
 
-The highest-consequence write in the CRM: it creates a customer profile, its
-contacts, and optionally an opportunity, in one call. Success is not reversible
-from the UI.
+## API contract
 
-## Request — `ConvertLeadDto`
+`POST /api/tenant/crm/v1/leads/:id/convert` · scoped `crm.leads.convert` ·
+201. The complete DTO fields, server semantics, lookup permissions and actual
+response are maintained in [CRM Leads API](../api/crm-leads.md#post-leadsidconvert).
+All conversion DTOs and the service transaction were read before implementation.
 
-| Field | Type | Required |
-| --- | --- | --- |
-| `profileType` | `CrmProfileTypeEnum` | **yes** |
-| `displayName` | string, max 180 | no |
-| `companyName` | string, max 180 | no |
-| `primaryContact` | `LeadConversionContactPersonDto` | no |
-| `createOpportunity` | boolean | no |
-| `opportunity` | `ConvertLeadOpportunityDto` | no |
+## Centered Small modal
 
-Full nested shapes in [../reference/dto-fields.md](../reference/dto-fields.md).
+Use `LeadConvertModal` composed from `FormModal size="card"
+density="compact"`: centered 672px maximum width, viewport-bounded scrollable
+body and persistent footer. It is not a Sheet or a side drawer.
+Standard modal focus trap, focus return, dirty-close confirmation, translated
+labels and RTL behavior are inherited from the design system.
 
-## The flow — a three-step drawer, not a dialog
+The top action bar has **Convert**, not a page-wide Edit button. Editing belongs
+to the existing Company/Contacts modals and Details card. Conversion requires
+the record's branch/owner capability and writable access; converted leads do
+not offer a new conversion. A retained result has a **Conversion result**
+action so closing the modal does not lose the receipt during this mounted visit.
 
-`FormDrawer`, `side="end"`. A dialog is wrong here: the form is long, and the
-user needs to re-read the lead behind it.
+### Profile and contacts
 
-### Step 1 — Profile
+- Profile type is read-only and matches the lead. Display/company names start
+  from the record; blank optional names are omitted to retain server fallback.
+- Company fields are hidden for an individual.
+- Show the existing primary contact name when present; do not copy it into a
+  new-person payload. An individual uses its existing person automatically.
+- **Create a new primary contact** defaults off, only for corporate leads.
+  Enabling it reveals full name, first name, last name, job title, email and
+  at most 20 typed contact methods with value/label. Row keys are stable and
+  UI-only; neither row IDs nor existing contact IDs go into this DTO.
+- A full name OR a composed first/last name is required for a new person.
+  Apply DTO lengths, email validation and duplicate-method normalization.
 
-`profileType` prefilled from the lead's `leadProfileType`, and **changeable** —
-a lead captured as individual often converts as a company.
+### Optional opportunity
 
-- `CORPORATE` → `companyName` required, `displayName` optional
-- `INDIVIDUAL` → `displayName` required, `companyName` hidden
+**Create an opportunity** defaults off and requires its own creation capability.
+When enabled, display pipeline, its non-terminal stage membership, title,
+importance (0–3), amount, currency, salesperson, expected close date,
+probability (0–100), description and applicable CREATE custom fields.
 
-Prefill from the lead. Do not make the user retype what was captured.
+Pipeline changes clear stage selection. Only active, accessible pipelines and
+active memberships are options; Won/Lost are excluded. Owners are verified
+Core users intersected with the capability boundary, with an explicit inherit
+option; never ask users to paste UUIDs. Amount stays a decimal string in form
+state and is converted only by the checked money helper at the DTO boundary.
+Blank optional values are omitted; valid zero/false custom values are retained.
 
-### Step 2 — Primary contact
+Reference failures are visible, not empty successful lists. Pipeline failure
+blocks opportunity submission and has Retry. Unavailable custom-field
+definitions display the shared degraded notice; the server remains authoritative
+for requirements. The user may turn the opportunity off and convert just the
+customer profile.
 
-`LeadConversionContactPersonDto`: `fullName` (required, max 180), plus
-optional `firstName`, `lastName`, `jobTitle`, `email`, and up to 20
-`contactMethods`.
+### Review, submit and success
 
-Each contact method is `methodType` — `PHONE` · `MOBILE` · `EMAIL` ·
-`WHATSAPP` · `WEBSITE` · `OTHER` — plus a `value` (max 255) and optional
-`label` (max 80).
+The first footer action validates and switches to a read-only review of the
+same sections without sending an API request. **Back to editing** unlocks the
+fields; **Confirm conversion** sends the validated DTO. In-flight requests
+disable fields, close and submit; a synchronous guard prevents double posting.
+Authorization and reference membership are checked again before the write.
 
-Prefill from the lead's own contact data. `ArrayMaxSize(20)` is enforced
-server-side; enforce it in the UI too so the 422 never happens.
+The actual 201 response is `{ lead, customerProfileId, opportunityId? }`.
+Validate the full lead and matching converted references. Show a persistent
+receipt with View customer profile, optional View opportunity, and Back to leads
+links using the returned IDs. Hide and block Submit in a receipt-only state.
+Closing and reopening retains the receipt. Navigating to another lead remounts
+the record workspace so forms and attempt state cannot cross record IDs.
 
-### Step 3 — Opportunity (optional)
+### Failure and safe retry
 
-A `Switch` bound to `createOpportunity`, default **on** — converting a lead
-without creating an opportunity is the unusual case.
+A definite refusal preserves the draft and shows a translated API error.
+409 also refetches the lead. The server's qualification setting, owner checks
+and custom-field requirements remain authoritative.
 
-When on, `ConvertLeadOpportunityDto` fields appear, including a pipeline and
-stage selector. **A terminal stage is rejected** — the backend returns
-`LEAD_CONVERSION_OPPORTUNITY_STAGE_TERMINAL` (422). Filter `WON`/`LOST` stages
-out of the selector rather than letting the user pick one and fail.
+Generate one UUIDv7 idempotency key **at first confirmed submission**, not on
+open. Retain that exact key and request body for retries of this attempt.
+Timeout/transport/5xx uncertainty freezes the form and retains evidence across
+close/reopen; show the request key, available support reference, explicit
+same-request Retry and Refresh lead. Never automatically retry or offer an
+edited request while the outcome is uncertain. A definite refusal permits
+editing; changed fields create a new intent/key. Applied-but-unreadable 2xx
+offers refresh only, not another conversion.
 
-### Review before submit
+## Verification
 
-The last step is a read-only summary: what will be created, and under which
-branch and owner. This write is not reversible from the UI, so the user sees it
-in full before committing.
-
-## Success
-
-`201` returns `{ lead, customerProfile, opportunity }`.
-
-Do **not** just close and toast. Render an in-body success panel with three
-links:
-
-```
-Lead converted.
-  → View customer profile   /crm/customer-profiles/{customerProfile.id}
-  → View opportunity        /crm/opportunities?pipelineId=…&highlight={opportunity.id}
-  → Back to leads
-```
-
-A toast disappears in four seconds and takes the only reference to two
-newly-created records with it. The panel persists until the user navigates.
-
-## Failures
-
-| Code | HTTP | Handling |
-| --- | --- | --- |
-| `LEAD_ALREADY_CONVERTED` | 409 | Close the drawer, refetch — the lead's state changed underneath |
-| `LEAD_CONVERSION_INVALID` | 422 | In-body, at the top of the drawer |
-| `LEAD_CONVERSION_OPPORTUNITY_REQUIRED` | 422 | Step 3 — the switch is on but fields are incomplete |
-| `LEAD_CONVERSION_OPPORTUNITY_STAGE_TERMINAL` | 422 | Step 3 — should be unreachable if the selector filters correctly |
-| `LEAD_CONTACT_NAME_REQUIRED` | 422 | Step 2 — inline on `fullName` |
-| `LEAD_COMPANY_NAME_REQUIRED` | 422 | Step 1 — inline on `companyName` |
-
-Full list: [../reference/error-codes.md](../reference/error-codes.md).
-
-## Idempotency — the part that matters
-
-Conversion is `WRITE_SENSITIVE`. `axiosClient` attaches a UUIDv7
-`x-idempotency-key` automatically.
-
-**Generate the key once when the drawer opens, and reuse that exact key for
-every retry of that attempt.** A new key on retry converts the lead twice.
-
-If the request times out or the connection drops, the outcome is **ambiguous** —
-it may have created a customer and an opportunity. Do not show failure, and do
-not silently retry. Render the persistent ambiguous-outcome panel with the
-idempotency key and a retry-exact affordance, per
-[patterns.md](patterns.md#ambiguous-outcomes).
-
-This is the single most important error path in the application: getting it
-wrong creates duplicate customers that a human has to merge by hand.
-
-## Definition of done
-
-- [ ] Both detail screens render real data with capabilities-gated actions
-- [ ] Custom fields render by type; the card hides when there are none
-- [ ] Conversion drawer prefills from the lead
-- [ ] Terminal stages filtered out of the opportunity selector
-- [ ] Review step before submit
-- [ ] Success panel with all three links — not a toast
-- [ ] One idempotency key per attempt, reused on retry
-- [ ] Ambiguous outcome renders the persistent panel
-- [ ] Convert hidden when already converted
-- [ ] Both languages, both themes, keyboard-operable
+Contract tests cover all DTO fields, limits, optional omission, money/zero
+values, duplicate contacts and flat service receipts. Hook tests cover review,
+double submission, permission changes, membership IDs, custom-field loading,
+owner inheritance and immutable retries. Modal tests cover both languages,
+Small centered layout, opt-in contacts, dirty cancel and persistent success.
+No live lead is converted as a test; runtime visual verification still requires
+working tenant admission and an authorized session.

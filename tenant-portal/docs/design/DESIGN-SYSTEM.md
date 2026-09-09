@@ -898,6 +898,16 @@ are `px-4 py-3`.
 
 `/crm/leads/[id]` and `/crm/customer-profiles/[id]`.
 
+**One Lead override, 2026-09-07:** use the compact Company/Contacts/Details
+layout and History/Activities/Attachments rail in [views.md](views.md#leads).
+The top Edit action is removed; Company and each Contact retain their own edit
+modal. Convert opens a centered Small `FormModal size="card"` with optional
+contact/opportunity sections and a read-only review before confirmation, not a
+side drawer. Its persistent receipt/evidence remains inside the modal; this
+specific irreversible workflow is documented in
+[detail-screens.md](detail-screens.md#lead-conversion) and overrides the generic
+header sketch and toast-only guidance for this conversion flow.
+
 Two columns, **no tabs** — a rep is scanning for a phone number, a stage and a
 next step; tabs hide two of them.
 

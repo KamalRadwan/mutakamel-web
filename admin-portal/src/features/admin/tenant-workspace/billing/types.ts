@@ -1,5 +1,6 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type { PaginationMeta } from "@/types/common";
+import type { SubscriptionCommercial } from "./model/subscription-commercial";
 
 export type BillingResourceState =
   | "idle"
@@ -99,105 +100,11 @@ export interface SubscriptionItemView {
 }
 
 export interface SubscriptionView {
+  commercial?: SubscriptionCommercial;
   subscription: SubscriptionHeaderView;
   effectiveAllowedUsers: number;
   enabledModules: string[];
   items: SubscriptionItemView[];
-}
-
-export interface SeedTenantSubscriptionDto {
-  billingCycle: BillingCycle;
-  currencyCode: "USD";
-  trialDays?: number;
-  items: Array<{ moduleKey: string; tierKey: string; seats: number }>;
-}
-
-export type SubscriptionPlanChangeOperation = "ADD" | "CHANGE" | "REMOVE";
-
-type ModuleSelector =
-  | { moduleId: string; moduleKey?: never }
-  | { moduleId?: never; moduleKey: string };
-type TierSelector =
-  | { tierId: string; tierKey?: never }
-  | { tierId?: never; tierKey: string };
-
-export type CreateSubscriptionPlanChangePreviewDto =
-  | ({
-      operation: "ADD";
-      itemId?: never;
-      seats: number;
-    } & ModuleSelector &
-      TierSelector)
-  | ({
-      operation: "CHANGE";
-      itemId: string;
-      moduleId?: never;
-      moduleKey?: never;
-    } &
-      (
-        | (TierSelector & { seats?: number })
-        | { tierId?: never; tierKey?: never; seats: number }
-      ))
-  | {
-      operation: "REMOVE";
-      itemId: string;
-      moduleId?: never;
-      moduleKey?: never;
-      tierId?: never;
-      tierKey?: never;
-      seats?: never;
-    };
-
-export interface SubscriptionPlanChangePreviewView {
-  previewId: string;
-  subscriptionId: string;
-  tenantId: string;
-  operation: SubscriptionPlanChangeOperation;
-  currencyCode: "USD";
-  billingCycle: BillingCycle;
-  itemSetFingerprint: string;
-  planFingerprint: string;
-  pricingRevision: string;
-  pricedAt: string;
-  expiresAt: string;
-  item: {
-    itemId: string | null;
-    moduleId: string;
-    fromTierId: string | null;
-    toTierId: string | null;
-    fromSeats: number | null;
-    toSeats: number | null;
-    previousLineTotalUsd: string;
-    nextLineTotalUsd: string;
-  };
-  financial: {
-    fullPeriodDeltaUsd: string;
-    direction: LedgerDirection | "NONE";
-    proratedAmountUsd: string;
-    walletAvailableUsd: string;
-    walletShortfallUsd: string;
-    walletStatus: WalletStatus;
-    canApply: boolean;
-  };
-}
-
-export interface SubscriptionPlanChangeApplyResult {
-  previewId: string;
-  operation: SubscriptionPlanChangeOperation;
-  appliedAt: string;
-  item: SubscriptionPlanChangeAppliedItemView | null;
-  removedItemId: string | null;
-  wallet: { direction: LedgerDirection | "NONE"; amountUsd: string };
-  subscriptionTotalUsd: string;
-}
-
-interface SubscriptionPlanChangeAppliedItemView {
-  id: string;
-  subscriptionId: string;
-  moduleId: string;
-  tierId: string;
-  seats: number;
-  lineTotal: string;
 }
 
 export interface SubscriptionCancellationResult {

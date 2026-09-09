@@ -85,8 +85,9 @@ export function ApplicationPublishActivateDialog({
 
   if (!isOpen) return null;
 
-  const needsPublish = application.publicationStatus === "UNPUBLISHED";
+  const needsPublish = application.publicationStatus === "UNPUBLISHED" || application.hasPendingDraft === true;
   const needsActivate = application.lifecycleStatus === "DRAFT";
+  const republishOnly = application.hasPendingDraft === true && !needsActivate;
   const hasWork = needsPublish || needsActivate;
 
   const submit = async (event: React.FormEvent) => {
@@ -140,9 +141,9 @@ export function ApplicationPublishActivateDialog({
           <p className="text-xs font-semibold text-primary">{copy.stepLabel}</p>
           <DialogTitle className="flex items-center gap-2 text-sm">
             <BookOpenCheck className="size-4 text-primary" aria-hidden="true" />
-            {copy.title}
+            {republishOnly ? t.applications.detail.releaseAuthority.republish : copy.title}
           </DialogTitle>
-          <p className="text-xs leading-relaxed text-muted-foreground">{copy.description}</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">{republishOnly ? t.applications.detail.releaseAuthority.pendingDraftHint : copy.description}</p>
         </DialogHeader>
 
         <form onSubmit={submit} noValidate className="space-y-4">
@@ -219,7 +220,7 @@ export function ApplicationPublishActivateDialog({
               </Button>
             ) : (
               <Button type="submit" variant="primary" loading={isSubmitting}>
-                {copy.confirm}
+                {republishOnly ? t.applications.detail.releaseAuthority.republish : copy.confirm}
               </Button>
             )}
           </footer>

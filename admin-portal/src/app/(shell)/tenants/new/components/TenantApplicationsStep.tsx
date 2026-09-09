@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { canSelectTenantApplication } from "../lib/tenant-registration";
+import { TenantApplicationAddons } from "./TenantApplicationAddons";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type {
   TenantApplicationCandidate,
@@ -185,7 +187,7 @@ export function TenantApplicationsStep({
                     id={`tenant-application-${candidate.key}`}
                     name={`applications.${candidate.key}.selected`}
                     checked={Boolean(selection)}
-                    disabled={!candidate.selectionAllowed}
+                    disabled={!canSelectTenantApplication(candidate)}
                     onCheckedChange={(checked) =>
                       onToggle(candidate.key, checked === true)
                     }
@@ -195,7 +197,7 @@ export function TenantApplicationsStep({
                     <label
                       htmlFor={`tenant-application-${candidate.key}`}
                       className={`flex min-h-6 items-center justify-between gap-3 font-semibold ${
-                        candidate.selectionAllowed
+                        canSelectTenantApplication(candidate)
                           ? "cursor-pointer text-foreground"
                           : "cursor-not-allowed text-muted-foreground"
                       }`}
@@ -210,7 +212,7 @@ export function TenantApplicationsStep({
                     </p>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
                       <Badge tone="neutral">{candidate.commercialMode}</Badge>
-                      {candidate.selectionAllowed ? (
+                      {canSelectTenantApplication(candidate) ? (
                         <Badge tone="brand">
                           <CheckCircle2 className="size-3" /> {copy.readyBadge}
                         </Badge>
@@ -221,7 +223,7 @@ export function TenantApplicationsStep({
                   </div>
                 </div>
 
-                {!candidate.selectionAllowed ? (
+                {!canSelectTenantApplication(candidate) ? (
                   <div className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">
                     {unavailableReasons.length > 0 ? (
                       <ul className="list-inside list-disc space-y-1">
@@ -245,6 +247,7 @@ export function TenantApplicationsStep({
                       {(field) => (
                       <Select
                         name={`applications.${candidate.key}.tierId`}
+                        disabled={selection.addons.length > 0}
                         value={selection.tierId}
                         onValueChange={(value) =>
                           onUpdateSelection(candidate.key, { tierId: value })
@@ -287,6 +290,7 @@ export function TenantApplicationsStep({
                     </Field>
                   </div>
                 ) : null}
+                {selection && <TenantApplicationAddons candidate={candidate} selection={selection} onChange={patch => onUpdateSelection(candidate.key, patch)} />}
               </article>
             );
           })}

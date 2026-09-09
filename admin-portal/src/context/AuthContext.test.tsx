@@ -115,6 +115,108 @@ describe("AuthProvider server-authoritative bootstrap", () => {
     vi.restoreAllMocks();
   });
 
+  it.each([false, true])(
+    "recovers a persisted session end without cache clearing (tab metadata: %s)",
+    async (hasTabMetadata) => {
+      vi.useFakeTimers();
+      const sessionId = "019f0000-0000-7000-8000-000000000001";
+      const endedEvent = JSON.stringify({
+        realm: "admin",
+        kind: "session-ended",
+        eventId: "persisted-session-end",
+        sourceId: "closed-tab",
+        issuedAt: Date.now() - 1_000,
+        sessionId,
+      });
+      window.localStorage.setItem("admin_auth_session_event", endedEvent);
+      window.localStorage.setItem("theme", "dark");
+      window.sessionStorage.setItem("unsaved-form", "keep this draft");
+      if (hasTabMetadata) {
+        window.sessionStorage.setItem("admin_session_meta", JSON.stringify({
+          savedAt: Date.now() - 2_000,
+          expiresIn: 600,
+          sessionExpiresIn: 1_800,
+          tokenType: "Bearer",
+          sessionId,
+          remember: false,
+          authorizationVersion: 1,
+          profileVersion: 1,
+          authEventId: "before-session-end",
+        }));
+      }
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      const cookieWrite = vi.spyOn(document, "cookie", "set");
+      const view = () => render(
+        <AuthProvider>
+          <AuthProbe />
+          <AuthGuard><ProtectedProbe /></AuthGuard>
+        </AuthProvider>,
+      );
+
+      const firstLoad = view();
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+      expect(screen.getByText("ENDED:none")).toBeTruthy();
+      expect(push).toHaveBeenCalledWith("/login");
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.queryByText("protected-content")).toBeNull();
+      expect(window.sessionStorage.getItem("admin_session_meta")).toBeNull();
+      // The cross-tab fence must survive; deleting it would unbind old work.
+      expect(window.localStorage.getItem("admin_auth_session_event")).toBe(endedEvent);
+      expect(window.localStorage.getItem("theme")).toBe("dark");
+      expect(window.sessionStorage.getItem("unsaved-form")).toBe("keep this draft");
+      expect(cookieWrite).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+      expect(screen.getByText("ENDED:none")).toBeTruthy();
+      expect(fetchMock).not.toHaveBeenCalled();
+      firstLoad.unmount();
+      view();
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(screen.getByText("ENDED:none")).toBeTruthy();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it.each(["different-session", "older-same-session"])(
+    "does not end a valid session for a persisted %s end event",
+    async (eventKind) => {
+      const sessionId = "019f0000-0000-7000-8000-000000000001";
+      const savedAt = Date.now();
+      window.sessionStorage.setItem("admin_session_meta", JSON.stringify({
+        savedAt,
+        expiresIn: 600,
+        sessionExpiresIn: 1_800,
+        tokenType: "Bearer",
+        sessionId,
+        remember: false,
+        authorizationVersion: 1,
+        profileVersion: 1,
+        authEventId: "current-session",
+      }));
+      window.localStorage.setItem("admin_auth_session_event", JSON.stringify({
+        realm: "admin",
+        kind: "session-ended",
+        eventId: "old-session-end",
+        sourceId: "old-tab",
+        issuedAt: eventKind === "different-session" ? savedAt + 1 : savedAt - 1,
+        sessionId: eventKind === "different-session" ? "old-session" : sessionId,
+      }));
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(adminMePayload())));
+      render(<AuthProvider><AuthProbe /></AuthProvider>);
+
+      await waitFor(() =>
+        expect(screen.getByText("AUTHENTICATED:admin@example.test")).toBeTruthy(),
+      );
+      expect(window.sessionStorage.getItem("admin_session_meta")).not.toBeNull();
+      expect(push).not.toHaveBeenCalledWith("/login");
+      expect(replace).not.toHaveBeenCalledWith("/login");
+    },
+  );
+
   it("validates a cold tab, then silently seeds refresh timing", async () => {
     const requestedUrls: string[] = [];
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {

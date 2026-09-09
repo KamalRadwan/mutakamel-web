@@ -9,6 +9,7 @@ import {
   DetailSection,
   ErrorState,
   type Attachment,
+  type FileUploadProps,
   type UploadFile,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -41,6 +42,8 @@ export interface RecordAttachmentsSectionProps {
   createCapability: CrmActionCapability | null;
   deleteCapability: CrmActionCapability | null;
   readOnly?: boolean;
+  uploadVariant?: FileUploadProps["variant"];
+  density?: "standard" | "compact";
 }
 
 /**
@@ -63,6 +66,8 @@ export function RecordAttachmentsSection({
   createCapability,
   deleteCapability,
   readOnly = false,
+  uploadVariant = "dropzone",
+  density,
 }: RecordAttachmentsSectionProps) {
   const { t, lang } = useI18n();
   const describeError = useCrmErrorText();
@@ -115,6 +120,7 @@ export function RecordAttachmentsSection({
 
   return (
     <DetailSection
+      density={density}
       title={t.attachments.title}
       description={formatTemplate(t.crmAttachments.constraint, {
         max: formatBytes(CRM_ATTACHMENT_MAX_BYTES),
@@ -188,9 +194,13 @@ export function RecordAttachmentsSection({
             />
           ) : (
             <AttachmentList
+              density={density}
               attachments={rows}
               isLoading={attachments.isLoading}
               canUpload={canUpload}
+              uploadVariant={uploadVariant}
+              disabled={attachments.isUploading || attachments.pendingId !== null ||
+                attachments.ambiguity !== null || attachments.appliedUnreadable !== null}
               onDownload={(attachment) => {
                 window.location.href = crmAttachmentDownloadPath(attachment.id);
               }}
@@ -219,7 +229,9 @@ export function RecordAttachmentsSection({
                 emptyDescription: t.attachments.emptyDescription,
                 download: t.attachments.download,
                 delete: t.attachments.delete,
-                upload: t.fileUpload,
+                upload: uploadVariant === "button"
+                  ? { ...t.fileUpload, browse: t.crmAttachments.addAttachment }
+                  : t.fileUpload,
               }}
             />
           )}

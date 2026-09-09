@@ -203,7 +203,13 @@ export function DirectoryWorkspace() {
               onCardMove={(move) =>
                 void directory.moveStatus(move.itemId, move.toColumnId as PartyStatus)
               }
-              labels={{ ...viewLabels, emptyColumn: copy.emptyColumn, moveTo: t.views.moveTo }}
+              labels={{
+                ...viewLabels,
+                emptyColumn: copy.emptyColumn,
+                moveTo: t.views.moveTo,
+                collapseColumn: t.views.collapseColumn,
+                expandColumn: t.views.expandColumn,
+              }}
             />
           )}
           {workspace.view === "card" && (

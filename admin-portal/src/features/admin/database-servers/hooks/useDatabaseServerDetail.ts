@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { databaseServersApi } from "../api/database-servers.api";
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
-import { normalizeApiError } from "@/shared/api/normalized-api-error";
+import { normalizeApiError, type NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { useActionMutation } from "@/shared/hooks/useActionMutation";
 import { useToast } from "@/components/ui/ToastContext";
 import { shouldResetDatabaseServerWriteKey } from "../lib/database-server-idempotency";
@@ -44,9 +44,10 @@ export function useDatabaseServerDetail(id: string) {
   const [credentialAction, setCredentialAction] = useState<DatabaseCredentialAction | null>(null);
   const [credentialActionServerId, setCredentialActionServerId] = useState<string | null>(null);
   const [credentialReason, setCredentialReason] = useState("");
-  const [credentialActionError, setCredentialActionError] = useState<string | null>(null);
+  const [credentialActionError, setCredentialActionError] = useState<string | NormalizedApiError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [isBindingsLoading, setIsBindingsLoading] = useState(false);
   const [bindingsError, setBindingsError] = useState<string | null>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -108,14 +109,18 @@ export function useDatabaseServerDetail(id: string) {
     }
   }, [id]);
 
-  const fetchServer = useCallback(async () => {
+  // Failure reconciliation must keep the original command dialog mounted.
+  const readServer = useCallback(async (background: boolean) => {
     const requestedId = id;
     const generation = ++serverGeneration.current;
     serverAbort.current?.abort();
     const controller = new AbortController();
     serverAbort.current = controller;
-    setIsLoading(true);
-    setError(null);
+    setRefreshError(null);
+    if (!background) {
+      setIsLoading(true);
+      setError(null);
+    }
     try {
       const data = await databaseServersApi.get(id, controller.signal);
       if (
@@ -133,13 +138,20 @@ export function useDatabaseServerDetail(id: string) {
         idRef.current !== requestedId
       ) return;
       const normalized = normalizeApiError(err);
-      setError(normalized.message);
       setLoadedServerId(null);
-      toast.error("Error", normalized.message);
+      if (!background) {
+        setError(normalized.message);
+        toast.error("Error", normalized.message);
+      } else {
+        setRefreshError(normalized.message);
+      }
     } finally {
       if (generation === serverGeneration.current) setIsLoading(false);
     }
   }, [fetchBindings, fetchHistory, id, toast]);
+
+  const fetchServer = useCallback(() => readServer(false), [readServer]);
+  const refreshServer = useCallback(() => readServer(true), [readServer]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -253,6 +265,8 @@ export function useDatabaseServerDetail(id: string) {
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
+      await readServer(true);
+      if (idRef.current !== id) throw normalized;
       toast.error("Error", normalized.message);
       throw normalized;
     } finally {
@@ -285,6 +299,8 @@ export function useDatabaseServerDetail(id: string) {
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
+      await readServer(true);
+      if (idRef.current !== id) throw normalized;
       toast.error("Error", normalized.message);
       throw normalized;
     } finally {
@@ -317,6 +333,9 @@ export function useDatabaseServerDetail(id: string) {
 
   const bootstrapApplication = async (applicationKey: string, expectedCatalogueRevision: string, expectedPolicyRevision: string, reason: string) => {
     assertCurrentServer();
+    if (isBindingsLoading || bindingsError) {
+      throw new Error("DATABASE_SERVER_BINDINGS_REFRESH_REQUIRED");
+    }
     setCredentialActionPending(`bootstrap:${applicationKey}`);
     try {
       const dto: BootstrapDatabaseServerApplicationDto = { expectedCatalogueRevision, expectedPolicyRevision, reason };
@@ -334,6 +353,8 @@ export function useDatabaseServerDetail(id: string) {
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
+      await readServer(true);
+      if (idRef.current !== id) throw normalized;
       toast.error("Error", normalized.message);
       throw normalized;
     } finally {
@@ -386,6 +407,8 @@ export function useDatabaseServerDetail(id: string) {
       if (shouldResetDatabaseServerWriteKey(normalized)) {
         resetKey();
       }
+      await readServer(true);
+      if (idRef.current !== id) throw normalized;
       toast.error("Error", normalized.message);
       throw normalized;
     } finally {
@@ -480,25 +503,34 @@ export function useDatabaseServerDetail(id: string) {
         );
       }
     } catch (error) {
+      if (idRef.current !== id) return;
       const normalized = normalizeApiError(error);
-      setCredentialActionError(normalized.message);
+      setCredentialActionError(normalized);
       return;
     }
+    if (idRef.current !== id) return;
     setCredentialAction(null);
     setCredentialActionServerId(null);
     setCredentialReason("");
   };
 
+  const publicCredentialError = typeof credentialActionError === "string" ? null : credentialActionError;
+
   return {
-    server: loadedServerId === id ? server : null,
+    server: server?.id === id ? server : null,
     loadedServerId,
+    canBootstrapApplication: loadedServerId === id && !isBindingsLoading && !bindingsError,
+    refreshError,
+    refreshServer,
     bindings,
     history,
     lastCredentialReceipt,
     credentialActionPending,
     credentialAction: credentialActionServerId === id ? credentialAction : null,
     credentialReason,
-    credentialActionError,
+    credentialActionError: typeof credentialActionError === "string" ? credentialActionError : publicCredentialError?.message ?? null,
+    credentialActionErrorCode: publicCredentialError?.errorCode,
+    credentialActionCorrelationId: publicCredentialError?.correlationId,
     isLoading,
     error,
     isBindingsLoading,

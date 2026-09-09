@@ -173,6 +173,13 @@ describe("Application technical provisioning API", () => {
     );
   });
 
+  it.each([true, false, undefined])("preserves additive pending-draft evidence %s on current reads", async hasPendingDraft => {
+    const data = { key: "crm", publicationStatus: "PUBLISHED", catalogueRevision: "99", publicationRevision: "2", ...(hasPendingDraft === undefined ? {} : { hasPendingDraft }) };
+    getMock.mockResolvedValueOnce(envelope(data)).mockResolvedValueOnce(envelope([data]));
+    expect(await applicationsApi.get("crm")).toEqual(data);
+    expect((await applicationsApi.list()).data).toEqual([data]);
+  });
+
   it("reads the bindable database-server candidates for one Application", async () => {
     const candidates = {
       applicationId: "019f0000-0000-7000-8000-000000000001",

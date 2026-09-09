@@ -4,6 +4,8 @@ Status: **[Verified]**
 
 Last source verification: **2026-08-25**
 
+Source amendment (2026-09-09): [Application-owned Addons and the canonical commercial contract](./application-addons-target.md). Nested Addon catalogue/forms/pricing uses one unversioned commercial payload and exact revision/idempotency fences. Real owner registration gates publication and owner-dependent editors; metadata, compatibility and dynamic prices remain available. Existing Application pending-draft presentation remains source-integrated. Runtime acceptance is separately tracked; older examples do not prove complete Addon acceptance.
+
 This is the Admin Portal implementation contract for the Application Catalogue:
 Application identity, independent publication and lifecycle, immutable runtime
 target evidence, technical readiness, database policy and safe manifest
@@ -299,6 +301,7 @@ interface ApplicationView {
   lifecycleStatus: ApplicationLifecycleStatus;
   runtimeTarget: string | null;
   publicationStatus: ApplicationPublicationStatus;
+  hasPendingDraft?: boolean; // current list/detail include boolean; older-server absence is unknown
   publicationRevision: string;
   publishedAt: string | null;
   publishedBy: string | null;
@@ -512,9 +515,10 @@ interface CreateApplicationProvisioningBindingDto {
 Application update and policy update require at least one actual writable
 field. Delete carries `expectedCatalogueRevision` and `reason` in the query.
 Publishing is independently fenced by the exact current catalogue and
-publication revisions. A metadata update to a published Application changes it
-to `UNPUBLISHED`, advances the publication revision, and clears
-`publishedAt`/`publishedBy`; it never auto-publishes the new revision.
+publication revisions. The current metadata owner stages presentation changes
+in an unpublished draft while preserving the existing publication and its
+attribution. It advances catalogue revision, never auto-publishes the draft,
+and does not invalidate the existing published runtime authority.
 
 ### Tiers and features
 
@@ -748,9 +752,9 @@ status/revision, and attributable `publishedAt`/`publishedBy`.
   READY coverage on every operational Database Server; Core returns
   `APPLICATION_REQUIRED_DATABASE_COVERAGE_INCOMPLETE` with safe summary counts
   when that fleet gate is incomplete.
-- Metadata editing a published Application must warn that the current release
-  authority will be invalidated. The returned/refetched `UNPUBLISHED` state is
-  authoritative; the browser must never publish automatically.
+- Metadata editing a published Application explains that changes remain in a
+  draft while the existing published authority stays active. The browser must
+  use explicit server publication/draft evidence and never publish automatically.
 - New commercial selection requires `selectionAllowed=true`, which represents
   `ACTIVE`, `PUBLISHED`, `PUBLIC`, commercial eligibility, and technical
   readiness. Existing installed runtime may retain a `PUBLISHED` Application
@@ -1230,11 +1234,15 @@ Response — HTTP `200`:
 }
 ```
 
-If the edited Application was `PUBLISHED`, the same transaction changes it to
-`UNPUBLISHED`, advances `publicationRevision`, clears
-`publishedAt`/`publishedBy`, and advances `catalogueRevision`. The UI must warn
-before this invalidation, then render the returned/refetched state and require a
-separate publish command.
+For an already `PUBLISHED` Application, current source stages the metadata
+draft and advances `catalogueRevision` without clearing the existing publication
+or attribution. The example above is an unpublished initial draft, not evidence
+that every metadata edit unpublishes an App. Render the returned/refetched
+evidence and require an independently confirmed publish command for draft
+adoption. Current Application detail/list reads add `hasPendingDraft:boolean`;
+the Admin rail/dialog offer republish only for explicit true and retain existing
+permissions, lifecycle and readiness constraints. Older-server absence is
+unknown; revision inequality alone is not draft evidence.
 
 ### 6. Delete an unused catalogue-only draft
 

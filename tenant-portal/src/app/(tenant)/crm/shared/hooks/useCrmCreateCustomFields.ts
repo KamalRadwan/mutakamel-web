@@ -37,10 +37,12 @@ export function useCrmCreateCustomFields(
 ) {
   const [items, setItems] = useState<CustomFieldItem[]>([]);
   const [degraded, setDegraded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!enabled) return;
     const controller = new AbortController();
+    queueMicrotask(() => { if (!controller.signal.aborted) setLoading(true); });
+    if (!enabled) return () => controller.abort();
     void (async () => {
       try {
         const response = await axiosClient.get<unknown>(CRM_CUSTOM_FIELDS_PATH, {
@@ -48,12 +50,15 @@ export function useCrmCreateCustomFields(
           cache: "no-store",
           maxResponseBytes: CUSTOM_FIELDS_RESPONSE_LIMIT_BYTES,
         });
+        if (controller.signal.aborted) return;
         setItems(parseCrmCustomFieldsResponse(response.data));
         setDegraded(false);
       } catch {
         if (controller.signal.aborted) return;
         setItems([]);
         setDegraded(true);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
     })();
     return () => controller.abort();
@@ -85,5 +90,5 @@ export function useCrmCreateCustomFields(
     [definitions, ownerType],
   );
 
-  return { definitions, requiredFieldKeys, degraded };
+  return { definitions, requiredFieldKeys, degraded, loading: enabled && loading };
 }

@@ -67,6 +67,7 @@ describe("Core settings navigation", () => {
       TENANT_ROUTES.coreBilling,
       TENANT_ROUTES.coreBillingInvoices,
       TENANT_ROUTES.coreSubscription,
+      TENANT_ROUTES.coreSubscriptionCatalogue,
     ]);
     for (const item of ownerItems) {
       expect(item.hasAccess([])).toBe(true);

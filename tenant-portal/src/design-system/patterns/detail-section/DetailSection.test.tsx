@@ -7,6 +7,15 @@ import { DetailSection } from "./DetailSection";
 afterEach(cleanup);
 
 describe("DetailSection", () => {
+  it("opts into compact spacing without changing the default density", () => {
+    const view = render(<DetailSection title="Details" density="compact"><p>Body</p></DetailSection>);
+    expect(screen.getByRole("heading", { name: "Details" })).toHaveClass("text-sm");
+    expect(screen.getByText("Body").parentElement).toHaveClass("p-2", "gap-2");
+    view.rerender(<DetailSection title="Details"><p>Body</p></DetailSection>);
+    expect(screen.getByRole("heading", { name: "Details" })).toHaveClass("text-lg");
+    expect(screen.getByText("Body").parentElement).toHaveClass("p-2.5", "gap-3");
+  });
+
   it("renders fields as a definition list, not a table", () => {
     const { container } = render(
       <DetailSection

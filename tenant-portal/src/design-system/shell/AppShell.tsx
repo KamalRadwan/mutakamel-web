@@ -127,16 +127,12 @@ export function AppShell({ children, initialApp }: AppShellProps) {
             compensates for chrome height here. The `scroll-mt-14` that used to
             sit on this element was 56px against a 48px topbar and had nothing
             to do in either arrangement. */}
-        {/* 20px above the screen at every width — `pt-5` after `p-4`/`md:p-6`,
-            which sets the other three sides. The bar directly above already
-            names the screen, so the gap between it and the first control is
-            spacing and nothing else; the 24px `md:p-6` inherited from the
-            sidebar era was reading as a gap where a page title used to be. */}
-        <main
-          id="main"
-          tabIndex={-1}
-          className="flex-1 overflow-y-auto p-4 pt-5 outline-none md:p-6 md:pt-5"
-        >
+        {/* 10px on every side, at every width. The bar directly above already
+            names the screen, so the space between it and the first control is
+            spacing and nothing else — the 16/24px this inherited from the
+            sidebar era read as a gap where a page title used to be, and on a
+            1366×768 laptop it was 48px of vertical budget spent on nothing. */}
+        <main id="main" tabIndex={-1} className="flex-1 overflow-y-auto p-2.5 outline-none">
           {children}
         </main>
       </div>

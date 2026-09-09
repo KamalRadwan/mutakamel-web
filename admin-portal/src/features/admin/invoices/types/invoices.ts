@@ -1,5 +1,6 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import type { PageResult, SortDirection } from "@/types/common";
+import type { InvoiceCommercial } from "../model/invoice-commercial";
 
 export const INVOICE_STATUSES = [
   "DRAFT",
@@ -54,13 +55,14 @@ export interface InvoiceLine {
   id: string;
   invoiceId: string;
   description: string;
-  descriptionI18n: { en: string; ar: string };
+  descriptionI18n?: { en: string; ar: string };
   quantity: string;
   unitPrice: string;
   lineTotal: string;
 }
 
 export interface Invoice {
+  commercial?: InvoiceCommercial;
   id: string;
   subscriptionId: string;
   tenantId: string;

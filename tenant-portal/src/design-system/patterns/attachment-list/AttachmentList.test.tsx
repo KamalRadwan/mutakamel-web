@@ -44,6 +44,26 @@ function renderList(overrides: Partial<AttachmentListProps> = {}) {
 }
 
 describe("AttachmentList", () => {
+  it("places the compact upload button before the downloadable list", () => {
+    const { props, container } = renderList({ uploadVariant: "button" });
+    const button = screen.getByRole("button", { name: "Browse files" });
+    expect(button.compareDocumentPosition(screen.getByRole("list")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const openPicker = vi.spyOn(input, "click");
+    fireEvent.click(button);
+    expect(openPicker).toHaveBeenCalledOnce();
+    const file = new File(["pdf"], "contract.pdf", { type: "application/pdf" });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(props.onFilesAdded).toHaveBeenCalledWith([file]);
+    expect(screen.getByText("Drop files here")).not.toBeVisible();
+  });
+
+  it("hides the add button without permission and disables it while busy", () => {
+    const view = renderList({ uploadVariant: "button", disabled: true });
+    expect(screen.getByRole("button", { name: "Browse files" })).toBeDisabled();
+    view.rerender(<AttachmentList {...view.props} canUpload={false} />);
+    expect(screen.queryByRole("button", { name: "Browse files" })).toBeNull();
+  });
   it("lists every stored attachment with its metadata", () => {
     renderList();
     expect(screen.getByText("contract.pdf")).toBeInTheDocument();

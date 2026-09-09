@@ -60,6 +60,18 @@ export function LeadCardFooter({
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-1">
+        {/* Rating first, activity second. The rating is a property OF the lead
+            and the row's most-used control; the activity mark is a state the
+            server owns and a way into the dialog. Reading order follows that,
+            and it is the same order in both directions because this is a flex
+            row of logical children, not a left-to-right layout. */}
+        <LeadRating
+          value={rating}
+          onChange={onRatingChange}
+          disabled={isRatingDisabled}
+          labels={labels}
+        />
+
         {/* A real control, and it renders in WorkspaceCard's footer — outside
             the activation surface and outside @hello-pangea/dnd's drag handle
             — so pressing it neither opens the lead nor starts a drag. Squared
@@ -85,13 +97,6 @@ export function LeadCardFooter({
           />
           <span className="sr-only">{labels.activity}</span>
         </Button>
-
-        <LeadRating
-          value={rating}
-          onChange={onRatingChange}
-          disabled={isRatingDisabled}
-          labels={labels}
-        />
       </div>
 
       {/* No owner, or an owner nobody named: a badge reading "?" would claim

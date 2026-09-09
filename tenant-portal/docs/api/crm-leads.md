@@ -2,7 +2,9 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-09-07**
+
+Contact detail/write contract re-verified: **2026-09-07** (scoped update below).
 
 Owning app: **crm-app**
 
@@ -10,8 +12,8 @@ Canonical prefix: `/api/tenant/crm/v1/leads`
 
 Upstream: `/api/v1/crm/leads` (`@Controller({ path: 'crm/leads', version: '1' })`)
 
-Portal status: **built** — list, create, delete, stage move, detail, update
-and conversion are all server-backed. Not exercised against a live session:
+Portal status: **built** — list, create (including atomic multi-tag assignment),
+delete, stage move, detail, update and conversion are all server-backed. Not exercised against a live session:
 CRM is blocked twice over, by P4 and by Q17.
 
 `GET /leads/capabilities` is `BRANCH_REQUIRED` in the Gateway route contract:
@@ -45,7 +47,10 @@ Source inspected:
 | GET | `/leads/company-options` | `crm.leads.company.options.get` | AUTHENTICATED | `crm.leads.create` (scoped) |
 | GET | `/leads/company-options/:companyPartyId/contacts` | — | AUTHENTICATED | `crm.leads.create` (scoped) |
 | GET | `/leads/:id` | `crm.leads.by.id.get` | AUTHENTICATED | `crm.leads.read` (scoped) |
+| GET | `/leads/:id/tags` | `crm.leads.by.id.tags.get` | AUTHENTICATED | `crm.leads.read` (scoped) |
 | PATCH | `/leads/:id` | `crm.leads.by.id.patch` | WRITE_SENSITIVE | `crm.leads.update` (scoped) |
+| POST | `/leads/:id/tags` | `crm.leads.by.id.tags.post` | WRITE_SENSITIVE, non-idempotent | `crm.leads.update` (scoped) |
+| DELETE | `/leads/:id/tags/:tagId` | `crm.leads.by.id.tags.by.tag.id.delete` | WRITE_SENSITIVE, non-idempotent | `crm.leads.update` (scoped) |
 | POST | `/leads/:id/stage` | `crm.leads.by.id.stage.post` | WRITE_SENSITIVE | `crm.leads.update` (scoped) |
 | POST | `/leads/:id/convert` | `crm.leads.by.id.convert.post` | WRITE_SENSITIVE | `crm.leads.convert` (scoped) |
 | DELETE | `/leads/:id` | `crm.leads.by.id.delete` | WRITE_SENSITIVE | `crm.leads.delete` (scoped) |
@@ -118,6 +123,43 @@ Success `201` with the created lead. Errors: `409` conflict, `422` validation.
 
 `forbidNonWhitelisted` is on — send only documented keys.
 
+### Tags during creation
+
+`CreateLeadDto.tagIds` is an optional array of up to 50 unique UUIDv7 ids from
+the tenant tag catalogue. Omit it or send `[]` to create a lead without tags.
+The modal sends all selected ids inside the single `POST /leads` body:
+
+```json
+{
+  "branchId": "018f0000-0000-7000-8000-000000000001",
+  "leadProfileType": "INDIVIDUAL",
+  "displayName": "New prospect",
+  "tagIds": [
+    "0192b7ea-7c4f-7a7d-9c9f-51c7f2b3ab01",
+    "0192b7ea-7c4f-7a7d-9c9f-51c7f2b3ab02"
+  ]
+}
+```
+
+The lead, its Party changes, custom fields and tag links share the creation
+transaction. An unknown or deleted tag returns `422 CRM_TAG_UNKNOWN` and rolls
+back the complete creation; malformed, duplicate or over-limit ids are rejected
+by DTO validation. The `201` lead response includes the saved `tags` array.
+
+Initial tag assignment uses the existing scoped `crm.leads.create` authority;
+it does not require `crm.leads.update` or `crm.tags.manage`. The picker requires
+exact `crm.tags.read` to load catalogue choices. The create request keeps its
+existing idempotency key, so a retry replays the whole creation result. The
+modal does not call the separate tag-attachment endpoint after creation.
+
+Changing tags on an existing lead still uses `/leads/:id/tags` and requires
+scoped `crm.leads.update`; those standalone writes remain non-idempotent.
+
+Roll out the backend contract before this portal version: older CRM builds
+reject `tagIds` as an unknown create field. Existing clients that omit it remain
+compatible. This change adds no schema migration; the tenant must already have
+the existing CRM tags migration (`1801000000130-crm-tags-v1`).
+
 ## POST /leads/:id/stage — move stage
 
 The board view's drag-and-drop target.
@@ -135,54 +177,210 @@ Both of those are terminal and require confirmation before the request — see
 
 ## POST /leads/:id/convert
 
-Converts a qualified lead into customer/contact records and optionally an
-opportunity.
+Verified 2026-09-07 against all conversion DTO classes in
+`crm-app/src/crm/leads/dto/lead.dto.ts`, the complete `LeadsService.convert`
+transaction and its validation/helpers, `PartyDirectoryAdapter`, scoped owner
+assignment, and Gateway `crm.route-contracts.ts`. Backend files remain read-only.
 
-Body: `ConvertLeadDto`. Success `201`:
+Promotes the lead's existing Party to a customer profile. Qualification is
+required only when tenant settings enable `requireQualifiedStageForConversion`;
+the server remains the authority for that condition.
+
+Body: `ConvertLeadDto`. Actual service success **201**:
 
 ```json
-{ "lead": { … }, "customerProfile": { … }, "opportunity": { … } }
+{
+  "lead": { "id": "…", "status": "CONVERTED", "convertedCustomerProfileId": "…", "convertedOpportunityId": "…" },
+  "customerProfileId": "…",
+  "opportunityId": "…"
+}
 ```
 
-Errors: `404`, `409`, `422`. Show the returned customer and opportunity links
-after success.
+The lead above is abbreviated; the real response carries the complete Lead
+detail read model. `opportunityId` is **omitted** when no opportunity is
+created; otherwise it matches `lead.convertedOpportunityId`.
+`customerProfileId` matches `lead.convertedCustomerProfileId`.
+These are **flat UUIDv7 IDs**, not the outdated Swagger
+`customerProfile: {…}, opportunity: {…}` example (tracked in Q135).
+The frontend validates both references, the requested lead ID and converted
+status before displaying the receipt links.
+
+### Complete conversion input
+
+| Field | DTO / service contract |
+| --- | --- |
+| `profileType` | Required `INDIVIDUAL \| CORPORATE`; must match the lead's existing Party type |
+| `displayName`, `companyName` | Optional non-empty strings, max 180; omission retains the existing name/fallback |
+| `primaryContact` | Optional nested **new person**, not an existing-contact update |
+| `createOpportunity` | Optional strict boolean |
+| `opportunity` | Required when the switch is true; forbidden when it is false/omitted |
+
+`LeadConversionContactPersonDto`:
+
+| Field | Contract |
+| --- | --- |
+| `fullName` | Optional non-empty string, max 180; absent name is composed from first/last name; an empty resulting name is rejected |
+| `firstName`, `lastName` | Optional strings, max 80 each |
+| `jobTitle` | Optional string, max 120 |
+| `email` | Optional valid email, max 180 |
+| `contactMethods` | Optional array, at most 20; no silent truncation |
+| `contactMethods[].methodType` | Required `PHONE \| MOBILE \| EMAIL \| WHATSAPP \| WEBSITE \| OTHER` |
+| `contactMethods[].value` | Required non-empty string, max 255 |
+| `contactMethods[].label` | Optional string, max 80 |
+
+For a corporate lead, omitting `primaryContact` reuses its existing primary
+contact if present. Supplying it **creates another person and relationship**.
+The modal defaults that toggle off and never prefills company identity as a
+person. An individual uses its own Party as its contact and sends no nested
+`primaryContact`. Duplicate methods are checked using the adapter's
+normalization, including an email repeated in the email field and method list.
+
+`ConvertLeadOpportunityDto`:
+
+| Field | Contract |
+| --- | --- |
+| `pipelineId` | Required UUIDv7 of an active pipeline accessible to the actor |
+| `stageId` | Required UUIDv7 of that pipeline's **membership** (`CrmPipelineStage.id`), not the master stage ID |
+| `title` | Required non-empty string, max 180 |
+| `importance` | Optional integer 0–3; server default 0 |
+| `amount` | Optional finite number >= 0, at most two decimal places; UI retains a decimal string until the tested money wire conversion |
+| `description` | Optional string, max 2000 |
+| `currencyCode` | Optional string, length 3 after trim/uppercase |
+| `ownerUserId` | Optional UUIDv7; inherits lead owner, or actor if lead is unassigned |
+| `expectedCloseDate` | Optional ISO date string; this modal uses a date-only picker |
+| `probabilityPercent` | Optional integer 0–100 |
+| `customFields` | Optional object; CREATE requirements for OPPORTUNITY are enforced |
+
+Only active memberships appear; `WON`/`LOST` are forbidden for conversion.
+Changing pipeline clears the selected membership. The switch defaults off and
+requires the independent `opportunities.create` capability returned with
+`GET /leads/capabilities?branchId=…`. The server separately validates owner
+assignment and branch eligibility.
+
+Reference reads: `GET /pipelines` requires `crm.pipelines.read`.
+Owner options use branch-visible ACTIVE users from Core `GET /users`
+(`users.user.read`, page/limit 100, all pages), narrowed by the creation
+capability's owner IDs. The active authenticated actor can also be a verified
+candidate. Missing directory permission does not invent names or raw-ID inputs;
+inheritance remains available. Custom fields reuse the shared create definition
+reader and wait for its request; unavailable definitions show a degraded
+notice, with the server retaining required-field authority.
 
 ### Conversion cannot change a Party from a person into an organization
 
-**Decided 2026-08-31**, from the CRM audit review's open question 1. The audit
-asked whether an Individual lead converting to a Corporate customer should
-change the Party's type. **It must not, and it already cannot.**
+The service passes the lead's existing `partyId` to
+`PartyDirectoryAdapter.ensureParty`. A mismatched type produces
+**409 PARTY_TYPE_IMMUTABLE**. The modal displays a read-only profile type.
+A genuine individual-to-company promotion would require a new organization and
+relationship; that is not part of this operation.
 
-`crm-app/src/common/party-directory.adapter.ts:195` — `ensureParty` is called
-during conversion with the lead's **existing** `partyId` and a `partyType`
-derived from `dto.profileType`. When those disagree it throws:
+### Writes and failures
 
-```
-409  PARTY_TYPE_IMMUTABLE
-     "An existing party cannot change between person and organization."
-```
+Gateway contract: `WRITE_SENSITIVE`, idempotent, operation
+`CRM.LEAD.CONVERT`, fingerprint `crm.lead.convert.v1`, transport retry
+`NEVER`, replay response limit 131072 bytes. The UI uses the canonical
+`/api/tenant/crm/v1/leads/:id/convert` path, one UUIDv7
+`x-idempotency-key` and one immutable request body per submitted attempt.
+No automatic conversion is triggered on open, field change or review.
 
-So converting a lead whose Party is a `PERSON` with `profileType: "CORPORATE"`
-is a **409, not a silent mutation**. That is the correct behaviour and this page
-now says so rather than leaving the reader to discover it: Party type is an
-identity invariant, and every projection that has already resolved that Party
-would be corrupted by changing it. A workflow's convenience does not outrank an
-identity invariant.
-
-The right shape for a genuine individual-to-corporate promotion is a **new
-organization Party plus a relationship**, with lineage kept on both — not a type
-change. That is not built, in this portal or in crm-app.
-
-> **Portal gap, recorded here rather than assumed away.** `PARTY_TYPE_IMMUTABLE`
-> appears nowhere in `src/` — the conversion drawer does not name it, so a user
-> who picks the wrong profile type gets the generic 409 copy instead of the one
-> sentence that would tell them what to do. It is a real reachable outcome of a
-> live screen.
+Errors include 403 scoped access/owner denial, 404 missing lead, 409
+`LEAD_ALREADY_CONVERTED` / `PARTY_TYPE_IMMUTABLE`, and 422 conversion,
+contact-name, pipeline-stage, nested-opportunity or required-custom-field
+validation. Preserve the draft on a definite rejection and refresh on conflict.
+An uncertain outcome freezes the body/key even across modal close/reopen and
+offers explicit same-request retry plus refresh. Applied-but-unreadable 2xx
+permits refresh, never another write. See the
+[modal behavior](../design/detail-screens.md#lead-conversion).
 
 ## PATCH /leads/:id · DELETE /leads/:id
 
 Update returns `200` with the updated lead (`404`, `409`, `422`).
 Delete is a **soft delete**, returns **`204` with no body** (`404`, `409`).
+
+### Contacts on the One Lead screen
+
+Source: `crm-app/src/crm/leads/dto/lead.dto.ts`, the lead detail read model,
+`LeadsService.update` and `PartyDirectoryAdapter`. Verified 2026-09-07.
+
+`GET /leads/:id` returns `contacts[]` with `partyId`, `relationshipId`,
+`displayName`, `firstName`, `lastName`, `honorificTitle`, `jobTitle`,
+`isPrimary`, `email` and `phones[]`. This list belongs to the lead, not the
+company's entire Directory. `primaryContactName` is only a list/card summary.
+Company and Contacts consume this one validated response; no Directory lookup
+is needed to render either card.
+
+For a corporate lead, PATCH `contacts` is a **replacement list**, maximum 20:
+each existing person is identified by `contactPartyId` (the read model's
+`partyId`). The contact modal's CRM write sends only that ID, `jobTitle`
+and `isPrimary` for each person. All people and untouched job titles must remain
+in the list; an empty job title clears the relationship label. Exactly one
+contact is selected as primary by this editor. It does not add/remove people.
+
+When `contactPartyId` is supplied, identity/contact inputs do **not** update
+that existing person. Omitting the ID takes the create-person path and must
+never be used as an edit workaround. `relationshipId` is read-only and is not
+a PATCH key. A single atomic contact update remains the boundary recorded in
+[OPEN-QUESTIONS Q133](../build/OPEN-QUESTIONS.md#q133--existing-corporate-contact-identity-is-not-editable-through-lead-patch).
+
+The per-person modal supports full identity editing through **Core Directory**,
+not by widening `UpdateLeadDto`: permission-gated GET/PATCH
+`/api/tenant/core/v1/directory/parties/:partyId`, and POST under
+`/parties/:partyId/contact-methods` or PATCH/DELETE
+`/directory/contact-methods/:methodId`. It requires `directory.party.read`,
+`directory.party.manage` and `directory.contact.manage`; server branch checks
+remain authoritative. Read the selected person on open to obtain actual method
+IDs. Preserve existing `PHONE`/`MOBILE` types, all other people, and unrelated
+methods; edit only the selected email. Clearing that email removes that method
+only; another stored email remains and may become the displayed email after
+refresh. No ID-free person creation is used.
+
+These operations are **not atomic**. Stop at the first failure, retain the
+modal, distinguish partial/uncertain outcomes, and require explicit reload
+before retrying after any applied or uncertain operation. A fresh lead read
+before the relationship replacement preserves other contact rows. Re-read
+the lead after completion; never simulate a successful response.
+
+For an individual lead, the same card PATCHes only changed supported fields:
+`displayName` (nonempty, max 180), `firstName`/`lastName` (max 80),
+`honorificTitle` (max 40), `email` (max 180) and `phones` (max 10 strings,
+max 32 each). Email and honorific can be cleared with `null`; a changed phone
+list is sent whole. The read projection includes `MOBILE` and `PHONE`, while
+individual `phones` writes sync `MOBILE` only: removing a Directory `PHONE`
+entry through this route is not guaranteed. Do not claim cross-kind deletion.
+
+Both profile types require the lead update capability and a non-converted lead.
+The editor sends no request on cancel/no change, keeps drafts on definite
+failure, and re-reads after an uncertain or applied-but-unreadable result rather
+than presenting simulated success or retrying with a fresh write automatically.
+
+## One Lead Details editor
+
+Verified 2026-09-07 against `UpdateLeadDto`, Lead detail/tags read models,
+Core tenant-users controller/service and Gateway route contracts.
+
+The Details card PATCHes only changed `acquisitionSourceId`, `ownerUserId`,
+`interestSummary`, `expectedNeed` and `description`. Created by, creation date
+and last update are response-only. The owner defaults to the current actor only
+in an unassigned lead's edit draft; opening the page never writes an assignment.
+`ownerUserId` is validated by the service's assignment/branch rules.
+
+The Details form is immediately editable when the lead update capability allows
+it and the lead is not converted. Save is explicit; typing or mounting never
+sends a PATCH. Save/cancel keep the form open. Clean fields follow fresh reads,
+dirty drafts retain their original comparison baseline, and ambiguous or
+applied-but-unreadable writes require reconciliation before another write.
+The one-lead page no longer mounts its standalone notes-ledger card; Notes in
+Details remains `description`. This removes no stored ledger notes and makes
+no notes-ledger create/delete call.
+
+`GET /api/tenant/crm/v1/leads/:id/tags` supplies the read-only tags.
+Owner/creator names use the authenticated actor when IDs match; otherwise
+`GET /api/tenant/core/v1/users/:id` requires `users.user.read`. The owner picker
+uses the same permission-gated `/users` list filtered by branch and ACTIVE
+status, paginated fully, then narrowed to the CRM update capability's owner IDs
+(`null` means all, not an empty list). Neither user response exposes an avatar
+URL; use initials until a real image contract exists. A missing permission or
+failed request must not invent names or impersonate the current actor.
 
 ## Company options
 
@@ -196,6 +394,54 @@ Both require `crm.leads.create`. Both are Gateway-exposed (previously
 documented otherwise — that was wrong).
 
 ## Frontend notes
+
+### One Lead side-panel contract (2026-09-07)
+
+History is the default of three icon tabs; Activities and Attachments load on
+first selection and keep their state when hidden. These tabs do not change the
+Lead GET/PATCH DTO or add another main-column attachments section.
+
+- Open activities use `GET /api/tenant/core/v1/activities` with
+  `targetApp=CRM`, `targetType=LEAD`, `targetId=<lead.id>`, `status=PLANNED`,
+  `sortBy=dueAt`, `sortDir=ASC`, `limit=25` and every page until `hasNext=false`.
+  Core returns `{items,total,page,limit,totalPages,hasNext}` inside `data`
+  (no `hasPrev`, so no pagination `meta` here). Read remains gated by
+  `activities.read`; row writes retain separate `activities.update`,
+  `activities.complete`, `activities.cancel` permissions, `If-Match` versions
+  and one UUIDv7 idempotency key per attempt. Do not use CRM's DONE activity
+  log endpoint for this planned-work list. The modal and rail share the reader
+  and `ActivityList` presentation. Their writes re-read the open list.
+- Attachments use the raw CRM `GET /api/tenant/crm/v1/attachments` response,
+  scoped by `branchId`, `sourceType=LEAD`, `sourceId=<lead.id>`, `limit=50`
+  and every page. Unlike Core activities, an empty CRM list has `totalPages=0`.
+  Both all-pages readers validate pagination, reject duplicate IDs and never
+  present a partial result as the full list; aborts cannot commit stale data.
+- Add attachment uses existing `POST /api/tenant/crm/v1/attachments/upload`,
+  one file per multipart request, the existing MIME allowlist and **25 MiB**
+  cap. Preserve source-owner create/delete capabilities and read-only access
+  mode; no permission is granted by selecting a tab. The queued upload and
+  ambiguous/applied-unreadable evidence survive tab switches.
+- Download uses same-origin navigation to
+  `GET /api/tenant/crm/v1/attachments/:id/download`; its attachment stream is
+  handled by the browser with session cookies, not the JSON transport. No
+  token, file bytes or invented public storage URL is put in the page.
+
+Verified against Core activities controller/service, CRM notes/attachments
+controller/service and Gateway route contracts. The visual contract is
+[Views → Leads](../design/views.md#leads), with the reusable template described
+in [ActivityList](../design/patterns.md#activitylist).
+
+### Existing lead integration
+
+- One Lead's History combines Lead + current company/person Party + current
+  contact Parties through the existing Core history endpoint's bounded
+  `relatedPartyIds` query. It uses IDs already in the detail response; no
+  per-contact fetch or client-side merging of separately paginated logs.
+  See [the related history contract](core-directory.md#related-party-history).
+- Pass the committed `lead` object as `EntityHistoryCard.refreshToken`, not only
+  `lead.updatedAt`: Directory/contact saves can leave the Lead timestamp intact.
+  New saves reset History to page one and abort stale page loads. Refresh/reopen
+  the detail page to see edits made elsewhere; this is not a realtime push feed.
 
 - Board axis is the **tenant lead-stage catalogue**, ordered by `sortOrder` —
   fetch from `/lead-stages`. Never hardcode stage names or assume a count.
@@ -222,6 +468,7 @@ documented otherwise — that was wrong).
 | List, branch-scoped, paginated | live |
 | Basic search — one field, one value | live |
 | Create | live |
+| Tags during create | live — multi-select catalogue ids in the single atomic, idempotent create request |
 | Delete | live |
 | Stage move + board | live |
 | Card view | live |
@@ -229,5 +476,5 @@ documented otherwise — that was wrong).
 | Capabilities-driven actions | live — every control on the list and the detail screen |
 | Detail route | live — `/crm/leads/[id]`; **the proxy does not admit the path yet, see OPEN-QUESTIONS.md Q40** |
 | Update | live — `PATCH /:id`, changed keys only |
-| Convert flow | live — three-step drawer, one idempotency key per attempt |
+| Convert flow | centered Small modal with review; immutable body/key per attempt; full verified DTO and flat-ID receipt |
 | Company options | live — both routes, in the create drawer |

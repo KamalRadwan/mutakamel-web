@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from controller DTO source)
 
-Last source verification: **2026-09-05**
+Last source verification: **2026-09-09**
 
-Classes: **46** · Fields: **295**
+Classes: **46** · Fields: **303**
 
 ## How to read this
 
@@ -96,6 +96,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `branchId` | UUIDv7 | **yes** | — |
 | `leadProfileType` | enum CrmProfileTypeEnum | **yes** | — |
 | `stageId` | UUIDv7 | no | — |
+| `tagIds` | UUIDv7[] | no | transformed, max MAX_TAGS_PER_ATTACH items, unique items |
 | `displayName` | string | no | non-empty, max 180 |
 | `firstName` | string | no | max 80 |
 | `lastName` | string | no | max 80 |
@@ -110,6 +111,8 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `commercialRegistrationNumber` | string | no | max 64 |
 | `companyPhone` | string | no | max 32 |
 | `companyPhones` | array | no | max 10 items, each item max 32 |
+| `companyEmail` | email | no | max 180 |
+| `companyWebsite` | string | no | max 255 |
 | `contacts` | array | no | max 20 items, nested, of `CreateLeadCorporateContactDto` |
 | `address` | object | no | nested, of `CreateLeadPartyAddressDto` |
 | `acquisitionSourceId` | UUIDv7 | no | — |
@@ -130,9 +133,14 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `primaryMobile` | string | no | max 32 |
 | `phones` | array | no | max 10 items, each item max 32 |
 | `email` | email | no | max 180 |
-| `companyName` | string | no | max 180 |
+| `companyName` | string | no | non-empty, max 180 |
 | `companyPhones` | array | no | max 10 items, each item max 32 |
+| `companyEmail` | email | no | max 180 |
+| `companyWebsite` | string | no | max 255 |
+| `taxNumber` | string | no | max 64 |
+| `commercialRegistrationNumber` | string | no | max 64 |
 | `contacts` | array | no | max 20 items, nested, of `CreateLeadCorporateContactDto` |
+| `address` | object | no | nested, of `CreateLeadPartyAddressDto` |
 | `acquisitionSourceId` | UUIDv7 | no | — |
 | `rating` | integer | no | >= CRM_LEAD_RATING_MIN, <= CRM_LEAD_RATING_MAX |
 | `cardColor` | enum CrmLeadCardColorEnum | no | — |
@@ -386,7 +394,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/lead-stages/dto/lead-stage.dt
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
-| `orderedIds` | UUIDv7 | **yes** | max 500 items |
+| `orderedIds` | UUIDv7[] | **yes** | max 500 items, unique items |
 
 ## Acquisition sources
 
@@ -412,7 +420,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/acquisition-sources/dto/acqui
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
-| `orderedIds` | UUIDv7 | **yes** | max 500 items |
+| `orderedIds` | UUIDv7[] | **yes** | max 500 items, unique items |
 
 ### `ListAcquisitionSourcesQueryDto`
 

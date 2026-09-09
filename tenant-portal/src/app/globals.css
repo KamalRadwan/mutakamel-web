@@ -64,6 +64,16 @@
   --color-brand-900:     oklch(0.321 0.101 266.2);
   --color-brand-950:     oklch(0.245 0.098 267.1);
 
+  /* CHROME — the global nav's surface in light mode, and nothing else. #000068.
+     It is the brand hue (264.05, against brand-600's 264.376) at the darkest
+     end of the ramp, so it reads as this product's own blue rather than as a
+     borrowed navy. It is NOT a ramp step: the brand ramp desaturates as it
+     darkens (C 0.217 at 600 down to 0.098 at 950) and this holds C 0.162, which
+     is the point — a chrome band wants the saturation the ramp gives up. Kept
+     out of the ramp so nobody reaches for it as "brand-1000" on a surface where
+     that curve is the rule. */
+  --color-chrome:        oklch(0.233811 0.162024 264.051);
+
   /* POSITIVE (admin: success) — healthy, completed, connected, verified. */
   --color-positive-50:   oklch(0.981926 0.01806 155.826);
   --color-positive-100:  oklch(0.962 0.044 156.743);
@@ -187,6 +197,10 @@
   --color-surface-100: var(--color-ink-100);
   --color-surface-200: var(--color-ink-200);
   --color-surface-300: var(--color-ink-300);
+
+  /* Service identity marks only; never use these colors for status or generic controls. */
+  --color-channel-whatsapp: #25d366;
+  --color-channel-telegram: #26a5e4;
 
   /* Type scale — 7 steps, 13px floor, 14px base. Ported from admin; the two
      steps that moved are text-2xs (12->13px, admin uses it as a compatibility
@@ -348,6 +362,26 @@ html[lang="ar"] {
   --sidebar-border: var(--color-ink-200);
   --sidebar-ring: var(--color-brand-500);
 
+  /* THE NAV SURFACE — the global nav is an inverted island in light mode.
+     Both bars used to be --card on an ink-50 canvas, so 90px of chrome was
+     separated from the workspace by one hairline. The top bar now carries the
+     brand colour and everything on it flips with it; the action bar below stays
+     on --card, which is what keeps the screen's primary button (brand-600, only
+     2.61:1 against the chrome) on a surface it was measured for.
+
+     Every value here is opaque and comes from a ramp, so scripts/design/
+     contrast.mjs can measure the pair — an rgb(255 255 255 / 0.7) muted text
+     would be invisible to that gate. Ratios against --color-chrome are pinned
+     as CLAIMS there; the summary is white 17.5:1, ink-400 ~7:1, brand-300
+     9.7:1. `.nav-surface` below is what hands these to the controls. */
+  --nav: var(--color-chrome);
+  --nav-foreground: white;
+  --nav-muted-foreground: var(--color-ink-400);
+  --nav-accent: var(--color-brand-900);
+  --nav-border: var(--color-brand-800);
+  --nav-active: var(--color-brand-300);
+  --nav-ring: white;
+
   /* Chart roles are semantic first. Qualitative slots are reserved for
      unrelated categories and are always paired with labels or patterns.
      Marks sit just above WCAG's 3:1 floor for non-text graphics; the axis,
@@ -452,6 +486,12 @@ html[lang="ar"] {
      written down. */
   --size-chrome: calc(var(--size-topbar) + var(--size-actionbar)); /* 90px */
 
+  /* A collapsed board column: wide enough for the expand control and the stage
+     name turned on its side, narrow enough that four collapsed stages cost
+     less than one open one. Scales with density like every other size here, so
+     a compact board's collapsed rail stays in proportion to its cards. */
+  --size-column-collapsed: calc(2.8125rem * var(--ui-scale)); /* 45px */
+
   /* Stacking order — six real layers. They collide if left to chance: a
      sticky table column will happily cover an open dropdown. Declared once
      here; never write a bare z-50. Three orderings are easy to get backwards.
@@ -515,6 +555,36 @@ html[lang="ar"] {
     min-block-size: 2.75rem;
     min-inline-size: 2.75rem;
   }
+}
+
+/* The nav surface — the one place in the product where the semantic colour
+   names mean something else. They are re-pointed here rather than overridden
+   control by control: a ghost Button on the bar asks for `hover:bg-accent`, a
+   Separator for `bg-border`, `focusRing` for `ring-ring` and
+   `ring-offset-background`, and all of them land on the on-chrome value without
+   knowing they are on the bar. A control added to the bar next year inherits
+   that for free, which a list of per-component overrides could not promise.
+
+   It stops at the bar. Every menu opened from here is a Radix portal rendered
+   under <body>, outside this subtree, so a dropdown keeps the light popover
+   surface — the menus are content, the bar is chrome.
+
+   --primary is deliberately NOT re-pointed: there is no filled primary on this
+   bar (the screen's one primary lives in PageActionBar, which stays on --card),
+   and brand-600 measures 2.61:1 against the chrome. If a primary button ever
+   has to sit here, it needs its own on-chrome fill, not this block.
+
+   In dark mode every --nav-* points back at the value the control would have
+   read anyway, so the whole block is a no-op there. */
+.nav-surface {
+  --background: var(--nav);
+  --card: var(--nav);
+  --foreground: var(--nav-foreground);
+  --muted-foreground: var(--nav-muted-foreground);
+  --accent: var(--nav-accent);
+  --accent-foreground: var(--nav-foreground);
+  --border: var(--nav-border);
+  --ring: var(--nav-ring);
 }
 
 /* Semantic roles — dark overrides, ported from admin. Interactive fills use
@@ -597,6 +667,19 @@ html[lang="ar"] {
   --sidebar-selected-foreground: var(--color-brand-200);
   --sidebar-border: var(--color-ink-800);
   --sidebar-ring: var(--color-brand-400);
+
+  /* Dark mode keeps the bar exactly as it was, so `.nav-surface` resolves to a
+     no-op here: every name points back at the value the control would have read
+     anyway. The chrome navy is a LIGHT-mode decision — against an ink-1000
+     canvas a saturated dark blue separates less than the card surface does, and
+     inverting an already-inverted theme inverts nothing. */
+  --nav: var(--card);
+  --nav-foreground: var(--foreground);
+  --nav-muted-foreground: var(--muted-foreground);
+  --nav-accent: var(--accent);
+  --nav-border: var(--border);
+  --nav-active: var(--sidebar-active);
+  --nav-ring: var(--ring);
 
   --chart-action: var(--color-brand-400);
   --chart-success: var(--color-positive-400);
@@ -715,6 +798,14 @@ html[lang="ar"] {
   --color-sidebar-selected-foreground: var(--sidebar-selected-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Only the two the nav names directly: `bg-nav` on the bar itself, and
+     `bg-nav-active` for the 2px marker under an open section. Everything else
+     on the bar goes through `.nav-surface`, which re-points the ordinary
+     semantic names — a control there asks for `text-muted-foreground` like any
+     other control in the product and gets the on-chrome value. */
+  --color-nav: var(--nav);
+  --color-nav-active: var(--nav-active);
 
   /* Card swatches. `inline` matters here for the usual reason — a plain
      @theme would resolve these once at :root and .dark's override would never

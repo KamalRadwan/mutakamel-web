@@ -3,26 +3,26 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-09-05T03:38:04.415Z**
+Generated at: **2026-09-08T23:15:14.736Z**
 
-Frontend revision: `5afe27a852af+dirty`
+Frontend revision: `bfdcef527d4d+dirty`
 
-Backend revision: `244b9a7f64c4+dirty`
+Backend revision: `500a64386c8a+dirty`
 
 ## Coverage
 
-This inventory contains **253** browser-visible Core Admin routes.
+This inventory contains **282** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 89 |
+| AUTHENTICATED | 102 |
 | PUBLIC | 6 |
 | READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 137 |
-| **Total** | **253** |
+| WRITE_SENSITIVE | 153 |
+| **Total** | **282** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -31,7 +31,7 @@ Machine-readable source:
 
 | Gateway route-key domain | Routes |
 | --- | ---: |
-| applications | 17 |
+| applications | 42 |
 | audit | 3 |
 | auth | 12 |
 | auth-invalidation-outbox | 1 |
@@ -48,7 +48,7 @@ Machine-readable source:
 | roles | 6 |
 | storage-migrations | 3 |
 | storage-servers | 11 |
-| subscriptions | 8 |
+| subscriptions | 12 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
 | tenants | 57 |
@@ -70,12 +70,37 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/applications/:applicationKey` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.get` |
 | PATCH | `/api/admin/core/v1/applications/:applicationKey` | WRITE_SENSITIVE | yes | ALL | admin.applications.update | `core.admin.applications.update` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/activate` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.activate` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.list` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/addons` | WRITE_SENSITIVE | yes | ALL | admin.applications.create | `core.admin.applications.addons.create` |
+| DELETE | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey` | WRITE_SENSITIVE | yes | ALL | admin.applications.delete + admin.applications.critical | `core.admin.applications.addons.delete` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.get` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey` | WRITE_SENSITIVE | yes | ALL | admin.applications.update | `core.admin.applications.addons.update` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/audit` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.audit.list` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/component-bindings` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.components.get` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/component-bindings` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.components.replace` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/configuration-schema` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.configuration-schema.get` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/configuration-schema` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.configuration-schema.replace` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/deprecate` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.deprecate` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/disable` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.disable` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/drafts` | WRITE_SENSITIVE | yes | ALL | admin.applications.update | `core.admin.applications.addons.drafts.create` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/feature-grants` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.grants.get` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/feature-grants` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.grants.replace` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/price-tiers` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.prices.list` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/price-tiers` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.prices.replace` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/publish` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.publish` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/tier-compatibility` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.compatibility.get` |
+| PATCH | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/tier-compatibility` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.compatibility.replace` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/versions` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.versions.list` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/versions/:versionId` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.addons.versions.get` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/addons/:addonKey/versions/:versionId/revoke` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.addons.versions.revoke` |
 | GET | `/api/admin/core/v1/applications/:applicationKey/database-manifests` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.database-manifests.list` |
 | PATCH | `/api/admin/core/v1/applications/:applicationKey/database-policy` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.database-policy.update` |
 | GET | `/api/admin/core/v1/applications/:applicationKey/database-servers` | AUTHENTICATED | yes | ALL | admin.database_servers.read | `core.admin.applications.database-servers.list` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/database-servers/bind` | WRITE_SENSITIVE | yes | ALL | admin.database_servers.update + admin.database_servers.critical | `core.admin.applications.database-servers.bind` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/deprecate` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.deprecate` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/disable` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.disable` |
+| POST | `/api/admin/core/v1/applications/:applicationKey/publication-baseline` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.publication-baseline.create` |
+| GET | `/api/admin/core/v1/applications/:applicationKey/publication-baseline/source` | AUTHENTICATED | yes | ALL | admin.applications.read + admin.applications.critical | `core.admin.applications.publication-baseline.source` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/publish` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.publish` |
 | GET | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning` | AUTHENTICATED | yes | ALL | admin.applications.read | `core.admin.applications.technical-provisioning.get` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/adopt` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.adopt` |
@@ -214,8 +239,10 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/subscriptions` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.list` |
 | POST | `/api/admin/core/v1/subscriptions/:id/plan-change-previews` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update | `core.admin.subscriptions.v1.plan-change-previews.create` |
 | POST | `/api/admin/core/v1/subscriptions/:id/plan-change-previews/:previewId/apply` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update + admin.subscriptions.critical | `core.admin.subscriptions.v1.plan-change-previews.apply` |
+| GET | `/api/admin/core/v1/subscriptions/:id/plan-change-previews/:previewId/receipt` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.plan-change-previews.receipt.get` |
+| POST | `/api/admin/core/v1/subscriptions/:id/preparations` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update | `core.admin.subscriptions.preparations.create` |
 | POST | `/api/admin/core/v1/subscriptions/:tenantId/cancel` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.cancel + admin.subscriptions.critical | `core.admin.subscriptions.cancel` |
-| POST | `/api/admin/core/v1/subscriptions/quote` | AUTHENTICATED | yes | ANY | admin.catalog.read OR admin.tenants.create | `core.admin.subscriptions.v1.quote` |
+| POST | `/api/admin/core/v1/subscriptions/quote` | AUTHENTICATED | no | ANY | admin.catalog.read OR admin.tenants.create | `core.admin.subscriptions.v1.quote` |
 | GET | `/api/admin/core/v1/system-settings` | AUTHENTICATED | yes | ALL | admin.settings.read | `core.admin.system-settings.list` |
 | GET | `/api/admin/core/v1/system-settings/:key` | AUTHENTICATED | yes | ALL | admin.settings.read | `core.admin.system-settings.get` |
 | PUT | `/api/admin/core/v1/system-settings/:key` | WRITE_SENSITIVE | yes | ALL | admin.settings.update + admin.settings.critical | `core.admin.system-settings.upsert` |
@@ -284,6 +311,8 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/tenants/:tenantId/subscription` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.v1.get` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/subscription` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.create + admin.subscriptions.critical | `core.admin.subscriptions.v1.seed` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/subscription/items` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.v1.items.list` |
+| GET | `/api/admin/core/v1/tenants/:tenantId/subscription/operations/:operationId` | AUTHENTICATED | yes | ALL | admin.subscriptions.read | `core.admin.subscriptions.operations.get` |
+| POST | `/api/admin/core/v1/tenants/:tenantId/subscription/operations/:operationId/recovery` | WRITE_SENSITIVE | yes | ALL | admin.subscriptions.update + admin.subscriptions.critical | `core.admin.subscriptions.operations.recover` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/wallet` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.wallets.by-tenant.list` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/wallet/adjustments` | WRITE_SENSITIVE | yes | ALL | admin.wallet.manage + admin.wallet.critical | `core.admin.wallets.adjustments.create` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/wallet/adjustments/preview` | WRITE_SENSITIVE | yes | ALL | admin.wallet.manage | `core.admin.wallets.adjustments.preview` |

@@ -26,6 +26,7 @@ describe("lead detail capabilities", () => {
       update: { scope: "own", ownerUserIds: [OWNER] },
       delete: null,
       convert: { scope: "all", ownerUserIds: null },
+      opportunitiesCreate: { scope: "all", ownerUserIds: null },
       notesCreate: { scope: "team", ownerUserIds: [OWNER] },
       notesDelete: null,
       attachmentsCreate: { scope: "team", ownerUserIds: [OWNER] },

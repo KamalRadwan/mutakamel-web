@@ -80,11 +80,11 @@ height. `dvh`, not `vh`, so mobile browser chrome does not clip the board.
 scroll-margin for the chrome: an in-page anchor scrolls **inside** `<main>` and
 never under the bars.
 
-**The content inset is 20px at the top** and 16px / 24px (`md`) on the other
-three sides — `p-4 pt-5 md:p-6 md:pt-5`. The top is the odd one out on purpose:
-the bar directly above already names the screen, so what is left between them is
-spacing and nothing else, and the 24px inherited from the sidebar era read as a
-gap where a page title used to sit.
+**The content inset is 10px on every side, at every width** — `p-2.5`. The bar
+directly above already names the screen, so the space between it and the first
+control is spacing and nothing else; the 16/24px this inherited from the sidebar
+era read as a gap where a page title used to sit, and on the 1366×768 laptop
+this is built for it spent 48px of vertical budget on nothing.
 
 ## GlobalNav — 45px
 
@@ -103,6 +103,22 @@ then relies on.
 The account cluster keeps the order it had in the topbar. WCAG's
 consistent-help expects the same controls in the same order on every route, and
 moving them would have restarted that habit for nothing.
+
+### The bar carries the brand colour
+
+This bar is the product's one inverted surface: `bg-nav`, which is
+`--color-chrome` — the brand hue at the ramp's darkest end, `#000068` for the
+system brand and the tenant's own hue for a branded portal. `PageActionBar`
+below it stays `--card`, which is what keeps a screen's primary button on a
+surface it was measured for; the two bars therefore no longer read as one
+90px block, and read instead as brand chrome above a working bar.
+
+Nothing in this bar styles itself for that. `.nav-surface` on the `<header>`
+re-points the ordinary semantic names for the subtree, so a control here asks
+for `text-muted-foreground` and `hover:bg-accent` exactly as it would anywhere
+else. The tokens, the measured ratios and the three conditions this depends on
+are in [tokens.md](tokens.md#the-nav-is-the-one-inverted-surface); the rule it
+narrowed is [anti-patterns.md § 8](anti-patterns.md).
 
 ### Sections are menus, not links
 
@@ -161,6 +177,13 @@ derived from `nav-config.ts` by `usePathname()` (`useNavLocation.ts`).
 Without it the shell would have traded a permanent location indicator for none,
 which is the one real thing a horizontal nav costs.
 
+**The screen half is a link; the section half is not.** A section has no index
+route to point at, but a nav item always has one — and on a detail route the
+match is a prefix, so standing on `/crm/leads/<id>` the label reads "Leads" and
+links to `/crm/leads`. That makes the bar the way back to the list, which is
+the trip a reader makes from a record far more often than any other, and it is
+why a detail screen no longer needs to draw its own back arrow in the body.
+
 Matching is **longest prefix wins, at a path boundary**. Both halves matter:
 `/core/settings` and `/core/settings/currencies` are both nav items and both
 prefix the currencies route, so a first-match scan labels every settings screen
@@ -172,10 +195,27 @@ one above it.
 
 ### It holds the screen's controls
 
-Three regions, in render order: **`actions` · `search` · `view`**. `view` sits
-at the inline end because it is the only control that changes how the screen is
-drawn rather than what it holds, so a fixed edge keeps it still as a screen
-gains or loses actions.
+Four regions, in render order: **`related`** in the middle, then
+**`actions` · `search` · `view`** in a trailing cluster. `view` sits at the
+inline end because it is the only control that changes how the screen is drawn
+rather than what it holds, so a fixed edge keeps it still as a screen gains or
+loses actions.
+
+#### The middle is for other records
+
+`related` is the one region that is not about this screen. It holds links that
+LEAVE it — a lead's opportunities, its quotations, its sales orders, its
+invoices, each with the number of records behind it — and it is separated from
+the trailing cluster for exactly that reason: a control that navigates away
+must not sit in the same group as the controls that act on what is in front of
+you.
+
+It is `mx-auto` and `empty:hidden`, so it centres in whatever room the location
+text and the trailing cluster leave, and disappears entirely on the screens
+that register nothing — which is every list screen. `LeadRelatedNav`
+(`crm/leads/[id]`) is the first and so far only filler; see
+[views.md](views.md#leads) for what it counts and why the opportunities join
+differs from the other three.
 
 Screens fill them with `<PageActions slot="…">`, which **portals** the DOM into
 the bar while the control stays mounted inside the page that declared it:

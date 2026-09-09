@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import { readRouteContracts } from "./route-contract-reader.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const checkOnly = process.argv.includes("--check");
@@ -48,91 +48,6 @@ const canonicalizationSource = resolve(
   gatewayRoot,
   "src/routing-proxy/gateway-api-path.ts",
 );
-
-function unwrapExpression(node) {
-  if (
-    ts.isAsExpression(node) ||
-    ts.isSatisfiesExpression(node) ||
-    ts.isParenthesizedExpression(node) ||
-    ts.isTypeAssertionExpression(node)
-  ) {
-    return unwrapExpression(node.expression);
-  }
-  return node;
-}
-
-function propertyName(node) {
-  if (
-    ts.isIdentifier(node) ||
-    ts.isStringLiteral(node) ||
-    ts.isNumericLiteral(node)
-  ) {
-    return node.text;
-  }
-  throw new Error(`Unsupported property name: ${node.getText()}`);
-}
-
-function evaluateExpression(input) {
-  const node = unwrapExpression(input);
-
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-    return node.text;
-  }
-  if (ts.isNumericLiteral(node)) {
-    return Number(node.text);
-  }
-  if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
-  if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
-  if (node.kind === ts.SyntaxKind.NullKeyword) return null;
-  if (ts.isPropertyAccessExpression(node)) return node.name.text;
-  if (ts.isArrayLiteralExpression(node)) {
-    return node.elements.map(evaluateExpression);
-  }
-  if (ts.isObjectLiteralExpression(node)) {
-    const value = {};
-    for (const property of node.properties) {
-      if (!ts.isPropertyAssignment(property)) {
-        throw new Error(`Unsupported object member: ${property.getText()}`);
-      }
-      value[propertyName(property.name)] = evaluateExpression(
-        property.initializer,
-      );
-    }
-    return value;
-  }
-
-  throw new Error(`Unsupported route expression: ${node.getText()}`);
-}
-
-function extractRoutes(filePath) {
-  const sourceText = readFileSync(filePath, "utf8");
-  const sourceFile = ts.createSourceFile(
-    filePath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-
-  for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (
-        ts.isIdentifier(declaration.name) &&
-        declaration.name.text === "CORE_ROUTE_CONTRACTS" &&
-        declaration.initializer
-      ) {
-        const value = evaluateExpression(declaration.initializer);
-        if (!Array.isArray(value)) {
-          throw new Error("CORE_ROUTE_CONTRACTS is not an array");
-        }
-        return value;
-      }
-    }
-  }
-
-  throw new Error(`CORE_ROUTE_CONTRACTS was not found in ${filePath}`);
-}
 
 function canonicalize(pathPattern) {
   const match = pathPattern.match(
@@ -183,7 +98,8 @@ function escapeMarkdown(value) {
   return String(value).replaceAll("|", "\\|");
 }
 
-const routes = extractRoutes(sourcePath)
+const extracted = readRouteContracts(sourcePath, "CORE_ROUTE_CONTRACTS");
+const routes = extracted.routes
   .filter((route) => route.routeKey.startsWith("core.admin."))
   .map((route) => ({
     method: route.method,
@@ -231,8 +147,7 @@ for (const route of routes) {
 
 
 const sourceHashes = {
-  [relative(frontendRoot, sourcePath).replaceAll("\\", "/")]:
-    sourceHash(sourcePath),
+  ...Object.fromEntries(extracted.sourceFiles.map(path => [relative(frontendRoot, path).replaceAll("\\", "/"), sourceHash(path)])),
   [relative(frontendRoot, canonicalizationSource).replaceAll("\\", "/")]:
     sourceHash(canonicalizationSource),
 };

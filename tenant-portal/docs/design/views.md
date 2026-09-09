@@ -293,6 +293,45 @@ vertically.
 stage carries an outcome — a 2px top border in the mapped role color from
 [tokens.md](tokens.md#status-mapping). Intermediate stages get no color.
 
+At the end of the header sit up to two controls, in this order: **`+`**, then
+the **collapse toggle**.
+
+- **`+`** appears only where a screen passes `onAddToColumn`, and it hands back
+  the column it was pressed in. The board does not know what creating means —
+  the screen opens its own modal and decides what that column id seeds. On
+  Leads it opens the create modal with the stage already filled in, keyed by
+  stage so pressing `+` in a second column re-seeds instead of showing the
+  first one's, and the field stays editable: a preset that cannot be corrected
+  is a trap rather than a shortcut. Gate it with the same capability that gates
+  the screen's own Add button, or the board offers a create the header refuses.
+- **The collapse toggle** takes the column down to
+  `--size-column-collapsed` (45px), where the stage name turns on its side and
+  the count chip stays under it. `writing-mode: vertical-rl`, not a
+  `rotate(270deg)`: the name reads top to bottom, `truncate` still ends a long
+  stage in an ellipsis because the box is measured the way it is drawn, and
+  Arabic turns with it rather than being laid on its back.
+
+Both toggles carry `aria-expanded` and both names end with the column's own
+label — "Collapse column: Qualifying" — because five identical buttons in a row
+tell a screen-reader user nothing about which stage they are on.
+`collapseColumn` and `expandColumn` are therefore **required** labels, unlike
+`moveTo`.
+
+A collapsed column renders no `Droppable`, so it cannot be dragged into. The
+single-pointer path is unaffected — "Move to…" still lists it — which is also
+what keeps the board's `dragging-alternative` conformance while a stage is
+collapsed.
+
+Collapse is **remembered per route** in
+`localStorage["tenant_board_collapsed_<pathname>"]`, through `safeStorage`, so
+a browser that blocks site data still collapses and merely forgets. It is
+restored in an effect rather than during render: reading storage while
+rendering would make every board with a collapsed stage a hydration mismatch,
+and the cost is one frame in which the column is still open. That is the
+opposite choice from [`useScrollRestoration`](#board-view), which is
+session-scoped — an offset belongs to one visit, a collapsed stage is a
+working preference.
+
 A column may also carry a **distribution bar** under that heading:
 `BoardColumnDef.segments` plus `segmentsLabel`, rendered by
 `ColumnSegmentBar`. Counts, never percentages — the bar divides its own width
@@ -364,17 +403,22 @@ only thing a board is for.
 The menu item is subject to the same capability gate as dragging, and a
 terminal destination confirms the same way.
 
-> **Open regression — the Leads board.** `BoardViewLabels.moveTo` is optional,
-> and omitting it removes the trigger. The redesigned Leads card
-> ([Leads](#leads) below) carries one overflow menu with exactly Open, Delete
-> and Card colour, so it no longer renders **Move to…** — which leaves the
-> Leads board with the keyboard path only and **not** conforming to
-> **Leads** does not render `BoardView`'s own **Move to…** trigger: its card
-> was redesigned down to one overflow menu. The control itself is not gone —
-> it is a section inside that menu, built from the same `stages` and gated by
-> the same rule that gates dragging, so `dragging-alternative` still holds on
-> all three boards. `BoardViewLabels.moveTo` is optional only so a screen may
-> own the menu itself, never so it may drop the capability.
+> **Leads: the alternative is on the detail screen, not on the card
+> (closed 2026-09-07).** The Leads card renders neither `BoardView`'s own
+> **Move to…** trigger nor a move section in its menu — the trigger went when
+> the card was redesigned to one overflow menu, and the section was removed
+> from that menu on request. For a day that left the board with the keyboard
+> path only and **not** conforming.
+>
+> What closed it: the **pipeline bar on `/crm/leads/[id]` is the move**. It
+> calls the same `POST /leads/:id/stage` the drag calls, is gated by the same
+> `capabilities.update` check, refuses the same `CONVERTED` destination, and is
+> reachable with one pointer press or with the keyboard. A card opens its
+> record in one press, so the path from board to moved lead is two.
+>
+> `BoardViewLabels.moveTo` is optional so a screen may own the control itself —
+> never so it may drop the capability. Leads owns it on the detail screen; a
+> screen that owns it nowhere is the configuration this rule forbids.
 
 **Card content** is per-screen; see the table at the end of this file.
 
@@ -620,6 +664,281 @@ across the transport's retries of that press — `crm/shared/crm-write.ts`,
 rule 1. A fresh key per retry books the activity twice. A successful create re-reads
 both halves: the dialog's list, and the board, whose `nextActivity` bucket the
 server owns.
+
+**One Lead Small density — updated 2026-09-07.** Scope this to
+`/crm/leads/[id]` and its company/contact/activity edit modals, not the entire
+portal. Use `gap-2` (8px) between cards and `p-2` within card headers/bodies;
+field rows use `gap-y-1` and 24px minimum read-value height. Card headings use
+`text-sm`; labels and body facts retain readable `text-xs` (13px English,
+14px Arabic). Controls and action buttons use `sm` (28px), identity avatars
+24px, and Details textareas start at two rows and remain resizable. Mobile
+inputs retain 16px text to avoid focus zoom. Keep Contacts at full column width
+with two equal person cards per row at `sm` and above; keep the commercial
+registration label's intrinsic width and single-line text.
+
+Shared `DetailSection`, `Timeline`, `ActivityList`, `AttachmentList` and
+`FormModal` opt in with `density="compact"`; their standard defaults are
+unchanged elsewhere. Company/contact modal sections inherit the modal density,
+including through its portal. No CSS zoom, root scale change, hidden content,
+or permission/write-contract change is part of this density setting.
+
+Phone actions use the local [ContactChannelIcon](icons.md#contact-channel-marks)
+component: a solid green call glyph and the authentic colored WhatsApp and
+Telegram marks. Preserve the existing `tel:`, `wa.me`, and `t.me` destinations.
+The third action currently targets Telegram, not Instagram; an Instagram
+action requires a real account URL and must never disguise a Telegram link.
+
+**The detail screen is a pipeline bar over the main cards and a tabbed end rail.** Top to bottom: the
+`StageBar` the card view draws, marking the stage this lead stands in
+(`aria-current="step"`, no "every stage" step) — and **pressing another stage
+moves the lead**. Same `POST /leads/:id/stage` the drag calls, same
+`capabilities.update` gate, and the same refusals: a `CONVERTED` lead does not
+move, and `CONVERTED` is not a destination — conversion owns that stage, so its
+step is drawn and inert rather than dropped from the pipeline. Without the
+update capability the bar has no handler at all and is simply a picture. This
+is the board's `dragging-alternative`, on the record's own screen.
+Then the start cards: **Company → Contacts → Details** on a corporate lead,
+and **Contacts → Details** on an individual lead. Company contains the company's
+name, tax number, phones, commercial registration, email, website and location;
+it never repeats the contact people. Company and each contact stay read-only
+on the page; their top-end pencils open separate prefilled edit modals.
+
+Its grid is **four columns — label, value, label, value** — so a row carries two
+pairs and the label sits BESIDE its box, not above it. That is why it does not
+use `DetailSection`, which stacks the label over the value: right for a column
+of read-only facts, and twice the height it needs for a form. Each label track
+uses `max-content`, while value tracks use `minmax(0,1fr)`; each field is a
+`col-span-2` cell on `grid-cols-subgrid`, keeping the label/value columns aligned
+across rows. Below `sm` the pairs stack to one label/value column, still side by
+side. Company field groups need not be exactly equal width; the separate
+Contacts cards retain their 50%/50% layout.
+
+The commercial registration label has enough intrinsic column width for the
+full **Commercial registration number** on one line (`whitespace-nowrap`). Keep
+its original `text-xs` size and normal weight: enlarge the available label
+space, not its font, and do not insert a line break. This applies in Arabic too.
+The stored registration number and modal form label remain unchanged.
+
+**Edit in a modal, never inline** (updated 2026-09-07). The Company pencil opens
+a centred `FormModal` containing only company fields and its address, never
+contact people. Save sends one PATCH carrying only changed fields; a changed
+phone array or address travels whole. Invalid fields keep the form open with
+inline errors. Cancel/close/Escape use the dirty-discard guard; untouched Save
+sends nothing. The page remains a read-only summary behind the modal.
+
+Company address editing uses the Lead DTO's `LEGAL` upsert. Other address types
+remain read-only with an explanation. The DTO cannot remove a whole address,
+so a fully cleared address is rejected locally rather than pretending it saved.
+
+Its phone list is the one block that is text even in read mode for a second
+reason: a number carries a call, a WhatsApp and a Telegram action beside it,
+because that is what it is used for a hundred times for every once it is
+corrected. **View mode shows the whole number in one piece; edit mode is where
+it comes apart** into the shared `CrmPhoneNumberInput`'s country code and
+national number inside the modal. The card's read-mode actions remain behind
+the modal and are not editing controls. Both forms come out of the same
+`splitPhoneNumber`, so `00201050049899` and `+20 105 0049 899` display alike and
+split alike; a second implementation in the row would drift from the editor's
+the first time either changed. WhatsApp and Telegram are offered only for a
+number that carries a calling code, because both resolve their path as an
+international number and `wa.me/010…` opens an error page rather than a chat.
+`companyPhones` is an array field, so the list is always sent whole.
+
+Edit mode always shows at least one phone row, plus **Add a number** and a
+per-row remove — bounded by the same `@ArrayMaxSize(10)` and `@MaxLength(32)`
+`CrmPhoneListField` enforces, exported from it so the two cannot disagree. The
+seeded row is what lets a company with no number on file be given one; a row
+left blank is dropped before the request is built, so it costs nothing when it
+is not used, and a row emptied on purpose is how a number is deleted. A row
+added to a company that already has numbers opens on THEIR calling code rather
+than on an empty picker or the reader's own locale — a second number for a
+company in Egypt is an Egyptian number almost every time.
+
+**Contacts is one full-width (100%) outer card**, separate from Company, with a
+single **Contacts** header above the entire collection. Inside it, each person
+occupies 50% of the available row, minus the shared gap, from the
+`sm` viewport breakpoint (`40rem` / 640px). Only smaller viewports stack the
+cards; the narrower main column beside History must not switch desktop contacts
+back to one column. More people continue onto subsequent rows. Person cards do
+not repeat the Contacts header. Their first label/value row is **Full name**,
+followed by job title, all phone numbers and email. The primary marker sits beside
+the full-name value when applicable; that person's pencil is at the inline end
+of the first row. The person's name is not a heading and is not split into
+first/last-name rows. The outer header remains visible for an empty collection.
+There is no collection-wide editor and no duplicate person inside Company.
+The same outer/inner-card structure applies to individual leads.
+
+Company, Contacts and Details are sibling sections. Their React keys include
+both the section role and the lead ID (`company:…`, `contacts:…`, `details:…`),
+never the bare lead ID shared across siblings. This preserves section identity
+on refresh and resets edit drafts when navigating to another lead without
+duplicating or dropping cards. Individual contact keys remain their party IDs.
+
+A contact pencil opens one prefilled modal for **that person only**. It includes
+the supported person DTO fields and lead relationship fields, with explicit Save
+and Cancel. Name/email/phone edits use the person's existing Directory identity
+and contact-method IDs; they require Directory read + party manage + contact
+manage grants. Without those grants, identity remains readable with an
+explanation while lead job title/primary edits remain available. Shared identity
+effects are explained in the modal. No person is recreated or unlinked.
+
+Core person/method updates and the CRM relationship update are separate writes,
+not one transaction. Partial or uncertain results block resubmission and require
+an explicit reload; the UI never announces complete success for a partial save.
+Changing a primary necessarily updates selection across the preserved lead list.
+For an individual lead, the person's own modal edits the supported Lead fields.
+All edit controls require the lead update capability and a non-converted lead.
+See [the contact write contract](../api/crm-leads.md#contacts-on-the-one-lead-screen).
+
+**Details** (updated 2026-09-07) displays Source with its catalog icon/name,
+the lead's Tags, Sales person as an avatar/name selector, creation date,
+immutable Created by with avatar/name, Last updated, then Interest summary,
+Expected need and Notes as textareas. Labels stay visible even when a value is
+read-only. User images are not exposed by the current Core user response;
+the initials fallback uses first/last initials (`Kamal Radwan` → `KR`), never a
+fabricated image or raw UUID presented as a name.
+
+Details is **always in edit mode** for a permitted, non-converted lead: source,
+sales person and the three textareas are ready immediately, with no Edit pencil.
+Save and Cancel stay visible, enabled when there are changes. Save sends changed
+fields only; Cancel resets the draft without closing editing. Neither mounting
+nor typing saves automatically. Clean forms follow fresh server values; unsaved
+drafts survive unrelated lead refreshes. An uncertain save blocks resubmission
+until the lead is re-read. Timestamps, creator and tags remain read-only, and
+missing capability or conversion still prevents edits. Preserve an assigned
+owner. Only an unassigned lead may suggest the current user in its open draft,
+and no assignment is saved on mount. Other owner names/options require
+`users.user.read`; the list is active users in the lead's branch, filtered by
+the CRM capability's owner boundary, with server validation remaining decisive.
+Tags are read from the lead tags endpoint; a failed read is not an empty tag
+set. Notes here maps to the lead's `description`, not the separate notes ledger.
+The standalone Notes card is not mounted on this page; removing that UI does
+not delete, migrate or merge any existing notes-ledger entries.
+**End rail — updated 2026-09-07:** a full-width header has three equal icon-only
+tabs: **History → Activities → Attachments**. History is selected by default
+and resets when navigating to another lead. Each icon has a localized accessible
+name and tooltip (`title`); use the shared keyboard-operable `Tabs`, including
+RTL direction. Main record cards stay visible; these are rail tabs, not page tabs.
+On narrow screens the rail stacks below the main cards.
+
+History uses the shared audit template. Its card header contains
+only the title, without the introductory "Everything recorded against this record,
+newest first." sentence. Timeline entries and empty/error feedback remain unchanged.
+Returning to History remounts its reader; committed lead changes still pass the
+whole `lead` object as the refresh token and preserve related Party IDs.
+
+Activities shows **all open (`PLANNED`) activities**, soonest due first, using
+the same compact cards as the lead card-view activity modal. Both consume the
+reusable design-system [`ActivityList`](patterns.md#activitylist) through
+`LeadActivityList`; do not copy its markup into another screen. Each card has
+subject, priority, type, due date and the existing permission-gated row menu:
+Edit opens the existing modal prefilled with that row, Mark as done completes
+it, and Discard confirms cancellation. Successful writes reload the open list.
+
+Attachments contains the record's full attachment list, with **Add attachment**
+above it and a named download icon for every file. It uses
+`RecordAttachmentsSection` with `uploadVariant="button"`, not a second upload
+implementation. Add opens the native file picker; the existing MIME/25 MiB
+validation, upload queue, error/uncertainty handling and permission-gated delete
+confirmation remain. No duplicate attachments card appears in the main column.
+
+Activities and Attachments load only on their first visit, then remain mounted
+but hidden while inactive so switching tabs cannot lose a pending upload or
+uncertain outcome. Only the selected panel is visible/reachable. Readers follow
+all pages (25 activities / 50 attachments per request); an incomplete, malformed
+or duplicate page produces an error rather than a falsely complete list.
+
+**The location and the contact list arrive with the lead.** `GET /leads/:id`
+returns `address` and `contacts[]` as part of the record — `LeadDetailReadModel`,
+two correlated sub-selects folded into the query that already fetched the lead.
+Read-mode cards make no extra Directory read for these values. Opening a
+corporate contact editor performs a permission-gated fresh person read, and
+the board list does not carry them: two aggregates per row that no card draws.
+`contacts[]` is not `primaryContactName` — that is one string for the board
+card's second line, and this is the people with their own data.
+
+**The history card reads as a story, not a row dump.** Its compact header is the
+actor beside the timestamp — `Kamal Radwan 07/09/2026 02:44 AM` — without an
+action label such as `Stage changed` and without repeating the actor below.
+The ledger's `diff` renders each change as one unboxed line —
+`Stage category: New > Contacted` — with no `Changes`, `Old value`, `New value`
+or reference text. The old value is light red and struck through; the new value
+keeps the normal foreground. The comparison stays old-to-new on both LTR and
+RTL pages. It takes the server's precomputed diff so a redacted value stays
+redacted; and the timestamp is
+`formatDateTimeNumeric` — `06/09/2026 08:01 AM`, day first in both languages,
+because a log is read by comparing rows and a month name is a different width
+in each.
+
+One Lead aggregates Lead, company/person Party and current contact Party history
+in one Core request. Related field lines are prefixed with a direction-isolated
+subject label, such as `Saly Essam · Phone: 0100 > 0200`, without new cards or
+headings. Empty historic evidence has an explicit localized unavailable message;
+it must not be replaced with today's values. A committed save refreshes the
+timeline even when the Lead timestamp is unchanged, and stale page requests are
+aborted. See [the API contract](../api/core-directory.md#related-party-history).
+
+The header block is `sr-only` for the reason the list's is: the bar above
+already names the record and carries Convert (no page-wide Edit), and the `<h1>` is still
+the document's outline.
+
+**The detail screen puts four counts in the action bar's middle.**
+`LeadRelatedNav` fills the shell's `related` slot with a link per resource —
+opportunities, quotations, sales orders, invoices — each carrying the number of
+records behind it.
+
+| Count | Joined on | Route |
+| --- | --- | --- |
+| Opportunities | the LEAD (`leadId`) | `POST /crm/v1/opportunities/search` |
+| Quotations · Sales orders · Invoices | the lead's PARTY (`partyId`) | `GET /trade/v1/…?partyId=&limit=1` |
+
+**The two joins are not interchangeable.** An opportunity is filed against the
+lead. A trade document has never heard of a lead — it is filed against a party,
+and the lead's own `partyId` is that party, the same row the directory holds
+and conversion promotes rather than replaces. Filtering opportunities by the
+party instead would answer a different question: every opportunity that party
+has ever had.
+
+Four services, four permissions, four independent reads. A CRM user with no
+Trade access is the ordinary case, so each count settles alone and a refused
+one stays `null` — rendered as a **dash, never a zero**, because "no invoices"
+and "the count did not come back" are different sentences and the second one
+printed as `0` is a number somebody would act on. A kind the user may not read
+draws no link at all; all four unpermitted draws nothing, and the bar's middle
+stays empty. Only `trading.invoices.get` declares `BRANCH_REQUIRED`, so the
+scope headers go to that one route and to nothing else.
+
+**Each planned row carries three actions**, in one overflow menu rather than
+three icons — this half is a column inside a dialog, and three 24px targets
+beside a priority badge would either wrap or shrink under the touch floor.
+
+| Action | Route | Permission |
+| --- | --- | --- |
+| Edit | `PATCH /activities/:id` | `activities.update` |
+| Mark as done | `POST /activities/:id/complete` | `activities.complete` |
+| Discard | `POST /activities/:id/cancel` | `activities.cancel` |
+
+Three things this depends on:
+
+- **The row's `version`, sent as `If-Match`.** All three routes require it —
+  Core answers 428 without one and 409 against a stale one — so the list parser
+  reads `version` and refuses a row that has none. A row whose Edit and Discard
+  could only ever fail is not a row worth rendering.
+- **Edit reuses the form half.** The same fields, a different heading, and the
+  footer reads *Save and mark as done · Cancel · Save*. Cancel leaves the mode,
+  not the dialog: the list the dialog exists to show stays on screen, and the
+  dialog's own Close is one more press away. **Save and mark as done is two
+  writes**, and the second uses the version the FIRST one returned — reading it
+  back out of list state would send the version from before the save.
+- **The past-due rule relaxes on edit, exactly as the server's does.**
+  `ActivitiesService.update` re-checks the due date only when it moved, so an
+  overdue activity can still have its subject corrected. The client validator
+  takes the row's own `dueAt` for that comparison rather than refusing a save
+  the server would have accepted.
+
+Discard confirms first; completing does not. Both make the row leave a
+`PLANNED`-only list, but one of them is the outcome the work was booked for and
+the other ends it — and the two sit one menu row apart.
 
 ### Customer Profiles
 

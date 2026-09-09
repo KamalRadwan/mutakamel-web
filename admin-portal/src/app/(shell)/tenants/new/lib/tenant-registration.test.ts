@@ -21,6 +21,7 @@ import type { TenantApplicationCandidate } from "../types";
 const applicationId = "019f0000-0000-7000-8000-000000000001";
 const tierId = "019f0000-0000-7000-8000-000000000002";
 const databaseId = "019f0000-0000-7000-8000-000000000003";
+const selectionKey = "019f0000-0000-7000-8000-000000000008";
 const quoteId = "019f0000-0000-7000-8000-000000000004";
 const tenantId = "019f0000-0000-7000-8000-000000000005";
 
@@ -32,7 +33,7 @@ const candidate: TenantApplicationCandidate = {
   rank: 10,
   commercialMode: "SUBSCRIPTION",
   technicalDefinitionRevision: "7",
-  selectionAllowed: true,
+  addons: [],
   selectionBlockers: [],
   readinessReasons: [],
   catalogueReasons: [],
@@ -96,7 +97,7 @@ describe("tenant registration contract", () => {
 
   it("accepts only the bounded least-privilege create-options projection", () => {
     const payload = {
-      contractVersion: 1,
+      quoteRequired: true,
       applications: [
         {
           applicationId,
@@ -106,7 +107,7 @@ describe("tenant registration contract", () => {
           rank: 10,
           commercialMode: "SUBSCRIPTION",
           technicalDefinitionRevision: "7",
-          selectionAllowed: true,
+          addons: [],
           selectionBlockers: [],
           readinessReasons: [],
           catalogueReasons: [],
@@ -123,26 +124,25 @@ describe("tenant registration contract", () => {
           { ...payload.applications[0], credentialsRef: "must-not-cross" },
         ],
       }),
-    ).toThrow("INVALID_TENANT_CREATE_OPTIONS_RESPONSE");
+    ).toThrow("COMMERCIAL_RESPONSE_UNAVAILABLE");
     expect(() =>
       readTenantCreateOptions({
         ...payload,
         applications: [
           {
             ...payload.applications[0],
-            selectionAllowed: false,
             tiers: [],
             catalogueReasons: [],
           },
         ],
       }),
-    ).toThrow("INVALID_TENANT_CREATE_OPTIONS_RESPONSE");
+    ).toThrow("COMMERCIAL_RESPONSE_UNAVAILABLE");
   });
 
-  it("builds quote IDs and create keys from the same authoritative selection", () => {
+  it("builds quote and create selections from the same authoritative selection", () => {
     expect(
       buildTenantSubscriptionLines([candidate], {
-        crm: { tierId, seats: 25 },
+        crm: { selectionKey, tierId, seats: 25, addons: [] },
       }),
     ).toEqual([
       {
@@ -153,18 +153,20 @@ describe("tenant registration contract", () => {
         tierKey: "business",
         tierName: "Business",
         seats: 25,
+        selectionKey,
+        addons: [],
       },
     ]);
 
     expect(
       buildTenantSubscriptionLines(
-        [{ ...candidate, selectionAllowed: false }],
-        { crm: { tierId, seats: 25 } },
+        [{ ...candidate, selectionBlockers: ["APPLICATION_NOT_PUBLISHED"] }],
+        { crm: { selectionKey, tierId, seats: 25, addons: [] } },
       ),
     ).toEqual([]);
     expect(
       buildTenantSubscriptionLines([candidate], {
-        crm: { tierId: databaseId, seats: 25 },
+        crm: { selectionKey, tierId: databaseId, seats: 25, addons: [] },
       }),
     ).toEqual([]);
   });
@@ -310,6 +312,7 @@ describe("tenant registration contract", () => {
       contractVersion: 1,
       selectedApplicationKeys: ["crm"],
       selectionDigest: "a".repeat(64),
+      applications: [],
       components: [],
       steps: [],
     };
@@ -319,26 +322,16 @@ describe("tenant registration contract", () => {
     );
 
     const lines = buildTenantSubscriptionLines([candidate], {
-      crm: { tierId, seats: 25 },
+      crm: { selectionKey, tierId, seats: 25, addons: [] },
     });
     const quote = {
-      quoteId,
-      requestHash: "request-hash",
-      pricingRevision: "12",
-      billingCycle: "ANNUAL",
-      currencyCode: "USD",
-      total: "120.00",
-      totalUsd: "120.00",
-      items: [
-        {
-          moduleId: applicationId,
-          tierId,
-          seats: 25,
-          lineTotal: "120.00",
-          lineTotalUsd: "120.00",
-        },
-      ],
-      expiresAt: "2030-01-01T00:00:00.000Z",
+      quoteId, purpose: "TENANT_CREATION", targetTenantId: null,
+      billingCycle: "ANNUAL", currencyCode: "USD", resolvedTrialDays: 14,
+      createdAt: "2030-01-01T00:00:00.000Z", expiresAt: "2030-01-01T00:15:00.000Z",
+      totals: { baseRecurringUsd: "120.0000", addonRecurringUsd: "0.0000", combinedRecurringUsd: "120.0000" },
+      items: [{ selectionKey, applicationId, tierId, seats: 25, addons: [],
+        acceptedPricing: { billingCycle: "ANNUAL", currencyCode: "USD", recurringAmountUsd: "120.0000", priceRevision: "a".repeat(64),
+          breakdown: [{ minUsers: 1, maxUsers: null, chargedUsers: 25, unitPriceUsd: "4.8000", amountUsd: "120.0000" }] } }]
     };
     expect(readSubscriptionQuote(quote, lines, "ANNUAL")).toEqual(quote);
     expect(() =>
@@ -347,7 +340,7 @@ describe("tenant registration contract", () => {
         lines,
         "ANNUAL",
       ),
-    ).toThrow("INVALID_SUBSCRIPTION_QUOTE_RESPONSE");
+    ).toThrow("COMMERCIAL_RESPONSE_UNAVAILABLE");
   });
 
   it("accepts only a fresh PROVISIONING tenant result", () => {

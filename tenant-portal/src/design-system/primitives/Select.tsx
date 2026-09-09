@@ -13,6 +13,13 @@ import { useFieldControl, useFieldControlContext } from "./field-control";
 // is what claims the enclosing `Field`. See field-control.tsx.
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
+export const SelectLabel = forwardRef<
+  React.ComponentRef<typeof SelectPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.Label ref={ref} className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)} {...props} />
+));
+SelectLabel.displayName = "SelectLabel";
 /**
  * Radix's value, with the enclosing `Field`'s label as its prompt.
  *

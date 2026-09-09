@@ -1,3 +1,4 @@
+import { initialCommercialApi } from "@/features/admin/subscriptions/initial-commercial/initial-commercial.api";
 import { axiosClient } from "@/lib/api/axiosClient";
 import {
   extractCoreData,
@@ -6,8 +7,7 @@ import {
 import {
   readDatabasePlacementOptions,
   readProvisioningPlanPreview,
-  readSubscriptionQuote,
-  readTenantCreateOptions,
+  tenantCreationQuoteRequest,
   readTenantCreateResult,
   readTenantIdentityValidation,
 } from "../lib/tenant-registration";
@@ -24,7 +24,6 @@ import type {
 } from "../types";
 
 const TENANTS_BASE_URL = "/api/admin/core/v1/tenants";
-const QUOTE_URL = "/api/admin/core/v1/subscriptions/quote";
 
 export const tenantRegistrationApi = {
   validateIdentity: async (
@@ -59,13 +58,7 @@ export const tenantRegistrationApi = {
     return readTenantReverseGeocodedAddress(extractCoreData(response));
   },
 
-  listCandidateApplications: async (signal?: AbortSignal) => {
-    const response = await axiosClient.get<SuccessResponse<unknown>>(
-      `${TENANTS_BASE_URL}/create-options`,
-      { signal },
-    );
-    return readTenantCreateOptions(extractCoreData(response));
-  },
+  listCandidateApplications: async (signal?: AbortSignal) => (await initialCommercialApi.options(signal)).applications,
 
   listDatabasePlacementOptions: async (applicationKeys: readonly string[]) => {
     const keys = [...new Set(applicationKeys)].sort();
@@ -88,34 +81,8 @@ export const tenantRegistrationApi = {
     return readProvisioningPlanPreview(extractCoreData(response), keys);
   },
 
-  quote: async (
-    lines: readonly TenantSubscriptionLine[],
-    billingCycle: TenantBillingCycle,
-    signal?: AbortSignal,
-  ): Promise<TenantSubscriptionQuote> => {
-    const response = await axiosClient.post<SuccessResponse<unknown>>(
-      QUOTE_URL,
-      {
-        billingCycle,
-        currencyCode: "USD",
-        items: lines.map((line) => ({
-          moduleId: line.applicationId,
-          tierId: line.tierId,
-          seats: line.seats,
-        })),
-      },
-      {
-        skipAutoIdempotency: true,
-        replayAfterRefresh: true,
-        ...(signal ? { signal } : {}),
-      },
-    );
-    return readSubscriptionQuote(
-      extractCoreData(response),
-      lines,
-      billingCycle,
-    );
-  },
+  quote: async (lines: readonly TenantSubscriptionLine[], billingCycle: TenantBillingCycle, signal?: AbortSignal): Promise<TenantSubscriptionQuote> =>
+    initialCommercialApi.quote(tenantCreationQuoteRequest(lines, billingCycle), signal),
 
   findCreateStatus: async (tenantName: string, signal?: AbortSignal) => {
     const params = new URLSearchParams({

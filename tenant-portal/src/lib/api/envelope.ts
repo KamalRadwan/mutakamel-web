@@ -34,6 +34,11 @@ export type CrmPath = `/api/tenant/crm/v1/${string}`;
 /** `/api/tenant/trade/v1/...` — enveloped, like Core. */
 export type TradePath = `/api/tenant/trade/v1/${string}`;
 
+/** Negotiated Core contracts validate both the closed envelope and version headers. */
+export function readCoreResponse(path: CorePath, config?: TenantApiRequestConfig) {
+  return axiosClient.get<unknown>(path, config);
+}
+
 /**
  * Reads a Core route and returns the contents of its `data` envelope.
  *

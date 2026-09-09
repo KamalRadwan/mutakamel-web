@@ -52,6 +52,8 @@ const labels: BoardViewLabels = {
   notSorted: "Not sorted",
   emptyColumn: "Drop here",
   moveTo: "Move to",
+  collapseColumn: "Collapse column",
+  expandColumn: "Expand column",
   pagination: { previous: "Previous", next: "Next", summary: (from, to, total) => `${from}-${to} of ${total}` },
 };
 

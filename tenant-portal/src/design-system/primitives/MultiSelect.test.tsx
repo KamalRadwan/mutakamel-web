@@ -39,8 +39,9 @@ describe("MultiSelect", () => {
 
   it("collapses past maxVisible behind a +n BUTTON, never a static count", () => {
     renderMultiSelect({ values: ["new", "qualified", "nurturing", "won", "lost"], maxVisible: 3 });
-    const overflow = screen.getByRole("button", { name: "+2" });
+    const overflow = screen.getByRole("button", { name: "More stages (2)" });
     expect(overflow.tagName).toBe("BUTTON");
+    expect(screen.getByText("+2")).toBeInTheDocument();
   });
 
   it("keeps the overflowed chips removable inside that popover", () => {
@@ -50,7 +51,7 @@ describe("MultiSelect", () => {
       maxVisible: 3,
       onValuesChange,
     });
-    fireEvent.click(screen.getByRole("button", { name: "+2" }));
+    fireEvent.click(screen.getByRole("button", { name: "More stages (2)" }));
     expect(screen.getByText("More stages")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove Lost" }));
@@ -87,6 +88,77 @@ describe("MultiSelect", () => {
 
     fireEvent.change(screen.getByLabelText("Search stages"), { target: { value: "zzz" } });
     expect(screen.getByText("No stages match")).toBeInTheDocument();
+  });
+
+  it("moves focus from search into the enabled options and skips disabled rows", () => {
+    renderMultiSelect({
+      searchPlaceholder: "Search stages",
+      options: [
+        { value: "new", label: "New", disabled: true },
+        { value: "qualified", label: "Qualified" },
+        { value: "nurturing", label: "Nurturing", disabled: true },
+        { value: "won", label: "Won" },
+      ],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Any stage" }));
+    const search = screen.getByLabelText("Search stages");
+
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: "Qualified" })).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: "Won" })).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowDown" });
+    expect(screen.getByRole("option", { name: "Qualified" })).toHaveFocus();
+  });
+
+  it("supports Home and End navigation and exposes a visible focus style", () => {
+    renderMultiSelect({ searchPlaceholder: "Search stages" });
+    fireEvent.click(screen.getByRole("button", { name: "Any stage" }));
+    const search = screen.getByLabelText("Search stages");
+
+    fireEvent.keyDown(search, { key: "End" });
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "End" });
+    const lastOption = screen.getByRole("option", { name: "Lost" });
+    expect(lastOption).toHaveFocus();
+    expect(lastOption.className).toContain("focus-visible:ring-2");
+
+    fireEvent.keyDown(lastOption, { key: "Home" });
+    expect(screen.getByRole("option", { name: "New" })).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowUp" });
+    expect(lastOption).toHaveFocus();
+  });
+
+  it("toggles a focused option with Enter or Space but never toggles a disabled option", () => {
+    const onValuesChange = vi.fn();
+    renderMultiSelect({
+      searchPlaceholder: "Search stages",
+      onValuesChange,
+      options: [
+        { value: "new", label: "New", disabled: true },
+        { value: "qualified", label: "Qualified" },
+        { value: "won", label: "Won" },
+      ],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Any stage" }));
+    const search = screen.getByLabelText("Search stages");
+
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    const qualified = screen.getByRole("option", { name: "Qualified" });
+    fireEvent.keyDown(qualified, { key: "Enter" });
+    expect(onValuesChange).toHaveBeenLastCalledWith(["qualified"]);
+
+    fireEvent.keyDown(qualified, { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByRole("option", { name: "Won" }), { key: " " });
+    expect(onValuesChange).toHaveBeenLastCalledWith(["won"]);
+
+    fireEvent.click(screen.getByRole("option", { name: "New", hidden: true }));
+    expect(onValuesChange).toHaveBeenCalledTimes(2);
   });
 
   it("clears everything through a single control", () => {

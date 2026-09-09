@@ -2,6 +2,7 @@ import type { Language } from "@/i18n/I18nContext";
 
 export const SUBSCRIPTIONS_COPY = {
   en: {
+    addon: "Addon", baseTotal: "Applications", addonTotal: "Addons", addonSeats: "Addon seats",
     title: "Subscriptions",
     total: "Total subscriptions",
     activeOnPage: "Active on page",
@@ -44,7 +45,7 @@ export const SUBSCRIPTIONS_COPY = {
     modules: "modules",
     items: "plan items",
     inspectItems: "Inspect plan items",
-    noItems: "No canonical items; this may be a legacy add-on projection.",
+    noItems: "No application selections are available.",
     module: "Module",
     tier: "Tier",
     features: "features",
@@ -65,6 +66,7 @@ export const SUBSCRIPTIONS_COPY = {
     errorCode: "Error code",
   },
   ar: {
+    addon: "إضافة", baseTotal: "التطبيقات", addonTotal: "الإضافات", addonSeats: "مقاعد الإضافة",
     title: "الاشتراكات",
     total: "إجمالي الاشتراكات",
     activeOnPage: "النشطة في الصفحة",
@@ -107,7 +109,7 @@ export const SUBSCRIPTIONS_COPY = {
     modules: "وحدات",
     items: "بنود خطة",
     inspectItems: "فحص بنود الخطة",
-    noItems: "لا توجد بنود أساسية؛ قد يكون هذا عرضًا قديمًا للإضافات.",
+    noItems: "لا تتوفر اختيارات للتطبيقات.",
     module: "الوحدة",
     tier: "الفئة",
     features: "ميزات",

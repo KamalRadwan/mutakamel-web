@@ -41,7 +41,9 @@ export function BrandMark() {
         // the four account controls about 125px to share — so it shrinks to fit
         // its own contents and lets the tenant name truncate.
         "flex h-full w-auto max-w-40 shrink-0 items-center gap-2 border-e border-border px-3 xl:w-(--size-brand) xl:max-w-none",
-        "text-sm font-medium text-sidebar-foreground hover:bg-accent",
+        // Plain semantic names: this only ever renders inside GlobalNav, whose
+        // `nav-surface` points them at the on-chrome values.
+        "text-sm font-medium text-foreground hover:bg-accent",
         focusRing,
       )}
     >

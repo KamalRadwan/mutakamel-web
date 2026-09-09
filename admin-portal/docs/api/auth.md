@@ -4,6 +4,8 @@ Status: **[Verified]**
 
 Last source verification: **2026-08-31**
 
+Persisted-session bootstrap recovery reverified: **2026-09-07**.
+
 Verified against the current Core controller, DTOs, cookie helpers, and gateway
 route contracts.
 
@@ -205,13 +207,35 @@ operation error. It never loops or silently swallows the failure. Explicit
 terminal `401`/`403` codes enter `ENDED`; an ordinary business permission `403`
 emits one Access Denied notification and is never treated as refresh failure.
 
-**Only a refusal that names the session as over ends it.** Bootstrap classifies
-its failure and signs the administrator out on `end` alone — a `401`/`403`
-carrying one of the session-ending codes. Every other outcome retains the
-session and enters `DEGRADED`.
+**Only explicit session-end evidence ends local authentication.** Bootstrap
+accepts a terminal `401`/`403`, or a local `AUTH_SESSION_CHANGED` rejection
+whose latest stored coordination event is an applicable `session-ended`.
+Other failures retain the session and enter `DEGRADED`.
 
-Two of those used to sign the operator out, and neither says anything about the
-session:
+A previously recorded session end survives reloads and browser restarts. The
+request fence refuses old work with `409 AUTH_SESSION_CHANGED` before sending
+`/auth/me`; retrying that unchanged state cannot recover it. Bootstrap now
+reconciles that recorded end, clears only local auth metadata, cancels its retry
+timer, and lets the route guard return the operator to `/login`. No cache or
+site-data clearing is required. Preferences and unrelated form state are not
+removed, cookies are not cleared in the background, and the shared end event
+is preserved to keep other tabs' old requests fenced. An explicit successful
+login replaces it through the existing auth lock and validates `/auth/me`.
+
+This is **not** a blanket `409`-to-logout rule: an end event for a different
+session, or one older than the current session metadata, cannot end the current
+session. The superseded-bootstrap check still protects a concurrent successful
+login. Cookie-quarantine cleanup and auth-mutex rules remain unchanged.
+
+Recovery verification (2026-09-07): the auth-focused suite passed 185 tests,
+including five new regression cases covering persisted ends with/without tab
+metadata, reload, fresh login, and stale/different-session end events.
+TypeScript, changed-file lint, and the production build passed. The live
+browser check was blocked by an unavailable local Gateway; authenticated
+runtime and deployment are not claimed. The global docs check separately
+reports five broken links in `application-addons-target.md`, outside this fix.
+
+Examples of non-terminal failures that must still retain the session:
 
 - **`400`/`404`/`409`/`422`** (`classifyAuthFailure` → `none`). Core registers
   its routes while it boots, so a reload that lands in that window is answered
@@ -459,8 +483,9 @@ the admin-user/role management APIs.
 Call `/auth/me` after login and when bootstrapping an access token for which no
 validated local profile exists.
 
-Every cold load and newly opened tab calls `/auth/me`. Browser storage is never
-used as proof that a session exists.
+Every cold load and newly opened tab must validate `/auth/me` before granting
+access. A previously ended or quarantined session returns to login without
+dispatching protected work. Browser storage is never proof of authentication.
 
 ## GET `/api/admin/core/v1/auth/sessions`
 

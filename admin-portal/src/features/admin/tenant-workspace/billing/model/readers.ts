@@ -18,9 +18,6 @@ import type {
   PaymentStatusView,
   SubscriptionCancellationResult,
   SubscriptionItemView,
-  SubscriptionPlanChangeApplyResult,
-  SubscriptionPlanChangeOperation,
-  SubscriptionPlanChangePreviewView,
   SubscriptionStatus,
   SubscriptionView,
   WalletAdjustmentPreviewView,
@@ -33,10 +30,8 @@ import type {
 const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const MONEY_PATTERN = /^(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$/u;
-const SIGNED_MONEY_PATTERN = /^-?(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$/u;
 const FX_RATE_PATTERN = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,12})?$/u;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/u;
-const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const MODULE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/u;
 const ENABLED_MODULE_PATTERN = /^module\.[a-z][a-z0-9_]{0,63}$/u;
 const ZERO = BigInt(0);
@@ -87,7 +82,6 @@ const INVOICE_PURPOSES = [
   "PRORATION",
   "MANUAL",
 ] as const satisfies readonly InvoicePurpose[];
-const PLAN_OPERATIONS = ["ADD", "CHANGE", "REMOVE"] as const satisfies readonly SubscriptionPlanChangeOperation[];
 const RECONCILIATION_ACTIONS = [
   "CONFIRM_SUCCEEDED",
   "CONFIRM_FAILED",
@@ -301,157 +295,6 @@ function readSubscriptionItem(
     ...optionalNullableCurrencyProperty(item, "currencyCode", code),
     ...optionalIsoTimestampProperty(item, "createdAt", code),
     ...optionalIsoTimestampProperty(item, "updatedAt", code),
-  };
-}
-
-export function readPlanChangePreview(
-  value: unknown,
-  expected: BillingReadIdentity = {},
-): SubscriptionPlanChangePreviewView {
-  const code = "INVALID_PLAN_CHANGE_PREVIEW";
-  const root = object(value, code);
-  const item = object(root.item, code);
-  const financial = object(root.financial, code);
-  const previewId = uuidV7(root.previewId, code);
-  const subscriptionId = uuidV7(root.subscriptionId, code);
-  const tenantId = uuidV7(root.tenantId, code);
-  assertIdentity(previewId, expected.previewId, code);
-  assertIdentity(subscriptionId, expected.subscriptionId, code);
-  assertIdentity(tenantId, expected.tenantId, code);
-
-  const operation = oneOf(root.operation, PLAN_OPERATIONS, code);
-  const itemId = nullableUuidV7(item.itemId, code);
-  const fromTierId = nullableUuidV7(item.fromTierId, code);
-  const toTierId = nullableUuidV7(item.toTierId, code);
-  const fromSeats = nullablePositiveInteger(item.fromSeats, code);
-  const toSeats = nullablePositiveInteger(item.toSeats, code);
-  if (
-    (operation === "ADD" &&
-      (itemId !== null || fromTierId !== null || fromSeats !== null || toTierId === null || toSeats === null)) ||
-    (operation === "CHANGE" &&
-      (itemId === null || fromTierId === null || fromSeats === null || toTierId === null || toSeats === null)) ||
-    (operation === "REMOVE" &&
-      (itemId === null || fromTierId === null || fromSeats === null || toTierId !== null || toSeats !== null))
-  ) {
-    fail(code);
-  }
-
-  const previousLineTotalUsd = money(item.previousLineTotalUsd, code);
-  const nextLineTotalUsd = money(item.nextLineTotalUsd, code);
-  if (
-    (operation === "ADD" && moneyMinor(previousLineTotalUsd, code) !== ZERO) ||
-    (operation === "REMOVE" && moneyMinor(nextLineTotalUsd, code) !== ZERO)
-  ) {
-    fail(code);
-  }
-
-  const fullPeriodDeltaUsd = signedMoney(financial.fullPeriodDeltaUsd, code);
-  const fullPeriodDeltaMinor = signedMoneyMinor(fullPeriodDeltaUsd, code);
-  if (
-    fullPeriodDeltaMinor !==
-    moneyMinor(nextLineTotalUsd, code) - moneyMinor(previousLineTotalUsd, code)
-  ) {
-    fail(code);
-  }
-
-  const direction = oneOf(financial.direction, ["CREDIT", "DEBIT", "NONE"] as const, code);
-  const proratedAmountUsd = money(financial.proratedAmountUsd, code);
-  const proratedAmountMinor = moneyMinor(proratedAmountUsd, code);
-  if (
-    (direction === "NONE") !== (proratedAmountMinor === ZERO) ||
-    (direction === "DEBIT" && fullPeriodDeltaMinor <= ZERO) ||
-    (direction === "CREDIT" && fullPeriodDeltaMinor >= ZERO)
-  ) {
-    fail(code);
-  }
-
-  const walletAvailableUsd = money(financial.walletAvailableUsd, code);
-  const walletShortfallUsd = money(financial.walletShortfallUsd, code);
-  const expectedShortfall =
-    direction === "DEBIT"
-      ? maxBigInt(proratedAmountMinor - moneyMinor(walletAvailableUsd, code), ZERO)
-      : ZERO;
-  if (moneyMinor(walletShortfallUsd, code) !== expectedShortfall) fail(code);
-
-  const walletStatus = oneOf(financial.walletStatus, WALLET_STATUSES, code);
-  const canApply = boolean(financial.canApply, code);
-  const expectedCanApply =
-    expectedShortfall === ZERO && (direction === "NONE" || walletStatus === "ACTIVE");
-  if (canApply !== expectedCanApply) fail(code);
-
-  const pricedAt = isoTimestamp(root.pricedAt, code);
-  const expiresAt = isoTimestamp(root.expiresAt, code);
-  if (timestampMs(expiresAt) <= timestampMs(pricedAt)) fail(code);
-
-  return {
-    previewId,
-    subscriptionId,
-    tenantId,
-    operation,
-    currencyCode: exactString(root.currencyCode, "USD", code),
-    billingCycle: oneOf(root.billingCycle, BILLING_CYCLES, code),
-    itemSetFingerprint: matchingString(root.itemSetFingerprint, HASH_PATTERN, code),
-    planFingerprint: matchingString(root.planFingerprint, HASH_PATTERN, code),
-    pricingRevision: matchingString(root.pricingRevision, HASH_PATTERN, code),
-    pricedAt,
-    expiresAt,
-    item: {
-      itemId,
-      moduleId: uuidV7(item.moduleId, code),
-      fromTierId,
-      toTierId,
-      fromSeats,
-      toSeats,
-      previousLineTotalUsd,
-      nextLineTotalUsd,
-    },
-    financial: {
-      fullPeriodDeltaUsd,
-      direction,
-      proratedAmountUsd,
-      walletAvailableUsd,
-      walletShortfallUsd,
-      walletStatus,
-      canApply,
-    },
-  };
-}
-
-export function readPlanChangeApplyResult(
-  value: unknown,
-  expected: BillingReadIdentity = {},
-): SubscriptionPlanChangeApplyResult {
-  const code = "INVALID_PLAN_CHANGE_RESULT";
-  const root = object(value, code);
-  const wallet = object(root.wallet, code);
-  const previewId = uuidV7(root.previewId, code);
-  const operation = oneOf(root.operation, PLAN_OPERATIONS, code);
-  const removedItemId = nullableUuidV7(root.removedItemId, code);
-  assertIdentity(previewId, expected.previewId, code);
-
-  const item =
-    root.item === null
-      ? null
-      : readAppliedSubscriptionItem(root.item, expected.subscriptionId, code);
-  if (
-    (operation === "REMOVE" && (item !== null || removedItemId === null)) ||
-    (operation !== "REMOVE" && (item === null || removedItemId !== null))
-  ) {
-    fail(code);
-  }
-
-  const direction = oneOf(wallet.direction, ["CREDIT", "DEBIT", "NONE"] as const, code);
-  const amountUsd = money(wallet.amountUsd, code);
-  if ((direction === "NONE") !== (moneyMinor(amountUsd, code) === ZERO)) fail(code);
-
-  return {
-    previewId,
-    operation,
-    appliedAt: isoTimestamp(root.appliedAt, code),
-    item,
-    removedItemId,
-    wallet: { direction, amountUsd },
-    subscriptionTotalUsd: money(root.subscriptionTotalUsd, code),
   };
 }
 
@@ -872,24 +715,6 @@ export function readReconciliation(
   };
 }
 
-function readAppliedSubscriptionItem(
-  value: unknown,
-  expectedSubscriptionId: string | undefined,
-  code: string,
-): NonNullable<SubscriptionPlanChangeApplyResult["item"]> {
-  const item = object(value, code);
-  const subscriptionId = uuidV7(item.subscriptionId, code);
-  assertIdentity(subscriptionId, expectedSubscriptionId, code);
-  return {
-    id: uuidV7(item.id, code),
-    subscriptionId,
-    moduleId: uuidV7(item.moduleId, code),
-    tierId: uuidV7(item.tierId, code),
-    seats: positiveInteger(item.seats, code),
-    lineTotal: money(item.lineTotal, code),
-  };
-}
-
 function readCurrentInvoice(value: unknown): AdminCurrentCollectionInvoiceView {
   const code = "INVALID_BILLING_SUMMARY_RESPONSE";
   const root = object(value, code);
@@ -1077,11 +902,6 @@ function nonNegativeInteger(value: unknown, code: string): number {
   return value;
 }
 
-function nullablePositiveInteger(value: unknown, code: string): number | null {
-  if (value === null) return null;
-  return positiveInteger(value, code);
-}
-
 function boolean(value: unknown, code: string): boolean {
   if (typeof value !== "boolean") fail(code);
   return value;
@@ -1111,16 +931,8 @@ function positiveMoney(value: unknown, code: string): string {
   return result;
 }
 
-function signedMoney(value: unknown, code: string): string {
-  return matchingString(value, SIGNED_MONEY_PATTERN, code);
-}
-
 function moneyMinor(value: string, code: string): bigint {
   return decimalUnits(value, 4, false, code);
-}
-
-function signedMoneyMinor(value: string, code: string): bigint {
-  return decimalUnits(value, 4, true, code);
 }
 
 function fxRate(value: unknown, code: string): string {
@@ -1181,10 +993,6 @@ function assertUnique(values: readonly string[], code: string): void {
 
 function sameSet(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value) => right.includes(value));
-}
-
-function maxBigInt(left: bigint, right: bigint): bigint {
-  return left > right ? left : right;
 }
 
 function optionalBoundedStringProperty<K extends string>(

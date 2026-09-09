@@ -14,6 +14,11 @@ import type { PublicBranding } from "./public-branding";
 // three at once, in both themes, which is the whole reason the ramp is the
 // indirection layer.
 //
+// `--color-chrome` is written beside the ramp and is the one brand colour that
+// is not a step of it: the light theme's nav bar. It has to move with the hue
+// for the same reason the marker on it does — a tenant who sets green and gets
+// the system's navy bar has a bar belonging to somebody else's product.
+//
 // The override is an inline style on the root element, so it outranks the
 // stylesheet without a second `:root` rule and without `!important`.
 
@@ -80,5 +85,6 @@ export function applyBrandingTokens(branding: PublicBranding): BrandingOutcome {
   for (const step of BRAND_RAMP_STEPS) {
     root.style.setProperty(`--color-brand-${step}`, formatOklch(verdict.ramp[step]));
   }
+  root.style.setProperty("--color-chrome", formatOklch(verdict.chrome));
   return { kind: "applied" };
 }

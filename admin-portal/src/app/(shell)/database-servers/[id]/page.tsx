@@ -62,6 +62,9 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
   }
 
   const { server } = page;
+  const serverReadReady = page.loadedServerId === id;
+  const credentialNeedsBindings = page.credentialAction?.kind === "retry-bootstrap" ||
+    page.credentialAction?.kind === "regenerate" || page.credentialAction?.kind === "reconcile";
 
   return (
     <div className="space-y-6 w-full">
@@ -113,8 +116,8 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
         {/* Header Hero */}
         <DatabaseServerHeaderHero
           server={server}
-          canUpdate={page.canUpdate}
-          canDelete={page.canDelete}
+          canUpdate={page.canUpdate && serverReadReady}
+          canDelete={page.canDelete && serverReadReady}
           onEditMetadata={() => page.setIsEditModalOpen(true)}
           onLifecycleAction={(action) => {
             page.setLifecycleError(null);
@@ -122,6 +125,10 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
           }}
           onDeleteHost={() => page.setIsDeleteModalOpen(true)}
         />
+
+        {page.refreshError && (
+          <ErrorState title={page.refreshError} onRetry={page.refreshServer} />
+        )}
 
         {/* Tabs Navigation Bar */}
         <DatabaseServerTabsNav
@@ -142,11 +149,11 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
               backupDependencyNeedsAttention={
                 page.backupDependencyNeedsAttention
               }
-              canBootstrapInitial={page.canBootstrapInitial}
+              canBootstrapInitial={page.canBootstrapInitial && serverReadReady}
               canReadBackup={page.canReadBackup}
-              canRegenerate={page.canRegenerate}
-              canReconcile={page.canReconcile}
-              canUpdate={page.canUpdate}
+              canRegenerate={page.canRegenerate && serverReadReady}
+              canReconcile={page.canReconcile && serverReadReady}
+              canUpdate={page.canUpdate && serverReadReady}
               credentialActionPending={page.credentialActionPending}
               onRetryBootstrap={page.openRetryBootstrap}
               onSystemCredentialMutation={page.openSystemCredentialMutation}
@@ -168,9 +175,9 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
               fetchBindings={page.fetchBindings}
               lastCredentialReceipt={page.lastCredentialReceipt}
               credentialActionPending={page.credentialActionPending}
-              canBootstrapExisting={page.canBootstrapExisting}
-              canRegenerate={page.canRegenerate}
-              canReconcile={page.canReconcile}
+              canBootstrapExisting={page.canBootstrapExisting && page.canBootstrapApplication}
+              canRegenerate={page.canRegenerate && serverReadReady}
+              canReconcile={page.canReconcile && serverReadReady}
               onAddApplicationOpen={() => page.setIsAddApplicationOpen(true)}
               onOpenCredentialMutation={page.openCredentialMutation}
             />
@@ -195,7 +202,12 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
         action={page.credentialAction}
         reason={page.credentialReason}
         error={page.credentialActionError}
+        errorCode={page.credentialActionErrorCode}
+        correlationId={page.credentialActionCorrelationId}
         pending={Boolean(page.credentialActionPending)}
+        submitDisabled={!serverReadReady || (credentialNeedsBindings && (page.isBindingsLoading || Boolean(page.bindingsError)))}
+        refreshError={page.refreshError ?? (credentialNeedsBindings ? page.bindingsError : null)}
+        onRefresh={page.refreshServer}
         onReasonChange={page.setCredentialReason}
         onClose={page.closeCredentialAction}
         onSubmit={page.submitCredentialAction}
@@ -204,6 +216,9 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
         isOpen={page.isAddApplicationOpen}
         boundApplicationKeys={page.bindings.map((b) => b.applicationKey)}
         isSubmitting={Boolean(page.credentialActionPending)}
+        bindingReady={page.canBootstrapApplication}
+        bindingRefreshError={page.refreshError ?? page.bindingsError}
+        onRefreshBindings={page.refreshServer}
         onClose={() => page.setIsAddApplicationOpen(false)}
         onBootstrap={page.bootstrapApplication}
       />

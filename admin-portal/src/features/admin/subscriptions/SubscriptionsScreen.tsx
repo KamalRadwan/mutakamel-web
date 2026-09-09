@@ -310,13 +310,17 @@ function SubscriptionResults({
                 variant="ghost"
                 size="sm"
                 className="group px-2 text-action"
-                aria-label={`${copy.inspectItems}: ${item.tenant?.companyName ?? item.subscription.id} (${formatInteger(item.items.length, lang)})`}
+                aria-label={`${copy.inspectItems}: ${item.tenant?.companyName ?? item.subscription.id} (${formatInteger(item.items.length + item.commercial.addonSelections.length, lang)})`}
               >
                 <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
-                {copy.inspectItems} ({formatInteger(item.items.length, lang)})
+                {copy.inspectItems} ({formatInteger(item.items.length + item.commercial.addonSelections.length, lang)})
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-2 motion-reduce:transition-none">
+              {item.commercial.addonSelections.map(addon => <div key={addon.id} className="rounded-md border border-border bg-muted p-2 text-sm">
+                <p className="font-semibold">{copy.addon}: <bdi>{addon.addonKey}</bdi></p>
+                <p className="mt-1">{copy.addonSeats}: <bdi>{formatInteger(addon.seats, lang)}</bdi> · <bdi className="font-mono">USD {addon.acceptedPricing.recurringAmountUsd}</bdi></p>
+              </div>)}
               {item.items.length ? (
                 item.items.map((planItem) => (
                   <div key={planItem.id} className="rounded-md border border-border bg-muted p-2 text-sm">
@@ -353,10 +357,9 @@ function SubscriptionResults({
       headerEn: copy.price,
       headerAr: copy.price,
       cell: (item) => (
-        <span className="font-mono font-semibold">
-          {item.subscription.totalPrice ?? copy.notConfigured}
-          {item.subscription.totalPrice && item.subscription.currencyCode ? ` ${item.subscription.currencyCode}` : ""}
-        </span>
+        <div><p className="font-mono font-semibold"><bdi>{item.commercial.totals.combinedRecurringUsd} USD</bdi></p>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.baseTotal}: <bdi className="font-mono">{item.commercial.totals.baseRecurringUsd}</bdi></p>
+          <p className="text-xs text-muted-foreground">{copy.addonTotal}: <bdi className="font-mono">{item.commercial.totals.addonRecurringUsd}</bdi></p></div>
       ),
     },
     {

@@ -74,13 +74,24 @@ interface CreateLeadFormState {
  * A shared touched-set rather than one `useBlurValidation` per field, because
  * the contacts and phone rows are dynamic and a hook cannot be called per row.
  */
-export function useCreateLeadForm(messages: LeadCreateMessages, requiredCustomFieldKeys: readonly string[]) {
+export function useCreateLeadForm(
+  messages: LeadCreateMessages,
+  requiredCustomFieldKeys: readonly string[],
+  // The stage a board column's `+` was pressed in. It seeds the field and
+  // nothing else — the select still offers every stage, and `reset` restores
+  // the seed rather than a blank, because the reason for the seed did not
+  // change when the user cleared the form.
+  initialStageId?: string,
+) {
   const validate = useCallback(
     (candidate: CreateLeadForm) =>
       validateCreateLead(candidate, messages, requiredCustomFieldKeys),
     [messages, requiredCustomFieldKeys],
   );
-  const createInitial = useCallback(() => emptyCreateLeadForm(nextContactKey()), []);
+  const createInitial = useCallback(
+    () => ({ ...emptyCreateLeadForm(nextContactKey()), ...(initialStageId ? { stageId: initialStageId } : {}) }),
+    [initialStageId],
+  );
   const { form, errors, allErrors, isDirty, setForm, setField, touch, revealAll, reset } =
     useCrmCreateForm({ createInitial, validate, fingerprint });
 

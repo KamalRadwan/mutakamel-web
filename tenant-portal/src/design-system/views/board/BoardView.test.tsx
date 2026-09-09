@@ -33,6 +33,8 @@ const labels: BoardViewLabels = {
   notSorted: "Not sorted",
   emptyColumn: "Drop here",
   moveTo: "Move to",
+  collapseColumn: "Collapse column",
+  expandColumn: "Expand column",
   pagination: {
     previous: "Previous",
     next: "Next",
@@ -216,5 +218,61 @@ describe("BoardView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+});
+
+describe("BoardView — column header controls", () => {
+  afterEach(() => window.localStorage.clear());
+
+  it("collapses one column to a rail and leaves the others open", () => {
+    renderBoard();
+    // Two empty columns, so two drop zones.
+    expect(screen.getAllByText("Drop here")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse column: Qualified" }));
+
+    // The stage is still named and still counted — a collapsed column is a
+    // narrower column, not a hidden one.
+    expect(screen.getByText("Qualified")).toBeInTheDocument();
+    expect(screen.getAllByText("Drop here")).toHaveLength(1);
+    const toggle = screen.getByRole("button", { name: "Expand column: Qualified" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(screen.getAllByText("Drop here")).toHaveLength(2);
+  });
+
+  it("remembers the collapsed column across a remount", () => {
+    // The whole point of storing it: a stage collapsed today is still
+    // collapsed after a reload.
+    renderBoard();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse column: Qualified" }));
+    cleanup();
+
+    renderBoard();
+    expect(screen.getByRole("button", { name: "Expand column: Qualified" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Collapse column: New" })).toBeInTheDocument();
+  });
+
+  it("names every toggle by its own column", () => {
+    // Three identical "Collapse column" buttons would tell a screen-reader
+    // user nothing about which stage they are on.
+    renderBoard();
+    for (const column of columns) {
+      expect(
+        screen.getByRole("button", { name: `Collapse column: ${column.label}` }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  it("draws the add control only where a screen wired one, and hands back the column", () => {
+    renderBoard();
+    expect(screen.queryByRole("button", { name: /Add lead/ })).toBeNull();
+    cleanup();
+
+    const onAddToColumn = vi.fn();
+    renderBoard({ onAddToColumn, labels: { ...labels, addToColumn: "Add lead" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add lead: Qualified" }));
+    expect(onAddToColumn).toHaveBeenCalledWith("qualified");
   });
 });

@@ -13,6 +13,15 @@ const events: TimelineEvent[] = [
 ];
 
 describe("Timeline", () => {
+  it("reduces event spacing in compact mode without changing the event content", () => {
+    render(<Timeline events={events} label="Audit history" density="compact" />);
+    const rows = screen.getAllByRole("listitem");
+    expect(rows[0]).toHaveClass("gap-2");
+    expect(rows[0].lastElementChild).toHaveClass("pb-2");
+    expect(rows[2].lastElementChild).toHaveClass("pb-0");
+    expect(rows[0]).toHaveTextContent("Stage moved to Qualified");
+  });
+
   it("renders an ordered list named for what it is a history of", () => {
     render(<Timeline events={events} label="Audit history" />);
     const list = screen.getByRole("list", { name: "Audit history" });

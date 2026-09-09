@@ -71,6 +71,8 @@ export interface FileUploadProps {
   /** Renders the byte cap for `constraint` and `tooLarge`; caller formats through Intl. */
   formatBytes: (bytes: number) => string;
   disabled?: boolean;
+  /** Compact picker button; uses the same validation and upload queue. */
+  variant?: "dropzone" | "button";
   labels: FileUploadLabels;
   className?: string;
 }
@@ -92,6 +94,7 @@ export function FileUpload({
   maxFiles,
   formatBytes,
   disabled,
+  variant = "dropzone",
   labels,
   className,
 }: FileUploadProps) {
@@ -133,11 +136,19 @@ export function FileUpload({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
+      {variant === "button" && (
+        <Button type="button" variant="outline" size="sm" disabled={disabled}
+          className="self-start" onClick={() => inputRef.current?.click()}>
+          <Upload className={iconSize({ size: "sm" })} aria-hidden="true" />
+          {labels.browse}
+        </Button>
+      )}
       {/* The drop zone is a label, not a button: it must both open the picker
           on click and stay a valid drop target, and a <button> wrapping a file
           input is neither. The input keeps its own focus ring so keyboard
           users get the native picker. */}
       <label
+        hidden={variant === "button"}
         htmlFor={inputId}
         onDragOver={(event) => {
           event.preventDefault();
@@ -155,6 +166,7 @@ export function FileUpload({
           "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
           dragging && "border-primary bg-accent",
           disabled && "pointer-events-none opacity-50",
+          variant === "button" && "hidden",
         )}
       >
         <Upload className={cn(iconSize({ size: "xl" }), "text-muted-foreground")} aria-hidden="true" />

@@ -32,11 +32,11 @@ describe("subscriptions response reader", () => {
     });
   });
 
-  it("accepts a missing soft-deleted tenant relation without inventing data", () => {
+  it("rejects a missing tenant relation as an inconsistent canonical snapshot", () => {
     const payload = validSubscriptionsEnvelope();
     payload.data[0].tenant = null as never;
 
-    expect(readSubscriptionsPage(payload).items[0].tenant).toBeNull();
+    expect(() => readSubscriptionsPage(payload)).toThrow(SubscriptionContractError);
   });
 
   it.each([
@@ -61,19 +61,19 @@ describe("subscriptions response reader", () => {
     [
       "cross-subscription item",
       (payload: ReturnType<typeof validSubscriptionsEnvelope>) => {
-        payload.data[0].items[0].subscriptionId = TENANT_ID;
+        Object.assign(payload.data[0].baseItems[0], { subscriptionId: TENANT_ID });
       },
     ],
     [
       "seat total mismatch",
       (payload: ReturnType<typeof validSubscriptionsEnvelope>) => {
-        payload.data[0].effectiveAllowedUsers = 9;
+        payload.data[0].baseAllowance.effectiveAllowedUsers = 9;
       },
     ],
     [
       "module projection mismatch",
       (payload: ReturnType<typeof validSubscriptionsEnvelope>) => {
-        payload.data[0].enabledModules = ["module.billing"];
+        payload.data[0].baseAllowance.enabledApplications = ["billing"];
       },
     ],
     [

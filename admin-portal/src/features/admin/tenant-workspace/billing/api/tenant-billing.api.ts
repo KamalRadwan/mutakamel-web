@@ -1,29 +1,24 @@
 import { axiosClient } from "@/lib/api/axiosClient";
+import { contractFailure, readCommercialResponse } from "@/shared/api/commercial-contract";
+import { adaptSubscriptionCommercial, readSubscriptionCommercial, readSubscriptionItems } from "../model/subscription-commercial";
 import {
   readBillingSummary,
   readCancellationResult,
   readCoreData,
   readCorePage,
   readPayment,
-  readPlanChangeApplyResult,
-  readPlanChangePreview,
   readReconciliation,
   readReconciliationCase,
-  readSubscriptionView,
-  readSubscriptionItems,
   readWallet,
   readWalletAdjustmentPreview,
   readWalletInputCurrencies,
   readWalletLedger,
 } from "../model/readers";
 import type {
-  CreateSubscriptionPlanChangePreviewDto,
   OfflinePaymentDto,
   PaymentReconciliationAction,
   PreviewWalletAdjustmentDto,
-  SeedTenantSubscriptionDto,
   PageView,
-  SubscriptionItemView,
   WalletLedgerView,
 } from "../types";
 
@@ -43,84 +38,23 @@ function pageQuery(page: number, limit: number): string {
 
 export const tenantBillingApi = {
   getSubscription: async (tenantId: string, signal?: AbortSignal) => {
-    const [subscriptionResponse, itemsResponse] = await Promise.all([
-      axiosClient.get<unknown>(
-        tenantPath(tenantId, "/subscription"),
-        signal ? { signal } : undefined,
-      ),
-      axiosClient.get<unknown>(
-        tenantPath(tenantId, "/subscription/items"),
-        signal ? { signal } : undefined,
-      ),
+    const config = { cache: "no-store" as const, signal };
+    const [detailResponse, itemsResponse] = await Promise.all([
+      axiosClient.get<unknown>(tenantPath(tenantId, "/subscription"), config),
+      axiosClient.get<unknown>(tenantPath(tenantId, "/subscription/items"), config),
     ]);
-    const subscription = readCoreData(
-      subscriptionResponse.data,
-      readSubscriptionView,
-    );
-    const items = readCoreData(itemsResponse.data, (value) =>
-      readSubscriptionItems(value, {
-        subscriptionId: subscription.subscription.id,
-      }),
-    );
-    assertSameSubscriptionItems(subscription.items, items);
-    return {
-      ...subscription,
-      items: items.map((item) => {
-        const embedded = subscription.items.find(
-          (candidate) => candidate.id === item.id,
-        );
-        if (!embedded) throw new Error("SUBSCRIPTION_ITEMS_PROJECTION_DRIFT");
-        return {
-          ...embedded,
-          ...item,
-          features: item.features ?? embedded.features,
-          moduleKey: item.moduleKey ?? embedded.moduleKey,
-          moduleName: item.moduleName ?? embedded.moduleName,
-          tierKey: item.tierKey ?? embedded.tierKey,
-          tierName: item.tierName ?? embedded.tierName,
-          currencyCode: item.currencyCode ?? embedded.currencyCode,
-        };
-      }),
-    };
-  },
-
-  seedSubscription: async (
-    tenantId: string,
-    dto: SeedTenantSubscriptionDto,
-    idempotencyKey: string,
-  ) => {
-    const response = await axiosClient.post<unknown>(
-      tenantPath(tenantId, "/subscription"),
-      dto,
-      keyed(idempotencyKey),
-    );
-    return readCoreData(response.data, readSubscriptionView);
-  },
-
-  previewPlanChange: async (
-    subscriptionId: string,
-    dto: CreateSubscriptionPlanChangePreviewDto,
-    idempotencyKey: string,
-  ) => {
-    const response = await axiosClient.post<unknown>(
-      `${BASE}/subscriptions/${encodeURIComponent(subscriptionId)}/plan-change-previews`,
-      dto,
-      keyed(idempotencyKey),
-    );
-    return readCoreData(response.data, readPlanChangePreview);
-  },
-
-  applyPlanChange: async (
-    subscriptionId: string,
-    previewId: string,
-    idempotencyKey: string,
-  ) => {
-    const response = await axiosClient.post<unknown>(
-      `${BASE}/subscriptions/${encodeURIComponent(subscriptionId)}/plan-change-previews/${encodeURIComponent(previewId)}/apply`,
-      undefined,
-      keyed(idempotencyKey),
-    );
-    return readCoreData(response.data, readPlanChangeApplyResult);
+    const detail = readCommercialResponse(detailResponse, value => {
+      const next = readSubscriptionCommercial(value);
+      if (next.subscription.tenantId !== tenantId) contractFailure();
+      return next;
+    }, false, 4 * 1024 * 1024 + 256);
+    readCommercialResponse(itemsResponse, value => {
+      const items = readSubscriptionItems(value);
+      if (items.subscriptionId !== detail.subscription.id || items.subscriptionRevision !== detail.subscriptionRevision
+        || JSON.stringify(items.baseItems) !== JSON.stringify(detail.baseItems) || JSON.stringify(items.addonSelections) !== JSON.stringify(detail.addonSelections)) contractFailure();
+      return items;
+    }, false, 4 * 1024 * 1024 + 256);
+    return adaptSubscriptionCommercial(detail);
   },
 
   cancelSubscription: async (tenantId: string, idempotencyKey: string) => {
@@ -305,29 +239,6 @@ export const tenantBillingApi = {
     return readCoreData(response.data, readReconciliation);
   },
 };
-
-function assertSameSubscriptionItems(
-  embedded: readonly SubscriptionItemView[],
-  exact: readonly SubscriptionItemView[],
-) {
-  const fingerprint = (items: typeof embedded) =>
-    items
-      .map((item) =>
-        [
-          item.id,
-          item.subscriptionId,
-          item.moduleId,
-          item.tierId,
-          item.seats,
-          item.lineTotal,
-        ].join("|"),
-      )
-      .sort()
-      .join("\n");
-  if (fingerprint(embedded) !== fingerprint(exact)) {
-    throw new Error("SUBSCRIPTION_ITEMS_PROJECTION_DRIFT");
-  }
-}
 
 function assertSameLedgerPage(
   tenantLedger: PageView<WalletLedgerView>,

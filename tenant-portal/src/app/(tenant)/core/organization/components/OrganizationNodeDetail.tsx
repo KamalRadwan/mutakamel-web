@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   Badge,
+  Button,
   DetailHeader,
   DetailSection,
   ErrorState,
@@ -22,7 +25,7 @@ export function OrganizationNodeDetail<L extends OrgLevel>({
   level: L;
   id: string;
 }) {
-  const { t, lang, config, node, isLoading, loadError, isMissing, reload } =
+  const { t, lang, config, node, isLoading, loadError, isMissing, reload, canReadApplicationAccess } =
     useOrganizationNode(level, id);
   const copy = t.coreIdentity;
   const levelCopy = copy.levels[level];
@@ -100,6 +103,11 @@ export function OrganizationNodeDetail<L extends OrgLevel>({
             <DetailSection
               title={copy.detail.placement}
               description={copy.detail.placementDescription}
+              action={canReadApplicationAccess && (level === "companies" || level === "branches") ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/core/application-access/${level}/${id}`}>{t.nav.coreApplicationAccess}</Link>
+                </Button>
+              ) : undefined}
               emptyValueLabel={t.detail.notRecorded}
               fields={[
                 ...("companyId" in node

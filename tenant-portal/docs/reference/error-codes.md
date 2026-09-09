@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from `throw new *Exception` sites)
 
-Last source verification: **2026-09-05**
+Last source verification: **2026-09-09**
 
-Codes: **313** across **36** areas
+Codes: **321** across **36** areas
 
 ## Scope
 
@@ -258,11 +258,13 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-auth` · 7 codes
 
 ## Organization
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/organization` · 6 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/organization` · 8 codes
 
 | Error code | HTTP |
 | --- | --- |
+| `BRANCH_PERMISSION_DENIED` | 403 |
 | `CURRENCY_NOT_ENABLED` | 422 |
+| `ORG_BRANCH_SCOPE_STALE` | 409 |
 | `ORG_HQ_EXISTS` | 409 |
 | `ORG_LEAD_USER_NOT_FOUND` | 404 |
 | `ORG_PARENT_INACTIVE` | 409 |
@@ -325,10 +327,14 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/scope-role-assignments` �
 
 ## User modules
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 8 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 12 codes
 
 | Error code | HTTP |
 | --- | --- |
+| `ADDON_ASSIGNMENTS_EXIST` | 409 |
+| `APPLICATION_ALLOWANCE_NOT_READY` | 409 |
+| `APPLICATION_ALLOWANCE_STALE` | 409 |
+| `APPLICATION_ALLOWANCE_UNAVAILABLE` | 503 |
 | `ASSIGNMENT_NOT_FOUND` | 404 |
 | `MODULE_NOT_FOUND` | 422 |
 | `MODULE_NOT_SUBSCRIBED` | 422 |
@@ -411,10 +417,12 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/billing` · 2 codes
 
 ## Subscription
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/subscription` · 1 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/subscription` · 3 codes
 
 | Error code | HTTP |
 | --- | --- |
+| `COMMERCIAL_CONTRACT_INVALID` | 400 |
+| `SUBSCRIPTION_CATALOGUE_UNAVAILABLE` | 503 |
 | `TENANT_CONTEXT_MISSING` | 401 |
 
 ## Payments

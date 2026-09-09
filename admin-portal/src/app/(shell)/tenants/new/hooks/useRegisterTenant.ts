@@ -13,6 +13,8 @@ import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
 import { adminCan } from "@/lib/auth/rbac";
 import { useToast } from "@/components/ui/ToastContext";
+import { generateUUIDv7 } from "@/lib/utils/uuid";
+import { useTenantCreationQuote } from "./useTenantCreationQuote";
 import { useIdempotency } from "@/shared/hooks/useIdempotency";
 import {
   normalizeApiError,
@@ -38,6 +40,7 @@ import {
 import { tenantRegistrationApi } from "../api/tenant-registration.api";
 import {
   buildTenantSubscriptionLines,
+  canSelectTenantApplication,
   getCanonicalCountrySelection,
   getTenantRegistrationLoadState,
   isCanonicalCountrySelection,
@@ -313,7 +316,7 @@ export function useRegisterTenant() {
           const selection = current[candidate.key];
           if (
             selection &&
-            candidate.selectionAllowed &&
+            canSelectTenantApplication(candidate) &&
             candidate.tiers.some((tier) => tier.id === selection.tierId)
           ) {
             retained[candidate.key] = selection;
@@ -368,7 +371,8 @@ export function useRegisterTenant() {
     [applicationSelections],
   );
   const hasValidApplicationSelection =
-    selectedApplicationKeys.length > 0 &&
+    selectedApplicationKeys.length > 0 && selectedApplicationKeys.length <= 50 &&
+    selectedApplicationLines.reduce((count, line) => count + line.addons.length, 0) <= 100 &&
     selectedApplicationLines.length === selectedApplicationKeys.length;
   const selectedApplicationEvidenceFingerprint = selectedApplicationKeys
     .map((applicationKey) => {
@@ -376,7 +380,7 @@ export function useRegisterTenant() {
         (item) => item.key === applicationKey,
       );
       return candidate
-        ? `${candidate.key}:${candidate.technicalDefinitionRevision}:${candidate.selectionAllowed}`
+        ? `${candidate.key}:${candidate.technicalDefinitionRevision}:${canSelectTenantApplication(candidate)}`
         : `${applicationKey}:missing`;
     })
     .join("|");
@@ -395,7 +399,7 @@ export function useRegisterTenant() {
       );
       if (
         selected &&
-        (!candidate || !candidate.selectionAllowed || !candidate.tiers[0])
+        (!candidate || !canSelectTenantApplication(candidate) || !candidate.tiers[0])
       ) {
         return;
       }
@@ -405,8 +409,10 @@ export function useRegisterTenant() {
           delete next[applicationKey];
         } else if (candidate) {
           next[applicationKey] = {
+            selectionKey: generateUUIDv7(),
             tierId: candidate.tiers[0].id,
             seats: 1,
+            addons: [],
           };
         }
         return next;
@@ -420,7 +426,7 @@ export function useRegisterTenant() {
     (applicationKey: string, patch: Partial<TenantApplicationSelection>) => {
       setApplicationSelections((current) => {
         const selection = current[applicationKey];
-        if (!selection) return current;
+        if (!selection || (patch.tierId !== undefined && patch.tierId !== selection.tierId && selection.addons.length > 0)) return current;
         return {
           ...current,
           [applicationKey]: { ...selection, ...patch },
@@ -645,6 +651,9 @@ export function useRegisterTenant() {
       }),
     [formData, selectedApplicationLines],
   );
+  const creationQuote = useTenantCreationQuote({ owner: JSON.stringify([user?.id, canCreateTenant, draftFingerprint]),
+    lines: selectedApplicationLines, billingCycle: formData.billingCycle,
+    enabled: canCreateTenant && !isAuthLoading && hasValidApplicationSelection && !pendingCreateRecovery && !isSubmitting });
   const draftFingerprintRef = useRef(draftFingerprint);
   useLayoutEffect(() => {
     draftFingerprintRef.current = draftFingerprint;
@@ -930,7 +939,7 @@ export function useRegisterTenant() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (submissionLockRef.current || isSubmitting) return;
+    if (submissionLockRef.current || isSubmitting || creationQuote.loading) return;
     if (pendingCreateRecovery) {
       toast.warning(
         t.tenants.registerFlow.resolvePreviousCreateTitle,
@@ -995,11 +1004,8 @@ export function useRegisterTenant() {
     setIsSubmitting(true);
     setCreateRecoveryError(null);
     try {
-      const quote = await tenantRegistrationApi.quote(
-        selectedApplicationLines,
-        formData.billingCycle,
-        submissionController.signal,
-      );
+      const quote = creationQuote.quote;
+      if (!quote || Date.parse(quote.expiresAt) <= Date.now()) throw new Error("TENANT_CREATION_QUOTE_REQUIRED");
       if (
         !isTenantCreateDraftCurrent(
           submittedFingerprint,
@@ -1063,11 +1069,7 @@ export function useRegisterTenant() {
           currencyCode: "USD",
           // Omitted on purpose: Core applies the tenants.trial_days setting,
           // so the platform default stays configurable in one place.
-          items: selectedApplicationLines.map((line) => ({
-            moduleKey: line.applicationKey,
-            tierKey: line.tierKey,
-            seats: line.seats,
-          })),
+          applications: selectedApplicationLines.map(({ selectionKey, applicationId, tierId, seats, addons }) => ({ selectionKey, applicationId, tierId, seats, addons })),
         },
       };
       if (
@@ -1287,6 +1289,7 @@ export function useRegisterTenant() {
   };
 
   return {
+    creationQuote,
     t,
     currentStep,
     goToStep: (step: number) => {

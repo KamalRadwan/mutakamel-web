@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { useDictionary } from "@/i18n/useLanguage";
 import { cn } from "../../lib/cn";
 import { iconSize, mirrorInRtl } from "../../lib/icons";
-import { Button } from "../../primitives/Button";
+import { Button, type ButtonProps } from "../../primitives/Button";
 import { PageActions } from "../../shell/PageActions";
 
 export interface Breadcrumb {
@@ -15,7 +15,7 @@ export interface Breadcrumb {
 export interface PageHeaderProps {
   title: string;
   description?: string;
-  primaryAction?: { label: string; onClick: () => void; disabled?: boolean; loading?: boolean };
+  primaryAction?: { label: string; onClick: () => void; disabled?: boolean; loading?: boolean; size?: ButtonProps["size"] };
   secondaryActions?: React.ReactNode;
   breadcrumbs?: Breadcrumb[];
   /** Rendered inline after the title — a `StatusBadge`, and nothing that takes focus. */
@@ -100,6 +100,7 @@ export function PageHeader({
             {primaryAction && (
               <Button
                 variant="primary"
+                size={primaryAction.size}
                 onClick={primaryAction.onClick}
                 disabled={primaryAction.disabled}
                 loading={primaryAction.loading}

@@ -8,6 +8,7 @@ import { DestructiveActionModal } from "@/components/shared/DestructiveActionMod
 import { StatusBadge, PageHeader, Card, Button } from "@/design-system";
 import { useAuth } from "@/context/AuthContext";
 import { ApplicationCatalogueWorkspace } from "@/features/admin/applications/components/ApplicationCatalogueWorkspace";
+import { ApplicationAddonsWorkspace } from "@/features/admin/applications/components/ApplicationAddonsWorkspace";
 import { ApplicationConfigurationDialog } from "@/features/admin/applications/components/ApplicationConfigurationDialog";
 import { ApplicationLifecycleDialog, type ApplicationLifecycleAction } from "@/features/admin/applications/components/ApplicationLifecycleDialog";
 import { ApplicationDatabaseBindDialog } from "@/features/admin/applications/components/ApplicationDatabaseBindDialog";
@@ -183,20 +184,21 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         onOpenBinding={() => setTechnicalDialog("BIND")}
       />
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_1.25fr]">
-        <Card className="p-5">
+      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+        <Card className="min-w-0 p-5">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Shield className="size-4 text-info" aria-hidden="true" />{t.applications.detail.databasePolicy}</h2>
           <dl className="mt-4 grid grid-cols-2 gap-4 text-xs"><Item label={t.applications.detail.newServers} value={application.databasePolicy.enableOnNewServers ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.rotation} value={application.databasePolicy.rotationEnabled ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.interval} value={`${application.databasePolicy.rotationIntervalHours} ${t.applications.detail.hours}`} /><Item label={t.applications.detail.maintenance} value={`${application.databasePolicy.maintenanceWindowStartUtc}:00 UTC · ${application.databasePolicy.maintenanceWindowHours}h`} /><Item label={t.applications.detail.policyRevision} value={application.databasePolicy.policyRevision} /><Item label={t.applications.detail.catalogueRevision} value={application.catalogueRevision} /></dl>
         </Card>
-        <Card className="p-5">
+        <Card className="min-w-0 p-5">
           <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><FileCheck className="size-4 text-info" aria-hidden="true" />{t.applications.detail.safeManifests}</h2><Button type="button" variant="ghost" size="sm" onClick={() => void detail.fetchManifests()}>{t.applications.detail.retry}</Button></div>
-          {detail.isManifestLoading ? <div role="status" className="mt-4 text-xs text-muted-foreground">{t.applications.detail.loadingManifests}</div> : detail.manifestError ? <div role="alert" className="mt-4 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">{detail.manifestError}</div> : !detail.manifests.length ? <div className="mt-4 rounded-lg border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{t.applications.detail.noManifests}</div> : <div className="mt-4 space-y-2">{detail.manifests.map((manifest) => <div key={manifest.id} className="grid gap-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-[1fr_auto]"><div dir="ltr"><div className="font-mono font-semibold text-foreground">{manifest.contractPackage}@{manifest.contractVersion}</div><div className="mt-1 truncate font-mono text-xs text-muted-foreground" title={manifest.checksum}>{manifest.checksum}</div></div><div className="text-end"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${manifest.active ? "bg-success-subtle text-success-subtle-foreground" : "bg-muted text-muted-foreground"}`}>{manifest.active ? t.applications.detail.active : t.applications.detail.historical} · v{manifest.version}</span><time className="mt-2 block text-xs text-muted-foreground">{new Date(manifest.publishedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</time></div></div>)}</div>}
+          {detail.isManifestLoading ? <div role="status" className="mt-4 text-xs text-muted-foreground">{t.applications.detail.loadingManifests}</div> : detail.manifestError ? <div role="alert" className="mt-4 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">{detail.manifestError}</div> : !detail.manifests.length ? <div className="mt-4 rounded-lg border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{t.applications.detail.noManifests}</div> : <div className="mt-4 space-y-2">{detail.manifests.map((manifest) => <div key={manifest.id} className="grid min-w-0 grid-cols-1 gap-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-[1fr_auto]"><div dir="ltr" className="min-w-0"><div className="wrap-anywhere font-mono font-semibold text-foreground">{manifest.contractPackage}@{manifest.contractVersion}</div><div className="mt-1 truncate font-mono text-xs text-muted-foreground" title={manifest.checksum}>{manifest.checksum}</div></div><div className="text-end"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${manifest.active ? "bg-success-subtle text-success-subtle-foreground" : "bg-muted text-muted-foreground"}`}>{manifest.active ? t.applications.detail.active : t.applications.detail.historical} · v{manifest.version}</span><time className="mt-2 block text-xs text-muted-foreground">{new Date(manifest.publishedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</time></div></div>)}</div>}
         </Card>
       </section>
 
       <ApplicationServerCoverage summary={application.serverSummary} lang={lang} />
 
       <ApplicationCatalogueWorkspace applicationId={application.id} applicationKey={application.key} canRead={canReadCatalogue} canCreate={canCreateCatalogue} canMutate={canMutateCatalogue} />
+      <ApplicationAddonsWorkspace key={`${user?.id}:${application.key}`} applicationKey={application.key} supported={application.applicationType !== "SYSTEM" && application.commercialMode !== "NON_BILLABLE"} />
     </div>
 
     <ApplicationConfigurationDialog mode={configurationMode} application={application} isSubmitting={detail.isMutating} onClose={() => setConfigurationMode(null)} onUpdateMetadata={detail.updateApplication} onUpdatePolicy={detail.updateDatabasePolicy} />

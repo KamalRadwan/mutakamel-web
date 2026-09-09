@@ -19,6 +19,7 @@ export interface CustomFieldsCardProps {
   branchId: string | null;
   ownerType: CrmCustomFieldValueOwnerType;
   ownerId: string | null;
+  density?: "standard" | "compact";
 }
 
 /**
@@ -38,6 +39,7 @@ export function CustomFieldsCard({
   branchId,
   ownerType,
   ownerId,
+  density,
 }: CustomFieldsCardProps) {
   const { t, lang } = useI18n();
   const { entries, isLoading, error } = useCrmCustomFieldValues(
@@ -59,6 +61,7 @@ export function CustomFieldsCard({
 
   return (
     <DetailSection
+      density={density}
       title={t.crmShared.customFieldsTitle}
       fields={fields}
       columns={1}

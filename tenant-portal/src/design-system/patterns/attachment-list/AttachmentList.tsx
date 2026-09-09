@@ -34,7 +34,7 @@ export interface AttachmentListLabels {
 export interface AttachmentListProps
   extends Pick<
     FileUploadProps,
-    "files" | "onFilesAdded" | "onRemove" | "onReject" | "accept" | "maxSizeBytes" | "maxFiles" | "formatBytes"
+    "files" | "onFilesAdded" | "onRemove" | "onReject" | "accept" | "maxSizeBytes" | "maxFiles" | "formatBytes" | "disabled"
   > {
   attachments: Attachment[];
   isLoading?: boolean;
@@ -43,8 +43,11 @@ export interface AttachmentListProps
   onDelete?: (attachment: Attachment) => void;
   /** Suppresses the drop zone entirely — READ_ONLY, DUNNING, or no write capability. */
   canUpload?: boolean;
+  /** Button above the list, or the default drop zone below it. */
+  uploadVariant?: FileUploadProps["variant"];
   labels: AttachmentListLabels;
   className?: string;
+  density?: "standard" | "compact";
 }
 
 /**
@@ -61,25 +64,30 @@ export function AttachmentList({
   onDownload,
   onDelete,
   canUpload = true,
+  uploadVariant = "dropzone",
   labels,
   className,
+  density = "standard",
   ...upload
 }: AttachmentListProps) {
   return (
-    <section className={cn("flex flex-col gap-3", className)} aria-label={labels.title}>
+    <section className={cn("flex flex-col", density === "compact" ? "gap-2" : "gap-3", className)} aria-label={labels.title}>
+      {canUpload && uploadVariant === "button" && (
+        <FileUpload {...upload} variant="button" labels={labels.upload} />
+      )}
       {isLoading ? (
         <div className="flex flex-col gap-1.5">
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-full" />
         </div>
       ) : attachments.length === 0 ? (
-        <EmptyState title={labels.emptyTitle} description={labels.emptyDescription} />
+        <EmptyState title={labels.emptyTitle} description={labels.emptyDescription} className={density === "compact" ? "py-4" : undefined} />
       ) : (
         <ul className="flex flex-col gap-1.5">
           {attachments.map((attachment) => (
             <li
               key={attachment.id}
-              className="flex items-center gap-2 rounded-sm border border-border bg-card p-2"
+              className={cn("flex items-center gap-2 rounded-sm border border-border bg-card", density === "compact" ? "p-1.5" : "p-2")}
             >
               <Paperclip
                 className={cn(iconSize({ size: "lg" }), "text-muted-foreground")}
@@ -124,7 +132,7 @@ export function AttachmentList({
         </ul>
       )}
 
-      {canUpload && <FileUpload {...upload} labels={labels.upload} />}
+      {canUpload && uploadVariant === "dropzone" && <FileUpload {...upload} labels={labels.upload} />}
     </section>
   );
 }

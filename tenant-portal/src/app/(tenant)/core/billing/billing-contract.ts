@@ -1,4 +1,5 @@
-import { readCoreData, readCorePage, type CorePath } from "@/lib/api/envelope";
+import { readCoreData, readCorePage, readCoreResponse, type CorePath } from "@/lib/api/envelope";
+import { INVOICE_READ_RESPONSE_LIMIT_BYTES, parseInvoiceRead, type InvoiceRead } from "./invoice-read";
 import { isAccessMode, type AccessMode } from "@/lib/access-mode";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
@@ -255,12 +256,10 @@ export async function fetchInvoices(
 export async function fetchInvoice(
   invoiceId: string,
   signal?: AbortSignal,
-): Promise<TenantInvoice> {
-  return parseTenantInvoice(
-    await readCoreData(invoicePath(invoiceId), {
-      signal,
-      cache: "no-store",
-      maxResponseBytes: CORE_DETAIL_RESPONSE_LIMIT_BYTES,
-    }),
-  );
+): Promise<InvoiceRead> {
+  const response = await readCoreResponse(invoicePath(invoiceId), {
+    signal, cache: "no-store", maxResponseBytes: INVOICE_READ_RESPONSE_LIMIT_BYTES,
+  });
+  // The authenticated host/session is the tenant boundary; /auth/me exposes no tenantId.
+  return parseInvoiceRead(response.data, { invoiceId: invoiceId.toLowerCase() });
 }

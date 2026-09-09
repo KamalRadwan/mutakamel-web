@@ -81,6 +81,7 @@ docs/
 | File | Contents |
 | --- | --- |
 | [README.md](api/README.md) | Canonical paths, envelopes, idempotency, pagination |
+| [application-addons-target.md](api/application-addons-target.md) | **Planned, 2026-09-07** — paid addons, V2 purchase/readback, user seats and Company/Branch scope; not live routes |
 | [core-auth.md](api/core-auth.md) | Login, refresh, logout, `/me`, sessions, invite, reset |
 | [core-notifications.md](api/core-notifications.md) | Notification list, read, read-all, realtime |
 | [crm-leads.md](api/crm-leads.md) | Leads, stages, conversion, capabilities |

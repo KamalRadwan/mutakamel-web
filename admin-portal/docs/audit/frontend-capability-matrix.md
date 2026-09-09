@@ -2,14 +2,17 @@
 
 Status: **[Source verified]**
 
-Last source verification: **2026-08-25**
+Last source verification: **2026-09-09** (Catalogue/Addons amendment; other rows retain their dated scope).
 
-The Admin Portal web application has an exact reachable production call for
-every current Core Admin route: **240 direct, 0 equivalent, 0 missing**. `DONE`
-below means source-integrated. It does not mean live-authenticated,
-deployment-verified, or release-ready.
+The historical 2026-08-25 scan found **240 direct, 0 equivalent, 0 missing**
+Core Admin calls. It is not current full-route parity: new Addon/commercial
+contracts have expanded the generated inventory (282 routes at this checkpoint).
+Generated route presence does not prove a reachable frontend action. Catalogue
+and billing work is partial; canonical catalogue/pricing, directory/detail, invoice detail and initial create/seed are source-integrated. Aggregate existing-subscription preparation, preview/apply, operation recovery and original receipt lookup are mounted. Governed definition adoption and authenticated runtime acceptance remain open; see the [commercial boundary](../api/subscriptions.md) and [track receipt](../plans/application-catalogue-frontend-track.md).
+`DONE` below preserves earlier source-integrated scope, not live-authenticated,
+deployment-verified, Addon-complete or release-ready status.
 
-## Core Admin web route coverage
+## Historical Core Admin web route coverage (2026-08-25)
 
 | Evidence | Result |
 | --- | ---: |
@@ -44,7 +47,7 @@ machine evidence.
 | Subscriptions | `DONE/SOURCE_INTEGRATED` | Cross-tenant directory plus tenant detail/items, seed, plan preview/apply, and cancellation are integrated. Exact item reads are reconciled with detail. |
 | Wallet | `DONE/SOURCE_INTEGRATED` | Wallet, currencies, exact wallet-ID ledger, and server-authoritative preview/confirm adjustment flow are integrated without local FX. |
 | Payments/reconciliation | `DONE/SOURCE_INTEGRATED` | Tenant history plus refund and evidence-bound reconciliation proposal/decision are integrated. |
-| Invoices | `DONE/SOURCE_INTEGRATED` | Directory, detail, metadata edit, generation, issue, void, and tenant offline payment are reachable with exact permissions and validation. |
+| Invoices | `DONE/SOURCE_INTEGRATED` (existing routes); canonical detail | Directory, detail, metadata edit, generation, issue, void, and tenant offline payment retain exact permissions and validation. Detail uses the single purpose-based retained/manual contract with complete system-invoice pricing and no legacy fallback. No authenticated runtime acceptance is claimed for this revision. |
 | Settings/SMTP | `DONE/SOURCE_INTEGRATED` | Registry and exact by-key reads, per-page resource states, critical save gates, top-up cross-field validation, SMTP unknown-before-read state, persisted-value verification, and Asterisk validation are integrated. |
 | Notifications | `DONE/SOURCE_INTEGRATED` | Navbar unread count/dropdown plus inbox, single/bulk actions, preferences, configuration, and device tokens cover all 14 routes. |
 | Logging | `DONE/SOURCE_INTEGRATED` | Override list/upsert/delete, effective view, history, and authorized SSE live stream cover all six routes. |
@@ -66,7 +69,8 @@ machine evidence.
 
 ## Remaining web foundation and release gates
 
-- Route capability parity and UI-022 are complete. A settled-tree TypeScript AST
+- Historical route capability parity and UI-022 were complete for the earlier
+  240-route scope; new Addon/commercial parity remains open. A settled-tree TypeScript AST
   scan found 151 production Axios write calls and 0 bare/implicit-policy calls.
   Idempotent writes own retry-stable UUIDv7 intents; the two Gateway
   non-idempotent WebPhone call-log and forgot-password calls explicitly use
@@ -97,18 +101,17 @@ REST notifications are integrated. Do not activate a Socket.IO client until
 Admin Realtime has a released admission/reconnect contract and deployment
 evidence.
 
-### Mobile Admin
+### Excluded clients
 
-The Flutter Admin surface is not at parity: 0 routes are finished, 44 are
-partial/fixture-only, 79 are not started, and 117 are not applicable. The
-current Admin authentication contract is Web/browser-cookie specific, so
-mobile implementation remains gated on an authorized backend mobile Admin
-authentication contract.
+Mobile and Partner implementation, inspection and testing are explicitly
+excluded from this task and are not release blockers. Existing files remain
+intact; their historical coverage numbers are not current task evidence.
 
 ## Evidence level
 
 - Compiler-backed Core/Gateway source audit: yes.
-- Exact 240-row Web route ledger and hard checks: yes.
+- Historical 240-row Web route ledger and hard checks: yes; expanded catalogue
+  and commercial full-route parity: not established.
 - Focused source tests for delivered modules and repaired defects: yes.
 - Authenticated live runtime: not established by this document.
 - Deployment verification: not established by this document.

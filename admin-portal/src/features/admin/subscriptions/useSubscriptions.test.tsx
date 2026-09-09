@@ -23,7 +23,8 @@ const { authMock, listMock } = vi.hoisted(() => ({
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authMock }));
 vi.mock("./api", () => ({ subscriptionsApi: { list: listMock } }));
 
-import { TENANT_ID } from "./test-fixtures";
+import { TENANT_ID, validSubscriptionsEnvelope } from "./test-fixtures";
+import { readSubscriptionsPage } from "./readers";
 import { useSubscriptions } from "./useSubscriptions";
 
 const EMPTY_PAGE: SubscriptionPage = {
@@ -38,41 +39,7 @@ const EMPTY_PAGE: SubscriptionPage = {
   timestamp: "2026-08-12T09:00:00.000Z",
 };
 
-const READY_PAGE: SubscriptionPage = {
-  ...EMPTY_PAGE,
-  items: [
-    {
-      subscription: {
-        id: "019f0000-0000-7000-8000-000000000001",
-        tenantId: TENANT_ID,
-        allowedUsers: 10,
-        status: "ACTIVE",
-        billingCycle: "MONTHLY",
-        currencyCode: "USD",
-        startedAt: "2026-01-01T00:00:00.000Z",
-        currentPeriodStart: "2026-08-01T00:00:00.000Z",
-        currentPeriodEnd: "2026-09-01T00:00:00.000Z",
-        pendingPeriodStart: null,
-        pendingPeriodEnd: null,
-        trialDays: 14,
-        trialStartedAt: null,
-        trialEndsAt: null,
-        activationScheduledAt: null,
-        activatedAt: "2026-01-01T00:00:00.000Z",
-        cancelAt: null,
-        totalPrice: "120.0000",
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-08-01T00:00:00.000Z",
-      },
-      effectiveAllowedUsers: 10,
-      enabledModules: ["module.crm"],
-      items: [],
-      tenant: null,
-    },
-  ],
-  total: 1,
-  totalPages: 1,
-};
+const READY_PAGE: SubscriptionPage = readSubscriptionsPage(validSubscriptionsEnvelope());
 
 describe("useSubscriptions", () => {
   beforeEach(() => {

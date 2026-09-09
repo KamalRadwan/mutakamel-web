@@ -7,10 +7,17 @@ import { formatTemplate } from "@/lib/format/template";
 import type { CrmFormErrors } from "../hooks/useCrmCreateForm";
 import { CrmPhoneNumberInput } from "./CrmPhoneNumberInput";
 
-/** `@ArrayMaxSize(10)` on every `phones` / `companyPhones` array in CRM. */
-const CRM_PHONE_LIST_MAX = 10;
+/**
+ * `@ArrayMaxSize(10)` on every `phones` / `companyPhones` array in CRM.
+ *
+ * Exported because the lead detail's company card edits the same array under a
+ * layout this component cannot produce — its label lives in the card's grid
+ * rather than over each row — and the two must not disagree about the DTO's
+ * own bounds.
+ */
+export const CRM_PHONE_LIST_MAX = 10;
 /** `@MaxLength(32)` on every phone string in CRM. */
-const CRM_PHONE_MAX_LENGTH = 32;
+export const CRM_PHONE_MAX_LENGTH = 32;
 
 export interface CrmPhoneListFieldProps {
   label: string;

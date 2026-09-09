@@ -1,8 +1,6 @@
-import type {
-  ApplicationCommercialMode,
-  ApplicationSelectionBlocker,
-  ApplicationTechnicalReadinessReason,
-} from "@/features/admin/applications/types";
+import type { InitialApplicationOption } from "@/features/admin/subscriptions/initial-commercial/initial-create-options";
+import type { InitialApplicationSelection } from "@/features/admin/subscriptions/initial-commercial/initial-commercial-request";
+import type { InitialQuoteView } from "@/features/admin/subscriptions/initial-commercial-readers";
 
 export type TenantRegistrationLoadState =
   "idle" | "loading" | "forbidden" | "error" | "empty" | "ready";
@@ -57,41 +55,15 @@ export interface TenantIdentityValidationEvidence {
   result: TenantIdentityValidationResult;
 }
 
-interface TenantApplicationTierOption {
-  id: string;
-  key: string;
-  name: string;
-  rank: number;
-}
+export type TenantApplicationCandidate = InitialApplicationOption;
 
-export interface TenantApplicationCandidate {
-  applicationId: string;
-  key: string;
-  name: string;
-  description: string | null;
-  rank: number;
-  commercialMode: ApplicationCommercialMode;
-  technicalDefinitionRevision: string;
-  selectionAllowed: boolean;
-  selectionBlockers: ApplicationSelectionBlocker[];
-  readinessReasons: ApplicationTechnicalReadinessReason[];
-  catalogueReasons: Array<"ACTIVE_TIER_REQUIRED">;
-  tiers: TenantApplicationTierOption[];
-}
+export type TenantApplicationSelection = Omit<InitialApplicationSelection, "applicationId">;
 
-export interface TenantApplicationSelection {
-  tierId: string;
-  seats: number;
-}
-
-export interface TenantSubscriptionLine {
-  applicationId: string;
+export interface TenantSubscriptionLine extends InitialApplicationSelection {
   applicationKey: string;
   applicationName: string;
-  tierId: string;
   tierKey: string;
   tierName: string;
-  seats: number;
 }
 
 export interface TenantDatabasePlacementOption {
@@ -115,7 +87,8 @@ interface TenantProvisioningComponentPreview {
   componentId: string;
   componentKey: string;
   ownerApp: string;
-  selectionSource: "FOUNDATION" | "ENTITLEMENT" | "DEPENDENCY";
+  selectionSource: "FOUNDATION" | "ENTITLEMENT" | "DEPENDENCY" | "ADDON";
+  installedReadiness: null;
   dependsOnComponentKeys: string[];
   required: boolean;
   activationRequired: boolean;
@@ -152,27 +125,12 @@ export interface TenantProvisioningPlanPreview {
   contractVersion: 1;
   selectedApplicationKeys: string[];
   selectionDigest: string;
+  applications: [];
   components: TenantProvisioningComponentPreview[];
   steps: TenantProvisioningStepPreview[];
 }
 
-export interface TenantSubscriptionQuote {
-  quoteId: string;
-  requestHash: string;
-  pricingRevision: string;
-  billingCycle: TenantBillingCycle;
-  currencyCode: "USD";
-  total: string;
-  totalUsd: string;
-  items: Array<{
-    moduleId: string;
-    tierId: string;
-    seats: number;
-    lineTotal: string;
-    lineTotalUsd: string;
-  }>;
-  expiresAt: string;
-}
+export type TenantSubscriptionQuote = InitialQuoteView;
 
 export interface TenantCreateCommand {
   quoteId: string;
@@ -212,11 +170,7 @@ export interface TenantCreateCommand {
     currencyCode: "USD";
     /** Omit to let Core apply the `tenants.trial_days` platform setting. */
     trialDays?: number;
-    items: Array<{
-      moduleKey: string;
-      tierKey: string;
-      seats: number;
-    }>;
+    applications: InitialApplicationSelection[];
   };
 }
 

@@ -6,10 +6,19 @@
 //   GET   /api/tenant/crm/v1/leads/company-options                  200
 //   GET   /api/tenant/crm/v1/leads/company-options/:id/contacts     200
 //
-// The detail response is `LeadReadModel` = `LeadEntity` **&**
-// `PartyBackedIdentity` (crm-app/src/common/party-read-model.ts). Everything
+// The detail response is `LeadDetailReadModel` (crm-app/src/common/party-read-model.ts)
+// = `LeadReadModel` — itself `LeadEntity` **&** `PartyBackedIdentity` **&**
+// `LeadBoardFields` — plus `address` and `contacts`. Everything
 // identity-shaped — displayName, the phones, the emails — lives on the Party
 // behind the lead and is projected onto the row by `toPartyBackedReadModel`.
+//
+// **Only `GET /leads/:id` carries `address` and `contacts`.** They are two
+// extra aggregates per row — a correlated subquery for the party's primary
+// address and another for the lead's people — so `findReadModelById` selects
+// them and `searchReadModels` does not. A 25-card board page would pay for
+// fifty aggregates that no card draws, which is why `LeadCard`
+// (./lead-card-contract.ts) has neither field and must not grow one. An empty
+// `contacts` here therefore means the lead has none, never that nobody asked.
 //
 // Two joins matter and only one exists: `selectPartySummary` does
 // `leftJoinAndSelect` on `acquisitionSource`, and **not** on `stage`. The lead
@@ -55,6 +64,62 @@ type LeadStageFlagValue = (typeof LEAD_STAGE_FLAGS)[number];
 export type CrmProfileType = (typeof CRM_PROFILE_TYPES)[number];
 export type CrmContactMethodType = (typeof CRM_CONTACT_METHOD_TYPES)[number];
 
+/**
+ * `PartyAddressView` — the lead party's PRIMARY address, or `null`.
+ *
+ * One address and not a list: the backend's subquery is `ORDER BY is_primary
+ * DESC ... LIMIT 1`, so a party holding a legal address and a shipping address
+ * answers with the primary one only. The rest of them live on the party's own
+ * directory screen, which is the surface that can edit them.
+ *
+ * `addressType` stays a `string` rather than the portal's `ADDRESS_TYPES`
+ * union: it is a catalogue the backend can extend, and a value this build has
+ * never heard of must show as itself rather than take the whole card down.
+ * Every other field is nullable because every underlying column is.
+ */
+export interface LeadAddress {
+  addressType: string;
+  label: string | null;
+  country: string | null;
+  city: string | null;
+  area: string | null;
+  street: string | null;
+  buildingNo: string | null;
+  floor: string | null;
+  apartment: string | null;
+  landmark: string | null;
+  postalCode: string | null;
+}
+
+/**
+ * `LeadContactView` — one person linked to THIS lead.
+ *
+ * Joined through `crm_lead_contacts`, not through the company: an organization
+ * may hold two dozen contacts while the lead names the two it is being worked
+ * with, so this is a shorter list than
+ * `parseLeadCompanyContactOptions` returns and the two must not be conflated.
+ *
+ * `relationshipId` is nullable here and required there, and that difference is
+ * real: the company picker lists people BY their organization relationship,
+ * while a lead contact may be a person with no organization link at all.
+ *
+ * The order is the server's — primary first, then by name — and is preserved
+ * rather than re-sorted, so the list reads the same way as every other
+ * server-collated name list on the screen.
+ */
+export interface LeadContact {
+  partyId: string;
+  relationshipId: string | null;
+  displayName: string;
+  firstName: string | null;
+  lastName: string | null;
+  honorificTitle: string | null;
+  jobTitle: string | null;
+  isPrimary: boolean;
+  email: string | null;
+  phones: string[];
+}
+
 export interface LeadDetail {
   id: string;
   branchId: string;
@@ -71,9 +136,30 @@ export interface LeadDetail {
   primaryMobile: string | null;
   email: string | null;
   companyPhone: string | null;
+  /**
+   * The COMPANY party's own email — not the primary contact's.
+   *
+   * The lead's `email` above still prefers its contact's address, because that
+   * is who a salesperson writes to; these are two different values and used to
+   * be the same one. The type did not change, only what it means, so nothing
+   * here parses differently.
+   */
   companyEmail: string | null;
   companyWebsite: string | null;
+  /**
+   * The registration pair, off the party the lead is backed by
+   * (`party_view_tax_number` / `..._commercial_registration_number` in
+   * `toLeadReadModel`). They were in every response already and simply unread —
+   * which is why the detail screen used to ask a corporate lead's registration
+   * questions and answer none of them.
+   */
+  taxNumber: string | null;
+  commercialRegistrationNumber: string | null;
   phones: string[];
+  /** `null` when the party has no address at all — see `LeadAddress`. */
+  address: LeadAddress | null;
+  /** Always an array; `[]` when the lead names nobody. */
+  contacts: LeadContact[];
   acquisitionSourceId: string | null;
   acquisitionSourceNameAr: string | null;
   acquisitionSourceNameEn: string | null;
@@ -155,6 +241,99 @@ function requiredTimestamp(value: unknown): string {
   return value;
 }
 
+/**
+ * The address, or `null` — and never a throw.
+ *
+ * Unlike the identity fields above, a bad address is not a bad lead. The whole
+ * detail screen refusing to render because one optional aggregate came back in
+ * a shape this build did not expect is a far worse outcome than a card that
+ * says the lead has no address on file, so every failure here lands on `null`.
+ *
+ * `addressType` is the one field the row cannot be missing — it is NOT NULL on
+ * `party_addresses` and it is what the card labels itself with — so its
+ * absence is what "malformed" means. The other ten are nullable columns and
+ * `nullableText` already answers for each of them.
+ */
+function parseLeadAddress(value: unknown): LeadAddress | null {
+  const address = record(value);
+  if (!address || typeof address.addressType !== "string") return null;
+  if (address.addressType.length === 0) return null;
+
+  return {
+    addressType: address.addressType,
+    label: nullableText(address.label),
+    country: nullableText(address.country),
+    city: nullableText(address.city),
+    area: nullableText(address.area),
+    street: nullableText(address.street),
+    buildingNo: nullableText(address.buildingNo),
+    floor: nullableText(address.floor),
+    apartment: nullableText(address.apartment),
+    landmark: nullableText(address.landmark),
+    postalCode: nullableText(address.postalCode),
+  };
+}
+
+/**
+ * The DTO caps a WRITE at `@ArrayMaxSize(20)` contacts. This is the READ
+ * bound, deliberately looser: rows predating the cap, or written by another
+ * client, are still real data and truncating them at twenty would hide people
+ * who are genuinely on the lead. A hundred is the point past which the list is
+ * a directory query rather than a detail card, and the overflow is dropped so
+ * a runaway response cannot turn into a runaway render.
+ */
+const MAX_LEAD_CONTACTS = 100;
+
+/**
+ * The contacts, or `[]` — and never a throw, for the same reason as the
+ * address.
+ *
+ * One malformed entry costs that entry and nothing else: a detail screen that
+ * renders nine of ten contacts tells the user more than one that renders none.
+ * A row is kept when it can be identified and named, which is exactly what the
+ * screen needs to draw and to link it; everything else falls back.
+ *
+ * The server's order — primary first, then by name — is preserved as received.
+ */
+function parseLeadContacts(value: unknown): LeadContact[] {
+  if (!Array.isArray(value)) return [];
+
+  const contacts: LeadContact[] = [];
+  for (const entry of value) {
+    if (contacts.length === MAX_LEAD_CONTACTS) break;
+    const contact = record(entry);
+    if (
+      !contact ||
+      !isUUIDv7(contact.partyId) ||
+      typeof contact.displayName !== "string" ||
+      contact.displayName.length === 0
+    ) {
+      continue;
+    }
+    contacts.push({
+      partyId: contact.partyId,
+      relationshipId: isUUIDv7(contact.relationshipId)
+        ? contact.relationshipId
+        : null,
+      displayName: contact.displayName,
+      firstName: nullableText(contact.firstName),
+      lastName: nullableText(contact.lastName),
+      honorificTitle: nullableText(contact.honorificTitle),
+      jobTitle: nullableText(contact.jobTitle),
+      // `=== true` rather than a truthiness test: a missing flag must read as
+      // "not primary", and the screen crowns whoever it marks.
+      isPrimary: contact.isPrimary === true,
+      email: nullableText(contact.email),
+      phones: Array.isArray(contact.phones)
+        ? contact.phones.filter(
+            (phone): phone is string => typeof phone === "string",
+          )
+        : [],
+    });
+  }
+  return contacts;
+}
+
 export function parseLeadDetailResponse(payload: unknown): LeadDetail {
   const lead = record(payload);
   if (
@@ -194,7 +373,11 @@ export function parseLeadDetailResponse(payload: unknown): LeadDetail {
     companyPhone: nullableText(lead.companyPhone),
     companyEmail: nullableText(lead.companyEmail),
     companyWebsite: nullableText(lead.companyWebsite),
+    taxNumber: nullableText(lead.taxNumber),
+    commercialRegistrationNumber: nullableText(lead.commercialRegistrationNumber),
     phones,
+    address: parseLeadAddress(lead.address),
+    contacts: parseLeadContacts(lead.contacts),
     acquisitionSourceId: isUUIDv7(lead.acquisitionSourceId)
       ? lead.acquisitionSourceId
       : null,

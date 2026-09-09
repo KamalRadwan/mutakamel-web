@@ -23,6 +23,7 @@ import type {
 export function useApplication(applicationKey: string) {
   const toast = useToast();
   const { mutate, isMutating } = useActionMutation();
+  const { mutate: mutateDatabaseBinding, isMutating: isBindingDatabaseServers } = useActionMutation();
   const ownerToken = useMemo(
     () => Symbol(`application:${applicationKey}`),
     [applicationKey],
@@ -261,7 +262,7 @@ export function useApplication(applicationKey: string) {
    */
   const bindDatabaseServers = (dto: BindApplicationDatabaseServersDto) => {
     assertCurrentKey();
-    return mutate(
+    return mutateDatabaseBinding(
       { operation: "BIND_DATABASE_SERVERS", applicationKey, dto },
       (key) => applicationsApi.bindDatabaseServers(applicationKey, dto, key),
       mutationOptions("Database binding command completed."),
@@ -321,7 +322,7 @@ export function useApplication(applicationKey: string) {
         : [],
     manifestError,
     isManifestLoading,
-    isMutating,
+    isMutating: isMutating || isBindingDatabaseServers,
     isLoading,
     /** A re-read over a snapshot already on screen; the page stays rendered. */
     isRefreshing,

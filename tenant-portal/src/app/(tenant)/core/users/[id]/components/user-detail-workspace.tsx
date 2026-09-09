@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Pencil, ShieldOff, Trash2, UserCheck } from "lucide-react";
 import {
   Badge,
@@ -90,6 +91,9 @@ export function UserDetailWorkspace({ id }: { id: string }) {
           }
           secondaryActions={
             <>
+              {screen.canReadAddonAssignments && <Button variant="outline" asChild>
+                <Link href={`${TENANT_ROUTES.coreAddonSeats}/${id}`}>{t.addonAssignments.nav}</Link>
+              </Button>}
               {screen.canUpdate ? (
                 <Button variant="outline" onClick={screen.openEdit}>
                   <Pencil className="size-4" aria-hidden="true" />

@@ -23,6 +23,7 @@ import type {
 
 import { ApplicationDatabaseBindDialog } from "./ApplicationDatabaseBindDialog";
 import { ApplicationPublishActivateDialog } from "./ApplicationPublishActivateDialog";
+import { ApplicationReleaseAuthorityRail } from "./ApplicationReleaseAuthorityRail";
 
 type PublishFn = (dto: PublishApplicationDto) => Promise<ApplicationMutationReceipt>;
 type ActivateFn = (
@@ -253,6 +254,36 @@ describe("ApplicationPublishActivateDialog (step 1)", () => {
     );
     expect(onContinueToBind).toHaveBeenCalled();
   });
+
+  it("publishes an explicitly pending draft without activating an already active Application", async () => {
+    const { onPublish, onActivate } = renderDialog({ application: application({
+      publicationStatus: "PUBLISHED", lifecycleStatus: "ACTIVE", hasPendingDraft: true,
+      catalogueRevision: "99", publicationRevision: "2",
+    }) });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Approve reviewed pending changes" } });
+    fireEvent.click(screen.getByRole("button", { name: en.applications.detail.releaseAuthority.republish }));
+    await waitFor(() => expect(onPublish).toHaveBeenCalledWith({ expectedCatalogueRevision: "99", expectedPublicationRevision: "2", reason: "Approve reviewed pending changes" }));
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+});
+
+describe("Application explicit pending-draft rail", () => {
+  it.each([true, false, undefined])("uses explicit pending evidence %s, never revision inequality", hasPendingDraft => {
+    render(<ApplicationReleaseAuthorityRail application={application({ publicationStatus: "PUBLISHED", lifecycleStatus: "ACTIVE", hasPendingDraft,
+      catalogueRevision: "99", publicationRevision: "2", publishedAt: "2026-09-07T00:00:00.000Z", publishedBy: SERVER_ONE })}
+      readiness={null} isReadinessLoading={false} hasReadinessError={false} canPublish isPublishing={false} onPublish={vi.fn()} />);
+    const action = screen.queryByRole("button", { name: en.applications.detail.releaseAuthority.republish });
+    if (hasPendingDraft === true) {
+      expect(action).toBeInTheDocument(); expect(screen.getByText(en.applications.detail.releaseAuthority.pendingDraft)).toBeInTheDocument();
+    } else expect(action).not.toBeInTheDocument();
+    if (hasPendingDraft === undefined) expect(screen.getByText(en.applications.detail.releaseAuthority.pendingDraftUnknown)).toBeInTheDocument();
+    expect(screen.getByText(`PUBLISHED · ${en.applications.detail.releaseAuthority.revision} 2`)).toBeInTheDocument();
+  });
+  it.each(["permission", "disabled"])("does not turn pending evidence into %s authority", gate => {
+    render(<ApplicationReleaseAuthorityRail application={application({ publicationStatus: "PUBLISHED", lifecycleStatus: gate === "disabled" ? "DISABLED" : "ACTIVE", hasPendingDraft: true })}
+      readiness={null} isReadinessLoading={false} hasReadinessError={false} canPublish={gate !== "permission"} isPublishing={false} onPublish={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: en.applications.detail.releaseAuthority.republish })).not.toBeInTheDocument();
+  });
 });
 
 describe("ApplicationDatabaseBindDialog (step 2)", () => {
@@ -454,9 +485,10 @@ describe("ApplicationDatabaseBindDialog (step 2)", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: bindCopy.clear }));
     await fillReason();
-    fireEvent.click(screen.getByRole("button", { name: bindCopy.confirm }));
+    const confirm = screen.getByRole("button", { name: bindCopy.confirm });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(confirm);
 
-    expect(await screen.findByText(bindCopy.selectServer)).toBeTruthy();
     expect(onBind).not.toHaveBeenCalled();
   });
 

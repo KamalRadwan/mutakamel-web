@@ -2,7 +2,7 @@ import { Dictionary } from "./ar";
 
 export const en: Dictionary = {
   common: {
-    appName: "Mutakamel Crowd Capital",
+    appName: "Mutakamel CRM",
     adminTag: "Control Plane",
     portalName: "Admin Console",
     webphone: "WebPhone",
@@ -1406,7 +1406,7 @@ export const en: Dictionary = {
         emptyDesc:
           "An Application must be Tenant, Active, Published, Public, technically ready, and have an active tier.",
         noDescriptionFallback: "No published description.",
-        readyBadge: "Ready",
+        readyBadge: "Available to quote",
         unavailableBadge: "Unavailable",
         noEvidenceReason: "Current evidence does not allow selection.",
         tierLabel: "Tier",
@@ -1415,7 +1415,7 @@ export const en: Dictionary = {
           "Select at least one eligible Application with a valid tier and seat count.",
         previewTitle: "Provisioning plan preview",
         previewDesc:
-          "The server derives foundation components and dependencies, then pins releases before creation.",
+          "This previews Application components and pinned releases. The final quote and create command validate the complete addon selection.",
         previewIdle: "Select Applications to preview the plan.",
         previewLoading: "Building the preview...",
         previewErrorTitle: "The provisioning plan could not be built",
@@ -1577,7 +1577,11 @@ export const en: Dictionary = {
         unpublishedHint:
           "The current catalogue revision is not published. Activation and new tenant selection remain blocked.",
         publishedHint:
-          "This catalogue revision has an attributable publication record.",
+          "This Application retains an attributable published definition.",
+        pendingDraft: "Unpublished changes",
+        pendingDraftHint: "Changes are staged in a draft. The existing published definition remains in force until a separate publish command succeeds.",
+        pendingDraftUnknown: "Pending-draft evidence is unavailable from this server. Revision differences do not prove a draft exists.",
+        republish: "Publish pending draft",
       },
       publishActivate: {
         stepLabel: "Step 1 of 2",
@@ -1698,7 +1702,7 @@ export const en: Dictionary = {
         publicationInvalidationTitle:
           "This edit invalidates the current publication",
         publicationInvalidationDescription:
-          "Saving metadata changes the catalogue revision to UNPUBLISHED. Activation and new tenant selection remain blocked until the updated revision is published explicitly.",
+          "Saving metadata stages a draft. An existing published definition remains in effect until the reviewed draft is explicitly published. Draft values are not proof that the live definition changed.",
       },
     },
     technicalProvisioning: {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
@@ -34,8 +34,13 @@ function renderSection(overrides: Partial<LeadClassificationSectionProps> = {}) 
         leadProfileType="INDIVIDUAL"
         stageId=""
         acquisitionSourceId=""
+        tagIds={[]}
         stages={[]}
         sources={[]}
+        tags={[]}
+        showTags={false}
+        tagsLoading={false}
+        tagsUnavailable={false}
         errors={{}}
         disabled={false}
         onCompanyChange={vi.fn()}
@@ -43,6 +48,8 @@ function renderSection(overrides: Partial<LeadClassificationSectionProps> = {}) 
         onProfileTypeChange={vi.fn()}
         onStageChange={vi.fn()}
         onSourceChange={vi.fn()}
+        onTagsChange={vi.fn()}
+        onTagsBlur={vi.fn()}
         {...overrides}
       />
     </I18nProvider>,
@@ -91,5 +98,56 @@ describe("the acquisition source", () => {
     // The "no source" sentinel is gone from the picker, so its label cannot
     // appear anywhere in the section — trigger placeholder included.
     expect(screen.queryByText(en.crmLeadDetail.noSource)).toBeNull();
+  });
+});
+
+describe("the tag picker", () => {
+  it("renders the design-system multi-select when admission allows tag reads", () => {
+    renderSection({ showTags: true });
+    expect(
+      screen.getByRole("button", { name: en.crmLeads.create.tags }),
+    ).toBeEnabled();
+    expect(screen.getByText("Up to 50 tags (0 selected).")).toBeVisible();
+  });
+
+  it("keeps a selected tag removable when the catalogue degrades", () => {
+    const onTagsChange = vi.fn();
+    renderSection({
+      showTags: true,
+      tagsUnavailable: true,
+      tagIds: ["priority"],
+      tags: [
+        { id: "priority", name: "Priority", color: null },
+        { id: "new", name: "New choice", color: null },
+      ],
+      onTagsChange,
+    });
+    expect(screen.getByRole("button", { name: en.crmLeads.create.tags })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Priority" }));
+    expect(onTagsChange).toHaveBeenCalledWith([]);
+  });
+
+  it("disables only unselected choices at the fifty-tag create ceiling", () => {
+    const selected = Array.from({ length: 50 }, (_, index) => ({
+      id: `tag-${index}`,
+      name: `Tag ${index}`,
+      color: null,
+    }));
+    const onTagsChange = vi.fn();
+    renderSection({
+      showTags: true,
+      tagIds: selected.map(({ id }) => id),
+      tags: [...selected, { id: "extra", name: "Additional", color: null }],
+      onTagsChange,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.tags }));
+    expect(screen.getByRole("option", { name: "Tag 0" })).not.toHaveAttribute(
+      "aria-disabled",
+    );
+    const extra = screen.getByRole("option", { name: "Additional" });
+    expect(extra).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(extra);
+    expect(onTagsChange).not.toHaveBeenCalled();
   });
 });

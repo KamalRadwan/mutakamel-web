@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { UseTenantBillingWorkspaceResult } from "../hooks/useTenantBillingWorkspace";
 import type {
   PaymentReconciliationCaseView,
   PaymentReconciliationView,
   PaymentStatusView,
-  SubscriptionPlanChangePreviewView,
   SubscriptionStatus,
   SubscriptionView,
   TenantBillingPermissions,
@@ -15,6 +14,12 @@ import type {
   WalletStatus,
   WalletView,
 } from "../types";
+import { commercialFixture, commercialPreviewFixture } from "../model/subscription-commercial-fixtures";
+import { adaptSubscriptionCommercial } from "../model/subscription-commercial";
+import { emptyCommercialJournal, saveCommercialJournal } from "@/features/admin/subscriptions/commercial-change/commercial-change-journal";
+const commercialApi = vi.hoisted(() => ({ preview: vi.fn() }));
+vi.mock("@/features/admin/subscriptions/commercial-change/commercial-change.api", () => ({ commercialChangeApi: commercialApi }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "billing-test-actor", permissions: ["admin.subscriptions.read", "admin.subscriptions.update", "admin.subscriptions.critical"] } }) }));
 import { TenantBillingPanel } from "./TenantBillingPanel";
 
 // TenantBillingPanel takes `lang` as a prop (its parent, TenantWorkspaceScreen,
@@ -147,41 +152,6 @@ function paymentFixture(status: PaymentStatusView["status"] = "SUCCEEDED"):
   };
 }
 
-function planPreviewFixture(): SubscriptionPlanChangePreviewView {
-  return {
-    previewId: "019f0000-0000-7000-8000-000000000010",
-    subscriptionId: SUBSCRIPTION_ID,
-    tenantId: TENANT_ID,
-    operation: "CHANGE",
-    currencyCode: "USD",
-    billingCycle: "MONTHLY",
-    itemSetFingerprint: "item-fingerprint",
-    planFingerprint: "plan-fingerprint",
-    pricingRevision: "pricing-1",
-    pricedAt: "1999-12-31T23:55:00.000Z",
-    expiresAt: EXPIRED_AT,
-    item: {
-      itemId: ITEM_ID,
-      moduleId: MODULE_ID,
-      fromTierId: TIER_ID,
-      toTierId: "019f0000-0000-7000-8000-000000000011",
-      fromSeats: 10,
-      toSeats: 20,
-      previousLineTotalUsd: "30.00",
-      nextLineTotalUsd: "50.00",
-    },
-    financial: {
-      fullPeriodDeltaUsd: "20.00",
-      direction: "DEBIT",
-      proratedAmountUsd: "10.00",
-      walletAvailableUsd: "90.00",
-      walletShortfallUsd: "0.00",
-      walletStatus: "ACTIVE",
-      canApply: true,
-    },
-  };
-}
-
 function walletPreviewFixture(): WalletAdjustmentPreviewView {
   return {
     quoteId: "019f0000-0000-7000-8000-000000000012",
@@ -298,7 +268,6 @@ function workspaceFixture(
     },
     billingSummaryState: "ready",
     billingSummaryError: null,
-    planPreview: null,
     walletPreview: null,
     selectedPaymentId: null,
     reconciliationCase: null,
@@ -307,9 +276,7 @@ function workspaceFixture(
     mutation: { name: null, error: null },
     isAuthLoading: false,
     refresh: vi.fn().mockResolvedValue(undefined),
-    seedSubscription: vi.fn().mockResolvedValue(null),
-    previewPlanChange: vi.fn().mockResolvedValue(null),
-    applyPlanChange: vi.fn().mockResolvedValue(null),
+    tenantId: TENANT_ID,
     cancelSubscription: vi.fn().mockResolvedValue(null),
     previewWalletAdjustment: vi.fn().mockResolvedValue(null),
     confirmWalletAdjustment: vi.fn().mockResolvedValue(null),
@@ -318,7 +285,6 @@ function workspaceFixture(
     proposeReconciliation: vi.fn().mockResolvedValue(null),
     decideReconciliation: vi.fn().mockResolvedValue(null),
     recordOfflinePayment: vi.fn().mockResolvedValue(null),
-    clearPlanPreview: vi.fn(),
     clearWalletPreview: vi.fn(),
   };
 
@@ -418,7 +384,9 @@ describe("TenantBillingPanel safety boundaries", () => {
     "PAST_DUE",
     "CANCELLED",
   ])("does not offer plan changes while subscription status is %s", (status) => {
-    const subscription = subscriptionFixture(status);
+    const canonical = commercialFixture();
+    canonical.subscription.status = status;
+    const subscription = adaptSubscriptionCommercial(canonical);
     const workspace = workspaceFixture({
       permissions: permissionFixture({ canUpdateSubscription: true }),
       subscription,
@@ -433,8 +401,8 @@ describe("TenantBillingPanel safety boundaries", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Preview change" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Prepare changes" }),
+    ).toBeDisabled();
   });
 
   it("does not offer a second cancellation after one is scheduled", () => {
@@ -609,7 +577,7 @@ describe("TenantBillingPanel safety boundaries", () => {
     expect(refundPayment).toHaveBeenCalledWith(PAYMENT_ID, undefined);
   });
 
-  it("disables apply and confirm commands when their reviewed previews have expired", () => {
+  it("disables apply and confirm commands when their reviewed previews have expired", async () => {
     const workspace = workspaceFixture({
       permissions: permissionFixture({
         canUpdateSubscription: true,
@@ -617,16 +585,25 @@ describe("TenantBillingPanel safety boundaries", () => {
         canPreviewWalletAdjustment: true,
         canConfirmWalletAdjustment: true,
       }),
-      planPreview: planPreviewFixture(),
+      subscription: adaptSubscriptionCommercial(commercialFixture()),
       walletPreview: walletPreviewFixture(),
     });
 
+    const source = commercialFixture();
+    const preview = commercialPreviewFixture();
+    preview.pricedAt = "1999-12-31T23:55:00.000Z"; preview.expiresAt = EXPIRED_AT;
+    commercialApi.preview.mockResolvedValueOnce(preview);
+    window.sessionStorage.clear();
+    saveCommercialJournal(`admin.commercial-change:billing-test-actor:${source.subscription.tenantId}:${source.subscription.id}`, {
+      ...emptyCommercialJournal(), preparationId: preview.preparation.preparationId, previewKey: preview.previewId, previewId: preview.previewId,
+      request: { expectedSubscriptionRevision: source.subscriptionRevision, changes: [{ selectionKey: preview.changes[0].selectionKey, sourceKind: "APPLICATION", operation: "CHANGE", itemId: source.baseItems[0].id, seats: 31 }] },
+    });
     render(<TenantBillingPanel workspace={workspace} lang="en" />);
 
-    expect(screen.getByText(/reviewed server preview has expired/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Apply reviewed change" }),
-    ).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Restore original preview" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Restore original preview" }));
+    await waitFor(() => expect(screen.getByText(/This preview has expired/)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Confirm reviewed settlement" })).toBeDisabled();
 
     activateTab("Wallet");
     fireEvent.change(screen.getByLabelText("Audit note"), {

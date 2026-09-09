@@ -3,12 +3,24 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TenantApiClientError } from "@/lib/api/axiosClient";
+import { emptyCreateLeadForm } from "../lead-create-contract";
 import { useLeadCapabilities } from "./useLeadCapabilities";
 import { useLeads } from "./useLeads";
 
 const { auth, get, post } = vi.hoisted(() => ({ auth: vi.fn(), get: vi.fn(), post: vi.fn() }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => auth() as unknown }));
-vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: { crmLeads: { messages: {} } } }) }));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({
+    t: {
+      crmLeads: {
+        messages: {
+          tagUnknown: "Selected tags changed. Remove them or choose again.",
+          createFailed: "Unable to create the lead.",
+        },
+      },
+    },
+  }),
+}));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/axiosClient")>();
   return { ...actual, axiosClient: { ...actual.axiosClient, get, post } };
@@ -17,8 +29,54 @@ vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
 const COMPANY = "0192f3a0-0000-7000-8000-000000000001";
 const BRANCH = "0192f3a0-0000-7000-8000-000000000002";
 const OTHER_BRANCH = "0192f3a0-0000-7000-8000-000000000003";
+const STAGE = "0192f3a0-0000-7000-8000-000000000004";
+const LEAD = "0192f3a0-0000-7000-8000-000000000005";
+const TAG = "0192f3a0-0000-7000-8000-000000000006";
+const SECOND_TAG = "0192f3a0-0000-7000-8000-000000000007";
 const LEADS_PATH = "/api/tenant/crm/v1/leads";
 const LEADS_SEARCH_PATH = "/api/tenant/crm/v1/leads/search";
+
+function response(data: unknown, status = 200) {
+  return { data, status, statusText: "OK", headers: new Headers() };
+}
+
+function allowCreateReads(url: string) {
+  if (url.startsWith(`${LEADS_PATH}?`)) {
+    return Promise.resolve(response({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 50,
+      totalPages: 0,
+      hasNext: false,
+      hasPrev: false,
+    }));
+  }
+  if (url === "/api/tenant/crm/v1/lead-stages") {
+    return Promise.resolve(response([]));
+  }
+  if (url.startsWith(`${LEADS_PATH}/capabilities?`)) {
+    return Promise.resolve(response({
+      branchId: BRANCH,
+      leads: {
+        create: { scope: "all", ownerUserIds: null },
+        update: null,
+        delete: null,
+      },
+    }));
+  }
+  return Promise.reject(serverError(500));
+}
+
+function createForm() {
+  return {
+    ...emptyCreateLeadForm("contact-1"),
+    firstName: "Mona",
+    lastName: "Hassan",
+    stageId: STAGE,
+    tagIds: [TAG, SECOND_TAG],
+  };
+}
 
 function serverError(status: number): TenantApiClientError {
   return new TenantApiClientError("Request failed", {
@@ -54,6 +112,70 @@ afterEach(() => {
 });
 
 describe("leads request lifecycle", () => {
+  it("creates a lead and all selected tags with exactly one write", async () => {
+    get.mockImplementation(allowCreateReads);
+    post.mockResolvedValue(response({
+      id: LEAD,
+      displayName: "Mona Hassan",
+      branchId: BRANCH,
+      stageId: STAGE,
+      ownerUserId: null,
+      tags: [
+        { id: TAG, name: "Priority" },
+        { id: SECOND_TAG, name: "New customer" },
+      ],
+    }, 201));
+    const { result } = renderHook(() => useLeads());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(result.current.canCreate).toBe(true);
+
+    let created = false;
+    await act(async () => {
+      created = await result.current.handleCreate(createForm());
+    });
+
+    expect(created).toBe(true);
+    expect(post).toHaveBeenCalledOnce();
+    expect(post).toHaveBeenCalledWith(
+      LEADS_PATH,
+      expect.objectContaining({ tagIds: [TAG, SECOND_TAG] }),
+      expect.objectContaining({
+        skipAutoIdempotency: true,
+        headers: expect.objectContaining({ "x-idempotency-key": expect.any(String) }),
+      }),
+    );
+    expect(post.mock.calls.some(([url]) => String(url).includes("/tags"))).toBe(false);
+  });
+
+  it("keeps the create flow open with actionable copy when a selected tag disappeared", async () => {
+    get.mockImplementation(allowCreateReads);
+    post.mockRejectedValue(new TenantApiClientError("Unknown tag", {
+      status: 422,
+      statusText: "Unprocessable Entity",
+      headers: new Headers(),
+      data: {
+        code: "CRM_TAG_UNKNOWN",
+        message: "Tag not found",
+        correlationId: "crm-request-reference",
+      },
+    }));
+    const { result } = renderHook(() => useLeads());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    act(() => result.current.openCreate());
+
+    let created = true;
+    await act(async () => {
+      created = await result.current.handleCreate(createForm());
+    });
+
+    expect(created).toBe(false);
+    expect(result.current.isCreateOpen).toBe(true);
+    expect(result.current.error).toBe(
+      "Selected tags changed. Remove them or choose again.",
+    );
+    expect(post).toHaveBeenCalledOnce();
+  });
+
   it("settles a failed load without refetching on error or unrelated state renders", async () => {
     const { result, rerender } = renderHook(() => useLeads());
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });

@@ -64,6 +64,13 @@ Source inspected:
 
 ## Organization — 21 routes
 
+**Planned addition, 2026-09-07:** [Application Addons target](application-addons-target.md)
+adds separate Company/Branch activation/configuration and Tenant-wide addon
+seat allocation. These are not new fields on the current organization/user
+DTOs below. A discovered Company or shared Branch does not authorize
+Company-wide activation or global seat management; current base module
+assignments remain distinct from planned addon assignments.
+
 Four levels, strictly nested: **company → branch → department → team**. A child
 cannot be created under an inactive parent, and a parent cannot be deleted while
 it has children or directly-placed users.

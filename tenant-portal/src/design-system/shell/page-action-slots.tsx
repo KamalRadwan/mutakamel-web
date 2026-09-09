@@ -3,15 +3,21 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 /**
- * The three regions of the page action bar, in the order it renders them.
+ * The four regions of the page action bar, in the order it renders them.
  *
- * `actions` first, then `search`, then `view` last — the reading order of the
- * controls a list screen offers, and the one the bar was specified with. `view`
- * is pinned to the inline end because it is the only control that changes how
- * the screen is drawn rather than what it holds; keeping it at a fixed edge
- * means it does not move as a screen gains or loses actions.
+ * `related` sits in the MIDDLE, on its own: it holds links to other records —
+ * a lead's opportunities, its quotations — which are navigation rather than
+ * things done to this screen. Keeping it out of the trailing cluster is the
+ * whole point, because a control that leaves the screen must not sit in the
+ * same group as the controls that act on it.
+ *
+ * The trailing cluster is then `actions`, `search`, `view` — the reading order
+ * of the controls a list screen offers, and the one the bar was specified
+ * with. `view` is pinned to the inline end because it is the only control that
+ * changes how the screen is drawn rather than what it holds; keeping it at a
+ * fixed edge means it does not move as a screen gains or loses actions.
  */
-export type PageActionSlot = "actions" | "search" | "view";
+export type PageActionSlot = "related" | "actions" | "search" | "view";
 
 type SlotNodes = Record<PageActionSlot, HTMLElement | null>;
 
@@ -31,7 +37,7 @@ interface PageActionSlotsValue {
   register: (slot: PageActionSlot, node: HTMLElement | null) => void;
 }
 
-const EMPTY_NODES: SlotNodes = { actions: null, search: null, view: null };
+const EMPTY_NODES: SlotNodes = { related: null, actions: null, search: null, view: null };
 
 const PageActionSlotsContext = createContext<PageActionSlotsValue>({
   present: false,

@@ -45,6 +45,17 @@ function drop(files: File[]) {
 }
 
 describe("FileUpload", () => {
+  it("applies the same MIME and size validation in button mode", () => {
+    const { props, container } = renderUpload({ variant: "button" });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [
+      makeFile("bad.svg", "image/svg+xml", 1024), makeFile("big.png", "image/png", 3 * MB),
+      makeFile("valid.png", "image/png", MB),
+    ] } });
+    expect(props.onFilesAdded).toHaveBeenCalledWith([expect.objectContaining({ name: "valid.png" })]);
+    expect(props.onReject).toHaveBeenCalledWith([
+      "bad.svg is not an accepted file type", "big.png is 3 MB, over the 2 MB limit",
+    ]);
+  });
   it("admits a file that passes the MIME allowlist and the size cap", () => {
     const onFilesAdded = vi.fn();
     renderUpload({ onFilesAdded });

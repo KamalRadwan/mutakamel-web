@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantCreateResult, TenantSubscriptionQuote } from "../types";
 
 const {
@@ -178,6 +178,8 @@ vi.mock("../lib/tenant-create-recovery", () => ({
   shouldRetainTenantCreateIntent: () => false,
 }));
 
+vi.mock("@/lib/utils/uuid", () => ({ generateUUIDv7: () => "019f0000-0000-7000-8000-000000000008" }));
+
 import { useRegisterTenant } from "./useRegisterTenant";
 
 const applicationId = "019f0000-0000-7000-8000-000000000001";
@@ -222,23 +224,13 @@ function adminAuthError(
 
 function subscriptionQuote(): TenantSubscriptionQuote {
   return {
-    quoteId,
-    requestHash: "request-hash",
-    pricingRevision: "1",
-    billingCycle: "MONTHLY",
-    currencyCode: "USD",
-    total: "10.00",
-    totalUsd: "10.00",
-    items: [
-      {
-        moduleId: applicationId,
-        tierId,
-        seats: 1,
-        lineTotal: "10.00",
-        lineTotalUsd: "10.00",
-      },
-    ],
-    expiresAt: "2030-01-01T00:00:00.000Z",
+    quoteId, purpose: "TENANT_CREATION", targetTenantId: null,
+    billingCycle: "MONTHLY", currencyCode: "USD", resolvedTrialDays: 14,
+    createdAt: "2030-01-01T00:00:00.000Z", expiresAt: "2030-01-01T00:15:00.000Z",
+    totals: { baseRecurringUsd: "10.0000", addonRecurringUsd: "0.0000", combinedRecurringUsd: "10.0000" },
+    items: [{ selectionKey: "019f0000-0000-7000-8000-000000000008", applicationId, tierId, seats: 1, addons: [],
+      acceptedPricing: { billingCycle: "MONTHLY", currencyCode: "USD", recurringAmountUsd: "10.0000", priceRevision: "a".repeat(64),
+        breakdown: [{ minUsers: 1, maxUsers: null, chargedUsers: 1, unitPriceUsd: "10.0000", amountUsd: "10.0000" }] } }]
   };
 }
 
@@ -294,9 +286,13 @@ async function renderReadyRegistration() {
   return rendered;
 }
 
-describe("useRegisterTenant silent quote recovery", () => {
+afterEach(() => vi.useRealTimers());
+
+describe("useRegisterTenant reviewed quote and create recovery", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2030-01-01T00:00:00.000Z"));
     getIdempotencyKeyMock.mockReturnValue(idempotencyKey);
     listCandidateApplicationsMock.mockResolvedValue([
       {
@@ -307,7 +303,7 @@ describe("useRegisterTenant silent quote recovery", () => {
         rank: 1,
         commercialMode: "SUBSCRIPTION",
         technicalDefinitionRevision: "1",
-        selectionAllowed: true,
+        addons: [],
         selectionBlockers: [],
         readinessReasons: [],
         catalogueReasons: [],
@@ -325,6 +321,7 @@ describe("useRegisterTenant silent quote recovery", () => {
     ]);
     previewProvisioningPlanMock.mockResolvedValue({
       contractVersion: 1,
+      applications: [],
       selectedApplicationKeys: ["crm"],
       selectionDigest: "a".repeat(64),
       components: [],
@@ -358,7 +355,7 @@ describe("useRegisterTenant silent quote recovery", () => {
     });
   });
 
-  it("stays locked without an error toast while quote auth repair is pending, then creates and redirects once", async () => {
+  it("blocks create while a quote is pending, then requires review before creating and redirecting once", async () => {
     const quote = deferred<TenantSubscriptionQuote>();
     const create = deferred<TenantCreateResult>();
     quoteMock.mockReturnValueOnce(quote.promise);
@@ -367,10 +364,10 @@ describe("useRegisterTenant silent quote recovery", () => {
 
     let submission!: Promise<void>;
     act(() => {
-      submission = result.current.handleSubmit(submitEvent());
+      submission = result.current.creationQuote.load();
     });
 
-    await waitFor(() => expect(result.current.isSubmitting).toBe(true));
+    await waitFor(() => expect(result.current.creationQuote.loading).toBe(true));
     expect(quoteMock).toHaveBeenCalledOnce();
     expect(createMock).not.toHaveBeenCalled();
     expect(toastMock.error).not.toHaveBeenCalled();
@@ -379,30 +376,16 @@ describe("useRegisterTenant silent quote recovery", () => {
       await result.current.handleSubmit(submitEvent());
     });
     expect(quoteMock).toHaveBeenCalledOnce();
-    expect(result.current.isSubmitting).toBe(true);
+    expect(result.current.creationQuote.loading).toBe(true);
 
     act(() => {
-      quote.resolve({
-        quoteId,
-        requestHash: "request-hash",
-        pricingRevision: "1",
-        billingCycle: "MONTHLY",
-        currencyCode: "USD",
-        total: "10.00",
-        totalUsd: "10.00",
-        items: [
-          {
-            moduleId: applicationId,
-            tierId,
-            seats: 1,
-            lineTotal: "10.00",
-            lineTotalUsd: "10.00",
-          },
-        ],
-        expiresAt: "2030-01-01T00:00:00.000Z",
-      });
+      quote.resolve(subscriptionQuote());
     });
 
+    await act(async () => { await submission; });
+    expect(result.current.creationQuote.quote).toEqual(subscriptionQuote());
+    expect(createMock).not.toHaveBeenCalled();
+    act(() => { submission = result.current.handleSubmit(submitEvent()); });
     await waitFor(() => expect(createMock).toHaveBeenCalledOnce());
     expect(result.current.isSubmitting).toBe(true);
     expect(toastMock.error).not.toHaveBeenCalled();
@@ -448,9 +431,9 @@ describe("useRegisterTenant silent quote recovery", () => {
 
     let submission!: Promise<void>;
     act(() => {
-      submission = result.current.handleSubmit(submitEvent());
+      submission = result.current.creationQuote.load();
     });
-    await waitFor(() => expect(result.current.isSubmitting).toBe(true));
+    await waitFor(() => expect(result.current.creationQuote.loading).toBe(true));
 
     expect(quoteSignal?.aborted).toBe(false);
     unmount();
@@ -465,38 +448,12 @@ describe("useRegisterTenant silent quote recovery", () => {
   });
 
   it("preserves recovery evidence and suppresses completion UI when unmounted during create", async () => {
-    let submissionSignal: AbortSignal | undefined;
-    quoteMock.mockImplementationOnce(
-      (
-        _lines: unknown,
-        _billingCycle: unknown,
-        signal: AbortSignal | undefined,
-      ) => {
-        submissionSignal = signal;
-        return Promise.resolve({
-          quoteId,
-          requestHash: "request-hash",
-          pricingRevision: "1",
-          billingCycle: "MONTHLY",
-          currencyCode: "USD",
-          total: "10.00",
-          totalUsd: "10.00",
-          items: [
-            {
-              moduleId: applicationId,
-              tierId,
-              seats: 1,
-              lineTotal: "10.00",
-              lineTotalUsd: "10.00",
-            },
-          ],
-          expiresAt: "2030-01-01T00:00:00.000Z",
-        } satisfies TenantSubscriptionQuote);
-      },
-    );
+    quoteMock.mockResolvedValueOnce(subscriptionQuote());
     const create = deferred<TenantCreateResult>();
     createMock.mockReturnValueOnce(create.promise);
     const { result, unmount } = await renderReadyRegistration();
+
+    await act(async () => { await result.current.creationQuote.load(); });
 
     let submission!: Promise<void>;
     act(() => {
@@ -508,7 +465,6 @@ describe("useRegisterTenant silent quote recovery", () => {
     expect(result.current.isSubmitting).toBe(true);
 
     unmount();
-    expect(submissionSignal?.aborted).toBe(true);
     act(() => {
       create.resolve({ id: tenantId, status: "PROVISIONING" });
     });
@@ -525,21 +481,18 @@ describe("useRegisterTenant silent quote recovery", () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it("surfaces one phase-aware error when retained auth repair is exhausted", async () => {
+  it("surfaces one inline quote error when retained auth repair is exhausted", async () => {
     quoteMock.mockRejectedValueOnce(adminAuthError(401, "repair-degraded"));
     const { result, unmount } = await renderReadyRegistration();
 
     await act(async () => {
-      await result.current.handleSubmit(submitEvent());
+      await result.current.creationQuote.load();
     });
 
     expect(result.current.isSubmitting).toBe(false);
     expect(createMock).not.toHaveBeenCalled();
-    expect(toastMock.error).toHaveBeenCalledOnce();
-    expect(toastMock.error).toHaveBeenCalledWith(
-      "Quote request failed",
-      expect.stringContaining("Your session was kept; try again."),
-    );
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(result.current.creationQuote.error).toMatchObject({ errorCode: "COMMON.AUTH.MISSING_TOKEN" });
     unmount();
   });
 
@@ -553,7 +506,7 @@ describe("useRegisterTenant silent quote recovery", () => {
       const { result, unmount } = await renderReadyRegistration();
 
       await act(async () => {
-        await result.current.handleSubmit(submitEvent());
+        await result.current.creationQuote.load();
       });
 
       expect(result.current.isSubmitting).toBe(false);
@@ -568,14 +521,11 @@ describe("useRegisterTenant silent quote recovery", () => {
     const { result, unmount } = await renderReadyRegistration();
 
     await act(async () => {
-      await result.current.handleSubmit(submitEvent());
+      await result.current.creationQuote.load();
     });
 
-    expect(toastMock.error).toHaveBeenCalledOnce();
-    expect(toastMock.error).toHaveBeenCalledWith(
-      "Quote request failed",
-      expect.stringContaining("COMMON.AUTH.MISSING_TOKEN"),
-    );
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(result.current.creationQuote.error).toMatchObject({ errorCode: "COMMON.AUTH.MISSING_TOKEN" });
     unmount();
   });
 
@@ -584,6 +534,7 @@ describe("useRegisterTenant silent quote recovery", () => {
     const create = deferred<TenantCreateResult>();
     createMock.mockReturnValueOnce(create.promise);
     const { result, unmount } = await renderReadyRegistration();
+    await act(async () => { await result.current.creationQuote.load(); });
 
     let submission!: Promise<void>;
     act(() => {
@@ -621,6 +572,7 @@ describe("useRegisterTenant silent quote recovery", () => {
     quoteMock.mockResolvedValueOnce(subscriptionQuote());
     createMock.mockRejectedValueOnce(adminAuthError(502, "repair-degraded"));
     const { result, unmount } = await renderReadyRegistration();
+    await act(async () => { await result.current.creationQuote.load(); });
 
     await act(async () => {
       await result.current.handleSubmit(submitEvent());

@@ -25,7 +25,11 @@ import {
   LeadActivityDialog,
   type LeadActivityTarget,
 } from "./components/lead-activity/LeadActivityDialog";
-import { useLeadBoardColumns, useLeadViewLabels } from "./components/lead-view-config";
+import {
+  LEAD_STAGE_BAR_TONE,
+  useLeadBoardColumns,
+  useLeadViewLabels,
+} from "./components/lead-view-config";
 import { LeadSearchBar } from "./components/LeadSearchBar";
 import { leadSearchValueOf, leadSearchWithField } from "./lead-search-contract";
 import { useLeadCardSlots } from "./components/useLeadCardSlots";
@@ -36,13 +40,6 @@ import { type LeadItem, useLeads } from "./hooks/useLeads";
 // the board must not offer it as a destination either — see
 // docs/api/crm-leads.md.
 const TERMINAL_STAGE_FLAG = "CONVERTED";
-
-// Only an outcome stage takes a hue, which is the rule the board's columns
-// follow too: position and label carry the stage, colour carries the outcome.
-const STAGE_BAR_TONE: Record<string, "positive" | "negative" | undefined> = {
-  CONVERTED: "positive",
-  DISQUALIFIED: "negative",
-};
 
 export default function LeadsPage() {
   const { t, lang } = useI18n();
@@ -85,6 +82,19 @@ export default function LeadsPage() {
   // `LeadItem` captured here would go on describing the version before it.
   const [activityLead, setActivityLead] = useState<LeadActivityTarget | null>(null);
 
+  // The stage a board column's `+` was pressed in, or null for the bar's own
+  // "Add lead". It only seeds the form's stage field — the user can still
+  // change it in the modal, because a preset that cannot be corrected is a
+  // trap rather than a shortcut.
+  const [createStageId, setCreateStageId] = useState<string | null>(null);
+  const openCreateInStage = useCallback(
+    (stageId: string | null) => {
+      setCreateStageId(stageId);
+      openCreate();
+    },
+    [openCreate],
+  );
+
   const applyPage = useCallback((next: number) => setPage(next), [setPage]);
   // Enter on a board card and a click on a card tile both open the record —
   // docs/design/detail-screens.md#routes. The table uses a real link in its
@@ -113,19 +123,18 @@ export default function LeadsPage() {
     onDelete: setSelectedForDelete,
     onCardChange: (leadId, patch) => void updateLeadCard(leadId, patch),
     onOpenActivities: (lead) => setActivityLead({ id: lead.id, name: lead.leadName }),
-    // The single-pointer alternative to dragging a card between columns, which
-    // WCAG 2.2 AA requires and the board cannot do without: the arrow left the
-    // card face, the capability did not. Gated by the SAME rule that gates
-    // dragging below, so the two can never disagree about where a lead may go.
-    moveTargets: (lead) =>
-      !isMovePending && canUpdateLead(lead) && stageById.get(lead.stageId)?.flag !== TERMINAL_STAGE_FLAG
-        ? stages
-            .filter(
-              (stage) => stage.id !== lead.stageId && stage.flag !== TERMINAL_STAGE_FLAG,
-            )
-            .map((stage) => ({ id: stage.id, label: localizedName(stage, lang) }))
-        : [],
-    onMove: (lead, stageId) => void moveLead(lead.id, stageId),
+    // `moveTargets` and `onMove` are deliberately NOT passed, which is what
+    // takes the "Move to…" section out of the card's menu.
+    //
+    // **This is a known WCAG 2.2 AA gap, not a tidy-up.** 2.5.7 Dragging
+    // Movements requires a single-pointer alternative to every drag, and
+    // dragging a card between stage columns is the board's whole point. That
+    // menu section was the alternative, and nothing else in the product moves
+    // a lead's stage: the detail screen only DISPLAYS it, and the update DTO
+    // carries no `stageId` — a stage move is `POST /leads/:id/stage`, which
+    // only the board calls. Until a stage control exists somewhere a pointer
+    // can reach without dragging, a user who cannot drag cannot move a lead.
+    // See LeadCardMenu's own note and docs/design/views.md#board-view.
   });
 
   const boardColumns = useLeadBoardColumns(stages, items);
@@ -157,7 +166,13 @@ export default function LeadsPage() {
         <PageHeader
           className="sr-only"
           title={t.crmLeads.title}
-          primaryAction={canCreate ? { label: t.crmLeads.addLead, onClick: openCreate } : undefined}
+          // `null`, so the bar's own Add lead opens an unseeded form even
+          // straight after a column's `+` left a stage behind.
+          primaryAction={
+            canCreate
+              ? { label: t.crmLeads.addLead, onClick: () => openCreateInStage(null) }
+              : undefined
+          }
           // The branch scopes every read on this screen, so it belongs with
           // the actions rather than beside the search box — which is where the
           // other two dozen branch-scoped screens already put it.
@@ -230,7 +245,7 @@ export default function LeadsPage() {
             steps={stages.map((stage) => ({
               id: stage.id,
               label: localizedName(stage, lang),
-              tone: STAGE_BAR_TONE[stage.flag],
+              tone: LEAD_STAGE_BAR_TONE[stage.flag],
             }))}
             value={leadSearchValueOf(search, "stage") || undefined}
             onChange={(stageId: string | undefined) =>
@@ -260,6 +275,12 @@ export default function LeadsPage() {
                 void moveLead(move.itemId, move.toColumnId);
               }}
               onActivate={openLead}
+              // The `+` in a column header. It opens the same modal the bar's
+              // Add lead opens, with the stage already filled in — the column
+              // the user pressed IS the answer to the first question the form
+              // would have asked. Gated by the same capability as the bar's,
+              // so the board cannot offer a create the header refuses.
+              onAddToColumn={canCreate ? openCreateInStage : undefined}
               isLoading={isLoading}
               error={loadError}
               onRetry={() => void fetchLeads()}
@@ -273,7 +294,15 @@ export default function LeadsPage() {
               // menu, which is what keeps the board's `dragging-alternative`
               // conformance. Bulk selection still lives in the card and table
               // views below.
-              labels={{ ...viewLabels, emptyColumn: t.crmLeads.emptyColumn }}
+              labels={{
+                ...viewLabels,
+                emptyColumn: t.crmLeads.emptyColumn,
+                collapseColumn: t.views.collapseColumn,
+                expandColumn: t.views.expandColumn,
+                // The screen's own word, not a generic one: the button's name
+                // ends up "Add lead: Qualifying".
+                addToColumn: t.crmLeads.addLead,
+              }}
             />
           )}
           {view === "card" && (
@@ -315,11 +344,16 @@ export default function LeadsPage() {
           )}
         </div>
 
+        {/* The stage is in the key as well as in the prop. The modal seeds its
+            form once, on mount, so opening it from Contacted after opening it
+            from New has to be a new mount — otherwise the second `+` would
+            show the first one's stage. */}
         <CreateLeadsModal
-          key={isCreateOpen ? "create-open" : "create-closed"}
+          key={isCreateOpen ? `create-open-${createStageId ?? "any"}` : "create-closed"}
           isOpen={isCreateOpen}
           stages={stages}
           branchId={branchId}
+          initialStageId={createStageId ?? undefined}
           onSubmit={handleCreate}
           error={isCreateOpen ? error : null}
           onClose={() => setIsCreateOpen(false)}

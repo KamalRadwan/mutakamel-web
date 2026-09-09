@@ -11,8 +11,9 @@ import { useScrollRestoration } from "../useScrollRestoration";
 import type { WorkspaceViewLabels, WorkspaceViewProps } from "../types";
 import type { BoardCardModel } from "./BoardCard";
 import { BoardColumn } from "./BoardColumn";
+import { useCollapsedColumns } from "./useCollapsedColumns";
 import type { MoveToTarget } from "./MoveToMenu";
-import type { BoardColumnDef } from "./types";
+import type { BoardColumnDef, BoardColumnLabels } from "./types";
 
 export interface BoardCardMove {
   itemId: string;
@@ -21,7 +22,8 @@ export interface BoardCardMove {
   toIndex: number;
 }
 
-export interface BoardViewLabels extends WorkspaceViewLabels {
+// `BoardColumnLabels` carries the column header's own three — see ./types.
+export interface BoardViewLabels extends WorkspaceViewLabels, BoardColumnLabels {
   emptyColumn: string;
   // Omitting this removes the "Move to…" trigger from every card, and with it
   // the board's only single-pointer alternative to dragging (WCAG 2.2 AA
@@ -61,6 +63,11 @@ export interface BoardViewProps<T> extends Omit<WorkspaceViewProps<T>, "sort" | 
   // onCardMove. Applies identically to a drag and to a "Move to…" choice.
   confirmMove?: (move: BoardCardMove) => boolean | Promise<boolean>;
   onCardMove: (move: BoardCardMove) => void;
+  // Draws a `+` at the end of every column header, before the collapse
+  // control, and hands back the column it was pressed in. The board does not
+  // know what creating means — the screen opens its own modal and decides what
+  // the column id seeds in it. Requires `labels.addToColumn`.
+  onAddToColumn?: (columnId: string) => void;
   labels: BoardViewLabels;
 }
 
@@ -82,6 +89,7 @@ export function BoardView<T>({
   canMoveTo,
   confirmMove,
   onCardMove,
+  onAddToColumn,
   isLoading,
   error,
   onRetry,
@@ -94,6 +102,7 @@ export function BoardView<T>({
   className,
 }: BoardViewProps<T>) {
   const setScrollElement = useScrollRestoration("board");
+  const collapsed = useCollapsedColumns();
 
   const grouped = useMemo(() => {
     const byColumn = new Map<string, T[]>(columns.map((column) => [column.id, []]));
@@ -215,6 +224,10 @@ export function BoardView<T>({
               column={column}
               emptyLabel={labels.emptyColumn}
               cards={cardsFor(column.id)}
+              isCollapsed={collapsed.isCollapsed(column.id)}
+              onToggleCollapse={collapsed.toggle}
+              onAdd={onAddToColumn}
+              labels={labels}
             />
           ))}
         </div>

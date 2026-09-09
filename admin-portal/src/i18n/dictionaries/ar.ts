@@ -1,6 +1,6 @@
 export const ar = {
   common: {
-    appName: "متكامل كراود كابيتال",
+    appName: "متكامل - CRM",
     adminTag: "Control Plane",
     portalName: "لوحة تحكم المنصة",
     webphone: "الهاتف المرئي",
@@ -1367,14 +1367,14 @@ export const ar = {
         emptyTitle: "لا توجد تطبيقات قابلة للاختيار",
         emptyDesc: "يجب أن يكون التطبيق Tenant وActive وPublished وPublic وله tier نشط وتعريف تقني جاهز.",
         noDescriptionFallback: "لا يوجد وصف منشور.",
-        readyBadge: "جاهز",
+        readyBadge: "متاح لطلب التسعير",
         unavailableBadge: "غير قابل للاختيار",
         noEvidenceReason: "الدليل الحالي لا يسمح بالاختيار.",
         tierLabel: "الخطة",
         seatsLabel: "المقاعد",
         selectionRequiredError: "اختر تطبيقاً مؤهلاً واحداً على الأقل وحدد tier ومقاعد صحيحة.",
         previewTitle: "معاينة خطة التجهيز",
-        previewDesc: "الخادم يضيف الـfoundation والاعتماديات ويثبت الإصدارات قبل الإنشاء.",
+        previewDesc: "تعرض هذه المعاينة مكونات التطبيقات وإصداراتها المثبتة. تتحقق التسعيرة وأمر الإنشاء من الاختيار الكامل للإضافات.",
         previewIdle: "اختر التطبيقات لعرض الخطة.",
         previewLoading: "جاري بناء المعاينة...",
         previewErrorTitle: "تعذر بناء الخطة",
@@ -1529,7 +1529,11 @@ export const ar = {
           "يتطلب النشر admin.applications.update + admin.applications.critical.",
         unpublishedHint:
           "إصدار الكتالوج الحالي غير منشور. سيظل التفعيل واختيار المستأجرين الجدد معطلين.",
-        publishedHint: "يمتلك إصدار الكتالوج الحالي سجل نشر موثقاً.",
+        publishedHint: "يحتفظ هذا التطبيق بتعريف منشور وسجل نشر موثق.",
+        pendingDraft: "تعديلات غير منشورة",
+        pendingDraftHint: "التعديلات محفوظة في مسودة. يظل التعريف المنشور الحالي ساريًا حتى نجاح أمر نشر مستقل.",
+        pendingDraftUnknown: "دليل المسودة المعلقة غير متاح من هذا الخادم. اختلاف أرقام الإصدارات لا يثبت وجود مسودة.",
+        republish: "نشر المسودة المعلقة",
       },
       publishActivate: {
         stepLabel: "الخطوة ١ من ٢",
@@ -1647,7 +1651,7 @@ export const ar = {
         save: "حفظ التغييرات",
         publicationInvalidationTitle: "سيُلغي هذا التعديل صلاحية النشر الحالي",
         publicationInvalidationDescription:
-          "يغيّر حفظ البيانات الأساسية إصدار الكتالوج إلى UNPUBLISHED. سيظل التفعيل واختيار المستأجرين الجدد معطلين حتى نشر الإصدار المحدّث بشكل صريح.",
+          "يحفظ تعديل البيانات الأساسية مسودة. يظل التعريف المنشور الحالي ساريًا حتى نشر المسودة المراجعة بشكل صريح. قيم المسودة لا تعني تغيّر التعريف التشغيلي.",
       },
     },
     technicalProvisioning: {

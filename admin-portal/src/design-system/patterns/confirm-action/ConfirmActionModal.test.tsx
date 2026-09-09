@@ -38,6 +38,16 @@ describe("ConfirmActionModal", () => {
     const onConfirm = vi.fn();
     renderConfirmation(undefined, onConfirm);
 
+    const dialog = screen.getByRole("alertdialog", { name: "Delete tenant" });
+    expect(dialog).toHaveClass(
+      "fixed",
+      "top-1/2",
+      "max-h-[calc(100dvh-2rem)]",
+      "overflow-y-auto",
+      "overscroll-contain",
+    );
+    expect(dialog).not.toHaveClass("relative");
+
     const confirm = screen.getByRole("button", { name: "Delete tenant" });
     expect(confirm).toBeEnabled();
     fireEvent.click(confirm);

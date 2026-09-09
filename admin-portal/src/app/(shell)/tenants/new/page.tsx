@@ -40,6 +40,7 @@ import { PhoneNumberInput } from "@/components/shared/PhoneNumberInput";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAddressGeocoding } from "./components/TenantAddressGeocoding";
 import { TenantApplicationsStep } from "./components/TenantApplicationsStep";
+import { TenantCreationQuote } from "./components/TenantCreationQuote";
 import { TenantInfrastructureStep } from "./components/TenantInfrastructureStep";
 import { TenantValidationSummary } from "./components/TenantValidationSummary";
 import { TenantWizardProgress } from "./components/TenantWizardProgress";
@@ -47,6 +48,7 @@ import { useRegisterTenant } from "./hooks/useRegisterTenant";
 
 export default function RegisterTenantWizardPage() {
   const {
+    creationQuote,
     t,
     currentStep,
     goToStep,
@@ -974,6 +976,7 @@ export default function RegisterTenantWizardPage() {
                   />
                 ) : null}
               </dl>
+              <TenantCreationQuote state={creationQuote} locked={wizardLocked} />
             </section>
           ) : null}
 
@@ -996,7 +999,7 @@ export default function RegisterTenantWizardPage() {
                 type="button"
                 variant="primary"
                 loading={isSubmitting}
-                disabled={wizardLocked}
+                disabled={wizardLocked || !creationQuote.canCreate || creationQuote.loading}
                 onClick={() => setIsConfirmingCreate(true)}
               >
                 {!isSubmitting ? (
@@ -1026,7 +1029,7 @@ export default function RegisterTenantWizardPage() {
                 {t.tenants.wizard.confirmCreateNo}
               </AlertDialogCancel>
               <AlertDialogAction
-                disabled={isSubmitting || wizardLocked}
+                disabled={isSubmitting || wizardLocked || !creationQuote.canCreate || creationQuote.loading}
                 onClick={(event) => {
                   event.preventDefault();
                   setIsConfirmingCreate(false);

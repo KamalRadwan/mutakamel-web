@@ -45,6 +45,8 @@ export function useInvoicePayment(invoiceId: string, onSettled: () => void) {
   const { t } = useI18n();
   const toast = useToast();
 
+  const [currencyCode, setCurrencyCode] = useState("USD");
+
   const [currencies, setCurrencies] = useState<PaymentInputCurrencies | null>(null);
   const [currenciesFailed, setCurrenciesFailed] = useState(false);
   const [quote, setQuote] = useState<InvoicePaymentQuote | null>(null);
@@ -213,6 +215,8 @@ export function useInvoicePayment(invoiceId: string, onSettled: () => void) {
   );
 
   return {
+    currencyCode,
+    setCurrencyCode,
     currencies,
     currenciesFailed,
     quote,

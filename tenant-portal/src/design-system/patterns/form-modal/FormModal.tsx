@@ -13,6 +13,7 @@ import {
 import { ConfirmActionModal } from "../confirm-action/ConfirmActionModal";
 import { FormErrorSummary } from "../form-shell/FormErrorSummary";
 import { useFormShell } from "../form-shell/useFormShell";
+import { FormDensityContext } from "./form-density";
 
 export interface FormModalSection {
   /** Matches the `id` of the `FormSection` it points at. */
@@ -45,6 +46,7 @@ export interface FormModalProps {
   description?: string;
   /** `full` is the viewport less 20px. `card` is a centred 672px card for a short create form that has no sections. */
   size?: "full" | "card";
+  density?: "standard" | "compact";
   isDirty: boolean;
   isSubmitting: boolean;
   onSubmit: () => void;
@@ -52,6 +54,8 @@ export interface FormModalProps {
   error?: string;
   /** Blocks submit for a reason other than an in-flight request — a hard validation stop. */
   submitDisabled?: boolean;
+  /** A persistent receipt has no second submit action. */
+  hideSubmit?: boolean;
   /** Index entries, in document order. Omit for a modal with no section index. Rendered only at `size="full"`. */
   sections?: FormModalSection[];
   /** Rendered in the header band, before the close button — a status chip, a scope note. */
@@ -62,38 +66,20 @@ export interface FormModalProps {
   children: React.ReactNode;
 }
 
-/**
- * A create/edit form on a centred surface, in one of two sizes.
- *
- * `full` is the whole viewport less 20px on every side, and it is the exception
- * `FormDrawer` defers to: a record whose fields are numerous enough to want two
- * columns AND grouped enough to want an index. `card` is a 672px card for a
- * create form that is genuinely short — a handful of fields, no sections — but
- * is still a create, and every create is a card rather than a drawer. See
- * docs/design/patterns.md#formmodal.
- *
- * Everything the drawer guarantees is guaranteed here, because both take it
- * from `useFormShell`: a real `<form noValidate>` so Enter submits and the
- * app's own errors render instead of a browser bubble, the dirty guard on all
- * four dismissal routes (Escape, backdrop, close button, Cancel), and focus
- * moving to the first invalid field after a rejected submit.
- *
- * The index is a genuine second affordance rather than decoration: it is the
- * only thing that tells a user a problem exists in a section scrolled out of
- * view, which is the failure mode a form this tall introduces. That failure
- * mode is what `full` has and `card` does not, so the index is `full`-only.
- */
+/** Centred form with shared validation/dirty guard; layout contract: docs/design/patterns.md#formmodal. */
 export function FormModal({
   open,
   onOpenChange,
   title,
   description,
   size = "full",
+  density = "standard",
   isDirty,
   isSubmitting,
   onSubmit,
   error,
   submitDisabled,
+  hideSubmit = false,
   sections,
   headerAside,
   footerLeading,
@@ -112,7 +98,7 @@ export function FormModal({
     isDirty,
     isSubmitting,
     error,
-    submitDisabled,
+    submitDisabled: submitDisabled || hideSubmit,
     onSubmit,
     onOpenChange,
   });
@@ -175,7 +161,7 @@ export function FormModal({
   }
 
   return (
-    <>
+    <FormDensityContext.Provider value={density}>
       <Dialog
         open={open}
         onOpenChange={(next) => (next ? onOpenChange(true) : shell.requestClose())}
@@ -203,11 +189,11 @@ export function FormModal({
           <form noValidate onSubmit={shell.handleSubmit} className="flex min-h-0 flex-1 flex-col">
             {/* pe-14 clears DialogContent's own close button, which is
                 positioned against the content box rather than this band. */}
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3 pe-14 sm:px-6">
+            <div className={cn("flex shrink-0 items-start justify-between border-b border-border", density === "compact" ? "gap-2 px-3 py-2 pe-14" : "gap-3 px-4 py-3 pe-14 sm:px-6")}>
               <div className="flex min-w-0 flex-col gap-1">
-                <DialogTitle>{title}</DialogTitle>
+                <DialogTitle className={density === "compact" ? "text-sm" : undefined}>{title}</DialogTitle>
                 {description && (
-                  <DialogDescription className={cn("text-sm", proseMeasure)}>
+                  <DialogDescription className={cn(density === "compact" ? "text-xs" : "text-sm", proseMeasure)}>
                     {description}
                   </DialogDescription>
                 )}
@@ -263,22 +249,14 @@ export function FormModal({
                   reset in globals.css can switch it off. */}
               <div
                 ref={setBody}
-                // `relative` is load-bearing, not decoration. Radix `Select`
-                // renders a hidden native <select> positioned `absolute` for
-                // form integration; without a positioned ancestor here its
-                // containing block is the dialog, so it escapes this box's
-                // clipping and gives the DIALOG something to scroll. An
-                // `overflow-hidden` element is still scrollable
-                // programmatically, so the first focus() after a rejected
-                // submit then slid the whole surface — header, footer and all —
-                // out of view.
-                className="relative flex min-w-0 flex-1 scroll-smooth flex-col gap-6 overflow-y-auto px-4 py-4 sm:px-6"
+                // Contains Radix's absolute native select so focus cannot scroll the entire dialog.
+                className={cn("relative flex min-w-0 flex-1 scroll-smooth flex-col overflow-y-auto", density === "compact" ? "gap-2 px-3 py-2" : "gap-6 px-4 py-4 sm:px-6")}
               >
                 {children}
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-col gap-2 border-t border-border px-4 py-3 sm:px-6">
+            <div className={cn("flex shrink-0 flex-col gap-2 border-t border-border", density === "compact" ? "px-3 py-2" : "px-4 py-3 sm:px-6")}>
               <FormErrorSummary error={error} />
               <div className="flex flex-wrap items-center gap-2">
                 {footerLeading && (
@@ -288,6 +266,7 @@ export function FormModal({
                   {/* Deliberately not DialogClose — that closes via Radix's own
                       context and would bypass the dirty guard. */}
                   <Button
+                    size={density === "compact" ? "sm" : "md"}
                     type="button"
                     variant="outline"
                     onClick={shell.requestClose}
@@ -295,14 +274,15 @@ export function FormModal({
                   >
                     {labels.cancel}
                   </Button>
-                  <Button
+                  {!hideSubmit && <Button
+                    size={density === "compact" ? "sm" : "md"}
                     type="submit"
                     variant="primary"
                     loading={isSubmitting}
                     disabled={submitDisabled}
                   >
                     {labels.submit}
-                  </Button>
+                  </Button>}
                 </div>
               </div>
             </div>
@@ -319,6 +299,6 @@ export function FormModal({
         cancelLabel={labels.discardCancel}
         onConfirm={shell.confirmDiscard}
       />
-    </>
+    </FormDensityContext.Provider>
   );
 }

@@ -102,7 +102,8 @@ export function useLeadDetail(leadId: string) {
 
   return {
     lead,
-    stages,
+    stages: stages.filter(({ isActive }) => isActive),
+    stageCatalogue: stages,
     stagesDegraded,
     isLoading,
     error,
@@ -118,9 +119,7 @@ function readStages(
 ): LeadStageItem[] | null {
   if (settled.status === "rejected") return null;
   try {
-    return parseLeadStageCatalogueResponse(settled.value.data).filter(
-      ({ isActive }) => isActive,
-    );
+    return parseLeadStageCatalogueResponse(settled.value.data);
   } catch {
     return null;
   }

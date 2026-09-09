@@ -96,12 +96,30 @@ A shadow means "floating above the document" and nothing else. Cards use border
 plus background step. `shadow-xl` / `shadow-2xl` do not appear in this system
 at all — the only two shadows are `shadow-pop` and `shadow-overlay`.
 
-### 8. Permanently dark chrome
+### 8. Dark chrome that is a costume
 
-The pre-rebuild navbar was dark regardless of theme. Both nav bars in this
-system are `bg-card` — **white in light mode**, one step off the `--canvas`
-page background they sit above. A dark chrome wrapped around a light body is a
-tell.
+**Narrowed on 2026-09-06.** This rule used to read "permanently dark chrome",
+and it banned what the product now does: `GlobalNav` carries `--color-chrome`,
+a dark brand blue, in light mode. The rule was written against the pre-rebuild
+navbar, which was dark because dark navbars look serious — and that is still
+banned. What is allowed is a top bar that is dark for reasons that can be
+stated:
+
+- **It is the brand, not a mood.** `--color-chrome` is the brand hue at the
+  ramp's darkest end, and it moves with a tenant's `primaryColor` exactly as
+  the ramp does — `deriveChrome` in `src/lib/branding/brand-ramp.ts`. A dark
+  bar that stayed navy while a tenant's product turned green would be the
+  costume this rule exists to stop.
+- **It is measured, not asserted.** Every pair on the bar is a claim in
+  `scripts/design/contrast.mjs` (white 17.5:1, muted text 6.96:1, the active
+  marker 9.7:1), and `brand-ramp.test.ts` sweeps all 360 hues to prove white
+  stays legible on it for any tenant.
+- **It stops at 45px.** `PageActionBar` below it stays `bg-card` and the
+  workspace stays `--canvas`. The screen's own primary button never lands on
+  the chrome — brand-600 measures 2.61:1 against it — because that button lives
+  in the bar that did not change.
+
+A dark bar failing any of those three is the tell again.
 
 ### 9. Emoji as UI
 

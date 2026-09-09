@@ -17,16 +17,13 @@ import type {
   AdminTenantBillingSummaryView,
   BillingMutationState,
   BillingResourceState,
-  CreateSubscriptionPlanChangePreviewDto,
   OfflinePaymentDto,
   PageView,
   PaymentReconciliationAction,
   PaymentReconciliationCaseView,
   PaymentStatusView,
   PreviewWalletAdjustmentDto,
-  SeedTenantSubscriptionDto,
   SubscriptionItemView,
-  SubscriptionPlanChangePreviewView,
   SubscriptionView,
   WalletAdjustmentPreviewView,
   WalletInputCurrenciesView,
@@ -80,7 +77,6 @@ export function useTenantBillingWorkspace(
    * draft edit. A preview whose request began before that clear no longer
    * describes anything the operator is looking at.
    */
-  const planPreviewGeneration = useRef(0);
   const walletPreviewGeneration = useRef(0);
   const intentKeys = useRef(createBillingIntentKeyStore());
   const mutationGenerations = useRef(new Map<string, number>());
@@ -132,8 +128,6 @@ export function useTenantBillingWorkspace(
   const [billingSummaryError, setBillingSummaryError] =
     useState<NormalizedApiError | null>(null);
 
-  const [planPreview, setPlanPreview] =
-    useState<SubscriptionPlanChangePreviewView | null>(null);
   const [walletPreview, setWalletPreview] =
     useState<WalletAdjustmentPreviewView | null>(null);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
@@ -168,7 +162,6 @@ export function useTenantBillingWorkspace(
     setBillingSummary(null);
     setBillingSummaryState("idle");
     setBillingSummaryError(null);
-    setPlanPreview(null);
     setWalletPreview(null);
     setSelectedPaymentId(null);
     setReconciliationCase(null);
@@ -446,94 +439,6 @@ export function useTenantBillingWorkspace(
     },
     [contextKey, dataContextKey],
   );
-
-  const seedSubscription = useCallback(
-    async (dto: SeedTenantSubscriptionDto) => {
-      if (!permissions.canCreateSubscription) {
-        setMutation({ name: null, error: forbidden("SUBSCRIPTION_CREATE_FORBIDDEN") });
-        return null;
-      }
-      const fingerprint = stableFingerprint(dto);
-      const key = intentKeys.current.get("subscription:seed", fingerprint);
-      const result = await runMutation("seed-subscription", "subscription:seed", () =>
-        tenantBillingApi.seedSubscription(tenantId, dto, key),
-      );
-      if (result) await refresh();
-      return result;
-    },
-    [permissions.canCreateSubscription, refresh, runMutation, tenantId],
-  );
-
-  const previewPlanChange = useCallback(
-    async (dto: CreateSubscriptionPlanChangePreviewDto) => {
-      if (!permissions.canUpdateSubscription) {
-        setMutation({ name: null, error: forbidden("SUBSCRIPTION_UPDATE_FORBIDDEN") });
-        return null;
-      }
-      if (!subscription || !isPlanChangeStatus(subscription.subscription.status)) {
-        setMutation({ name: null, error: conflict("SUBSCRIPTION_UPDATE_NOT_ALLOWED") });
-        return null;
-      }
-      setPlanPreview(null);
-      // UI-018. Two same-scope previews racing are already resolved by
-      // runMutation. What was unguarded is the CLEAR: the panel clears the
-      // preview when the operator edits the draft, but a preview already in
-      // flight still landed afterwards and sat there confirmable, priced
-      // against terms it never saw. Reading the counter here and comparing it
-      // after the await is what disowns it.
-      const clearedAt = planPreviewGeneration.current;
-      const fingerprint = stableFingerprint(dto);
-      const key = intentKeys.current.get("subscription:preview", fingerprint);
-      const result = await runMutation("preview-plan-change", "subscription:preview", () =>
-        tenantBillingApi.previewPlanChange(subscription.subscription.id, dto, key),
-      );
-      if (clearedAt !== planPreviewGeneration.current) return null;
-      if (result) setPlanPreview(result);
-      return result;
-    },
-    [permissions.canUpdateSubscription, runMutation, subscription],
-  );
-
-  const applyPlanChange = useCallback(async () => {
-    if (!permissions.canApplySubscriptionUpdate) {
-      setMutation({ name: null, error: forbidden("SUBSCRIPTION_APPLY_FORBIDDEN") });
-      return null;
-    }
-    if (
-      !subscription ||
-      !isPlanChangeStatus(subscription.subscription.status) ||
-      !planPreview
-    ) {
-      setMutation({ name: null, error: conflict("SUBSCRIPTION_APPLY_NOT_ALLOWED") });
-      return null;
-    }
-    if (!planPreview.financial.canApply) {
-      setMutation({ name: null, error: conflict("SUBSCRIPTION_PREVIEW_NOT_APPLICABLE") });
-      return null;
-    }
-    if (!isFutureInstant(planPreview.expiresAt)) {
-      setPlanPreview(null);
-      setMutation({ name: null, error: conflict("SUBSCRIPTION_PREVIEW_EXPIRED") });
-      return null;
-    }
-    const key = intentKeys.current.get(
-      `subscription:apply:${planPreview.previewId}`,
-      planPreview.previewId,
-    );
-    const intentScope = `subscription:apply:${planPreview.previewId}`;
-    const result = await runMutation("apply-plan-change", intentScope, () =>
-      tenantBillingApi.applyPlanChange(
-        subscription.subscription.id,
-        planPreview.previewId,
-        key,
-      ),
-    );
-    if (result) {
-      setPlanPreview(null);
-      await refresh();
-    }
-    return result;
-  }, [permissions.canApplySubscriptionUpdate, planPreview, refresh, runMutation, subscription]);
 
   const cancelSubscription = useCallback(async () => {
     if (!permissions.canCancelSubscription) {
@@ -863,6 +768,7 @@ export function useTenantBillingWorkspace(
     isAuthLoading ? "idle" : allowed ? "loading" : "forbidden";
 
   return {
+    tenantId,
     permissions,
     actorId: user?.id ?? null,
     subscription: ownsData ? subscription : null,
@@ -900,7 +806,6 @@ export function useTenantBillingWorkspace(
       ? billingSummaryState
       : hiddenState(permissions.canReadBillingSummary),
     billingSummaryError: ownsData ? billingSummaryError : null,
-    planPreview: ownsData ? planPreview : null,
     walletPreview: ownsData ? walletPreview : null,
     selectedPaymentId: ownsData ? selectedPaymentId : null,
     reconciliationCase: ownsData ? reconciliationCase : null,
@@ -909,9 +814,6 @@ export function useTenantBillingWorkspace(
     mutation: ownsData ? mutation : { name: null, error: null },
     isAuthLoading,
     refresh,
-    seedSubscription,
-    previewPlanChange,
-    applyPlanChange,
     cancelSubscription,
     previewWalletAdjustment,
     confirmWalletAdjustment,
@@ -920,12 +822,6 @@ export function useTenantBillingWorkspace(
     selectPayment,
     proposeReconciliation,
     decideReconciliation,
-    // Clearing is what the panel does when the draft changes, so it must also
-    // disown any preview still in flight for the previous draft.
-    clearPlanPreview: () => {
-      planPreviewGeneration.current += 1;
-      setPlanPreview(null);
-    },
     clearWalletPreview: () => {
       walletPreviewGeneration.current += 1;
       setWalletPreview(null);
@@ -970,10 +866,6 @@ function conflict(
     errorCode,
     message,
   };
-}
-
-function isPlanChangeStatus(status: SubscriptionView["subscription"]["status"]): boolean {
-  return status === "TRIAL" || status === "ACTIVE";
 }
 
 function isFutureInstant(value: string): boolean {

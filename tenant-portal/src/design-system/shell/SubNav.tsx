@@ -32,7 +32,7 @@ export function SubNav({ items }: SubNavProps) {
   const isTenantOwner = user?.isTenantOwner ?? false;
   const visibleItems = items.filter((item) =>
     // Owner-guarded entries carry no permission to look up — see NavItem.
-    item.requiresTenantOwner ? isTenantOwner : item.hasAccess(permissions),
+    item.requiresTenantOwner ? isTenantOwner : item.hasAccess(permissions, isTenantOwner),
   );
 
   if (visibleItems.length === 0) return null;

@@ -23,12 +23,17 @@ export interface NavMenuProps {
 // edge, which is the horizontal nav's equivalent of the sidebar's inset-start
 // bar. Not a filled chip — docs/design/anti-patterns.md#4-hue-coded-controls
 // and the sidebar rule it inherits.
+// Inactive is the muted role and active is the plain one, in both themes: on
+// the light chrome that reads as ink-400 against white rather than as two
+// shades of ink, and `nav-surface` is what makes the same two names mean that
+// here. The marker keeps its own token because it is the one colour on the bar
+// that is neither text nor surface.
 const TRIGGER =
-  "relative flex h-full items-center gap-1 px-3 text-sm text-sidebar-foreground " +
+  "relative flex h-full items-center gap-1 px-3 text-sm text-muted-foreground " +
   "after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent " +
   "hover:bg-accent";
 
-const TRIGGER_ACTIVE = "font-medium text-foreground after:bg-sidebar-active";
+const TRIGGER_ACTIVE = "font-medium text-foreground after:bg-nav-active";
 
 /**
  * One nav section as a menu in the global nav.

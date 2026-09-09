@@ -25,6 +25,9 @@ interface Props {
   isOpen: boolean;
   boundApplicationKeys: string[];
   isSubmitting: boolean;
+  bindingReady?: boolean;
+  bindingRefreshError?: string | null;
+  onRefreshBindings?: () => Promise<void>;
   onClose: () => void;
   onBootstrap: (
     applicationKey: string,
@@ -53,6 +56,9 @@ export function AddDatabaseApplicationDialog({
   isOpen,
   boundApplicationKeys,
   isSubmitting,
+  bindingReady = true,
+  bindingRefreshError,
+  onRefreshBindings,
   onClose,
   onBootstrap,
 }: Props) {
@@ -63,7 +69,10 @@ export function AddDatabaseApplicationDialog({
   const [reason, setReason] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const dialogGeneration = useRef(0);
+  const submissionPending = useRef(false);
   const boundKeyFingerprint = boundApplicationKeys.join(",");
   const boundKeys = useMemo(
     () =>
@@ -86,10 +95,27 @@ export function AddDatabaseApplicationDialog({
 
   useEffect(() => {
     if (!isOpen) return;
+    ++dialogGeneration.current;
+    let cancelled = false;
     queueMicrotask(() => {
-      setIsLoading(true);
+      if (cancelled) return;
       setError(null);
       setReason("");
+      setSelectedKey("");
+    });
+    return () => {
+      cancelled = true;
+      ++dialogGeneration.current;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIsLoading(true);
+      setLoadError(null);
       applicationsApi
         .list({
           page: 1,
@@ -98,34 +124,44 @@ export function AddDatabaseApplicationDialog({
           databaseAccessMode: "TENANT_DATABASE",
         })
         .then(({ data }) => {
+          if (cancelled) return;
           setApplications(data);
           setSelectedKey(
-            data.find(
+            (current) => current || (data.find(
               (application) =>
                 isBootstrapEligible(application) &&
                 !boundKeys.has(application.key),
-            )?.key ?? "",
+            )?.key ?? ""),
           );
         })
-        .catch((requestError) =>
-          setError(normalizeApiError(requestError).message),
-        )
-        .finally(() => setIsLoading(false));
+        .catch((requestError) => {
+          if (cancelled) return;
+          setApplications([]);
+          setLoadError(normalizeApiError(requestError).message);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
     });
+    return () => { cancelled = true; };
   }, [boundKeys, isOpen]);
 
+  const visibleError = error ?? loadError;
   useEffect(() => {
-    if (error) errorRef.current?.focus();
-  }, [error]);
+    if (visibleError) errorRef.current?.focus();
+  }, [visibleError]);
 
   if (!isOpen) return null;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submissionPending.current || isSubmitting || isLoading || loadError || !bindingReady) return;
     if (!selected) return setError(copy.selectEligible);
     if (reason.trim().length < 8) {
       return setError(copy.reasonMinimum);
     }
+    submissionPending.current = true;
+    const generation = dialogGeneration.current;
     setError(null);
     try {
       await onBootstrap(
@@ -134,13 +170,12 @@ export function AddDatabaseApplicationDialog({
         selected.databasePolicy.policyRevision,
         reason.trim(),
       );
-      onClose();
+      if (generation === dialogGeneration.current) onClose();
     } catch (submissionError) {
-      setError(
-        submissionError instanceof Error
-          ? submissionError.message
-          : copy.initializeFailed,
-      );
+      if (generation !== dialogGeneration.current) return;
+      setError(normalizeApiError(submissionError).message);
+    } finally {
+      submissionPending.current = false;
     }
   };
 
@@ -169,7 +204,7 @@ export function AddDatabaseApplicationDialog({
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4 p-5">
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+            <div role="status" className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               {copy.loading}
             </div>
@@ -226,15 +261,25 @@ export function AddDatabaseApplicationDialog({
               </Field>
             </>
           )}
-          {error && (
+          {visibleError && (
             <p
               ref={errorRef}
               role="alert"
               tabIndex={-1}
               className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {error}
+              {visibleError}
             </p>
+          )}
+          {bindingRefreshError && (
+            <div role="alert" className="space-y-2 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">
+              <p>{bindingRefreshError}</p>
+              {onRefreshBindings && (
+                <Button type="button" variant="outline" size="sm" onClick={() => void onRefreshBindings()}>
+                  {lang === "ar" ? "تحديث حالة الارتباطات" : "Refresh binding status"}
+                </Button>
+              )}
+            </div>
           )}
           <DialogFooter className="mt-0">
             <Button
@@ -251,7 +296,7 @@ export function AddDatabaseApplicationDialog({
               variant="secondary"
               size="sm"
               loading={isSubmitting}
-              disabled={isSubmitting || isLoading || !available.length}
+              disabled={isSubmitting || isLoading || Boolean(loadError) || !bindingReady || !selected}
             >
               {copy.initialize}
             </Button>

@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { axiosClient } from "@/lib/api/axiosClient";
+import { readAllCrmAttachments } from "./readCrmAttachments";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
   CRM_ATTACHMENTS_PATH,
   buildCrmAttachmentUploadBody,
-  buildCrmAttachmentsListPath,
   classifyAttachmentUploadFailure,
   crmAttachmentPath,
   parseCrmAttachment,
-  parseCrmAttachmentsPageResponse,
   type CrmAttachment,
   type CrmAttachmentSourceType,
   type CrmAttachmentUploadFailure,
@@ -23,9 +21,6 @@ import {
   type CrmAppliedUnreadable,
   type CrmWriteAttempt,
 } from "../crm-write";
-
-const ATTACHMENTS_PAGE_SIZE = 50;
-const ATTACHMENTS_RESPONSE_LIMIT_BYTES = 1024 * 1024;
 
 export interface CrmAttachmentsSource {
   branchId: string | null;
@@ -104,29 +99,11 @@ export function useCrmAttachments({
       setIsLoading(true);
       setLoadError(null);
       try {
-        const response = await axiosClient.get<unknown>(
-          buildCrmAttachmentsListPath({
-            branchId,
-            sourceType,
-            sourceId,
-            page: 1,
-            limit: ATTACHMENTS_PAGE_SIZE,
-          }),
-          {
-            signal,
-            cache: "no-store",
-            maxResponseBytes: ATTACHMENTS_RESPONSE_LIMIT_BYTES,
-          },
-        );
-        const page = parseCrmAttachmentsPageResponse(response.data, {
-          branchId,
-          sourceType,
-          sourceId,
-        });
-        if (epoch !== requestEpochRef.current) return;
-        setAttachments(page.items);
+        const rows = await readAllCrmAttachments({ branchId, sourceType, sourceId }, signal);
+        if (signal?.aborted || epoch !== requestEpochRef.current) return;
+        setAttachments(rows);
       } catch (caught) {
-        if (isAbortError(caught) || epoch !== requestEpochRef.current) return;
+        if (signal?.aborted || isAbortError(caught) || epoch !== requestEpochRef.current) return;
         setAttachments([]);
         setLoadError(normalizeApiError(caught));
       } finally {

@@ -1,6 +1,6 @@
 # Known Frontend Gaps
 
-Last source verification: **2026-08-12**
+Last source verification: **2026-09-09** (Addon/commercial scope amendment).
 
 The exhaustive evidence and status history are in the
 [Core Admin UI parity audit](../audit/core-admin-ui-gap-audit-2026-08-12.md)
@@ -8,8 +8,13 @@ and [capability matrix](../audit/frontend-capability-matrix.md).
 
 ## Core Admin web route gaps
 
-None. Current Admin Portal source has exact reachable production calls for all
-240 Core Admin routes: **240 direct, 0 equivalent, 0 missing**.
+The historical 240-route baseline had **240 direct, 0 equivalent, 0 missing**.
+New Addon/commercial contracts expand the current inventory and are not covered
+by that parity claim. See the [Addon contract boundary](../api/application-addons-target.md)
+and [Admin receipt](../plans/application-catalogue-frontend-track.md).
+Catalogue forms, full canonical subscription directory/detail/items, purpose-based invoice detail and reviewed initial tenant creation/first-subscription seed are source-integrated.
+Aggregate preparation, preview/apply, operation recovery and original receipt lookup are mounted in tenant billing. Governed definition adoption and final integrated runtime acceptance remain open. Commercial negotiation, legacy read/evidence fallbacks and scalar plan-change commands have been removed. Mobile/Partner are excluded,
+not release blockers.
 
 This closes the former false/missing claims for tenant FQDN and access methods,
 wallet adjustments, forgot password, invite/reset/logout-all, self profile,
@@ -48,13 +53,13 @@ provisioning-governance routes.
   integrated REST contract.
 - Worker Backup package/schema adoption and authenticated runtime evidence are
   separate release blockers from Core Admin parity.
-- Flutter Admin is not at parity and cannot safely use the Web-only browser
-  cookie authentication channel. Mobile implementation requires an authorized
-  backend mobile Admin authentication contract.
+- Mobile and Partner are outside the user's active scope and are not inspected,
+  implemented, tested or used as release blockers by this track.
 
-## Backend/tooling verification limitation
+## Historical backend/tooling verification limitation
 
-The local Gateway dependency directory cannot currently be restored because
-private GitHub Packages returns 401 without `NODE_AUTH_TOKEN`. Static
-Core/Gateway Admin reconciliation is complete; Gateway test execution remains
-credential-dependent. No backend source was changed by this frontend task.
+An earlier task recorded a private-registry credential failure. That historical
+observation is not evidence of a current blocker: the coordinator owns current
+package publication/adoption and Gateway execution evidence. This Admin track
+does not print registry credentials, edit backend source or claim backend
+verification from its frontend tests.

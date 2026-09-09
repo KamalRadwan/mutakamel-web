@@ -4,6 +4,9 @@ Status: **verified**
 
 Last source verification: **2026-08-27**
 
+Inventory and Application/Addon read additions refreshed **2026-09-08** from
+the generated Gateway source inventory and the separately dated domain pages.
+
 Source: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/`,
 `core-app/src/tenant/`, `crm-app/src/crm/`.
 
@@ -20,7 +23,7 @@ The Gateway is the only browser-facing edge. Upstream paths
 and must never appear in browser code. `worker-app` has **no** tenant browser
 API — its results are read through Core, CRM or Trade projections.
 
-Current inventory: **573 tenant routes** — core 199, CRM 143, Trade 231. Full
+Current inventory: **618 tenant routes** — Core207, CRM160, Trade231, WebPhone20. Full
 table in [../generated/tenant-api-routes.md](../generated/tenant-api-routes.md);
 machine-readable in the sibling `.json`. Regenerate with `pnpm docs:routes`.
 
@@ -30,10 +33,10 @@ Every Gateway route declares one. It determines transport policy.
 
 | Class | Count | Meaning |
 | --- | --- | --- |
-| `AUTHENTICATED` | 209 | Standard authenticated read |
-| `WRITE_SENSITIVE` | 328 | Mutation; idempotency and retry policy apply |
+| `AUTHENTICATED` | 233 | Standard authenticated read |
+| `WRITE_SENSITIVE` | 347 | Mutation; idempotency and retry policy apply |
 | `READ_HEAVY` | 23 | Larger payload/timeout allowance |
-| `PUBLIC` | 13 | No session required |
+| `PUBLIC` | 15 | No session required |
 
 A route that is `WRITE_SENSITIVE` **and** `idempotent: true` requires an
 `x-idempotency-key` (UUIDv7). `axiosClient` attaches one automatically.
@@ -403,12 +406,23 @@ the manual test plan. The authenticated half has not.
 
 ## Domain pages
 
+Target addition, aligned **2026-09-08**: [Application Addons](application-addons-target.md)
+retains a planned broader consumer contract with thirteen separately verified
+read endpoints. The linked domain pages identify exactly what is implemented;
+the remaining target tables are not proof of callable commands. Commercial V2,
+user seats and Company/Branch activation remain separate from base-only behavior.
+
 | Page | Contract | Portal |
 | --- | --- | --- |
+| [application-addons-target.md](application-addons-target.md) | target; partial implementation | thirteen verified GETs, including retained invoices and assignment options; new writes remain gated |
+| [application-access.md](application-access.md) | source-verified | seven scoped reads, directory/navigation/detail UI; no authenticated acceptance |
+| [addon-assignments.md](addon-assignments.md) | source-verified | exact-user allocation and precondition tabs with independent seat permissions; no authenticated acceptance |
+| [subscription-addons.md](subscription-addons.md) | source-verified | negotiated detail/items and accepted App/Addon prices; no authenticated acceptance |
+| [subscription-offers.md](subscription-offers.md) | source-verified | owner-only published Tier/Addon explorer with independent dynamic ladders; no authenticated acceptance |
 | [core-auth.md](core-auth.md) | verified | **partial** — the unauthenticated paths are verified; the authenticated half is built only |
 | [core-identity.md](core-identity.md) | verified | built — Phase 4, all 50 routes called |
 | [core-settings.md](core-settings.md) | verified | built — Phase 5, 30 of 33 routes |
-| [core-billing.md](core-billing.md) | verified | built — Phase 6, 22 of 23 routes |
+| [core-billing.md](core-billing.md) | verified | built — Phase 6 baseline plus retained V2 invoice detail; payment DTOs unchanged |
 | [core-directory.md](core-directory.md) | verified | built — Phase 7 |
 | [core-templates.md](core-templates.md) | verified | **partial** — Phase 7; the layout-document editor is not buildable, see 7.12 |
 | [core-notifications.md](core-notifications.md) | verified | **partial** — 9 of 14 routes unused |

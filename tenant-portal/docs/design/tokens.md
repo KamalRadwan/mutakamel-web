@@ -40,6 +40,12 @@ admin spells `--color-surface-*`.
 
 ## Ramps
 
+**Contact-channel identity exception — 2026-09-07:** the explicitly requested
+authentic service marks use `--color-channel-whatsapp` and
+`--color-channel-telegram`, centralized in `globals.css`. They identify only
+those services and are not additional outcome roles, stage colors, body-text
+colors, or tenant-brand overrides. See [contact channel marks](icons.md#contact-channel-marks).
+
 > **The exact values are not duplicated here.** All 57 OKLCH steps live in one
 > place only: **[DESIGN-SYSTEM.md § Ramps](DESIGN-SYSTEM.md#ramps--exact-values)**,
 > mirroring `src/app/globals.css`.
@@ -147,7 +153,8 @@ and did not exist before:
 | Selection | `--selected`, `--selected-foreground` | The selected-row tint, a surface `--accent` was being overloaded to do |
 | Status roles | `--info-*`, `--success-*`, `--warning-*`, and `--destructive-subtle` / `-vivid` | A named role per outcome, each with a filled, a subtle and a vivid form |
 | Charts | `--chart-1…5`, `--chart-qualitative-1…6`, `--chart-grid`, `--chart-axis` | See [§ Charts](#charts) |
-| Chrome | `--sidebar`, `--sidebar-foreground`, `--sidebar-active`, `-primary`, `-accent`, `-selected`, `-border`, `-ring` | The shell's own copies, so re-theming chrome does not disturb the body. The `sidebar` spelling outlived the sidebar: `brand-ramp.ts` validates `--sidebar-active` under the `sidebarActiveLight` / `sidebarActiveDark` contrast pairs, and the name is shared with `admin-portal` |
+| Chrome | `--sidebar`, `--sidebar-foreground`, `--sidebar-active`, `-primary`, `-accent`, `-selected`, `-border`, `-ring` | The shell's own copies, so re-theming chrome does not disturb the body. The `sidebar` spelling outlived the sidebar: `brand-ramp.ts` validates `--sidebar-active` under the `sidebarActiveLight` / `sidebarActiveDark` contrast pairs, and the name is shared with `admin-portal`. `NavSheet` is what still draws them |
+| Nav surface | `--nav`, `--nav-foreground`, `--nav-muted-foreground`, `--nav-accent`, `--nav-border`, `--nav-active`, `--nav-ring`, over `--color-chrome` | The global nav's own inverted set — see [§ The nav is the one inverted surface](#the-nav-is-the-one-inverted-surface) |
 
 Two distinctions inside the status roles decide how the product reads:
 
@@ -162,15 +169,60 @@ Two distinctions inside the status roles decide how the product reads:
   Those dark steps are exactly what made every badge read grey-green instead of
   green.
 
-The chrome is a light surface in light mode. Both nav bars paint `--card` —
-white in light, `ink-950` in dark — which is also the exact background
-`--sidebar-active`'s two contrast pairs are measured against, so the active
-marker is validated on the surface it actually sits on. `--sidebar-foreground`
-and `--sidebar-active` are the two the shell draws; `--sidebar` itself is now
-declared for `admin-portal` parity and consumed by nothing, the same standing
-`--radius-xl` has. It is **not**
-permanently dark; a permanently dark chrome around a light body is one of the
-tells listed in [anti-patterns.md](anti-patterns.md).
+`PageActionBar` paints `--card` — white in light, `ink-950` in dark — which is
+also the exact background `--sidebar-active`'s two contrast pairs are measured
+against, so the active marker in `NavSheet` is validated on the surface it sits
+on. `--sidebar-foreground` and `--sidebar-active` are the two that family still
+draws; `--sidebar` itself is declared for `admin-portal` parity and consumed by
+nothing, the same standing `--radius-xl` has.
+
+### The nav is the one inverted surface
+
+`GlobalNav` is not on `--card`. It paints `--color-chrome`, `#000068` — the
+brand hue (264.05, against brand-600's 264.376) held at the ramp's darkest
+lightness. It is deliberately **not** a ramp step: the brand ramp desaturates as
+it darkens, from C 0.217 at 600 to 0.098 at 950, and the chrome holds 0.162,
+because a 45px band of brand wants the saturation the ramp gives up. Keeping it
+out of the ramp is what stops it being reached for as "brand-1000" on a surface
+where that curve is the rule.
+
+| Token | Value | Against the chrome |
+| --- | --- | ---: |
+| `--nav-foreground` | `white` | 17.50 |
+| `--nav-muted-foreground` | `ink-400` | 6.96 |
+| `--nav-active` | `brand-300` | 9.70 |
+| `--nav-ring` | `white` | 17.50 |
+| `--nav-border` | `brand-800` | 1.69 — separation, not legibility |
+| `--nav-accent` (hover) | `brand-900` | 1.36 — the same |
+
+Every one of those is a claim in `scripts/design/contrast.mjs`, so a step
+changed underneath them fails the gate rather than the eye.
+
+**Three things make this work and would break it if dropped.**
+
+1. **`.nav-surface` re-points the ordinary names.** The class sets
+   `--foreground`, `--muted-foreground`, `--accent`, `--border`, `--ring`,
+   `--background` and `--card` from the `--nav-*` set, on the bar only. A ghost
+   `Button` there asks for `hover:bg-accent` like every other button in the
+   product and gets the on-chrome value; nothing in the bar knows it is
+   inverted, and a control added later inherits that for free. Menus opened from
+   the bar are Radix portals under `<body>`, outside the class, so they keep the
+   light popover surface — the menus are content, the bar is chrome.
+2. **It follows the tenant.** `deriveChrome` rebuilds the chrome at the
+   tenant's hue beside the ramp, fitting chroma into gamut per hue the same way
+   every step does, and `apply-branding.ts` writes `--color-chrome` with the
+   rest. `navTextLight` and `navActiveLight` are contrast pairs in
+   `brand-ramp.ts`, so a tenant colour that made the bar unreadable is refused
+   before it is applied, and `brand-ramp.test.ts` sweeps all 360 hues.
+3. **Dark mode is untouched.** Each `--nav-*` points back at the value the
+   control would have read anyway, so `.nav-surface` is a no-op there. Against
+   an `ink-1000` canvas a saturated navy separates less than the card surface
+   does, and inverting an already-inverted theme inverts nothing.
+
+`--primary` is deliberately not re-pointed: brand-600 measures **2.61:1**
+against the chrome, and the screen's one filled action lives in
+`PageActionBar`, which is still `--card`. A primary button that ever has to sit
+on the bar needs its own on-chrome fill.
 
 ## Status mapping
 

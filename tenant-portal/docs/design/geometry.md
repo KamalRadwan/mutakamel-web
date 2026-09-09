@@ -207,6 +207,27 @@ that was available, the taller topbar and the wider `md:p-6` gutter take 20 px
 of it, and what remains divides by the new row height. A fresh count in the
 running app would supersede all three numbers, and should.
 
+### Where a row has to fit, ask the container
+
+A viewport breakpoint answers "how wide is the window". A row inside a modal,
+a drawer or a column is asking something else — "is there room for five
+controls **here**" — and the two answers part company by exactly the width of
+whatever is beside it, plus the density swing above.
+
+`CrmContactLine` is where that bit. It went single-row at `xl`, and the create
+modal is `inset-5`: at a 1160px window the line had about 900px to work with
+and still wrapped into two columns, because the window was 120px short of a
+breakpoint that was never measuring this element. It is now a `@container`
+with `@min-[52rem]` / `@min-[64rem]` variants, so it goes single-row when it
+actually fits — in a wide modal, in a narrow drawer, at any density.
+
+**This is the exception, not the new default.** Page-level layout still uses
+viewport breakpoints: they are the right measure for the page, they are what
+`md:p-6` and the shell's own rules are written in, and a container query costs
+a containment context on every element that declares one. Reach for `@container`
+where a component's own width is genuinely different from the window's — a
+form line inside a modal, a card grid inside a split pane — and nowhere else.
+
 The direction is not in doubt: **standard density trades roughly three rows for
 matching the admin portal's physical size.** An operator who wants the rows
 back picks compact, which is exactly what the setting is for.

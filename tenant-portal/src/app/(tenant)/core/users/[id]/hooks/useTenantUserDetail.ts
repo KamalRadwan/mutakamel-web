@@ -123,6 +123,7 @@ export function useTenantUserDetail(id: string) {
     isMissing: isMissing || isDeleted,
     reload,
     canRead: permissions.includes("users.user.read"),
+    canReadAddonAssignments: actor?.isTenantOwner === true || permissions.includes("applications.addon_seats.read") || permissions.includes("applications.addon_seats.manage"),
     canDeactivate: permissions.includes("users.user.deactivate"),
     canDelete: permissions.includes("users.user.delete"),
     canManageMemberships: permissions.includes("users.user.manage_memberships"),

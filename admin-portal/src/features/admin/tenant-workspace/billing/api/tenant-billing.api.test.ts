@@ -20,8 +20,6 @@ vi.mock("../model/readers", () => ({
   ) => ({ items: payload.data.map(reader), meta: payload.meta }),
   readSubscriptionView: (value: unknown) => value,
   readSubscriptionItems: (value: unknown) => value,
-  readPlanChangePreview: (value: unknown) => value,
-  readPlanChangeApplyResult: (value: unknown) => value,
   readCancellationResult: (value: unknown) => value,
   readWallet: (value: unknown) => value,
   readWalletInputCurrencies: (value: unknown) => value,
@@ -33,10 +31,15 @@ vi.mock("../model/readers", () => ({
   readReconciliation: (value: unknown) => value,
 }));
 
+import { commercialFixture, commercialIds, commercialPreviewFixture, commercialReceiptFixture } from "../model/subscription-commercial-fixtures";
+import { addonEnvelope } from "../../../applications/lib/addon-test-fixtures";
+import { initialCommercialApi } from "../../../subscriptions/initial-commercial/initial-commercial.api";
+import { initialQuoteFixture, initialReceiptFixture, initialRequestFixture, initialResponse, initialId } from "../../../subscriptions/initial-commercial/initial-commercial.fixture";
+import { buildInitialSeedRequest } from "../../../subscriptions/initial-commercial/initial-commercial-request";
+import { commercialChangeApi } from "@/features/admin/subscriptions/commercial-change/commercial-change.api";
 import { tenantBillingApi } from "./tenant-billing.api";
 
 const tenantId = "019f0000-0000-7000-8000-000000000001";
-const subscriptionId = "019f0000-0000-7000-8000-000000000002";
 const paymentId = "019f0000-0000-7000-8000-000000000003";
 const previewId = "019f0000-0000-7000-8000-000000000004";
 const reconciliationId = "019f0000-0000-7000-8000-000000000005";
@@ -61,41 +64,23 @@ describe("tenant billing API contract", () => {
     postMock.mockResolvedValue(envelope({}));
   });
 
-  it("uses the canonical enriched tenant subscription read and seed command", async () => {
-    getMock
-      .mockResolvedValueOnce(
-        envelope({
-          subscription: { id: subscriptionId },
-          items: [],
-          effectiveAllowedUsers: 0,
-          enabledModules: [],
-        }),
-      )
-      .mockResolvedValueOnce(envelope([]));
-    await tenantBillingApi.getSubscription(tenantId);
-    const dto = {
-      billingCycle: "MONTHLY" as const,
-      currencyCode: "USD" as const,
-      items: [{ moduleKey: "crm", tierKey: "pro", seats: 4 }],
-    };
-    await tenantBillingApi.seedSubscription(tenantId, dto, key);
+  it("uses canonical subscription reads and the reviewed initial seed command", async () => {
+    const detail = commercialFixture();
+    const items = { subscriptionId: detail.subscription.id, subscriptionRevision: detail.subscriptionRevision,
+      baseItems: detail.baseItems, addonSelections: detail.addonSelections };
+    getMock.mockResolvedValueOnce(addonEnvelope(detail)).mockResolvedValueOnce(addonEnvelope(items));
+    await tenantBillingApi.getSubscription(commercialIds.tenant);
+    const quote = initialQuoteFixture(), dto = buildInitialSeedRequest(quote, initialRequestFixture());
+    postMock.mockResolvedValueOnce(initialResponse(initialReceiptFixture()));
+    await initialCommercialApi.seed(initialId(2), dto, quote, key);
 
-    expect(getMock).toHaveBeenNthCalledWith(
-      1,
-      `/api/admin/core/v1/tenants/${tenantId}/subscription`,
-      undefined,
-    );
-    expect(getMock).toHaveBeenNthCalledWith(
-      2,
-      `/api/admin/core/v1/tenants/${tenantId}/subscription/items`,
-      undefined,
-    );
+    expect(getMock).toHaveBeenNthCalledWith(1,
+      `/api/admin/core/v1/tenants/${commercialIds.tenant}/subscription`, { cache: "no-store", signal: undefined });
+    expect(getMock).toHaveBeenNthCalledWith(2,
+      `/api/admin/core/v1/tenants/${commercialIds.tenant}/subscription/items`, { cache: "no-store", signal: undefined });
     expect(getMock).toHaveBeenCalledTimes(2);
-    expect(postMock).toHaveBeenCalledWith(
-      `/api/admin/core/v1/tenants/${tenantId}/subscription`,
-      dto,
-      { headers: { "x-idempotency-key": key } },
-    );
+    expect(postMock).toHaveBeenCalledWith(`/api/admin/core/v1/tenants/${initialId(2)}/subscription`,
+      dto, { headers: { "x-idempotency-key": key }, replayAfterRefresh: true, cache: "no-store" });
   });
 
   it("reconciles a non-empty tenant ledger through the exact wallet-id route", async () => {
@@ -125,34 +110,21 @@ describe("tenant billing API contract", () => {
   });
 
   it("uses preview/apply and the non-nested canonical cancellation route", async () => {
-    const dto = {
-      operation: "CHANGE" as const,
-      itemId: previewId,
-      tierKey: "pro",
-      seats: 8,
-    };
-    await tenantBillingApi.previewPlanChange(subscriptionId, dto, key);
-    await tenantBillingApi.applyPlanChange(subscriptionId, previewId, key);
+    const preview = commercialPreviewFixture();
+    const dto = { expectedSubscriptionRevision: preview.subscriptionRevision, preparationId: preview.preparation.preparationId,
+      changes: [{ selectionKey: preview.changes[0].selectionKey, sourceKind: "APPLICATION" as const, operation: "CHANGE" as const,
+        itemId: commercialIds.item, tierId: commercialIds.tier, seats: 31 }] };
+    postMock.mockResolvedValueOnce({ ...addonEnvelope(preview), status: 201 }).mockResolvedValueOnce(addonEnvelope(commercialReceiptFixture()));
+    await commercialChangeApi.preview(commercialIds.subscription, dto, key);
+    await commercialChangeApi.apply(commercialIds.subscription, preview, key);
     await tenantBillingApi.cancelSubscription(tenantId, key);
-
-    expect(postMock).toHaveBeenNthCalledWith(
-      1,
-      `/api/admin/core/v1/subscriptions/${subscriptionId}/plan-change-previews`,
-      dto,
-      { headers: { "x-idempotency-key": key } },
-    );
-    expect(postMock).toHaveBeenNthCalledWith(
-      2,
-      `/api/admin/core/v1/subscriptions/${subscriptionId}/plan-change-previews/${previewId}/apply`,
-      undefined,
-      { headers: { "x-idempotency-key": key } },
-    );
-    expect(postMock).toHaveBeenNthCalledWith(
-      3,
-      `/api/admin/core/v1/subscriptions/${tenantId}/cancel`,
-      undefined,
-      { headers: { "x-idempotency-key": key } },
-    );
+    expect(postMock).toHaveBeenNthCalledWith(1,
+      `/api/admin/core/v1/subscriptions/${commercialIds.subscription}/plan-change-previews`, dto,
+      { headers: { "x-idempotency-key": key }, replayAfterRefresh: true });
+    expect(postMock).toHaveBeenNthCalledWith(2,
+      `/api/admin/core/v1/subscriptions/${commercialIds.subscription}/plan-change-previews/${preview.previewId}/apply`, {},
+      { headers: { "x-idempotency-key": key }, replayAfterRefresh: true });
+    expect(postMock).toHaveBeenNthCalledWith(3, `/api/admin/core/v1/subscriptions/${tenantId}/cancel`, undefined, { headers: { "x-idempotency-key": key } });
   });
 
   it("uses wallet preview and confirmation instead of nonexistent credit/debit routes", async () => {

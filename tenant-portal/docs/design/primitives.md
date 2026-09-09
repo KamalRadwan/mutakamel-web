@@ -327,17 +327,30 @@ returned for the query, so filtering never happens in the browser and the
 control has real loading and empty states instead of an empty dropdown. It is
 not a `Select` with a filter box bolted on.
 
-**`CrmPhoneNumberInput`'s country picker is the one sanctioned exception**, and
-it does not contradict that rule. The contract the primitive states is that
-`options` are the answer to the current query — whether a server or an array
-answered it is the caller's business. What the rule forbids is handing over all
-250 countries and filtering them inside the popup, and that is not what
-happens: `onSearch` sets a query in the caller's state, the caller narrows the
-catalogue itself, and only the matches arrive as `options`, with
-`debounceMs={0}` because there is nothing to wait for. Two conditions make it
-legitimate. There is no endpoint to call — a country catalogue is static and
-offline. And the caller still narrows the list before the primitive sees it,
-which is the part the rule protects.
+**Two callers narrow the list themselves, and neither contradicts that rule.**
+The contract the primitive states is that `options` are the answer to the
+current query — whether a server or an array answered it is the caller's
+business. What the rule forbids is handing over the whole catalogue and
+filtering it inside the popup. Both of these do the narrowing outside:
+`onSearch` sets a query in the caller's state, the caller filters, and only the
+matches arrive as `options`, with `debounceMs={0}` because there is nothing to
+wait for.
+
+| Caller | The list | Why there is no query to send |
+| --- | --- | --- |
+| `CrmPhoneNumberInput`'s country picker | 250 countries | The catalogue is static and offline — there is no endpoint at all |
+| `LeadCompanySection`'s existing-company picker | A branch's organizations | `GET /leads/company-options` takes `branchId` and nothing else; the whole permitted list arrives once when the modal opens |
+
+Two conditions make a caller like this legitimate, and both must hold: **there
+is no endpoint that answers the query**, and **the caller still narrows before
+the primitive sees the list**. A screen whose endpoint does take a search
+parameter sends it instead — that is the default this section describes, not a
+harder path to be avoided.
+
+The company picker adds one wrinkle worth copying: its "Create a new company"
+row is **pinned and never filtered**. A search that finds nothing is exactly
+when that row is the answer, and making the user clear the box to reach it
+would be backwards.
 
 ### FileUpload
 
@@ -347,7 +360,8 @@ already-translated strings rather than being rendered here, so a screen can
 choose between an inline list and its own surface.
 
 Backend caps it is built for: branding 2 MB · party image 2 MB · template asset
-5 MiB · CRM attachment 26 MiB.
+5 MiB · CRM attachment **25 MiB** per file (the Gateway multipart envelope has
+a separate, larger whole-body ceiling).
 
 **There is no progress bar, and there is no fake one.** `fetch` cannot report
 upload progress — only `XMLHttpRequest` can — and `AGENTS.md` says `fetch` is
@@ -361,6 +375,12 @@ Full reasoning: [DECISIONS D14](../build/DECISIONS.md#d14--fileupload-has-no-pro
 The drop zone is a `<label>`, not a `<button>`: it has to open the native
 picker on click **and** stay a valid drop target, and a button wrapping a file
 input is neither.
+
+`variant="button"` renders a compact, keyboard-operable picker button instead
+of the visible drop zone. It opens the same native input and reuses the MIME,
+size and count checks, rejection callbacks and queued upload states. The
+default remains `"dropzone"`; `disabled` blocks both picker admission and queue
+removal in either variant. The caller supplies the localized button label.
 
 ### CommandPalette
 

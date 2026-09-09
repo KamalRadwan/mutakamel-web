@@ -4,6 +4,12 @@ Status: **verified**
 
 Last source verification: **2026-08-31**
 
+One Lead contact-edit integration re-verified: **2026-09-07**. Its per-person
+modal uses existing Directory routes under the read/party-manage/contact-manage
+permissions, preserving contact-method IDs. The contact-method service also
+checks party write scope. See [the integration contract](crm-leads.md#contacts-on-the-one-lead-screen)
+for the split Core/CRM save and partial-outcome handling.
+
 Owning app: **core-app**
 
 Canonical prefixes: `/api/tenant/core/v1/directory`, `.../activities`,
@@ -162,6 +168,31 @@ shows "user X updated Y" throws away the half that matters during an incident.
 
 `/audit/entities/:entityType/:entityId` is the per-record history. Embed it on
 every detail screen that has one, via the `Timeline` pattern (task 7.21).
+
+### Related Party history
+
+The same entity route accepts optional `relatedPartyIds`, a comma-separated
+list of 1–21 unique UUIDv7 IDs. One Lead passes `[lead.partyId,
+...lead.contacts.map(contact => contact.partyId)]` from its detail response.
+There is one HTTP request and one set-based Core query, not one per contact.
+Omitting the parameter preserves the original exact-entity reader. It is not
+accepted on the tenant-wide audit list.
+
+Related mode includes `Lead`/`LeadEntity`, `party`/`PartyEntity`, contact-method,
+address and mutual-relationship aliases for the selected Parties, including
+soft-deleted child records. It does not discover unrelated company contacts or
+read CRM tables. `audit.read` is the existing **tenant-wide** ledger permission;
+all results still bind the active tenant.
+
+Domain events are grouped by recorded request ID (otherwise correlation ID,
+otherwise individual audit ID), actor and source app. Requests are grouped
+**before pagination**; duplicate changes are removed within a group, never
+across unrelated requests or different contact entities. `items` contains
+`id`, `action`, `createdAt`, `actorLabel`, `actorType`, `outcome`, `reason` and
+`diff: [{ field, before, after, subjectId?, subjectLabel? }]`. A phone replacement
+written as remove + create becomes one transition of old/new value arrays.
+Only stored, redacted evidence supplies values. `[NOT_RECORDED]` means an older
+writer omitted the value; the current Party value must not fill that gap.
 
 ### One pagination detail that will bite
 

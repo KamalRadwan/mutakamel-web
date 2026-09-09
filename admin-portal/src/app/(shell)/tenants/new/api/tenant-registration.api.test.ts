@@ -24,7 +24,9 @@ const storageId = "019f0000-0000-7000-8000-000000000004";
 const quoteId = "019f0000-0000-7000-8000-000000000005";
 const tenantId = "019f0000-0000-7000-8000-000000000006";
 const idempotencyKey = "019f0000-0000-7000-8000-000000000007";
-const envelope = (data: unknown) => ({ data: { data } });
+const selectionKey = "019f0000-0000-7000-8000-000000000008";
+const envelope = (data: unknown, status = 200) => ({ status, headers: new Headers(),
+  data: { success: true, data, correlationId: idempotencyKey, timestamp: "2030-01-01T00:00:00.000Z" } });
 
 const lines: TenantSubscriptionLine[] = [
   {
@@ -35,6 +37,8 @@ const lines: TenantSubscriptionLine[] = [
     tierKey: "business",
     tierName: "Business",
     seats: 10,
+    selectionKey,
+    addons: [],
   },
 ];
 
@@ -112,14 +116,14 @@ describe("tenant registration API", () => {
       rank: 2,
       commercialMode: "SUBSCRIPTION",
       technicalDefinitionRevision: "3",
-      selectionAllowed: true,
+      addons: [],
       selectionBlockers: [],
       readinessReasons: [],
       catalogueReasons: [],
       tiers: [{ id: tierId, key: "business", name: "Business", rank: 1 }],
     };
     getMock.mockResolvedValue(
-      envelope({ contractVersion: 1, applications: [candidate] }),
+      envelope({ quoteRequired: true, applications: [candidate] }),
     );
 
     await expect(
@@ -127,7 +131,7 @@ describe("tenant registration API", () => {
     ).resolves.toEqual([candidate]);
     expect(getMock).toHaveBeenCalledWith(
       "/api/admin/core/v1/tenants/create-options",
-      { signal: undefined },
+      { skipAutoIdempotency: true, replayAfterRefresh: true, cache: "no-store", signal: undefined },
     );
   });
 
@@ -151,6 +155,7 @@ describe("tenant registration API", () => {
     postMock.mockResolvedValue(
       envelope({
         contractVersion: 1,
+        applications: [],
         selectedApplicationKeys: ["crm", "trade"],
         selectionDigest: "a".repeat(64),
         components: [],
@@ -185,28 +190,18 @@ describe("tenant registration API", () => {
     );
   });
 
-  it("quotes with UUID IDs and creates with the matching nested V1 keys", async () => {
+  it("quotes and creates with the same canonical nested selection identities", async () => {
     postMock
       .mockResolvedValueOnce(
         envelope({
-          quoteId,
-          requestHash: "hash",
-          pricingRevision: "1",
-          billingCycle: "ANNUAL",
-          currencyCode: "USD",
-          total: "50.00",
-          totalUsd: "50.00",
-          items: [
-            {
-              moduleId: applicationId,
-              tierId,
-              seats: 10,
-              lineTotal: "50.00",
-              lineTotalUsd: "50.00",
-            },
-          ],
-          expiresAt: "2030-01-01T00:00:00.000Z",
-        }),
+      quoteId, purpose: "TENANT_CREATION", targetTenantId: null,
+      billingCycle: "ANNUAL", currencyCode: "USD", resolvedTrialDays: 14,
+      createdAt: "2030-01-01T00:00:00.000Z", expiresAt: "2030-01-01T00:15:00.000Z",
+      totals: { baseRecurringUsd: "50.0000", addonRecurringUsd: "0.0000", combinedRecurringUsd: "50.0000" },
+      items: [{ selectionKey, applicationId, tierId, seats: 10, addons: [],
+        acceptedPricing: { billingCycle: "ANNUAL", currencyCode: "USD", recurringAmountUsd: "50.0000", priceRevision: "a".repeat(64),
+          breakdown: [{ minUsers: 1, maxUsers: null, chargedUsers: 10, unitPriceUsd: "5.0000", amountUsd: "50.0000" }] } }]
+    }, 201),
       )
       .mockResolvedValueOnce(
         envelope({ id: tenantId, status: "PROVISIONING" }),
@@ -219,9 +214,10 @@ describe("tenant registration API", () => {
       {
         billingCycle: "ANNUAL",
         currencyCode: "USD",
-        items: [{ moduleId: applicationId, tierId, seats: 10 }],
+        purpose: "TENANT_CREATION",
+        applications: [{ selectionKey, applicationId, tierId, seats: 10, addons: [] }],
       },
-      { skipAutoIdempotency: true, replayAfterRefresh: true },
+      { skipAutoIdempotency: true, replayAfterRefresh: false, cache: "no-store", signal: undefined },
     );
 
     const command: TenantCreateCommand = {
@@ -248,7 +244,7 @@ describe("tenant registration API", () => {
         billingCycle: "ANNUAL",
         currencyCode: "USD",
         trialDays: 14,
-        items: [{ moduleKey: "crm", tierKey: "business", seats: 10 }],
+        applications: [{ selectionKey, applicationId, tierId, seats: 10, addons: [] }],
       },
     };
     await expect(

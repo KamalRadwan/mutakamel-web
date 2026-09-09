@@ -1,10 +1,10 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import { formatTemplate } from "@/lib/format/template";
 import { cn } from "../lib/cn";
-import { textEntrySize, type ControlSizeProps } from "../lib/variants";
+import { focusRing, textEntrySize, type ControlSizeProps } from "../lib/variants";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import type { ComboboxOption } from "./Combobox";
@@ -60,7 +60,10 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeValue, setActiveValue] = useState<string | null>(null);
+  const optionRefs = useRef(new Map<string, HTMLLIElement>());
   const listId = useId();
+  const overflowHeadingId = useId();
   const field = useFieldControlContext();
   const controlId = id ?? field?.controlId;
   const isInvalid = invalid ?? field?.invalid;
@@ -77,15 +80,64 @@ export function MultiSelect({
   const filtered = needle
     ? options.filter((option) => option.label.toLowerCase().includes(needle))
     : options;
+  const enabledOptions = filtered.filter((option) => !option.disabled);
+  const tabStopValue = enabledOptions.some((option) => option.value === activeValue)
+    ? activeValue
+    : enabledOptions[0]?.value;
 
   function toggle(value: string) {
     onValuesChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
   }
 
+  function toggleOption(option: ComboboxOption) {
+    if (option.disabled) return;
+    toggle(option.value);
+  }
+
+  function focusEnabledOption(index: number) {
+    const option = enabledOptions[index];
+    if (!option) return;
+    setActiveValue(option.value);
+    optionRefs.current.get(option.value)?.focus();
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (enabledOptions.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusEnabledOption(0);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusEnabledOption(enabledOptions.length - 1);
+    }
+  }
+
+  function handleOptionKeyDown(event: KeyboardEvent<HTMLLIElement>, option: ComboboxOption) {
+    const currentIndex = enabledOptions.findIndex((item) => item.value === option.value);
+    if (currentIndex === -1) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusEnabledOption((currentIndex + 1) % enabledOptions.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusEnabledOption((currentIndex - 1 + enabledOptions.length) % enabledOptions.length);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusEnabledOption(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusEnabledOption(enabledOptions.length - 1);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleOption(option);
+    }
+  }
+
   function renderChip(option: Pick<ComboboxOption, "value" | "label">) {
     return (
       <Badge key={option.value} tone="neutral" className="max-w-40 gap-0.5 pe-0.5">
-        <span className="truncate">{option.label}</span>
+        <bdi dir="auto" className="truncate">{option.label}</bdi>
         {editable && (
           <Button
             variant="ghost"
@@ -126,12 +178,23 @@ export function MultiSelect({
       {overflow.length > 0 && (
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="xs" className="cursor-pointer rounded-sm">
+            <Button
+              variant="outline"
+              size="xs"
+              aria-label={`${overflowLabel} (${overflow.length})`}
+              className="cursor-pointer rounded-sm"
+            >
               {formatTemplate(moreLabel, { count: overflow.length })}
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-64 p-2">
-            <p className="pb-1.5 text-xs text-muted-foreground">{overflowLabel}</p>
+          <PopoverContent
+            align="start"
+            aria-labelledby={overflowHeadingId}
+            className="w-64 p-2"
+          >
+            <p id={overflowHeadingId} className="pb-1.5 text-xs text-muted-foreground">
+              {overflowLabel}
+            </p>
             <div className="flex flex-wrap gap-1">{overflow.map(renderChip)}</div>
           </PopoverContent>
         </Popover>
@@ -141,7 +204,10 @@ export function MultiSelect({
         open={open}
         onOpenChange={(next) => {
           setOpen(editable && next);
-          if (!next) setQuery("");
+          if (!next) {
+            setQuery("");
+            setActiveValue(null);
+          }
         }}
       >
         <PopoverTrigger asChild>
@@ -177,9 +243,11 @@ export function MultiSelect({
                 size="sm"
                 value={query}
                 autoFocus
+                dir="auto"
                 aria-label={searchPlaceholder}
                 placeholder={searchPlaceholder}
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={handleSearchKeyDown}
                 className={textEntrySize({ size: "sm" })}
               />
             </div>
@@ -199,12 +267,20 @@ export function MultiSelect({
             {filtered.map((option) => (
               <li
                 key={option.value}
+                ref={(node) => {
+                  if (node) optionRefs.current.set(option.value, node);
+                  else optionRefs.current.delete(option.value);
+                }}
                 role="option"
+                tabIndex={!option.disabled && option.value === tabStopValue ? 0 : -1}
                 aria-selected={values.includes(option.value)}
                 aria-disabled={option.disabled || undefined}
-                onClick={() => toggle(option.value)}
+                onFocus={() => setActiveValue(option.value)}
+                onKeyDown={(event) => handleOptionKeyDown(event, option)}
+                onClick={() => toggleOption(option)}
                 className={cn(
                   "flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm hover:bg-accent",
+                  focusRing,
                   option.disabled && "pointer-events-none opacity-50",
                 )}
               >
@@ -212,7 +288,7 @@ export function MultiSelect({
                   className={cn("size-3.5 shrink-0", !values.includes(option.value) && "invisible")}
                   aria-hidden="true"
                 />
-                <span className="truncate">{option.label}</span>
+                <bdi dir="auto" className="truncate">{option.label}</bdi>
               </li>
             ))}
           </ul>

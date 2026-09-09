@@ -4,19 +4,24 @@ Status: **[Verified]**
 
 Last source verification: **2026-08-25**
 
-Application Catalogue integration reverified: **2026-08-25**.
+Application Catalogue/Addons source amendment: **2026-09-09**; see the
+[implementation boundary](api/application-addons-target.md) and
+[verification receipt](plans/application-catalogue-frontend-track.md).
 
 Database and Storage registration workflows reverified: **2026-08-25**.
 
-Authentication/session subsection reverified: **2026-08-26**.
+Authentication/session subsection: persisted-session bootstrap recovery
+reverified **2026-09-07**; other behavior last reverified **2026-08-26**.
 
 ## Scope
 
 This guide connects the current Admin Portal source to the Core and Worker
-Admin Gateway contracts. The Web source has exact reachable calls for all 240
-Core Admin routes. That establishes source route parity, not authenticated
-runtime success, release readiness, or deployment. A route inventory remains
-transport evidence rather than runtime evidence.
+Admin Gateway contracts. The historical 240-route parity baseline predates the
+Addon/commercial expansion; the generated inventory currently contains 282
+routes, which is not a claim of complete frontend parity. Nested Addon editing,
+dynamic prices, canonical subscription directory/detail and invoice detail, reviewed initial tenant creation and initial subscription seed are source-integrated;
+aggregate preparation, priced review, apply, operation recovery and original receipt lookup are now mounted in tenant billing. Governed definition adoption remains unavailable pending its actual owner integration. One commercial contract has no version header, HTTP discriminator or legacy read fallback. A route
+inventory is transport evidence, not authenticated runtime or deployment proof.
 
 Read the [documentation contract](DOCUMENTATION_CONTRACT.md) and
 [AI Start Here](ai/START_HERE.md) before changing a server-backed feature.
@@ -305,6 +310,12 @@ field errors and `correlationId`. See
   Worker returns the accepted run instead of dispatching a duplicate effect.
 - Only explicit terminal session/security `401` codes clear the session.
   Permission/CSRF `403`, rate limits, network failures, and `5xx` retain it.
+- A persisted, applicable `session-ended` coordination event also lets bootstrap
+  recover from the request fence's local `AUTH_SESSION_CHANGED`: cancel retries,
+  clear only local auth metadata, and return to login without clearing cache,
+  cookies, preferences, or unrelated drafts. Preserve the shared event until a
+  successful login replaces it. A different-session or older end event cannot
+  end the current session; ordinary `409` failures remain non-terminal.
 - Logout clears local state and notifies sibling tabs only after durable server
   success (or a terminal session code); transient failure reports that the
   user remains signed in.

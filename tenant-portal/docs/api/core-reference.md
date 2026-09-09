@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-09-05**
+Last source verification: **2026-09-09**
 
-Generated at: **2026-09-05T04:51:49.804Z**
+Generated at: **2026-09-09T01:56:20.808Z**
 
-Backend revision: `f8eb9e3dfff3+dirty`
+Backend revision: `2c4f06948504+dirty`
 
 Owning app: **core-app**
 
-Routes: **197**
+Routes: **222**
 
 ## What this page is
 
@@ -72,6 +72,12 @@ browser code.
 | GET | `/api/tenant/core/v1/billing/payment-input-currencies` | `core.tenant.billing.payment-input-currencies.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/billing/payments/:paymentId` | `core.tenant.billing.payments.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/billing/summary` | `core.tenant.billing.summary` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/branches/:branchId/application-activations` | `core.tenant.application-access.branch-applications.list` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/branches/:branchId/application-activations/:applicationKey/addons/:addonKey` | `core.tenant.application-access.branch-addon.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/core/v1/branches/:branchId/application-activations/:applicationKey/addons/:addonKey` | `core.tenant.application-access.branch.override.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/branches/:branchId/application-activations/:applicationKey/addons/:addonKey/configuration` | `core.tenant.application-access.branch-configuration.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/core/v1/branches/:branchId/application-activations/:applicationKey/addons/:addonKey/configuration` | `core.tenant.application-access.branch.configuration.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/branches/:branchId/application-activations/:applicationKey/addons/:addonKey/configuration/input-schema` | `core.tenant.application-access.branch-configuration-input.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/branding` | `core.tenant.branding.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/branding` | `core.tenant.branding.update` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/branding/icon` | `core.tenant.branding.icon.upload` | WRITE_SENSITIVE | no | TENANT_PORTAL |
@@ -79,6 +85,16 @@ browser code.
 | GET | `/api/tenant/core/v1/branding/public` | `core.tenant.branding.public` | PUBLIC | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/branding/public/icon` | `core.tenant.branding.public-icon` | PUBLIC | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/branding/public/logo` | `core.tenant.branding.public-logo` | PUBLIC | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/companies/:companyId/application-activations` | `core.tenant.application-access.company-applications.list` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey` | `core.tenant.application-access.company-application.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey` | `core.tenant.application-access.application.activation.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey` | `core.tenant.application-access.company-addon.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey` | `core.tenant.application-access.addon.activation.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey/activation-commands/:commandId` | `core.tenant.application-access.company-addon-activation-command.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey/configuration` | `core.tenant.application-access.company-configuration.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey/configuration` | `core.tenant.application-access.company.configuration.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey/configuration-commands/:commandId` | `core.tenant.application-access.company-addon-configuration-command.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/companies/:companyId/application-activations/:applicationKey/addons/:addonKey/configuration/input-schema` | `core.tenant.application-access.company-configuration-input.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/currencies` | `core.tenant.currencies.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/currencies` | `core.tenant.currencies.create` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/core/v1/currencies/:id` | `core.tenant.currencies.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
@@ -166,9 +182,14 @@ browser code.
 | PATCH | `/api/tenant/core/v1/roles/:id` | `core.tenant.roles.update` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/roles/:id/permissions` | `core.tenant.roles.permissions.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription` | `core.tenant.subscriptions.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/subscription/catalogue` | `core.tenant.subscriptions.catalogue.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription/items` | `core.tenant.subscriptions.items.list` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/subscription/operations/:operationId` | `core.tenant.subscriptions.operations.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/subscription/operations/:operationId/recovery` | `core.tenant.subscriptions.operations.recover` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/subscription/plan-change-previews` | `core.tenant.subscriptions.plan-change-previews.create` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/subscription/plan-change-previews/:previewId/apply` | `core.tenant.subscriptions.plan-change-previews.apply` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/subscription/plan-change-previews/:previewId/receipt` | `core.tenant.subscriptions.plan-change-previews.receipt.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/subscription/preparations` | `core.tenant.subscriptions.preparations.create` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/taxes` | `core.tenant.taxes.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/taxes` | `core.tenant.taxes.create` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/core/v1/taxes/:id` | `core.tenant.taxes.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
@@ -225,6 +246,10 @@ browser code.
 | POST | `/api/tenant/core/v1/users/:id/team-memberships` | `core.tenant.users.team-memberships.add` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/users/:id/team-memberships` | `core.tenant.users.team-memberships.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | DELETE | `/api/tenant/core/v1/users/:id/team-memberships/:membershipId` | `core.tenant.users.team-memberships.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/users/:userId/addon-assignment-options` | `core.tenant.application-access.addon-assignment-options.list` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/users/:userId/addon-assignments` | `core.tenant.application-access.addon-assignments.list` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/users/:userId/addon-assignments` | `core.tenant.application-access.addon.assign` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| DELETE | `/api/tenant/core/v1/users/:userId/addon-assignments/:assignmentId` | `core.tenant.application-access.addon.unassign` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/users/:userId/assignments` | `core.tenant.users.assignments.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/users/:userId/assignments` | `core.tenant.users.assignments.add` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PUT | `/api/tenant/core/v1/users/:userId/assignments` | `core.tenant.users.assignments.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |

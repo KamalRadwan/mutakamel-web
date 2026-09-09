@@ -30,6 +30,7 @@ let currentStep = 1;
 function hookState() {
   return {
     t: en,
+    creationQuote: { quote: null, expired: false, canCreate: false, loading: false, error: null, errorRef: { current: null }, load: vi.fn() },
     currentStep,
     goToStep: vi.fn(),
     validationErrors: [],

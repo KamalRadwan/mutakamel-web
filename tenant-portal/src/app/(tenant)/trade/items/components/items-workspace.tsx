@@ -267,7 +267,13 @@ export function ItemsWorkspace() {
               onRetry={() => void items.reload()}
               page={items.pageInfo}
               onPageChange={items.setPage}
-              labels={{ ...viewLabels, emptyColumn: t.trade.itemEmpty, moveTo: t.views.moveTo }}
+              labels={{
+                ...viewLabels,
+                emptyColumn: t.trade.itemEmpty,
+                moveTo: t.views.moveTo,
+                collapseColumn: t.views.collapseColumn,
+                expandColumn: t.views.expandColumn,
+              }}
             />
           )}
           {view === "card" && (

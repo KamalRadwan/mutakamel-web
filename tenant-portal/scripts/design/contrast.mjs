@@ -95,6 +95,20 @@ for (const [ramp, expected] of Object.entries(RAMP_STEPS)) {
   }
 }
 
+/* ---------- The nav chrome ----------
+   One colour, outside every ramp on purpose (see globals.css), and the light
+   theme's global-nav surface. It is parsed separately so the ramp step counts
+   above keep meaning what they say, and so the pairs the bar actually renders
+   can be claimed below like any other. */
+
+const chrome =
+  /--color-chrome:\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/.exec(css);
+if (!chrome) {
+  process.stderr.write("Palette parse failed: no --color-chrome in globals.css.\n");
+  process.exit(1);
+}
+T.chrome = [Number(chrome[1]), Number(chrome[2]), Number(chrome[3])];
+
 /* ---------- The card swatches, both themes ----------
    Unlike a ramp step, a swatch is declared TWICE under the same name — once on
    :root and once on .dark — so the name alone cannot address a value. The file
@@ -180,6 +194,24 @@ const CLAIMS = [
   ["badge positive · dark", "positive-300", "positive-950", 4.5, 10.61],
   ["badge caution · dark", "caution-300", "caution-950", 4.5, 10.46],
   ["badge negative · dark", "negative-300", "negative-950", 4.5, 9.24],
+
+  // The global nav, light theme. It is the one inverted surface in the product,
+  // so every pair on it answers to --color-chrome instead of to a card. Dark
+  // mode is unchanged and already covered by the rows above: `.nav-surface`
+  // resolves to the card values there.
+  ["nav text · light", "white", "chrome", 4.5, 17.5],
+  ["nav muted text · light", "ink-400", "chrome", 4.5, null],
+  ["nav active marker · light (non-text)", "brand-300", "chrome", 3.0, null],
+  ["nav focus ring · light (non-text)", "white", "chrome", 3.0, null],
+  ["nav unread bell · light (non-text)", "negative-400", "chrome", 3.0, null],
+  ["nav unread dot · light (non-text)", "negative-500", "chrome", 3.0, null],
+  // Separation, not legibility — the zebra reasoning above, applied to the bar:
+  // the hairline between the brand zone and the nav, and the hover lift under a
+  // trigger, are both meant to be barely there. 1.05 is chosen so an identical
+  // colour (1.00) fails; anything higher would be a legibility bar these two
+  // are not asking to clear.
+  ["nav hairline vs chrome · light (non-text)", "brand-800", "chrome", 1.05, null],
+  ["nav hover lift vs chrome · light (non-text)", "brand-900", "chrome", 1.05, null],
 ];
 
 // The eleven card swatches, against the card they paint the border of, in both

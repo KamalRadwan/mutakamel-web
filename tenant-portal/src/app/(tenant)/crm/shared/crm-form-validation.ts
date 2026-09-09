@@ -23,6 +23,20 @@ export interface CrmFieldMessages {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 /**
+ * The same shape check, for a caller that has no error bag.
+ *
+ * Exported so a request builder can decline to SEND a value `@IsEmail()` would
+ * 400 on, without a second regex drifting away from this one. It answers only
+ * "is this the shape of an address"; producing the message belongs to
+ * `CrmErrorBag.email`, and a blank value is not this function's question —
+ * blank is cleared, not malformed, and every caller means something different
+ * by it.
+ */
+export function looksLikeEmail(value: string): boolean {
+  return EMAIL_PATTERN.test(value.trim());
+}
+
+/**
  * `normalizeMobile`, mirrored from the CRM services.
  *
  * Only ever used to compare two numbers the user typed. What is SENT is the raw

@@ -19,7 +19,7 @@ export function useNavTree(): NavSection[] {
     return NAV_SECTIONS.map((section) => ({
       ...section,
       items: section.items.filter((item) =>
-        item.requiresTenantOwner ? isTenantOwner : item.hasAccess(permissions),
+        item.requiresTenantOwner ? isTenantOwner : item.hasAccess(permissions, isTenantOwner),
       ),
     })).filter((section) => section.items.length > 0);
   }, [user]);

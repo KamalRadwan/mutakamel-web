@@ -24,6 +24,7 @@ export interface DetailSectionProps {
   emptyValueLabel?: string;
   columns?: 1 | 2;
   className?: string;
+  density?: "standard" | "compact";
 }
 
 /**
@@ -47,19 +48,24 @@ export function DetailSection({
   emptyValueLabel,
   columns = 2,
   className,
+  density = "standard",
 }: DetailSectionProps) {
   return (
     <Card className={className}>
-      <CardHeader className="flex-row items-start justify-between gap-2">
+      {/* 10px, not the primitive's 16: a detail screen stacks four or five of
+          these down one column, so the padding is paid five times over and the
+          heading ends up further from its own fields than they are from each
+          other. The `Card` default stands for a card that appears once. */}
+      <CardHeader className={cn("flex-row items-start justify-between gap-2", density === "compact" ? "p-2" : "p-2.5")}>
         <div className="min-w-0">
-          <CardTitle>{title}</CardTitle>
+          <CardTitle className={density === "compact" ? "text-sm" : undefined}>{title}</CardTitle>
           {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className={cn("flex flex-col", density === "compact" ? "gap-2 p-2" : "gap-3 p-2.5")}>
         {fields && fields.length > 0 && (
-          <dl className={cn("grid gap-3", columns === 2 && "sm:grid-cols-2")}>
+          <dl className={cn("grid", density === "compact" ? "gap-2" : "gap-3", columns === 2 && "sm:grid-cols-2")}>
             {fields.map((field, index) => (
               <div
                 key={`${field.label}-${index}`}

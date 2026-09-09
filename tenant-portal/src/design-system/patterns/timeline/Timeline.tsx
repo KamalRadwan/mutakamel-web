@@ -47,6 +47,7 @@ export interface TimelineProps {
   loadMoreLabel?: string;
   isLoadingMore?: boolean;
   className?: string;
+  density?: "standard" | "compact";
 }
 
 const MARKER_BY_TONE: Record<TimelineTone, string> = {
@@ -75,6 +76,7 @@ export function Timeline({
   loadMoreLabel,
   isLoadingMore,
   className,
+  density = "standard",
 }: TimelineProps) {
   if (isLoading) {
     return (
@@ -87,7 +89,7 @@ export function Timeline({
   }
 
   if (events.length === 0 && emptyTitle) {
-    return <EmptyState title={emptyTitle} description={emptyDescription} className={className} />;
+    return <EmptyState title={emptyTitle} description={emptyDescription} className={cn(density === "compact" && "py-4", className)} />;
   }
 
   return (
@@ -98,7 +100,7 @@ export function Timeline({
           const isLast = index === events.length - 1;
 
           return (
-            <li key={event.id} className="flex gap-3">
+            <li key={event.id} className={cn("flex", density === "compact" ? "gap-2" : "gap-3")}>
               {/* The rail and the marker are one column so the connector is a
                   border on a box that already exists, rather than an absolutely
                   positioned pseudo-element that has to be told which side it is
@@ -119,7 +121,7 @@ export function Timeline({
                 {!isLast && <span aria-hidden="true" className="w-px flex-1 bg-border" />}
               </div>
 
-              <div className={cn("flex min-w-0 flex-1 flex-col gap-0.5", isLast ? "pb-0" : "pb-4")}>
+              <div className={cn("flex min-w-0 flex-1 flex-col gap-0.5", isLast ? "pb-0" : density === "compact" ? "pb-2" : "pb-4")}>
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                   <span className="text-xs font-medium text-foreground">{event.title}</span>
                   <span className="text-xs text-muted-foreground">{event.timestamp}</span>

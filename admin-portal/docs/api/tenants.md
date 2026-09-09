@@ -3,7 +3,9 @@
 Verified against the current API Gateway route contracts, Core controllers,
 DTOs, services, repositories, entities, subscription quoting, provisioning
 contracts, error catalogue, and active Admin Portal screens on
-**2026-08-12**.
+**2026-09-09** for the canonical initial commercial flow; other tenant routes retain their earlier source evidence.
+
+Canonical initial commercial amendment (2026-09-09): the wizard uses the single published options projection, nested Application/Addon UUID selections and an explicit reviewed quote before create. The billing empty state mounts the canonical initial-seed workspace. See [the current Addon boundary](application-addons-target.md) and [subscriptions](subscriptions.md). No commercial version header, HTTP discriminator or legacy fallback remains. Identity/owner/geography/placement and status-only create recovery are preserved. Source wiring does not prove installation or authenticated runtime acceptance. Minimal retained seed attempts cannot reconstruct or replace a lost original in-memory request.
 
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
 tenant-detail shell. It covers identity validation, creation, list/detail,
@@ -479,7 +481,7 @@ type TenantCreateReadinessReason =
   | "DATABASE_PERMISSION_MANIFEST_INVALID";
 
 interface TenantCreateOptionsView {
-  contractVersion: 1;
+  quoteRequired: true;
   applications: Array<{
     applicationId: string; // UUIDv7
     key: string;           // immutable Application key
@@ -488,7 +490,6 @@ interface TenantCreateOptionsView {
     rank: number;
     commercialMode: "INCLUDED" | "SUBSCRIPTION";
     technicalDefinitionRevision: string; // positive bigint; never Number(...)
-    selectionAllowed: boolean;
     selectionBlockers: TenantCreateSelectionBlocker[];
     readinessReasons: TenantCreateReadinessReason[];
     catalogueReasons: Array<"ACTIVE_TIER_REQUIRED">;
@@ -498,6 +499,11 @@ interface TenantCreateOptionsView {
       name: string;
       rank: number;
     }>;
+    addons: Array<{
+      addonId: string; key: string; name: string; description: string | null;
+      definitionVersionId: string; compatibleTierIds: string[];
+      catalogueReasons: Array<"ADDON_DEFINITION_REVOKED" | "ACTIVE_COMPATIBLE_TIER_REQUIRED">;
+    }>;
   }>;
 }
 ```
@@ -505,11 +511,9 @@ interface TenantCreateOptionsView {
 The response is wrapped under `data`, carries
 `Cache-Control: private, no-store`, and is read from one `REPEATABLE READ`
 snapshot. Core returns only ACTIVE, PUBLISHED, PUBLIC Tenant Applications in
-INCLUDED or SUBSCRIPTION commercial modes, caps the projection at 100, batches
-active tiers, and fails closed when the cap or readiness identity is invalid.
+INCLUDED or SUBSCRIPTION commercial modes, caps the projection at 100, batches active tiers and published Addon definitions, and fails closed when the cap or readiness identity is invalid. The whole envelope is bounded to1MiB; there are at most100tiers per Application and100aggregate Addon options.
 
-Use only entries with `selectionAllowed: true`; show the returned blockers and
-reasons for disabled entries. Treat an empty array as an authoritative empty
+Allow a local selection only when the returned tiers are nonempty and all Application diagnostics are empty; show the returned blockers and reasons. This display predicate is not quote, installation or use authority. Treat an empty array as an authoritative empty
 catalogue, but treat `403`, `5xx`, or a malformed/unknown contract as a blocking
 error. Do not fall back to broad Application Catalogue, readiness, or tier APIs,
 and do not derive Application or tier identities from display names.
@@ -544,7 +548,7 @@ PostgreSQL-backed optional location fields can be `null`; the response adapter
 normalizes them to absent display metadata without rejecting the eligible
 server.
 
-The Admin Portal V1 requires an explicit returned UUIDv7 and sends it as
+The Admin Portal requires an explicit returned UUIDv7 and sends it as
 `databaseServerId`. It never sends `placementMode`, never displays the complete
 Database Server registry, and never creates a local or fake server id.
 
@@ -628,12 +632,15 @@ interface PreviewTenantProvisioningDto {
 interface TenantProvisioningSelectionPreview {
   contractVersion: 1;
   selectedApplicationKeys: string[];
+  applications: []; // This keys-only preview has no commercial selections.
   selectionDigest: string;
   components: Array<{
     componentId: string;
     componentKey: string;
     ownerApp: string;
-    selectionSource: "FOUNDATION" | "ENTITLEMENT" | "DEPENDENCY";
+    selectionSource: "FOUNDATION" | "ENTITLEMENT" | "DEPENDENCY" | "ADDON";
+    installedReadiness: null;
+    applicationAuthority: TenantProvisioningApplicationAuthority; // Published source pins; see Core contracts.
     dependsOnComponentKeys: string[];
     required: boolean;
     activationRequired: boolean;
@@ -664,9 +671,7 @@ selected module to be active and have a valid published component/release
 catalogue. Core and Worker foundations are never selected by the browser;
 foundation and dependency components are expanded automatically by Core.
 
-Render component and step arrays from the response. The current frontend’s
-three-field `components: string[]`/`stepsCount` mock loses important dependency,
-release, checksum, seed, and activation evidence.
+Render component and step arrays from the response. This keys-only Application preview retains its technical contractVersion1, empty applications and null installed readiness. It is not the full Addon closure or installation proof; the quote/create owner binds that closure independently.
 
 ### 8. Obtain the subscription quote
 
@@ -675,60 +680,13 @@ prefix:
 
 `POST /api/admin/core/v1/subscriptions/quote`
 
-Permission: either `admin.catalog.read` or `admin.tenants.create` (`ANY`). This
-authenticated POST issues a new short-lived quote row and does not require an
-idempotency header. Its Gateway contract permits one exact request replay after
-a pre-handler authentication `401`; the portal therefore refreshes silently
-and resubmits the unchanged body once. It does not perform arbitrary UI-level
-retries after an ambiguous outcome. Non-terminal refresh failures are retried
-behind the still-locked submission, while a session switch rejects the old
-quote intent instead of replaying it under the new login. If bounded repair is
-exhausted, the session is retained and the wizard shows one retryable quote
-error; terminal auth and permission-denied UI remain globally owned. The
-tenant-create wizard uses
-`admin.tenants.create`; standalone catalogue/pricing surfaces may use
-`admin.catalog.read`.
+Permission: either `admin.catalog.read` or `admin.tenants.create` (`ANY`). Each POST creates retained evidence, so it forbids an idempotency header and uses `replayAfterRefresh:false`. Duplicate clicks while pending are blocked. A retry is a new explicit quote request. Globally handled session/permission failures stay globally owned; other quote failures appear in the inline summary.
 
-```ts
-interface QuoteSubscriptionDto {
-  billingCycle?: BillingCycleEnum; // default MONTHLY
-  currencyCode?: "USD";            // default/fixed USD
-  items: Array<{
-    moduleId: string; // UUIDv7
-    tierId: string;   // UUIDv7
-    seats: number;    // integer 1..100000
-  }>;                 // 1..100
-}
+The closed request is `{purpose:"TENANT_CREATION",billingCycle,currencyCode:"USD",trialDays?,applications}`. Each Application has `selectionKey,applicationId,tierId,seats,addons`; each child has `selectionKey,addonId,definitionVersionId,seats`. Keys are unique UUIDv7 values, Application/tier IDs are UUIDs and Addon/definition IDs UUIDv7. At most50Applications and100aggregate children are allowed, with1–100000 seats and child≤parent.
 
-interface SubscriptionQuote {
-  quoteId: string;
-  requestHash: string;
-  pricingRevision: string;
-  billingCycle: BillingCycleEnum;
-  currencyCode: "USD";
-  total: string;
-  totalUsd: string;
-  items: Array<{
-    moduleId: string;
-    tierId: string;
-    seats: number;
-    lineTotal: string;
-    lineTotalUsd: string;
-  }>;
-  expiresAt: string;
-}
-```
+The201 quote is exactly `{quoteId,purpose,targetTenantId,billingCycle,currencyCode,resolvedTrialDays,createdAt,expiresAt,totals,items}`. For creation the target is null. Items retain the same nested selections plus complete `acceptedPricing`; totals separate base, Addon and combined recurring USD. The4MiB envelope contains no private request hash, aggregate pricing revision or provisioning intent. Accepted price revisions and marginal brackets are required, never synthesized.
 
-Each module may appear only once. Resolve UUIDs and immutable keys from the
-catalogue contract; quote with IDs, then create with the corresponding
-`moduleKey`/`tierKey`. The quote expires after 15 minutes, is bound to its
-creating admin when an actor id is stored, and can be consumed once. Re-quote
-after any module, tier, seat, cycle, or price change.
-
-The complete creation page requires only `admin.tenants.create`. Its composite
-create-options projection supplies Application identity, technical readiness,
-and active tiers, while the quote route accepts the same permission. Missing
-permission is a blocking forbidden state, never an empty catalogue.
+The quote expires after15minutes. Admin displays it before final confirmation and creates using its exact stable selection identities. Draft/actor/permission changes invalidate it; no fresh quote is silently obtained during create. The complete wizard requires only `admin.tenants.create`, which also authorizes options and quote. Source-only preview success is not installation authority.
 
 ### 9. Create the tenant
 
@@ -736,7 +694,7 @@ permission is a blocking forbidden state, never an empty catalogue.
 
 Permission: `admin.tenants.create`.
 
-Canonical Admin Portal V1 request shape:
+Canonical Admin Portal request shape:
 
 ```ts
 interface CreateTenantDto {
@@ -770,10 +728,9 @@ interface CreateTenantDto {
     billingCycle: "MONTHLY" | "ANNUAL";
     currencyCode: "USD";
     trialDays?: number;
-    items: Array<{
-      moduleKey: string;
-      tierKey: string;
-      seats: number;
+    applications: Array<{
+      selectionKey: string; applicationId: string; tierId: string; seats: number;
+      addons: Array<{ selectionKey: string; addonId: string; definitionVersionId: string; seats: number }>;
     }>;
   };
 }
@@ -781,14 +738,13 @@ interface CreateTenantDto {
 
 The Admin Portal sends only this nested subscription shape. It does not send
 overlapping top-level billing fields, `modules`, `allowedUsers`, `addons`, or
-`placementMode`. Quote uses Application/tier UUIDv7 IDs; create uses the exact
-corresponding immutable keys retained in the same selection state.
+`placementMode`. Quote and create use the same nested UUID selection identities, including child definitions.
 
 Detailed validation:
 
 | Field | Rule |
 |:---|:---|
-| `quoteId` | Required UUIDv7; exact unexpired quote must match cycle/modules/tiers/seats |
+| `quoteId` | Required UUIDv7; exact unexpired quote must match cycle/trial/Applications/tiers/Addons/definitions/seats |
 | `name` | Trim/lowercase; 1–63 DNS-label characters; immutable |
 | `secondaryFqdns` | Optional array, max 50; normalized unique valid FQDNs; may not contain generated primary or any `mutakamel.ai` domain |
 | `companyName` | Required trimmed string, 1–160 |
@@ -800,7 +756,7 @@ Detailed validation:
 | `phone` | Optional, max 32, digits/parentheses/plus/hyphen/space/dot |
 | `address` | Required nested object; each property optional and trimmed |
 | `taxNumber`, `commercialRegistrationNumber` | Optional, max 64 |
-| `databaseServerId` | Required by Admin Portal V1; UUIDv7 selected from the exact Application-aware options |
+| `databaseServerId` | Required by Admin Portal; UUIDv7 selected from the exact Application-aware options |
 | `storageServerId` | Required UUIDv7 selected from the safe Storage Server placement options; no default/failover |
 | `ownerEmail` | Email, max 255, trim/lowercase |
 | `ownerFirstName`, `ownerLastName` | Required trimmed string, 1–80 |
@@ -810,12 +766,13 @@ Detailed validation:
 | `ownerLanguage`, `locale` | Optional trimmed string, max 16 |
 | `ownerUsername` | Optional trimmed string, max 120 |
 | `sendInvitation`, `ownerActive` | Optional JSON booleans; both default to `true` |
-| `billingCycle` | Required in the preferred shape: `MONTHLY` or `ANNUAL` |
-| `currencyCode` | Optional but, when present, exactly `USD` after normalization |
+| `subscription.billingCycle` | Required: `MONTHLY` or `ANNUAL` |
+| `subscription.currencyCode` | Required, exactly `USD` |
 | `trialDays` | Optional integer 1–365 |
-| `modules` | Required in preferred shape; 1–50 lines |
-| `moduleKey`, `tierKey` | Required non-empty strings, max 64 |
-| `seats` | Integer 1–1,000,000 in create DTO, but use 1–100,000 because the required quote is stricter |
+| `subscription.applications` | Required,1–50 unique Application selections |
+| `selectionKey`, `applicationId`, `tierId` | Stable selection UUIDv7 and authoritative Application/tier UUIDs |
+| `addons` | Required array per Application, at most100children in total; selected Addon/definition UUIDv7 |
+| `seats` | Integer1–100000, child≤parent |
 
 Representative create request:
 
@@ -844,16 +801,18 @@ Representative create request:
   "ownerJobTitle": "Chief Executive Officer",
   "sendInvitation": true,
   "ownerActive": true,
-  "billingCycle": "MONTHLY",
-  "currencyCode": "USD",
-  "trialDays": 14,
-  "modules": [
-    {
-      "moduleKey": "core",
-      "tierKey": "business",
-      "seats": 25
-    }
-  ]
+  "subscription": {
+    "billingCycle": "MONTHLY",
+    "currencyCode": "USD",
+    "trialDays": 14,
+    "applications": [{
+      "selectionKey": "019f0000-0000-7000-8000-000000000031",
+      "applicationId": "019f0000-0000-7000-8000-000000000032",
+      "tierId": "019f0000-0000-7000-8000-000000000033",
+      "seats": 25,
+      "addons": []
+    }]
+  }
 }
 ```
 
@@ -1266,14 +1225,12 @@ source-integrated:
 
 - candidate Applications come from the ACTIVE, PUBLISHED, PUBLIC Tenant
   catalogue for INCLUDED and SUBSCRIPTION commercial modes;
-- every candidate is fail-closed against its technical
-  `selectionAllowed` projection and active tiers;
+- every candidate is checked against its returned selection/readiness/catalogue diagnostics and active tiers; the options contract has no `selectionAllowed` field;
 - Core/Worker foundations are shown only when returned by the provisioning
   preview;
 - database placement refetches with the exact selected `applicationKeys`;
 - Database and Storage selections accept only returned UUIDv7 values;
-- quote sends UUIDv7 `items`, while create sends the matching keys in one
-  nested `subscription` object;
+- quote and create retain the same nested `applications/addons` UUID selections and unique selection keys; final create requires the operator's current reviewed quote;
 - ambiguous create outcomes retain only a minimal status-recovery marker and
   block a new submit; no tenant DTO or PII is persisted for replay;
 - a response discarded after a cross-tab session change retains that marker

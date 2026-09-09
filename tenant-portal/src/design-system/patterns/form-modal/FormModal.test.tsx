@@ -51,6 +51,24 @@ function Modal(overrides: Partial<FormModalProps> = {}) {
 }
 
 describe("FormModal is a real form", () => {
+  it("hides and blocks submission for receipt-only states", () => {
+    const onSubmit = vi.fn();
+    renderModal(<Modal hideSubmit onSubmit={onSubmit} />);
+    expect(screen.queryByRole("button", { name: "Create" })).not.toBeInTheDocument();
+    screen.getByLabelText("Company name").closest("form")!.requestSubmit();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+  it("applies compact density to the portal and its nested form sections", () => {
+    renderModal(<Modal density="compact" />);
+    expect(screen.getByRole("heading", { name: "Add lead" })).toHaveClass("text-sm");
+    expect(screen.getByRole("button", { name: "Create" })).toHaveClass("h-(--size-control-sm)");
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveClass("h-(--size-control-sm)");
+    const section = screen.getByRole("heading", { name: "Company" }).closest("section");
+    expect(section?.lastElementChild).toHaveClass("gap-x-2", "gap-y-2");
+    expect(section?.parentElement).toHaveClass("gap-2", "px-3", "py-2");
+  });
+
   it("submits on Enter from inside a field, not only on a click", () => {
     const onSubmit = vi.fn();
     renderModal(<Modal onSubmit={onSubmit} />);

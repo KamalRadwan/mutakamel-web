@@ -21,10 +21,11 @@ import { formatNumber } from "@/lib/format/number";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { BillingBadge } from "../../components/BillingBadge";
 import { useBillingTableLabels } from "../../billing/hooks/useBillingTableLabels";
-import type { SubscriptionItem } from "../subscription-contract";
-import { usePlanChange } from "../hooks/usePlanChange";
+import type { SubscriptionView } from "../subscription-read";
+import { OwnerGate } from "../../components/OwnerGate";
+import { AcceptedPricingDetails } from "./AcceptedPricingDetails";
+import { SubscriptionAddonSelections } from "./SubscriptionAddonSelections";
 import { useSubscription } from "../hooks/useSubscription";
-import { SeatIncreaseDrawer } from "./SeatIncreaseDrawer";
 
 /**
  * `assertPlanChangeLifecycle` in `subscription-items.service.ts` — the only two
@@ -37,22 +38,22 @@ const PLAN_CHANGEABLE_STATUSES = ["TRIAL", "ACTIVE"];
 export function SubscriptionWorkspace() {
   const { t, lang } = useI18n();
   const subscription = useSubscription();
-  const planChange = usePlanChange(() => void subscription.reload());
   const labels = useBillingTableLabels(
     t.coreBilling.itemsLoadFailed,
     t.coreBilling.itemsEmpty,
   );
 
-  const header = subscription.subscription?.header ?? null;
+  const header = subscription.view?.subscription ?? null;
   const status = header?.status ?? null;
-  const canChangePlan = status !== null && PLAN_CHANGEABLE_STATUSES.includes(status);
+  const canChangePlan = status !== null && PLAN_CHANGEABLE_STATUSES.includes(status)
+    && header?.currentCollectionInvoiceId === null;
 
-  const columns: ColumnDef<SubscriptionItem>[] = [
+  const columns: ColumnDef<SubscriptionView["baseItems"][number]>[] = [
     {
       id: "module",
-      header: t.coreBilling.module,
+      header: t.applicationAccess.application,
       cell: (item) => (
-        <span className="text-foreground">{item.moduleName ?? item.moduleKey ?? item.moduleId}</span>
+        <span className="text-foreground">{item.applicationName ?? item.applicationKey}</span>
       ),
     },
     {
@@ -70,25 +71,13 @@ export function SubscriptionWorkspace() {
       id: "lineTotal",
       header: t.coreBilling.lineTotal,
       numeric: true,
-      cell: (item) => <Money value={item.lineTotalUsd} currency="USD" />,
+      cell: (item) => <Money value={item.acceptedPricing.recurringAmountUsd} currency="USD" maximumFractionDigits={4} />,
     },
-    ...(canChangePlan
-      ? [
-          {
-            id: "actions",
-            header: t.common.actions,
-            align: "end" as const,
-            cell: (item: SubscriptionItem) => (
-              <Button variant="ghost" size="sm" onClick={() => planChange.open(item)}>
-                {t.coreBilling.increaseSeats}
-              </Button>
-            ),
-          },
-        ]
-      : []),
+    { id: "pricing", header: t.subscriptionAddons.acceptedBreakdown, cell: (item) => <AcceptedPricingDetails pricing={item.acceptedPricing} /> },
   ];
 
   return (
+    <OwnerGate denied={subscription.denied}>
     <div className="flex flex-col gap-4">
       <PageHeader
         title={t.coreBilling.subscriptionPageTitle}
@@ -98,6 +87,12 @@ export function SubscriptionWorkspace() {
         }
         secondaryActions={
           <>
+            <Button variant="outline" asChild>
+              <Link href={TENANT_ROUTES.coreSubscriptionChange}>{t.commercialPurchase.title}</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={TENANT_ROUTES.coreSubscriptionCatalogue}>{t.subscriptionOffers.browse}</Link>
+            </Button>
             <Button variant="outline" asChild>
               <Link href={TENANT_ROUTES.coreBilling}>{t.coreBilling.title}</Link>
             </Button>
@@ -120,35 +115,12 @@ export function SubscriptionWorkspace() {
 
       {status && <LifecycleNotice status={status} />}
 
-      {subscription.itemsFailed && <DegradedBanner message={t.coreBilling.itemsDegraded} />}
-
-      {planChange.applied && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted p-3">
-          <span className="text-xs text-foreground">
-            {t.coreBilling.planChangeAppliedTitle}
-          </span>
-          <BillingBadge kind="ProrationDirection" value={planChange.applied.direction} />
-          <Money value={planChange.applied.amountUsd} currency="USD" className="text-xs" />
-          <span className="text-xs text-muted-foreground">
-            {t.coreBilling.newSubscriptionTotal}
-          </span>
-          <Money
-            value={planChange.applied.subscriptionTotalUsd}
-            currency="USD"
-            className="text-xs"
-          />
-          <Button variant="ghost" size="sm" onClick={planChange.dismissApplied}>
-            {t.common.dismiss}
-          </Button>
-        </div>
-      )}
-
       {subscription.isLoading ? (
         <Skeleton className="h-56 w-full" />
       ) : subscription.subscriptionError || !header ? (
         <ErrorState
           title={t.coreBilling.subscriptionLoadFailed}
-          description={subscription.subscriptionError?.correlationId}
+          description={subscription.subscriptionError?.correlationId ?? t.applicationAccess.unavailable}
           onRetry={() => void subscription.reload()}
           retryLabel={t.common.retry}
         />
@@ -166,13 +138,13 @@ export function SubscriptionWorkspace() {
               },
               {
                 label: t.coreBilling.subscriptionTotal,
-                value: header.totalPriceUsd ? (
-                  <Money value={header.totalPriceUsd} currency="USD" />
+                value: header.totalPrice ? (
+                  <Money value={header.totalPrice} currency="USD" maximumFractionDigits={4} />
                 ) : null,
               },
               {
                 label: t.coreBilling.seatsAllowed,
-                value: formatNumber(subscription.subscription?.effectiveAllowedUsers ?? 0, lang),
+                value: formatNumber(subscription.view?.baseAllowance.effectiveAllowedUsers ?? 0, lang),
               },
               {
                 label: t.coreBilling.currentPeriodStart,
@@ -212,14 +184,15 @@ export function SubscriptionWorkspace() {
             rowKey={(item) => item.id}
             labels={labels}
           />
+          {subscription.view && <SubscriptionAddonSelections view={subscription.view} />}
 
           {!canChangePlan && <p className="text-xs text-muted-foreground">{t.coreBilling.planChangeUnavailable}</p>}
-          <p className="text-xs text-muted-foreground">{t.coreBilling.addModuleUnavailable}</p>
+          <p className="text-xs text-muted-foreground">{t.subscriptionOffers.notice}</p>
         </>
       )}
 
-      <SeatIncreaseDrawer planChange={planChange} onApplied={planChange.close} />
     </div>
+    </OwnerGate>
   );
 }
 

@@ -34,6 +34,8 @@ function activityRow(overrides: Record<string, unknown> = {}) {
     type: "CALL",
     priority: "HIGH",
     dueAt: "2026-09-06T09:00:00.000Z",
+    description: "Ask about the second site",
+    version: 4,
     ...overrides,
   };
 }
@@ -75,8 +77,27 @@ describe("lead activity contract", () => {
         type: "CALL",
         priority: "HIGH",
         dueAt: "2026-09-06T09:00:00.000Z",
+        description: "Ask about the second site",
+        version: 4,
       },
     ]);
+  });
+
+  // Both are read for the row actions rather than for the list: the version is
+  // the `If-Match` all three send, and the description seeds the edit form.
+  it("keeps a null description as an empty string", () => {
+    expect(parseLeadPlannedActivities({ items: [activityRow({ description: null })] })[0])
+      .toHaveProperty("description", "");
+  });
+
+  it("refuses a row it could never write back", () => {
+    // No version means no If-Match, which Core answers with 428. A row whose
+    // Edit and Discard could only fail is not a row worth rendering.
+    for (const version of [undefined, 0, -1, 1.5, "3"]) {
+      expect(() =>
+        parseLeadPlannedActivities({ items: [activityRow({ version })] }),
+      ).toThrow();
+    }
   });
 
   // A type or a priority this build has never heard of must not blank the

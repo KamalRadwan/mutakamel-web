@@ -1,4 +1,5 @@
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
+import type { SubscriptionCommercial } from "../tenant-workspace/billing/model/subscription-commercial";
 import type { PageResult, SortDirection } from "@/types/common";
 
 export const SUBSCRIPTION_STATUSES = [
@@ -70,11 +71,12 @@ interface SubscriptionTenantSummary {
 }
 
 export interface SubscriptionListItem {
+  commercial: SubscriptionCommercial;
   subscription: SubscriptionHeader;
   effectiveAllowedUsers: number;
   enabledModules: string[];
   items: SubscriptionItem[];
-  tenant: SubscriptionTenantSummary | null;
+  tenant: SubscriptionTenantSummary;
 }
 
 export type SubscriptionPage = PageResult<SubscriptionListItem> & {

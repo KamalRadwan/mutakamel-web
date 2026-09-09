@@ -11,9 +11,18 @@ export interface NavLocation {
   itemId: string | null;
   /** `NavItem.labelKey` of that entry — what the action bar names. */
   itemLabelKey: string | null;
+  /**
+   * `NavItem.href` of that entry — where the bar's own label links to.
+   *
+   * It matters on a DETAIL route, where the match is a prefix: standing on
+   * `/crm/leads/<id>`, the item is Leads and this is `/crm/leads`, so the label
+   * is the way back to the list. On the list itself the link points at the page
+   * already open, which is a no-op and not worth a second code path.
+   */
+  itemHref: string | null;
 }
 
-const NONE: NavLocation = { section: null, itemId: null, itemLabelKey: null };
+const NONE: NavLocation = { section: null, itemId: null, itemLabelKey: null, itemHref: null };
 
 /**
  * Which nav entry the current route belongs to.
@@ -47,7 +56,7 @@ export function useNavLocation(sections: NavSection[]): NavLocation {
           (pathname.startsWith(item.href) && pathname.charAt(item.href.length) === "/");
         if (!matches || item.href.length <= bestLength) continue;
         bestLength = item.href.length;
-        best = { section, itemId: item.id, itemLabelKey: item.labelKey };
+        best = { section, itemId: item.id, itemLabelKey: item.labelKey, itemHref: item.href };
       }
     }
 

@@ -3,6 +3,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CoreSnapshot, Invoice } from "../types/invoices";
+import { acceptedInvoiceFixture } from "../model/invoice-commercial-fixtures";
+import { adaptInvoiceCommercial } from "../model/invoice-commercial";
 
 const { authMock, getMock, updateMock, issueMock, voidMock } = vi.hoisted(() => ({
   authMock: {
@@ -14,7 +16,7 @@ const { authMock, getMock, updateMock, issueMock, voidMock } = vi.hoisted(() => 
         "admin.invoices.critical",
         "admin.invoices.void",
       ],
-    } as { isSuperAdmin: boolean; permissions: string[] } | null,
+    } as { id?: string; isSuperAdmin: boolean; permissions: string[] } | null,
     isLoading: false,
   },
   getMock: vi.fn(),
@@ -117,6 +119,59 @@ describe("useInvoiceDetail", () => {
     await waitFor(() => expect(result.current.state).toBe("FORBIDDEN"));
     expect(getMock).not.toHaveBeenCalled();
     expect(result.current.snapshot).toBeNull();
+  });
+
+  it("clears prior actor evidence and fences late command completion after an actor switch", async () => {
+    authMock.user = { ...authMock.user!, id: "actor-one" };
+    let resolveCommand: ((value: CoreSnapshot<Invoice>) => void) | undefined;
+    issueMock.mockImplementation(() => new Promise(resolve => { resolveCommand = resolve; }));
+    const { result, rerender } = renderHook(() => useInvoiceDetail(INVOICE_ID));
+    await waitFor(() => expect(result.current.state).toBe("READY"));
+    act(() => { result.current.openIssue(); });
+    act(() => { result.current.updateIssueDraft("reason", "Reviewed tenant and total"); result.current.updateIssueDraft("confirmed", true); });
+    let pending: Promise<CoreSnapshot<Invoice> | null>;
+    act(() => { pending = result.current.issueInvoice(); });
+    getMock.mockImplementation(() => new Promise(() => {}));
+    authMock.user = { ...authMock.user!, id: "actor-two" };
+    rerender();
+    expect(result.current.snapshot).toBeNull();
+    expect(result.current.canIssue).toBe(false);
+    expect(result.current.dialog).toBeNull();
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+    await act(async () => { resolveCommand?.(snapshot("ISSUED")); await pending!; });
+    expect(result.current.snapshot).toBeNull();
+    expect(result.current.mutation.phase).toBe("IDLE");
+  });
+
+  it("refreshes retained detail after a confirmed legacy-shaped command response", async () => {
+    const before = acceptedInvoiceFixture(); before.invoice.status = "DRAFT";
+    const after = acceptedInvoiceFixture();
+    getMock.mockResolvedValueOnce({ ...snapshot(), data: adaptInvoiceCommercial(before) })
+      .mockResolvedValueOnce({ ...snapshot("ISSUED"), data: adaptInvoiceCommercial(after) });
+    issueMock.mockResolvedValue(snapshot("ISSUED"));
+    const { result } = renderHook(() => useInvoiceDetail(INVOICE_ID));
+    await waitFor(() => expect(result.current.state).toBe("READY"));
+    expect(result.current.canEdit).toBe(false);
+    act(() => { result.current.openIssue(); });
+    act(() => { result.current.updateIssueDraft("reason", "Reviewed accepted invoice"); result.current.updateIssueDraft("confirmed", true); });
+    await act(async () => { await result.current.issueInvoice(); });
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.snapshot?.data.commercial?.invoice.status).toBe("ISSUED"));
+    expect(result.current.snapshot?.data.commercial?.lines[1].acceptedSeats).toBe(30);
+    expect(result.current.mutation.phase).toBe("SUCCEEDED");
+  });
+
+  it("does not reinterpret a rejected invoice command as a successful refresh", async () => {
+    const value = acceptedInvoiceFixture(); value.invoice.status = "DRAFT";
+    getMock.mockResolvedValue({ ...snapshot(), data: adaptInvoiceCommercial(value) });
+    issueMock.mockRejectedValue({ isNormalized: true, httpStatus: 422, errorCode: "INVOICE_ACCEPTED_HISTORY_UNAVAILABLE", message: "Retained source is inconsistent" });
+    const { result } = renderHook(() => useInvoiceDetail(INVOICE_ID));
+    await waitFor(() => expect(result.current.state).toBe("READY"));
+    act(() => { result.current.openIssue(); });
+    act(() => { result.current.updateIssueDraft("reason", "Reviewed accepted invoice"); result.current.updateIssueDraft("confirmed", true); });
+    await act(async () => { await result.current.issueInvoice(); });
+    expect(result.current.mutation.phase).toBe("VALIDATION");
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
   it("requires both critical permissions before exposing issue and void", async () => {

@@ -1,3 +1,6 @@
+import { readInitialCreateOptions } from "@/features/admin/subscriptions/initial-commercial/initial-create-options";
+import { assertQuoteMatchesRequest, readInitialQuoteRequest } from "@/features/admin/subscriptions/initial-commercial/initial-commercial-request";
+import { readInitialQuote } from "@/features/admin/subscriptions/initial-commercial-readers";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { isAmbiguousWriteOutcome } from "@/shared/api/write-command-recovery";
 import { getAllTimezones } from "@/lib/geo/country-data";
@@ -112,15 +115,22 @@ export function buildTenantSubscriptionLines(
       );
       if (
         !candidate ||
-        !candidate.selectionAllowed ||
+        !canSelectTenantApplication(candidate) ||
         !tier ||
         !Number.isInteger(selection.seats) ||
         selection.seats < 1 ||
-        selection.seats > 100_000
+        selection.seats > 100_000 || !isUuidV7(selection.selectionKey) ||
+        selection.addons.some(chosen => {
+          const option = candidate.addons.find(addon => addon.addonId === chosen.addonId && addon.definitionVersionId === chosen.definitionVersionId);
+          return !option || !option.compatibleTierIds.includes(tier.id) || option.catalogueReasons.length > 0 ||
+            !isUuidV7(chosen.selectionKey) || !Number.isInteger(chosen.seats) || chosen.seats < 1 || chosen.seats > selection.seats;
+        })
       ) {
         return null;
       }
       return {
+        selectionKey: selection.selectionKey,
+        addons: selection.addons,
         applicationId: candidate.applicationId,
         applicationKey: candidate.key,
         applicationName: candidate.name,
@@ -136,153 +146,13 @@ export function buildTenantSubscriptionLines(
     );
 }
 
-const TENANT_CREATE_SELECTION_BLOCKERS = new Set([
-  "APPLICATION_LIFECYCLE_NOT_ACTIVE",
-  "APPLICATION_NOT_PUBLISHED",
-  "APPLICATION_NOT_PUBLIC",
-  "APPLICATION_NON_BILLABLE",
-  "TECHNICAL_READINESS_BLOCKED",
-]);
-const TENANT_CREATE_READINESS_REASONS = new Set([
-  "RUNTIME_TARGET_REQUIRED",
-  "COMPONENT_BINDING_REQUIRED",
-  "ACTIVE_COMPONENT_REQUIRED",
-  "PUBLISHED_RELEASE_REQUIRED",
-  "MINIMUM_RELEASE_NOT_SATISFIED",
-  "DATABASE_PERMISSION_MANIFEST_REQUIRED",
-  "DATABASE_PERMISSION_MANIFEST_INVALID",
-]);
-const TENANT_CREATE_OPTIONS_KEYS = new Set(["contractVersion", "applications"]);
-const TENANT_CREATE_APPLICATION_KEYS = new Set([
-  "applicationId",
-  "key",
-  "name",
-  "description",
-  "rank",
-  "commercialMode",
-  "technicalDefinitionRevision",
-  "selectionAllowed",
-  "selectionBlockers",
-  "readinessReasons",
-  "catalogueReasons",
-  "tiers",
-]);
-const TENANT_CREATE_TIER_KEYS = new Set(["id", "key", "name", "rank"]);
-const TENANT_CREATE_CATALOGUE_REASONS = new Set(["ACTIVE_TIER_REQUIRED"]);
+/** Display eligibility only. A fresh quote still checks complete commercial authority. */
+export function canSelectTenantApplication(candidate: TenantApplicationCandidate): boolean {
+  return candidate.tiers.length > 0 && candidate.selectionBlockers.length === 0 && candidate.readinessReasons.length === 0 && candidate.catalogueReasons.length === 0;
+}
 
-export function readTenantCreateOptions(
-  payload: unknown,
-): TenantApplicationCandidate[] {
-  const root = asRecord(payload);
-  if (
-    !root ||
-    !hasOnlyKeys(root, TENANT_CREATE_OPTIONS_KEYS) ||
-    root.contractVersion !== 1 ||
-    !Array.isArray(root.applications) ||
-    root.applications.length > 100
-  ) {
-    throw new Error("INVALID_TENANT_CREATE_OPTIONS_RESPONSE");
-  }
-
-  const applicationIds = new Set<string>();
-  const applicationKeys = new Set<string>();
-  const tierIds = new Set<string>();
-  const parsed = root.applications.map((value) => {
-    const application = asRecord(value);
-    if (
-      !application ||
-      !hasOnlyKeys(application, TENANT_CREATE_APPLICATION_KEYS) ||
-      !isUuidV7(application.applicationId) ||
-      !isApplicationKey(application.key) ||
-      !isNonEmptyString(application.name) ||
-      (application.description !== null &&
-        typeof application.description !== "string") ||
-      !isNonNegativeInteger(application.rank) ||
-      !["INCLUDED", "SUBSCRIPTION"].includes(
-        String(application.commercialMode),
-      ) ||
-      !isPositiveIntegerString(application.technicalDefinitionRevision) ||
-      typeof application.selectionAllowed !== "boolean" ||
-      !isStringArrayFromSet(
-        application.selectionBlockers,
-        TENANT_CREATE_SELECTION_BLOCKERS,
-      ) ||
-      !isStringArrayFromSet(
-        application.readinessReasons,
-        TENANT_CREATE_READINESS_REASONS,
-      ) ||
-      !isStringArrayFromSet(
-        application.catalogueReasons,
-        TENANT_CREATE_CATALOGUE_REASONS,
-      ) ||
-      !Array.isArray(application.tiers) ||
-      applicationIds.has(application.applicationId) ||
-      applicationKeys.has(application.key)
-    ) {
-      throw new Error("INVALID_TENANT_CREATE_OPTIONS_RESPONSE");
-    }
-
-    applicationIds.add(application.applicationId);
-    applicationKeys.add(application.key);
-    const tiers = application.tiers.map((tierValue) => {
-      const tier = asRecord(tierValue);
-      if (
-        !tier ||
-        !hasOnlyKeys(tier, TENANT_CREATE_TIER_KEYS) ||
-        !isUuidV7(tier.id) ||
-        !isApplicationKey(tier.key) ||
-        !isNonEmptyString(tier.name) ||
-        !isNonNegativeInteger(tier.rank) ||
-        tierIds.has(tier.id)
-      ) {
-        throw new Error("INVALID_TENANT_CREATE_OPTIONS_RESPONSE");
-      }
-      tierIds.add(tier.id);
-      return {
-        id: tier.id,
-        key: tier.key,
-        name: tier.name,
-        rank: tier.rank,
-      };
-    });
-
-    const selectionBlockers =
-      application.selectionBlockers as TenantApplicationCandidate["selectionBlockers"];
-    const readinessReasons =
-      application.readinessReasons as TenantApplicationCandidate["readinessReasons"];
-    const catalogueReasons =
-      application.catalogueReasons as TenantApplicationCandidate["catalogueReasons"];
-    if (
-      (tiers.length === 0) !==
-        catalogueReasons.includes("ACTIVE_TIER_REQUIRED") ||
-      (application.selectionAllowed &&
-        (selectionBlockers.length > 0 ||
-          readinessReasons.length > 0 ||
-          catalogueReasons.length > 0))
-    ) {
-      throw new Error("INVALID_TENANT_CREATE_OPTIONS_RESPONSE");
-    }
-
-    return {
-      applicationId: application.applicationId,
-      key: application.key,
-      name: application.name,
-      description: application.description,
-      rank: application.rank,
-      commercialMode: application.commercialMode as "INCLUDED" | "SUBSCRIPTION",
-      technicalDefinitionRevision: application.technicalDefinitionRevision,
-      selectionAllowed: application.selectionAllowed,
-      selectionBlockers,
-      readinessReasons,
-      catalogueReasons,
-      tiers,
-    };
-  });
-
-  return parsed.sort(
-    (left, right) =>
-      left.rank - right.rank || left.key.localeCompare(right.key),
-  );
+export function readTenantCreateOptions(payload: unknown): TenantApplicationCandidate[] {
+  return readInitialCreateOptions(payload).applications;
 }
 
 export function readDatabasePlacementOptions(
@@ -344,11 +214,14 @@ export function readProvisioningPlanPreview(
   if (
     !preview ||
     preview.contractVersion !== 1 ||
+    !Array.isArray(preview.applications) ||
+    preview.applications.length !== 0 ||
     !Array.isArray(preview.selectedApplicationKeys) ||
     preview.selectedApplicationKeys.join(",") !== expected.join(",") ||
     typeof preview.selectionDigest !== "string" ||
     !/^[0-9a-f]{64}$/i.test(preview.selectionDigest) ||
     !Array.isArray(preview.components) ||
+    preview.components.some(component => !component || component.installedReadiness !== null) ||
     !Array.isArray(preview.steps)
   ) {
     throw new Error("INVALID_TENANT_PROVISIONING_PREVIEW_RESPONSE");
@@ -356,51 +229,13 @@ export function readProvisioningPlanPreview(
   return preview as TenantProvisioningPlanPreview;
 }
 
-export function readSubscriptionQuote(
-  payload: unknown,
-  expectedLines: readonly TenantSubscriptionLine[],
-  expectedBillingCycle: "MONTHLY" | "ANNUAL",
-): TenantSubscriptionQuote {
-  const quote = payload as Partial<TenantSubscriptionQuote> | null;
-  if (
-    !quote ||
-    !isUuidV7(quote.quoteId) ||
-    quote.currencyCode !== "USD" ||
-    quote.billingCycle !== expectedBillingCycle ||
-    !isNonEmptyString(quote.requestHash) ||
-    !isNonEmptyString(quote.pricingRevision) ||
-    !isDecimalString(quote.total) ||
-    !isDecimalString(quote.totalUsd) ||
-    typeof quote.expiresAt !== "string" ||
-    Number.isNaN(Date.parse(quote.expiresAt)) ||
-    !Array.isArray(quote.items) ||
-    quote.items.length !== expectedLines.length
-  ) {
-    throw new Error("INVALID_SUBSCRIPTION_QUOTE_RESPONSE");
-  }
+export function tenantCreationQuoteRequest(lines: readonly TenantSubscriptionLine[], billingCycle: "MONTHLY" | "ANNUAL") {
+  return readInitialQuoteRequest({ purpose: "TENANT_CREATION", billingCycle, currencyCode: "USD",
+    applications: lines.map(({ selectionKey, applicationId, tierId, seats, addons }) => ({ selectionKey, applicationId, tierId, seats, addons })) });
+}
 
-  const expected = new Map(
-    expectedLines.map((line) => [
-      `${line.applicationId}:${line.tierId}:${line.seats}`,
-      true,
-    ]),
-  );
-  for (const item of quote.items) {
-    if (
-      !isUuidV7(item.moduleId) ||
-      !isUuidV7(item.tierId) ||
-      !Number.isInteger(item.seats) ||
-      !isDecimalString(item.lineTotal) ||
-      !isDecimalString(item.lineTotalUsd) ||
-      !expected.delete(`${item.moduleId}:${item.tierId}:${item.seats}`)
-    ) {
-      throw new Error("INVALID_SUBSCRIPTION_QUOTE_RESPONSE");
-    }
-  }
-  if (expected.size > 0) {
-    throw new Error("INVALID_SUBSCRIPTION_QUOTE_RESPONSE");
-  }
-  return quote as TenantSubscriptionQuote;
+export function readSubscriptionQuote(payload: unknown, expectedLines: readonly TenantSubscriptionLine[], expectedBillingCycle: "MONTHLY" | "ANNUAL"): TenantSubscriptionQuote {
+  return assertQuoteMatchesRequest(readInitialQuote(payload), tenantCreationQuoteRequest(expectedLines, expectedBillingCycle));
 }
 
 export function shouldRetainTenantCreateIntent(
@@ -506,25 +341,6 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function isApplicationKey(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(value);
-}
-
-function isPositiveIntegerString(value: unknown): value is string {
-  return typeof value === "string" && /^[1-9][0-9]*$/.test(value);
-}
-
-function isStringArrayFromSet(
-  value: unknown,
-  allowed: ReadonlySet<string>,
-): value is string[] {
-  return (
-    Array.isArray(value) &&
-    new Set(value).size === value.length &&
-    value.every((item) => typeof item === "string" && allowed.has(item))
-  );
-}
-
 function hasOnlyKeys(
   value: Record<string, unknown>,
   allowed: ReadonlySet<string>,
@@ -542,8 +358,4 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
-}
-
-function isDecimalString(value: unknown): value is string {
-  return typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value);
 }

@@ -21,6 +21,8 @@ import {
   type ColumnDef,
 } from "@/design-system";
 import { useInvoiceDetail } from "../hooks/use-invoice-detail";
+import { InvoiceCommercialEvidence } from "./invoice-commercial-evidence";
+import { INVOICE_COMMERCIAL_COPY } from "../model/invoice-commercial-copy";
 import type { InvoiceLine, InvoiceValidationCode } from "../types/invoices";
 import {
   formatInvoiceDate,
@@ -73,7 +75,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
       key: "description",
       headerEn: copy.description,
       headerAr: copy.description,
-      cell: (line) => <span className="font-medium">{line.descriptionI18n[lang]}</span>,
+      cell: (line) => <span className="font-medium">{line.descriptionI18n?.[lang] ?? line.description}</span>,
     },
     {
       key: "quantity",
@@ -153,7 +155,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
           <Evidence label={copy.tax} value={formatInvoiceMoney(invoice.taxTotal, invoice.currencyCode)} mono />
           <Evidence label={copy.settlementTotal} value={invoice.settlementTotalUsd ? formatInvoiceMoney(invoice.settlementTotalUsd, "USD") : copy.notRecorded} mono />
           <Evidence label={copy.amountPaid} value={formatInvoiceMoney(invoice.amountPaidUsd, "USD")} mono />
-          <Evidence label={copy.fxRate} value={invoice.fxUnitsPerUsd ?? copy.notRecorded} mono />
+          <Evidence label={copy.fxRate} value={invoice.commercial ? INVOICE_COMMERCIAL_COPY[lang].fxUnavailable : invoice.fxUnitsPerUsd ?? copy.notRecorded} mono={!invoice.commercial} />
         </EvidenceCard>
         <EvidenceCard title={copy.dates}>
           <Evidence label={copy.periodStart} value={formatInvoiceDateOnly(invoice.periodStart, lang)} />
@@ -202,6 +204,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
         />
       </Card>
 
+      {invoice.commercial && <InvoiceCommercialEvidence value={invoice.commercial} lang={lang} />}
       <InvoiceSnapshotMeta snapshot={detail.snapshot} copy={copy} lang={lang} />
     </div>
   );

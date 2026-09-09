@@ -107,8 +107,13 @@ export function NotificationsDropdown() {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" aria-label={triggerLabel} className="relative">
+          {/* negative-400 in BOTH themes, which is the one ramp step that
+              works on either bar: the light bar is the chrome navy now, and
+              negative-600 measured 2.5:1 against it — a warning colour nobody
+              can see is worse than no colour. Not a `nav-surface` name because
+              a ramp step is not a semantic role that block can re-point. */}
           <Bell
-            className={cn("size-4", snapshot.unreadCount > 0 && "text-negative-600 dark:text-negative-400")}
+            className={cn("size-4", snapshot.unreadCount > 0 && "text-negative-400")}
             aria-hidden="true"
           />
           {snapshot.unreadCount > 0 && (

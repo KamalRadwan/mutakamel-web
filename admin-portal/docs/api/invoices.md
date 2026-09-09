@@ -1,8 +1,20 @@
 # Invoice Administration API
 
-Status: **[Verified]**
+Status: PARTIAL SOURCE INTEGRATION. Last source verification: 2026-09-09.
 
-Last source verification: **2026-08-31**
+## Canonical commercial detail
+
+The existing detail GET and `admin.invoices.read` permission return the single closed `{invoice,lines}` contract. There is no HTTP contractVersion, commercial version header, evidence-status union or fallback request. The private/no-store response is bounded to4MiB, with22safe invoice fields and1–200lines. The request has no body, query or idempotency key.
+
+Complete source lines are valid for every current purpose: TRIAL_ACTIVATION, RENEWAL, PRORATION and MANUAL. They retain Application/Addon identity, parent item, selected definition, purchased seats, accepted price revision and1–100 complete marginal brackets. Their quantity1 represents the exact graduated charge, not one user. All amounts remain decimal strings and are checked with exact arithmetic; current catalogue prices never fill missing historical evidence.
+
+Only MANUAL invoices may instead have entirely custom ordinary quantity/price lines with null source, lineage, accepted seats and pricing fields. Generated MANUAL invoices can retain complete subscription pricing; edited custom manual lines use the null-attribution shape. Mixed or incomplete evidence fails closed. Original descriptions are retained. Omitted FX or translated-description data is unavailable; it is not inferred.
+
+Explicit PRORATION generation preserves the saved recurring-source charge under that purpose. It does not invoke the commercial plan-change proration calculator. Actual plan-change financial previews belong to the separately gated preparation/preview/apply owner.
+
+Admin [invoice-commercial.ts](../../src/features/admin/invoices/model/invoice-commercial.ts) validates purpose, closed fields, selectors, amounts, periods and parent/child seat bounds. The shared-client detail adapter preserves correlation. The bilingual detail card displays full retained brackets or manual line semantics. Actor changes fence snapshots and late commands; successful existing writes refetch canonical detail before showing current state.
+
+Current source verification is coordinated through task13. Historical passing suites and unauthenticated requests do not verify this revision. No invoice, payment or database fixture was created and no authenticated runtime or financial acceptance is claimed.
 
 Owner: **Core**
 

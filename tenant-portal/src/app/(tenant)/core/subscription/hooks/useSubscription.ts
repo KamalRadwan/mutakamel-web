@@ -1,78 +1,51 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTenantAuth } from "@/context/AuthContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import {
-  fetchSubscription,
-  fetchSubscriptionItems,
-  type SubscriptionItem,
-  type TenantSubscription,
-} from "../subscription-contract";
+import { readSubscription, readSubscriptionItems, type SubscriptionView } from "../subscription-read";
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
+interface ReadState { key: string; view: SubscriptionView | null; error: NormalizedApiError | null }
 
-/**
- * `GET /subscription` and `GET /subscription/items`, settled independently.
- *
- * They are two projections of one resource: the first carries the lifecycle
- * header plus catalogue-enriched item names, the second the authoritative item
- * rows the plan-change DTO's `itemId` must come from. `allSettled` keeps the
- * screen alive when only one of them answers, and the caller says which half is
- * missing rather than blanking both.
- */
+/** One coherent accepted snapshot, without a partial base-only fallback. */
 export function useSubscription() {
-  const [subscription, setSubscription] = useState<TenantSubscription | null>(null);
-  const [subscriptionError, setSubscriptionError] = useState<NormalizedApiError | null>(null);
-  const [items, setItems] = useState<SubscriptionItem[] | null>(null);
-  const [itemsFailed, setItemsFailed] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-
-  const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
-    setIsLoading(true);
-    const [headerResult, itemsResult] = await Promise.allSettled([
-      fetchSubscription(signal),
-      fetchSubscriptionItems(signal),
-    ]);
-    if (signal?.aborted) return;
-
-    if (headerResult.status === "fulfilled") {
-      setSubscription(headerResult.value);
-      setSubscriptionError(null);
-    } else if (!isAbortError(headerResult.reason)) {
-      setSubscriptionError(normalizeApiError(headerResult.reason));
-    }
-
-    if (itemsResult.status === "fulfilled") {
-      setItems(itemsResult.value);
-      setItemsFailed(false);
-    } else if (!isAbortError(itemsResult.reason)) {
-      setItemsFailed(true);
-    }
-
-    setHasLoaded(true);
-    setIsLoading(false);
-  }, []);
+  const { user, isAuthenticated, realtimeAuthGeneration } = useTenantAuth();
+  const [refresh, setRefresh] = useState(0);
+  const [state, setState] = useState<ReadState | null>(null);
+  const allowed = isAuthenticated && user?.isTenantOwner === true;
+  const key = JSON.stringify([user?.id, realtimeAuthGeneration, allowed, refresh]);
+  // A restored owner/session must obtain a new observation before showing financial facts.
+  if (state !== null && state.key !== key) setState(null);
 
   useEffect(() => {
+    if (!allowed) return;
     const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
+    Promise.all([readSubscription(controller.signal), readSubscriptionItems(controller.signal)]).then(
+      ([view, items]) => {
+        if (controller.signal.aborted) return;
+        if (view.subscription.id !== items.subscriptionId || view.subscriptionRevision !== items.subscriptionRevision
+          || JSON.stringify(view.baseItems) !== JSON.stringify(items.baseItems)
+          || JSON.stringify(view.addonSelections) !== JSON.stringify(items.addonSelections)) {
+          setState({ key, view: null, error: { status: 0 } });
+          return;
+        }
+        setState({ key, view, error: null });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted) {
+          setState({ key, view: null, error: normalizeApiError(error) });
+          controller.abort();
+        }
+      },
+    );
     return () => controller.abort();
-  }, [load]);
+  }, [allowed, key]);
 
+  const current = state?.key === key ? state : null;
+  const reload = useCallback(() => setRefresh((value) => value + 1), []);
   return {
-    subscription,
-    subscriptionError,
-    // The enriched list is what a reader wants; the raw rows are the fallback
-    // when catalogue enrichment is what failed.
-    items: subscription?.items ?? items ?? [],
-    itemsFailed,
-    isLoading: isLoading && !hasLoaded,
-    isRefreshing: isLoading,
-    reload: () => load(),
+    view: current?.view ?? null, subscriptionError: current?.error ?? null,
+    items: current?.view?.baseItems ?? [], denied: !allowed || current?.error?.status === 403,
+    isLoading: allowed && !current, isRefreshing: allowed && !current, reload,
   };
 }

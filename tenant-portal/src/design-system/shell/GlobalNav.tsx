@@ -57,7 +57,14 @@ export function GlobalNav({
   const { t } = useI18n();
 
   return (
-    <header className="flex h-(--size-topbar) shrink-0 items-stretch border-b border-border bg-card pe-3 print:hidden">
+    // `nav-surface` (globals.css) re-points the semantic colour names for this
+    // subtree, so the controls below keep asking for `hover:bg-accent`,
+    // `bg-border` and `ring-ring` and get the on-chrome values. `text-foreground`
+    // is on the element itself and not left to inherit: <body> resolved its
+    // colour against the page's --foreground long before this bar existed, and
+    // an inherited computed colour does not re-resolve when a descendant
+    // re-declares the variable.
+    <header className="nav-surface flex h-(--size-topbar) shrink-0 items-stretch border-b border-border bg-nav pe-3 text-foreground print:hidden">
       <BrandMark />
       <div className="flex items-center gap-1 ps-2">
         <Button

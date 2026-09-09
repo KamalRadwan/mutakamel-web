@@ -1,12 +1,11 @@
 "use client";
 
-import { OwnerGate } from "../components/OwnerGate";
+import { useTenantAuth } from "@/context/AuthContext";
 import { SubscriptionWorkspace } from "./components/subscription-workspace";
 
 export default function SubscriptionPage() {
+  const { user, realtimeAuthGeneration } = useTenantAuth();
   return (
-    <OwnerGate>
-      <SubscriptionWorkspace />
-    </OwnerGate>
+    <SubscriptionWorkspace key={`${user?.id ?? "none"}:${realtimeAuthGeneration ?? "none"}`} />
   );
 }

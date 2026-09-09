@@ -268,6 +268,8 @@ export default function CustomerProfilesPage() {
                 ...viewLabels,
                 emptyColumn: t.crmCustomerProfiles.empty,
                 moveTo: t.views.moveTo,
+                collapseColumn: t.views.collapseColumn,
+                expandColumn: t.views.expandColumn,
               }}
             />
           )}

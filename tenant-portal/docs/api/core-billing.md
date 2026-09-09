@@ -69,6 +69,38 @@ wrong in the last decimal place is worse than no total.
 
 All carry `Cache-Control: private, no-store`.
 
+### Negotiated invoice detail — accepted cutover
+
+Last source verification for this addition: **2026-09-09**. Existing detail route
+`core.tenant.billing.invoices.get` uses the same closed canonical `InvoiceRead`
+evidence as Admin, without a commercial version header or payload discriminator.
+Owner authority is checked again by the retained reader; Company/Branch
+authority is not a substitute. The heading anchor is retained for existing links.
+
+Source: `tenant/billing/tenant-invoice-read.{service,transport,openapi}.ts`,
+`admin/invoices/invoice-commercial-read.{contract,openapi}.ts`,
+`admin/invoices/accepted-invoice-source.ts`. The response is bounded to4MiB,
+has no query/body/idempotency or Company/Branch selectors, and preserves exact
+recorded identity, accepted seat and complete pricing evidence. Only genuine
+MANUAL invoices may contain homogeneous lines with null source identity/pricing;
+their quantity and original amount arithmetic still must match. Missing retained
+commercial evidence fails closed. No current catalogue reconstruction is allowed.
+Original invoice amounts and nullable USD settlement amounts are distinct;
+no outstanding amount is returned by this projection.
+
+Prior Core/Gateway image and test handoffs belong to their dated source snapshots.
+The existing invoice fetch now uses the canonical adapter and retained evidence
+card. Payment contracts remain unchanged. Current verification limits are in
+[the canonical delivery record](catalogue-canonical-delivery.md); no authenticated
+Tenant browser or current control-plane state is asserted here.
+
+TenantUserProfile/AuthContext exposes no independent tenantId. Live parsing pins
+the exact invoice selector and validates the persisted tenant UUID structurally;
+the accepted owner-scoped server enforces tenant isolation. Never manufacture an
+expected tenantId from the response itself. An independently supplied tenantId
+must match exactly. The hook fences actor/session, owner/auth state, target and
+refresh; actual403 replaces stale facts with the owner-denial boundary.
+
 ### The two shapes the quote form needs
 
 `GET /api/tenant/core/v1/billing/payment-input-currencies` returns
@@ -131,6 +163,14 @@ only readback is the paginated `GET /payments` —
 
 ## Subscription — 4 routes
 
+**Canonical read update, 2026-09-09:** [Subscription/Addons](subscription-addons.md)
+supplies detail/items and complete retained parent/Addon prices in the subscription workspace.
+[Published offer enumeration](subscription-offers.md) is also implemented as a read-only owner explorer.
+[The broader target](application-addons-target.md) still defines purchase preparation and recovery;
+Q25's discovery gap is resolved, not its complete purchase workflow. Future pure definition adoption
+has separate scoped authority; it must not give a non-owner monetary access
+or be blocked merely by an owner-only UI predicate.
+
 | Method | Canonical path | Access | Notes |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/core/v1/subscription` | owner | Current subscription + lifecycle |
@@ -140,21 +180,21 @@ only readback is the paginated `GET /payments` —
 
 ### Add-or-increase only
 
-`CreateSubscriptionPlanChangePreviewDto` takes an `operation`, and the service
-**rejects fields that do not belong to the chosen operation**. `seats` is
-required for `ADD` and must be ≥1; `itemId` is required for everything except
-`ADD`.
+The canonical preparation body is `{expectedSubscriptionRevision,changes,reason?}`.
+The preview body adds the actual `preparationId`; apply sends exactly `{}`.
+Ordered change rows use the actual Application/Addon ADD or CHANGE selectors.
+The removed flat single-item DTO and seat-only browser adapter are not supported.
 
 **The API has no downgrade path.** A UI that offers "reduce seats" or "remove
 module" and then surfaces a rejection is a worse experience than not offering
 it. Show the ceiling honestly and route reductions to support.
 
-**And no upgrade path it can drive, either.** `ADD` needs a module *and* a tier
-identifier, and there is no tenant-facing route that enumerates either — the
-catalogues are behind `AdminGuard`. The portal therefore expresses only
-`operation: CHANGE` with `itemId` + `seats`, and says plainly that adding a
-module or moving to a higher tier goes through support. See
-[Q25](../build/OPEN-QUESTIONS.md#q25--no-tenant-facing-module--tier-catalogue-for-a-plan-change).
+The `/core/subscription/change` editor supports new Application/Addon purchases,
+existing quantity increases and Application tiers with nondecreasing actual rank.
+It consumes the real preparation and quote before explicit apply. Published
+PREPARATION_REQUIRED is discovery only; the complete retained quote supplies
+every displayed financial total. Current owner, subscription, readiness and
+wallet checks remain authoritative. See [canonical purchase flow](catalogue-canonical-delivery.md#mounted-ordinary-purchase-editor).
 
 The preview is **durable, owner-bound and price-frozen**, and it expires.
 `apply` revalidates collection, price and wallet before committing, so a stale
@@ -248,10 +288,10 @@ over static tokens. The runtime checker (task 13.26) is not optional.
 | Screen | Plan task | State |
 | --- | --- | --- |
 | `/core/billing` summary | 6.1 | built |
-| `/core/billing/invoices` + detail | 6.2–6.3 | built |
+| `/core/billing/invoices` + detail | 6.2–6.3 | list unchanged; detail uses canonical InvoiceRead with complete retained App/Addon evidence |
 | Payment quote / intent / status | 6.4–6.7 | built |
 | Wallet top-up + history | 6.8–6.10 | built |
-| `/core/subscription` | 6.11–6.13, 6.19 | built; seat increase only (Q25) |
+| `/core/subscription` | 6.11–6.13, 6.19 | canonical retained App/Addon read; links to the canonical preparation/quote/apply editor at `/core/subscription/change` |
 | Dunning surface | 6.14 | built |
 | `/core/settings/branding` | 6.15–6.16 | built |
 | Branding → tokens | 6.17–6.18 | built (G2 closed) |

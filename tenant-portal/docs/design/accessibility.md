@@ -172,7 +172,7 @@ can check them in one pass.
 
 | Criterion | Where it bites us | Rule |
 | --- | --- | --- |
-| **`dragging-alternative`** (AA) | The three board views | Every card has a **Move to…** menu item — a single-pointer path, not just the keyboard one — [views.md](views.md#every-card-carries-a-move-to-action--not-optional) |
+| **`dragging-alternative`** (AA) | The three board views | A single-pointer path to every drag. Customer Profiles and Opportunities carry a **Move to…** menu item on the card; **Leads carries it on the detail screen** — the pipeline bar there IS the stage move, same route and same gate as the drag — [views.md](views.md#every-card-carries-a-move-to-action--not-optional) |
 | **`focus-not-obscured`** (AA) | Four overlapping sticky layers in `DataTable` | `scroll-margin` sized to the sticky offsets — [patterns.md](patterns.md#datatable) |
 | **`accessible-authentication`** (AA) | `/login` | `autocomplete` attributes present; **paste never blocked** — [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md#71-login--login) |
 | **`redundant-entry`** (A) | Lead conversion | Prefilled from the lead; the user never retypes captured data |
@@ -202,7 +202,9 @@ criterion.
       focus ring is never behind a sticky header or sticky column
 - [ ] **Submit a form with two invalid fields** — focus lands on the first
       invalid field and its error is announced
-- [ ] **Move a board card without dragging**, using only the Move to… menu
+- [ ] **Move a record between stages without dragging** — the Move to… menu on
+      Customer Profiles and Opportunities, and on Leads the pipeline bar on the
+      record's own screen
 - [ ] Sorted column reports `aria-sort`; the others report `none`
 - [ ] Toast announces politely, does **not** steal focus, and any Retry in it
       is keyboard-reachable

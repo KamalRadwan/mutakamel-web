@@ -21,7 +21,12 @@ interface DatabaseCredentialActionDialogProps {
   action: DatabaseCredentialAction | null;
   reason: string;
   error: string | null;
+  errorCode?: string;
+  correlationId?: string;
   pending: boolean;
+  submitDisabled?: boolean;
+  refreshError?: string | null;
+  onRefresh?: () => Promise<void>;
   onReasonChange: (reason: string) => void;
   onClose: () => void;
   onSubmit: () => Promise<void>;
@@ -52,12 +57,17 @@ export function DatabaseCredentialActionDialog({
   action,
   reason,
   error,
+  errorCode,
+  correlationId,
   pending,
+  submitDisabled = false,
+  refreshError,
+  onRefresh,
   onReasonChange,
   onClose,
   onSubmit,
 }: DatabaseCredentialActionDialogProps) {
-  const { dir, t } = useI18n();
+  const { dir, lang, t } = useI18n();
   const copy = t.databaseServerDetail.credentialDialog;
   const errorRef = useRef<HTMLDivElement>(null);
 
@@ -124,7 +134,26 @@ export function DatabaseCredentialActionDialog({
           {error && (
             <div ref={errorRef} tabIndex={-1} className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" role="alert">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{error}</span>
+              <div className="min-w-0 space-y-1">
+                <p>{error}</p>
+                {errorCode && <code className="block break-words font-mono" dir="ltr">{errorCode}</code>}
+                {correlationId && (
+                  <p>
+                    {lang === "ar" ? "معرّف التتبّع" : "Correlation ID"}: {" "}
+                    <code className="break-all font-mono" dir="ltr">{correlationId}</code>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {refreshError && (
+            <div role="alert" className="space-y-2 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">
+              <p>{refreshError}</p>
+              {onRefresh && (
+                <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => void onRefresh()}>
+                  {lang === "ar" ? "تحديث الحالة" : "Refresh status"}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -138,7 +167,7 @@ export function DatabaseCredentialActionDialog({
             variant="primary"
             onClick={() => void onSubmit()}
             loading={pending}
-            disabled={reason.trim().length < 8}
+            disabled={submitDisabled || reason.trim().length < 8}
           >
             {entry.submit}
           </Button>

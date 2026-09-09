@@ -1,75 +1,39 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTenantAuth } from "@/context/AuthContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
-import { fetchInvoice, type TenantInvoice } from "../../../billing-contract";
+import { fetchInvoice } from "../../../billing-contract";
+import type { InvoiceRead } from "../../../invoice-read";
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
+interface State { key: string; view: InvoiceRead | null; error: NormalizedApiError | null }
 
-/**
- * `GET /billing/invoices/:invoiceId` — 404 for both an absent invoice and one
- * belonging to another tenant, which is the correct answer to both.
- *
- * A malformed id in the URL is resolved here rather than sent: the route param
- * is `@IsUUID('7')` and a bad value is a stale or hand-edited link, which is a
- * not-found, not a validation error to surface.
- */
+/** Exact owner read: never retain old financial facts across a new target or session. */
 export function useInvoiceDetail(invoiceId: string) {
-  const [invoice, setInvoice] = useState<TenantInvoice | null>(null);
-  const [error, setError] = useState<NormalizedApiError | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-
-  const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      if (!isUUIDv7(invoiceId)) {
-        setError({ status: 404, code: "INVOICE_NOT_FOUND" });
-        setIsLoading(false);
-        setHasLoaded(true);
-        return;
-      }
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await fetchInvoice(invoiceId, signal);
-        if (signal?.aborted) return;
-        setInvoice(result);
-        setHasLoaded(true);
-      } catch (caught) {
-        if (isAbortError(caught)) return;
-        setError(normalizeApiError(caught));
-        setHasLoaded(true);
-      } finally {
-        if (!signal?.aborted) setIsLoading(false);
-      }
-    },
-    [invoiceId],
-  );
+  const { user, isAuthenticated, realtimeAuthGeneration } = useTenantAuth();
+  const [refresh, setRefresh] = useState(0);
+  const [state, setState] = useState<State | null>(null);
+  const allowed = isAuthenticated && !!user?.id && user.isTenantOwner;
+  const validTarget = isUUIDv7(invoiceId);
+  const key = JSON.stringify([invoiceId, user?.id, realtimeAuthGeneration, allowed, refresh]);
+  // Retire the old snapshot permanently, including an A→B→A context change.
+  if (state !== null && state.key !== key) setState(null);
 
   useEffect(() => {
+    if (!allowed || !validTarget) return;
     const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
+    fetchInvoice(invoiceId, controller.signal).then(
+      (view) => { if (!controller.signal.aborted) setState({ key, view, error: null }); },
+      (error: unknown) => { if (!controller.signal.aborted) setState({ key, view: null, error: normalizeApiError(error) }); },
+    );
     return () => controller.abort();
-  }, [load]);
+  }, [allowed, validTarget, invoiceId, key]);
 
-  // Stable while `invoiceId` is: the payment hook takes this as its
-  // settled-callback and puts it in an effect's dependency list, so a fresh
-  // arrow per render would tear down and rebuild the poll on every render.
-  const reload = useCallback(() => {
-    void load();
-  }, [load]);
-
-  return {
-    invoice,
-    error,
-    isNotFound: error?.status === 404,
-    isLoading: isLoading && !hasLoaded,
-    isRefreshing: isLoading,
-    reload,
-  };
+  const current = state?.key === key ? state : null;
+  const error: NormalizedApiError | null = allowed && !validTarget ? { status: 404, code: "INVOICE_NOT_FOUND" } : current?.error ?? null;
+  const reload = useCallback(() => setRefresh((value) => value + 1), []);
+  return { view: current?.view ?? null, error, isNotFound: error?.status === 404,
+    denied: !allowed || error?.status === 403, isLoading: allowed && validTarget && !current,
+    isRefreshing: allowed && validTarget && !current, reload };
 }

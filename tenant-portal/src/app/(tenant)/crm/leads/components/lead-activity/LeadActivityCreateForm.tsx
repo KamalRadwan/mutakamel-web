@@ -26,6 +26,7 @@ export interface LeadActivityCreateFormProps {
   onChange: (patch: Partial<LeadActivityForm>) => void;
   errors: LeadActivityErrors;
   disabled: boolean;
+  density?: "standard" | "compact";
 }
 
 /**
@@ -42,6 +43,7 @@ export function LeadActivityCreateForm({
   onChange,
   errors,
   disabled,
+  density = "standard",
 }: LeadActivityCreateFormProps) {
   const { t } = useI18n();
   const copy = t.crmLeads.activities;
@@ -56,7 +58,7 @@ export function LeadActivityCreateForm({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={density === "compact" ? "flex flex-col gap-2" : "flex flex-col gap-3"}>
       <Field label={copy.typeLabel} required>
         <Select
           value={values.type}
@@ -126,7 +128,8 @@ export function LeadActivityCreateForm({
           value={values.description}
           onChange={(event) => onChange({ description: event.target.value })}
           maxLength={LEAD_ACTIVITY_DESCRIPTION_MAX}
-          rows={3}
+          size="sm"
+          rows={density === "compact" ? 2 : 3}
           disabled={disabled}
         />
       </Field>

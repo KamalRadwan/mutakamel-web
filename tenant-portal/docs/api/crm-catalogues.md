@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-09-07**
 
 Owning app: **crm-app**
 
@@ -10,16 +10,23 @@ Portal status: **built** — all five screens are server-backed. Not exercised
 against a live session: CRM is blocked twice over, by P4 and by Q17.
 
 Covers the tenant-configured vocabulary the workspaces depend on: lead stages,
-acquisition sources, custom fields, CRM settings, and the read-only static
-catalogue.
+acquisition sources, tags, custom fields, CRM settings, and the read-only
+static catalogue.
 
 Source inspected:
 `crm-app/src/crm/lead-stages/lead-stages.controller.ts`,
 `acquisition-sources/acquisition-sources.controller.ts`,
+`tags/tags.controller.ts`, `tags/tags.service.ts`, `tags/dto/tag.dto.ts`,
 `custom-fields/custom-fields.controller.ts`,
 `settings/`, `static-data/`.
 
 ## Lead stages
+
+**Planned commercial extension, 2026-09-07:** [Application Addons target](application-addons-target.md)
+belongs to Core catalogue/subscription and Company/Branch admission, not CRM
+static-data CRUD. The CRM-owned catalogues and custom-field behavior on this
+page remain in place. Installing an industry addon does not itself grant its
+business actions or justify a tenant-global industry switch.
 
 Canonical prefix: `/api/tenant/crm/v1/lead-stages`
 
@@ -127,6 +134,31 @@ Sources carry an **icon** — `GET /:id/icon` serves it, `POST /:id/icon`
 uploads it. Treat the icon URL as an opaque, cache-busted path; do not
 construct it by hand. Reordering uses the dedicated `reorder` endpoint, same
 reasoning as lead stages.
+
+## Tags
+
+Canonical prefix: `/api/tenant/crm/v1/tags`
+
+| Method | Canonical path | Permission |
+| --- | --- | --- |
+| GET | `/api/tenant/crm/v1/tags` | `crm.tags.read` |
+| POST | `/api/tenant/crm/v1/tags` | `crm.tags.manage` |
+| GET | `/api/tenant/crm/v1/tags/:id` | `crm.tags.read` |
+| PATCH | `/api/tenant/crm/v1/tags/:id` | `crm.tags.manage` |
+| DELETE | `/api/tenant/crm/v1/tags/:id` | `crm.tags.manage` |
+
+The list is a raw, name-sorted array of `{ id, name, createdAt, updatedAt }`,
+not a Core envelope and not paginated. A tenant can have at most 500 live tags.
+Names are trimmed, non-empty, at most 60 characters, and unique among live tags
+after case/whitespace normalization. There is no colour field in the current
+catalogue contract.
+
+The Create Lead modal loads this catalogue and sends the selected ids as
+`CreateLeadDto.tagIds` in its single lead-creation request. Up to 50 unique ids
+are saved atomically with the lead under scoped `crm.leads.create` authority.
+Later attachment and detach are record operations under `/leads/:id/tags` and
+require scoped `crm.leads.update`; neither path requires `crm.tags.manage`. See
+[CRM — Leads](crm-leads.md#tags-during-creation).
 
 ## Custom fields
 

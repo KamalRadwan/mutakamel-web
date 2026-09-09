@@ -11,6 +11,8 @@
 // here is a mirror would otherwise go looking for a decorator that is not
 // there. No other rule may be added without the same treatment.
 
+import { formatTemplate } from "@/lib/format/template";
+import { isUUIDv7 } from "@/lib/uuid";
 import {
   CrmErrorBag,
   sectionErrorCount,
@@ -31,6 +33,9 @@ export type LeadCreateErrors = CrmFormErrors;
 /** The shared field messages, plus the one rule only a lead has. */
 export interface LeadCreateMessages extends CrmFieldMessages {
   contactRequired: string;
+  /** Takes `{max}`. Mirrors `CreateLeadDto.tagIds`' array ceiling. */
+  tagsLimit: string;
+  tagsInvalid: string;
 }
 
 /** One `FormSection` id, and one key under `t.crmLeads.create.sections`. */
@@ -44,10 +49,10 @@ export type LeadCreateSectionId =
   | "customFields";
 
 const SECTION_BY_PREFIX: ReadonlyArray<[string, LeadCreateSectionId]> = [
-  // Classification holds exactly one validated field. Without this row the
-  // index would flag no section at all for it, and a user scrolled past the
-  // top would meet a submit that refuses with every tab reading clean.
+  // Classification fields stay in the index so a user scrolled past the top
+  // can still see why submission stopped.
   ["acquisitionSourceId", "classification"],
+  ["tagIds", "classification"],
   ["contacts", "contacts"],
   ["address", "address"],
   ["customFields", "customFields"],
@@ -131,6 +136,15 @@ export function validateCreateLead(
   // goes back to fill it in. Loosening it breaks no contract; tightening it
   // costs the user one click they would otherwise have skipped.
   bag.required("acquisitionSourceId", form.acquisitionSourceId);
+  if (form.tagIds.length > limits.tags) {
+    bag.set("tagIds", formatTemplate(messages.tagsLimit, { max: limits.tags }));
+  } else if (
+    new Set(form.tagIds.map((tagId) => tagId.toLowerCase())).size !==
+      form.tagIds.length ||
+    !form.tagIds.every(isUUIDv7)
+  ) {
+    bag.set("tagIds", messages.tagsInvalid);
+  }
 
   if (corporate) {
     // 422 LEAD_COMPANY_NAME_REQUIRED. Picking a company from the Directory

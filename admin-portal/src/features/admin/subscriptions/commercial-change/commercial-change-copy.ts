@@ -1,0 +1,28 @@
+export const commercialChangeCopy = (lang: string) => lang === "ar" ? {
+  review: "مراجعة تعديل الاشتراك", before: "قبل التعديل", after: "بعد التعديل", recurringBefore: "الإجمالي الدوري السابق", recurringAfter: "الإجمالي الدوري المقترح",
+  fullDelta: "فرق الفترة الكاملة", settlement: "تسوية الفترة الحالية", CREDIT: "رصيد مضاف", DEBIT: "مبلغ مخصوم", NONE: "لا توجد تسوية فورية",
+  available: "رصيد المحفظة المتاح", shortfall: "المبلغ الناقص", wallet: "حالة المحفظة", ACTIVE: "نشطة", FROZEN: "مجمّدة", CLOSED: "مغلقة",
+  expires: "تنتهي التسعيرة", expired: "انتهت صلاحية هذه التسعيرة. اطلب تسعيرة جديدة قبل التأكيد.", cannotApply: "هذه التسعيرة غير مؤهلة للتأكيد. راجع الحالة الحالية قبل المتابعة.",
+  APPLICATION: "تطبيق", ADDON: "إضافة", ADD: "إضافة", CHANGE: "تعديل", REMOVE: "إزالة", ADOPT_DEFINITION: "اعتماد التعريف", seats: "المقاعد", tier: "الفئة", definition: "إصدار التعريف",
+  noSelection: "لا يوجد اختيار في هذه المرحلة", brackets: "شرائح السعر المقبولة", from: "من", through: "حتى", charged: "مستخدمون محتسبون", unit: "دولار لكل مستخدم", amount: "المبلغ بالدولار", open: "بلا حد أعلى",
+  priceRevision: "مرجع السعر المقبول", references: "المراجع", preview: "مرجع التسعيرة", operation: "مرجع عملية التسعيرة", preparation: "مرجع التحضير", revision: "مراجعة الاشتراك",
+  receipt: "إيصال التسوية الأصلي", original: "تعكس هذه المبالغ وحالة الإسقاط لحظة التسوية الأصلية. حالة العملية والاشتراك الحالية تُقرأ بصورة مستقلة.",
+  appliedAt: "وقت التسوية", base: "إجمالي التطبيقات الأساسية", addons: "إجمالي الإضافات", combined: "الإجمالي الدوري", balance: "رصيد المحفظة بعد التسوية", selection: "معرّف الاختيار المسجل",
+  progress: "حالة العملية", progressNotice: "تقدم العملية لا يثبت صلاحية الاستخدام الحالية أو تعيين المستخدمين.", PREPARING: "جارٍ التحضير", BLOCKED: "متوقفة", READY: "تم التحضير",
+  CONFIRMING: "جارٍ التأكيد", COMMITTED: "تم الالتزام", ABORTED: "أُلغيت العملية", NEEDS_REVIEW: "تحتاج إلى مراجعة", updated: "آخر تحديث", phase: "المرحلة", reason: "رمز السبب", recheck: "المدة المقترحة لإعادة التحقق بالثواني",
+  projection: "حالة الإسقاط", projectionReady: "اكتمل الإسقاط", NOT_REQUIRED: "غير مطلوب", PENDING: "قيد الانتظار", operationRevision: "مراجعة العملية",
+} : {
+  review: "Review subscription changes", before: "Before", after: "After", recurringBefore: "Previous recurring total", recurringAfter: "Proposed recurring total",
+  fullDelta: "Full-period difference", settlement: "Current-period settlement", CREDIT: "Wallet credit", DEBIT: "Wallet debit", NONE: "No immediate settlement",
+  available: "Available wallet balance", shortfall: "Wallet shortfall", wallet: "Wallet status", ACTIVE: "Active", FROZEN: "Frozen", CLOSED: "Closed",
+  expires: "Quote expires", expired: "This preview has expired. Request a fresh preview before confirming.", cannotApply: "This preview is not eligible for confirmation. Review current state before continuing.",
+  APPLICATION: "Application", ADDON: "Addon", ADD: "Add", CHANGE: "Change", REMOVE: "Remove", ADOPT_DEFINITION: "Adopt definition", seats: "Seats", tier: "Tier", definition: "Definition version",
+  noSelection: "No selection at this stage", brackets: "Accepted price brackets", from: "From", through: "Through", charged: "Charged users", unit: "USD per user", amount: "Amount USD", open: "No upper limit",
+  priceRevision: "Accepted price revision", references: "References", preview: "Preview reference", operation: "Preview operation reference", preparation: "Preparation reference", revision: "Subscription revision",
+  receipt: "Original financial receipt", original: "These amounts and the saved projection state reflect the original commit. Current operation and subscription state are read separately.",
+  appliedAt: "Applied at", base: "Base applications total", addons: "Addons total", combined: "Recurring total", balance: "Wallet balance after settlement", selection: "Recorded selection ID",
+  progress: "Operation progress", progressNotice: "Operation progress does not establish current usable access or user assignment.", PREPARING: "Preparing", BLOCKED: "Blocked", READY: "Prepared",
+  CONFIRMING: "Confirming", COMMITTED: "Committed", ABORTED: "Aborted", NEEDS_REVIEW: "Needs review", updated: "Last updated", phase: "Phase", reason: "Reason code", recheck: "Suggested recheck delay in seconds",
+  projection: "Projection state", projectionReady: "Projection complete", NOT_REQUIRED: "Not required", PENDING: "Pending", operationRevision: "Operation revision",
+};
+export type CommercialChangeCopy = ReturnType<typeof commercialChangeCopy>;

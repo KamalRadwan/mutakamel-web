@@ -92,6 +92,38 @@ describe("AuthProvider bootstrap supersession", () => {
     vi.restoreAllMocks();
   });
 
+  it("allows a fresh login after reloading an already-ended session", async () => {
+    window.localStorage.setItem("admin_auth_session_event", JSON.stringify({
+      realm: "admin",
+      kind: "session-ended",
+      eventId: "persisted-session-end",
+      sourceId: "closed-tab",
+      issuedAt: Date.now() - 60_000,
+      sessionId: "old-session",
+    }));
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/admin/core/v1/auth/login") return jsonResponse(webAuthResponse());
+      if (url === "/api/admin/core/v1/auth/me") return jsonResponse(adminMePayload());
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AuthProvider><LoginProbe /></AuthProvider>);
+
+    await waitFor(() => expect(screen.getByText("ENDED:none")).toBeTruthy());
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("login"));
+    await waitFor(() =>
+      expect(screen.getByText("AUTHENTICATED:admin@example.test")).toBeTruthy(),
+    );
+    expect(JSON.parse(window.localStorage.getItem("admin_auth_session_event") ?? "null"))
+      .toMatchObject({ kind: "session-updated" });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/admin/core/v1/auth/login",
+      "/api/admin/core/v1/auth/me",
+    ]);
+    expect(screen.getByText("error:none")).toBeTruthy();
+  });
+
   it("keeps a completed sign-in when the cold bootstrap it raced finally answers", async () => {
     // The ordinary way an operator reaches /login: the tab loads with no
     // session, so bootstrap's `/auth/me` is already in flight and doomed. They

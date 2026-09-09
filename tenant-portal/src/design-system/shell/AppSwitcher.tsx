@@ -62,10 +62,12 @@ export function AppSwitcher({ apps, activeApp, onSelect }: AppSwitcherProps) {
     if (href) router.push(href);
   }
 
-  // Sized for a bar, not a column: no `w-full`, and `text-foreground` rather
-  // than `text-sidebar-foreground`, because this sits on `bg-card`. The app
-  // label hides on the narrowest widths so the icon and the account controls
-  // still fit.
+  // Sized for a bar, not a column: no `w-full`. `text-foreground` and the
+  // chevron's `text-muted-foreground` are the ordinary names — GlobalNav's
+  // `nav-surface` re-points them to the on-chrome values, so this trigger reads
+  // white on the light theme's navy bar without knowing that. The app label
+  // hides on the narrowest widths so the icon and the account controls still
+  // fit.
   const trigger = (
     <Button
       variant="ghost"

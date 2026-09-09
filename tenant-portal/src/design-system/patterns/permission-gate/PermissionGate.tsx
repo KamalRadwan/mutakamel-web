@@ -10,17 +10,19 @@ import { hasPermission } from "./hasPermission";
 export interface PermissionGateProps {
   require: string | string[];
   scoped?: boolean;
+  /** An authoritative server denial overrides advisory session permissions. */
+  denied?: boolean;
   children: React.ReactNode;
 }
 
 // 403 is not an empty state — a distinct, labelled in-body state explaining
 // that access is missing, never EmptyState, which implies "there is nothing
 // here". Client-side only; the backend is authoritative.
-export function PermissionGate({ require, scoped, children }: PermissionGateProps) {
+export function PermissionGate({ require, scoped, denied = false, children }: PermissionGateProps) {
   const { t } = useI18n();
   const { user } = useTenantAuth();
 
-  if (hasPermission(user?.permissions ?? [], require, scoped)) {
+  if (!denied && hasPermission(user?.permissions ?? [], require, scoped)) {
     return <>{children}</>;
   }
 

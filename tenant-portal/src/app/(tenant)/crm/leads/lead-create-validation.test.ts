@@ -18,6 +18,8 @@ const messages: LeadCreateMessages = {
   duplicatePhone: "Already listed.",
   url: "Bad URL.",
   contactRequired: "Add a contact.",
+  tagsLimit: "At most {max} tags.",
+  tagsInvalid: "Choose valid tags.",
 };
 
 const SOURCE_ID = "01900100-0000-7000-8000-0000000000a1";
@@ -157,6 +159,30 @@ describe("validateCreateLead — acquisition source", () => {
   });
 });
 
+describe("validateCreateLead — tags", () => {
+  it("mirrors CreateLeadDto's fifty-tag ceiling", () => {
+    const tagIds = Array.from(
+      { length: 51 },
+      (_, index) => `01900100-0000-7000-8000-${String(index).padStart(12, "0")}`,
+    );
+    expect(validateCreateLead(form({ tagIds }), messages).tagIds).toBe("At most 50 tags.");
+    expect(validateCreateLead(form({ tagIds: tagIds.slice(0, 50) }), messages).tagIds)
+      .toBeUndefined();
+  });
+
+  it("blocks duplicate or non-UUIDv7 ids before the create write", () => {
+    const tagId = "01900100-0000-7000-8000-000000000001";
+    expect(validateCreateLead(form({ tagIds: [tagId, tagId] }), messages).tagIds)
+      .toBe("Choose valid tags.");
+    expect(
+      validateCreateLead(form({ tagIds: [tagId, tagId.toUpperCase()] }), messages)
+        .tagIds,
+    ).toBe("Choose valid tags.");
+    expect(validateCreateLead(form({ tagIds: ["not-a-tag"] }), messages).tagIds)
+      .toBe("Choose valid tags.");
+  });
+});
+
 describe("required custom fields", () => {
   it("blocks a submit that CUSTOM_FIELD_REQUIRED would reject", () => {
     const base = form({
@@ -175,6 +201,7 @@ describe("required custom fields", () => {
 describe("section index", () => {
   it("routes every error path to the section that renders it", () => {
     expect(sectionOfLeadCreateError("acquisitionSourceId")).toBe("classification");
+    expect(sectionOfLeadCreateError("tagIds")).toBe("classification");
     expect(sectionOfLeadCreateError("companyName")).toBe("company");
     expect(sectionOfLeadCreateError("companyPhones.1")).toBe("company");
     expect(sectionOfLeadCreateError("contacts.2.email")).toBe("contacts");

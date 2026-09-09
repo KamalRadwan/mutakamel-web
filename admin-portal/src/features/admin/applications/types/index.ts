@@ -186,6 +186,8 @@ export interface ApplicationView {
   lifecycleStatus: ApplicationLifecycleStatus;
   runtimeTarget: string | null;
   publicationStatus: ApplicationPublicationStatus;
+  /** Additive server evidence. Absent on older servers means unknown. */
+  hasPendingDraft?: boolean;
   publicationRevision: string;
   publishedAt: string | null;
   publishedBy: string | null;

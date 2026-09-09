@@ -1,13 +1,16 @@
 "use client";
 
 import { Droppable } from "@hello-pangea/dnd";
+import { ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import { Badge } from "../../primitives/Badge";
+import { Button } from "../../primitives/Button";
 import { cn } from "../../lib/cn";
+import { iconSize, mirrorInRtl } from "../../lib/icons";
 import { BoardCard, type BoardCardModel } from "./BoardCard";
 import { ColumnSegmentBar } from "./ColumnSegmentBar";
 import { VirtualColumnBody } from "./VirtualColumnBody";
 import { VIRTUALIZE_ABOVE } from "./useColumnWindow";
-import type { BoardColumnDef } from "./types";
+import type { BoardColumnDef, BoardColumnLabels } from "./types";
 
 const OUTCOME_BORDER: Record<NonNullable<BoardColumnDef["outcomeRole"]>, string> = {
   positive: "border-t-positive-500",
@@ -46,6 +49,12 @@ export interface BoardColumnProps {
   // whose first page has not arrived still needs the drop zone rather than a
   // blank body.
   cards: BoardCardModel[];
+  isCollapsed: boolean;
+  onToggleCollapse: (columnId: string) => void;
+  // Absent on a board whose screen has nothing to create — the `+` is then not
+  // drawn at all rather than drawn dead.
+  onAdd?: (columnId: string) => void;
+  labels: BoardColumnLabels;
 }
 
 // Fixed 280px width — the row scrolls horizontally, never the page. A 2px
@@ -60,7 +69,63 @@ export interface BoardColumnProps {
 // is exactly the problem: it is a default, invisible at this call site, and one
 // `items-start` on the row away from silently collapsing every column back onto
 // its content. Asked for here, it holds whatever the row does.
-export function BoardColumn({ column, emptyLabel, cards }: BoardColumnProps) {
+export function BoardColumn({
+  column,
+  emptyLabel,
+  cards,
+  isCollapsed,
+  onToggleCollapse,
+  onAdd,
+  labels,
+}: BoardColumnProps) {
+  // Both control labels name the column, because five identical "Collapse
+  // column" buttons in a row tell a screen-reader user nothing about which
+  // stage they are on.
+  const toggle = (
+    <Button
+      variant="ghost"
+      size="xs"
+      className="shrink-0"
+      aria-expanded={!isCollapsed}
+      aria-label={`${isCollapsed ? labels.expandColumn : labels.collapseColumn}: ${column.label}`}
+      onClick={() => onToggleCollapse(column.id)}
+    >
+      {/* Direction-bearing, so it mirrors under RTL — docs/design/icons.md.
+          The chevrons point the way the column is about to move. */}
+      {isCollapsed ? (
+        <ChevronsRight className={cn(iconSize({ size: "sm" }), mirrorInRtl)} aria-hidden="true" />
+      ) : (
+        <ChevronsLeft className={cn(iconSize({ size: "sm" }), mirrorInRtl)} aria-hidden="true" />
+      )}
+    </Button>
+  );
+
+  if (isCollapsed) {
+    return (
+      <div
+        className={cn(
+          "flex h-full min-h-0 w-(--size-column-collapsed) shrink-0 flex-col items-center gap-1.5 rounded-md border border-border bg-card py-1.5",
+          column.outcomeRole ? cn("border-t-2", OUTCOME_BORDER[column.outcomeRole]) : "",
+        )}
+      >
+        {toggle}
+        {/* `vertical-rl` rather than a rotate: the name reads top to bottom,
+            the box it occupies is the box it is measured in — so `truncate`
+            still ends a long stage name in an ellipsis against the column's
+            height — and Arabic turns with it instead of being flipped onto its
+            back. A `rotate(270deg)` would read bottom-to-top and would leave a
+            horizontal box the layout still reserved space for. */}
+        <span className="min-h-0 truncate text-xs font-medium text-foreground [writing-mode:vertical-rl]">
+          {column.label}
+        </span>
+        <Badge tone="neutral">{column.count}</Badge>
+        {column.overdueCount !== undefined && column.overdueCount > 0 && (
+          <span className="size-1.5 shrink-0 rounded-full bg-caution-500" aria-hidden="true" />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -82,6 +147,21 @@ export function BoardColumn({ column, emptyLabel, cards }: BoardColumnProps) {
               {column.amountLabel}
             </span>
           )}
+          <div className="flex shrink-0 items-center gap-0.5">
+            {onAdd && labels.addToColumn && (
+              <Button
+                variant="ghost"
+                size="xs"
+                className="shrink-0"
+                aria-label={`${labels.addToColumn}: ${column.label}`}
+                onClick={() => onAdd(column.id)}
+              >
+                {/* A `+` is direction-neutral and must NOT mirror. */}
+                <Plus className={iconSize({ size: "sm" })} aria-hidden="true" />
+              </Button>
+            )}
+            {toggle}
+          </div>
         </div>
 
         {/* Inside the heading block, not floating above the column, so the

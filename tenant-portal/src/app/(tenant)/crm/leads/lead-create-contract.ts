@@ -33,6 +33,7 @@ export const LEAD_CREATE_LIMITS = {
   taxNumber: 64,
   commercialRegistrationNumber: 64,
   contacts: 20,
+  tags: 50,
   description: 2000,
   interestSummary: 4000,
   expectedNeed: 4000,
@@ -83,6 +84,10 @@ export interface CreateLeadForm {
   leadProfileType: CrmProfileType;
   stageId: string;
   acquisitionSourceId: string;
+  /**
+   * Tenant tag ids written atomically with the new lead.
+   */
+  tagIds: string[];
   existingCompanyPartyId: string;
   companyName: string;
   legalName: string;
@@ -142,6 +147,7 @@ export function emptyCreateLeadForm(contactKey: string): CreateLeadForm {
     leadProfileType: "INDIVIDUAL",
     stageId: "",
     acquisitionSourceId: "",
+    tagIds: [],
     existingCompanyPartyId: "",
     companyName: "",
     legalName: "",
@@ -234,6 +240,7 @@ export interface CreateLeadRequest {
   displayName?: string;
   stageId?: string;
   acquisitionSourceId?: string;
+  tagIds?: string[];
   companyName?: string;
   existingCompanyPartyId?: string;
   legalName?: string;
@@ -347,6 +354,10 @@ export function buildCreateLeadRequest(
     ...optional("interestSummary", form.interestSummary),
     ...optional("expectedNeed", form.expectedNeed),
   };
+
+  // Optional on CreateLeadDto. Keep the clean empty form out of the body, but
+  // send every selected id together so lead + tags share one transaction.
+  if (form.tagIds.length > 0) request.tagIds = [...form.tagIds];
 
   const customFields = buildCustomFields(form.customFields);
   if (customFields) request.customFields = customFields;

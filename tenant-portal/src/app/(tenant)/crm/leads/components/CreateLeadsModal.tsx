@@ -10,6 +10,7 @@ import { isUUIDv7 } from "@/lib/uuid";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
 import { useCreateLeadForm } from "../hooks/useCreateLeadForm";
+import { useCreateLeadTags } from "../hooks/useCreateLeadTags";
 import { useLeadCompanyOptions } from "../hooks/useLeadCompanyOptions";
 import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import type { LeadStage } from "../hooks/useLeads";
@@ -31,6 +32,13 @@ export interface CreateLeadsModalProps {
   onClose: () => void;
   stages: LeadStage[];
   branchId: string | null;
+  /**
+   * Seeds the stage field — the board's `+` answers "which stage" by the column
+   * it was pressed in. Read once, when the form is created, so the caller keys
+   * this modal by the stage: a seed reapplied on every render would overwrite a
+   * stage the user had since changed by hand.
+   */
+  initialStageId?: string;
   onSubmit: (form: CreateLeadForm) => Promise<boolean>;
   error: string | null;
 }
@@ -57,6 +65,7 @@ export function CreateLeadsModal({
   onSubmit,
   stages,
   branchId,
+  initialStageId,
   error,
 }: CreateLeadsModalProps) {
   const { t } = useI18n();
@@ -69,10 +78,15 @@ export function CreateLeadsModal({
 
   const fieldMessages = useCrmFieldMessages();
   const messages = useMemo(
-    () => ({ ...fieldMessages, contactRequired: t.crmLeads.create.errors.contactRequired }),
+    () => ({
+      ...fieldMessages,
+      contactRequired: t.crmLeads.create.errors.contactRequired,
+      tagsLimit: t.crmLeads.create.errors.tagsLimit,
+      tagsInvalid: t.crmLeads.create.errors.tagsInvalid,
+    }),
     [fieldMessages, t],
   );
-  const state = useCreateLeadForm(messages, customFields.requiredFieldKeys);
+  const state = useCreateLeadForm(messages, customFields.requiredFieldKeys, initialStageId);
   const { form, errors, allErrors } = state;
 
   const corporate = isCorporateLead(form);
@@ -107,6 +121,7 @@ export function CreateLeadsModal({
   // Empty `form.branchId` means the branch the list screen is on — see
   // `buildCreateLeadRequest`.
   const activeBranchId = form.branchId || branchId || "";
+  const leadTags = useCreateLeadTags(isOpen);
   const companyId =
     pickedCompanyId && companyIds.includes(pickedCompanyId)
       ? pickedCompanyId
@@ -127,11 +142,8 @@ export function CreateLeadsModal({
   // changed nothing, and the close guard would then ask about edits that do
   // not exist.
   //
-  // Picking a DIFFERENT branch here is currently reported as a failed create
-  // even though the lead is stored — `useLeads.handleCreate` re-parses the
-  // response against the page's branch. That handler was owned by another
-  // session while this picker landed; the defect and its fix are D25 in
-  // docs/build/DEFECTS.md.
+  // A different branch is stored explicitly so `buildCreateLeadRequest` files
+  // the lead there and the response parser validates against that same branch.
   function chooseBranch(next: string) {
     state.setField("branchId", next === branchId ? "" : next);
   }
@@ -234,6 +246,9 @@ export function CreateLeadsModal({
       {customFields.degraded && (
         <DegradedBanner message={t.crmShared.customFieldsUnavailable} />
       )}
+      {(leadTags.degraded || (!leadTags.canRead && form.tagIds.length > 0)) && (
+        <DegradedBanner message={t.crmLeads.create.tagsUnavailable} />
+      )}
 
       <LeadClassificationSection
         companyIds={companyIds}
@@ -243,8 +258,13 @@ export function CreateLeadsModal({
         leadProfileType={form.leadProfileType}
         stageId={form.stageId}
         acquisitionSourceId={form.acquisitionSourceId}
+        tagIds={form.tagIds}
         stages={stages}
         sources={acquisitionSources.items}
+        tags={leadTags.items}
+        showTags={leadTags.canRead || form.tagIds.length > 0}
+        tagsLoading={leadTags.isLoading}
+        tagsUnavailable={leadTags.degraded || !leadTags.canRead}
         errors={errors}
         disabled={isSubmitting}
         onCompanyChange={chooseCompany}
@@ -257,6 +277,8 @@ export function CreateLeadsModal({
           // field", so the pick itself is what lets its error speak.
           state.touch("acquisitionSourceId");
         }}
+        onTagsChange={(tagIds) => state.setField("tagIds", tagIds)}
+        onTagsBlur={() => state.touch("tagIds")}
       />
 
       {corporate ? (

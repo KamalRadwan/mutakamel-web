@@ -10,7 +10,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Card, Button } from "@/design-system";
+import { Card, Button, Badge } from "@/design-system";
 import type {
   ApplicationTechnicalReadinessView,
   ApplicationView,
@@ -47,6 +47,7 @@ export function ApplicationReleaseAuthorityRail({
   // available to an already-published DRAFT that still has to be activated.
   const canOfferPublish =
     (application.publicationStatus === "UNPUBLISHED" ||
+      application.hasPendingDraft === true ||
       application.lifecycleStatus === "DRAFT") &&
     application.lifecycleStatus !== "DISABLED";
 
@@ -61,6 +62,8 @@ export function ApplicationReleaseAuthorityRail({
             {copy.title}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">{copy.subtitle}</p>
+          {application.hasPendingDraft === true && <div className="mt-2 space-y-1"><Badge tone="warn">{copy.pendingDraft}</Badge><p className="text-xs text-muted-foreground">{copy.pendingDraftHint}</p></div>}
+          {typeof application.hasPendingDraft !== "boolean" && application.publicationStatus === "PUBLISHED" && <p className="mt-2 text-xs text-muted-foreground">{copy.pendingDraftUnknown}</p>}
         </div>
         {canOfferPublish && canPublish && (
           <Button type="button" variant="primary" loading={isPublishing} onClick={onPublish} className="shrink-0">
@@ -69,7 +72,7 @@ export function ApplicationReleaseAuthorityRail({
             )}
             {isPublishing
               ? copy.publishing
-              : t.applications.detail.publishActivate.title}
+              : application.hasPendingDraft === true && application.lifecycleStatus !== "DRAFT" ? copy.republish : t.applications.detail.publishActivate.title}
           </Button>
         )}
       </header>

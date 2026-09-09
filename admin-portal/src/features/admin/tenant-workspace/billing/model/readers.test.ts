@@ -6,8 +6,6 @@ import {
   readCoreData,
   readCorePage,
   readPayment,
-  readPlanChangeApplyResult,
-  readPlanChangePreview,
   readReconciliation,
   readReconciliationCase,
   readSubscriptionItems,
@@ -18,12 +16,14 @@ import {
   readWalletLedger,
 } from "./readers";
 
+import { readCommercialPreview, readCommercialApplyReceipt } from "@/features/admin/subscriptions/commercial-change/commercial-change-readers";
+import { commercialPreviewFixture, commercialReceiptFixture } from "./subscription-commercial-fixtures";
+
 const TENANT_ID = "019ff251-0000-7000-8000-000000000001";
 const SUBSCRIPTION_ID = "019ff251-0000-7000-8000-000000000002";
 const ITEM_ID = "019ff251-0000-7000-8000-000000000003";
 const MODULE_ID = "019ff251-0000-7000-8000-000000000004";
 const TIER_ID = "019ff251-0000-7000-8000-000000000005";
-const NEXT_TIER_ID = "019ff251-0000-7000-8000-000000000006";
 const PREVIEW_ID = "019ff251-0000-7000-8000-000000000007";
 const WALLET_ID = "019ff251-0000-7000-8000-000000000008";
 const LEDGER_ID = "019ff251-0000-7000-8000-000000000009";
@@ -38,7 +38,6 @@ const CORRELATION_ID = "019ff251-0000-7000-8000-000000000010";
 const NOW = "2026-08-11T19:33:49.000Z";
 const LATER = "2026-08-11T19:34:49.000Z";
 const FUTURE = "2026-09-11T19:33:49.000Z";
-const HASH = "a".repeat(64);
 
 function envelope(data: unknown, meta?: Record<string, unknown>) {
   return {
@@ -97,42 +96,6 @@ function subscriptionView(overrides: Record<string, unknown> = {}) {
     effectiveAllowedUsers: 2,
     enabledModules: ["module.crm"],
     items: [subscriptionItem()],
-    ...overrides,
-  };
-}
-
-function planPreview(overrides: Record<string, unknown> = {}) {
-  return {
-    previewId: PREVIEW_ID,
-    subscriptionId: SUBSCRIPTION_ID,
-    tenantId: TENANT_ID,
-    operation: "CHANGE",
-    currencyCode: "USD",
-    billingCycle: "MONTHLY",
-    itemSetFingerprint: HASH,
-    planFingerprint: HASH,
-    pricingRevision: HASH,
-    pricedAt: NOW,
-    expiresAt: LATER,
-    item: {
-      itemId: ITEM_ID,
-      moduleId: MODULE_ID,
-      fromTierId: TIER_ID,
-      toTierId: NEXT_TIER_ID,
-      fromSeats: 2,
-      toSeats: 3,
-      previousLineTotalUsd: "10.0000",
-      nextLineTotalUsd: "12.0000",
-    },
-    financial: {
-      fullPeriodDeltaUsd: "2.0000",
-      direction: "DEBIT",
-      proratedAmountUsd: "1.0000",
-      walletAvailableUsd: "5.0000",
-      walletShortfallUsd: "0.0000",
-      walletStatus: "ACTIVE",
-      canApply: true,
-    },
     ...overrides,
   };
 }
@@ -351,74 +314,33 @@ describe("subscription readers", () => {
 
 describe("subscription lifecycle mutation readers", () => {
   it("reads a financially consistent plan-change preview", () => {
-    expect(
-      readPlanChangePreview(planPreview(), {
-        tenantId: TENANT_ID,
-        subscriptionId: SUBSCRIPTION_ID,
-        previewId: PREVIEW_ID,
-      }).financial.canApply,
-    ).toBe(true);
+    const preview = commercialPreviewFixture();
+    expect(readCommercialPreview(preview).financial.canApply).toBe(true);
+    // Eligibility is the owner's saved observation, never inferred from the wallet.
+    preview.financial.canApply = false;
+    expect(readCommercialPreview(preview).financial.canApply).toBe(false);
   });
 
   it.each([
-    ["hash", (value: ReturnType<typeof planPreview>) => {
-      value.planFingerprint = "A".repeat(64);
-    }],
-    ["expiry", (value: ReturnType<typeof planPreview>) => {
-      value.expiresAt = NOW;
-    }],
-    ["operation shape", (value: ReturnType<typeof planPreview>) => {
-      value.operation = "ADD";
-    }],
-    ["full-period delta", (value: ReturnType<typeof planPreview>) => {
-      value.financial.fullPeriodDeltaUsd = "3.0000";
-    }],
-    ["direction", (value: ReturnType<typeof planPreview>) => {
-      value.financial.direction = "CREDIT";
-    }],
-    ["shortfall", (value: ReturnType<typeof planPreview>) => {
-      value.financial.walletShortfallUsd = "1.0000";
-    }],
-    ["application eligibility", (value: ReturnType<typeof planPreview>) => {
-      value.financial.canApply = false;
-    }],
+    ["hash", (value: ReturnType<typeof commercialPreviewFixture>) => { value.actorBindingDigest = "A".repeat(64); }],
+    ["expiry", (value: ReturnType<typeof commercialPreviewFixture>) => { value.expiresAt = value.pricedAt; }],
+    ["operation shape", (value: ReturnType<typeof commercialPreviewFixture>) => { value.changes[0].operation = "ADD"; }],
+    ["full-period delta", (value: ReturnType<typeof commercialPreviewFixture>) => { value.financial.fullPeriodDeltaUsd = "3.0000"; }],
+    ["direction", (value: ReturnType<typeof commercialPreviewFixture>) => { value.financial.direction = "CREDIT"; }],
+    ["shortfall", (value: ReturnType<typeof commercialPreviewFixture>) => { value.financial.walletShortfallUsd = "-1.0000"; }],
+    ["application eligibility", (value: ReturnType<typeof commercialPreviewFixture>) => { Object.assign(value.financial, { canApply: "true" }); }],
   ])("rejects an invalid plan-change %s", (_label, mutate) => {
-    const value = clone(planPreview());
+    const value = commercialPreviewFixture();
     mutate(value);
-    expectContractError(() => readPlanChangePreview(value));
+    expect(() => readCommercialPreview(value)).toThrow("COMMERCIAL_RESPONSE_UNAVAILABLE");
   });
 
   it("enforces ADD and REMOVE result shapes", () => {
-    const applied = readPlanChangeApplyResult(
-      {
-        previewId: PREVIEW_ID,
-        operation: "CHANGE",
-        appliedAt: LATER,
-        item: {
-          id: ITEM_ID,
-          subscriptionId: SUBSCRIPTION_ID,
-          moduleId: MODULE_ID,
-          tierId: NEXT_TIER_ID,
-          seats: 3,
-          lineTotal: "12.0000",
-        },
-        removedItemId: null,
-        wallet: { direction: "DEBIT", amountUsd: "1.0000" },
-        subscriptionTotalUsd: "12.0000",
-      },
-      { previewId: PREVIEW_ID, subscriptionId: SUBSCRIPTION_ID },
-    );
-    expect(applied.item?.seats).toBe(3);
-
-    expectContractError(() =>
-      readPlanChangeApplyResult({ ...applied, operation: "REMOVE" }),
-    );
-    expectContractError(() =>
-      readPlanChangeApplyResult({
-        ...applied,
-        wallet: { direction: "NONE", amountUsd: "1.0000" },
-      }),
-    );
+    const preview = commercialPreviewFixture();
+    const applied = readCommercialApplyReceipt(commercialReceiptFixture(), preview);
+    expect(applied.changes[0].selectionId).toBe(preview.changes[0].itemId);
+    expect(() => readCommercialApplyReceipt({ ...applied, changes: [{ ...applied.changes[0], operation: "REMOVE" }] }, preview)).toThrow("COMMERCIAL_RESPONSE_UNAVAILABLE");
+    expect(() => readCommercialApplyReceipt({ ...applied, settlement: null }, preview)).toThrow("COMMERCIAL_RESPONSE_UNAVAILABLE");
   });
 
   it("enforces immediate and scheduled cancellation semantics", () => {

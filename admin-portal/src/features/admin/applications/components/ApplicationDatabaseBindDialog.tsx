@@ -15,6 +15,7 @@ import {
   Textarea,
 } from "@/design-system";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
+import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery";
 import { applicationsApi } from "../api/applications.api";
 import type {
   ApplicationDatabaseServerBindReceipt,
@@ -37,7 +38,20 @@ interface Props {
 }
 
 function useBindCopy() {
-  return useI18n().t.applications.detail.databaseBind;
+  const { lang, t } = useI18n();
+  return {
+    ...t.applications.detail.databaseBind,
+    attemptHistory: lang === "ar"
+      ? "نتائج آخر محاولة ربط."
+      : "Results from the last bind attempt.",
+    currentBinding: lang === "ar" ? "الارتباط الحالي" : "Current binding",
+    noBinding: lang === "ar" ? "لا يوجد ارتباط" : "No binding",
+    revision: lang === "ar" ? "المراجعة" : "Revision",
+    retryOriginal: lang === "ar" ? "إعادة محاولة الطلب الأصلي" : "Retry original request",
+    unresolvedNotice: lang === "ar"
+      ? "نتيجة الطلب الأصلي غير مؤكدة. تحتفظ إعادة المحاولة بالخوادم والمراجعات والسبب الأصليين."
+      : "The original outcome is uncertain. A retry preserves its exact servers, revisions and reason.",
+  };
 }
 
 /**
@@ -46,7 +60,7 @@ function useBindCopy() {
  *
  * The command reports one outcome per server instead of rolling the batch
  * back, so this dialog stays open on a partial failure and offers a retry
- * scoped to exactly the servers that failed.
+ * scoped to failed servers that remain bindable after refreshing their state.
  */
 export function ApplicationDatabaseBindDialog({
   isOpen,
@@ -63,36 +77,66 @@ export function ApplicationDatabaseBindDialog({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ApplicationDatabaseServerBindReceipt | null>(null);
+  const [unresolvedIntent, setUnresolvedIntent] = useState<BindApplicationDatabaseServersDto | null>(null);
+  const unresolvedIntentRef = useRef<{ applicationKey: string; dto: BindApplicationDatabaseServersDto } | null>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const loadAbort = useRef<AbortController | null>(null);
+  const dialogGeneration = useRef(0);
+  const submissionPending = useRef(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (selectBindable = false) => {
+    loadAbort.current?.abort();
+    const controller = new AbortController();
+    loadAbort.current = controller;
     setIsLoading(true);
     setLoadError(null);
     try {
-      const next = await applicationsApi.listBindableDatabaseServers(applicationKey);
+      const next = await applicationsApi.listBindableDatabaseServers(applicationKey, controller.signal);
+      if (controller.signal.aborted) return;
       setFleet(next);
-      setSelected(
-        next.servers
-          .filter((server) => server.bindable)
-          .map((server) => server.databaseServerId),
-      );
+      if (selectBindable) {
+        setSelected(
+          next.servers
+            .filter((server) => server.bindable)
+            .map((server) => server.databaseServerId),
+        );
+      }
     } catch (requestError) {
+      if (controller.signal.aborted) return;
       setFleet(null);
       setLoadError(normalizeApiError(requestError).message);
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) setIsLoading(false);
     }
   }, [applicationKey]);
 
   useEffect(() => {
     if (!isOpen) return;
+    ++dialogGeneration.current;
+    let cancelled = false;
     queueMicrotask(() => {
-      setReason("");
-      setError(null);
-      setReceipt(null);
-      void load();
+      if (cancelled) return;
+      const original = unresolvedIntentRef.current?.applicationKey === applicationKey
+        ? unresolvedIntentRef.current.dto
+        : null;
+      setUnresolvedIntent(original);
+      if (original) {
+        setReason(original.reason);
+        setSelected(original.databaseServerIds);
+      } else {
+        unresolvedIntentRef.current = null;
+        setReason("");
+        setError(null);
+        setReceipt(null);
+      }
+      void load(original === null);
     });
-  }, [isOpen, load]);
+    return () => {
+      cancelled = true;
+      ++dialogGeneration.current;
+      loadAbort.current?.abort();
+    };
+  }, [applicationKey, isOpen, load]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -109,24 +153,50 @@ export function ApplicationDatabaseBindDialog({
 
   if (!isOpen) return null;
 
+  const hasCurrentFleet =
+    !isLoading && !loadError && fleet?.applicationKey === applicationKey && fleet.bindable;
+  const failedIds = (receipt?.results ?? [])
+    .filter((row) => row.outcome === "FAILED")
+    .map((row) => row.databaseServerId);
+  const retryIds = hasCurrentFleet
+    ? failedIds.filter((databaseServerId) => bindableIds.includes(databaseServerId))
+    : [];
+  const canSubmit = !isSubmitting && hasCurrentFleet && selected.length > 0 &&
+    selected.every((databaseServerId) => bindableIds.includes(databaseServerId));
+
   const submitIds = async (databaseServerIds: string[]) => {
+    if (submissionPending.current || isSubmitting || !hasCurrentFleet) return;
     if (!fleet?.policyRevision) return;
+    if (databaseServerIds.some((databaseServerId) => !bindableIds.includes(databaseServerId))) return;
     if (!databaseServerIds.length) return setError(copy.selectServer);
     // Retrying reuses the same audited reason, so it is re-validated here too.
     if (reason.trim().length < 8) return setError(copy.reasonMinimum);
+    submissionPending.current = true;
+    const generation = dialogGeneration.current;
+    const dto = unresolvedIntent ?? {
+      databaseServerIds,
+      expectedCatalogueRevision: fleet.catalogueRevision,
+      expectedPolicyRevision: fleet.policyRevision,
+      reason: reason.trim(),
+    };
     setError(null);
     try {
-      setReceipt(
-        await onBind({
-          databaseServerIds,
-          expectedCatalogueRevision: fleet.catalogueRevision,
-          expectedPolicyRevision: fleet.policyRevision,
-          reason: reason.trim(),
-        }),
-      );
-      await load();
+      const nextReceipt = await onBind(dto);
+      if (generation !== dialogGeneration.current) return;
+      setReceipt(nextReceipt);
+      unresolvedIntentRef.current = null;
+      setUnresolvedIntent(null);
+      await load(true);
     } catch (submissionError) {
+      if (generation !== dialogGeneration.current) return;
+      const normalized = normalizeApiError(submissionError);
+      const original = shouldRotateWriteCommandKey(normalized) ? null : dto;
+      unresolvedIntentRef.current = original ? { applicationKey, dto: original } : null;
+      setUnresolvedIntent(original);
       setError(readMessage(submissionError, copy.submitFailed));
+      await load();
+    } finally {
+      submissionPending.current = false;
     }
   };
 
@@ -134,12 +204,6 @@ export function ApplicationDatabaseBindDialog({
     event.preventDefault();
     await submitIds(selected);
   };
-
-  const failedIds = (receipt?.results ?? [])
-    .filter((row) => row.outcome === "FAILED")
-    .map((row) => row.databaseServerId);
-  const canSubmit =
-    !isSubmitting && !isLoading && fleet?.bindable === true && bindableIds.length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
@@ -177,7 +241,7 @@ export function ApplicationDatabaseBindDialog({
                 servers={servers}
                 selected={selected}
                 bindableIds={bindableIds}
-                disabled={isSubmitting || fleet?.bindable !== true}
+                disabled={isSubmitting || unresolvedIntent !== null || fleet?.bindable !== true}
                 copy={copy}
                 onToggle={(databaseServerId, checked) =>
                   setSelected((current) =>
@@ -202,6 +266,7 @@ export function ApplicationDatabaseBindDialog({
                       maxLength={500}
                       rows={3}
                       value={reason}
+                      disabled={isSubmitting || unresolvedIntent !== null}
                       onChange={(event) => setReason(event.target.value)}
                       className="resize-none"
                     />
@@ -212,6 +277,9 @@ export function ApplicationDatabaseBindDialog({
           )}
 
           {receipt && <BindOutcomes receipt={receipt} copy={copy} />}
+          {unresolvedIntent && (
+            <p role="status" className="text-xs text-muted-foreground">{copy.unresolvedNotice}</p>
+          )}
 
           {error && (
             <p
@@ -231,15 +299,16 @@ export function ApplicationDatabaseBindDialog({
             {failedIds.length > 0 && (
               <Button
                 type="button"
-                variant="secondary"
-                loading={isSubmitting}
-                onClick={() => void submitIds(failedIds)}
+                 variant="secondary"
+                 loading={isSubmitting}
+                disabled={unresolvedIntent !== null || !hasCurrentFleet || retryIds.length === 0}
+                onClick={() => void submitIds(retryIds)}
               >
                 {copy.retryFailed}
               </Button>
             )}
             <Button type="submit" variant="primary" loading={isSubmitting} disabled={!canSubmit}>
-              {copy.confirm}
+              {unresolvedIntent ? copy.retryOriginal : copy.confirm}
             </Button>
           </footer>
         </form>
@@ -348,6 +417,15 @@ function ServerRow({
           <span className="mt-1 block truncate font-mono text-xs text-muted-foreground" dir="ltr">
             {server.host}:{server.port}
           </span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {copy.currentBinding}: {server.bindingStatus ?? copy.noBinding}
+            {server.credentialRevision !== null && ` · ${copy.revision} ${server.credentialRevision}`}
+          </span>
+          {server.safeFailureCode && (
+            <code className="mt-1 block break-words font-mono text-xs text-warning-subtle-foreground" dir="ltr">
+              {server.safeFailureCode}
+            </code>
+          )}
           {blocked && (
             <span className="mt-1 block text-xs text-warning-subtle-foreground">{blocked}</span>
           )}
@@ -374,6 +452,7 @@ function BindOutcomes({
       <h3 id={titleId} className="text-xs font-semibold text-foreground">
         {copy.outcomeTitle}
       </h3>
+      <p className="text-xs text-muted-foreground">{copy.attemptHistory}</p>
       <p className="text-xs text-muted-foreground">
         {copy.outcomeSummary
           .replace("{{bound}}", String(receipt.bound))

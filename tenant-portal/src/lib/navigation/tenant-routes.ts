@@ -22,6 +22,11 @@ export const TENANT_ROUTES = {
   coreBilling: "/core/billing",
   coreBillingInvoices: "/core/billing/invoices",
   coreSubscription: "/core/subscription",
+  coreSubscriptionCatalogue: "/core/subscription/catalogue",
+  coreSubscriptionChange: "/core/subscription/change",
+  coreSubscriptionDefinitionAdoption: "/core/subscription/definition-adoption",
+  coreApplicationAccess: "/core/application-access",
+  coreAddonSeats: "/core/application-access/addon-seats",
   coreNotifications: "/core/notifications",
   coreProfile: "/core/profile",
   coreOrganization: "/core/organization",
@@ -365,6 +370,8 @@ const CORE_OWNER_ROUTES = [
   TENANT_ROUTES.coreBilling,
   TENANT_ROUTES.coreBillingInvoices,
   TENANT_ROUTES.coreSubscription,
+  TENANT_ROUTES.coreSubscriptionCatalogue,
+  TENANT_ROUTES.coreSubscriptionChange,
 ] as const;
 
 /** The nav predicate for a billing or subscription entry — never a permission. */
@@ -374,6 +381,9 @@ export function canAccessCoreOwnerRoute(isTenantOwner: boolean): boolean {
 
 const CORE_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.core,
+  TENANT_ROUTES.coreApplicationAccess,
+  TENANT_ROUTES.coreSubscriptionDefinitionAdoption,
+  TENANT_ROUTES.coreAddonSeats,
   TENANT_ROUTES.coreSessions,
   // WebPhone settings stay reachable for a workspace that has not subscribed:
   // the screen renders disabled and states why, so the capability stays
@@ -398,7 +408,11 @@ const CORE_DETAIL_PATHS =
   /^\/core\/(?:notifications|users|roles|directory|templates|billing\/invoices|organization\/(?:companies|branches|departments|teams))\/[^/]+$/u;
 
 export function isSupportedCorePath(pathname: string): boolean {
-  return CORE_EXACT_PATHS.has(pathname) || CORE_DETAIL_PATHS.test(pathname);
+  return CORE_EXACT_PATHS.has(pathname) || CORE_DETAIL_PATHS.test(pathname)
+    || /^\/core\/subscription\/(?:receipts|operations)\/[^/]+$/u.test(pathname)
+    || /^\/core\/application-access\/addon-seats\/[^/]+$/u.test(pathname)
+    || /^\/core\/application-access\/(?:companies|branches)\/[^/]+$/u.test(pathname)
+    || /^\/core\/application-access\/(?:companies\/[^/]+\/application-activations\/[^/]+(?:\/addons\/[^/]+(?:\/configuration)?)?|branches\/[^/]+\/application-activations\/[^/]+\/addons\/[^/]+(?:\/configuration)?)$/u.test(pathname);
 }
 
 // One detail segment per list, never two — same rule as CORE_DETAIL_PATHS.

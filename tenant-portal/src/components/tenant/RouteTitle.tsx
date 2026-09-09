@@ -11,7 +11,7 @@ import { routeTitleKey } from "@/lib/navigation/route-title";
  *
  * Before this, all 132 routes shared the single `metadata` block in
  * `src/app/layout.tsx`: every tab in a user's window read "Tenant Portal -
- * Mutakamel Crowd Capital", in English, in an otherwise Arabic product. Tabs
+ * Mutakamel CRM", in English, in an otherwise Arabic product. Tabs
  * were indistinguishable, browser history was unusable, and a bookmark
  * recorded nothing about what had been bookmarked.
  *
@@ -38,9 +38,9 @@ export function RouteTitle() {
     document.title = page
       ? formatTemplate(t.metadata.titleTemplate, { page, portal: t.common.portalName })
       : formatTemplate(t.metadata.title, {
-          portal: t.common.portalName,
-          app: t.common.appName,
-        });
+        portal: t.common.portalName,
+        app: t.common.appName,
+      });
     // `t` is the whole dictionary object, which changes identity exactly when
     // the language does — that is what makes the title follow the toggle.
   }, [pathname, t]);

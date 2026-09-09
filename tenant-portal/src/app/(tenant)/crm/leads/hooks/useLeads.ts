@@ -704,7 +704,11 @@ export function useLeads() {
     }
 
     if (outcome.kind === "failed") {
-      setError(outcome.error.message || t.crmLeads.messages.createFailed);
+      setError(
+        outcome.error.code === "CRM_TAG_UNKNOWN"
+          ? t.crmLeads.messages.tagUnknown
+          : outcome.error.message || t.crmLeads.messages.createFailed,
+      );
       return false;
     }
 

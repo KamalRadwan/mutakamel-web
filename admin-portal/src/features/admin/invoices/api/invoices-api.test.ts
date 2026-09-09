@@ -10,7 +10,8 @@ vi.mock("@/lib/api/axiosClient", () => ({
   axiosClient: { get: getMock, post: postMock, patch: patchMock },
 }));
 
-import { invoicesApi, serializeInvoiceQuery } from "./invoices-api";
+import { getRetainedInvoiceDetail, invoicesApi, serializeInvoiceQuery } from "./invoices-api";
+import { invoiceCommercialResponse, manualInvoiceFixture } from "../model/invoice-commercial-fixtures";
 
 const INVOICE_ID = "019f0000-0000-7000-8000-000000000001";
 const TENANT_ID = "019f0000-0000-7000-8000-000000000002";
@@ -102,7 +103,7 @@ describe("invoicesApi", () => {
           hasPrev: false,
         }),
       )
-      .mockResolvedValueOnce(envelope(invoice()));
+      .mockResolvedValueOnce(invoiceCommercialResponse(manualInvoiceFixture()));
 
     await invoicesApi.list(
       { page: 1, limit: 20, sortBy: "createdAt", sortDir: "DESC" },
@@ -158,6 +159,38 @@ describe("invoicesApi", () => {
       [`/api/admin/core/v1/invoices/${INVOICE_ID}/issue`, issueDto, config],
       [`/api/admin/core/v1/invoices/${INVOICE_ID}/void`, undefined, config],
     ]);
+  });
+
+  it("reads retained detail with no body, query or idempotency header", async () => {
+    const signal = new AbortController().signal;
+    getMock.mockResolvedValue(invoiceCommercialResponse());
+    const result = await getRetainedInvoiceDetail(INVOICE_ID, signal);
+    expect(getMock).toHaveBeenCalledWith(`/api/admin/core/v1/invoices/${INVOICE_ID}`, {
+      cache: "no-store", signal,
+    });
+    expect(result.data.commercial?.lines[1].acceptedSeats).toBe(30);
+    expect(result.correlationId).toBe("corr-retained-invoice");
+    expect(postMock).not.toHaveBeenCalled();
+  });
+
+  it("reads manual invoice detail without a second request", async () => {
+    getMock.mockResolvedValue(invoiceCommercialResponse(manualInvoiceFixture()));
+    const result = await getRetainedInvoiceDetail(INVOICE_ID);
+    expect(result.data.commercial?.invoice.purpose).toBe("MANUAL");
+    expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([403, 409, 503])("does not fallback or widen requests after HTTP%s", async status => {
+    getMock.mockRejectedValue({ httpStatus: status });
+    await expect(getRetainedInvoiceDetail(INVOICE_ID)).rejects.toMatchObject({ httpStatus: status });
+    expect(getMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fallback after an obsolete contract discriminator", async () => {
+    const response = invoiceCommercialResponse(); Object.assign((response.data as { data: object }).data, { contractVersion: 2 });
+    getMock.mockResolvedValue(response);
+    await expect(getRetainedInvoiceDetail(INVOICE_ID)).rejects.toMatchObject({ errorCode: "COMMERCIAL_RESPONSE_UNAVAILABLE" });
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
   it("fails before transport for non-v7 resource or command identifiers", async () => {

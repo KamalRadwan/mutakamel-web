@@ -132,22 +132,30 @@ export function CrmContactLine({
   }, [contact.honorificTitle, directoryOwned, honorifics, onFieldChange]);
 
   return (
-    <div className="flex flex-col gap-2">
+    // A container, so the line answers to the width IT has rather than to the
+    // width of the window. It used to go single-row at `xl`, a 1280px VIEWPORT
+    // — which is a different question from "is there room for five controls
+    // here". The create modal is `inset-5`, so at 1160px of screen the line had
+    // roughly 900px to work with and still wrapped into two columns, because
+    // the window was 120px short of a breakpoint that was never measuring this
+    // element. It is also the answer to the hazard geometry.md#density-does-not
+    // -move-the-breakpoints names: density scales the controls but not the
+    // breakpoints, and a container query measures what density actually did.
+    <div className="@container flex flex-col gap-2">
       <div
         className={cn(
-          "grid grid-cols-1 gap-x-3 gap-y-3 md:grid-cols-2",
-          // One row at xl, which is what the modal is sized for. The two name
-          // boxes are fixed at 250px each — a first or last name has a known
-          // length and stretching them only padded whitespace — and the slack
-          // goes to the phone column, which holds a dial-code picker, a number
-          // and an add button in one track and was the one control the line
-          // squeezed. On the six-column line the job title and the email give
-          // up a rem each for the same reason: both truncate anyway, and a
-          // half-visible phone number is the one that cannot be read at all.
+          "grid grid-cols-1 gap-x-3 gap-y-3 @min-[28rem]:grid-cols-2",
+          // One row as soon as one row FITS — 52rem of container without a job
+          // title, 64rem with one. Both name boxes became `minmax(0,1fr)`: at
+          // 250px each they were 500px of the 832px this now needs, so the line
+          // could not fit before the window was 1280px wide no matter how much
+          // room the modal had. The phone column keeps a real floor because it
+          // holds three controls (code picker, number, add) and is the one that
+          // cannot be read when squeezed; the email takes what is left.
           // Written out rather than composed: Tailwind reads these as text.
           showJobTitle
-            ? "xl:grid-cols-[5rem_250px_250px_9rem_minmax(0,1fr)_minmax(0,12rem)]"
-            : "xl:grid-cols-[5rem_250px_250px_minmax(0,1fr)_minmax(0,13rem)]",
+            ? "@min-[64rem]:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(15rem,1.3fr)_minmax(0,1.3fr)]"
+            : "@min-[52rem]:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(15rem,1.3fr)_minmax(0,1.3fr)]",
         )}
       >
         {!directoryOwned && (

@@ -41,6 +41,7 @@ only when no pattern fits.
 | `DetailSection` | `detail-section/` | A labelled field group for read-mostly detail bodies |
 | `Timeline` | `timeline/` | Audit history, stage history, delivery attempts, approval ladders |
 | `AttachmentList` | `attachment-list/` | Stored attachments plus the upload affordance |
+| `ActivityList` | `activity-list/` | Reusable activity cards with permission-gated row actions |
 | `EditDrawer` | `edit-drawer/` | The **edit** counterpart to `FormDrawer`, which is create-only |
 | `DeletionBlockerDialog` | `deletion-blocker/` | A 409 with reasons — the list of blocking children |
 | `AtomicReplacementConfirm` | `atomic-replacement/` | The pre-write diff for a full-replacement `PUT` |
@@ -333,6 +334,11 @@ which is where it bites. Recorded by MASTER-PLAN task 3.38.
 
 ## DetailSection
 
+`density="compact"` opts into 8px header/body padding and content gaps with a
+`text-sm` heading. Default `"standard"` keeps existing consumers unchanged.
+One Lead passes the setting through history, activities, attachments and custom
+fields; it is not a global portal preference. Updated 2026-09-07.
+
 A labelled field group — a definition list, not a table. These are attributes of
 one record, and a `<table>` would announce row and column positions that carry
 no meaning.
@@ -342,6 +348,9 @@ Hiding the row leaves the reader unable to tell "not recorded" from "this record
 has no such field".
 
 ## Timeline
+
+`density="compact"` reduces the marker/content gap and event spacing to 8px;
+it never truncates audit changes or changes event order. Default is standard.
 
 Audit history, stage history, delivery attempts, approval ladders. One rail, one
 marker per event.
@@ -356,7 +365,68 @@ for step position.
 It never sorts. "Newest first" and "oldest first" are both correct depending on
 whether the reader is auditing or following a process, so the caller decides.
 
+### Entity-history changes
+
+`EntityHistoryCard` is the shared per-record audit presentation, including the
+History card on `/crm/leads/[id]`. Keep its diff deliberately compact and do not
+redesign it as a nested list of cards:
+
+```text
+Stage category: New > Contacted
+```
+
+- Do not render a `Changes` heading or visible `Old value` / `New value` labels.
+- The event header is `<actor> <timestamp>`. Do not show the action key/label
+  (`Stage changed`) and do not repeat the actor on a second line.
+- Each changed field is one plain wrapping line: `<field>: <old> > <new>`.
+- Related changes prefix the field with a direction-isolated subject label:
+  `<company/contact> · <field>: <old> > <new>`. Keep this on the same wrapping
+  line, with no extra card or action headline. Phone arrays display as a
+  comma-separated list, not JSON.
+- If historical evidence is missing, localize `Not recorded` for a missing
+  value or `Change details were not recorded.` for an empty event. Never leave
+  the event body blank or manufacture its old values.
+- The old value is struck through and uses `text-danger-600` in light mode and
+  `dark:text-danger-300` in dark mode; the new value uses the normal foreground.
+  These are the existing accessible theme ramps, not a raw red value.
+- Do not render the audit correlation/reference identifier in this card.
+- Keep the comparison itself left-to-right inside an RTL page so old always
+  precedes new; each value still resolves its own text direction.
+- Read the server's redacted `diff`. For legacy `LEAD_STAGE_CHANGED` rows whose
+  diff is absent, only the known stage/status fields in metadata may be used as
+  a compatibility fallback. Do not reconstruct arbitrary before/after objects.
+
+## ActivityList
+
+`density="compact"` uses 6px card padding, 4px list gaps, and the shared
+`text-xs` subject size. Both lead activity surfaces can select it without
+forking row markup or altering action permissions. Default is standard.
+
+`ActivityList<T>` is the API-free card template for open work. Import it from
+`@/design-system`; never import a Lead feature component into another app.
+Pass rows with `id`, `subject`, `dueAt`, plus `describe(row)` for localized
+type/priority/date/action labels and priority tone. The template renders wrapped
+subjects, a labelled priority badge, type/date and one overflow menu. Loading,
+error and empty states live in the same template.
+
+The caller supplies `canEdit`, `canComplete`, `canDiscard`, `pendingId`,
+`editingId` and row callbacks. Permissions, queries, confirmation, modal state,
+optimistic version and idempotency stay outside the template. Discard means
+cancel, never delete. `LeadActivityList` supplies CRM's labels and formatting;
+both `LeadActivityDialog` and `LeadActivitiesPanel` reuse it.
+
 ## AttachmentList
+
+`density="compact"` reduces list gaps to 8px and stored-file padding to 6px.
+The upload queue, download controls, error feedback and standard default remain
+unchanged; density does not alter file admission or upload behavior.
+
+`uploadVariant="button"` places a compact file-picker button **above** the
+stored files, using the same `FileUpload` admission checks and queue. Default
+`"dropzone"` preserves the drop zone below the list for existing consumers.
+`canUpload=false` omits either upload control; `disabled` prevents additions
+during an upload or unresolved write. Downloads remain per-file icon controls,
+named with the filename. The caller owns navigation and delete confirmation.
 
 Stored attachments plus the upload affordance, built on `FileUpload`.
 
@@ -588,6 +658,21 @@ constraint-critical rather than cosmetic.
 
 
 ## FormModal
+
+`density="compact"` is independent of surface `size`: it reduces header/body/
+footer insets to 12px horizontal and 8px vertical, body gaps to 8px, and footer
+buttons to `sm`. Nested `FormSection` grids inherit 8px gaps through an internal
+context, including inside the dialog portal. Standard remains the default;
+dirty guards, focus management, error summaries and the close button's safe
+clearance are identical in both densities. One Lead opts into this setting for
+company/contact/activity editing and lead conversion. Updated 2026-09-07.
+
+`hideSubmit` supports persistent receipt-only modal states: it removes the
+submit button and blocks implicit/Enter submission in the shared form shell.
+It defaults false. Lead conversion uses it after success, uncertainty or an
+applied-but-unreadable response; Close remains available outside an in-flight
+request. Its centered card may contain compact sections by explicit One Lead
+product decision, overriding the generic short-create guidance below.
 
 The same contract as `FormDrawer`, on a centred `DialogContent`. Both take their
 behaviour from `useFormShell`, so the real `<form>`, the `noValidate` decision,

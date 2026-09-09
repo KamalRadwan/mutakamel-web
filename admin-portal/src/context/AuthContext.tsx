@@ -27,6 +27,7 @@ import {
 } from "@/lib/api/axiosClient";
 import {
   publishAdminAuthEvent,
+  readLatestAdminAuthEvent,
   subscribeToAdminAuthEvents,
   subscribeToAdminAuthLifecycle,
 } from "@/lib/auth/sessionCoordinator";
@@ -241,7 +242,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           getAuthErrorStatus(error),
           getAuthErrorCode(error),
         );
-        if (disposition !== "end") {
+        // A reload can observe an already-recorded end without receiving its
+        // original event. The request fence correctly rejects that old work
+        // with 409, but bootstrap must resume sign-in instead of retrying the
+        // same fence forever. Never treat a different/newer session as ended.
+        const latestEvent = readLatestAdminAuthEvent();
+        const recordedSessionEnd =
+          getAuthErrorCode(error) === "AUTH_SESSION_CHANGED" &&
+          latestEvent !== null &&
+          shouldHonorSessionEndedEvent(latestEvent);
+        if (disposition !== "end" && !recordedSessionEnd) {
           setBootstrapFailure({
             status: getAuthErrorStatus(error) ?? 0,
             ...(getAuthErrorCode(error)

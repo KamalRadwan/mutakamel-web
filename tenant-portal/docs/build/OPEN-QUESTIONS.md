@@ -993,6 +993,15 @@ than the page cap.
 
 ## Q25 — no tenant-facing module / tier catalogue for a plan change
 
+**Discovery resolved2026-09-07:** the exact V2 owner-only published catalogue and
+`/core/subscription/catalogue` explorer now enumerate Application/Tier and Addon
+offers with independent dynamic ladders. See [published offers](../api/subscription-offers.md).
+The historical gap below no longer applies to enumeration. Prepared purchase,
+Addon changes and adoption remain separate unfinished commands; display offers
+must not be passed into the legacy flow as if they were confirmed quotes.
+
+Historical finding:
+
 `CreateSubscriptionPlanChangePreviewDto` accepts three operations. For a TENANT
 actor `SubscriptionItemsService.preparePlanChange` refuses `REMOVE` outright
 (`DOWNGRADE_NOT_ALLOWED`), which leaves `ADD` and `CHANGE`.
@@ -2225,3 +2234,138 @@ the actor may see, so the absence costs a user with `own` scope nothing.
 `?includeOwner=true` on the list, projecting `ownerDisplayName` the way
 `/pipelines/:id/cards` already does), or an explicit decision that owner is a
 CRM-admin filter and does not belong on a user-facing list screen.
+
+## Q133 — existing corporate contact identity is not editable through Lead PATCH
+
+Found 2026-09-07 while moving people into the standalone One Lead Contacts card.
+
+**Verified:** `UpdateLeadDto.contacts` accepts existing people by
+`contactPartyId`, but `LeadsService.update` uses that path to synchronize the
+lead contact link and relationship label/primary flag, not the person's name,
+email or phones. Omitting the ID creates a person; it is not an edit mechanism.
+Directory routes have their own authorization and contact-method identity
+requirements, so calling them implicitly would widen this lead-scoped action.
+
+**Current implementation — subsequent user request, 2026-09-07:** each contact
+has its own edit modal. With Directory read + party manage + contact manage
+permissions it updates the existing person's name and method IDs through Core,
+and job title/primary through CRM while preserving the lead's other people.
+Without the Directory grants, those identity fields remain read-only. No
+add/remove person controls are offered. The modal explains shared-record effects
+and handles partial/uncertain saves with a blocking reload boundary. See
+[the verified contract](../api/crm-leads.md#contacts-on-the-one-lead-screen).
+
+**Settle with:** an explicitly authorized backend change to support updating an
+existing person's allowed identity/contact fields through the Lead operation,
+if an atomic all-fields contact save is required. The separately permission-gated
+Directory workflow is now implemented, but is not an atomic transaction.
+Also clarify phone kinds before promising complete deletion: the individual
+lead read model merges `PHONE` and `MOBILE`, but its `phones` write synchronizes
+`MOBILE` only. The frontend must not invent contact-method IDs or claim that a
+removed Directory `PHONE` has been deleted by that request.
+
+## Q134 — tenant-host status fails during One Lead visual verification
+
+Observed 2026-09-07 while verifying One Lead Small density and the reported
+missing `useCreateLeadTags.ts` build error. The hook exists with a matching
+import/call; `pnpm build` succeeds for `/crm/leads` and `/crm/leads/[id]`.
+
+The running HTTP development server on port 5002 instead shows the root
+not-found boundary. A read-only request to
+`GET /api/tenant/core/v1/public/tenant-host/status`, through the configured
+Gateway at `http://127.0.0.1:9000` with `Host: mersany.mutakamel.ai`, returned
+HTTP 500 / `COMMON.GENERIC.INTERNAL_ERROR` at `2026-09-07T04:00:47.069Z`.
+Correlation ID: `01a07a06-9596-7478-b58c-34d2bcc449cc`.
+`TenantHostAdmission` deliberately calls `notFound()` when this probe cannot
+validate tenant status. This is separate from source compilation and prevents
+authenticated visual QA of the style changes.
+
+**Settle with:** the backend/runtime owner investigating that correlated
+Gateway/Core failure and restoring the existing host-status contract. Do not
+bypass tenant admission, hardcode ACTIVE, edit backend files from this frontend
+task, or mark visual verification complete on the strength of a successful build.
+
+Rechecked during the conversion modal rebuild on 2026-09-07: the same
+read-only probe could not connect to `127.0.0.1:9000` (connection refused).
+The runtime blocker therefore still prevents live-session visual/conversion QA;
+the frontend must not change tenant admission to work around it.
+
+## Q135 — conversion Swagger receipt differs from the CRM service
+
+Verified 2026-09-07 during the requested Convert Lead modal rebuild.
+`LeadsService.convert` returns `{ lead, customerProfileId, opportunityId? }`,
+while the controller Swagger example and older portal prose describe nested
+`customerProfile` / `opportunity` objects. The old frontend parser followed
+that stale example, risking an applied-but-unreadable UI after a successful
+conversion.
+
+**Implemented in the portal:** parse the actual flat UUIDv7 IDs, verify them
+against the returned converted lead, display corresponding record links, and
+retain safe reconciliation for unreadable receipts. API and design documents
+now use the service contract. No backend file was changed.
+
+**Settle with:** the backend owner aligning the controller/Swagger example with
+the existing service result and adding a response-contract assertion.
+
+## Q136 — Addon management and commercial transports beyond singleton reads
+
+**2026-09-09 receipt/status source closure:** actual 25 immutable financial reader, 04 Tenant controllers and 09 Gateway rows now back owner-only operation and saved-receipt pages. Verified COMMITTED status supplies the actual preview and preparation references; standalone receipt retrieval requires no original apply key or fabricated preview. The saved PENDING projection remains historical. Tenant uses a 4 MiB envelope budget and a separate 65,536-byte receipt-data bound. This read-only source packet awaits task 13 checks and authenticated acceptance. Purchase-write cutover and the generic schema form/configuration writer remain separate unfinished work.
+
+**2026-09-09 current resolution:** [Canonical delivery](../api/catalogue-canonical-delivery.md) removes the commercial header/discriminator and unavailable commercial evidence alternative. Exact Core and Gateway seat POST/DELETE are registered and their existing Tenant command/recovery panel is mounted. The prior missing DELETE registration described below is resolved in source; generated inventory and runtime acceptance remain integration checks. Company Application, Company Addon and Branch override positive/narrowing UI is now mounted after authenticated scoped-event, module and exact Gateway source closure. Forward narrow-grant adoption and runtime acceptance remain pending. Tenant purchase/preparation/installation/readiness are assigned to coordinated implementation owners; no guessed public command is mounted. A reviewed real business Addon/configuration owner remains a separate product decision. The following entries preserve earlier dated snapshots.
+
+Verified2026-09-07 during the Application Catalogue Tenant Frontend track. Five scoped singleton GETs are implemented and documented in [scoped reads](../api/application-access.md). A read contract is not permission to invent a list, assignment, activation/configuration PATCH, purchase/preparation/apply or adoption endpoint.
+
+Access & RBAC track has frozen Company/Branch list contracts and is implementing them; exact mutation receipt storage depends on Database track. Commercial track is implementing negotiated Tenant V2 subscription/items and safe offers before public commands. The current configuration projector registry is empty, so configured arbitrary values must remain unavailable. Existing V1 owner-only billing behavior is preserved until the successor contracts are verified.
+
+**Read slice resolved in this task:** two Company/Branch lists and Tenant V2 subscription detail/items have accepted Core/Gateway source handoffs and are now wired through strict adapters and scoped/session-fenced UI. This does not close assignment/mutation/purchase/adoption gaps. Offers source is accepted by its owner but its public registration remains a separate handoff. Seven scoped reads and negotiated subscription prices are documented in their current API pages; no live authenticated claim is made.
+
+**Subsequent offers resolution:** Commercial and coordinator Gateway source acceptance now permit the read-only published catalogue, which is mounted and discoverable. This resolves its GET handoff only. Assignment-read acceptance, scope mutations and commercial commands remain pending; no whole FE task or live acceptance is implied.
+
+**Subsequent allocation-read resolution:** the exact-user Addon assignment GET has Access46actualPg/HTTP and coordinator Gateway144-test handoffs. Its standalone independently authorized page and User-detail link are now wired. No user-profile permission is added to the read. Assignment/removal, activation/configuration and commercial mutations remain unaccepted; no whole-task/live claim.
+
+**2026-09-08 retained invoice/options resolution:** owner-scoped retained InvoiceReadV2 now has17actual-Pg/26HTTP and root195Gateway/live-image acceptance; its existing Tenant detail fetch and evidence UI are enabled and production-built. The separate exact-user options GET has53owner/3HTTP and root204Gateway/coherent-image acceptance. Its closed sixteen-field parser and lazily mounted read-only tab expose genuine nullable parent/child pins, allowance revisions and six non-authoritative diagnostics. First-assignment revision discovery is resolved without expanding the frozen live-assignment list or inventing revision0/1. Assignment/removal commands, activation/configuration writes and prepared commercial/adoption workflows remain unfinished dependencies. See the [track receipt](../plans/application-catalogue-frontend-track.md) for exact tests/builds; this is not authenticated Tenant browser proof.
+
+**2026-09-08 unmounted ASSIGN/REMOVE preparation:** coordinator authorized actual
+closed command adapters, reusable dialog/hooks, bilingual copy and feature-local
+original-intent recovery before integration release. These now pass371scoped
+Access tests and remain absent from route/workspace imports. Core controllers,
+closed request codec and retained nine-field receipt are source-verified with
+Access; no DTO decision remains open. This is production source preparation,
+not a live API enablement or authenticated Tenant test.
+
+The honest called-route check now finds201source paths:200registered/documented
+and one prepared path absent from Gateway,
+`/api/tenant/core/v1/users/:userId/addon-assignments/:assignmentId`, in
+`application-addon-assignment-command.ts`. The existing POST shares the current
+GET's path, but its write method is not accepted either. Keep this check red
+until the root-owned exact Core/Gateway/permit-invalidation/deployment handoff;
+do not add a checker exemption, hide the path or edit the backend to satisfy a
+frontend check. There is no live call from either unmounted component.
+
+**Subsequent bounded composition preparation:** `AddonSeatCommandPanel` now
+composes the existing exact-user read result with the prepared row/recovery
+commands, without any live workspace/page import or additional request owner.
+Private snapshot context, stale-row retirement, inaccessible/restored target
+recovery and temporary self-refresh ownership pass387scoped Access tests.
+TypeScript, scoped lint, design and docs checks pass; called-route verification
+still reports the same201/200 and held DELETE path. This preparation does not
+resolve the integration dependency or enable a browser write.
+
+**FE07 restriction-only UI preparation:** the Access owner confirmed provisional
+Branch DISABLED semantics and hidden Company binding prerequisites. A local
+dialog/callback now consumes accepted Branch facts and a real reason, without
+any DTO, endpoint, restoration action or live import. Its39new tests bring the
+scoped Access suite to426. Strict TypeScript/lint/design pass. During this
+parallel follow-on, `docs:check` stopped at a stale generated route inventory;
+the coordinator owns accepting and refreshing the changed source inventory.
+This preparation does not enable Branch writes or resolve recovery/transport
+acceptance. No generated route or backend file was edited by FE07.
+
+**Subsequent accepted metadata refresh:** coordinator authorization allowed the
+official route generator and its inventory-derived reference pages to refresh
+against accepted Gateway read metadata. The618route inventory and all207/160/231
+Core/CRM/Trade reference rows remain unchanged. Full docs checks now pass;
+called-route verification still fails201/200 on the same held assignment DELETE.
+No Branch endpoint was added and no backend or checker was edited.
+
+**Settle with:** actual Gateway/controller/closed DTO and service evidence from the owning Access and Commercial tracks, followed by frontend contract/UI integration and authenticated tests. This is active parallel coordination, not a request for the user to design an API. Do not bypass authority, assume prices or seed imaginary configuration. Mobile/Partner readiness is outside the user's current task scope.

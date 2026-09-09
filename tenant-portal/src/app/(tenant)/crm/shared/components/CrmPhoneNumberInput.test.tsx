@@ -77,10 +77,44 @@ describe("CrmPhoneNumberInput", () => {
     expect(codeButton()).toHaveTextContent("+971");
   });
 
-  it("keeps a number typed without any code, which the field used to accept", () => {
+  it("drops the trunk zero from a number written the local way", () => {
+    // "01050049899" is how an Egyptian number is dialled from inside Egypt.
+    // That leading 0 is exactly what the calling code replaces, so keeping it
+    // beside +20 would send one digit too many.
     render(<Harness />);
+    chooseCountry("Egypt");
     fireEvent.change(numberBox(), { target: { value: "01050049899" } });
-    expect(stored()).toBe("01050049899");
+    expect(numberBox()).toHaveValue("1050049899");
+    expect(stored()).toBe("+201050049899");
+  });
+
+  it("never accepts a leading zero as it is typed", () => {
+    render(<Harness />);
+    chooseCountry("Egypt");
+    // The field holds the whole value on every keystroke, so the first "0" is
+    // refused as it arrives rather than cleaned up on blur.
+    fireEvent.change(numberBox(), { target: { value: "0" } });
+    expect(numberBox()).toHaveValue("");
+    fireEvent.change(numberBox(), { target: { value: "1" } });
+    expect(numberBox()).toHaveValue("1");
+  });
+
+  it("reads a pasted 00 prefix as the + it stands for", () => {
+    // The one place a leading zero means something: 00 is the international
+    // prefix, so this is a +20 number and has to split like one.
+    render(<Harness />);
+    fireEvent.change(numberBox(), { target: { value: "00201050049899" } });
+    expect(codeButton()).toHaveTextContent("+20");
+    expect(numberBox()).toHaveValue("1050049899");
+    expect(stored()).toBe("+201050049899");
+  });
+
+  it("strips a trunk zero left behind a pasted calling code", () => {
+    // Contact sheets are full of "+20 010…", which is both forms at once.
+    render(<Harness />);
+    fireEvent.change(numberBox(), { target: { value: "+2001050049899" } });
+    expect(codeButton()).toHaveTextContent("+20");
+    expect(stored()).toBe("+201050049899");
   });
 
   it("keeps the country the user picked, not the first that shares its code", () => {

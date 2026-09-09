@@ -52,8 +52,10 @@ const EMPTY_CRITICAL: CriticalInvoiceDraft = {
 export function useInvoiceDetail(invoiceId: string) {
   const { user, isLoading: isAuthLoading } = useAuth();
   const permissions = useMemo(() => readInvoicePermissions(user), [user]);
+  const ownerKey = JSON.stringify([user?.id ?? null, invoiceId]);
   const [state, setState] = useState<InvoiceResourceState>("LOADING");
   const [snapshot, setSnapshot] = useState<CoreSnapshot<Invoice> | null>(null);
+  const [snapshotOwner, setSnapshotOwner] = useState<string | null>(null);
   const [error, setError] = useState<ReturnType<typeof normalizeApiError> | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -67,6 +69,8 @@ export function useInvoiceDetail(invoiceId: string) {
   const requestGeneration = useRef(0);
   const hasSnapshot = useRef(false);
   const intents = useRef(createInvoiceIntentStore());
+  const scopeEpoch = useRef(0);
+  const mutationPending = useRef(false);
 
   const setDialog = useCallback((next: InvoiceDetailDialog) => {
     dialogRef.current = next;
@@ -76,6 +80,7 @@ export function useInvoiceDetail(invoiceId: string) {
   const applySnapshot = useCallback((next: CoreSnapshot<Invoice>) => {
     hasSnapshot.current = true;
     setSnapshot(next);
+    setSnapshotOwner(ownerKey);
     setState("READY");
     setEditDraft(invoiceToEditDraft(next.data));
     // FE-B01. Whoever delivers authoritative data owns the refresh flag.
@@ -87,15 +92,18 @@ export function useInvoiceDetail(invoiceId: string) {
     // life. The command had just supplied a newer snapshot than the GET would
     // have, so there is nothing left to wait for.
     setIsRefreshing(false);
-  }, []);
+  }, [ownerKey]);
 
   useEffect(() => {
     let cancelled = false;
+    scopeEpoch.current += 1;
     queueMicrotask(() => {
       if (cancelled) return;
       intents.current.clearAll();
       hasSnapshot.current = false;
+      mutationPending.current = false;
       setSnapshot(null);
+      setSnapshotOwner(null);
       setError(null);
       setMutation(EMPTY_MUTATION);
       setValidationErrors({});
@@ -103,8 +111,9 @@ export function useInvoiceDetail(invoiceId: string) {
     });
     return () => {
       cancelled = true;
+      scopeEpoch.current += 1;
     };
-  }, [invoiceId, setDialog]);
+  }, [ownerKey, permissions.canRead, setDialog]);
 
   useEffect(() => {
     if (isAuthLoading || !permissions.canRead) return;
@@ -123,6 +132,7 @@ export function useInvoiceDetail(invoiceId: string) {
         if (controller.signal.aborted || current !== requestGeneration.current) return;
         hasSnapshot.current = true;
         setSnapshot(next);
+        setSnapshotOwner(ownerKey);
         setState("READY");
         const activeDialog = dialogRef.current;
         const dialogIsStillEligible =
@@ -151,9 +161,11 @@ export function useInvoiceDetail(invoiceId: string) {
         }
       });
     return () => controller.abort();
-  }, [invoiceId, isAuthLoading, permissions.canRead, revision, setDialog]);
+  }, [invoiceId, ownerKey, isAuthLoading, permissions.canRead, revision, setDialog]);
 
-  const invoice = snapshot?.data ?? null;
+  const ownsSnapshot = snapshotOwner === ownerKey && !isAuthLoading && permissions.canRead;
+  const invoice = ownsSnapshot ? snapshot?.data ?? null : null;
+  const requiresDetailRefresh = Boolean(invoice?.commercial);
   const canEdit = Boolean(
     permissions.canUpdate &&
       invoice?.status === "DRAFT" &&
@@ -266,16 +278,26 @@ export function useInvoiceDetail(invoiceId: string) {
       fingerprintValue: unknown,
       command: (key: string) => Promise<CoreSnapshot<Invoice>>,
     ) => {
-      if (mutation.phase === "PENDING") return null;
+      if (mutationPending.current) return null;
+      mutationPending.current = true;
+      const startedScope = scopeEpoch.current;
       const key = intents.current.get(scope, stableInvoiceFingerprint(fingerprintValue));
       setMutation({ name, phase: "PENDING", error: null, correlationId: null });
       try {
         const result = await command(key);
+        if (scopeEpoch.current !== startedScope) return null;
         intents.current.clear(scope);
         // A GET started before this command must never overwrite the newer
         // authoritative command response when it eventually settles.
         requestGeneration.current += 1;
-        applySnapshot(result);
+        if (requiresDetailRefresh) {
+          // Existing command receipts have their own response contract.
+          // Re-read current detail to retain complete commercial evidence.
+          hasSnapshot.current = false;
+          setSnapshot(null);
+          setState("LOADING");
+          setRevision(current => current + 1);
+        } else applySnapshot(result);
         setDialog(null);
         setValidationErrors({});
         setMutation({
@@ -286,6 +308,7 @@ export function useInvoiceDetail(invoiceId: string) {
         });
         return result;
       } catch (caught) {
+        if (scopeEpoch.current !== startedScope) return null;
         const normalized = normalizeApiError(caught);
         if (!shouldRetainInvoiceIntent(normalized)) intents.current.clear(scope);
         const phase = classifyInvoiceMutationError(caught, normalized);
@@ -299,9 +322,11 @@ export function useInvoiceDetail(invoiceId: string) {
           setRevision((current) => current + 1);
         }
         return null;
+      } finally {
+        if (scopeEpoch.current === startedScope) mutationPending.current = false;
       }
     },
-    [applySnapshot, mutation.phase, setDialog],
+    [applySnapshot, requiresDetailRefresh, setDialog],
   );
 
   const saveEdit = useCallback(async () => {
@@ -349,7 +374,7 @@ export function useInvoiceDetail(invoiceId: string) {
     ? "LOADING"
     : !permissions.canRead
       ? "FORBIDDEN"
-      : state;
+      : state === "READY" && !ownsSnapshot ? "LOADING" : state;
 
   return {
     permissions,
@@ -357,7 +382,7 @@ export function useInvoiceDetail(invoiceId: string) {
     snapshot: visibleState === "READY" ? snapshot : null,
     error,
     isRefreshing,
-    dialog,
+    dialog: visibleState === "READY" ? dialog : null,
     editDraft,
     issueDraft,
     voidDraft,

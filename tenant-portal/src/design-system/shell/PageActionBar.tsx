@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback } from "react";
+import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { cn } from "../lib/cn";
 import { iconSize, mirrorInRtl } from "../lib/icons";
+import { focusRing } from "../lib/variants";
 import { usePageActionSlots } from "./page-action-slots";
 import { useNavLocation } from "./useNavLocation";
 import type { NavSection } from "./nav-config";
@@ -53,6 +55,7 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
   // until React throws "Maximum update depth exceeded". Found by
   // AppShell.actions.test.tsx, which is the reason that test renders the real
   // bar instead of a stub.
+  const setRelated = useCallback((node: HTMLDivElement | null) => register("related", node), [register]);
   const setActions = useCallback((node: HTMLDivElement | null) => register("actions", node), [register]);
   const setSearch = useCallback((node: HTMLDivElement | null) => register("search", node), [register]);
   const setView = useCallback((node: HTMLDivElement | null) => register("view", node), [register]);
@@ -76,9 +79,12 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
         "overflow-x-auto bg-card px-3 print:hidden",
       )}
     >
-      {/* Plain text, not a <nav>: these are not links — the sections have no
-          index route — and a second landmark announced as navigation would
-          just add noise to the one above it. */}
+      {/* Not a <nav>: a second landmark announced as navigation would just add
+          noise to the one above it. The SECTION stays plain text because a
+          section has no index route to link to; the ITEM is a link, because it
+          always has one — and on a detail route that link is the way back to
+          the list the record came from, which is the trip a user makes far more
+          often than any other from here. */}
       <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
         <span className="truncate">{sectionLabel}</span>
         {itemLabel && (
@@ -87,12 +93,31 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
               className={cn(iconSize({ size: "xs" }), mirrorInRtl)}
               aria-hidden="true"
             />
-            <span className="truncate text-sm font-medium text-foreground">{itemLabel}</span>
+            {location.itemHref ? (
+              <Link
+                href={location.itemHref}
+                className={cn(
+                  "truncate rounded-xs text-sm font-medium text-foreground hover:underline",
+                  focusRing,
+                )}
+              >
+                {itemLabel}
+              </Link>
+            ) : (
+              <span className="truncate text-sm font-medium text-foreground">{itemLabel}</span>
+            )}
           </>
         )}
       </p>
+      {/* The middle. Links to OTHER records live here rather than in the
+          trailing cluster: they leave this screen, and the controls beside the
+          view switcher act on it. `mx-auto` centres the group in whatever room
+          the location text and the trailing cluster leave, and `min-w-0` lets
+          it shrink and scroll with the bar rather than pushing either aside. */}
+      <div ref={setRelated} className="mx-auto flex min-w-0 items-center gap-2 empty:hidden" />
       {/* min-w-0 so a long search box shrinks instead of pushing the view
-          switcher off the inline end. */}
+          switcher off the inline end. `ms-auto` still holds when the middle is
+          empty, which is every list screen. */}
       <div className="ms-auto flex min-w-0 items-center gap-2">
         <div ref={setActions} className="flex items-center gap-2" />
         <div ref={setSearch} className="flex min-w-0 items-center gap-2" />
