@@ -1,5 +1,9 @@
 # Tenant Addon definition adoption
 
+Status: **source-verified discovery and command contracts; consumer checks and authenticated runtime acceptance pending**
+
+Last source verification: **2026-09-09**. Owning backend app: **core-app**.
+
 Source integration: **2026-09-09**. Coordinated Tenant executable checks and authenticated runtime acceptance are pending for this packet. The Gateway discovery packet independently passed production TypeScript, scoped lint and 61 existing cases; those checks do not verify this consumer.
 
 The mounted page is `/core/subscription/definition-adoption`. The existing Application access navigation item also admits the exact `applications.addon_definitions.adopt` permission. Its entry link appears on that landing page for a current Owner or the exact ADOPT permission, outside the unchanged activation-read gate. Ordinary subscription detail, items, offers and purchase pages remain Owner-only. This page does not request their APIs.

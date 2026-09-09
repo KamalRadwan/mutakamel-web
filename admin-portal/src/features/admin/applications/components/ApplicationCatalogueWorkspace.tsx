@@ -62,6 +62,20 @@ const decimalPattern = /^\d{1,18}(?:\.\d{1,4})?$/;
 const CRM_OUTBOUND_EMAIL_DEFAULT_CONFIG = JSON.stringify({ dailyQuota: 1000, rateLimitPerMin: 30 });
 
 /**
+ * The row a cycle starts from when it has no stored ladder.
+ *
+ * An unconfigured ladder is *unavailable*, never free. The backend draws that
+ * line from the bracket count alone — zero stored rows project as
+ * `UNCONFIGURED`/`PRICE_NOT_CONFIGURED`, while a stored `0.0000` is a real,
+ * published free price — and there is no ladder-level flag on the tier read to
+ * carry the distinction, because `GET .../price-tiers` answers with a bare row
+ * array. Seeding the price empty instead of at `0.0000` keeps the two apart on
+ * screen and leaves `decimalPattern` to refuse a save nobody filled in, so a
+ * stray click can no longer publish free pricing where none was intended.
+ */
+const unconfiguredLadder = (): PriceTierInput[] => [{ minUsers: 1, maxUsers: null, unitPrice: "" }];
+
+/**
  * Re-seats a ladder after a row is removed from it.
  *
  * The last row's maximum is not an editable field — the final bracket is the
@@ -90,7 +104,9 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   const [grantConfig, setGrantConfig] = useState<Record<string, string>>({});
   const [selectedGrantIds, setSelectedGrantIds] = useState<Set<string>>(new Set());
   const [cycle, setCycle] = useState<BillingCycle>("MONTHLY");
-  const [brackets, setBrackets] = useState<PriceTierInput[]>([{ minUsers: 1, maxUsers: null, unitPrice: "0.0000" }]);
+  const [brackets, setBrackets] = useState<PriceTierInput[]>(unconfiguredLadder);
+  /** Whether the *stored* ladder for `cycle` exists; set in lockstep with `brackets`. */
+  const [ladderConfigured, setLadderConfigured] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +122,8 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
       setFormError(null);
       setSelectedGrantIds(new Set());
       setGrantConfig({});
-      setBrackets([{ minUsers: 1, maxUsers: null, unitPrice: "0.0000" }]);
+      setBrackets(unconfiguredLadder());
+      setLadderConfigured(false);
     });
   }, [applicationId]);
 
@@ -120,9 +137,10 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
   useEffect(() => {
     queueMicrotask(() => {
       const rows = catalogue.prices.filter((row) => row.billingCycle === cycle);
+      setLadderConfigured(rows.length > 0);
       setBrackets(rows.length
         ? rows.map((row) => ({ minUsers: row.minUsers, maxUsers: row.maxUsers, unitPrice: row.unitPrice }))
-        : [{ minUsers: 1, maxUsers: null, unitPrice: "0.0000" }]);
+        : unconfiguredLadder());
     });
   }, [catalogue.prices, cycle]);
 
@@ -190,6 +208,9 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
       const row = brackets[index];
       const expectedMin = index === 0 ? 1 : (brackets[index - 1].maxUsers ?? 0) + 1;
       if (row.minUsers !== expectedMin) return setFormError(copy.bracketStart(index + 1, expectedMin));
+      // A blank price is "no ladder here", not zero — refuse it with a message
+      // that says so, rather than letting it read as a malformed decimal.
+      if (!row.unitPrice.trim()) return setFormError(copy.bracketPriceRequired(index + 1));
       if (!decimalPattern.test(row.unitPrice)) return setFormError(copy.bracketDecimal(index + 1));
       if (typeof row.maxUsers === "number" && row.maxUsers < row.minUsers) return setFormError(copy.bracketRange(index + 1));
       if (index < brackets.length - 1 && row.maxUsers === null) return setFormError(copy.onlyFinalOpen);
@@ -435,6 +456,14 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                 <Loading text={copy.loadingTier} />
               ) : (
                 <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={ladderConfigured ? "success" : "warn"}>
+                      {ladderConfigured ? copy.ladderConfigured : copy.ladderUnconfigured}
+                    </Badge>
+                    {!ladderConfigured ? (
+                      <p className="text-xs text-muted-foreground">{copy.ladderUnconfiguredHint}</p>
+                    ) : null}
+                  </div>
                   {brackets.map((row, index) => (
                     <div key={index} className="grid grid-cols-1 gap-3 rounded-md border border-border p-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto]">
                       <NumberField
@@ -791,6 +820,7 @@ function catalogueCopy(lang: "ar" | "en") {
       invalidGrantConfig: "إعداد الميزة غير صالح.",
       bracketStart: (row: number, minimum: number) => `يجب أن تبدأ الشريحة ${row} عند ${minimum}.`,
       bracketDecimal: (row: number) => `سعر الشريحة ${row} العشري غير صالح.`,
+      bracketPriceRequired: (row: number) => `تحتاج الشريحة ${row} إلى سعر. اترك السلم دون حفظ ليبقى غير متاح بدلاً من نشره مجاناً.`,
       bracketRange: (row: number) => `يجب أن تنتهي الشريحة ${row} عند الحد الأدنى أو بعده.`,
       onlyFinalOpen: "يمكن أن تكون الشريحة الأخيرة فقط مفتوحة النهاية.",
       finalMustOpen: "يجب أن تكون الشريحة الأخيرة مفتوحة النهاية.",
@@ -837,6 +867,9 @@ function catalogueCopy(lang: "ar" | "en") {
       openEndedHint: "يجب أن تظل الشريحة الأخيرة مفتوحة النهاية.",
       openEnded: "مفتوحة النهاية",
       usdPerUser: "دولار لكل مستخدم",
+      ladderConfigured: "مُعد",
+      ladderUnconfigured: "غير مُعد — غير متاح وليس مجانيًا",
+      ladderUnconfiguredHint: "اترك هذه الدورة دون حفظ لتبقى غير متاحة؛ حفظ 0.0000 ينشرها بسعر مجاني حقيقي.",
       removeBracket: (row: number) => `إزالة الشريحة ${row}`,
       addBracket: "إضافة شريحة",
       replaceLadder: (billingCycle: BillingCycle) => `استبدال سلم ${billingCycle === "MONTHLY" ? "التسعير الشهري" : "التسعير السنوي"}`,
@@ -858,6 +891,7 @@ function catalogueCopy(lang: "ar" | "en") {
     invalidGrantConfig: "Grant configuration is invalid.",
     bracketStart: (row: number, minimum: number) => `Bracket ${row} must begin at ${minimum}.`,
     bracketDecimal: (row: number) => `Bracket ${row} has an invalid decimal price.`,
+    bracketPriceRequired: (row: number) => `Bracket ${row} needs a price. Leave the ladder unsaved to keep it unavailable rather than publishing it as free.`,
     bracketRange: (row: number) => `Bracket ${row} must end at or after its minimum user count.`,
     onlyFinalOpen: "Only the final bracket may be open-ended.",
     finalMustOpen: "The final bracket must be open-ended.",
@@ -904,6 +938,9 @@ function catalogueCopy(lang: "ar" | "en") {
     openEndedHint: "The final bracket must remain open-ended.",
     openEnded: "Open ended",
     usdPerUser: "USD per user",
+    ladderConfigured: "Configured",
+    ladderUnconfigured: "Not configured — unavailable, not free",
+    ladderUnconfiguredHint: "Leave this cycle unsaved to keep it unavailable; saving 0.0000 publishes a real free price.",
     removeBracket: (row: number) => `Remove bracket ${row}`,
     addBracket: "Add bracket",
     replaceLadder: (billingCycle: BillingCycle) => `Replace ${billingCycle.toLowerCase()} ladder`,

@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-09-09T01:56:20.808Z**
+Generated at: **2026-09-09T17:42:21.852Z**
 
-Frontend revision: `bfdcef527d4d+dirty`
+Frontend revision: `9940d1053ff3+dirty`
 
-Backend revision: `2c4f06948504+dirty`
+Backend revision: `22e119066314`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,11 +17,11 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 222 |
+| core | 224 |
 | crm | 160 |
 | trade | 231 |
 | webphone | 20 |
-| **Total** | **633** |
+| **Total** | **635** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -176,6 +176,8 @@ Machine-readable source:
 | core | PUT | `/api/tenant/core/v1/roles/:id/permissions` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.roles.permissions.set` |
 | core | GET | `/api/tenant/core/v1/subscription` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.subscriptions.get` |
 | core | GET | `/api/tenant/core/v1/subscription/catalogue` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.subscriptions.catalogue.get` |
+| core | GET | `/api/tenant/core/v1/subscription/definition-adoption-selections` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.subscriptions.definition-adoption-selections.list` |
+| core | GET | `/api/tenant/core/v1/subscription/definition-adoption-selections/:addonSelectionId/targets` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.subscriptions.definition-adoption-selections.targets.list` |
 | core | GET | `/api/tenant/core/v1/subscription/items` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.subscriptions.items.list` |
 | core | GET | `/api/tenant/core/v1/subscription/operations/:operationId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.subscriptions.operations.get` |
 | core | POST | `/api/tenant/core/v1/subscription/operations/:operationId/recovery` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.subscriptions.operations.recover` |

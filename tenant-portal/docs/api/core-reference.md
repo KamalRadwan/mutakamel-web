@@ -9,13 +9,13 @@ Status: **verified** (Gateway exposure and transport policy only)
 
 Last source verification: **2026-09-09**
 
-Generated at: **2026-09-09T01:56:20.808Z**
+Generated at: **2026-09-09T17:42:21.852Z**
 
-Backend revision: `2c4f06948504+dirty`
+Backend revision: `22e119066314`
 
 Owning app: **core-app**
 
-Routes: **222**
+Routes: **224**
 
 ## What this page is
 
@@ -183,6 +183,8 @@ browser code.
 | PUT | `/api/tenant/core/v1/roles/:id/permissions` | `core.tenant.roles.permissions.set` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription` | `core.tenant.subscriptions.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription/catalogue` | `core.tenant.subscriptions.catalogue.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/subscription/definition-adoption-selections` | `core.tenant.subscriptions.definition-adoption-selections.list` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/subscription/definition-adoption-selections/:addonSelectionId/targets` | `core.tenant.subscriptions.definition-adoption-selections.targets.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription/items` | `core.tenant.subscriptions.items.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/subscription/operations/:operationId` | `core.tenant.subscriptions.operations.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/subscription/operations/:operationId/recovery` | `core.tenant.subscriptions.operations.recover` | WRITE_SENSITIVE | yes | TENANT_PORTAL |

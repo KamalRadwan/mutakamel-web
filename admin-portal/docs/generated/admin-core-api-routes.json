@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-09-08T23:15:14.736Z",
+    "generatedAt": "2026-09-09T17:42:05.616Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "bfdcef527d4d+dirty",
-    "backendRevision": "500a64386c8a+dirty",
+    "frontendRevision": "9940d1053ff3",
+    "backendRevision": "22e119066314",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
@@ -53,11 +53,12 @@
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon-activation-write.route-contracts.ts": "721bcb84bf05245b0fb70ad5f6987eb7c5e0d4dea2364848fae5b9c9bcba97a3",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon-assignment-write.route-contracts.ts": "46cc8a97ea8569748b0aa8651c096cefd593de337b5ef568bddae441ef98b9df",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon-configuration.route-contracts.ts": "095e6866b603ca31eca0ab916e78527d186e2aadeaad0fe7abe6b75880647f39",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon.route-contracts.ts": "fe59dc10ce938fac25d9a2db8e1b42ae8eae6d42c3fc7c2ccc7f17004ad6a3a1",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-addon.route-contracts.ts": "a6c59d6f64da6c5aa4cca672a2e73eae8b736716fef1666fc0107dc144b4dc79",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-adoption-discovery.route-contracts.ts": "1a1f3b09d2088eca7046fa66ad6383be83a6501ea52ae21e4ff98270aeec5c26",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-command.route-contracts.ts": "5cd09f208fe88bcecc34645e5d06ef8a9fb051441afb6a8adc4dbb3551ae2474",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "708333c057052443f3f19042cd71e94d7f7dbf342de325a4ebb53d497a33d282",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "93ed6f9c8bd64823da42530961312184a7acd3286eb332a12ebb54b6ecc6c7cc",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "09d48ef6418340339a12afa4ad70fbd33b863c7396824faa84c945db93ece484",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "c8ad6c2b7e5742cf845a118276575eef0d130f7a83dc564ce8784dd98039b794",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
