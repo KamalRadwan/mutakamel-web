@@ -17,7 +17,7 @@ import { CrmPhoneNumberInput } from "./CrmPhoneNumberInput";
  */
 export const CRM_PHONE_LIST_MAX = 10;
 /** `@MaxLength(32)` on every phone string in CRM. */
-export const CRM_PHONE_MAX_LENGTH = 32;
+const CRM_PHONE_MAX_LENGTH = 32;
 
 export interface CrmPhoneListFieldProps {
   label: string;

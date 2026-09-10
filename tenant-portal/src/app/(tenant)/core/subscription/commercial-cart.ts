@@ -3,8 +3,8 @@ import { parseTenantCommercialRequest } from "./commercial-intent";
 import type { SubscriptionOffer } from "./subscription-offers";
 import type { SubscriptionView } from "./subscription-read";
 
-export interface CommercialCartRow { selectionKey: string; offer: SubscriptionOffer; seats: string }
-export interface CommercialSeatEdit { selectionKey: string; seats: string }
+interface CommercialCartRow { selectionKey: string; offer: SubscriptionOffer; seats: string }
+interface CommercialSeatEdit { selectionKey: string; seats: string }
 export interface CommercialCart { offers: CommercialCartRow[]; quantities: Record<string, CommercialSeatEdit>; reason: string }
 export const emptyCommercialCart = (): CommercialCart => ({ offers: [], quantities: {}, reason: "" });
 const quantity = (text: string) => {

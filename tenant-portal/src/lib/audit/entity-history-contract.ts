@@ -17,7 +17,7 @@ import { readCorePage, type CorePath } from "@/lib/api/envelope";
 /** `audit.read`, as the controller declares it. */
 export const AUDIT_READ_PERMISSION = "audit.read";
 
-export const AUDIT_RESPONSE_LIMIT_BYTES = 256 * 1024;
+const AUDIT_RESPONSE_LIMIT_BYTES = 256 * 1024;
 
 export const AUDIT_HISTORY_PAGE_SIZE = 10;
 
@@ -26,7 +26,7 @@ export const AUDIT_HISTORY_PAGE_SIZE = 10;
  * is deliberately unread — a card tells a story, it does not dump a row.
  */
 /** One field that moved, as `computeDiff` in the audit-log package writes it. */
-export interface EntityAuditChange {
+interface EntityAuditChange {
   field: string;
   before: unknown;
   after: unknown;
@@ -129,7 +129,7 @@ export function entityHistoryQuery(page: number, limit: number, relatedPartyIds?
   return query.toString();
 }
 
-export function entityHistoryPath(entityType: string, entityId: string): CorePath {
+function entityHistoryPath(entityType: string, entityId: string): CorePath {
   return `/api/tenant/core/v1/audit/entities/${encodeURIComponent(
     entityType,
   )}/${encodeURIComponent(entityId)}` as CorePath;

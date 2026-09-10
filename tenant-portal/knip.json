@@ -6,6 +6,6 @@
     "scripts/**/*.mjs"
   ],
   "project": ["src/**/*.{ts,tsx}", "scripts/**/*.mjs"],
-  "ignore": ["src/lib/api/**", "src/lib/auth/**", "src/context/**"],
+  "ignore": ["src/lib/api/**", "src/context/**"],
   "ignoreDependencies": ["tailwindcss", "tw-animate-css"]
 }

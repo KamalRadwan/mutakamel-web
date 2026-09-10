@@ -8,7 +8,7 @@ import type { UpdateLeadRequest } from "../lead-write-contract";
 export const CONTACT_MODAL_LIMITS = { displayName: 200, name: 120, honorificTitle: 40, jobTitle: 120, value: 255, methods: 200 } as const;
 export const CONTACT_DIRECTORY_PERMISSIONS = ["directory.party.read", "directory.party.manage", "directory.contact.manage"] as const;
 type MethodType = "PHONE" | "MOBILE" | "EMAIL" | "WHATSAPP" | "WEBSITE" | "OTHER";
-export interface DirectoryContactMethod { id: string; methodType: MethodType; value: string; isPrimary: boolean; createdAt: string }
+interface DirectoryContactMethod { id: string; methodType: MethodType; value: string; isPrimary: boolean; createdAt: string }
 export interface ContactPerson {
   id: string; displayName: string; firstName: string; lastName: string; honorificTitle: string;
   contactMethods: DirectoryContactMethod[];

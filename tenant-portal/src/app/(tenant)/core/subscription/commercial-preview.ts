@@ -26,7 +26,7 @@ const preview = z.object({
   }).strict(), preparation: z.object({ preparationId: commercialUuid7 }).strict(),
 }).strict();
 const envelope = z.object({ ...commercialEnvelope, data: preview }).strict();
-export type CommercialPreviewChange = z.infer<typeof change>;
+type CommercialPreviewChange = z.infer<typeof change>;
 export type CommercialPreview = z.infer<typeof preview>;
 
 export function parseCommercialPreview(body: unknown, expected: { subscriptionId: string; request: CommercialPreviewRequest }): CommercialPreview {

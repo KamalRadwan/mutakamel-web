@@ -1,5 +1,5 @@
-export interface ConfigurationText { ar: string; en: string }
-export interface ConfigurationUi { label: ConfigurationText; help?: ConfigurationText; enumLabels?: ConfigurationText[]; widget?: "textarea" | "password" }
+interface ConfigurationText { ar: string; en: string }
+interface ConfigurationUi { label: ConfigurationText; help?: ConfigurationText; enumLabels?: ConfigurationText[]; widget?: "textarea" | "password" }
 type Scalar = string | number | boolean;
 export interface ConfigurationObject { type: "object"; ui: ConfigurationUi; properties: Record<string, ConfigurationNode>; required: string[]; additionalProperties: false }
 export type ConfigurationNode = ConfigurationObject

@@ -77,7 +77,7 @@ export type CrmContactMethodType = (typeof CRM_CONTACT_METHOD_TYPES)[number];
  * never heard of must show as itself rather than take the whole card down.
  * Every other field is nullable because every underlying column is.
  */
-export interface LeadAddress {
+interface LeadAddress {
   addressType: string;
   label: string | null;
   country: string | null;

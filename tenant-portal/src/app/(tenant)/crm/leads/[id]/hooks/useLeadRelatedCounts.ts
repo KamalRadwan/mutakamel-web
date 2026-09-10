@@ -19,7 +19,7 @@ import {
 } from "../lead-related-contract";
 
 /** `null` = permitted but not answered yet, or answered with something unreadable. */
-export type LeadRelatedCounts = Record<LeadRelatedKind, number | null>;
+type LeadRelatedCounts = Record<LeadRelatedKind, number | null>;
 
 export interface LeadRelatedCountsState {
   counts: LeadRelatedCounts;

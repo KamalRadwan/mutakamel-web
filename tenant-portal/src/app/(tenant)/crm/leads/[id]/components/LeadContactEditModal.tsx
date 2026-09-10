@@ -5,11 +5,11 @@ import { useI18n } from "@/i18n/I18nContext";
 import { CrmJobTitleField } from "../../../shared/components/CrmJobTitleField";
 import { CrmPhoneListField } from "../../../shared/components/CrmPhoneListField";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
-import type { useLeadContactModal } from "../hooks/useLeadContactModal";
+import type { LeadContactModal } from "../hooks/useLeadContactModal";
 import { CONTACT_MODAL_LIMITS } from "../contact-modal-contract";
 import { LeadContactFields } from "./LeadContactList";
 
-export function LeadContactEditModal({ edit }: { edit: ReturnType<typeof useLeadContactModal> }) {
+export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
   const { t } = useI18n();
   const describeError = useCrmErrorText();
   const form = edit.form;

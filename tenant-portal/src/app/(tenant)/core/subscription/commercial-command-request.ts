@@ -21,8 +21,8 @@ const change = z.union([
 const changes = z.array(change).min(1).max(100).refine((rows) => new Set(rows.map((row) => row.selectionKey)).size === rows.length);
 const request = { expectedSubscriptionRevision: commercialRevision, changes,
   reason: z.string().max(256).refine((value) => value.trim().length > 0).optional() };
-export const commercialPreparationRequestSchema = z.object(request).strict();
-export const commercialPreviewRequestSchema = z.object({ ...request, preparationId: commercialSelector }).strict();
+const commercialPreparationRequestSchema = z.object(request).strict();
+const commercialPreviewRequestSchema = z.object({ ...request, preparationId: commercialSelector }).strict();
 export type CommercialChange = z.infer<typeof change>;
 export type CommercialPreparationRequest = z.infer<typeof commercialPreparationRequestSchema>;
 export type CommercialPreviewRequest = z.infer<typeof commercialPreviewRequestSchema>;
