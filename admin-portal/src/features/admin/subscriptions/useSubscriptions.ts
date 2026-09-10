@@ -148,8 +148,12 @@ export function useSubscriptions(): SubscriptionsViewModel {
   }, []);
 
   // Header sorting bypasses the draft/apply cycle the filter form uses: the
-  // click is the request. The field is checked against the endpoint's list
-  // first, since `sortBy` outside it is a 400 rather than an ignored value.
+  // click is the request. The field is still checked against the endpoint's
+  // list first -- not because the endpoint rejects an unknown one, but because
+  // it does NOT: `SubscriptionDirectoryReadService` resolves
+  // `SORTS[sortBy] ?? SORTS.createdAt`, so an unrecognised field silently sorts
+  // by creation date and the header would show an order the rows are not in.
+  // Refusing locally is what keeps the header honest.
   const changeSort = useCallback((sortBy: string, sortDir: "ASC" | "DESC") => {
     const field = SUBSCRIPTION_SORT_FIELDS.find((allowed) => allowed === sortBy);
     if (!field) return;
