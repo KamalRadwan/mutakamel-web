@@ -36,7 +36,7 @@ export function validSubscriptionsEnvelope() {
         },
         subscriptionRevision: "1",
         baseItems: [{ id: ITEM_ID, applicationId: MODULE_ID, applicationKey: "crm", applicationName: "CRM", tierId: TIER_ID,
-          tierKey: "pro", tierName: "Professional", seats: 10, acceptedPricing: { billingCycle: "MONTHLY", currencyCode: "USD", recurringAmountUsd: "120.0000",
+          tierKey: "pro", tierName: "Professional", tierRank: 1, seats: 10, acceptedPricing: { billingCycle: "MONTHLY", currencyCode: "USD", recurringAmountUsd: "120.0000",
             priceRevision: "a".repeat(64), breakdown: [{ minUsers: 1, maxUsers: null, chargedUsers: 10, unitPriceUsd: "12.0000", amountUsd: "120.0000" }] } }],
         addonSelections: [],
         baseAllowance: { allowedUsers: 10, effectiveAllowedUsers: 10, enabledApplications: ["crm"] },

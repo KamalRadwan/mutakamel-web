@@ -21,12 +21,27 @@ afterEach(() => {
 });
 
 describe("static route-contract reader", () => {
-  it("reads the actual current Gateway aggregate including five canonical scoped reads", () => {
+  /** The `.get` suffix selects the single-resource scoped reads under application-access — the `.list`
+   * collections and the PATCH/POST/DELETE writes carry other suffixes. Core owns nine of them:
+   *   1. company-application.get                     application-access-read.controller.ts
+   *   2. company-addon.get                           application-access-read.controller.ts
+   *   3. branch-addon.get                            application-access-read.controller.ts
+   *   4. company-configuration.get                   application-access-read.controller.ts
+   *   5. branch-configuration.get                    application-access-read.controller.ts
+   *   6. company-addon-activation-command.get        activation-continuation/company-addon-activation-status.controller.ts
+   *   7. company-addon-configuration-command.get     configuration/continuation/company-addon-configuration-status.controller.ts
+   *   8. company-configuration-input.get             configuration/addon-configuration-input.controller.ts
+   *   9. branch-configuration-input.get              configuration/addon-configuration-input.controller.ts
+   * Rows 6-9 arrived with the `activation-continuation/` and `configuration/` trees: the two 202-command
+   * status polls and the two input-schema descriptors. All nine are AUTHENTICATED GETs whose alternative
+   * read-or-manage grants make `requiredPermissionsMode` ANY, and all carry route-contract `version` 1 —
+   * the Gateway's single contract version, which replaced the V1/V2 `commercialContractVersion` field. */
+  it("reads the actual current Gateway aggregate including nine canonical scoped reads", () => {
     const path = resolve(import.meta.dirname, "../../../../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts");
     const { routes, sourceFiles } = readRouteContracts(path, "CORE_ROUTE_CONTRACTS");
     const scoped = routes.filter((route) => route.routeKey.startsWith("core.tenant.application-access.") && route.routeKey.endsWith(".get"));
-    expect(scoped).toHaveLength(5);
-    expect(scoped.every((route) => route.commercialContractVersion === 2 && route.requiredPermissionsMode === "ANY")).toBe(true);
+    expect(scoped).toHaveLength(9);
+    expect(scoped.every((route) => route.version === 1 && route.requiredPermissionsMode === "ANY")).toBe(true);
     expect(sourceFiles.some((file) => file.endsWith("core-addon.route-contracts.ts"))).toBe(true);
   });
   it("follows imports/spreads and literal map functions without evaluating a module", () => {

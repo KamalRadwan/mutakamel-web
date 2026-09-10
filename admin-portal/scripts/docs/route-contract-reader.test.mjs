@@ -26,7 +26,16 @@ describe("static route-contract reader", () => {
     const { routes, sourceFiles } = readRouteContracts(path, "CORE_ROUTE_CONTRACTS");
     const scoped = routes.filter((route) => route.routeKey.startsWith("core.admin.applications.addons."));
     expect(scoped).toHaveLength(23);
-    expect(scoped.every((route) => route.commercialContractVersion === 2 && route.requiredPermissionsMode === "ALL")).toBe(true);
+    /* The app catalogue collapsed to a single contract version: backend commit 6b9a5566 deleted
+     * the V1/V2 `commercialContractVersion` field from every Gateway route contract, leaving the
+     * route-contract `version` 1 all 23 already carried. So the pin is that single version plus
+     * the field's ABSENCE, rather than `commercialContractVersion === 2`. Each of the 23 still
+     * maps 1:1 onto a real Core controller handler - 21 on
+     * `admin/catalog/addons/addons.controller.ts` and the two `price-tiers` reads/writes on
+     * `admin/catalog/addon-pricing/addon-pricing.controller.ts` - and the permission mode is
+     * unchanged, so neither the count nor the mode moved. */
+    expect(scoped.every((route) => route.version === 1 && route.requiredPermissionsMode === "ALL"
+      && !("commercialContractVersion" in route))).toBe(true);
     expect(sourceFiles.some((file) => file.endsWith("core-addon.route-contracts.ts"))).toBe(true);
   });
   it("follows imports/spreads and literal map functions without evaluating a module", () => {
