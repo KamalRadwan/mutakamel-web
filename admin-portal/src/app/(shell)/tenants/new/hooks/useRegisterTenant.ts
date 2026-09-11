@@ -67,6 +67,15 @@ import type {
 import type { TenantWizardValidationError } from "../components/TenantValidationSummary";
 import { isValidEmailAddress } from "@/shared/validation/email";
 
+/**
+ * How long a sent create may still be committing. It outlasts the Gateway
+ * in-flight lease (`IDEM_INFLIGHT_TIMEOUT_SEC`, 120 s by default) and the
+ * proxy's 45 s total ceiling, after which no request for the key can still be
+ * running. Tenant name, FQDN and create key are unique-indexed, so this only
+ * avoids a needless conflict; it is not what prevents a duplicate tenant.
+ */
+const TENANT_CREATE_IN_FLIGHT_WINDOW_MS = 3 * 60 * 1000;
+
 export function useRegisterTenant() {
   const router = useRouter();
   const { t } = useI18n();
@@ -1185,7 +1194,24 @@ export function useRegisterTenant() {
       );
       if (controller.signal.aborted) return;
       if (!status) {
-        setCreateRecoveryError(t.tenants.registerFlow.recoveryNoRecordYet);
+        // Within the window the create may still be committing, so an absent
+        // row is not yet an answer. Past it, the absence IS the answer: the
+        // create is one transaction that rolls back on every rejection, and
+        // the Gateway in-flight lease has lapsed. Keeping the marker then
+        // strands the wizard for good, because a tenant that was never created
+        // can never be found. Either answer is final, as in database
+        // relocation's reconcile.
+        if (Date.now() - Date.parse(attempt.savedAt) < TENANT_CREATE_IN_FLIGHT_WINDOW_MS) {
+          setCreateRecoveryError(t.tenants.registerFlow.recoveryNoRecordYet);
+          return;
+        }
+        clearPendingTenantCreateStatusAttempt();
+        setPendingCreateRecovery(null);
+        resetKey();
+        toast.warning(
+          t.tenants.registerFlow.recoveryNotCreatedTitle,
+          t.tenants.registerFlow.recoveryNotCreatedDesc,
+        );
         return;
       }
 

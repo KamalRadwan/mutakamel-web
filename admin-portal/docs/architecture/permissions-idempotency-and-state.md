@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-12**
+Last source verification: **2026-09-11**
 
 ## Permission semantics
 
@@ -53,6 +53,11 @@ secret, audit reason, confirmation text, or tenant PII. Reuse requires an exact
 digest match; a changed intent or unavailable browser storage fails closed.
 Where a command cannot be safely reconstructed, use authoritative read-only
 status recovery and block replay instead of persisting its sensitive body.
+That recovery must be able to end. Once the command can no longer be in flight,
+an authoritative absent record resolves the attempt exactly as a found one
+does: clear the marker and rotate the key. A recovery whose only terminal answer
+is "found" strands the operator for good after a rejected command, because what
+was never created can never be found.
 
 ### A handle the server returns once still has to survive a reload
 

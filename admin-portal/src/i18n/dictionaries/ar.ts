@@ -1222,6 +1222,9 @@ export const ar = {
         "يلزم تصريح admin.tenants.read لفحص الحالة. لم تُخزن بيانات الطلب أو بيانات المالك في المتصفح.",
       recoveryNoRecordYet:
         "لا يوجد سجل مستأجر مؤكد حتى الآن. احتفظ بعلامة الاسترداد وافحص الحالة مرة أخرى؛ لا ترسل أمر إنشاء جديدًا.",
+      recoveryNotCreatedTitle: "لم يُنشأ أي مستأجر",
+      recoveryNotCreatedDesc:
+        "لا يوجد في Core أي سجل لتلك المحاولة، ولم يعد ممكنًا أن تكون قيد التنفيذ. تم فتح المعالج: اطلب عرض سعر جديدًا وأنشئ المستأجر مرة أخرى.",
       createOutcomeRecoveredTitle: "تم استرداد نتيجة الإنشاء",
       createOutcomeRecoveredDesc: (status: string) =>
         `تم العثور على المستأجر بالحالة ${status}.`,

@@ -1255,6 +1255,9 @@ export const en: Dictionary = {
         "admin.tenants.read is required to check status. No request DTO or owner data was stored in the browser.",
       recoveryNoRecordYet:
         "No authoritative tenant record is visible yet. Keep the recovery marker and check again; do not send a new create command.",
+      recoveryNotCreatedTitle: "No tenant was created",
+      recoveryNotCreatedDesc:
+        "Core has no record of that attempt, and it can no longer be in progress. The wizard is unlocked: request a new quote and create the tenant again.",
       createOutcomeRecoveredTitle: "Create outcome recovered",
       createOutcomeRecoveredDesc: (status: string) =>
         `The tenant was found with status ${status}.`,

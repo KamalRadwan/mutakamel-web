@@ -7,6 +7,8 @@ contracts, error catalogue, and active Admin Portal screens on
 
 Canonical initial commercial amendment (2026-09-09): the wizard uses the single published options projection, nested Application/Addon UUID selections and an explicit reviewed quote before create. The billing empty state mounts the canonical initial-seed workspace. See [the current Addon boundary](application-addons-target.md) and [subscriptions](subscriptions.md). No commercial version header, HTTP discriminator or legacy fallback remains. Identity/owner/geography/placement and status-only create recovery are preserved. Source wiring does not prove installation or authenticated runtime acceptance. Minimal retained seed attempts cannot reconstruct or replace a lost original in-memory request.
 
+Create-recovery amendment (2026-09-11): a status check that finds no tenant once the create can no longer be in flight now resolves the recovery marker, rotates the command key and unlocks the wizard, instead of holding the tab until a tenant that was never created appears. A rejected create is one rolled-back transaction, so an absent row past the Gateway in-flight lease is authoritative.
+
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
 tenant-detail shell. It covers identity validation, creation, list/detail,
 profile updates, lifecycle, and FQDN management. Tenant users, provisioning
@@ -198,8 +200,15 @@ the POST. Success clears it. An ambiguous response keeps it and disables all
 new tenant-create submissions in that tab. Recovery is read-only and requires
 `admin.tenants.read`: the UI performs an exact-name check against the
 authoritative tenant list, projects only `id`, `name`, and `status`, then clears
-the marker and redirects when a row exists. No row, a forbidden read, or an
-unavailable response keeps the marker and never triggers an automatic replay.
+the marker and redirects when a row exists. No row within three minutes of the
+save time, a forbidden read, or an unavailable response keeps the marker and
+never triggers an automatic replay. No row after that window resolves the
+attempt: the UI clears the marker, rotates the command key and unlocks the
+wizard. The absence is authoritative by then, because the create runs as one
+transaction that rolls back on every rejection and the Gateway in-flight lease
+(`IDEM_INFLIGHT_TIMEOUT_SEC`, 120 s by default) has lapsed. Tenant name, active
+FQDN and create key are all unique-indexed, so even an early release could not
+produce a duplicate tenant; the window only avoids a needless conflict.
 Because the DTO is intentionally not persisted, reload cannot reconstruct or
 resend the original tenant-create command.
 
@@ -1233,6 +1242,8 @@ source-integrated:
 - quote and create retain the same nested `applications/addons` UUID selections and unique selection keys; final create requires the operator's current reviewed quote;
 - ambiguous create outcomes retain only a minimal status-recovery marker and
   block a new submit; no tenant DTO or PII is persisted for replay;
+- a status check that finds no tenant after the three-minute in-flight window
+  resolves that marker, rotates the command key and unlocks the wizard;
 - a response discarded after a cross-tab session change retains that marker
   because the old-session create may already have committed, while exhausted
   pre-handler auth repair clears it so the operator can safely retry;
