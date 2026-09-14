@@ -146,16 +146,14 @@ export function CrmContactLine({
         className={cn(
           "grid grid-cols-1 gap-x-3 gap-y-3 @min-[28rem]:grid-cols-2",
           // One row as soon as one row FITS — 52rem of container without a job
-          // title, 64rem with one. Both name boxes became `minmax(0,1fr)`: at
-          // 250px each they were 500px of the 832px this now needs, so the line
-          // could not fit before the window was 1280px wide no matter how much
-          // room the modal had. The phone column keeps a real floor because it
-          // holds three controls (code picker, number, add) and is the one that
-          // cannot be read when squeezed; the email takes what is left.
+          // title, 64rem with one. Name boxes and email share equal fractional
+          // space (`minmax(0,1fr)`) so that first name, last name, and email
+          // have balanced, harmonious proportions in both individual and company
+          // forms, preventing email from dominating the row.
           // Written out rather than composed: Tailwind reads these as text.
           showJobTitle
-            ? "@min-[64rem]:grid-cols-[4.5rem_minmax(0,8.5rem)_minmax(0,8.5rem)_8rem_minmax(15rem,1.3fr)_minmax(0,1.3fr)]"
-            : "@min-[52rem]:grid-cols-[4.5rem_minmax(0,8.5rem)_minmax(0,8.5rem)_minmax(15rem,1.3fr)_minmax(0,1.3fr)]",
+            ? "@min-[64rem]:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(15rem,1fr)_minmax(0,1fr)]"
+            : "@min-[52rem]:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(15rem,1fr)_minmax(0,1fr)]",
         )}
       >
         {!directoryOwned && (
@@ -199,7 +197,6 @@ export function CrmContactLine({
               error={errors[`${path}.firstName`]}
               required
               hint={identityHint}
-              className="max-w-44"
             >
               <Input size="sm" placeholder={t.crmLeads.create.firstName}
                 value={contact.firstName}
@@ -209,7 +206,7 @@ export function CrmContactLine({
                 onBlur={() => onBlur(`${path}.firstName`)}
               />
             </Field>
-            <Field label={t.crmLeads.create.lastName} error={errors[`${path}.lastName`]} className="max-w-44">
+            <Field label={t.crmLeads.create.lastName} error={errors[`${path}.lastName`]}>
               <Input size="sm" placeholder={t.crmLeads.create.lastName}
                 value={contact.lastName}
                 maxLength={limits.name}
