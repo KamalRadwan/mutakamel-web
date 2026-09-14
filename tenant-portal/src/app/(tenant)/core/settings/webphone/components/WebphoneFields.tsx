@@ -50,7 +50,7 @@ export function TextField({
     >
       {/* SIP domains, URIs and extension numbers are Latin technical values
           that stay left-to-right inside an Arabic page. */}
-      <Input
+      <Input size="sm"
         dir="ltr"
         value={value}
         maxLength={maxLength}
@@ -91,7 +91,7 @@ export function SelectField<T extends string>({
       {/* Direction comes from the app-wide DirectionProvider in
           src/i18n/DirectionBridge.tsx, so no screen branches on `dir`. */}
       <Select value={value} onValueChange={(next) => onChange(next as T)} disabled={disabled}>
-        <SelectTrigger>
+        <SelectTrigger size="sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -117,13 +117,13 @@ interface SecretInputProps extends InputProps {
  * The input half of a write-only secret, with its reveal toggle.
  *
  * Split out so `Field` still clones a single control and keeps `htmlFor`
- * pointing at the real `<input>`: the toggle is a sibling inside this
+ * pointing at the real input control: the toggle is a sibling inside this
  * component rather than a second child of the field.
  */
 const SecretInput = forwardRef<HTMLInputElement, SecretInputProps>(
   ({ revealed, onToggleReveal, showLabel, hideLabel, disabled, className, ...props }, ref) => (
     <div className="relative">
-      <Input
+      <Input size="sm"
         ref={ref}
         dir="ltr"
         autoComplete="new-password"
@@ -242,7 +242,7 @@ export function SectionCard({
   actions?: ReactNode;
 }) {
   return (
-    <Card role="region" aria-label={title} aria-describedby={describedBy} className="p-4">
+    <Card role="region" aria-label={title} aria-describedby={describedBy} className="p-3 sm:p-3.5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-medium text-card-foreground">

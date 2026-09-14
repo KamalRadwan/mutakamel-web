@@ -43,7 +43,7 @@ export function TradeDocumentFilters({ kind, value, onChange }: TradeDocumentFil
           value={value === "" ? ANY_STATUS : value}
           onValueChange={(next) => onChange(next === ANY_STATUS ? "" : next)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

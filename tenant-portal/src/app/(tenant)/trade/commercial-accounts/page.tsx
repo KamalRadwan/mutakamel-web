@@ -145,7 +145,7 @@ export default function TradeCommercialAccountsPage() {
               : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void accounts.reload()}
               disabled={accounts.isRefreshing}

@@ -12,7 +12,7 @@ export function InitialCreateOptions({ scope, terms, onChange, locked, maxApplic
   return <section aria-label={copy.options} aria-busy={state.loading} className="min-w-0 space-y-3 rounded-md border border-border p-3">
     <h3 className="text-sm font-semibold">{copy.options}</h3><p className="text-xs text-muted-foreground">{copy.optionsBoundary}</p>
     {!state.permitted ? <p className="text-xs text-muted-foreground">{copy.optionsForbidden}</p> :
-      <Button type="button" variant="outline" disabled={locked || state.loading} loading={state.loading} onClick={() => void state.load()}>{copy.loadOptions}</Button>}
+      <Button type="button" variant="outline" size="sm" disabled={locked || state.loading} loading={state.loading} onClick={() => void state.load()}>{copy.loadOptions}</Button>}
     {state.loading && <p role="status" className="text-sm">{copy.loadingOptions}</p>}
     {state.error && <div ref={errorRef} tabIndex={-1} role="alert" className="space-y-1 rounded-md border border-destructive p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <p>{copy.failure}</p><p>{state.error.message}</p><p className="break-all font-mono text-xs" dir="ltr">{state.error.errorCode} {state.error.correlationId}</p></div>}
@@ -26,8 +26,8 @@ export function InitialCreateOptions({ scope, terms, onChange, locked, maxApplic
         {application.description !== null && <p className="break-words text-xs text-muted-foreground">{application.description}</p>}
         <p className="break-all font-mono text-xs" dir="ltr">{application.key} · {application.applicationId}</p>
         {!!diagnostics.length && <Diagnostics values={diagnostics} copy={copy} />}
-        <Field label={`${copy.tier} — ${application.name}`}>{field => <Select value={tierId} disabled={!state.canEdit || Boolean(selected)} onValueChange={id => state.chooseTier(application.applicationId, id)}>
-          <SelectTrigger {...field}><SelectValue placeholder={copy.chooseTier} /></SelectTrigger><SelectContent>{application.tiers.map(tier => <SelectItem key={tier.id} value={tier.id}>{tier.name}</SelectItem>)}</SelectContent>
+        <Field label={`${copy.tier} — ${application.name}`} hideLabel>{field => <Select value={tierId} disabled={!state.canEdit || Boolean(selected)} onValueChange={id => state.chooseTier(application.applicationId, id)}>
+          <SelectTrigger {...field} size="sm"><SelectValue placeholder={copy.chooseTier} /></SelectTrigger><SelectContent>{application.tiers.map(tier => <SelectItem key={tier.id} value={tier.id}>{tier.name}</SelectItem>)}</SelectContent>
         </Select>}</Field>
         {selected ? <p className="text-xs text-muted-foreground">{copy.changeTier}</p> : <Button type="button" variant="outline" size="sm"
           disabled={!state.canEdit || !tierId || !!diagnostics.length || terms.applications.length >= maxApplications} onClick={() => state.addApplication(application.applicationId)}>{copy.addApplication}</Button>}

@@ -33,7 +33,7 @@ export default function TenantProfilePage() {
         title={copy.title}
         description={copy.subtitle}
         secondaryActions={
-          <Button variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
+          <Button size="sm" variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
             <RefreshCw
               className={`size-4 ${screen.isLoading ? "animate-spin" : ""}`}
               aria-hidden="true"
@@ -78,7 +78,7 @@ export default function TenantProfilePage() {
                   }}
                   disabled={screen.isSubmitting}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -100,7 +100,7 @@ export default function TenantProfilePage() {
                   }}
                   disabled={screen.isSubmitting}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

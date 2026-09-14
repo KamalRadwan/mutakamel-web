@@ -48,15 +48,15 @@ export function AuthSessionsPanel() {
     <>
       <section
         aria-busy={isLoading || isBusy}
-        className="space-y-4 rounded-lg border border-border bg-card p-5"
+        className="space-y-3 rounded-lg border border-border bg-card p-3 sm:p-3.5"
       >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Laptop className="size-4 text-muted-foreground" />
+            <h2 className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+              <Laptop className="size-3.5 text-muted-foreground" />
               {copy.title}
             </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {copy.description}
             </p>
           </div>
@@ -64,22 +64,24 @@ export function AuthSessionsPanel() {
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => setIsLogoutAllOpen(true)}
               disabled={isLoading || isBusy}
               className="border-destructive/40 text-destructive hover:bg-destructive-subtle"
             >
-              <LogOut className="size-4" />
+              <LogOut className="size-3.5" />
               {copy.logoutAllButton}
             </Button>
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={() => void reload()}
               disabled={isLoading || isBusy}
-              className="w-9 p-0"
+              className="size-8 p-0"
               aria-label={copy.refresh}
             >
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+              <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
             </Button>
           </div>
         </div>
@@ -91,8 +93,8 @@ export function AuthSessionsPanel() {
         )}
 
         {isLoading ? (
-          <div role="status" className="flex items-center justify-center p-8 text-muted-foreground">
-            <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <div role="status" className="flex items-center justify-center p-6 text-muted-foreground">
+            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
             <span className="sr-only">{copy.loading}</span>
           </div>
         ) : (
@@ -100,16 +102,16 @@ export function AuthSessionsPanel() {
             {sessions.map((session) => (
               <article
                 key={session.id}
-                className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-2.5 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-xs font-semibold text-foreground">
                       {session.deviceLabel ?? session.clientId}
                     </span>
                     {session.current && <Badge tone="brand">{copy.current}</Badge>}
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {copy.lastUsed}: {formatDate(
                       session.lastUserActivityAt ??
                         session.lastAccessIssuedAt ??
@@ -122,7 +124,7 @@ export function AuthSessionsPanel() {
                     {" · "}
                     {copy.accessIssuances}: {session.accessIssueCount}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {session.clientId} · {session.clientType}
                   </p>
                 </div>
@@ -130,19 +132,20 @@ export function AuthSessionsPanel() {
                   <Button
                     type="button"
                     variant="outline"
+                    size="sm"
                     onClick={() => setPendingSession(session)}
                     disabled={isBusy}
                     loading={revokingId === session.id}
                     className="border-destructive/40 text-destructive hover:bg-destructive-subtle"
                   >
-                    {revokingId !== session.id && <ShieldOff className="size-4" />}
+                    {revokingId !== session.id && <ShieldOff className="size-3.5" />}
                     {session.current ? copy.endCurrent : copy.revoke}
                   </Button>
                 )}
               </article>
             ))}
             {sessions.length === 0 && (
-              <p className="py-6 text-center text-xs text-muted-foreground">
+              <p className="py-4 text-center text-xs text-muted-foreground">
                 {copy.empty}
               </p>
             )}

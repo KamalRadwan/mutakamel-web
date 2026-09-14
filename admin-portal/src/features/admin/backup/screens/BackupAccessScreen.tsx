@@ -68,15 +68,14 @@ export function BackupAccessScreen() {
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <BackupPageHeader
         eyebrow={copy.eyebrow}
         title={copy.title}
-        description={copy.description}
       />
 
       <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+        <CardContent className="grid gap-2.5 p-3 sm:p-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <BackupServerSelect
             label={t.backup.policiesScreen.databaseServerLabel}
             value={view.selectedServerId}
@@ -86,8 +85,8 @@ export function BackupAccessScreen() {
             placeholder={t.backup.policiesScreen.selectServerPlaceholder}
             required
           />
-          <Button type="button" variant="outline" onClick={() => void view.refreshBinding()} disabled={!view.selectedServerId || view.isLoadingBinding} loading={view.isLoadingBinding}>
-            {!view.isLoadingBinding && <RefreshCw className="size-4" aria-hidden="true" />}
+          <Button type="button" variant="outline" size="sm" onClick={() => void view.refreshBinding()} disabled={!view.selectedServerId || view.isLoadingBinding} loading={view.isLoadingBinding}>
+            {!view.isLoadingBinding && <RefreshCw className="size-3.5" aria-hidden="true" />}
             {copy.refreshEvidenceButton}
           </Button>
         </CardContent>
@@ -103,37 +102,37 @@ export function BackupAccessScreen() {
         view.error ? null : <BackupStatePanel kind="empty" title={copy.notProvisionedTitle} description={copy.notProvisionedDescription} />
       ) : (
         <>
-          <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
             <Card>
-              <CardContent className="p-5">
-                <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-11 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
-                      <KeyRound className="size-5" aria-hidden="true" />
+              <CardContent className="p-3 sm:p-3.5">
+                <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid size-9 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
+                      <KeyRound className="size-4" aria-hidden="true" />
                     </span>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{copy.fixedPrincipalLabel}</p>
-                      <p dir="ltr" className="mt-1 break-all font-mono text-base font-semibold">{view.binding.databasePrincipal}</p>
+                      <p dir="ltr" className="mt-0.5 break-all font-mono text-xs font-semibold">{view.binding.databasePrincipal}</p>
                     </div>
                   </div>
                   <StatusBadge status={view.binding.status} />
                 </div>
 
-                <dl className="mt-6 grid gap-4 sm:grid-cols-2">
+                <dl className="mt-3 grid gap-2.5 sm:grid-cols-2">
                   {[
                     [copy.credentialRevisionLabel, view.binding.credentialRevision],
                     [copy.rotationDueLabel, formatBackupDate(view.binding.rotationDueAt, locale)],
                     [copy.lastRotationLabel, formatBackupDate(view.binding.lastRotationSucceededAt, locale)],
                     [copy.retryAtLabel, formatBackupDate(view.binding.retryAt, locale)],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-md bg-muted p-4">
+                    <div key={label} className="rounded-md bg-muted p-2.5">
                       <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
-                      <dd dir={label === copy.credentialRevisionLabel ? "ltr" : undefined} className="mt-1 break-all text-sm font-semibold text-foreground">{value}</dd>
+                      <dd dir={label === copy.credentialRevisionLabel ? "ltr" : undefined} className="mt-0.5 break-all text-xs font-semibold text-foreground">{value}</dd>
                     </div>
                   ))}
                 </dl>
                 {view.binding.safeFailureCode && (
-                  <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning-subtle p-4 text-sm text-warning-subtle-foreground">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">
                     <span>{copy.safeFailureCodeLabel}:</span> <CodeRef value={view.binding.safeFailureCode} />
                   </div>
                 )}
@@ -141,12 +140,12 @@ export function BackupAccessScreen() {
             </Card>
 
             <Card>
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="size-5 text-info" aria-hidden="true" />
-                  <h2 className="text-base font-semibold">{copy.rotationPolicyTitle}</h2>
+              <CardContent className="p-3 sm:p-3.5">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="size-4 text-info" aria-hidden="true" />
+                  <h2 className="text-xs font-semibold">{copy.rotationPolicyTitle}</h2>
                 </div>
-                <dl className="mt-5 space-y-3 text-sm">
+                <dl className="mt-3 space-y-2 text-xs">
                   <div className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">{copy.statusLabel}</dt>
                     <dd className="font-semibold">{view.binding.rotationEnabled ? t.backup.policiesScreen.policyEnabledBadge : t.backup.policiesScreen.policyDisabledBadge}</dd>
@@ -164,12 +163,13 @@ export function BackupAccessScreen() {
                   <Button
                     type="button"
                     variant="primary"
-                    className="mt-6 w-full"
+                    size="sm"
+                    className="mt-4 w-full"
                     onClick={openPolicyDialog}
                     disabled={!view.ownsSelectedServerState || Boolean(view.activeAction)}
                     loading={view.activeAction === "policy"}
                   >
-                    {view.activeAction !== "policy" && <Settings2 className="size-4" aria-hidden="true" />}
+                    {view.activeAction !== "policy" && <Settings2 className="size-3.5" aria-hidden="true" />}
                     {copy.editPolicyButton}
                   </Button>
                 )}
@@ -178,31 +178,32 @@ export function BackupAccessScreen() {
           </div>
 
           <Card>
-            <CardContent className="p-5">
-              <h2 className="text-base font-semibold">{copy.credentialCommandsTitle}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{copy.credentialCommandsDescription}</p>
-              <div className="mt-5 flex flex-wrap gap-3">
+            <CardContent className="p-3 sm:p-3.5">
+              <h2 className="text-xs font-semibold">{copy.credentialCommandsTitle}</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">{copy.credentialCommandsDescription}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
                 {view.canRegenerate && (
                   <Button
                     type="button"
                     variant="destructive"
+                    size="sm"
                     onClick={() => setDialog("regenerate")}
                     disabled={!view.ownsSelectedServerState || view.binding.status !== "READY" || view.binding.hasStagedCandidate || Boolean(view.activeAction)}
                     loading={view.activeAction === "regenerate"}
                   >
-                    {view.activeAction !== "regenerate" && <RotateCcw className="size-4" aria-hidden="true" />}
+                    {view.activeAction !== "regenerate" && <RotateCcw className="size-3.5" aria-hidden="true" />}
                     {copy.rotatePasswordButton}
                   </Button>
                 )}
                 {view.canReconcile && (
-                  <Button type="button" variant="outline" onClick={() => setDialog("reconcile")} disabled={!view.ownsSelectedServerState || Boolean(view.activeAction)} loading={view.activeAction === "reconcile"}>
-                    {view.activeAction !== "reconcile" && <RefreshCw className="size-4" aria-hidden="true" />}
+                  <Button type="button" variant="outline" size="sm" onClick={() => setDialog("reconcile")} disabled={!view.ownsSelectedServerState || Boolean(view.activeAction)} loading={view.activeAction === "reconcile"}>
+                    {view.activeAction !== "reconcile" && <RefreshCw className="size-3.5" aria-hidden="true" />}
                     {copy.reconcileCredentialButton}
                   </Button>
                 )}
               </div>
               {view.canRegenerate && (view.binding.status !== "READY" || view.binding.hasStagedCandidate) && (
-                <p className="mt-3 text-xs text-warning-subtle-foreground">
+                <p className="mt-2 text-xs text-warning-subtle-foreground">
                   {lang === "ar"
                     ? view.binding.hasStagedCandidate ? "يجب مطابقة المرشح المرحلي قبل بدء تدوير جديد." : "يتطلب التدوير حالة READY مؤكدة من Core."
                     : view.binding.hasStagedCandidate ? "Reconcile the staged candidate before starting another rotation." : "Rotation requires the exact READY state from Core."}
@@ -229,23 +230,23 @@ export function BackupAccessScreen() {
         confirmDisabled={!view.ownsSelectedServerState || reason.trim().length < 8 || intervalHours < 24 || intervalHours > 8760 || windowStart < 0 || windowStart > 23 || windowHours < 1 || windowHours > 24}
         error={view.error}
       >
-        <label htmlFor="backup-rotation-enabled" className="flex min-h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
+        <label htmlFor="backup-rotation-enabled" className="flex min-h-8 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-semibold">
           <Checkbox id="backup-rotation-enabled" checked={rotationEnabled} onCheckedChange={(c) => setRotationEnabled(c === true)} />
           {copy.enableAutoRotationLabel}
         </label>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={copy.intervalHoursLabel} error={intervalError} required>
-            {(fp) => <Input {...fp} dir="ltr" type="number" value={intervalHours} min={24} max={8760} onChange={(e) => setIntervalHours(Number(e.target.value))} />}
+        <div className="grid gap-2.5 sm:grid-cols-3">
+          <Field label={copy.intervalHoursLabel} hideLabel error={intervalError} required>
+            {(fp) => <Input {...fp} size="sm" className="text-xs" dir="ltr" type="number" placeholder={`${copy.intervalHoursLabel} *`} value={intervalHours} min={24} max={8760} onChange={(e) => setIntervalHours(Number(e.target.value))} />}
           </Field>
-          <Field label={copy.utcStartLabel} error={windowStartError} required>
-            {(fp) => <Input {...fp} dir="ltr" type="number" value={windowStart} min={0} max={23} onChange={(e) => setWindowStart(Number(e.target.value))} />}
+          <Field label={copy.utcStartLabel} hideLabel error={windowStartError} required>
+            {(fp) => <Input {...fp} size="sm" className="text-xs" dir="ltr" type="number" placeholder={`${copy.utcStartLabel} *`} value={windowStart} min={0} max={23} onChange={(e) => setWindowStart(Number(e.target.value))} />}
           </Field>
-          <Field label={copy.windowHoursLabel} error={windowHoursError} required>
-            {(fp) => <Input {...fp} dir="ltr" type="number" value={windowHours} min={1} max={24} onChange={(e) => setWindowHours(Number(e.target.value))} />}
+          <Field label={copy.windowHoursLabel} hideLabel error={windowHoursError} required>
+            {(fp) => <Input {...fp} size="sm" className="text-xs" dir="ltr" type="number" placeholder={`${copy.windowHoursLabel} *`} value={windowHours} min={1} max={24} onChange={(e) => setWindowHours(Number(e.target.value))} />}
           </Field>
         </div>
-        <Field label={copy.auditReasonMin8Label} error={reasonError} required>
-          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} />}
+        <Field label={copy.auditReasonMin8Label} hideLabel error={reasonError} required>
+          {(fp) => <Textarea {...fp} className="text-xs" placeholder={`${copy.auditReasonMin8Label} *`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} />}
         </Field>
       </BackupDialog>
 
@@ -261,11 +262,11 @@ export function BackupAccessScreen() {
         destructive
         error={view.error}
       >
-        <Field label={copy.auditReasonMin8Label} error={reasonError} required>
-          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} />}
+        <Field label={copy.auditReasonMin8Label} hideLabel error={reasonError} required>
+          {(fp) => <Textarea {...fp} className="text-xs" placeholder={`${copy.auditReasonMin8Label} *`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} />}
         </Field>
-        <Field label={copy.confirmationTextLabel} error={confirmation !== "ROTATE" ? (lang === "ar" ? "اكتب ROTATE تماماً للتأكيد." : "Type ROTATE exactly to confirm.") : undefined} required>
-          {(fp) => <Input {...fp} dir="ltr" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder="ROTATE" />}
+        <Field label={copy.confirmationTextLabel} hideLabel error={confirmation !== "ROTATE" ? (lang === "ar" ? "اكتب ROTATE تماماً للتأكيد." : "Type ROTATE exactly to confirm.") : undefined} required>
+          {(fp) => <Input {...fp} size="sm" className="text-xs" dir="ltr" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} placeholder={`${copy.confirmationTextLabel} * (ROTATE)`} />}
         </Field>
       </BackupDialog>
 
@@ -280,8 +281,8 @@ export function BackupAccessScreen() {
         confirmDisabled={!view.ownsSelectedServerState || reason.trim().length < 8}
         error={view.error}
       >
-        <Field label={copy.auditReasonMin8Label} error={reasonError} required>
-          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} />}
+        <Field label={copy.auditReasonMin8Label} hideLabel error={reasonError} required>
+          {(fp) => <Textarea {...fp} className="text-xs" placeholder={`${copy.auditReasonMin8Label} *`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} />}
         </Field>
       </BackupDialog>
     </div>

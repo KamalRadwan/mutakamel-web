@@ -120,7 +120,7 @@ export default function OpportunityStageDetailPage({
               }
               secondaryActions={
                 detail.canManage && !stage.isSystem ? (
-                  <Button
+                  <Button size="sm"
                     variant="outline"
                     onClick={() => setIsDeleteOpen(true)}
                     disabled={detail.isSubmitting}

@@ -7,6 +7,7 @@ import { Coins, Plus, Edit2, Loader2, RefreshCw, CheckCircle2, XCircle, DollarSi
 import {
   Card,
   Button,
+  Field,
   Input,
   Textarea,
   Checkbox,
@@ -157,13 +158,13 @@ export function CurrencyRatesSection() {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border p-5">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-info-subtle p-2.5 text-info-subtle-foreground">
-            <Coins className="size-5" aria-hidden="true" />
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3 sm:p-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="rounded-lg bg-info-subtle p-2 text-info-subtle-foreground">
+            <Coins className="size-4" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground">
+            <h2 className="text-xs font-semibold text-foreground">
               {copy.title}
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -200,7 +201,7 @@ export function CurrencyRatesSection() {
                   setIsAddModalOpen(true);
                 }}
               >
-                <Plus className="size-4" aria-hidden="true" />
+                <Plus className="size-3.5" aria-hidden="true" />
                 {copy.addCurrency}
               </Button>
             </>
@@ -208,8 +209,8 @@ export function CurrencyRatesSection() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-b border-border bg-muted px-5 py-3 text-xs text-muted-foreground">
-        <DollarSign className="size-4 shrink-0 text-info" aria-hidden="true" />
+      <div className="flex items-center gap-2 border-b border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+        <DollarSign className="size-3.5 shrink-0 text-info" aria-hidden="true" />
         <span>
           <strong className="font-semibold text-foreground">{copy.baseCurrencyLabel}</strong>{" "}
           {copy.baseCurrencyNote}&nbsp;
@@ -219,15 +220,15 @@ export function CurrencyRatesSection() {
         </span>
       </div>
 
-      <div className="p-5">
+      <div className="p-3 sm:p-3.5">
         {error && (
-          <div role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground">
+          <div role="alert" className="mb-3 rounded-lg border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground">
             {error}
           </div>
         )}
         {rates.length === 0 && !isLoading ? (
-          <div className="py-8 text-center">
-            <Coins className="mx-auto mb-2 size-8 text-muted-foreground" aria-hidden="true" />
+          <div className="py-6 text-center">
+            <Coins className="mx-auto mb-2 size-6 text-muted-foreground" aria-hidden="true" />
             <p className="text-xs font-medium text-muted-foreground">
               {copy.empty}
             </p>
@@ -250,45 +251,47 @@ export function CurrencyRatesSection() {
       </div>
 
       <Dialog open={isAddModalOpen || Boolean(editingRate)} onOpenChange={(open) => { if (!open) { setIsAddModalOpen(false); setEditingRate(null); } }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md p-3 sm:p-3.5">
           <DialogHeader>
-            <DialogTitle className="text-base">
+            <DialogTitle className="text-xs font-semibold">
               {editingRate ? copy.editRateTitle(editingRate.currencyCode) : copy.addRateTitle}
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-                {copy.currencyCodeLabel}
-              </label>
-              <Input
-                type="text"
-                maxLength={3}
-                required
-                disabled={Boolean(editingRate)}
-                value={formCurrencyCode}
-                onChange={(e) => setFormCurrencyCode(e.target.value.toUpperCase())}
-                placeholder="EUR, EGP, SAR..."
-                className="font-mono"
-              />
-            </div>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <Field label={copy.currencyCodeLabel} hideLabel required>
+              {(fp) => (
+                <Input
+                  {...fp}
+                  type="text"
+                  size="sm"
+                  maxLength={3}
+                  required
+                  disabled={Boolean(editingRate)}
+                  value={formCurrencyCode}
+                  onChange={(e) => setFormCurrencyCode(e.target.value.toUpperCase())}
+                  placeholder={`${copy.currencyCodeLabel} (EUR, EGP, SAR...) *`}
+                  className="font-mono text-xs"
+                />
+              )}
+            </Field>
 
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-muted-foreground">
-                {copy.unitsLabel}
-              </label>
-              <Input
-                type="text"
-                required
-                value={formUnitsPerUsd}
-                onChange={(e) => setFormUnitsPerUsd(e.target.value)}
-                placeholder="e.g. 48.50"
-                className="font-mono"
-              />
-            </div>
+            <Field label={copy.unitsLabel} hideLabel required>
+              {(fp) => (
+                <Input
+                  {...fp}
+                  type="text"
+                  size="sm"
+                  required
+                  value={formUnitsPerUsd}
+                  onChange={(e) => setFormUnitsPerUsd(e.target.value)}
+                  placeholder={`${copy.unitsLabel} (e.g. 48.50) *`}
+                  className="font-mono text-xs"
+                />
+              )}
+            </Field>
 
-            <label className="flex items-center gap-2 pt-1 text-xs font-semibold text-muted-foreground">
+            <label className="flex items-center gap-2 pt-0.5 text-xs font-medium text-muted-foreground">
               <Checkbox checked={formIsActive} onCheckedChange={(checked) => setFormIsActive(checked === true)} />
               {copy.activeLabel}
             </label>
@@ -297,6 +300,7 @@ export function CurrencyRatesSection() {
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => {
                   setIsAddModalOpen(false);
                   setEditingRate(null);
@@ -304,7 +308,7 @@ export function CurrencyRatesSection() {
               >
                 {copy.cancel}
               </Button>
-              <Button type="submit" variant="primary" disabled={isSaving}>
+              <Button type="submit" variant="primary" size="sm" disabled={isSaving}>
                 {isSaving && <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
                 {copy.save}
               </Button>
@@ -314,32 +318,37 @@ export function CurrencyRatesSection() {
       </Dialog>
 
       <Dialog open={isBatchOpen} onOpenChange={(open) => !open && setIsBatchOpen(false)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg p-3 sm:p-3.5">
           <DialogHeader>
-            <DialogTitle className="text-base">{copy.batchDialogTitle}</DialogTitle>
+            <DialogTitle className="text-xs font-semibold">{copy.batchDialogTitle}</DialogTitle>
             <p className="text-xs text-muted-foreground">
               {copy.batchDialogDescription}
             </p>
           </DialogHeader>
-          <form onSubmit={handleBatchSubmit} className="space-y-4">
-            <Textarea
-              value={batchText}
-              onChange={(event) => setBatchText(event.target.value)}
-              rows={10}
-              spellCheck={false}
-              placeholder="EUR,0.9300,true"
-              className="resize-none font-mono"
-            />
+          <form onSubmit={handleBatchSubmit} className="space-y-3">
+            <Field label={copy.batchDialogTitle} hideLabel required>
+              {(fp) => (
+                <Textarea
+                  {...fp}
+                  value={batchText}
+                  onChange={(event) => setBatchText(event.target.value)}
+                  rows={8}
+                  spellCheck={false}
+                  placeholder={`${copy.batchDialogTitle} (EUR,0.9300,true) *`}
+                  className="resize-none font-mono text-xs"
+                />
+              )}
+            </Field>
             {batchError && (
-              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground">
+              <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground">
                 {batchError}
               </p>
             )}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsBatchOpen(false)}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsBatchOpen(false)}>
                 {copy.cancel}
               </Button>
-              <Button type="submit" variant="primary" disabled={isSaving}>
+              <Button type="submit" variant="primary" size="sm" disabled={isSaving}>
                 {isSaving && <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
                 {copy.saveBatch}
               </Button>

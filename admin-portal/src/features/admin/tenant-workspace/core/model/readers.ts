@@ -12,6 +12,7 @@ import {
   type TenantStorageServerSummary,
   type TenantSubscriptionSummary,
   type TenantView,
+  type TenantDestroyView,
   type UpdateTenantProfileDto,
 } from "../types";
 
@@ -19,6 +20,21 @@ const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const TENANT_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+export function readTenantDestroy(value: unknown): TenantDestroyView | null {
+  if (value === null) return null;
+  const row = object(value, 'INVALID_TENANT_DESTROY_RESPONSE');
+  const code = 'INVALID_TENANT_DESTROY_RESPONSE';
+  if (!['STOPPING_PROVISIONING','DROPPING_DATABASE','FINALIZING','SUCCEEDED'].includes(String(row.phase))) invalid(code);
+  if ((row.phase === 'SUCCEEDED') !== (row.completedAt !== null)) invalid(code);
+  return {
+    operationId: uuidV7(row.operationId,code), tenantId: uuidV7(row.tenantId,code),
+    phase: row.phase as TenantDestroyView['phase'],
+    requestedAt: requiredString(row.requestedAt,code), updatedAt: requiredString(row.updatedAt,code),
+    completedAt: row.completedAt === null ? null : requiredString(row.completedAt,code),
+    lastErrorCode: row.lastErrorCode === null ? null : requiredString(row.lastErrorCode,code),
+  };
+}
 const DECIMAL_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const SUBSCRIPTION_STATUSES = [
   "TRIAL",

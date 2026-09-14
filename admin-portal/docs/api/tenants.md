@@ -93,7 +93,8 @@ generated for one mutation intent.
 | `POST /api/admin/core/v1/tenants/:id/reprovision` | `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Compatibility retry of the latest failed/cancelled operation |
 | `POST /api/admin/core/v1/tenants/:id/provisioning/cancel` | `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Compatibility cancellation of the latest active operation |
 | `DELETE /api/admin/core/v1/tenants/:id` | `admin.tenants.delete` + `admin.tenants.critical` | `204` | Yes | Soft-delete a tenant |
-| `DELETE /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.destroy` + `admin.tenants.critical` | `204` | Yes | Permanently destroy an eligible soft-deleted tenant |
+| `DELETE /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.destroy` + `admin.tenants.critical` | `202` | Yes | Accept durable destruction of a soft-deleted tenant |
+| `GET /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.read` | `200` | No | Read destruction progress or null |
 
 ### FQDNs
 
@@ -1086,6 +1087,8 @@ from normal lists. Deleted records remain available through direct detail and
 
 ### Permanent destroy
 
+Source verified: **2026-09-12**.
+
 `DELETE /api/admin/core/v1/tenants/:id/destroy?destroySubscriptions=false`
 
 Permissions: `admin.tenants.destroy` + `admin.tenants.critical`.
@@ -1096,15 +1099,41 @@ interface DestroyTenantQueryDto {
 }
 ```
 
-There is no `confirm` query parameter. The tenant must already be soft-deleted.
-With the default `false`, subscriptions are detached from the tenant. With
-`true`, subscription headers, items, and add-ons are purged.
+The tenant must already be soft-deleted. The compatibility flag must be false;
+`true` returns `TENANT_DESTROY_HISTORY_RETAINED`. Financial, subscription and audit
+records remain attached to a retained tenant tombstone.
 
-Permanent destruction is refused when legally/financially retained evidence
-exists, including invoices, payments, protected plan-change previews,
-non-zero wallet balances/reservations, or any wallet ledger history. The UI
-must treat `TENANT_FINANCIAL_HISTORY_EXISTS` as a permanent retention
-constraint, not as a retry prompt.
+The DELETE returns **202** with the destruction operation under `data`.
+`GET /api/admin/core/v1/tenants/:id/destroy` requires `admin.tenants.read` and
+returns that operation (including after completion), or `null` when none exists.
+
+```ts
+interface TenantDestroyView {
+  operationId: string;
+  tenantId: string;
+  phase: "STOPPING_PROVISIONING" | "DROPPING_DATABASE" | "FINALIZING" | "SUCCEEDED";
+  requestedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  lastErrorCode: string | null;
+}
+```
+
+Core authorizes and stores one immutable request per tenant. Worker owns
+background recovery, requests provisioning cancellation through Core, waits
+for actual stop evidence, acquires the exclusive database claim, drops the
+pinned database and verifies absence. Core then releases domain identity and
+capacity exactly once. Restore and placement changes are prohibited once the
+request is accepted. Repeated requests return the same operation.
+
+Late authenticated provisioning results remain projectable after soft deletion.
+When Core still shows an open operation whose Worker execution has stopped,
+Worker replays its original signed terminal outbox event with the same identity
+and checksum. Destruction still waits for Core to acknowledge the terminal state.
+
+The UI retains the tenant while pending and polls progress, including after a
+page reload. Only `SUCCEEDED` displays completion. A retry delay keeps the
+request and target intact; it never reports an unverified drop as success.
 
 ## FQDN management
 

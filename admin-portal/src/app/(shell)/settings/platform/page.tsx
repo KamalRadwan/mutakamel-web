@@ -55,7 +55,7 @@ export default function PlatformSettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
         title={copy.title}
         action={<SettingSearch value={search} onChange={setSearch} />}
@@ -73,7 +73,7 @@ export default function PlatformSettingsPage() {
           onSave={saveAll}
           lang={lang}
         />
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredSettings.length ? (
             filteredSettings.map((setting) => (
               <SettingField
@@ -90,7 +90,7 @@ export default function PlatformSettingsPage() {
               />
             ))
           ) : (
-            <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
+            <div className="rounded-lg border border-border bg-card p-4 text-center text-xs text-muted-foreground">
               {allSettings.length ? copy.emptyFiltered : copy.emptyGroup}
             </div>
           )}

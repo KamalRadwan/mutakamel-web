@@ -1,9 +1,5 @@
 import type { NextConfig } from "next";
 
-const devApiTarget = (
-  process.env.DEV_API_TARGET || "http://localhost:9000"
-).replace(/\/+$/, "");
-
 /**
  * Tenant workspaces are reached through customer-owned domains, so the set of
  * hosts a developer legitimately loads this dev server from is open-ended. This
@@ -74,13 +70,6 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ALLOWED_DEV_ORIGINS,
   experimental: {
     optimizePackageImports: ['lucide-react'],
-  },
-  async rewrites() {
-    if (process.env.NODE_ENV !== "development") return [];
-    return [{
-      source: "/api/:path*",
-      destination: `${devApiTarget}/api/:path*`,
-    }];
   },
   async redirects() {
     return [{

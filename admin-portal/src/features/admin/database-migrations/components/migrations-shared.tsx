@@ -725,15 +725,15 @@ export function MigrationsHero({
   action?: ReactNode;
 }) {
   return (
-    <header className="rounded-lg border border-border bg-primary p-5 text-primary-foreground shadow-md">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-primary-foreground/15 text-primary-foreground">
-            <DatabaseZap className="size-5" aria-hidden="true" />
+    <header className="rounded-lg border border-border bg-primary p-3 sm:p-3.5 text-primary-foreground shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="grid size-8 place-items-center rounded-lg bg-primary-foreground/15 text-primary-foreground">
+            <DatabaseZap className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <h1 className="text-xl font-semibold sm:text-2xl">{title}</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-primary-foreground/80">
+            <h1 className="text-base font-semibold sm:text-lg">{title}</h1>
+            <p className="mt-0.5 max-w-3xl text-xs leading-5 text-primary-foreground/80">
               {subtitle}
             </p>
           </div>
@@ -809,10 +809,10 @@ export function RefreshMigrationsButton({
       type="button"
       onClick={onClick}
       disabled={pending}
-      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-50"
+      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-2.5 text-xs font-semibold text-primary disabled:opacity-50"
     >
       <RefreshCw
-        className={`size-4 ${pending ? "animate-spin motion-reduce:animate-none" : ""}`}
+        className={`size-3.5 ${pending ? "animate-spin motion-reduce:animate-none" : ""}`}
         aria-hidden="true"
       />
       {label}
@@ -973,19 +973,19 @@ export function MigrationPager({
   return (
     <nav
       aria-label={isArabic ? "تصفح الصفحات" : "Pagination"}
-      className="flex items-center justify-between border-t border-border px-4 py-3 text-xs"
+      className="flex items-center justify-between border-t border-border px-3 py-2 text-xs"
     >
       <span className="font-semibold text-muted-foreground">
         {isArabic
           ? `صفحة ${page} من ${totalPages}`
           : `Page ${page} of ${totalPages}`}
       </span>
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         <button
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
-          className="min-h-9 rounded-xl border border-border px-3 font-semibold disabled:opacity-50"
+          className="h-8 rounded-md border border-border px-2.5 text-xs font-semibold disabled:opacity-50"
         >
           {isArabic ? "السابق" : "Previous"}
         </button>
@@ -993,7 +993,7 @@ export function MigrationPager({
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
-          className="min-h-9 rounded-xl border border-border px-3 font-semibold disabled:opacity-50"
+          className="h-8 rounded-md border border-border px-2.5 text-xs font-semibold disabled:opacity-50"
         >
           {isArabic ? "التالي" : "Next"}
         </button>
@@ -1012,7 +1012,7 @@ export function TableHeader({
   return (
     <th
       scope="col"
-      className={`px-4 py-3 ${align === "end" ? "text-end" : "text-start"}`}
+      className={`px-3 py-2 text-xs ${align === "end" ? "text-end" : "text-start"}`}
     >
       {children}
     </th>
@@ -1047,6 +1047,6 @@ export function formatDuration(
 }
 
 export const migrationInputClass =
-  "min-h-11 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/20";
+  "h-8 w-full rounded-md border border-input bg-card px-2.5 text-xs text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/20";
 export const migrationLabelClass =
-  "mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+  "mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground";

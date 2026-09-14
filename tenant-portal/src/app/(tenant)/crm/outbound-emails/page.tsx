@@ -124,7 +124,7 @@ export default function OutboundEmailsPage() {
               : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void reload()}
               disabled={isLoading}
@@ -207,7 +207,7 @@ export default function OutboundEmailsPage() {
 
         {hasNext ? (
           <div className="flex justify-center">
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={loadMore}
               disabled={isLoadingMore}

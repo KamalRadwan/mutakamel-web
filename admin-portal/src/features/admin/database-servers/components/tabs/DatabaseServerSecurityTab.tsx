@@ -34,42 +34,42 @@ export function DatabaseServerSecurityTab({ server }: DatabaseServerSecurityTabP
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="p-6">
-          <h3 className="flex items-center gap-2 border-b border-border pb-3 text-sm font-semibold text-foreground">
-            <Shield className="size-4 text-info" aria-hidden="true" />
+    <div className="space-y-3">
+      <div className="grid gap-2.5 md:grid-cols-2">
+        <Card className="p-3 sm:p-3.5">
+          <h3 className="flex items-center gap-2 border-b border-border pb-2 text-xs font-semibold text-foreground">
+            <Shield className="size-3.5 text-info" aria-hidden="true" />
             {d.title}
           </h3>
-          <div className="mt-4 space-y-4 text-xs">
-            <div className={`rounded-lg border p-4 ${modeSurface}`}>
+          <div className="mt-3 space-y-3 text-xs">
+            <div className={`rounded-lg border p-2.5 ${modeSurface}`}>
               <div className="text-xs font-semibold uppercase tracking-wider rtl:normal-case rtl:tracking-normal">
                 {d.modeLabel}
               </div>
-              <div className="mt-1 font-mono text-xl font-semibold uppercase">
+              <div className="mt-1 font-mono text-lg font-semibold uppercase">
                 {server.sslMode}
               </div>
-              <p className="mt-2 font-medium leading-relaxed text-foreground">{getSslModeHelp(server.sslMode)}</p>
+              <p className="mt-1.5 font-medium leading-relaxed text-foreground">{getSslModeHelp(server.sslMode)}</p>
             </div>
 
-            <div className="flex justify-between border-b border-border py-2">
+            <div className="flex justify-between border-b border-border py-1.5">
               <span className="font-medium text-muted-foreground">{d.certStatus}</span>
               <span className="flex items-center gap-1.5 font-semibold text-foreground">
                 {server.hasSslConfig ? (
                   <>
-                    <CheckCircle2 className="size-4 text-success" aria-hidden="true" />
+                    <CheckCircle2 className="size-3.5 text-success" aria-hidden="true" />
                     {d.certConfigured}
                   </>
                 ) : (
                   <>
-                    <FileKey className="size-4 text-muted-foreground" aria-hidden="true" />
+                    <FileKey className="size-3.5 text-muted-foreground" aria-hidden="true" />
                     {d.noCustomBundle}
                   </>
                 )}
               </span>
             </div>
 
-            <div className="flex justify-between border-b border-border py-2">
+            <div className="flex justify-between border-b border-border py-1.5">
               <span className="font-medium text-muted-foreground">{d.verification}</span>
               <span className="font-mono font-semibold text-foreground">
                 {/*
@@ -90,25 +90,25 @@ export function DatabaseServerSecurityTab({ server }: DatabaseServerSecurityTabP
           </div>
         </Card>
 
-        <Card className="flex flex-col justify-between p-6">
+        <Card className="flex flex-col justify-between p-3 sm:p-3.5">
           <div>
-            <h3 className="flex items-center gap-2 border-b border-border pb-3 text-sm font-semibold text-foreground">
-              <Lock className="size-4 text-info" aria-hidden="true" />
+            <h3 className="flex items-center gap-2 border-b border-border pb-2 text-xs font-semibold text-foreground">
+              <Lock className="size-3.5 text-info" aria-hidden="true" />
               {d.encryptedBoundaryTitle}
             </h3>
-            <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{d.encryptedBoundaryDesc}</p>
-            <div className="mt-4 space-y-2 text-xs">
-              <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted p-3">
-                <FileKey className="size-4 shrink-0 text-info" aria-hidden="true" />
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{d.encryptedBoundaryDesc}</p>
+            <div className="mt-3 space-y-2 text-xs">
+              <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted p-2.5">
+                <FileKey className="size-3.5 shrink-0 text-info" aria-hidden="true" />
                 <span className="font-medium text-foreground">{d.passwordBoundaryNote}</span>
               </div>
-              <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted p-3">
-                <Shield className="size-4 shrink-0 text-info" aria-hidden="true" />
+              <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted p-2.5">
+                <Shield className="size-3.5 shrink-0 text-info" aria-hidden="true" />
                 <span className="font-medium text-foreground">{d.isolatedCredentialsNote}</span>
               </div>
             </div>
           </div>
-          <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-3 text-xs text-info-subtle-foreground">
+          <div className="mt-3 rounded-lg border border-info/30 bg-info-subtle p-2.5 text-xs text-info-subtle-foreground">
             {d.auditLoggingNote}
           </div>
         </Card>

@@ -204,7 +204,7 @@ export default function CustomerProfilesPage() {
                 onChange={selectBranch}
                 disabled={isLoading}
               />
-              <Button variant="outline" onClick={reload} disabled={isLoading}>
+              <Button size="sm" variant="outline" onClick={reload} disabled={isLoading}>
                 <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
                 {t.common.retry}
               </Button>

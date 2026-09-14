@@ -660,9 +660,32 @@ export function useRegisterTenant() {
       }),
     [formData, selectedApplicationLines],
   );
-  const creationQuote = useTenantCreationQuote({ owner: JSON.stringify([user?.id, canCreateTenant, draftFingerprint]),
-    lines: selectedApplicationLines, billingCycle: formData.billingCycle,
-    enabled: canCreateTenant && !isAuthLoading && hasValidApplicationSelection && !pendingCreateRecovery && !isSubmitting });
+  const quoteScope = useMemo(
+    () =>
+      JSON.stringify([
+        user?.id,
+        canCreateTenant,
+        selectedApplicationLines,
+        formData.billingCycle,
+      ]),
+    [
+      user?.id,
+      canCreateTenant,
+      selectedApplicationLines,
+      formData.billingCycle,
+    ],
+  );
+  const creationQuote = useTenantCreationQuote({
+    owner: quoteScope,
+    lines: selectedApplicationLines,
+    billingCycle: formData.billingCycle,
+    enabled:
+      canCreateTenant &&
+      !isAuthLoading &&
+      hasValidApplicationSelection &&
+      !pendingCreateRecovery &&
+      !isSubmitting,
+  });
   const draftFingerprintRef = useRef(draftFingerprint);
   useLayoutEffect(() => {
     draftFingerprintRef.current = draftFingerprint;
@@ -694,9 +717,12 @@ export function useRegisterTenant() {
   );
 
   const clearValidationError = useCallback((fieldId: string) => {
-    setValidationErrors((current) =>
-      current.filter((error) => error.fieldId !== fieldId),
-    );
+    setValidationErrors((current) => {
+      if (!current.some((error) => error.fieldId === fieldId)) {
+        return current;
+      }
+      return current.filter((error) => error.fieldId !== fieldId);
+    });
   }, []);
 
   const focusValidationField = useCallback((fieldId: string) => {
@@ -862,11 +888,9 @@ export function useRegisterTenant() {
     identityFingerprintRef.current = identityFingerprint;
     identityRequestGeneration.current += 1;
     identityRequestAbort.current?.abort();
-    queueMicrotask(() => {
-      setIdentityValidationEvidence(null);
-      setIdentityValidationError(null);
-      setIsValidatingIdentity(false);
-    });
+    setIdentityValidationEvidence((prev) => (prev !== null ? null : prev));
+    setIdentityValidationError((prev) => (prev !== null ? null : prev));
+    setIsValidatingIdentity((prev) => (prev ? false : prev));
   }, [identityFingerprint]);
 
   /** Resolves to whether the identity is confirmed available. */
@@ -1314,13 +1338,34 @@ export function useRegisterTenant() {
     setCurrentStep(next);
   };
 
+  const goToStepRef = useRef(goToStep);
+  useLayoutEffect(() => {
+    goToStepRef.current = goToStep;
+  });
+  const handleGoToStep = useCallback((step: number) => {
+    void goToStepRef.current(step);
+  }, []);
+
+  const handleNextStep = useCallback(() => {
+    void goToStepRef.current(currentStep + 1);
+  }, [currentStep]);
+
+  const handlePrevStep = useCallback(() => {
+    if (!isSubmitting && !pendingCreateRecovery) {
+      setValidationErrors([]);
+      setCurrentStep((step) => Math.max(1, step - 1));
+    }
+  }, [isSubmitting, pendingCreateRecovery]);
+
+  const handleCancel = useCallback(() => {
+    router.push("/tenants");
+  }, [router]);
+
   return {
     creationQuote,
     t,
     currentStep,
-    goToStep: (step: number) => {
-      void goToStep(step);
-    },
+    goToStep: handleGoToStep,
     applyCompanyName,
     markTenantCodeManual,
     validationErrors,
@@ -1377,15 +1422,8 @@ export function useRegisterTenant() {
     recoverTenantCreateStatus,
     handleValidateIdentity,
     handleSubmit,
-    nextStep: () => {
-      void goToStep(currentStep + 1);
-    },
-    prevStep: () => {
-      if (!isSubmitting && !pendingCreateRecovery) {
-        setValidationErrors([]);
-        setCurrentStep((step) => Math.max(1, step - 1));
-      }
-    },
-    onCancel: () => router.push("/tenants"),
+    nextStep: handleNextStep,
+    prevStep: handlePrevStep,
+    onCancel: handleCancel,
   };
 }

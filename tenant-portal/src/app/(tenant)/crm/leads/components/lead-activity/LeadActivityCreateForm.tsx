@@ -65,7 +65,7 @@ export function LeadActivityCreateForm({
           onValueChange={(value) => onChange({ type: value as LeadActivityForm["type"] })}
           disabled={disabled}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -79,7 +79,7 @@ export function LeadActivityCreateForm({
       </Field>
 
       <Field label={copy.subject} error={messageFor("subject")} required>
-        <Input
+        <Input size="sm" placeholder={copy.subject}
           value={values.subject}
           onChange={(event) => onChange({ subject: event.target.value })}
           maxLength={LEAD_ACTIVITY_SUBJECT_MAX}
@@ -92,7 +92,7 @@ export function LeadActivityCreateForm({
           the browser's, and mirroring the box puts the year where the day
           belongs. The label beside it still reads right-to-left. */}
       <Field label={copy.dueAt} hint={copy.dueAtHint} error={messageFor("dueAt")} required>
-        <Input
+        <Input size="sm" placeholder={copy.dueAt}
           dir="ltr"
           type="datetime-local"
           value={values.dueAt}
@@ -110,7 +110,7 @@ export function LeadActivityCreateForm({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -124,7 +124,7 @@ export function LeadActivityCreateForm({
       </Field>
 
       <Field label={copy.notes}>
-        <Textarea
+        <Textarea placeholder={copy.notes}
           value={values.description}
           onChange={(event) => onChange({ description: event.target.value })}
           maxLength={LEAD_ACTIVITY_DESCRIPTION_MAX}

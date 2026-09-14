@@ -94,7 +94,7 @@ export function AddressDrawer({
             }
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -108,7 +108,7 @@ export function AddressDrawer({
         </Field>
 
         <Field label={copy.addressFields.label}>
-          <Input
+          <Input size="sm" placeholder={copy.addressFields.label}
             value={values.label}
             onChange={(event) =>
               setValues((current) => ({ ...current, label: event.target.value }))
@@ -140,7 +140,7 @@ export function AddressDrawer({
 
         {TEXT_FIELDS.map((key) => (
           <Field key={key} label={copy.addressFields[key]}>
-            <Input
+            <Input size="sm" placeholder={copy.addressFields[key]}
               value={values[key]}
               onChange={(event) =>
                 setValues((current) => ({ ...current, [key]: event.target.value }))

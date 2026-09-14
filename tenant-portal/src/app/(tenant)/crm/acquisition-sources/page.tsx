@@ -164,7 +164,7 @@ export default function AcquisitionSourcesPage() {
           description={t.crmAcquisitionSources.subtitle}
           primaryAction={canManage ? { label: t.crmAcquisitionSources.add, onClick: openCreate } : undefined}
           secondaryActions={
-            <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
               {t.crmAcquisitionSources.reload}
             </Button>

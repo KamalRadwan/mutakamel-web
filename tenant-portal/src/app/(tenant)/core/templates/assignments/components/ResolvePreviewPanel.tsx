@@ -74,7 +74,7 @@ export function ResolvePreviewPanel({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={copy.documentType}>
           <Select value={documentType} onValueChange={setDocumentType} disabled={isResolving}>
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -89,7 +89,7 @@ export function ResolvePreviewPanel({
 
         <Field label={copy.outputChannel}>
           <Select value={outputChannel} onValueChange={setOutputChannel} disabled={isResolving}>
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -104,7 +104,7 @@ export function ResolvePreviewPanel({
 
         <Field label={copy.dataSource}>
           <Select value={adapterKey} onValueChange={setAdapterKey} disabled={isResolving}>
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -119,7 +119,7 @@ export function ResolvePreviewPanel({
 
         <Field label={copy.locale}>
           <Select value={locale} onValueChange={setLocale} disabled={isResolving}>
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

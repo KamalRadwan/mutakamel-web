@@ -58,7 +58,7 @@ export function CreateAcquisitionSourcesModal({ isOpen, onClose, onSubmit, isSub
     >
       <div className="flex flex-col gap-4">
         <Field label={t.crmLeadStages.arabicName} required>
-          <Input
+          <Input size="sm" placeholder={t.crmLeadStages.arabicName}
             dir="rtl"
             value={nameAr}
             onChange={(event) => setNameAr(event.target.value)}
@@ -68,7 +68,7 @@ export function CreateAcquisitionSourcesModal({ isOpen, onClose, onSubmit, isSub
           />
         </Field>
         <Field label={t.crmLeadStages.englishName} required>
-          <Input
+          <Input size="sm" placeholder={t.crmLeadStages.englishName}
             dir="ltr"
             value={nameEn}
             onChange={(event) => setNameEn(event.target.value)}

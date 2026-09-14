@@ -83,25 +83,25 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
   };
 
   return (
-    <div className={`rounded-lg border p-5 transition-colors motion-reduce:transition-none ${readOnly ? "border-border bg-muted" : "border-border bg-card hover:border-primary/30"} group`}>
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+    <div className={`rounded-lg border p-3 sm:p-3.5 transition-colors motion-reduce:transition-none ${readOnly ? "border-border bg-muted" : "border-border bg-card hover:border-primary/30"} group`}>
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
 
         {/* Left Side: Label and Description */}
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h3 id={titleId} className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <h3 id={titleId} className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
               {title}
-              {readOnly && <Lock className="size-3.5 text-muted-foreground" aria-hidden="true" />}
+              {readOnly && <Lock className="size-3 text-muted-foreground" aria-hidden="true" />}
             </h3>
           </div>
 
-          <p id={descriptionId} className="mt-1.5 flex max-w-2xl items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
-            <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <p id={descriptionId} className="mt-1 flex max-w-2xl items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             {lang === "ar" ? descriptionI18n.ar : descriptionI18n.en}
           </p>
 
           {readOnly && (
-            <p id={readOnlyReasonId} className="mt-2 w-fit rounded bg-warning-subtle px-2 py-1 text-xs font-medium text-warning-subtle-foreground">
+            <p id={readOnlyReasonId} className="mt-1.5 w-fit rounded bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning-subtle-foreground">
               {permissionLocked ? copy.permissionLockedNote : copy.environmentLockedNote}
             </p>
           )}
@@ -109,11 +109,11 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
         </div>
 
         {/* Right Side: Input and Save Button */}
-        <div className="w-full sm:w-72 shrink-0 flex flex-col items-end gap-2">
+        <div className="w-full sm:w-72 shrink-0 flex flex-col items-end gap-1.5">
           <div className="w-full flex items-center gap-2">
             <div className="flex-1">
               {uiMeta.inputType === "boolean" && (
-                <div className="flex h-9 items-center justify-start">
+                <div className="flex h-8 items-center justify-start">
                   <Switch
                     id={fieldId}
                     aria-labelledby={titleId}
@@ -131,6 +131,7 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   aria-labelledby={titleId}
                   aria-describedby={describedBy}
                   type="text"
+                  size="sm"
                   value={
                     typeof localValue === "string"
                       ? localValue
@@ -138,8 +139,8 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   }
                   onChange={(e) => handleChange(e.target.value)}
                   disabled={readOnly}
-                  placeholder={uiMeta.placeholder}
-                  className="w-full font-mono"
+                  placeholder={uiMeta.placeholder ?? title}
+                  className="w-full font-mono text-xs"
                 />
               )}
 
@@ -149,6 +150,8 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   aria-labelledby={titleId}
                   aria-describedby={describedBy}
                   type="number"
+                  size="sm"
+                  placeholder={uiMeta.placeholder ?? title}
                   value={
                     typeof localValue === "number" ? localValue : ""
                   }
@@ -156,7 +159,7 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   disabled={readOnly}
                   min={uiMeta.min}
                   max={uiMeta.max}
-                  className="w-full font-mono"
+                  className="w-full font-mono text-xs"
                 />
               )}
 
@@ -170,7 +173,7 @@ export function SettingField({ setting, lang, onUpdate, onReload, onRetryExact }
                   onValueChange={handleChange}
                   disabled={readOnly}
                 >
-                  <SelectTrigger id={fieldId} aria-labelledby={titleId} aria-describedby={describedBy} className="w-full">
+                  <SelectTrigger id={fieldId} aria-labelledby={titleId} aria-describedby={describedBy} size="sm" className="w-full text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

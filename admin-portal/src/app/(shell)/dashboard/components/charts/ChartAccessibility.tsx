@@ -151,7 +151,7 @@ export function ChartFigure({
       </div>
 
       <details className="rounded-md border border-border bg-muted/50">
-        <summary className="flex min-h-11 cursor-pointer items-center px-3 text-xs font-semibold text-foreground">
+        <summary className="flex min-h-8 cursor-pointer items-center px-3 text-xs font-semibold text-foreground">
           {copy.exactValues}
         </summary>
         <div

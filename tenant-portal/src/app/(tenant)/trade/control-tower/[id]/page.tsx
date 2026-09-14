@@ -160,7 +160,7 @@ export default function ControlTowerExceptionPage({
           exception ? (
             <>
               {canRetry && isRetryable ? (
-                <Button
+                <Button size="sm"
                   variant="outline"
                   disabled={pending !== null}
                   loading={pending === "retry"}
@@ -171,7 +171,7 @@ export default function ControlTowerExceptionPage({
                 </Button>
               ) : null}
               {canResolve && exception.status !== "RESOLVED" ? (
-                <Button
+                <Button size="sm"
                   variant="outline"
                   disabled={pending !== null}
                   loading={pending === "resolve"}

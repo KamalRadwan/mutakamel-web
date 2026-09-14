@@ -218,14 +218,17 @@ export function CrmPhoneNumberInput({
             loadingLabel={t.common.loading}
             emptyLabel={t.crmShared.noMatchingCountries}
             disabled={disabled}
+            inlineDescription
+            popoverClassName="w-80 min-w-80"
           />
         </div>
       </FieldControlBoundary>
-      <Input
+      <Input size="sm"
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"
-        aria-label={label}
+        aria-label={label ?? t.crmShared.phoneNumber}
+        placeholder={label ?? t.crmShared.phoneNumber}
         dir="ltr"
         value={nationalNumber}
         maxLength={Math.max(1, maxLength - callingCode.length)}

@@ -3,11 +3,14 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { FlaskConical, Loader2, ShieldAlert } from "lucide-react";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  Input,
+  Textarea,
 } from "@/design-system";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
 import { readFleetHealth } from "../model/migration-outcomes";
@@ -178,7 +181,7 @@ export function StartMigrationDialog({
     >
       <DialogContent
         showCloseButton={!isSubmitting}
-        className="max-w-2xl"
+        className="max-w-2xl p-3 sm:p-3.5"
         onOpenAutoFocus={() => {
           returnFocusRef.current =
             document.activeElement instanceof HTMLElement
@@ -212,15 +215,15 @@ export function StartMigrationDialog({
         ) : null}
 
         <form
-          className="mt-5 space-y-5"
+          className="mt-3 space-y-3"
           aria-label={copy.startTitle}
           onSubmit={handleSubmit}
         >
-          <fieldset className="rounded-lg border border-border p-4">
+          <fieldset className="rounded-lg border border-border p-3 sm:p-3.5">
             <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {copy.modeLegend}
             </legend>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div className="mt-1.5 grid gap-2.5 sm:grid-cols-2">
               <ModeCard
                 name={`${fieldId}-mode`}
                 value="DRY_RUN"
@@ -242,11 +245,11 @@ export function StartMigrationDialog({
             </div>
           </fieldset>
 
-          <fieldset className="rounded-lg border border-border p-4">
+          <fieldset className="rounded-lg border border-border p-3 sm:p-3.5">
             <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {copy.scopeLegend}
             </legend>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div className="mt-1.5 grid gap-2.5 sm:grid-cols-2">
               <ModeCard
                 name={`${fieldId}-scope`}
                 value="FLEET"
@@ -274,16 +277,18 @@ export function StartMigrationDialog({
                 >
                   {copy.tenantIdLabel}
                 </label>
-                <input
+                <Input
                   id={`${fieldId}-tenant`}
+                  size="sm"
                   dir="ltr"
                   value={tenantId}
                   onChange={(event) => setTenantId(event.target.value)}
+                  placeholder={`${copy.tenantIdLabel} *`}
                   aria-invalid={errors.tenantId ? "true" : undefined}
                   aria-describedby={
                     errors.tenantId ? `${fieldId}-tenant-error` : undefined
                   }
-                  className={`${migrationInputClass} font-mono`}
+                  className="font-mono"
                 />
                 <FieldError id={`${fieldId}-tenant-error`} message={errors.tenantId} />
                 <p className="mt-1 text-xs text-muted-foreground">{copy.tenantIdHelp}</p>
@@ -326,16 +331,18 @@ export function StartMigrationDialog({
               >
                 {copy.targetVersionLabel}
               </label>
-              <input
+              <Input
                 id={`${fieldId}-version`}
+                size="sm"
                 dir="ltr"
                 value={targetVersion}
                 onChange={(event) => setTargetVersion(event.target.value)}
+                placeholder={`${copy.targetVersionLabel} *`}
                 aria-invalid={errors.targetVersion ? "true" : undefined}
                 aria-describedby={
                   errors.targetVersion ? `${fieldId}-version-error` : undefined
                 }
-                className={`${migrationInputClass} font-mono`}
+                className="font-mono"
               />
               <FieldError
                 id={`${fieldId}-version-error`}
@@ -353,18 +360,19 @@ export function StartMigrationDialog({
               >
                 {copy.batchSizeLabel}
               </label>
-              <input
+              <Input
                 id={`${fieldId}-batch`}
+                size="sm"
                 type="number"
                 min={1}
                 max={500}
                 value={batchSize}
                 onChange={(event) => setBatchSize(event.target.value)}
+                placeholder={`${copy.batchSizeLabel} *`}
                 aria-invalid={errors.batchSize ? "true" : undefined}
                 aria-describedby={
                   errors.batchSize ? `${fieldId}-batch-error` : undefined
                 }
-                className={migrationInputClass}
               />
               <FieldError
                 id={`${fieldId}-batch-error`}
@@ -394,63 +402,61 @@ export function StartMigrationDialog({
             <label className={migrationLabelClass} htmlFor={`${fieldId}-reason`}>
               {copy.triggeredByLabel}
             </label>
-            <textarea
+            <Textarea
               id={`${fieldId}-reason`}
-              rows={3}
+              rows={2}
               maxLength={500}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
+              placeholder={`${copy.triggeredByLabel} *`}
               aria-invalid={errors.reason ? "true" : undefined}
               aria-describedby={
                 errors.reason ? `${fieldId}-reason-error` : undefined
               }
-              className={`${migrationInputClass} py-3`}
             />
             <FieldError id={`${fieldId}-reason-error`} message={errors.reason} />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {copy.triggeredByHelp}
             </p>
           </div>
 
-          <section className="rounded-xl border border-info/30 bg-info-subtle p-3 text-xs leading-5 text-info-subtle-foreground">
+          <section className="rounded-lg border border-info/30 bg-info-subtle p-2.5 text-xs leading-5 text-info-subtle-foreground">
             <h3 className="font-semibold">{copy.canaryTitle}</h3>
-            <p className="mt-1">{copy.canaryHelp}</p>
+            <p className="mt-0.5">{copy.canaryHelp}</p>
           </section>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onClose}
               disabled={isSubmitting}
-              className="inline-flex min-h-11 items-center rounded-xl border border-input px-4 text-sm font-semibold disabled:opacity-50"
             >
               {copy.cancel}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant={mode === "DRY_RUN" ? "primary" : "destructive"}
+              size="sm"
               disabled={isSubmitting}
-              className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-white disabled:opacity-50 ${
-                mode === "DRY_RUN"
-                  ? "bg-primary hover:bg-primary/90"
-                  : "bg-destructive hover:bg-destructive/90"
-              }`}
             >
               {isSubmitting ? (
                 <Loader2
-                  className="size-4 animate-spin motion-reduce:animate-none"
+                  className="size-3.5 animate-spin motion-reduce:animate-none"
                   aria-hidden="true"
                 />
               ) : mode === "DRY_RUN" ? (
-                <FlaskConical className="size-4" aria-hidden="true" />
+                <FlaskConical className="size-3.5" aria-hidden="true" />
               ) : (
-                <ShieldAlert className="size-4" aria-hidden="true" />
+                <ShieldAlert className="size-3.5" aria-hidden="true" />
               )}
               {isSubmitting
                 ? copy.starting
                 : mode === "DRY_RUN"
                   ? copy.startDryRun
                   : copy.startApply}
-            </button>
+            </Button>
           </div>
         </form>
       </DialogContent>

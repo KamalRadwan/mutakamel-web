@@ -41,13 +41,14 @@ export function CreateRoleModal({
       isDirty={isDirty}
       footerActions={
         <>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isAmbiguous}>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting || isAmbiguous}>
             {t.roles.cancel}
           </Button>
           <Button
             type="submit"
             form="create-role-form"
             variant="primary"
+            size="sm"
             loading={isSubmitting}
             disabled={Boolean(nameError || descriptionError) || trimmedName.length < 2}
           >
@@ -56,7 +57,7 @@ export function CreateRoleModal({
         </>
       }
     >
-      <form id="create-role-form" onSubmit={handleSubmit} className="space-y-4 py-1">
+      <form id="create-role-form" onSubmit={handleSubmit} className="space-y-2.5 py-1 text-xs">
         {isAmbiguous && (
           <AmbiguousOutcomePanel
             idempotencyKey={idempotencyKey}
@@ -67,11 +68,13 @@ export function CreateRoleModal({
           />
         )}
 
-        <Field label={t.roles.roleNameLabel} required error={name && nameError ? nameError : undefined}>
+        <Field label={t.roles.roleNameLabel} hideLabel required error={name && nameError ? nameError : undefined}>
           {(fieldProps) => (
             <Input
               {...fieldProps}
+              size="sm"
               value={name}
+              placeholder={`${t.roles.roleNameLabel} *`}
               onChange={(event) => setName(event.target.value)}
               disabled={isSubmitting || isAmbiguous}
               minLength={2}
@@ -80,11 +83,12 @@ export function CreateRoleModal({
           )}
         </Field>
 
-        <Field label={t.roles.descriptionLabel} error={descriptionError ?? undefined}>
+        <Field label={t.roles.descriptionLabel} hideLabel error={descriptionError ?? undefined}>
           {(fieldProps) => (
             <Textarea
               {...fieldProps}
               value={description}
+              placeholder={t.roles.descriptionLabel}
               onChange={(event) => setDescription(event.target.value)}
               disabled={isSubmitting || isAmbiguous}
               maxLength={2_001}

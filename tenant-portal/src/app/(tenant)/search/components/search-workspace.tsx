@@ -159,10 +159,10 @@ export function SearchWorkspace({ initialTerm }: { initialTerm: string }) {
       />
 
       <Card>
-        <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-end">
+        <CardContent className="flex flex-col gap-3 p-3 sm:p-3.5 sm:flex-row sm:items-end">
           <div className="flex grow flex-col gap-1.5">
             <Label htmlFor="global-search-term">{copy.inputLabel}</Label>
-            <Input
+            <Input size="sm"
               id="global-search-term"
               type="search"
               value={search.draft}
@@ -182,7 +182,7 @@ export function SearchWorkspace({ initialTerm }: { initialTerm: string }) {
             />
             {/* Not `primary`: at most one filled primary button per screen and
                 it belongs in PageHeader — AGENTS.md#design. */}
-            <Button variant="secondary" size="md" onClick={search.submit}>
+            <Button variant="secondary" size="sm" onClick={search.submit}>
               <Search className="size-4" aria-hidden="true" />
               {copy.searchAction}
             </Button>

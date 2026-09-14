@@ -149,7 +149,7 @@ export function CustomerProfileDetailWorkspace({
         secondaryActions={
           <>
             {canUpdate && (
-              <Button variant="outline" onClick={actions.openEdit}>
+              <Button size="sm" variant="outline" onClick={actions.openEdit}>
                 {t.crmLeadDetail.edit}
               </Button>
             )}
@@ -161,7 +161,7 @@ export function CustomerProfileDetailWorkspace({
                 }
                 disabled={actions.busy === "status"}
               >
-                <SelectTrigger
+                <SelectTrigger size="sm"
                   className="w-40"
                   aria-label={t.crmCustomerProfileActions.changeStatus}
                 >
@@ -177,7 +177,7 @@ export function CustomerProfileDetailWorkspace({
               </Select>
             )}
             {canDelete && (
-              <Button
+              <Button size="sm"
                 variant="ghost"
                 className="text-destructive"
                 onClick={actions.requestDelete}

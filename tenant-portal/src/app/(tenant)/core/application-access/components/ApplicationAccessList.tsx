@@ -22,8 +22,8 @@ export function ApplicationAccessList({ scope, scopeId }: { scope: "COMPANY" | "
   return <PermissionGate require={[]} denied={denied}>
     <div className="flex flex-col gap-4">
       <PageHeader title={copy.title} description={copy.directoryNotice}
-        secondaryActions={<><Button variant="outline" asChild><Link href="/core/application-access">{copy.changeScope}</Link></Button>
-          <Button variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button></>} />
+        secondaryActions={<><Button size="sm" variant="outline" asChild><Link href="/core/application-access">{copy.changeScope}</Link></Button>
+          <Button size="sm" variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button></>} />
       <DetailSection title={copy.scope} fields={[{ label: scope === "COMPANY" ? copy.company : copy.branch, value: <IdentifierText>{scopeId}</IdentifierText> }]} />
       {error ? <ErrorState title={copy.loadFailed} description={copy.unavailable} onRetry={reload} retryLabel={t.common.retry} />
         : <DataTable columns={columns} rows={data?.items ?? []} rowKey={(item) => `${item.target.applicationId}:${item.target.addonId ?? "base"}`}

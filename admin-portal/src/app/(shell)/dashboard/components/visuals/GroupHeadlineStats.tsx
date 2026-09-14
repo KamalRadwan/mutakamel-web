@@ -27,21 +27,21 @@ export function GroupHeadlineStats({
   return (
     <dl
       aria-label={t.dashboard.visuals.headlineAriaLabel}
-      className="flex flex-wrap items-start gap-x-10 gap-y-4 rounded-lg border border-border bg-card px-5 py-4"
+      className="flex flex-wrap items-start gap-x-8 gap-y-2.5 rounded-lg border border-border bg-card p-3 sm:p-3.5"
     >
       {cards.map((card) => (
-        <div key={card.key} className="min-w-40">
-          <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
+        <div key={card.key} className="min-w-36">
+          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
             {resolveMetricLabel(card, lang, t)}
           </dt>
           <dd
-            className="mt-1 font-mono text-2xl font-semibold tabular-nums leading-none text-foreground"
+            className="mt-0.5 font-mono text-xl font-semibold tabular-nums leading-none text-foreground sm:text-2xl"
             dir="auto"
           >
             {formatDashboardMetric(card, currencyCode, lang)}
           </dd>
           {card.description && (
-            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {resolveMetricDescription(card, lang, t)}
             </p>
           )}

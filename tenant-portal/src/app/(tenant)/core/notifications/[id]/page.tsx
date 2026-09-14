@@ -51,18 +51,18 @@ export default function NotificationDetailPage() {
             notification ? (
               <span className="flex flex-wrap items-center gap-2">
                 {notification.readAt === null ? (
-                  <Button variant="outline" onClick={() => void markRead()} disabled={isPending}>
+                  <Button size="sm" variant="outline" onClick={() => void markRead()} disabled={isPending}>
                     <Check className="size-4" aria-hidden="true" />
                     {t.coreNotifications.markRead}
                   </Button>
                 ) : null}
                 {notification.acknowledgedAt === null ? (
-                  <Button variant="outline" onClick={() => void acknowledge()} disabled={isPending}>
+                  <Button size="sm" variant="outline" onClick={() => void acknowledge()} disabled={isPending}>
                     <CheckCheck className="size-4" aria-hidden="true" />
                     {t.coreNotifications.acknowledge}
                   </Button>
                 ) : null}
-                <Button variant="outline" onClick={() => void dismiss()} disabled={isPending}>
+                <Button size="sm" variant="outline" onClick={() => void dismiss()} disabled={isPending}>
                   <X className="size-4" aria-hidden="true" />
                   {t.coreNotifications.dismiss}
                 </Button>
@@ -100,7 +100,7 @@ export default function NotificationDetailPage() {
               <CardContent>
                 <p className="whitespace-pre-wrap text-sm text-foreground">{notification.body}</p>
                 {notification.actionUrl ? (
-                  <Button variant="link" asChild className="mt-3">
+                  <Button size="sm" variant="link" asChild className="mt-3">
                     {/* Validated same-origin at the boundary; an unsafe route
                         never survives the schema, so it never becomes an href. */}
                     <Link href={notification.actionUrl}>

@@ -95,7 +95,7 @@ export function ModuleSeatsPanel({
         {canManage ? (
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-56 flex-1">
-              <Input
+              <Input size="sm"
                 dir="ltr"
                 value={panel.moduleKey}
                 onChange={(event) => panel.setModuleKey(event.target.value)}
@@ -107,6 +107,7 @@ export function ModuleSeatsPanel({
             </div>
             <Button
               variant="outline"
+              size="sm"
               disabled={!panel.isModuleKeyValid || panel.isSubmitting}
               onClick={() => void panel.assign()}
             >

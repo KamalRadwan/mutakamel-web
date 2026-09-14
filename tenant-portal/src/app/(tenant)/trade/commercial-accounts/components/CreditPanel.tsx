@@ -40,7 +40,7 @@ export function CreditPanel({
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={t.trade.creditAmount} hint={t.trade.accountCreditLimitHint} error={error ?? undefined} required>
-            <Input
+            <Input size="sm" placeholder={t.trade.creditAmount}
               dir="ltr"
               inputMode="decimal"
               className="tabular-nums"
@@ -51,7 +51,7 @@ export function CreditPanel({
             />
           </Field>
           <Field label={t.trade.creditCurrency} hint={t.trade.accountCurrencyHint} required>
-            <Input
+            <Input size="sm" placeholder={t.trade.creditCurrency}
               dir="ltr"
               value={currency}
               onChange={(event) => setCurrency(event.target.value.toUpperCase())}
@@ -63,7 +63,7 @@ export function CreditPanel({
         </div>
 
         <div>
-          <Button
+          <Button size="sm"
             variant="outline"
             loading={isSubmitting}
             onClick={() => onEvaluate(amount, currency)}

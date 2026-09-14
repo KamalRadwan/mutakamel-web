@@ -7,7 +7,7 @@ import { cn } from "../lib/cn";
  */
 export const Table = forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+    <table ref={ref} className={cn("w-full caption-bottom text-xs", className)} {...props} />
   ),
 );
 Table.displayName = "Table";
@@ -52,7 +52,7 @@ export const TableHead = forwardRef<HTMLTableCellElement, React.ThHTMLAttributes
     <th
       ref={ref}
       className={cn(
-        "h-9 px-4 text-start align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal",
+        "h-8 px-3 text-start align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal",
         className,
       )}
       {...props}
@@ -63,7 +63,7 @@ TableHead.displayName = "TableHead";
 
 export const TableCell = forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn("px-4 py-3 align-middle", className)} {...props} />
+    <td ref={ref} className={cn("px-3 py-1.5 align-middle text-xs", className)} {...props} />
   ),
 );
 TableCell.displayName = "TableCell";

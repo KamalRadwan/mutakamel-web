@@ -13,7 +13,6 @@ import {
   Badge,
   Button,
   Card,
-  Checkbox,
 } from "@/design-system";
 import type { useTenantCoreWorkspace } from "../hooks/useTenantCoreWorkspace";
 import {
@@ -33,23 +32,21 @@ type LifecycleAction =
 export interface TenantLifecyclePanelProps {
   locale: TenantWorkspaceLocale;
   workspace: ReturnType<typeof useTenantCoreWorkspace>;
-  onDestroyed?: () => void;
 }
 
 export function TenantLifecyclePanel({
   locale,
   workspace,
-  onDestroyed,
 }: TenantLifecyclePanelProps) {
   const text = tenantWorkspaceCopy(locale);
   const tenant = workspace.tenant;
   const [confirmation, setConfirmation] = useState<LifecycleAction | null>(
     null,
   );
-  const [destroySubscriptions, setDestroySubscriptions] = useState(false);
   if (!tenant) return null;
 
-  const busy = workspace.mutation.name !== null;
+  const destroying = !!workspace.destroyOperation;
+  const busy = workspace.mutation.name !== null || destroying;
   const actionLabel: Record<LifecycleAction, string> = {
     suspend: text.suspend,
     activate: text.activate,
@@ -76,8 +73,7 @@ export function TenantLifecyclePanel({
       if (confirmation === "soft-delete") await workspace.softDelete();
       if (confirmation === "restore") await workspace.restore();
       if (confirmation === "destroy") {
-        await workspace.destroy(destroySubscriptions);
-        onDestroyed?.();
+        await workspace.destroy(false);
       }
       setConfirmation(null);
     } catch {
@@ -87,9 +83,9 @@ export function TenantLifecyclePanel({
 
   return (
     <section aria-labelledby="tenant-lifecycle-title">
-    <Card className="space-y-3 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-        <h2 id="tenant-lifecycle-title" className="text-sm font-semibold text-foreground">
+    <Card className="space-y-3 p-3 sm:p-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+        <h2 id="tenant-lifecycle-title" className="text-xs font-semibold text-foreground">
           {text.lifecycle}
         </h2>
         <Badge tone={tenant.status === "ACTIVE" ? "success" : tenant.status === "SUSPENDED" ? "warn" : tenant.status === "PROVISIONING_FAILED" ? "danger" : "neutral"} className="font-mono">
@@ -102,6 +98,14 @@ export function TenantLifecyclePanel({
           {workspace.pollExhausted ? text.pollExhausted : text.polling}
         </p>
       )}
+
+      {workspace.destroyOperation ? (
+        <p role="status" aria-live="polite" className="rounded-lg bg-info-subtle p-3 text-xs text-info-subtle-foreground">
+          {text.destroyPhases[workspace.destroyOperation.phase]}
+          <span className="mt-1 block">{text.destroyBackground}</span>
+          {workspace.destroyOperation.lastErrorCode || workspace.destroyError ? <span className="mt-1 block">{text.destroyRetry}</span> : null}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {tenant.status === "ACTIVE" &&
@@ -180,17 +184,6 @@ export function TenantLifecyclePanel({
                 ) : null}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            {confirmation === "destroy" ? (
-              <label htmlFor="destroy-subscriptions" className="flex min-h-11 items-center gap-3 text-sm text-foreground">
-                <Checkbox
-                  id="destroy-subscriptions"
-                  name="destroySubscriptions"
-                  checked={destroySubscriptions}
-                  onCheckedChange={(checked) => setDestroySubscriptions(checked === true)}
-                />
-                <span>{text.destroySubscriptions}</span>
-              </label>
-            ) : null}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>{text.cancel}</AlertDialogCancel>
               <AlertDialogAction

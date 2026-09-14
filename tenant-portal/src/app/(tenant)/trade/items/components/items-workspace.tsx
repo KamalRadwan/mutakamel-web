@@ -172,7 +172,7 @@ export function ItemsWorkspace() {
             items.canManage ? { label: t.trade.itemCreate, onClick: items.openCreate } : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void items.reload()}
               disabled={items.isRefreshing}

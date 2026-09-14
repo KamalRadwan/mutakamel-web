@@ -16,7 +16,7 @@ export function SubscriptionCommercialEvidence({ value, lang }: { value: Subscri
   const selections = [...value.baseItems.map(item => ({ id: item.id, label: item.applicationName ?? item.applicationKey, seats: item.seats, pricing: item.acceptedPricing, definition: null as string | null })),
     ...value.addonSelections.map(item => ({ id: item.id, label: `${value.baseItems.find(parent => parent.id === item.parentItemId)!.applicationKey} / ${item.addonKey}`,
       seats: item.seats, pricing: item.acceptedPricing, definition: item.definitionVersionId }))];
-  return <Card className="space-y-4 p-5"><div><h3 className="font-semibold">{copy.title}</h3><p className="mt-1 text-xs text-muted-foreground">{copy.revision}: <bdi className="font-mono">{value.subscriptionRevision}</bdi></p></div>
+  return <Card className="space-y-3 p-3 sm:p-3.5"><div><h3 className="font-semibold">{copy.title}</h3><p className="mt-1 text-xs text-muted-foreground">{copy.revision}: <bdi className="font-mono">{value.subscriptionRevision}</bdi></p></div>
     <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
       [copy.base, `USD ${value.totals.baseRecurringUsd}`], [copy.addons, `USD ${value.totals.addonRecurringUsd}`], [copy.combined, `USD ${value.totals.combinedRecurringUsd}`], [copy.allowance, String(value.baseAllowance.effectiveAllowedUsers)],
     ].map(([label, amount]) => <div key={label} className="rounded-md border border-border p-3"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 font-mono text-sm"><bdi>{amount}</bdi></dd></div>)}</dl>

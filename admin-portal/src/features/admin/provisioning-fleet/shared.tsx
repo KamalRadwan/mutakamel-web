@@ -34,7 +34,7 @@ export function FleetPageFrame({
   children: ReactNode;
 }) {
   return (
-    <div dir={dir} className="mx-auto w-full max-w-[1500px] space-y-5">
+    <div dir={dir} className="mx-auto w-full max-w-[1500px] space-y-3">
       {children}
     </div>
   );
@@ -47,7 +47,7 @@ export function FleetHero({
   copy: ProvisioningFleetCopy;
   action?: ReactNode;
 }) {
-  return <PageHeader title={copy.title} description={copy.subtitle} action={action} />;
+  return <PageHeader title={copy.title} action={action} />;
 }
 
 export function FleetBackLink({
@@ -60,12 +60,12 @@ export function FleetBackLink({
   dir: "ltr" | "rtl";
 }) {
   return (
-    <Button asChild variant="ghost">
+    <Button asChild variant="ghost" size="sm">
       <Link href={href}>
         {dir === "rtl" ? (
-          <ArrowRight className="size-4" aria-hidden="true" />
+          <ArrowRight className="size-3.5" aria-hidden="true" />
         ) : (
-          <ArrowLeft className="size-4" aria-hidden="true" />
+          <ArrowLeft className="size-3.5" aria-hidden="true" />
         )}
         {label}
       </Link>
@@ -83,8 +83,8 @@ export function RefreshButton({
   pending?: boolean;
 }) {
   return (
-    <Button type="button" variant="outline" onClick={onClick} loading={pending}>
-      <RefreshCw className="size-4" aria-hidden="true" />
+    <Button type="button" variant="outline" size="sm" onClick={onClick} loading={pending}>
+      <RefreshCw className="size-3.5" aria-hidden="true" />
       {copy.refresh}
     </Button>
   );
@@ -133,7 +133,7 @@ export function FleetStatePanel({
         <p className="mt-3 text-sm font-semibold text-foreground">{label}</p>
         {error ? <FleetProblem error={error} /> : null}
         {!loading && onRetry ? (
-          <Button type="button" variant="outline" onClick={onRetry} className="mt-4">
+          <Button size="sm" type="button" variant="outline" onClick={onRetry} className="mt-4">
             {copy.retry}
           </Button>
         ) : null}
@@ -293,7 +293,7 @@ export function FleetDatum({
   mono?: boolean;
 }) {
   return (
-    <Card className="min-w-0 p-3">
+    <Card className="min-w-0 p-2.5 sm:p-3">
       <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</dt>
       <dd
         dir={mono ? "ltr" : undefined}

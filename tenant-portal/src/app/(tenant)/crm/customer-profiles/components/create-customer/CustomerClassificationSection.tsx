@@ -63,7 +63,7 @@ export function CustomerClassificationSection({
           disabled={disabled}
           onValueChange={(value) => onProfileTypeChange(value as CrmProfileType)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -84,7 +84,7 @@ export function CustomerClassificationSection({
             onFieldChange("status", value as CustomerProfileCreateStatus)
           }
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -105,7 +105,7 @@ export function CustomerClassificationSection({
             onFieldChange("acquisitionSourceId", value === NO_SOURCE_VALUE ? "" : value)
           }
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t.crmLeadDetail.noSource} />
           </SelectTrigger>
           <SelectContent>

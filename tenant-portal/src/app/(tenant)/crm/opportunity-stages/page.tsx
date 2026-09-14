@@ -113,7 +113,7 @@ export default function OpportunityStagesPage() {
               : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void reload()}
               disabled={isLoading}

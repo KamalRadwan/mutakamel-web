@@ -9,18 +9,17 @@ import {
   MoreHorizontal,
   Plus,
   RotateCcw,
+  Search,
   Server,
   Trash2,
 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
-  Badge,
   Button,
   ConfirmActionModal,
   DataTable,
   ErrorState,
-  FilterBar,
-  Field,
+  Input,
   PageHeader,
   Select,
   SelectContent,
@@ -184,11 +183,9 @@ export default function TenantsDirectoryPage() {
   ];
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-3">
       <PageHeader
         title={t.tenants.pageTitle}
-        description={t.tenants.pageSubtitle}
-        status={<Badge tone="neutral">{copy.isolation}</Badge>}
         action={
           permissions.canCreate ? (
             <Button asChild variant="primary" size="sm">
@@ -215,70 +212,81 @@ export default function TenantsDirectoryPage() {
       ) : null}
 
       <div className="rounded-lg border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-start">
-          <div className="flex-1">
-            <FilterBar
-              fields={[
-                {
-                  key: "search",
-                  type: "search",
-                  placeholderEn: "Search name, company, country, database, or owner email",
-                  placeholderAr: "ابحث بالاسم أو الشركة أو الدولة أو قاعدة البيانات أو بريد المالك",
-                },
-              ]}
-              values={{ search }}
-              onChange={(next) => setSearch(typeof next.search === "string" ? next.search : "")}
-            />
+        <div className="flex flex-col gap-2.5 border-b border-border p-3 sm:flex-row sm:items-end">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <label htmlFor="tenant-search" className="text-xs font-medium text-foreground">
+              {lang === "ar" ? "بحث" : "Search"}
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                id="tenant-search"
+                name="search"
+                type="search"
+                size="sm"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={
+                  lang === "ar"
+                    ? "ابحث بالاسم أو الشركة أو الدولة أو قاعدة البيانات أو بريد المالك"
+                    : "Search name, company, country, database, or owner email"
+                }
+                className="h-8 ps-8 pe-2.5 text-xs"
+              />
+            </div>
           </div>
 
-          <div className="grid items-start gap-2 sm:grid-cols-2">
-            <Field label={copy.statusFilter}>
-              {(field) => (
-                <Select
-                  name="tenant-status-filter"
-                  value={statusFilter}
-                  onValueChange={(value) => setStatusFilter(value as TenantStatusFilter)}
-                >
-                  <SelectTrigger id={field.id} aria-describedby={field["aria-describedby"]}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">{t.tenants.allStatuses}</SelectItem>
-                    <SelectItem value="ACTIVE">{t.tenants.statusNames.ACTIVE}</SelectItem>
-                    <SelectItem value="PROVISIONING">{t.tenants.statusNames.PROVISIONING}</SelectItem>
-                    <SelectItem value="PROVISIONING_FAILED">{copy.provisioningFailed}</SelectItem>
-                    <SelectItem value="SUSPENDED">{t.tenants.statusNames.SUSPENDED}</SelectItem>
-                    <SelectItem value="DELETED">{t.tenants.statusNames.DELETED}</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            </Field>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex min-w-36 flex-col gap-1">
+              <label htmlFor="tenant-status-filter" className="text-xs font-medium text-foreground">
+                {copy.statusFilter}
+              </label>
+              <Select
+                name="tenant-status-filter"
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as TenantStatusFilter)}
+              >
+                <SelectTrigger id="tenant-status-filter" size="sm" className="h-8 min-w-36 px-2.5 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL" className="py-1.5 text-xs">{t.tenants.allStatuses}</SelectItem>
+                  <SelectItem value="ACTIVE" className="py-1.5 text-xs">{t.tenants.statusNames.ACTIVE}</SelectItem>
+                  <SelectItem value="PROVISIONING" className="py-1.5 text-xs">{t.tenants.statusNames.PROVISIONING}</SelectItem>
+                  <SelectItem value="PROVISIONING_FAILED" className="py-1.5 text-xs">{copy.provisioningFailed}</SelectItem>
+                  <SelectItem value="SUSPENDED" className="py-1.5 text-xs">{t.tenants.statusNames.SUSPENDED}</SelectItem>
+                  <SelectItem value="DELETED" className="py-1.5 text-xs">{t.tenants.statusNames.DELETED}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="flex min-w-48 flex-col gap-1">
-              <Field label={copy.databaseServerFilter}>
-                {(field) => (
-                  <Select
-                    name="tenant-database-server-filter"
-                    value={serverFilter}
-                    disabled={databaseServerOptionsState !== "ready"}
-                    onValueChange={setServerFilter}
-                  >
-                    <SelectTrigger id={field.id} aria-describedby={field["aria-describedby"]} className="min-w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">
-                        {databaseServerOptionsState === "loading" ? copy.databaseServerLoading : t.tenants.allServers}
-                      </SelectItem>
-                      {databaseServerOptions.map((server) => (
-                        <SelectItem key={server.id} value={server.id}>
-                          {server.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </Field>
+              <label htmlFor="tenant-database-server-filter" className="text-xs font-medium text-foreground">
+                {copy.databaseServerFilter}
+              </label>
+              <Select
+                name="tenant-database-server-filter"
+                value={serverFilter}
+                disabled={databaseServerOptionsState !== "ready"}
+                onValueChange={setServerFilter}
+              >
+                <SelectTrigger id="tenant-database-server-filter" size="sm" className="h-8 min-w-48 px-2.5 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL" className="py-1.5 text-xs">
+                    {databaseServerOptionsState === "loading" ? copy.databaseServerLoading : t.tenants.allServers}
+                  </SelectItem>
+                  {databaseServerOptions.map((server) => (
+                    <SelectItem key={server.id} value={server.id} className="py-1.5 text-xs">
+                      {server.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {databaseServerOptionsState === "forbidden" ? (
                 <span className="text-xs text-warning-subtle-foreground">{copy.databaseServerForbidden}</span>
               ) : databaseServerOptionsState === "error" ? (
@@ -298,6 +306,23 @@ export default function TenantsDirectoryPage() {
                 </span>
               ) : null}
             </div>
+
+            {(search || statusFilter !== "ALL" || serverFilter !== "ALL") && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("ALL");
+                  setServerFilter("ALL");
+                }}
+                className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="size-3.5" aria-hidden="true" />
+                {lang === "ar" ? "إعادة تعيين" : "Reset"}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -367,20 +392,20 @@ function TenantRowActions({
     <div className="flex justify-end">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button type="button" variant="ghost" size="md" aria-label={`${copy.actions}: ${tenant.companyName}`} className="size-8 p-0">
-            {thisRowBusy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <MoreHorizontal className="size-4" aria-hidden="true" />}
+          <Button type="button" variant="ghost" size="sm" aria-label={`${copy.actions}: ${tenant.companyName}`} className="size-7 p-0">
+            {thisRowBusy ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <MoreHorizontal className="size-3.5" aria-hidden="true" />}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <Link href={`/tenants/${tenant.id}`}>
-              <ExternalLink className="size-4" aria-hidden="true" />
+              <ExternalLink className="size-3.5" aria-hidden="true" />
               {copy.details}
             </Link>
           </DropdownMenuItem>
           {canSuspendOrActivate && tenant.status === "SUSPENDED" ? (
             <DropdownMenuItem disabled={busy} onSelect={() => onActivate(tenant)}>
-              <RotateCcw className="size-4 text-success" aria-hidden="true" />
+              <RotateCcw className="size-3.5 text-success" aria-hidden="true" />
               {copy.activate}
             </DropdownMenuItem>
           ) : null}
@@ -391,13 +416,13 @@ function TenantRowActions({
           ) : null}
           {canReprovision && tenant.status === "PROVISIONING_FAILED" ? (
             <DropdownMenuItem disabled={busy} onSelect={() => void onReprovision(tenant)}>
-              <RotateCcw className="size-4" aria-hidden="true" />
+              <RotateCcw className="size-3.5" aria-hidden="true" />
               {copy.reprovision}
             </DropdownMenuItem>
           ) : null}
           {canSoftDelete && tenant.status !== "DELETED" ? (
             <DropdownMenuItem destructive disabled={busy} onSelect={() => onDelete(tenant)}>
-              <Trash2 className="size-4" aria-hidden="true" />
+              <Trash2 className="size-3.5" aria-hidden="true" />
               {copy.delete}
             </DropdownMenuItem>
           ) : null}
@@ -494,7 +519,6 @@ function ErrorBanner({
 function directoryCopy(lang: "ar" | "en") {
   return lang === "ar"
     ? {
-        isolation: "عزل متعدد المستأجرين",
         statusFilter: "تصفية حسب الحالة",
         databaseServerFilter: "تصفية حسب خادم قاعدة البيانات",
         databaseServerLoading: "جارٍ تحميل سجل خوادم قاعدة البيانات…",
@@ -521,7 +545,6 @@ function directoryCopy(lang: "ar" | "en") {
         modalDeleteDescription: "سيُنقل المستأجر إلى حالة الحذف المؤقت وفق قيود الفوترة والعمليات:",
       }
     : {
-        isolation: "Multi-tenant isolation",
         statusFilter: "Filter by status",
         databaseServerFilter: "Filter by database server",
         databaseServerLoading: "Loading database server registry…",

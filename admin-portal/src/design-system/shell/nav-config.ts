@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Building2,
   LayoutGrid,
+  Puzzle,
   CreditCard,
   Receipt,
   Database,
@@ -82,6 +83,13 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/applications-catalogue",
         icon: LayoutGrid,
         permission: any("admin.applications.read", "admin.applications.create"),
+      },
+      {
+        key: "addons",
+        labelKey: { en: "Addons", ar: "الإضافات" },
+        href: "/addons",
+        icon: Puzzle,
+        permission: single("admin.applications.read"),
       },
       {
         key: "subscriptions",

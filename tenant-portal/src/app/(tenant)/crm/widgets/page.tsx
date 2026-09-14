@@ -84,7 +84,7 @@ export default function WidgetsPage() {
               : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void widgets.reload()}
               disabled={widgets.isLoading}

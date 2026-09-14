@@ -66,6 +66,7 @@ export function EmailConfigWorkspace() {
                 <>
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => void verify()}
                     disabled={isBusy}
                     loading={pending === "verify"}
@@ -75,6 +76,7 @@ export function EmailConfigWorkspace() {
                   </Button>
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => void verifyConnection()}
                     disabled={isBusy || config.providerDriver !== "smtp"}
                     loading={pending === "probe"}
@@ -84,7 +86,7 @@ export function EmailConfigWorkspace() {
                   </Button>
                 </>
               ) : null}
-              <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+              <Button variant="outline" size="sm" onClick={() => void reload()} disabled={isLoading}>
                 <RefreshCw className={isLoading ? "size-4 animate-spin" : "size-4"} aria-hidden="true" />
                 {t.coreSettings.reload}
               </Button>
@@ -96,7 +98,7 @@ export function EmailConfigWorkspace() {
 
         {isLoading && !config ? (
           <Card>
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className="flex flex-col gap-3">
               <Skeleton className="h-9 w-full" />
               <Skeleton className="h-9 w-full" />
               <Skeleton className="h-9 w-full" />

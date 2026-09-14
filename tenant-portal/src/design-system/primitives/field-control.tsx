@@ -30,7 +30,7 @@ export interface FieldControlContextValue {
   /**
    * The id `Field`'s `<Label htmlFor>` points at. Exactly one control may take
    * it. A button is a labelable element, so this names a Radix select trigger
-   * or a composite's trigger as directly as it names an `<input>` — no
+   * or a composite's trigger as directly as it names an input element — no
    * `aria-labelledby` indirection needed.
    */
   controlId: string;
@@ -59,7 +59,7 @@ export function FieldControlProvider({
  * Two uses, and they are the same rule seen from both sides:
  *
  * 1. Inside a composite (`Combobox`, `MultiSelect`) whose popover holds its own
- *    search `<Input>`. The composite has already claimed the field for its
+ *    search input control. The composite has already claimed the field for its
  *    trigger; without this the search box would claim the same id a second time
  *    and `htmlFor` would resolve to whichever came first in the document.
  * 2. At a call site where one label covers two controls — a day picker beside a
@@ -96,8 +96,8 @@ export type FieldControlAria = FieldControlOwnProps;
 
 export interface FieldControlOptions {
   /**
-   * Also resolve the **native** `readOnly` attribute. Only `<input>` and
-   * `<textarea>` have one — putting it on a button element (a Radix select trigger,
+   * Also resolve the **native** `readOnly` attribute. Only native input and
+   * textarea elements have one — putting it on a button element (a Radix select trigger,
    * a switch) renders a meaningless `readonly=""`, so those take `aria-readonly`
    * alone.
    */

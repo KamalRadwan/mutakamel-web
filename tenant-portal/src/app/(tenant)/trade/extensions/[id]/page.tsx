@@ -66,7 +66,7 @@ export default function ExtensionProfilePage({
         secondaryActions={
           profile ? (
             <>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canManage || pending !== null}
                 loading={pending === "save"}
@@ -75,7 +75,7 @@ export default function ExtensionProfilePage({
                 <Save className="size-4" aria-hidden="true" />
                 {t.tradeAutomation.saveFields}
               </Button>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canManage || pending !== null}
                 loading={pending === "validate"}
@@ -84,7 +84,7 @@ export default function ExtensionProfilePage({
                 <CheckCircle2 className="size-4" aria-hidden="true" />
                 {t.tradeGovernance.validate}
               </Button>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canPublish || pending !== null}
                 loading={pending === "publish"}

@@ -90,7 +90,7 @@ export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNa
           <Button
             type="button"
             variant="ghost"
-            size="md"
+            size="sm"
             onClick={onToggleCollapse}
             aria-label={
               isCollapsed

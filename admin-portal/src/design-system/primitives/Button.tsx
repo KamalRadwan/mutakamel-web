@@ -35,7 +35,7 @@ const buttonVariants = cva(
         xl: "",
       },
     },
-    defaultVariants: { variant: "secondary", size: "md" },
+    defaultVariants: { variant: "secondary", size: "sm" },
   },
 );
 
@@ -54,13 +54,13 @@ export interface ButtonProps
  */
 export function buttonVariantClasses(
   variant: NonNullable<VariantProps<typeof buttonVariants>["variant"]>,
-  size: NonNullable<VariantProps<typeof buttonVariants>["size"]> = "md",
+  size: NonNullable<VariantProps<typeof buttonVariants>["size"]> = "sm",
 ): string {
   return cn(buttonVariants({ variant, size }), controlSize({ size }));
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size = "md", asChild, loading, disabled, children, ...props }, ref) => {
+  ({ className, variant, size = "sm", asChild, loading, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
 
     return (

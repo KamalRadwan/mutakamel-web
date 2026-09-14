@@ -60,13 +60,13 @@ function TenantDatabaseRelocationWorkspace({ tenantId }: { tenantId: string }) {
   const { copy } = controller;
 
   return (
-    <div dir={dir} className="mx-auto max-w-[1200px] space-y-4">
-      <Button asChild variant="link" className="px-0">
+    <div dir={dir} className="mx-auto max-w-[1200px] space-y-3">
+      <Button asChild variant="link" size="sm" className="h-auto px-0 text-xs">
         <Link href={`/tenants/${tenantId}`}>
           {dir === "rtl" ? (
-            <ArrowRight size={16} aria-hidden="true" />
+            <ArrowRight size={14} aria-hidden="true" />
           ) : (
-            <ArrowLeft size={16} aria-hidden="true" />
+            <ArrowLeft size={14} aria-hidden="true" />
           )}
           {copy.back}
         </Link>
@@ -74,7 +74,6 @@ function TenantDatabaseRelocationWorkspace({ tenantId }: { tenantId: string }) {
 
       <PageHeader
         title={copy.pageTitle}
-        description={copy.pageDescription}
         action={
           <Button
             type="button"
@@ -82,7 +81,7 @@ function TenantDatabaseRelocationWorkspace({ tenantId }: { tenantId: string }) {
             size="sm"
             onClick={() => void controller.refresh()}
           >
-            <RefreshCw className="size-4" aria-hidden="true" />
+            <RefreshCw className="size-3.5" aria-hidden="true" />
             {copy.refresh}
           </Button>
         }

@@ -56,7 +56,7 @@ export function NumberingFormFields({
           }
           disabled={scopeReadOnly || isSubmitting || companies.length === 0}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -78,7 +78,7 @@ export function NumberingFormFields({
         readOnly={scopeReadOnly}
         required
       >
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.numberingCode}
           dir="ltr"
           value={values.code}
           onChange={(event) => onChange({ code: event.target.value.toUpperCase() })}
@@ -90,7 +90,7 @@ export function NumberingFormFields({
       </Field>
 
       <Field label={t.coreSettings.numberingPrefix} hint={t.coreSettings.numberingPrefixHint}>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.numberingPrefix}
           dir="ltr"
           value={values.prefix}
           onChange={(event) => onChange({ prefix: event.target.value })}
@@ -100,7 +100,7 @@ export function NumberingFormFields({
       </Field>
 
       <Field label={t.coreSettings.numberingPadding} hint={t.coreSettings.numberingPaddingHint} required>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.numberingPadding}
           dir="ltr"
           inputMode="numeric"
           value={values.padding}
@@ -112,7 +112,7 @@ export function NumberingFormFields({
       </Field>
 
       <Field label={counterLabel} hint={counterHint} required>
-        <Input
+        <Input size="sm" placeholder={counterLabel}
           dir="ltr"
           inputMode="numeric"
           value={values.startValue}

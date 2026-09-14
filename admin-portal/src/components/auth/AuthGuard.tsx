@@ -54,7 +54,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             <bdi dir="ltr">{bootstrapFailure.code}</bdi>
           </p>
         ) : null}
-        <Button
+        <Button size="sm"
           type="button"
           onClick={() => void retryBootstrap()}
           variant="primary"

@@ -57,7 +57,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   const canMutateCatalogue = adminCanAll(user, ["admin.catalog.manage", "admin.catalog.critical"]);
 
   if (detail.isLoading) return <PageFrame><div role="status" className="flex min-h-96 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />{t.applications.detail.loading}</div></PageFrame>;
-  if (detail.error || !detail.application) return <PageFrame><div role="alert" className="mx-auto mt-16 max-w-lg rounded-lg border border-destructive/30 bg-destructive-subtle p-6 text-center text-sm text-destructive-subtle-foreground"><p>{detail.error || t.applications.detail.notFound}</p><Button type="button" variant="destructive" className="mt-4" onClick={() => void detail.fetchApplication()}>{t.applications.detail.retry}</Button></div></PageFrame>;
+  if (detail.error || !detail.application) return <PageFrame><div role="alert" className="mx-auto mt-16 max-w-lg rounded-lg border border-destructive/30 bg-destructive-subtle p-6 text-center text-sm text-destructive-subtle-foreground"><p>{detail.error || t.applications.detail.notFound}</p><Button type="button" variant="destructive" size="sm" className="mt-4" onClick={() => void detail.fetchApplication()}>{t.applications.detail.retry}</Button></div></PageFrame>;
 
   const application = detail.application;
   const activationReadiness = getActivationReadinessState(
@@ -115,7 +115,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   // A command's reconciling re-read no longer blanks the page, so the only
   // thing left to announce is that the values on screen are being replaced.
   return <PageFrame isBusy={detail.isRefreshing}>
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
         breadcrumb={
           <Link href="/applications-catalogue" className="inline-flex w-fit items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground">
@@ -139,17 +139,17 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         }
         action={
           <div className="flex flex-wrap gap-2">
-            {canEditMetadata && <Button type="button" variant="outline" onClick={() => setConfigurationMode("metadata")}><Pencil className="size-3.5" aria-hidden="true" />{t.applications.detail.editMetadata}</Button>}
-            {canLifecycle && <Button type="button" variant="outline" onClick={() => setConfigurationMode("policy")}><Settings className="size-3.5" aria-hidden="true" />{t.applications.detail.databasePolicy}</Button>}
+            {canEditMetadata && <Button type="button" variant="outline" size="sm" onClick={() => setConfigurationMode("metadata")}><Pencil className="size-3.5" aria-hidden="true" />{t.applications.detail.editMetadata}</Button>}
+            {canLifecycle && <Button type="button" variant="outline" size="sm" onClick={() => setConfigurationMode("policy")}><Settings className="size-3.5" aria-hidden="true" />{t.applications.detail.databasePolicy}</Button>}
             {canLifecycle && lifecycleOptions.map((action) => {
               const blocked =
                 action === "activate" &&
                 (activationReadiness !== "ALLOWED" ||
                   requiredFleetCoverageBlocked);
               const blockedTitle = activationReadiness === "UNAVAILABLE" ? t.applications.detail.activationUnavailable : t.applications.detail.activationBlocked;
-              return <Button key={action} type="button" variant="secondary" disabled={blocked} title={blocked ? blockedTitle : undefined} onClick={() => setLifecycleAction(action)}>{t.applications.detail.lifecycle[action]}</Button>;
+              return <Button key={action} type="button" variant="secondary" size="sm" disabled={blocked} title={blocked ? blockedTitle : undefined} onClick={() => setLifecycleAction(action)}>{t.applications.detail.lifecycle[action]}</Button>;
             })}
-            {canDelete && application.lifecycleStatus === "DRAFT" && <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}><Trash2 className="size-3.5" aria-hidden="true" />{t.applications.detail.delete}</Button>}
+            {canDelete && application.lifecycleStatus === "DRAFT" && <Button type="button" variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2 className="size-3.5" aria-hidden="true" />{t.applications.detail.delete}</Button>}
           </div>
         }
       />
@@ -164,7 +164,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         onPublish={() => setReleaseStep("PUBLISH_ACTIVATE")}
       />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Fact label={t.applications.detail.facts.applicationType} value={application.applicationType} />
         <Fact label={t.applications.detail.facts.commercialMode} value={application.commercialMode} />
         <Fact label={t.applications.detail.facts.databaseDeployment} value={application.databaseDeployment} />
@@ -184,14 +184,14 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
         onOpenBinding={() => setTechnicalDialog("BIND")}
       />
 
-      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        <Card className="min-w-0 p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Shield className="size-4 text-info" aria-hidden="true" />{t.applications.detail.databasePolicy}</h2>
-          <dl className="mt-4 grid grid-cols-2 gap-4 text-xs"><Item label={t.applications.detail.newServers} value={application.databasePolicy.enableOnNewServers ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.rotation} value={application.databasePolicy.rotationEnabled ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.interval} value={`${application.databasePolicy.rotationIntervalHours} ${t.applications.detail.hours}`} /><Item label={t.applications.detail.maintenance} value={`${application.databasePolicy.maintenanceWindowStartUtc}:00 UTC · ${application.databasePolicy.maintenanceWindowHours}h`} /><Item label={t.applications.detail.policyRevision} value={application.databasePolicy.policyRevision} /><Item label={t.applications.detail.catalogueRevision} value={application.catalogueRevision} /></dl>
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+        <Card className="min-w-0 p-3 sm:p-3.5">
+          <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground"><Shield className="size-3.5 text-info" aria-hidden="true" />{t.applications.detail.databasePolicy}</h2>
+          <dl className="mt-3 grid grid-cols-2 gap-3 text-xs"><Item label={t.applications.detail.newServers} value={application.databasePolicy.enableOnNewServers ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.rotation} value={application.databasePolicy.rotationEnabled ? t.applications.detail.enabled : t.applications.detail.disabled} /><Item label={t.applications.detail.interval} value={`${application.databasePolicy.rotationIntervalHours} ${t.applications.detail.hours}`} /><Item label={t.applications.detail.maintenance} value={`${application.databasePolicy.maintenanceWindowStartUtc}:00 UTC · ${application.databasePolicy.maintenanceWindowHours}h`} /><Item label={t.applications.detail.policyRevision} value={application.databasePolicy.policyRevision} /><Item label={t.applications.detail.catalogueRevision} value={application.catalogueRevision} /></dl>
         </Card>
-        <Card className="min-w-0 p-5">
-          <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><FileCheck className="size-4 text-info" aria-hidden="true" />{t.applications.detail.safeManifests}</h2><Button type="button" variant="ghost" size="sm" onClick={() => void detail.fetchManifests()}>{t.applications.detail.retry}</Button></div>
-          {detail.isManifestLoading ? <div role="status" className="mt-4 text-xs text-muted-foreground">{t.applications.detail.loadingManifests}</div> : detail.manifestError ? <div role="alert" className="mt-4 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">{detail.manifestError}</div> : !detail.manifests.length ? <div className="mt-4 rounded-lg border border-dashed border-border p-5 text-center text-xs text-muted-foreground">{t.applications.detail.noManifests}</div> : <div className="mt-4 space-y-2">{detail.manifests.map((manifest) => <div key={manifest.id} className="grid min-w-0 grid-cols-1 gap-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-[1fr_auto]"><div dir="ltr" className="min-w-0"><div className="wrap-anywhere font-mono font-semibold text-foreground">{manifest.contractPackage}@{manifest.contractVersion}</div><div className="mt-1 truncate font-mono text-xs text-muted-foreground" title={manifest.checksum}>{manifest.checksum}</div></div><div className="text-end"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${manifest.active ? "bg-success-subtle text-success-subtle-foreground" : "bg-muted text-muted-foreground"}`}>{manifest.active ? t.applications.detail.active : t.applications.detail.historical} · v{manifest.version}</span><time className="mt-2 block text-xs text-muted-foreground">{new Date(manifest.publishedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</time></div></div>)}</div>}
+        <Card className="min-w-0 p-3 sm:p-3.5">
+          <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-xs font-semibold text-foreground"><FileCheck className="size-3.5 text-info" aria-hidden="true" />{t.applications.detail.safeManifests}</h2><Button type="button" variant="ghost" size="sm" onClick={() => void detail.fetchManifests()}>{t.applications.detail.retry}</Button></div>
+          {detail.isManifestLoading ? <div role="status" className="mt-3 text-xs text-muted-foreground">{t.applications.detail.loadingManifests}</div> : detail.manifestError ? <div role="alert" className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">{detail.manifestError}</div> : !detail.manifests.length ? <div className="mt-3 rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">{t.applications.detail.noManifests}</div> : <div className="mt-3 space-y-2">{detail.manifests.map((manifest) => <div key={manifest.id} className="grid min-w-0 grid-cols-1 gap-2 rounded-lg border border-border p-2.5 text-xs sm:grid-cols-[1fr_auto]"><div dir="ltr" className="min-w-0"><div className="wrap-anywhere font-mono font-semibold text-foreground">{manifest.contractPackage}@{manifest.contractVersion}</div><div className="mt-0.5 truncate font-mono text-xs text-muted-foreground" title={manifest.checksum}>{manifest.checksum}</div></div><div className="text-end"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${manifest.active ? "bg-success-subtle text-success-subtle-foreground" : "bg-muted text-muted-foreground"}`}>{manifest.active ? t.applications.detail.active : t.applications.detail.historical} · v{manifest.version}</span><time className="mt-1 block text-xs text-muted-foreground">{new Date(manifest.publishedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</time></div></div>)}</div>}
         </Card>
       </section>
 
@@ -253,8 +253,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ ap
   </PageFrame>;
 }
 
-function PageFrame({ children, isBusy = false }: { children: React.ReactNode; isBusy?: boolean }) { return <div className="w-full space-y-6" aria-busy={isBusy || undefined}>{children}</div>; }
-function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <Card className="p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</div><div className={`mt-2 truncate text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`} title={value}>{value}</div></Card>; }
+function PageFrame({ children, isBusy = false }: { children: React.ReactNode; isBusy?: boolean }) { return <div className="w-full space-y-3" aria-busy={isBusy || undefined}>{children}</div>; }
+function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) { return <Card className="p-3 sm:p-3.5"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</div><div className={`mt-1.5 truncate text-xs font-semibold text-foreground ${mono ? "font-mono" : ""}`} title={value}>{value}</div></Card>; }
 function Item({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</dt><dd className="mt-1 font-mono font-semibold text-foreground">{value}</dd></div>; }
 
 function ApplicationServerCoverage({ summary, lang }: { summary: ApplicationServerSummaryView; lang: "ar" | "en" }) {
@@ -272,13 +272,13 @@ function ApplicationServerCoverage({ summary, lang }: { summary: ApplicationServ
     : summary.rolloutRequired
       ? copy.complete
       : copy.notRequired;
-  return <Card className="p-5">
+  return <Card className="p-3 sm:p-3.5">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Database className={`size-4 ${needsAttention ? "text-warning" : "text-success"}`} aria-hidden="true" />{copy.title}</h2>
-      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${needsAttention ? "bg-warning-subtle text-warning-subtle-foreground" : "bg-success-subtle text-success-subtle-foreground"}`}>{status}</span>
+      <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground"><Database className={`size-3.5 ${needsAttention ? "text-warning" : "text-success"}`} aria-hidden="true" />{copy.title}</h2>
+      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${needsAttention ? "bg-warning-subtle text-warning-subtle-foreground" : "bg-success-subtle text-success-subtle-foreground"}`}>{status}</span>
     </div>
-    <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={coverage} className="mt-4 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-success" style={{ width: `${coverage}%` }} /></div>
-    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={coverage} className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-success" style={{ width: `${coverage}%` }} /></div>
+    <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
       <CoverageMetric label={copy.eligible} value={summary.eligible} />
       <CoverageMetric label={copy.ready} value={summary.ready} />
       <CoverageMetric label={copy.pending} value={summary.pending} />
@@ -288,5 +288,5 @@ function ApplicationServerCoverage({ summary, lang }: { summary: ApplicationServ
 }
 
 function CoverageMetric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg bg-muted p-3"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</div><div className="mt-1 font-mono text-lg font-semibold text-foreground">{value}</div></div>;
+  return <div className="rounded-lg bg-muted p-2.5"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{label}</div><div className="mt-0.5 font-mono text-base font-semibold text-foreground">{value}</div></div>;
 }

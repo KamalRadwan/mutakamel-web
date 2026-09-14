@@ -76,7 +76,7 @@ export function ConflictDialog({
         aria-busy={loading || undefined}
         onEscapeKeyDown={(event) => (loading ? event.preventDefault() : undefined)}
         onPointerDownOutside={(event) => (loading ? event.preventDefault() : undefined)}
-        className={className}
+        className={cn("p-3 sm:p-3.5", className)}
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -101,15 +101,15 @@ export function ConflictDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={dismiss} disabled={loading}>
+          <Button size="sm" variant="outline" onClick={dismiss} disabled={loading}>
             {labels.cancel}
           </Button>
           {onOverwrite && (
-            <Button variant="destructive" onClick={onOverwrite} disabled={loading}>
+            <Button size="sm" variant="destructive" onClick={onOverwrite} disabled={loading}>
               {labels.overwrite}
             </Button>
           )}
-          <Button variant="primary" onClick={onReload} loading={loading}>
+          <Button size="sm" variant="primary" onClick={onReload} loading={loading}>
             {labels.reload}
           </Button>
         </DialogFooter>

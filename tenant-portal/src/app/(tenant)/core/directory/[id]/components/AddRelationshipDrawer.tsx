@@ -105,7 +105,7 @@ export function AddRelationshipDrawer({
             }
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -119,7 +119,7 @@ export function AddRelationshipDrawer({
         </Field>
 
         <Field label={copy.relationshipLabel}>
-          <Input
+          <Input size="sm" placeholder={copy.relationshipLabel}
             value={values.label}
             onChange={(event) =>
               setValues((current) => ({ ...current, label: event.target.value }))

@@ -97,7 +97,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={t.crmLeadStages.arabicName} error={nameValidationError ?? undefined} required>
-            <Input
+            <Input size="sm" placeholder={t.crmLeadStages.arabicName}
               dir="rtl"
               value={nameAr}
               onChange={(event) => setNameAr(event.target.value)}
@@ -107,7 +107,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
             />
           </Field>
           <Field label={t.crmLeadStages.englishName} error={nameValidationError ?? undefined} required>
-            <Input
+            <Input size="sm" placeholder={t.crmLeadStages.englishName}
               dir="ltr"
               value={nameEn}
               onChange={(event) => setNameEn(event.target.value)}
@@ -119,7 +119,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
         </div>
 
         <Field label={t.crmCustomFields.key} error={validationError ?? undefined} required>
-          <Input
+          <Input size="sm"
             dir="ltr"
             value={fieldKey}
             onChange={(event) => setFieldKey(event.target.value)}
@@ -133,7 +133,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label={t.crmCustomFields.owner}>
             <Select value={ownerType} onValueChange={(value) => setOwnerType(value as CrmCustomFieldCreateOwnerType)}>
-              <SelectTrigger disabled={isSubmitting}>
+              <SelectTrigger size="sm" disabled={isSubmitting}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -147,7 +147,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
           </Field>
           <Field label={t.crmCustomFields.fieldType}>
             <Select value={type} onValueChange={(value) => setType(value as CrmCustomFieldSimpleCreateType)}>
-              <SelectTrigger disabled={isSubmitting}>
+              <SelectTrigger size="sm" disabled={isSubmitting}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

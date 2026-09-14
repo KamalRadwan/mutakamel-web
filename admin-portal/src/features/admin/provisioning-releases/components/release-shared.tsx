@@ -231,11 +231,11 @@ export const RELEASE_COPY = {
 export type ReleaseCopy = (typeof RELEASE_COPY)["en"] | (typeof RELEASE_COPY)["ar"];
 
 export function ReleasePageFrame({ children, dir }: { children: ReactNode; dir: "rtl" | "ltr" }) {
-  return <div dir={dir} className="mx-auto w-full max-w-[1600px] space-y-4">{children}</div>;
+  return <div dir={dir} className="mx-auto w-full max-w-[1600px] space-y-3">{children}</div>;
 }
 
 export function ReleaseHero({ copy, action }: { copy: ReleaseCopy; action?: ReactNode }) {
-  return <PageHeader title={copy.title} description={copy.subtitle} action={action} />;
+  return <PageHeader title={copy.title} action={action} />;
 }
 
 export function ReleaseStatePanel({ kind, title, detail, correlationId, copy, action }: { kind: "loading" | "empty" | "forbidden" | "notFound" | "unavailable" | "error"; title: string; detail?: string; correlationId?: string; copy: ReleaseCopy; action?: ReactNode }) {
@@ -286,7 +286,7 @@ export function ReleaseMutationNotice({ mutation, copy }: { mutation: ReleaseMut
 export function ReleaseSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSnapshot<unknown>; copy: ReleaseCopy; lang: "ar" | "en" }) {
   return (
     <Card>
-      <footer className="grid gap-2 px-4 py-3 text-xs text-muted-foreground sm:grid-cols-2">
+      <footer className="grid gap-2 px-3 py-2.5 text-xs text-muted-foreground sm:grid-cols-2">
         <p><strong>{copy.responseAt}:</strong> {formatDate(snapshot.responseTimestamp, lang)}</p>
         <p><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{snapshot.correlationId}</code></p>
       </footer>
@@ -307,7 +307,7 @@ export function ReleaseFieldError({ id, code, copy }: { id: string; code?: Relea
 
 export function JsonEvidence({ title, value }: { title: string; value: Record<string, unknown> }) {
   return (
-    <section className="min-w-0 rounded-lg border border-border bg-muted p-3 text-foreground">
+    <section className="min-w-0 rounded-lg border border-border bg-muted p-2.5 sm:p-3 text-foreground">
       <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
       <pre dir="ltr" className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all text-start font-mono text-xs leading-5">{JSON.stringify(value, null, 2)}</pre>
     </section>
@@ -316,8 +316,8 @@ export function JsonEvidence({ title, value }: { title: string; value: Record<st
 
 export function RefreshReleaseButton({ label, onClick, pending = false }: { label: string; onClick: () => void; pending?: boolean }) {
   return (
-    <Button type="button" variant="outline" onClick={onClick} disabled={pending} loading={pending}>
-      <RefreshCw className="size-4" aria-hidden="true" />
+    <Button type="button" variant="outline" size="sm" onClick={onClick} disabled={pending} loading={pending}>
+      <RefreshCw className="size-3.5" aria-hidden="true" />
       {label}
     </Button>
   );

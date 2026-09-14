@@ -110,7 +110,7 @@ export default function OutboundEmailDetailPage({
                   : undefined
               }
               secondaryActions={
-                <Button
+                <Button size="sm"
                   variant="outline"
                   onClick={() => void detail.reload()}
                   disabled={detail.isLoading}

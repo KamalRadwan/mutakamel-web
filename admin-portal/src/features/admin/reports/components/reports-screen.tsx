@@ -195,7 +195,7 @@ export function ReportsScreen() {
   const report = useReports();
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-3">
       <PageHeader title={copy.title} />
 
       {!report.canRead ? (
@@ -215,7 +215,7 @@ export function ReportsScreen() {
         >
           <TabsList
             aria-label={copy.title}
-            className="h-auto w-full flex-wrap justify-start gap-1 bg-muted p-1.5"
+            className="h-auto w-full flex-wrap justify-start gap-1 bg-muted p-1"
           >
             {REPORT_KINDS.map((kind) => {
               const Icon = TAB_ICON[kind];
@@ -223,27 +223,27 @@ export function ReportsScreen() {
                 <TabsTrigger
                   key={kind}
                   value={kind}
-                  className="gap-2 px-3"
+                  className="gap-2 px-2.5 py-1 text-xs"
                 >
-                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  <Icon className="size-3.5 shrink-0" aria-hidden="true" />
                   {tabLabel(kind, copy)}
                 </TabsTrigger>
               );
             })}
           </TabsList>
 
-          <TabsContent value={report.activeReport} className="mt-4 space-y-4">
+          <TabsContent value={report.activeReport} className="mt-3 space-y-3">
             <Card>
-              <CardContent>
+              <CardContent className="p-3 sm:p-3.5">
                 <form
                   aria-label={copy.filters}
                   onSubmit={report.submitFilters}
-                  className="space-y-4"
+                  className="space-y-3"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
                     <h2 className="inline-flex items-center gap-2 text-sm font-semibold">
                       <Filter
-                        className="size-4 text-primary"
+                        className="size-3.5 text-primary"
                         aria-hidden="true"
                       />
                       {copy.filters}
@@ -273,17 +273,18 @@ export function ReportsScreen() {
                   />
 
                   {report.activeReport !== "SERVERS" ? (
-                    <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+                    <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-2.5">
                       <Button
                         type="button"
                         variant="outline"
+                        size="sm"
                         onClick={report.clearFilters}
                       >
-                        <RotateCcw className="size-4" aria-hidden="true" />
+                        <RotateCcw className="size-3.5" aria-hidden="true" />
                         {copy.clear}
                       </Button>
-                      <Button type="submit" variant="primary">
-                        <Filter className="size-4" aria-hidden="true" />
+                      <Button type="submit" variant="primary" size="sm">
+                        <Filter className="size-3.5" aria-hidden="true" />
                         {copy.apply}
                       </Button>
                     </div>
@@ -296,7 +297,7 @@ export function ReportsScreen() {
               {report.isRefreshing ? (
                 <p
                   role="status"
-                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-md border border-info/30 bg-info-subtle px-3 py-1.5 text-sm font-semibold text-info-subtle-foreground"
+                  className="absolute end-3 top-3 z-10 inline-flex items-center gap-2 rounded-md border border-info/30 bg-info-subtle px-2.5 py-1 text-xs font-semibold text-info-subtle-foreground"
                 >
                   <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   {copy.refreshing}
@@ -338,17 +339,20 @@ function ReportFilters({
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
       {kind === "OVERVIEW" || kind === "BILLING" || kind === "PROVISIONING" ? (
         <>
           <Field
             label={copy.from}
+            hideLabel
             error={validationMessage(errors.from, copy)}
           >
             {(fp) => (
               <Input
                 {...fp}
+                size="sm"
                 type="date"
+                placeholder={copy.from}
                 value={draft.from}
                 invalid={Boolean(validationMessage(errors.from, copy))}
                 onChange={(event) => update("from", event.target.value)}
@@ -357,12 +361,15 @@ function ReportFilters({
           </Field>
           <Field
             label={copy.to}
+            hideLabel
             error={validationMessage(errors.to ?? errors.dateRange, copy)}
           >
             {(fp) => (
               <Input
                 {...fp}
+                size="sm"
                 type="date"
+                placeholder={copy.to}
                 value={draft.to}
                 invalid={Boolean(
                   validationMessage(errors.to ?? errors.dateRange, copy),
@@ -376,7 +383,7 @@ function ReportFilters({
 
       {kind === "TENANTS" ? (
         <>
-          <Field label={copy.tenantStatus}>
+          <Field label={copy.tenantStatus} hideLabel>
             {(fp) => (
               <Select
                 value={draft.status || "ANY"}
@@ -387,8 +394,8 @@ function ReportFilters({
                   )
                 }
               >
-                <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                  <SelectValue />
+                <SelectTrigger {...fp} size="sm">
+                  <SelectValue placeholder={copy.tenantStatus} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ANY">{copy.anyStatus}</SelectItem>
@@ -403,12 +410,15 @@ function ReportFilters({
           </Field>
           <Field
             label={copy.serverId}
+            hideLabel
             error={validationMessage(errors.serverId, copy)}
           >
             {(fp) => (
               <Input
                 {...fp}
+                size="sm"
                 dir="ltr"
+                placeholder={`${copy.serverId} (UUIDv7)`}
                 value={draft.serverId}
                 invalid={Boolean(validationMessage(errors.serverId, copy))}
                 onChange={(event) => update("serverId", event.target.value.trim())}
@@ -421,6 +431,7 @@ function ReportFilters({
       {kind === "TENANTS" || kind === "PROVISIONING" ? (
         <Field
           label={copy.limit}
+          hideLabel
           error={validationMessage(errors.limit, copy)}
         >
           {(fp) => (
@@ -428,8 +439,8 @@ function ReportFilters({
               value={draft.limit}
               onValueChange={(value) => update("limit", value)}
             >
-              <SelectTrigger {...fp}>
-                <SelectValue />
+              <SelectTrigger {...fp} size="sm">
+                <SelectValue placeholder={copy.limit} />
               </SelectTrigger>
               <SelectContent>
                 {[10, 20, 25, 50, 100].map((limit) => (
@@ -476,8 +487,8 @@ function ReportBody({
         correlationId={report.error?.correlationId}
         correlationLabel={copy.correlation}
         action={
-          <Button type="button" variant="outline" onClick={report.refresh}>
-            <RefreshCw className="size-4" aria-hidden="true" />
+          <Button type="button" variant="outline" size="sm" onClick={report.refresh}>
+            <RefreshCw className="size-3.5" aria-hidden="true" />
             {copy.retry}
           </Button>
         }
@@ -493,8 +504,8 @@ function ReportBody({
         correlationId={report.error?.correlationId}
         correlationLabel={copy.correlation}
         action={
-          <Button type="button" variant="outline" onClick={report.refresh}>
-            <RefreshCw className="size-4" aria-hidden="true" />
+          <Button type="button" variant="outline" size="sm" onClick={report.refresh}>
+            <RefreshCw className="size-3.5" aria-hidden="true" />
             {copy.retry}
           </Button>
         }
@@ -584,7 +595,7 @@ function OverviewView({
     ([left], [right]) => left.localeCompare(right),
   );
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid gap-3 lg:grid-cols-3">
       <ReportCard
         title={copy.tenantLifecycle}
         icon={<Users className="size-4" />}
@@ -594,19 +605,19 @@ function OverviewView({
             {statuses.map(([status, count]) => (
               <div
                 key={status}
-                className="flex min-h-11 items-center justify-between gap-3 py-2"
+                className="flex min-h-8 items-center justify-between gap-2.5 py-1"
               >
                 <dt>
                   <StatusBadge status={status} />
                 </dt>
-                <dd className="font-mono text-lg font-semibold">
+                <dd className="font-mono text-base font-semibold">
                   {formatInteger(count, lang)}
                 </dd>
               </div>
             ))}
           </dl>
         ) : (
-          <p className="text-sm text-muted-foreground">{copy.allZero}</p>
+          <p className="text-xs text-muted-foreground">{copy.allZero}</p>
         )}
       </ReportCard>
       <ReportCard
@@ -966,12 +977,12 @@ function ReportCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="p-4">
-      <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+    <Card className="p-3 sm:p-3.5">
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <span className="text-primary">{icon}</span>
         {title}
       </h2>
-      <div className="mt-3 space-y-3">{children}</div>
+      <div className="mt-2.5 space-y-2.5">{children}</div>
     </Card>
   );
 }
@@ -986,13 +997,13 @@ function Metric({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-md bg-muted px-3 py-2">
-      <span className="block text-sm font-semibold text-muted-foreground">
+    <div className="rounded-md bg-muted p-2.5">
+      <span className="block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       <strong
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 block text-lg font-semibold ${mono ? "font-mono text-start" : ""}`}
+        className={`mt-0.5 block text-base font-semibold ${mono ? "font-mono text-start" : ""}`}
       >
         {value}
       </strong>
@@ -1027,7 +1038,7 @@ function SnapshotFooter({
   const asOf = data.kind === "TENANTS" ? null : data.snapshot.data.asOf;
   return (
     <footer
-      className={`grid gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground ${asOf ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+      className={`grid gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground ${asOf ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
     >
       {asOf ? (
         <p>
@@ -1083,25 +1094,25 @@ function StatePanel({
   return (
     <section
       role={kind === "loading" || kind === "empty" ? "status" : "alert"}
-      className={`flex min-h-56 flex-col items-center justify-center rounded-lg border p-6 text-center ${tone}`}
+      className={`flex min-h-36 flex-col items-center justify-center rounded-lg border p-4 text-center ${tone}`}
     >
       <Icon
-        className={`mb-3 size-9 opacity-70 ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`}
+        className={`mb-2 size-6 opacity-70 ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`}
         aria-hidden="true"
       />
-      <h2 className="text-base font-semibold">{title}</h2>
+      <h2 className="text-sm font-semibold">{title}</h2>
       {detail ? (
-        <p className="mt-2 max-w-2xl text-sm leading-6 opacity-80">{detail}</p>
+        <p className="mt-1 max-w-2xl text-xs leading-5 opacity-80">{detail}</p>
       ) : null}
       {correlationId ? (
-        <p className="mt-2 max-w-full text-sm">
+        <p className="mt-1.5 max-w-full text-xs">
           <strong>{correlationLabel}:</strong>{" "}
           <code dir="ltr" className="select-all break-all">
             {correlationId}
           </code>
         </p>
       ) : null}
-      {action ? <div className="mt-4">{action}</div> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
     </section>
   );
 }

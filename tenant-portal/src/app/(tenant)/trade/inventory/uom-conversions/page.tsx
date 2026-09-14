@@ -153,7 +153,7 @@ export default function UomConversionsPage() {
               onChange={selectBranch}
               disabled={isRefreshing}
             />
-            <Button variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
+            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
               <RefreshCw
                 className={isRefreshing ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

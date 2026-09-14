@@ -121,7 +121,7 @@ export function EditLeadStageDrawer({
         hint={isProtected ? t.crmLeadStages.protectedHint : undefined}
         required
       >
-        <Input
+        <Input size="sm" placeholder={t.crmLeadStages.arabicName}
           value={form.nameAr}
           maxLength={80}
           readOnly={isProtected}
@@ -138,7 +138,7 @@ export function EditLeadStageDrawer({
         readOnly={isProtected}
         required
       >
-        <Input
+        <Input size="sm" placeholder={t.crmLeadStages.englishName}
           value={form.nameEn}
           maxLength={80}
           readOnly={isProtected}
@@ -161,7 +161,7 @@ export function EditLeadStageDrawer({
             setForm((current) => ({ ...current, flag: next as LeadStageFlag }))
           }
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -184,7 +184,7 @@ export function EditLeadStageDrawer({
             }))
           }
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

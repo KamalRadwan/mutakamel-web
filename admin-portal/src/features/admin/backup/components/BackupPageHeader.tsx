@@ -5,7 +5,7 @@ import { PageHeader } from "@/design-system";
 interface BackupPageHeaderProps {
   eyebrow: string;
   title: string;
-  description: string;
+  description?: string;
   actions?: ReactNode;
 }
 

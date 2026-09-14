@@ -71,7 +71,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
         secondaryActions={
           dashboard ? (
             <>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={pending !== null}
                 loading={pending === "run"}
@@ -81,7 +81,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
                 {t.tradeAnalytics.run}
               </Button>
               {canEdit ? (
-                <Button
+                <Button size="sm"
                   variant="outline"
                   disabled={pending !== null}
                   loading={pending === "layout"}
@@ -169,14 +169,14 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
             >
               <div className="flex items-end gap-3">
                 <Field label={t.tradeAnalytics.widgetId} required>
-                  <Input
+                  <Input size="sm"
                     value={widgetId}
                     disabled={pending !== null}
                     placeholder={t.tradeInventory.uuidPlaceholder}
                     onChange={(event) => setWidgetId(event.target.value)}
                   />
                 </Field>
-                <Button
+                <Button size="sm"
                   variant="outline"
                   disabled={pending !== null}
                   loading={pending === "place"}
@@ -205,7 +205,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
                     disabled={pending !== null}
                     onValueChange={setShareSubjectId}
                   >
-                    <SelectTrigger aria-label={t.tradeAnalytics.subjectId}>
+                    <SelectTrigger size="sm" aria-label={t.tradeAnalytics.subjectId}>
                       <SelectValue placeholder={t.tradeAnalytics.subjectPlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
@@ -217,7 +217,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Button
+                <Button size="sm"
                   variant="outline"
                   disabled={pending !== null || shareSubjectId === ""}
                   loading={pending === "share"}

@@ -111,7 +111,7 @@ export function WalletTopupCard({
               error={error ?? undefined}
               className="flex-1"
             >
-              <Input
+              <Input size="sm" placeholder={t.coreBilling.topupAmount}
                 value={amount}
                 inputMode="decimal"
                 disabled={isSubmitting}
@@ -124,7 +124,7 @@ export function WalletTopupCard({
                 disabled={isSubmitting || options.length === 0}
                 onValueChange={onCurrencyChange}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue placeholder={t.coreBilling.topupCurrency} />
                 </SelectTrigger>
                 <SelectContent>
@@ -136,7 +136,7 @@ export function WalletTopupCard({
                 </SelectContent>
               </Select>
             </Field>
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={onSubmit}
               loading={isSubmitting}

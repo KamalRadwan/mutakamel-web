@@ -142,7 +142,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
                 </SelectContent>
               </Select>
             ) : null}
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void detailState.reload()}
               disabled={isRunning}
@@ -154,19 +154,19 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
               {t.crmDashboards.rerun}
             </Button>
             {layout.canEdit ? (
-              <Button variant="outline" onClick={() => setIsEditOpen(true)}>
+              <Button size="sm" variant="outline" onClick={() => setIsEditOpen(true)}>
                 <Pencil className="size-4" aria-hidden="true" />
                 {t.crmDashboards.edit}
               </Button>
             ) : null}
             {layout.canEdit ? (
-              <Button variant="outline" onClick={() => setIsAddOpen(true)}>
+              <Button size="sm" variant="outline" onClick={() => setIsAddOpen(true)}>
                 <Plus className="size-4" aria-hidden="true" />
                 {t.crmDashboards.addWidget}
               </Button>
             ) : null}
             {layout.canEdit ? (
-              <Button
+              <Button size="sm"
                 variant="outline"
                 aria-pressed={layout.isEditing}
                 onClick={() => layout.setIsEditing(!layout.isEditing)}
@@ -176,7 +176,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
               </Button>
             ) : null}
             {isOwner ? (
-              <Button variant="outline" onClick={() => setIsShareOpen(true)}>
+              <Button size="sm" variant="outline" onClick={() => setIsShareOpen(true)}>
                 <Share2 className="size-4" aria-hidden="true" />
                 {t.crmDashboards.share}
               </Button>
@@ -229,10 +229,10 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
             onReorder={layout.reorder}
           />
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => layout.setIsEditing(false)}>
+            <Button size="sm" variant="ghost" onClick={() => layout.setIsEditing(false)}>
               {t.common.cancel}
             </Button>
-            <Button
+            <Button size="sm"
               disabled={!layout.isDirty || layout.isSaving}
               loading={layout.isSaving}
               onClick={() => {

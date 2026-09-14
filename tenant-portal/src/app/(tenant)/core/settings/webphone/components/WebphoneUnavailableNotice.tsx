@@ -46,7 +46,7 @@ export function WebphoneUnavailableNotice({
   const { Icon } = reason;
 
   return (
-    <Card id={id} role="status" aria-label={copy.unavailableHeading} className="p-4">
+    <Card id={id} role="status" aria-label={copy.unavailableHeading} className="p-3 sm:p-3.5">
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div>

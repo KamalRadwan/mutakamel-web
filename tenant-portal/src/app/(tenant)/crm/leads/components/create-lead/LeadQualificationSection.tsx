@@ -49,7 +49,7 @@ export function LeadQualificationSection({
 
   const field = ({ key, label, max }: { key: QualificationField; label: string; max: number }) => (
     <Field key={key} label={label} error={errors[key]} className="max-w-prose">
-      <Textarea
+      <Textarea placeholder={label}
         rows={3}
         value={form[key]}
         maxLength={max}

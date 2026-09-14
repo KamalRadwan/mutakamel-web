@@ -111,7 +111,7 @@ export default function TradeUomsPage() {
             uoms.canManage ? { label: t.trade.uomCreate, onClick: uoms.openCreate } : undefined
           }
           secondaryActions={
-            <Button variant="outline" onClick={() => void uoms.reload()} disabled={uoms.isRefreshing}>
+            <Button size="sm" variant="outline" onClick={() => void uoms.reload()} disabled={uoms.isRefreshing}>
               <RefreshCw
                 className={uoms.isRefreshing ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

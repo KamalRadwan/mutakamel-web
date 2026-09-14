@@ -39,7 +39,7 @@ export default function OrganizationTreePage() {
           title={copy.title}
           description={copy.subtitle}
           secondaryActions={
-            <Button variant="outline" onClick={reload} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={reload} disabled={isLoading}>
               <RefreshCw
                 className={`size-4 ${isLoading ? "animate-spin" : ""}`}
                 aria-hidden="true"
@@ -56,7 +56,7 @@ export default function OrganizationTreePage() {
           // an unbounded payload. Retrying cannot change that, so this offers
           // the paginated screens instead of a retry button.
           <Card>
-            <CardContent className="flex flex-col items-start gap-3 py-8">
+            <CardContent className="flex flex-col items-start gap-3 py-4">
               <p className="text-sm font-medium text-foreground">{copy.tooLargeTitle}</p>
               <p className="max-w-prose text-xs text-muted-foreground">
                 {formatTemplate(copy.tooLargeDescription, {

@@ -66,7 +66,7 @@ function ItemFields({
         readOnly={isEdit}
         required={!isEdit}
       >
-        <Input
+        <Input size="sm" placeholder={t.trade.itemCode}
           dir="ltr"
           value={values.canonicalCode}
           onChange={(event) => onChange({ canonicalCode: event.target.value.toUpperCase() })}
@@ -84,7 +84,7 @@ function ItemFields({
           onValueChange={(next) => onChange({ itemKind: next as ItemKind })}
           disabled={isSubmitting || isEdit}
         >
-          <SelectTrigger aria-label={t.trade.itemKind} aria-readonly={isEdit}>
+          <SelectTrigger size="sm" aria-label={t.trade.itemKind} aria-readonly={isEdit}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -98,7 +98,7 @@ function ItemFields({
       </Field>
 
       <Field label={t.trade.nameAr} hint={t.trade.localizedNamesHint}>
-        <Input
+        <Input size="sm" placeholder={t.trade.nameAr}
           value={values.nameAr}
           onChange={(event) => onChange({ nameAr: event.target.value })}
           maxLength={LOCALIZED_NAME_MAX_LENGTH}
@@ -107,7 +107,7 @@ function ItemFields({
       </Field>
 
       <Field label={t.trade.nameEn}>
-        <Input
+        <Input size="sm" placeholder={t.trade.nameEn}
           dir="ltr"
           value={values.nameEn}
           onChange={(event) => onChange({ nameEn: event.target.value })}
@@ -122,7 +122,7 @@ function ItemFields({
         readOnly={isEdit}
         required={!isEdit}
       >
-        <Input
+        <Input size="sm" placeholder={t.trade.itemBaseUom}
           dir="ltr"
           className="font-mono"
           value={values.baseUomId}
@@ -134,7 +134,7 @@ function ItemFields({
       </Field>
 
       <Field label={t.trade.itemCategory}>
-        <Input
+        <Input size="sm" placeholder={t.trade.itemCategory}
           dir="ltr"
           className="font-mono"
           value={values.categoryId}
@@ -144,7 +144,7 @@ function ItemFields({
       </Field>
 
       <Field label={t.trade.itemVariantIdentity} hint={t.trade.itemVariantHint}>
-        <Textarea
+        <Textarea placeholder={t.trade.itemVariantIdentity}
           dir="ltr"
           className="font-mono"
           value={values.variantIdentity}
@@ -160,7 +160,7 @@ function ItemFields({
             onValueChange={(next) => onChange({ status: next as ItemStatus })}
             disabled={isSubmitting}
           >
-            <SelectTrigger aria-label={t.common.status}>
+            <SelectTrigger size="sm" aria-label={t.common.status}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

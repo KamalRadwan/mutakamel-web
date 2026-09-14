@@ -1150,8 +1150,6 @@ export const en: Dictionary = {
   },
   tenants: {
     pageTitle: "Tenants Directory",
-    pageSubtitle:
-      "Manage tenant organizations, subscriptions, FQDN domains, and automated provisioning operations.",
     registerTenant: "Register New Tenant",
     totalTenants: "Total Organizations",
     activeTenants: "Active Tenants",
@@ -1175,11 +1173,11 @@ export const en: Dictionary = {
     wizardTitle: "Tenant Provisioning Wizard",
     wizardSubtitle:
       "Provide tenant identity, owner details, application modules, and database placement to provision an environment.",
-    step1: "1. Identity & Geocoding",
-    step2: "2. Owner & Admin User",
-    step3: "3. Applications & Subscription",
-    step4: "4. Infrastructure Placement",
-    step5: "5. Confirm & Submit",
+    step1: "Identity & Geocoding",
+    step2: "Owner & Admin User",
+    step3: "Applications & Subscription",
+    step4: "Infrastructure Placement",
+    step5: "Confirm & Submit",
     tabs: {
       details: "📝 Profile & Details",
       subscriptions: "💰 Subscriptions & Plan",
@@ -1195,7 +1193,7 @@ export const en: Dictionary = {
       taxNumber: "Tax ID Number",
       commercialRegistrationNumber: "Commercial Reg. No.",
       phone: "Main Phone Number",
-      addressSection: "Structured Office Address (TenantAddressDto)",
+      addressSection: "Structured Office Address",
       street1: "Street Line 1",
       buildingNo: "Building Number",
       district: "District / Neighborhood",
@@ -1322,8 +1320,8 @@ export const en: Dictionary = {
       checkTenantStatus: "Check tenant status",
       recoveryPermissionNote:
         "admin.tenants.read is required for recovery; automatic replay is not enabled.",
-      step1Heading: "Step 1: Tenant Identity & FQDN",
-      tenantNameCodeLabel: "Tenant Name Code (name)",
+      step1Heading: "Tenant Identity & FQDN",
+      tenantNameCodeLabel: "Tenant Name Code",
       checkAvailability: "Check Availability",
       derivedFqdn: (domain: string) => `Derived FQDN: ${domain}`,
       countryLabel: "Country",
@@ -1371,14 +1369,14 @@ export const en: Dictionary = {
       postalCodePlaceholder: "Postal code",
       landmarkPlaceholder: "Landmark",
       formattedAddressPlaceholder: "Editable formatted address",
-      step2Heading: "Step 2: Owner Contact & Admin User",
+      step2Heading: "Owner Contact & Admin User",
       ownerEmailLabel: "Owner Email",
       firstNameRequiredLabel: "First Name",
       lastNameRequiredLabel: "Last Name",
       jobTitleLabel: "Job Title",
       sendInvitationLabel:
-        "Automatically send email invitation to owner (sendInvitation)",
-      step5Heading: "Step 5: Review & Confirm Provisioning Order",
+        "Automatically send email invitation to owner",
+      step5Heading: "Review & Confirm Provisioning Order",
       primaryOwnerLabel: "Primary Owner:",
       notSelected: "Not selected",
       storageServerLabel: "Storage Server:",
@@ -1392,9 +1390,8 @@ export const en: Dictionary = {
       confirmCreation: "Confirm Creation",
       retryButton: "Retry",
       applicationsStep: {
-        stepHeading: "Step 3: Applications & Subscription",
-        stepDescription:
-          "Select only commercially and technically eligible Applications. Core and Worker foundation components are derived by the server and are never user-selectable.",
+        stepHeading: "Applications & Subscription",
+        stepDescription: "",
         billingCycleLabel: "Billing cycle",
         monthlyOption: "Monthly",
         annualOption: "Annual",
@@ -1417,8 +1414,7 @@ export const en: Dictionary = {
         selectionRequiredError:
           "Select at least one eligible Application with a valid tier and seat count.",
         previewTitle: "Provisioning plan preview",
-        previewDesc:
-          "This previews Application components and pinned releases. The final quote and create command validate the complete addon selection.",
+        previewDesc: "",
         previewIdle: "Select Applications to preview the plan.",
         previewLoading: "Building the preview...",
         previewErrorTitle: "The provisioning plan could not be built",
@@ -1429,12 +1425,10 @@ export const en: Dictionary = {
         executionStepsLabel: "Execution steps",
       },
       infrastructureStep: {
-        stepHeading: "Step 4: Infrastructure Placement",
-        stepDescription:
-          "Choose a Database Server compatible with the selected Applications and an eligible Storage Server. Core revalidates both when the tenant is created.",
+        stepHeading: "Infrastructure Placement",
+        stepDescription: "",
         databaseServerTitle: "Database Server",
-        databaseServerDescription:
-          "Only servers with ready system principals and ready bindings for every selected Application are returned.",
+        databaseServerDescription: "",
         completeApplicationsFirst: "Complete the Application selection first.",
         noCompatibleDatabaseServer:
           "No Database Server is compatible with the current Application set.",
@@ -1447,8 +1441,7 @@ export const en: Dictionary = {
         capacityLabel: "Capacity",
         countryLabel: "Country",
         storageServerTitle: "Storage Server",
-        storageServerDescription:
-          "Selection is explicit; there is no silent fallback or tenant default.",
+        storageServerDescription: "",
         noEligibleStorageServer:
           "No Storage Server has current eligible connection evidence.",
         selectStorageServerPlaceholder: "-- Select Storage Server --",

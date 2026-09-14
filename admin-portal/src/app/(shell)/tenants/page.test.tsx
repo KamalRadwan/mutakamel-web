@@ -172,7 +172,7 @@ describe("TenantsDirectoryPage", () => {
     );
     render(<TenantsDirectoryPage />);
 
-    expect(screen.getByText("عزل متعدد المستأجرين")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "المستأجرون" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("combobox", { name: "تصفية حسب الحالة" }));
     expect(screen.getAllByText("فشل التجهيز")).toHaveLength(2);
     fireEvent.keyDown(document, { key: "Escape" });

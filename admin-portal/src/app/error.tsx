@@ -25,7 +25,7 @@ export default function RootError({
         <br />
         Something went wrong. You can try again.
       </p>
-      <Button type="button" variant="primary" onClick={reset}>
+      <Button size="sm" type="button" variant="primary" onClick={reset}>
         إعادة المحاولة · Retry
       </Button>
     </section>

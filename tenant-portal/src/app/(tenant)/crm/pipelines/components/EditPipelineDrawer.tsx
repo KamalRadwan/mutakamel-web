@@ -89,7 +89,7 @@ export function EditPipelineDrawer({
       }}
     >
       <Field label={t.crmPipelines.nameAr} error={nameArError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmPipelines.nameAr}
           value={form.nameAr}
           maxLength={PIPELINE_NAME_MAX_LENGTH}
           onChange={(event) =>
@@ -99,7 +99,7 @@ export function EditPipelineDrawer({
       </Field>
 
       <Field label={t.crmPipelines.nameEn} error={nameEnError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmPipelines.nameEn}
           value={form.nameEn}
           maxLength={PIPELINE_NAME_MAX_LENGTH}
           onChange={(event) =>
@@ -109,7 +109,7 @@ export function EditPipelineDrawer({
       </Field>
 
       <Field label={t.crmPipelines.description}>
-        <Textarea
+        <Textarea placeholder={t.crmPipelines.description}
           value={form.description}
           maxLength={PIPELINE_DESCRIPTION_MAX_LENGTH}
           onChange={(event) =>

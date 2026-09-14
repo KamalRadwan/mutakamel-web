@@ -5,13 +5,24 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
+  Clock,
+  Database,
+  FileText,
+  Flag,
   Globe,
+  HardDrive,
+  Home,
+  Link2,
   Loader2,
+  Mail,
+  Map,
   MapPin,
+  Package,
+  Route,
   ShieldCheck,
   User,
 } from "lucide-react";
-import { useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,17 +37,22 @@ import {
   Checkbox,
   Field,
   Input,
+  SecondNavBar,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Textarea,
+  cn,
 } from "@/design-system";
 import { CountrySelect } from "@/components/shared/CountrySelect";
 import { IndustrySelect } from "@/components/shared/IndustrySelect";
 import { JobTitleSelect } from "@/components/shared/JobTitleSelect";
-import { PhoneNumberInput } from "@/components/shared/PhoneNumberInput";
+import {
+  PhoneNumberInput,
+  type PhoneNumberValue,
+} from "@/components/shared/PhoneNumberInput";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantAddressGeocoding } from "./components/TenantAddressGeocoding";
 import { TenantApplicationsStep } from "./components/TenantApplicationsStep";
@@ -45,6 +61,7 @@ import { TenantInfrastructureStep } from "./components/TenantInfrastructureStep"
 import { TenantValidationSummary } from "./components/TenantValidationSummary";
 import { TenantWizardProgress } from "./components/TenantWizardProgress";
 import { useRegisterTenant } from "./hooks/useRegisterTenant";
+import type { TenantReverseGeocodedAddress } from "./types";
 
 export default function RegisterTenantWizardPage() {
   const {
@@ -109,61 +126,195 @@ export default function RegisterTenantWizardPage() {
   const { lang, dir } = useI18n();
   const wizardLocked = isSubmitting || pendingCreateRecovery !== null;
   const labels = t.tenants.wizard.fieldLabels;
-  const placeholders = t.tenants.wizard.placeholders;
-  const wizardSteps = [
-    { number: 1, label: t.tenants.step1 },
-    { number: 2, label: t.tenants.step2 },
-    { number: 3, label: t.tenants.step3 },
-    { number: 4, label: t.tenants.step4 },
-    { number: 5, label: t.tenants.step5 },
-  ] as const;
+  const wizardSteps = useMemo(
+    () => [
+      { number: 1, label: t.tenants.step1 },
+      { number: 2, label: t.tenants.step2 },
+      { number: 3, label: t.tenants.step3 },
+      { number: 4, label: t.tenants.step4 },
+      { number: 5, label: t.tenants.step5 },
+    ],
+    [
+      t.tenants.step1,
+      t.tenants.step2,
+      t.tenants.step3,
+      t.tenants.step4,
+      t.tenants.step5,
+    ],
+  );
 
-  const validationError = (fieldId: string) =>
-    validationErrors.find((error) => error.fieldId === fieldId)?.message;
+  const validationError = useCallback(
+    (fieldId: string) =>
+      validationErrors.find((error) => error.fieldId === fieldId)?.message,
+    [validationErrors],
+  );
 
-  const updateField = <Key extends keyof typeof formData>(
-    fieldId: string,
-    key: Key,
-    value: (typeof formData)[Key],
-  ) => {
-    setFormData((current) => ({ ...current, [key]: value }));
-    clearValidationError(fieldId);
-  };
+  const updateField = useCallback(
+    <Key extends keyof typeof formData>(
+      fieldId: string,
+      key: Key,
+      value: (typeof formData)[Key],
+    ) => {
+      setFormData((current) => ({ ...current, [key]: value }));
+      clearValidationError(fieldId);
+    },
+    [clearValidationError, setFormData],
+  );
+
+  const timezoneSelectItems = useMemo(
+    () =>
+      countryTimezoneOptions.map((timezone) => (
+        <SelectItem key={timezone} value={timezone}>
+          {timezone}
+        </SelectItem>
+      )),
+    [countryTimezoneOptions],
+  );
+
+  const phoneValue = useMemo<PhoneNumberValue>(
+    () => ({
+      callingCode: formData.phoneCountryCode,
+      nationalNumber: formData.phone,
+    }),
+    [formData.phoneCountryCode, formData.phone],
+  );
+
+  const handlePhoneChange = useCallback(
+    (next: PhoneNumberValue) => {
+      setFormData((current) => ({
+        ...current,
+        phoneCountryCode: next.callingCode,
+        phone: next.nationalNumber,
+      }));
+      clearValidationError("tenant-phone-country-code");
+      clearValidationError("tenant-phone");
+    },
+    [clearValidationError, setFormData],
+  );
+
+  const handleCountryChange = useCallback(
+    (countryIsoCode: string) => {
+      const selected = selectCountry(countryIsoCode);
+      if (selected) {
+        clearValidationError("tenant-country");
+        clearValidationError("tenant-timezone");
+        clearValidationError("tenant-phone-country-code");
+      }
+      return selected;
+    },
+    [clearValidationError, selectCountry],
+  );
+
+  const handleAddressApply = useCallback(
+    (suggestion: TenantReverseGeocodedAddress) => {
+      if (!selectCountry(suggestion.countryIsoCode)) return;
+      clearValidationError("tenant-country");
+      clearValidationError("tenant-timezone");
+      clearValidationError("tenant-phone-country-code");
+      setFormData((current) => ({
+        ...current,
+        ...(suggestion.street1 ? { street: suggestion.street1 } : {}),
+        ...(suggestion.city ? { city: suggestion.city } : {}),
+        ...(suggestion.state ? { state: suggestion.state } : {}),
+        ...(suggestion.district ? { district: suggestion.district } : {}),
+        ...(suggestion.buildingNo
+          ? { buildingNo: suggestion.buildingNo }
+          : {}),
+        ...(suggestion.postalCode
+          ? { postalCode: suggestion.postalCode }
+          : {}),
+        ...(suggestion.landmark ? { landmark: suggestion.landmark } : {}),
+        ...(suggestion.formattedAddress
+          ? { formattedAddress: suggestion.formattedAddress }
+          : {}),
+      }));
+    },
+    [clearValidationError, selectCountry, setFormData],
+  );
 
   const [isConfirmingCreate, setIsConfirmingCreate] = useState(false);
 
   const headingClassName =
-    "flex items-center gap-2 border-b border-border pb-3 text-base font-semibold text-foreground outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+    "flex items-center gap-2 border-b border-border pb-2 text-sm font-semibold text-foreground outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
   return (
-    <div className="w-full space-y-6">
-      <header className="rounded-lg border border-border bg-card p-5">
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            aria-label={t.tenants.wizard.backToTenants}
-          >
-            {lang === "ar" ? (
-              <ArrowRight aria-hidden="true" className="size-4" />
-            ) : (
-              <ArrowLeft aria-hidden="true" className="size-4" />
-            )}
-          </Button>
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
-              <Building2 aria-hidden="true" className="size-5 text-primary" />
-              <span>{t.tenants.wizardTitle}</span>
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t.tenants.wizardSubtitle}
-            </p>
+    <div className="w-full space-y-3">
+      <SecondNavBar
+        title={t.tenants.wizardTitle}
+        breadcrumb={
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="size-7 p-0 shrink-0"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              aria-label={t.tenants.wizard.backToTenants}
+            >
+              {lang === "ar" ? (
+                <ArrowRight aria-hidden="true" className="size-3.5" />
+              ) : (
+                <ArrowLeft aria-hidden="true" className="size-3.5" />
+              )}
+            </Button>
+            <Building2 aria-hidden="true" className="size-4 text-primary shrink-0" />
           </div>
-        </div>
-      </header>
+        }
+        status={
+          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+            {t.tenants.wizard.currentStepStatus}: {currentStep}/5
+          </span>
+        }
+        action={
+          <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onCancel}
+              disabled={isSubmitting}
+            >
+              {t.common.cancel}
+            </Button>
+            {currentStep > 1 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={prevStep}
+                disabled={isSubmitting}
+              >
+                {t.tenants.wizard.previousStep}
+              </Button>
+            ) : null}
+            {currentStep < 5 ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={nextStep}
+              >
+                {t.tenants.wizard.nextStepLabel}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                loading={isSubmitting}
+                disabled={wizardLocked || !creationQuote.canCreate || creationQuote.loading}
+                onClick={() => setIsConfirmingCreate(true)}
+              >
+                {!isSubmitting ? (
+                  <CheckCircle2 aria-hidden="true" className="size-3.5" />
+                ) : null}
+                {t.tenants.wizard.confirmCreation}
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       {pendingCreateRecovery ? (
         <AmbiguousOutcomePanel
@@ -201,7 +352,7 @@ export default function RegisterTenantWizardPage() {
         aria-busy={isSubmitting}
         noValidate
       >
-        <div className="mb-6">
+        <div className="mb-3">
           <TenantValidationSummary
             ref={validationSummaryRef}
             errors={validationErrors}
@@ -211,18 +362,19 @@ export default function RegisterTenantWizardPage() {
           />
         </div>
 
-        <fieldset disabled={wizardLocked} className="min-w-0 space-y-6 border-0 p-0">
+        <fieldset disabled={wizardLocked} className="min-w-0 space-y-3 border-0 p-0">
           {currentStep === 1 ? (
-            <section className="space-y-5 rounded-lg border border-border bg-card p-5">
+            <section className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-3.5">
               <h2 ref={stepHeadingRef} tabIndex={-1} className={headingClassName}>
                 <Globe aria-hidden="true" className="size-4 text-primary" />
                 {t.tenants.wizard.step1Heading}
               </h2>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2.5 sm:grid-cols-2">
                 <Field
                   id="tenant-company-name"
                   label={labels.companyName}
+                  hideLabel
                   required
                   error={validationError("tenant-company-name")}
                 >
@@ -230,15 +382,19 @@ export default function RegisterTenantWizardPage() {
                     <>
                       <Input
                         {...field}
+                        size="sm"
                         name="companyName"
                         type="text"
+                        leading={
+                          <Building2 className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                        }
                         value={formData.companyName}
                         onChange={(event) => {
                           applyCompanyName(event.target.value);
                           clearValidationError("tenant-company-name");
                           clearValidationError("tenant-name");
                         }}
-                        placeholder={placeholders.companyName}
+                        placeholder={`${labels.companyName} *`}
                         aria-describedby={[
                           field["aria-describedby"],
                           identityValidationEvidence
@@ -251,7 +407,7 @@ export default function RegisterTenantWizardPage() {
                       {identityValidationEvidence ? (
                         <p
                           id="tenant-company-identity"
-                          className={`mt-1 text-sm ${
+                          className={`mt-1 text-xs ${
                             identityValidationEvidence.result.fields.companyName
                               .available
                               ? "text-success-subtle-foreground"
@@ -271,16 +427,26 @@ export default function RegisterTenantWizardPage() {
                 <Field
                   id="tenant-name"
                   label={labels.tenantName}
+                  hideLabel
                   required
                   error={validationError("tenant-name")}
                 >
                   {(field) => (
                     <>
-                      <div className="flex flex-col gap-2 sm:flex-row">
+                      <div
+                        className={cn(
+                          "flex items-center rounded-md border border-input bg-card h-(--size-control-sm) text-xs overflow-hidden transition-colors w-full min-w-0 focus-within:ring-2 focus-within:ring-ring focus-within:border-input",
+                          field["aria-invalid"] && "border-destructive focus-within:ring-destructive",
+                        )}
+                      >
+                        <div className="flex items-center ps-2.5 pe-1 shrink-0 text-muted-foreground">
+                          <Link2 className="size-3.5" aria-hidden="true" />
+                        </div>
                         <Input
-                          {...field}
+                          id={field.id}
                           name="name"
                           type="text"
+                          size="sm"
                           value={formData.name}
                           onChange={(event) => {
                             // Typing here takes ownership of the code; the
@@ -294,9 +460,10 @@ export default function RegisterTenantWizardPage() {
                                 .replace(/[^a-z0-9-]/g, ""),
                             );
                           }}
-                          placeholder={placeholders.tenantName}
-                          className="flex-1 font-mono"
+                          placeholder={`${labels.tenantName} *`}
+                          className="flex-1 rounded-none border-0 bg-transparent px-2 h-8 shadow-none focus-visible:ring-0 text-xs font-mono text-foreground placeholder:text-muted-foreground min-w-0"
                           dir="ltr"
+                          required
                           aria-describedby={[
                             field["aria-describedby"],
                             identityValidationEvidence
@@ -306,21 +473,30 @@ export default function RegisterTenantWizardPage() {
                           ]
                             .filter(Boolean)
                             .join(" ")}
+                          aria-invalid={field["aria-invalid"]}
                         />
+                        <div
+                          className="flex items-center shrink-0 h-full border-s border-border bg-muted/30 px-2 text-xs font-mono text-muted-foreground select-none"
+                          dir="ltr"
+                        >
+                          .mutakamel.ai
+                        </div>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => void handleValidateIdentity()}
                           disabled={
                             isValidatingIdentity ||
                             !formData.name.trim() ||
                             !formData.companyName.trim()
                           }
+                          className="flex items-center gap-1.5 shrink-0 h-full rounded-none border-s border-border px-3 text-xs font-medium text-primary hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
                         >
                           {isValidatingIdentity ? (
                             <Loader2
                               aria-hidden="true"
-                              className="size-4 animate-spin motion-reduce:animate-none"
+                              className="size-3 animate-spin motion-reduce:animate-none"
                             />
                           ) : null}
                           {t.tenants.wizard.checkAvailability}
@@ -329,7 +505,7 @@ export default function RegisterTenantWizardPage() {
                       {identityValidationEvidence ? (
                         <p
                           id="tenant-name-identity"
-                          className={`mt-1 text-sm ${
+                          className={`mt-1 text-xs ${
                             identityValidationEvidence.result.fields.name.available
                               ? "text-success-subtle-foreground"
                               : "text-destructive-subtle-foreground"
@@ -340,7 +516,7 @@ export default function RegisterTenantWizardPage() {
                       ) : null}
                       <p
                         id="tenant-derived-fqdn"
-                        className="mt-1 font-mono text-sm text-muted-foreground"
+                        className="sr-only font-mono text-xs text-muted-foreground"
                         dir="ltr"
                       >
                         {t.tenants.wizard.workspaceAddress(
@@ -357,7 +533,7 @@ export default function RegisterTenantWizardPage() {
               {identityValidationEvidence ? (
                 <div
                   role="status"
-                  className={`rounded-lg border px-4 py-3 text-sm ${
+                  className={`rounded-md border px-3 py-1.5 text-xs ${
                     hasValidIdentityEvidence
                       ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
                       : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
@@ -368,21 +544,22 @@ export default function RegisterTenantWizardPage() {
               ) : identityValidationError ? (
                 <div
                   role="alert"
-                  className="rounded-lg border border-destructive/30 bg-destructive-subtle px-4 py-3 text-sm text-destructive-subtle-foreground"
+                  className="rounded-md border border-destructive/30 bg-destructive-subtle px-3 py-1.5 text-xs text-destructive-subtle-foreground"
                 >
                   <p>{identityValidationError.message}</p>
                   {identityValidationError.correlationId ? (
-                    <p className="mt-1 font-mono text-sm">
+                    <p className="mt-0.5 font-mono text-xs">
                       Correlation ID: {identityValidationError.correlationId}
                     </p>
                   ) : null}
                 </div>
               ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2.5 sm:grid-cols-3">
                 <Field
                   id="tenant-industry"
                   label={labels.industry}
+                  hideLabel
                   required
                   error={validationError("tenant-industry")}
                 >
@@ -395,6 +572,7 @@ export default function RegisterTenantWizardPage() {
                         updateField("tenant-industry", "industry", industry)
                       }
                       disabled={wizardLocked}
+                      placeholder={`${labels.industry} *`}
                       aria-describedby={field["aria-describedby"]}
                       aria-invalid={field["aria-invalid"]}
                     />
@@ -404,6 +582,7 @@ export default function RegisterTenantWizardPage() {
                 <Field
                   id="tenant-timezone"
                   label={labels.timezone}
+                  hideLabel
                   required
                   error={validationError("tenant-timezone")}
                 >
@@ -419,29 +598,31 @@ export default function RegisterTenantWizardPage() {
                     >
                       <SelectTrigger
                         id={field.id}
+                        size="sm"
                         aria-describedby={field["aria-describedby"]}
                         aria-invalid={field["aria-invalid"]}
                       >
-                        <SelectValue
-                          placeholder={t.tenants.wizard.chooseTimezonePlaceholder}
-                        />
+                        <div className="flex items-center gap-2 truncate">
+                          <Clock
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <SelectValue
+                            placeholder={`${labels.timezone} *`}
+                          />
+                        </div>
                       </SelectTrigger>
                       <SelectContent>
-                        {countryTimezoneOptions.map((timezone) => (
-                          <SelectItem key={timezone} value={timezone}>
-                            {timezone}
-                          </SelectItem>
-                        ))}
+                        {timezoneSelectItems}
                       </SelectContent>
                     </Select>
                   )}
                 </Field>
-              </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   id="tenant-phone"
                   label={labels.companyPhone}
+                  hideLabel
                   required
                   error={
                     validationError("tenant-phone-country-code") ??
@@ -452,22 +633,11 @@ export default function RegisterTenantWizardPage() {
                     <PhoneNumberInput
                       id={field.id}
                       name="phone"
-                      value={{
-                        callingCode: formData.phoneCountryCode,
-                        nationalNumber: formData.phone,
-                      }}
-                      onChange={(next) => {
-                        setFormData((current) => ({
-                          ...current,
-                          phoneCountryCode: next.callingCode,
-                          phone: next.nationalNumber,
-                        }));
-                        clearValidationError("tenant-phone-country-code");
-                        clearValidationError("tenant-phone");
-                      }}
+                      value={phoneValue}
+                      onChange={handlePhoneChange}
                       disabled={wizardLocked}
                       required
-                      numberPlaceholder={placeholders.phone}
+                      numberPlaceholder={`${labels.companyPhone} *`}
                       aria-describedby={field["aria-describedby"]}
                       aria-invalid={field["aria-invalid"]}
                     />
@@ -475,50 +645,31 @@ export default function RegisterTenantWizardPage() {
                 </Field>
               </div>
 
-              <section aria-labelledby="tenant-address-heading" className="space-y-4 pt-2">
-                <h3
-                  id="tenant-address-heading"
-                  className="flex items-center gap-2 text-sm font-semibold text-foreground"
-                >
-                  <MapPin aria-hidden="true" className="size-4 text-info" />
-                  {t.tenants.detailsTab.addressSection}
-                </h3>
+              <section aria-labelledby="tenant-address-heading" className="space-y-2.5 pt-1">
+                <div className="flex items-center justify-between border-b border-border pb-1.5 pt-1">
+                  <h3
+                    id="tenant-address-heading"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-foreground"
+                  >
+                    <MapPin aria-hidden="true" className="size-3.5 text-primary" />
+                    {t.tenants.detailsTab.addressSection}
+                  </h3>
 
-                <TenantAddressGeocoding
-                  lang={lang}
-                  disabled={wizardLocked}
-                  onApply={(suggestion) => {
-                    if (!selectCountry(suggestion.countryIsoCode)) return;
-                    clearValidationError("tenant-country");
-                    clearValidationError("tenant-timezone");
-                    clearValidationError("tenant-phone-country-code");
-                    setFormData((current) => ({
-                      ...current,
-                      ...(suggestion.street1 ? { street: suggestion.street1 } : {}),
-                      ...(suggestion.city ? { city: suggestion.city } : {}),
-                      ...(suggestion.state ? { state: suggestion.state } : {}),
-                      ...(suggestion.district ? { district: suggestion.district } : {}),
-                      ...(suggestion.buildingNo
-                        ? { buildingNo: suggestion.buildingNo }
-                        : {}),
-                      ...(suggestion.postalCode
-                        ? { postalCode: suggestion.postalCode }
-                        : {}),
-                      ...(suggestion.landmark ? { landmark: suggestion.landmark } : {}),
-                      ...(suggestion.formattedAddress
-                        ? { formattedAddress: suggestion.formattedAddress }
-                        : {}),
-                    }));
-                  }}
-                />
+                  <TenantAddressGeocoding
+                    lang={lang}
+                    disabled={wizardLocked}
+                    compact
+                    onApply={handleAddressApply}
+                  />
+                </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
                   <Field
                     id="tenant-country"
                     label={labels.country}
+                    hideLabel
                     required
                     error={validationError("tenant-country")}
-                    className="sm:col-span-2"
                   >
                     {(field) => (
                       <>
@@ -526,17 +677,9 @@ export default function RegisterTenantWizardPage() {
                           id={field.id}
                           label={labels.country}
                           value={formData.countryIsoCode}
-                          onChange={(countryIsoCode) => {
-                            const selected = selectCountry(countryIsoCode);
-                            if (selected) {
-                              clearValidationError("tenant-country");
-                              clearValidationError("tenant-timezone");
-                              clearValidationError("tenant-phone-country-code");
-                            }
-                            return selected;
-                          }}
+                          onChange={handleCountryChange}
                           disabled={wizardLocked}
-                          placeholder={t.tenants.wizard.chooseCountryPlaceholder}
+                          placeholder={`${labels.country} *`}
                           searchPlaceholder={
                             t.tenants.wizard.searchCountriesPlaceholder
                           }
@@ -548,6 +691,8 @@ export default function RegisterTenantWizardPage() {
                         <Input
                           type="hidden"
                           name="countryIsoCode"
+                          size="sm"
+                          placeholder={labels.country}
                           value={formData.countryIsoCode}
                         />
                       </>
@@ -559,6 +704,7 @@ export default function RegisterTenantWizardPage() {
                     label={labels.city}
                     value={formData.city}
                     maxLength={100}
+                    leading={<Building2 className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) => updateField("tenant-address-city", "city", value)}
                   />
                   <AddressInput
@@ -567,6 +713,7 @@ export default function RegisterTenantWizardPage() {
                     label={labels.stateProvince}
                     value={formData.state}
                     maxLength={100}
+                    leading={<Map className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) => updateField("tenant-address-state", "state", value)}
                   />
                   <AddressInput
@@ -575,16 +722,21 @@ export default function RegisterTenantWizardPage() {
                     label={labels.district}
                     value={formData.district}
                     maxLength={100}
+                    leading={<MapPin className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) =>
                       updateField("tenant-address-district", "district", value)
                     }
                   />
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   <AddressInput
                     id="tenant-address-street"
                     name="street"
                     label={labels.street}
                     value={formData.street}
                     maxLength={200}
+                    leading={<FileText className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) => updateField("tenant-address-street", "street", value)}
                   />
                   <AddressInput
@@ -593,16 +745,21 @@ export default function RegisterTenantWizardPage() {
                     label={labels.street2}
                     value={formData.street2}
                     maxLength={200}
+                    leading={<FileText className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) =>
                       updateField("tenant-address-street2", "street2", value)
                     }
                   />
+                </div>
+
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                   <AddressInput
                     id="tenant-address-building-number"
                     name="buildingNo"
                     label={labels.buildingNumber}
                     value={formData.buildingNo}
                     maxLength={100}
+                    leading={<Home className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) =>
                       updateField("tenant-address-building-number", "buildingNo", value)
                     }
@@ -613,6 +770,7 @@ export default function RegisterTenantWizardPage() {
                     label={labels.postalCode}
                     value={formData.postalCode}
                     maxLength={100}
+                    leading={<Mail className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) =>
                       updateField("tenant-address-postal-code", "postalCode", value)
                     }
@@ -623,49 +781,62 @@ export default function RegisterTenantWizardPage() {
                     label={labels.landmark}
                     value={formData.landmark}
                     maxLength={100}
+                    leading={<Flag className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) =>
                       updateField("tenant-address-landmark", "landmark", value)
                     }
                   />
                 </div>
-                <Field id="tenant-formatted-address" label={labels.formattedAddress}>
+
+                <Field
+                  id="tenant-formatted-address"
+                  label={labels.formattedAddress}
+                  hideLabel
+                >
                   {(field) => (
-                    <Textarea
-                      {...field}
-                      name="formattedAddress"
-                      value={formData.formattedAddress}
-                      onChange={(event) =>
-                        updateField(
-                          "tenant-formatted-address",
-                          "formattedAddress",
-                          event.target.value,
-                        )
-                      }
-                      maxLength={500}
-                      rows={3}
-                      className="resize-y"
-                    />
+                    <div className="relative">
+                      <div className="pointer-events-none absolute top-2.5 start-2.5 flex items-center text-muted-foreground">
+                        <MapPin className="size-3.5" aria-hidden="true" />
+                      </div>
+                      <Textarea
+                        {...field}
+                        name="formattedAddress"
+                        value={formData.formattedAddress}
+                        onChange={(event) =>
+                          updateField(
+                            "tenant-formatted-address",
+                            "formattedAddress",
+                            event.target.value,
+                          )
+                        }
+                        placeholder={labels.formattedAddress}
+                        maxLength={500}
+                        rows={2}
+                        className="resize-y text-xs ps-8 min-h-12"
+                      />
+                    </div>
                   )}
                 </Field>
               </section>
 
               <section
                 aria-labelledby="tenant-commercial-heading"
-                className="space-y-4 pt-2"
+                className="space-y-2.5 pt-1"
               >
                 <h3
                   id="tenant-commercial-heading"
-                  className="flex items-center gap-2 text-sm font-semibold text-foreground"
+                  className="flex items-center gap-1.5 border-b border-border pb-1.5 pt-1 text-xs font-semibold text-foreground"
                 >
-                  <ShieldCheck aria-hidden="true" className="size-4 text-info" />
+                  <ShieldCheck aria-hidden="true" className="size-3.5 text-primary" />
                   {t.tenants.wizard.commercialSectionTitle}
                 </h3>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2.5 sm:grid-cols-2">
                   <AddressInput
                     id="tenant-tax-number"
                     name="taxNumber"
                     label={labels.taxNumber}
                     value={formData.taxNumber}
+                    leading={<FileText className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) => updateField("tenant-tax-number", "taxNumber", value)}
                   />
                   <AddressInput
@@ -673,6 +844,7 @@ export default function RegisterTenantWizardPage() {
                     name="commercialRegistrationNumber"
                     label={labels.commercialRegistrationNumber}
                     value={formData.commercialRegistrationNumber}
+                    leading={<FileText className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                     onChange={(value) =>
                       updateField(
                         "tenant-commercial-registration-number",
@@ -683,51 +855,61 @@ export default function RegisterTenantWizardPage() {
                   />
                 </div>
               </section>
+
+              <p className="text-xs text-muted-foreground pt-1 select-none">
+                * {lang === "ar" ? "حقول مطلوبة" : "Required fields"}
+              </p>
             </section>
           ) : null}
 
           {currentStep === 2 ? (
-            <section className="space-y-5 rounded-lg border border-border bg-card p-5">
+            <section className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-3.5">
               <h2 ref={stepHeadingRef} tabIndex={-1} className={headingClassName}>
                 <User aria-hidden="true" className="size-4 text-primary" />
                 {t.tenants.wizard.step2Heading}
               </h2>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 <Field
                   id="tenant-owner-email"
                   label={labels.ownerEmail}
+                  hideLabel
                   required
                   error={validationError("tenant-owner-email")}
                 >
                   {(field) => (
                     <Input
                       {...field}
+                      size="sm"
                       name="ownerEmail"
                       type="email"
                       dir="ltr"
                       autoComplete="email"
                       value={formData.ownerEmail}
+                      leading={<Mail className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                       onChange={(event) =>
                         updateField("tenant-owner-email", "ownerEmail", event.target.value)
                       }
-                      placeholder={placeholders.ownerEmail}
+                      placeholder={`${labels.ownerEmail} *`}
                     />
                   )}
                 </Field>
                 <Field
                   id="tenant-owner-first-name"
                   label={labels.firstName}
+                  hideLabel
                   required
                   error={validationError("tenant-owner-first-name")}
                 >
                   {(field) => (
                     <Input
                       {...field}
+                      size="sm"
                       name="ownerFirstName"
                       type="text"
                       autoComplete="given-name"
                       value={formData.ownerFirstName}
+                      leading={<User className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                       onChange={(event) =>
                         updateField(
                           "tenant-owner-first-name",
@@ -735,23 +917,26 @@ export default function RegisterTenantWizardPage() {
                           event.target.value,
                         )
                       }
-                      placeholder={placeholders.firstName}
+                      placeholder={`${labels.firstName} *`}
                     />
                   )}
                 </Field>
                 <Field
                   id="tenant-owner-last-name"
                   label={labels.lastName}
+                  hideLabel
                   required
                   error={validationError("tenant-owner-last-name")}
                 >
                   {(field) => (
                     <Input
                       {...field}
+                      size="sm"
                       name="ownerLastName"
                       type="text"
                       autoComplete="family-name"
                       value={formData.ownerLastName}
+                      leading={<User className="size-3.5 text-muted-foreground" aria-hidden="true" />}
                       onChange={(event) =>
                         updateField(
                           "tenant-owner-last-name",
@@ -759,16 +944,17 @@ export default function RegisterTenantWizardPage() {
                           event.target.value,
                         )
                       }
-                      placeholder={placeholders.lastName}
+                      placeholder={`${labels.lastName} *`}
                     />
                   )}
                 </Field>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2.5 sm:grid-cols-2">
                 <Field
                   id="tenant-owner-job-title"
                   label={labels.jobTitle}
+                  hideLabel
                   required
                   error={validationError("tenant-owner-job-title")}
                 >
@@ -784,6 +970,7 @@ export default function RegisterTenantWizardPage() {
                           jobTitle,
                         )
                       }
+                      placeholder={`${labels.jobTitle} *`}
                       disabled={wizardLocked}
                       aria-describedby={field["aria-describedby"]}
                       aria-invalid={field["aria-invalid"]}
@@ -793,6 +980,7 @@ export default function RegisterTenantWizardPage() {
                 <Field
                   id="tenant-owner-phone"
                   label={labels.ownerPhone}
+                  hideLabel
                   required
                   error={
                     validationError("tenant-owner-phone-country-code") ??
@@ -818,7 +1006,7 @@ export default function RegisterTenantWizardPage() {
                       }}
                       disabled={wizardLocked}
                       required
-                      numberPlaceholder={placeholders.phone}
+                      numberPlaceholder={`${labels.ownerPhone} *`}
                       aria-describedby={field["aria-describedby"]}
                       aria-invalid={field["aria-invalid"]}
                     />
@@ -826,7 +1014,7 @@ export default function RegisterTenantWizardPage() {
                 </Field>
               </div>
 
-              <div className="flex min-h-11 items-center gap-3">
+              <div className="flex min-h-8 items-center gap-2 pt-1">
                 <Checkbox
                   id="tenant-send-invitation"
                   name="sendInvitation"
@@ -840,11 +1028,15 @@ export default function RegisterTenantWizardPage() {
                 />
                 <label
                   htmlFor="tenant-send-invitation"
-                  className="cursor-pointer select-none text-sm font-medium text-foreground"
+                  className="cursor-pointer select-none text-xs font-medium text-foreground"
                 >
                   {t.tenants.wizard.sendInvitationLabel}
                 </label>
               </div>
+
+              <p className="text-xs text-muted-foreground pt-1 select-none">
+                * {lang === "ar" ? "حقول مطلوبة" : "Required fields"}
+              </p>
             </section>
           ) : null}
 
@@ -908,28 +1100,32 @@ export default function RegisterTenantWizardPage() {
           ) : null}
 
           {currentStep === 5 ? (
-            <section className="space-y-5 rounded-lg border border-border bg-card p-5">
+            <section className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-3.5">
               <h2 ref={stepHeadingRef} tabIndex={-1} className={headingClassName}>
                 <ShieldCheck aria-hidden="true" className="size-4 text-primary" />
                 {t.tenants.wizard.step5Heading}
               </h2>
 
-              <dl className="divide-y divide-border rounded-lg border border-border bg-muted/50 px-4 text-sm">
+              <dl className="divide-y divide-border rounded-md border border-border bg-muted/40 px-3 text-xs">
                 <ReviewRow
+                  icon={<Building2 className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
                   label={t.tenants.tenantName}
                   value={`${formData.name} (${formData.companyName})`}
                   mono
                 />
                 <ReviewRow
+                  icon={<Globe className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
                   label={t.tenants.primaryFqdn}
                   value={`${formData.name}.mutakamel.ai`}
                   mono
                 />
                 <ReviewRow
+                  icon={<User className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
                   label={t.tenants.wizard.primaryOwnerLabel}
                   value={`${formData.ownerFirstName} ${formData.ownerLastName} (${formData.ownerEmail})`}
                 />
                 <ReviewRow
+                  icon={<Database className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
                   label={t.tenants.hostingServer}
                   value={
                     selectedDatabasePlacement
@@ -939,6 +1135,7 @@ export default function RegisterTenantWizardPage() {
                   mono
                 />
                 <ReviewRow
+                  icon={<HardDrive className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
                   label={t.tenants.wizard.storageServerLabel}
                   value={
                     selectedStoragePlacement
@@ -947,21 +1144,22 @@ export default function RegisterTenantWizardPage() {
                   }
                   mono
                 />
-                <div className="grid gap-2 py-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)]">
-                  <dt className="text-muted-foreground">
-                    {t.tenants.wizard.selectedApplicationsLabel}
+                <div className="grid gap-1 py-2 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-2.5">
+                  <dt className="flex items-center gap-1.5 text-muted-foreground">
+                    <Package className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                    <span>{t.tenants.wizard.selectedApplicationsLabel}</span>
                   </dt>
                   <dd>
-                    <ul className="grid gap-2 sm:grid-cols-2">
+                    <ul className="grid gap-1.5 sm:grid-cols-2">
                       {selectedApplicationLines.map((line) => (
                         <li
                           key={line.applicationId}
-                          className="rounded-md border border-border bg-card px-3 py-2"
+                          className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs flex items-center justify-between gap-1.5"
                         >
-                          <span className="font-semibold text-foreground">
+                          <span className="font-semibold text-foreground truncate">
                             {line.applicationName}
                           </span>
-                          <span className="ms-2 font-mono text-sm text-muted-foreground">
+                          <span className="shrink-0 font-mono text-xs text-muted-foreground">
                             {line.tierKey} · {line.seats} {t.tenants.wizard.seatsSuffix}
                           </span>
                         </li>
@@ -971,6 +1169,7 @@ export default function RegisterTenantWizardPage() {
                 </div>
                 {provisioningPreview ? (
                   <ReviewRow
+                    icon={<Route className="size-3.5 text-muted-foreground shrink-0" aria-hidden="true" />}
                     label={t.tenants.wizard.provisioningPlanLabel}
                     value={`${provisioningPreview.components.length} ${t.tenants.wizard.componentsSuffix} · ${provisioningPreview.steps.length} ${t.tenants.wizard.stepsSuffix}`}
                   />
@@ -980,10 +1179,11 @@ export default function RegisterTenantWizardPage() {
             </section>
           ) : null}
 
-          <footer className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+          <footer className="flex items-center justify-between gap-2.5 rounded-md border border-border bg-card p-2.5 sm:p-3">
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={prevStep}
               disabled={currentStep === 1}
             >
@@ -991,19 +1191,20 @@ export default function RegisterTenantWizardPage() {
             </Button>
 
             {currentStep < 5 ? (
-              <Button type="button" variant="primary" onClick={nextStep}>
+              <Button type="button" variant="primary" size="sm" onClick={nextStep}>
                 {t.tenants.wizard.nextStepLabel}
               </Button>
             ) : (
               <Button
                 type="button"
                 variant="primary"
+                size="sm"
                 loading={isSubmitting}
                 disabled={wizardLocked || !creationQuote.canCreate || creationQuote.loading}
                 onClick={() => setIsConfirmingCreate(true)}
               >
                 {!isSubmitting ? (
-                  <CheckCircle2 aria-hidden="true" className="size-4" />
+                  <CheckCircle2 aria-hidden="true" className="size-3.5" />
                 ) : null}
                 {t.tenants.wizard.confirmCreation}
               </Button>
@@ -1046,49 +1247,73 @@ export default function RegisterTenantWizardPage() {
   );
 }
 
-function AddressInput({
-  id,
-  name,
-  label,
-  value,
-  maxLength,
-  onChange,
-}: {
-  id: string;
-  name: string;
-  label: string;
-  value: string;
-  maxLength?: number;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Field id={id} label={label}>
-      {(field) => (
-        <Input
-          {...field}
-          name={name}
-          type="text"
-          value={value}
-          maxLength={maxLength}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-    </Field>
-  );
-}
+const AddressInput = memo(
+  function AddressInput({
+    id,
+    name,
+    label,
+    value,
+    maxLength,
+    className,
+    leading,
+    required,
+    onChange,
+  }: {
+    id: string;
+    name: string;
+    label: string;
+    value: string;
+    maxLength?: number;
+    className?: string;
+    leading?: React.ReactNode;
+    required?: boolean;
+    onChange: (value: string) => void;
+  }) {
+    return (
+      <Field id={id} label={label} hideLabel required={required} className={className}>
+        {(field) => (
+          <Input
+            {...field}
+            size="sm"
+            name={name}
+            type="text"
+            value={value}
+            maxLength={maxLength}
+            leading={leading}
+            placeholder={required ? `${label} *` : label}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        )}
+      </Field>
+    );
+  },
+  (prev, next) =>
+    prev.id === next.id &&
+    prev.name === next.name &&
+    prev.label === next.label &&
+    prev.value === next.value &&
+    prev.maxLength === next.maxLength &&
+    prev.className === next.className &&
+    prev.required === next.required,
+);
 
-function ReviewRow({
+const ReviewRow = memo(function ReviewRow({
   label,
   value,
   mono = false,
+  icon,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  icon?: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1 py-4 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
+    <div className="grid gap-1 py-2 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] sm:gap-2.5 text-xs items-center">
+      <dt className="flex items-center gap-1.5 text-muted-foreground">
+        {icon}
+        <span>{label}</span>
+      </dt>
       <dd
         className={`min-w-0 break-words font-semibold text-foreground sm:text-end ${
           mono ? "font-mono" : ""
@@ -1099,4 +1324,4 @@ function ReviewRow({
       </dd>
     </div>
   );
-}
+});

@@ -128,7 +128,7 @@ export function ComposeEmailDrawer({
             composer.reset();
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -201,7 +201,7 @@ export function ComposeEmailDrawer({
                 composer.clearPreview();
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue
                   placeholder={t.crmOutboundEmails.recipientPlaceholder}
                 />
@@ -231,7 +231,7 @@ export function ComposeEmailDrawer({
                 composer.clearPreview();
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue
                   placeholder={t.crmOutboundEmails.templatePlaceholder}
                 />
@@ -250,7 +250,7 @@ export function ComposeEmailDrawer({
           </Field>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
+            <Button size="sm"
               variant="outline"
               disabled={!canPreviewOrSend || composer.isPreviewing}
               onClick={() => {

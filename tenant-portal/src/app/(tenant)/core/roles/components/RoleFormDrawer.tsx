@@ -78,7 +78,7 @@ export function RoleFormDrawer({
     >
       <div className="flex flex-col gap-4">
         <Field label={copy.name} required>
-          <Input
+          <Input size="sm" placeholder={copy.name}
             value={values.name}
             onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
             maxLength={ROLE_NAME_MAX_LENGTH}
@@ -87,7 +87,7 @@ export function RoleFormDrawer({
           />
         </Field>
         <Field label={copy.description}>
-          <Textarea
+          <Textarea placeholder={copy.description}
             value={values.description}
             onChange={(event) =>
               setValues((current) => ({ ...current, description: event.target.value }))

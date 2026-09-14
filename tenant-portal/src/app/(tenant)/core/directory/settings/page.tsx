@@ -56,7 +56,7 @@ export default function DirectorySettingsPage() {
             loading: isSaving,
           }}
           secondaryActions={
-            <Button variant="outline" onClick={revert} disabled={!isDirty || isSaving}>
+            <Button size="sm" variant="outline" onClick={revert} disabled={!isDirty || isSaving}>
               {copy.settingsRevert}
             </Button>
           }
@@ -89,7 +89,7 @@ export default function DirectorySettingsPage() {
                     }
                     disabled={isSaving}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger size="sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -141,7 +141,7 @@ export default function DirectorySettingsPage() {
                   hint={copy.settingsMaxContactsHint}
                   error={formError ?? undefined}
                 >
-                  <Input
+                  <Input size="sm" placeholder={copy.settingsMaxContacts}
                     dir="ltr"
                     inputMode="numeric"
                     value={values.maxContactMethodsPerParty}
@@ -153,7 +153,7 @@ export default function DirectorySettingsPage() {
                 </Field>
 
                 <Field label={copy.settingsMaxAddresses} hint={copy.settingsMaxAddressesHint}>
-                  <Input
+                  <Input size="sm" placeholder={copy.settingsMaxAddresses}
                     dir="ltr"
                     inputMode="numeric"
                     value={values.maxAddressesPerParty}
@@ -163,7 +163,7 @@ export default function DirectorySettingsPage() {
                 </Field>
 
                 <Field label={copy.settingsCacheTtl} hint={copy.settingsCacheTtlHint}>
-                  <Input
+                  <Input size="sm" placeholder={copy.settingsCacheTtl}
                     dir="ltr"
                     inputMode="numeric"
                     value={values.partyCacheTtlSeconds}

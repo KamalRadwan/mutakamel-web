@@ -199,30 +199,33 @@ function DatabaseServersContent() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <PageHeader
         title={copy.pageTitle}
-        description={copy.pageDescription}
         action={
           canCreate && (
-            <Button variant="primary" asChild>
-              <Link href="/database-servers/new">{copy.registerServer}</Link>
+            <Button variant="primary" size="sm" asChild>
+              <Link href="/database-servers/new" className="flex items-center gap-1.5">
+                <Server className="size-3.5" aria-hidden="true" />
+                {copy.registerServer}
+              </Link>
             </Button>
           )
         }
       />
 
-      <StatGrid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <StatGrid className="grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label={copy.statTotalHosts} value={summaryMetrics.totalServers} icon={Server} />
         <StatCard label={copy.statActiveNodes} value={summaryMetrics.activeServers} icon={Server} />
         <StatCard label={copy.statDraining} value={summaryMetrics.drainingServers} icon={Server} />
         <StatCard label={copy.statOfflineHosts} value={summaryMetrics.offlineServers} icon={Server} />
       </StatGrid>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="flex flex-col gap-2.5 border-b border-border p-3 sm:flex-row sm:items-end">
           <div className="flex-1">
             <FilterBar
+              className="border-0 p-0 bg-transparent"
               labelEn="Database server filters"
               labelAr="عوامل تصفية خوادم قواعد البيانات"
               ariaControls="database-server-results"

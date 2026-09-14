@@ -21,8 +21,8 @@ export function CommercialChangeWorkspace() {
   const state = change.state, intent = state?.intent, operation = state?.operation;
   return <div className="flex min-w-0 flex-col gap-4">
     <PageHeader title={copy.title} description={copy.description} secondaryActions={<>
-      <Button variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscription}>{t.commercialReceipt.back}</Link></Button>
-      <Button variant="outline" disabled={change.busy} onClick={() => void change.recheck()}>{copy.recheck}</Button>
+      <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscription}>{t.commercialReceipt.back}</Link></Button>
+      <Button size="sm" variant="outline" disabled={change.busy} onClick={() => void change.recheck()}>{copy.recheck}</Button>
     </>} />
     <OwnerGate denied={change.denied || subscription.denied}>
       {!state && <Skeleton className="h-48 w-full" />}
@@ -51,10 +51,10 @@ export function CommercialChangeWorkspace() {
           { label: copy.reason, value: intent.pending.request.reason },
         ]} />}
         {state?.phase === "uncertain" && <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">{copy.uncertain}</p>
-          <div><Button variant="outline" disabled={!change.canRetry} onClick={() => void change.retry()}>{copy.retryOriginal}</Button></div></div>}
+          <div><Button size="sm" variant="outline" disabled={!change.canRetry} onClick={() => void change.retry()}>{copy.retryOriginal}</Button></div></div>}
         {intent.operationId && <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={change.busy || !change.ready} onClick={() => void change.reload()}>{copy.readProgress}</Button>
-          <Button variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/operations/${intent.operationId}`}>{copy.openProgress}</Link></Button>
+          <Button size="sm" variant="outline" disabled={change.busy || !change.ready} onClick={() => void change.reload()}>{copy.readProgress}</Button>
+          <Button size="sm" variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/operations/${intent.operationId}`}>{copy.openProgress}</Link></Button>
         </div>}
         {(intent.expiredApplies.length > 0 || intent.unresolvedPreviews.length > 0 || intent.rejectedRecoveries.length > 0) && <details className="rounded-md border border-border p-3">
           <summary className="cursor-pointer text-sm font-medium">{copy.previousRequests}</summary>
@@ -82,19 +82,19 @@ export function CommercialChangeWorkspace() {
         { label: t.commercialOperation.revision, value: <IdentifierText>{operation.operationRevision}</IdentifierText> },
         { label: t.commercialOperation.updatedAt, value: <DateTime value={operation.updatedAt} /> },
       ]} />}
-      {change.canQuote && <div><Button variant="outline" onClick={() => void change.quote()}>{state?.preview ? copy.newQuote : copy.quoteAction}</Button></div>}
+      {change.canQuote && <div><Button size="sm" variant="outline" onClick={() => void change.quote()}>{state?.preview ? copy.newQuote : copy.quoteAction}</Button></div>}
       {state?.preview && state.phase !== "complete" && <>
         <CommercialPreviewDetails preview={state.preview} />
         {change.expired && <p role="status" className="text-sm text-muted-foreground">{copy.expired}</p>}
         <p className="text-xs text-muted-foreground">{copy.applyNotice}</p>
-        <div><Button variant="outline" disabled={!change.canApply} onClick={() => void change.apply()}>{copy.apply}</Button></div>
+        <div><Button size="sm" variant="outline" disabled={!change.canApply} onClick={() => void change.apply()}>{copy.apply}</Button></div>
       </>}
       {change.canRecover && <CommercialRecoveryControls change={change} />}
       {state?.receipt && <><CommercialReceiptDetails receipt={state.receipt} /><div className="flex flex-wrap gap-2">
-        <Button variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/receipts/${state.receipt.previewId}`}>{t.commercialOperation.openReceipt}</Link></Button>
-        <Button variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/operations/${state.receipt.projection.preparationId}`}>{copy.openProgress}</Link></Button>
+        <Button size="sm" variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/receipts/${state.receipt.previewId}`}>{t.commercialOperation.openReceipt}</Link></Button>
+        <Button size="sm" variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/operations/${state.receipt.projection.preparationId}`}>{copy.openProgress}</Link></Button>
       </div></>}
-      {state?.phase === "complete" && <div><Button variant="outline" onClick={change.newChange}>{copy.newChange}</Button></div>}
+      {state?.phase === "complete" && <div><Button size="sm" variant="outline" onClick={change.newChange}>{copy.newChange}</Button></div>}
     </OwnerGate>
   </div>;
 }

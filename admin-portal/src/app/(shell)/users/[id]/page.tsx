@@ -150,7 +150,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <PageHeader
         title={`${firstName} ${lastName}`}
         description={email}
@@ -165,7 +165,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         action={
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => router.push("/users")}>
-              {lang === "ar" ? <ArrowRight className="size-4" /> : <ArrowLeft className="size-4" />}
+              {lang === "ar" ? <ArrowRight className="size-3.5" /> : <ArrowLeft className="size-3.5" />}
               {t.users.usersNavLabel}
             </Button>
             {permissions.canSuspend && (
@@ -190,8 +190,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="space-y-3">
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-sm">
@@ -200,33 +200,37 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               </CardTitle>
               {identityHasChanges && permissions.canEdit && <Badge tone="warn">{t.users.unsavedBadge}</Badge>}
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Field label={t.users.firstNameLabel}>
+            <CardContent className="space-y-2.5">
+              <Field label={t.users.firstNameLabel} hideLabel required>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
                     maxLength={80}
                     disabled={!permissions.canEdit || isSaving}
                     value={firstName}
+                    placeholder={`${t.users.firstNameLabel} *`}
                     onChange={(e) => setFirstName(e.target.value)}
                   />
                 )}
               </Field>
-              <Field label={t.users.lastNameLabel}>
+              <Field label={t.users.lastNameLabel} hideLabel required>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
                     maxLength={80}
                     disabled={!permissions.canEdit || isSaving}
                     value={lastName}
+                    placeholder={`${t.users.lastNameLabel} *`}
                     onChange={(e) => setLastName(e.target.value)}
                   />
                 )}
               </Field>
-              <Field label={t.users.emailLabel} hint={t.users.emailImmutable}>
+              <Field label={t.users.emailLabel} hideLabel hint={t.users.emailImmutable}>
                 {(fieldProps) => (
                   <div className="relative">
-                    <Input {...fieldProps} disabled type="email" value={email} className="pe-9 font-mono" />
+                    <Input {...fieldProps} size="sm" disabled type="email" placeholder={t.users.emailLabel} value={email} className="pe-9 font-mono" />
                     <Lock className="absolute end-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   </div>
                 )}
@@ -281,7 +285,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <UserProfileCard profile={user?.profile} />
         </div>
 
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-3 lg:col-span-2">
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-sm">
@@ -290,7 +294,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               </CardTitle>
               {roleHasChanges && permissions.canAssignRole && <Badge tone="warn">{t.users.unsavedRoleBadge}</Badge>}
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <Field label={t.users.roleLabel}>
                 {(fieldProps) => (
                   <Select
@@ -298,7 +302,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     onValueChange={(v) => setAssignedRoleId(v || undefined)}
                     disabled={!permissions.canAssignRole || permissions.isSelf || isSaving}
                   >
-                    <SelectTrigger {...fieldProps}>
+                    <SelectTrigger {...fieldProps} size="sm">
                       <SelectValue placeholder={t.users.selectRolePlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
@@ -317,7 +321,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 </p>
               )}
 
-              <div className="flex gap-2 rounded-md border border-warning/30 bg-warning-subtle p-3 text-warning-subtle-foreground">
+              <div className="flex gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-warning-subtle-foreground">
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
                 <p className="text-xs leading-relaxed">{t.users.roleChangeWarning}</p>
               </div>
@@ -372,11 +376,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <CardContent className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                 <Field label={t.users.sipExtension} error={extensionError ?? undefined}>
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
+                      size="sm"
                       ref={webphoneFieldRefs.extension}
                       maxLength={32}
                       value={sipExtension}
@@ -390,6 +395,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
+                      size="sm"
                       ref={webphoneFieldRefs.sipUsername}
                       maxLength={120}
                       value={sipUsername}
@@ -418,9 +424,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                       className="h-auto px-1.5 py-1"
                     >
                       {showSipPassword ? (
-                        <EyeOff className="size-4" aria-hidden="true" />
+                        <EyeOff className="size-3.5" aria-hidden="true" />
                       ) : (
-                        <Eye className="size-4" aria-hidden="true" />
+                        <Eye className="size-3.5" aria-hidden="true" />
                       )}
                     </Button>
                   }
@@ -429,28 +435,30 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     <Input
                       {...fieldProps}
                       ref={webphoneFieldRefs.sipPassword}
+                      size="sm"
                       type={showSipPassword ? "text" : "password"}
                       maxLength={255}
                       value={sipPassword}
                       onChange={(e) => setSipPassword(e.target.value)}
-                      placeholder={passwordConfigured ? "••••••••••••" : ""}
+                      placeholder={passwordConfigured ? `${t.users.sipPasswordLabel} (••••••••)` : t.users.sipPasswordLabel}
                       className="font-mono"
                     />
                   )}
                 </Field>
-                <Field label={t.users.displayNameLabel}>
+                <Field label={t.users.displayNameLabel} hideLabel>
                   {(fieldProps) => (
-                    <Input {...fieldProps} maxLength={120} value={webphoneDisplayName} onChange={(e) => setWebphoneDisplayName(e.target.value)} />
+                    <Input {...fieldProps} size="sm" maxLength={120} placeholder={t.users.displayNameLabel} value={webphoneDisplayName} onChange={(e) => setWebphoneDisplayName(e.target.value)} />
                   )}
                 </Field>
-                <Field label={t.users.outboundCallerIdLabel}>
+                <Field label={t.users.outboundCallerIdLabel} hideLabel>
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
+                      size="sm"
                       maxLength={64}
                       value={outboundCallerId}
                       onChange={(e) => setOutboundCallerId(e.target.value)}
-                      placeholder="+201001234567"
+                      placeholder={`${t.users.outboundCallerIdLabel} (+201001234567)`}
                       className="font-mono"
                     />
                   )}

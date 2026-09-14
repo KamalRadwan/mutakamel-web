@@ -322,7 +322,7 @@ export function buildLeadActivityUpdateRequest(
   };
 }
 
-/** A `<input type="datetime-local">` value, in the reader's own zone. */
+/** A datetime-local input value, in the reader's own zone. */
 function toLocalDateTimeInput(iso: string): string {
   const due = new Date(iso);
   if (Number.isNaN(due.getTime())) return "";

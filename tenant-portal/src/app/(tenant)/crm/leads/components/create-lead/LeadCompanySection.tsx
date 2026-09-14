@@ -132,7 +132,7 @@ export function LeadCompanySection({
               `companyName` is still what validation checks and what the request
               carries. Only the box is gone. */}
           <Field label={t.crmLeads.companyName} error={errors.companyName} required>
-            <Input
+            <Input size="sm" placeholder={t.crmLeads.companyName}
               value={form.companyName}
               maxLength={LEAD_CREATE_LIMITS.companyName}
               disabled={disabled}
@@ -142,7 +142,7 @@ export function LeadCompanySection({
           </Field>
 
           <Field label={t.crmLeads.create.legalName} error={errors.legalName}>
-            <Input
+            <Input size="sm" placeholder={t.crmLeads.create.legalName}
               value={form.legalName}
               maxLength={LEAD_CREATE_LIMITS.legalName}
               disabled={disabled}
@@ -171,7 +171,7 @@ export function LeadCompanySection({
           </div>
 
           <Field label={t.crmLeads.create.taxNumber} error={errors.taxNumber}>
-            <Input
+            <Input size="sm" placeholder={t.crmLeads.create.taxNumber}
               dir="ltr"
               value={form.taxNumber}
               maxLength={LEAD_CREATE_LIMITS.taxNumber}
@@ -185,7 +185,7 @@ export function LeadCompanySection({
             label={t.crmLeads.create.commercialRegistrationNumber}
             error={errors.commercialRegistrationNumber}
           >
-            <Input
+            <Input size="sm" placeholder={t.crmLeads.create.commercialRegistrationNumber}
               dir="ltr"
               value={form.commercialRegistrationNumber}
               maxLength={LEAD_CREATE_LIMITS.commercialRegistrationNumber}

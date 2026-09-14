@@ -232,3 +232,12 @@ export interface TenantCorePermissions {
   canValidateFqdn: boolean;
   canManageFqdns: boolean;
 }
+export interface TenantDestroyView {
+  operationId: string;
+  tenantId: string;
+  phase: 'STOPPING_PROVISIONING' | 'DROPPING_DATABASE' | 'FINALIZING' | 'SUCCEEDED';
+  requestedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  lastErrorCode: string | null;
+}

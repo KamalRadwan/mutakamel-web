@@ -20,17 +20,18 @@ export function SettingSearch({ value, onChange }: SettingSearchProps) {
         {t.settings.search.label}
       </label>
       <div className="relative">
-        <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        <Search className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
         <Input
           id={inputId}
           type="search"
+          size="sm"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={t.settings.search.placeholder}
-          className="w-full ps-9 pe-8"
+          className="w-full ps-8 pe-7 text-xs"
         />
         {value && (
-          <Button
+          <Button size="sm"
             type="button"
             variant="ghost"
             onClick={() => onChange("")}

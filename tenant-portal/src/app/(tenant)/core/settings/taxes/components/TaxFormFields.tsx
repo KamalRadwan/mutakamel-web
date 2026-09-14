@@ -46,7 +46,7 @@ export function TaxFormFields({
           }
           disabled={scopeReadOnly || isSubmitting || companies.length === 0}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -66,7 +66,7 @@ export function TaxFormFields({
         readOnly={scopeReadOnly}
         required
       >
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.taxCode}
           dir="ltr"
           value={values.code}
           onChange={(event) => onChange({ code: event.target.value.toUpperCase() })}
@@ -78,7 +78,7 @@ export function TaxFormFields({
       </Field>
 
       <Field label={t.coreSettings.taxName} required>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.taxName}
           value={values.name}
           onChange={(event) => onChange({ name: event.target.value })}
           maxLength={TAX_NAME_MAX_LENGTH}
@@ -88,7 +88,7 @@ export function TaxFormFields({
       </Field>
 
       <Field label={t.coreSettings.taxRate} hint={t.coreSettings.taxRateHint} required>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.taxRate}
           dir="ltr"
           inputMode="decimal"
           value={values.rate}

@@ -82,7 +82,7 @@ export function ContactMethodDrawer({
             }
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -96,7 +96,7 @@ export function ContactMethodDrawer({
         </Field>
 
         <Field label={copy.contactValue} required>
-          <Input
+          <Input size="sm" placeholder={copy.contactValue}
             dir="ltr"
             value={values.value}
             onChange={(event) =>
@@ -109,7 +109,7 @@ export function ContactMethodDrawer({
         </Field>
 
         <Field label={copy.contactLabel}>
-          <Input
+          <Input size="sm" placeholder={copy.contactLabel}
             value={values.label}
             onChange={(event) =>
               setValues((current) => ({ ...current, label: event.target.value }))

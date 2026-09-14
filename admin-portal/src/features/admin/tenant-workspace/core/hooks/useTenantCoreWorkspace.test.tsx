@@ -14,6 +14,7 @@ import type { TenantCorePermissions, TenantView } from "../types";
 
 const api = vi.hoisted(() => ({
   get: vi.fn(),
+  getDestroy: vi.fn(),
   updateProfile: vi.fn(),
   suspend: vi.fn(),
   activate: vi.fn(),
@@ -75,6 +76,7 @@ describe("useTenantCoreWorkspace tenant-first ownership", () => {
       canManageFqdns: true,
     };
     api.get.mockResolvedValue(tenantFixture());
+    api.getDestroy.mockResolvedValue(null);
   });
 
   it("issues one initial detail request under React Strict Mode", async () => {
@@ -215,6 +217,7 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
       canManageFqdns: true,
     };
     api.get.mockResolvedValue(tenantFixture());
+    api.getDestroy.mockResolvedValue(null);
   });
 
   it("keeps one profile draft, sends null clears, and adopts success", async () => {
@@ -358,20 +361,28 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
     );
   });
 
-  it("destroys only a soft-deleted tenant and enters terminal local state", async () => {
+  it("waits for verified destruction before entering terminal local state", async () => {
     api.get.mockResolvedValue(tenantFixture("DELETED"));
-    api.destroy.mockResolvedValue(undefined);
-    const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID));
+    const operation = { tenantId: TENANT_ID, operationId: OTHER_TENANT_ID, phase: "STOPPING_PROVISIONING", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null };
+    api.destroy.mockResolvedValue(operation);
+    const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 20 }));
     await waitFor(() => expect(result.current.tenant?.status).toBe("DELETED"));
-
-    await act(async () => result.current.destroy(true));
-    expect(api.destroy).toHaveBeenCalledWith(
-      TENANT_ID,
-      true,
-      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7/i),
-    );
-    expect(result.current.resourceState).toBe("destroyed");
+    await act(async () => { await result.current.destroy(false); });
+    expect(result.current.resourceState).toBe("ready");
+    expect(result.current.destroyOperation?.phase).toBe("STOPPING_PROVISIONING");
+    api.getDestroy.mockResolvedValue({ ...operation, phase: "SUCCEEDED", completedAt: UPDATED_AT });
+    await waitFor(() => expect(result.current.resourceState).toBe("destroyed"));
     expect(result.current.tenant).toBeNull();
+  });
+
+  it("recovers pending destruction on reload and keeps polling after a temporary read failure", async () => {
+    api.get.mockResolvedValue(tenantFixture("DELETED"));
+    const operation = { tenantId: TENANT_ID, operationId: OTHER_TENANT_ID, phase: "DROPPING_DATABASE", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null };
+    api.getDestroy.mockResolvedValueOnce(operation).mockRejectedValueOnce(normalizedError(503,"TEMPORARY")).mockResolvedValue({ ...operation, phase: "SUCCEEDED", completedAt: UPDATED_AT });
+    const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 20 }));
+    await waitFor(() => expect(result.current.resourceState).toBe("destroyed"));
+    expect(api.destroy).not.toHaveBeenCalled();
+    expect(api.getDestroy.mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 
   it("cannot let tenant A destruction mark tenant B as destroyed", async () => {
@@ -392,7 +403,7 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
     );
     await waitFor(() => expect(result.current.tenant?.status).toBe("DELETED"));
 
-    let destruction!: Promise<void>;
+    let destruction!: Promise<unknown>;
     act(() => {
       destruction = result.current.destroy(false);
     });

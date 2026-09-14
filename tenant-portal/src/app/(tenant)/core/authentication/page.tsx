@@ -108,7 +108,7 @@ export default function AuthenticationManagementPage() {
         title={t.authSessions.title}
         description={t.authSessions.subtitle}
         secondaryActions={
-          <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+          <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
             <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
             {t.authSessions.refresh}
           </Button>

@@ -44,7 +44,7 @@ export function DeviceTokensPanel() {
       <CardHeader>
         <CardTitle>{t.coreNotifications.deviceTokensTitle}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-3">
         {/* The Core contract has no device-token listing route, so this panel
             can only show what this session registered. Saying so beats
             rendering an empty list that implies "no devices". */}
@@ -58,7 +58,7 @@ export function DeviceTokensPanel() {
                 onValueChange={(value) => setProvider(value as DeviceTokenProvider)}
                 disabled={isSubmitting}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -77,8 +77,9 @@ export function DeviceTokensPanel() {
               error={formError ?? undefined}
               required
             >
-              <Input
+              <Input size="sm"
                 dir="ltr"
+                placeholder={t.coreNotifications.deviceToken}
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
                 maxLength={4096}
@@ -88,8 +89,9 @@ export function DeviceTokensPanel() {
             </Field>
 
             <Field label={t.coreNotifications.deviceId}>
-              <Input
+              <Input size="sm"
                 dir="ltr"
+                placeholder={t.coreNotifications.deviceId}
                 value={deviceId}
                 onChange={(event) => setDeviceId(event.target.value)}
                 maxLength={128}
@@ -98,8 +100,9 @@ export function DeviceTokensPanel() {
             </Field>
 
             <Field label={t.coreNotifications.devicePlatform}>
-              <Input
+              <Input size="sm"
                 dir="ltr"
+                placeholder={t.coreNotifications.devicePlatform}
                 value={platform}
                 onChange={(event) => setPlatform(event.target.value)}
                 maxLength={32}
@@ -109,6 +112,7 @@ export function DeviceTokensPanel() {
 
             <Button
               variant="outline"
+              size="sm"
               onClick={() => void submit()}
               loading={isSubmitting}
               className="self-start"

@@ -109,7 +109,7 @@ function ListRowBody({
     </>
   );
 
-  const shared = "flex min-h-11 items-start gap-2 rounded-md px-2 py-2";
+  const shared = "flex min-h-8 items-start gap-2 rounded-md px-2 py-1.5";
 
   // Only an in-app route becomes a link. Every href the reports emit today is
   // one, but this panel renders whatever a provider puts in the payload, and a

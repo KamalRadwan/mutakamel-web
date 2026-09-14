@@ -134,4 +134,5 @@ export interface FilterBarProps {
   /** Initial load may disable remote controls; background refresh never does. */
   isLoading?: boolean;
   isRefreshing?: boolean;
+  className?: string;
 }

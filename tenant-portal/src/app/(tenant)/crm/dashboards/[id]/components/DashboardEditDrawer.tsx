@@ -64,7 +64,7 @@ export function DashboardEditDrawer({
       }}
     >
       <Field label={t.crmDashboards.name} required>
-        <Input
+        <Input size="sm" placeholder={t.crmDashboards.name}
           value={name}
           maxLength={DASHBOARD_NAME_MAX_LENGTH}
           autoComplete="off"
@@ -72,7 +72,7 @@ export function DashboardEditDrawer({
         />
       </Field>
       <Field label={t.crmDashboards.description}>
-        <Textarea
+        <Textarea placeholder={t.crmDashboards.description}
           value={description}
           maxLength={DASHBOARD_DESCRIPTION_MAX_LENGTH}
           onChange={(event) => setDescription(event.target.value)}

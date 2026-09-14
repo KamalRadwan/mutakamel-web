@@ -123,7 +123,7 @@ export function UploadAssetDrawer({
               }
               disabled={isSubmitting}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -148,7 +148,7 @@ export function UploadAssetDrawer({
               }
               disabled={isSubmitting}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

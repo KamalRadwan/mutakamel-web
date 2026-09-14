@@ -50,7 +50,7 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
     <InvoicePageFrame dir={dir}>
       <Button variant="link" size="sm" asChild className="w-fit px-0">
         <Link href="/invoices">
-          {dir === "rtl" ? <ArrowRight className="size-4" aria-hidden="true" /> : <ArrowLeft className="size-4" aria-hidden="true" />}
+          {dir === "rtl" ? <ArrowRight className="size-3.5" aria-hidden="true" /> : <ArrowLeft className="size-3.5" aria-hidden="true" />}
           {copy.backToInvoices}
         </Link>
       </Button>
@@ -98,44 +98,44 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
   ];
 
   return (
-    <div className="space-y-4" aria-busy={detail.isRefreshing || detail.mutation.phase === "PENDING"}>
-      <Card className="p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-3" aria-busy={detail.isRefreshing || detail.mutation.phase === "PENDING"}>
+      <Card className="p-3 sm:p-3.5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 dir="ltr" className="font-mono text-xl font-semibold text-start sm:text-2xl">{invoice.number}</h1>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 dir="ltr" className="font-mono text-lg font-semibold text-start sm:text-xl">{invoice.number}</h1>
               <StatusBadge status={invoice.status} enumType="invoice" />
             </div>
-            <code dir="ltr" className="mt-2 block break-all text-start text-sm text-muted-foreground">{invoice.id}</code>
-            <p className="mt-2 text-sm font-semibold text-muted-foreground">{invoicePurposeLabel(invoice.purpose, lang)}</p>
+            <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">{invoice.id}</code>
+            <p className="mt-1 text-xs font-semibold text-muted-foreground">{invoicePurposeLabel(invoice.purpose, lang)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={detail.refresh} disabled={detail.isRefreshing}>
-              <RefreshCw className={`size-4 ${detail.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+            <Button size="sm" type="button" variant="outline" onClick={detail.refresh} disabled={detail.isRefreshing}>
+              <RefreshCw className={`size-3.5 ${detail.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {copy.refresh}
             </Button>
             {detail.canEdit ? (
-              <Button type="button" variant="outline" onClick={detail.openEdit}>
-                <Pencil className="size-4" aria-hidden="true" />
+              <Button size="sm" type="button" variant="outline" onClick={detail.openEdit}>
+                <Pencil className="size-3.5" aria-hidden="true" />
                 {copy.editDraft}
               </Button>
             ) : null}
             {detail.canIssue ? (
-              <Button type="button" variant="primary" onClick={detail.openIssue}>
-                <FileCheck2 className="size-4" aria-hidden="true" />
+              <Button size="sm" type="button" variant="primary" onClick={detail.openIssue}>
+                <FileCheck2 className="size-3.5" aria-hidden="true" />
                 {copy.issueInvoice}
               </Button>
             ) : null}
             {detail.canVoid ? (
-              <Button type="button" variant="destructive" onClick={detail.openVoid}>
-                <Trash2 className="size-4" aria-hidden="true" />
+              <Button size="sm" type="button" variant="destructive" onClick={detail.openVoid}>
+                <Trash2 className="size-3.5" aria-hidden="true" />
                 {copy.voidInvoice}
               </Button>
             ) : null}
           </div>
         </div>
         {invoice.status === "DRAFT" && invoice.purpose !== "MANUAL" ? (
-          <p className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning-subtle-foreground">
+          <p className="mt-2.5 rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">
             {copy.systemDraftLocked}
           </p>
         ) : null}
@@ -143,7 +143,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
 
       <InvoiceMutationNotice mutation={detail.mutation} copy={copy} />
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-3 xl:grid-cols-3">
         <EvidenceCard title={copy.identity}>
           <Evidence label={copy.tenantId} value={invoice.tenantId} mono link={`/tenants/${invoice.tenantId}`} />
           <Evidence label={copy.subscriptionId} value={invoice.subscriptionId} mono />
@@ -168,15 +168,15 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
       </div>
 
       {detail.canRecordOfflinePayment ? (
-        <Card className="border-info/30 bg-info-subtle px-4 py-3 text-info-subtle-foreground">
+        <Card className="border-info/30 bg-info-subtle px-3 py-2.5 text-info-subtle-foreground">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold">{copy.offlinePayment}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{copy.offlinePaymentHint}</p>
+              <h2 className="text-xs font-semibold">{copy.offlinePayment}</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">{copy.offlinePaymentHint}</p>
             </div>
-            <Button type="button" variant="primary" asChild>
+            <Button size="sm" type="button" variant="primary" asChild>
               <Link href={`/tenants/${invoice.tenantId}`}>
-                <CircleDollarSign className="size-4" aria-hidden="true" />
+                <CircleDollarSign className="size-3.5" aria-hidden="true" />
                 {copy.offlinePayment}
               </Link>
             </Button>
@@ -185,7 +185,7 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
       ) : null}
 
       <Card>
-        <h2 className="px-4 py-3 text-base font-semibold">{copy.invoiceLines}</h2>
+        <h2 className="px-3 py-2 text-sm font-semibold">{copy.invoiceLines}</h2>
         <DataTable
           labelEn={INVOICE_COPY.en.invoiceLines}
           labelAr={INVOICE_COPY.ar.invoiceLines}
@@ -212,9 +212,9 @@ function InvoiceDetailBody({ detail, copy, lang }: { detail: ReturnType<typeof u
 
 function EvidenceCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Card className="p-4">
-      <h2 className="text-base font-semibold">{title}</h2>
-      <dl className="mt-3 grid gap-2">{children}</dl>
+    <Card className="p-3 sm:p-3.5">
+      <h2 className="text-xs font-semibold">{title}</h2>
+      <dl className="mt-2.5 grid gap-1.5">{children}</dl>
     </Card>
   );
 }
@@ -228,9 +228,9 @@ function Evidence({ label, value, mono, link }: { label: string; value: string; 
     value
   );
   return (
-    <div className="rounded-md bg-muted px-3 py-2">
-      <dt className="text-sm font-semibold text-muted-foreground">{label}</dt>
-      <dd dir={mono ? "ltr" : undefined} className={`mt-1 break-all text-sm font-semibold ${mono ? "font-mono text-start" : ""}`}>
+    <div className="rounded-md bg-muted px-2.5 py-1.5">
+      <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
+      <dd dir={mono ? "ltr" : undefined} className={`mt-0.5 break-all text-xs font-semibold ${mono ? "font-mono text-start" : ""}`}>
         {output}
       </dd>
     </div>
@@ -278,18 +278,18 @@ function EditInvoiceDialog({ detail, copy, lang }: { detail: ReturnType<typeof u
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="mt-5 justify-center px-0"
+                  className="justify-center px-0"
                   aria-label={`${copy.removeLine} ${formatInvoiceInteger(index + 1, lang)}`}
                   onClick={() => detail.removeEditLine(line.clientId)}
                 >
-                  <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+                  <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
                 </Button>
               </div>
             </fieldset>
           ))}
           <InvoiceFieldError id="invoice-lines-error" code={detail.validationErrors.lines} copy={copy} />
-          <Button type="button" variant="outline" onClick={detail.addEditLine} disabled={detail.editDraft.lines.length >= 200}>
-            <Plus className="size-4" aria-hidden="true" />
+          <Button size="sm" type="button" variant="outline" onClick={detail.addEditLine} disabled={detail.editDraft.lines.length >= 200}>
+            <Plus className="size-3.5" aria-hidden="true" />
             {copy.addLine}
           </Button>
         </div>
@@ -308,27 +308,28 @@ function CriticalInvoiceDialog({ kind, detail, copy }: { kind: "ISSUE" | "VOID";
   const confirmationErrorId = `${kind.toLowerCase()}-confirmed-error`;
   return (
     <DetailDialog title={kind === "ISSUE" ? copy.issueTitle : copy.voidTitle} onClose={detail.closeDialog}>
-      <form onSubmit={(event) => { event.preventDefault(); void execute(); }} className="space-y-4">
+      <form onSubmit={(event) => { event.preventDefault(); void execute(); }} className="space-y-3">
         <InvoiceMutationNotice mutation={detail.mutation} copy={copy} />
         {kind === "ISSUE" ? (
           <EditDateInput label={copy.dueAt} value={draft.dueAt} error={detail.validationErrors.dueAt} copy={copy} onChange={(value) => update("dueAt", value)} />
         ) : null}
-        <Field label={copy.reviewReason} hint={copy.reviewReasonHint} error={detail.validationErrors.reason ? invoiceValidationMessage(detail.validationErrors.reason, copy) : undefined}>
+        <Field label={copy.reviewReason} hideLabel hint={copy.reviewReasonHint} error={detail.validationErrors.reason ? invoiceValidationMessage(detail.validationErrors.reason, copy) : undefined}>
           {(fp) => (
             <Textarea
               {...fp}
+              placeholder={copy.reviewReason}
               value={draft.reason}
               maxLength={501}
-              rows={4}
+              rows={2}
               invalid={Boolean(detail.validationErrors.reason)}
               onChange={(event) => update("reason", event.target.value)}
             />
           )}
         </Field>
-        <Label htmlFor={confirmationId} className="flex min-h-11 items-start gap-3 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
+        <Label htmlFor={confirmationId} className="flex min-h-8 items-start gap-2.5 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-xs font-semibold text-warning-subtle-foreground">
           <Checkbox
             id={confirmationId}
-            className="mt-1"
+            className="mt-0.5"
             checked={draft.confirmed}
             aria-invalid={Boolean(detail.validationErrors.confirmed)}
             aria-describedby={detail.validationErrors.confirmed ? confirmationErrorId : undefined}
@@ -346,9 +347,9 @@ function CriticalInvoiceDialog({ kind, detail, copy }: { kind: "ISSUE" | "VOID";
 function DetailDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg">{title}</DialogTitle>
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto p-3 sm:p-3.5">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
         </DialogHeader>
         {children}
       </DialogContent>
@@ -358,12 +359,12 @@ function DetailDialog({ title, onClose, children }: { title: string; onClose: ()
 
 function DialogActions({ copy, pending, onCancel, submitLabel, danger }: { copy: InvoiceCopy; pending: boolean; onCancel: () => void; submitLabel: string; danger: boolean }) {
   return (
-    <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-      <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+    <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+      <Button size="sm" type="button" variant="outline" onClick={onCancel} disabled={pending}>
         {copy.cancel}
       </Button>
-      <Button type="submit" variant={danger ? "destructive" : "primary"} disabled={pending}>
-        {pending ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
+      <Button size="sm" type="submit" variant={danger ? "destructive" : "primary"} disabled={pending}>
+        {pending ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
         {submitLabel}
       </Button>
     </div>
@@ -372,11 +373,13 @@ function DialogActions({ copy, pending, onCancel, submitLabel, danger }: { copy:
 
 function EditDateInput({ label, value, onChange, error, copy }: { label: string; value: string; onChange: (value: string) => void; error?: InvoiceValidationCode; copy: InvoiceCopy }) {
   return (
-    <Field label={label} error={error ? invoiceValidationMessage(error, copy) : undefined}>
+    <Field label={label} hideLabel error={error ? invoiceValidationMessage(error, copy) : undefined}>
       {(fp) => (
         <Input
           {...fp}
+          size="sm"
           type="datetime-local"
+          placeholder={`${label} *`}
           value={value}
           invalid={Boolean(error)}
           onChange={(event) => onChange(event.target.value)}
@@ -388,10 +391,12 @@ function EditDateInput({ label, value, onChange, error, copy }: { label: string;
 
 function EditTextInput({ label, value, onChange, error, copy, dir, inputMode }: { label: string; value: string; onChange: (value: string) => void; error?: InvoiceValidationCode; copy: InvoiceCopy; dir?: "ltr"; inputMode?: "decimal" }) {
   return (
-    <Field label={label} error={error ? invoiceValidationMessage(error, copy) : undefined}>
+    <Field label={label} hideLabel error={error ? invoiceValidationMessage(error, copy) : undefined}>
       {(fp) => (
         <Input
           {...fp}
+          size="sm"
+          placeholder={`${label} *`}
           value={value}
           dir={dir}
           inputMode={inputMode}

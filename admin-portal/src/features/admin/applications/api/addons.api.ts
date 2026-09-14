@@ -16,8 +16,11 @@ const query = (values: Record<string, string | number | undefined>) => {
 };
 
 export const addonsApi = {
-  async list(owner: string, options: { page?: number; search?: string; lifecycleStatus?: string } = {}, signal?: AbortSignal) {
-    const response = await axiosClient.get<unknown>(`${base(owner)}${query({ ...options, limit: 20 })}`, { signal, cache: "no-store" });
+  // `limit` is caller-supplied because the cross-application index has to read
+  // a whole owner in one request to merge an honest union; the per-application
+  // screen keeps the paged default. The server caps it at PAGINATION MAX_LIMIT.
+  async list(owner: string, options: { page?: number; search?: string; lifecycleStatus?: string; limit?: number } = {}, signal?: AbortSignal) {
+    const response = await axiosClient.get<unknown>(`${base(owner)}${query({ ...options, limit: options.limit ?? 20 })}`, { signal, cache: "no-store" });
     return readCommercialResponse(response, value => {
       const result = readAddonPage(value);
       if (new Set(result.items.map(item => item.id)).size !== result.items.length || new Set(result.items.map(item => item.key)).size !== result.items.length) contractFailure();

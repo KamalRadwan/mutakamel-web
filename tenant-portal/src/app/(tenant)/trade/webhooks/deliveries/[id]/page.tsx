@@ -140,7 +140,7 @@ export default function WebhookDeliveryPage({
         backHref={TENANT_ROUTES.tradeWebhookDeliveries}
         secondaryActions={
           delivery && canReplay && isRetryable ? (
-            <Button variant="outline" loading={isRetrying} onClick={() => setRetryOpen(true)}>
+            <Button size="sm" variant="outline" loading={isRetrying} onClick={() => setRetryOpen(true)}>
               <RotateCw className="size-4" aria-hidden="true" />
               {t.tradeAutomation.retryDelivery}
             </Button>

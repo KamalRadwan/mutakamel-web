@@ -104,7 +104,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
   const permissionsReadOnly = !canReplacePermissions || permissionsAmbiguous;
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <PageHeader
         title={name || t.roles.unnamedRole}
         description={`ID: ${id}`}
@@ -125,20 +125,20 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         }
         action={
           <Button type="button" variant="outline" size="sm" onClick={() => router.push("/roles")}>
-            {lang === "ar" ? <ArrowRight className="size-4" /> : <ArrowLeft className="size-4" />}
+            {lang === "ar" ? <ArrowRight className="size-3.5" /> : <ArrowLeft className="size-3.5" />}
             {t.roles.rolesNavLabel}
           </Button>
         }
       />
 
       {isSuperAdmin && (
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-warning/30 bg-warning-subtle p-4 text-warning-subtle-foreground">
-          <div className="flex items-center gap-3">
-            <div className="shrink-0 rounded-md bg-warning p-2.5 text-warning-foreground">
-              <Zap className="size-5" aria-hidden="true" />
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-warning-subtle-foreground">
+          <div className="flex items-center gap-2.5">
+            <div className="shrink-0 rounded-md bg-warning p-2 text-warning-foreground">
+              <Zap className="size-4" aria-hidden="true" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">
+              <h3 className="text-xs font-semibold text-foreground">
                 {t.roles.superAdminGrantedTitle}
               </h3>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -146,17 +146,17 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               </p>
             </div>
           </div>
-          <span className="hidden shrink-0 rounded-md bg-warning px-3 py-1 text-xs font-semibold text-warning-foreground sm:inline-flex">
+          <span className="hidden shrink-0 rounded-md bg-warning px-2.5 py-1 text-xs font-semibold text-warning-foreground sm:inline-flex">
             {catalogueLength} / {catalogueLength} {t.roles.grantedSuffix}
           </span>
         </div>
       )}
 
       {isSystem && !isSuperAdmin && (
-        <div className="flex gap-3 rounded-lg border border-border bg-muted/40 p-4 text-foreground">
-          <Info className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="flex gap-2.5 rounded-lg border border-border bg-muted/40 p-3 text-foreground">
+          <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div className="text-xs">
-            <h4 className="mb-1 font-semibold">{t.roles.protectedSystemTitle}</h4>
+            <h4 className="mb-0.5 font-semibold">{t.roles.protectedSystemTitle}</h4>
             <p className="leading-relaxed text-muted-foreground">
               {t.roles.protectedSystemDesc}
             </p>
@@ -165,13 +165,13 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="p-3 sm:p-3.5 pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <ShieldAlert className="size-4 text-info" aria-hidden="true" />
             {t.roles.generalInfoTitle}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-3 sm:p-3.5 pt-0 space-y-2.5">
           {metadataAmbiguous && (
             <AmbiguousOutcomePanel
               idempotencyKey={metadataIdempotencyKey}
@@ -181,12 +181,14 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               retrying={isSavingMetadata}
             />
           )}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <Field label={t.roles.roleNameLabel} error={nameError ?? undefined}>
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            <Field label={t.roles.roleNameLabel} hideLabel error={nameError ?? undefined}>
               {(fieldProps) => (
                 <Input
                   {...fieldProps}
+                  size="sm"
                   value={name}
+                  placeholder={`${t.roles.roleNameLabel} *`}
                   onChange={(e) => setName(e.target.value)}
                   disabled={metadataReadOnly}
                   minLength={2}
@@ -194,11 +196,12 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                 />
               )}
             </Field>
-            <Field label={t.roles.descriptionLabel} error={descriptionError ?? undefined}>
+            <Field label={t.roles.descriptionLabel} hideLabel error={descriptionError ?? undefined}>
               {(fieldProps) => (
                 <Textarea
                   {...fieldProps}
                   value={description}
+                  placeholder={t.roles.descriptionLabel}
                   onChange={(e) => setDescription(e.target.value)}
                   disabled={metadataReadOnly}
                   maxLength={2_001}
@@ -209,7 +212,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </CardContent>
         {canUpdateMetadata && (
-          <CardFooter className="justify-end">
+          <CardFooter className="p-3 sm:p-3.5 pt-0 justify-end">
             <Button
               type="button"
               variant="primary"
@@ -241,6 +244,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               <Search className="pointer-events-none absolute start-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
+                size="sm"
                 placeholder={t.roles.searchPermissionsPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -254,14 +258,14 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         </CardHeader>
 
         {isCatalogueLoading && (
-          <div className="flex items-center gap-2 border-b border-border p-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 border-b border-border p-3 text-xs text-muted-foreground">
             <Sparkles className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
             {t.roles.loadingCatalogue}
           </div>
         )}
 
         {catalogueError && (
-          <div className="m-4">
+          <div className="m-3">
             <ErrorState
               title={catalogueError.httpStatus === 403 ? t.roles.catalogueForbidden : undefined}
               error={catalogueError}
@@ -271,7 +275,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         )}
 
         {permissionsError && (
-          <div className="m-4">
+          <div className="m-3">
             <AmbiguousOutcomePanel
               idempotencyKey={permissionsAmbiguous ? permissionsIdempotencyKey : undefined}
               correlationId={permissionsAmbiguous ? permissionsError.correlationId : undefined}
@@ -290,8 +294,8 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
             const isAllChecked = perms.length > 0 && checkedCount === perms.length;
 
             return (
-              <div key={groupName} className="space-y-3 p-4">
-                <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 p-3">
+              <div key={groupName} className="space-y-3 p-3 sm:p-3.5">
+                <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 p-2.5">
                   <div className="flex items-center gap-2.5">
                     <span className="size-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
                     <h3 className="text-xs font-semibold text-foreground">{groupName}</h3>
@@ -319,7 +323,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                     return (
                       <label
                         key={p.id}
-                        className={`flex items-start justify-between gap-2 rounded-md border p-3 transition-colors motion-reduce:transition-none ${
+                        className={`flex items-start justify-between gap-2 rounded-md border p-2 sm:p-2.5 transition-colors motion-reduce:transition-none ${
                           isChecked
                             ? "border-primary/40 bg-selected"
                             : "border-border bg-card"

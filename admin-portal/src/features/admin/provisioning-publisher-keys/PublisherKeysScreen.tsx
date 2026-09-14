@@ -50,7 +50,7 @@ export function PublisherKeysScreen() {
   const revoked = rows.length - active;
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="mx-auto w-full max-w-[1500px] space-y-4">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="mx-auto w-full max-w-[1500px] space-y-3">
       <PageHeader
         breadcrumb={
           <Button asChild variant="ghost" size="sm" className="w-fit">
@@ -61,7 +61,6 @@ export function PublisherKeysScreen() {
           </Button>
         }
         title={copy.title}
-        description={copy.subtitle}
         status={
           view.permissions.canRead && view.directory.data ? (
             <div className="flex items-center gap-1.5">
@@ -72,12 +71,12 @@ export function PublisherKeysScreen() {
         }
       />
 
-      <Card className="border-warning/30 bg-warning-subtle p-4 text-warning-subtle-foreground">
+      <Card className="border-warning/30 bg-warning-subtle p-3 sm:p-3.5 text-warning-subtle-foreground">
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
           <div>
             <h2 className="font-semibold">{copy.securityTitle}</h2>
-            <p className="mt-1 text-sm leading-6">{copy.securityBody}</p>
+            <p className="mt-1 text-xs leading-5">{copy.securityBody}</p>
             <p className="mt-2 text-xs font-semibold uppercase tracking-wide rtl:normal-case rtl:tracking-normal">
               {copy.noPrivateKey}
             </p>
@@ -85,12 +84,12 @@ export function PublisherKeysScreen() {
         </div>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
         <DirectoryPanel view={view} copy={copy} lang={lang} />
         <DetailPanel view={view} copy={copy} lang={lang} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-3 xl:grid-cols-2">
         <ChallengePanel view={view} copy={copy} />
         <RegistrationPanel view={view} copy={copy} />
       </div>
@@ -141,7 +140,7 @@ function DirectoryPanel({
   ];
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-3 sm:p-3.5 pb-0">
         <PanelHeader
           icon={<Fingerprint className="size-5" />}
           title={copy.directory}
@@ -156,14 +155,14 @@ function DirectoryPanel({
                 disabled={resource.isRefreshing || resource.state === "LOADING"}
                 loading={resource.isRefreshing}
               >
-                <RefreshCw className="size-4" aria-hidden="true" />
+                <RefreshCw className="size-3.5" aria-hidden="true" />
                 {resource.isRefreshing ? copy.refreshing : copy.refresh}
               </Button>
             ) : null
           }
         />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 sm:p-3.5">
         {resource.state === "FORBIDDEN" ? (
           <StateNotice tone="warning" title={copy.forbidden} body={copy.readPermission} />
         ) : resource.state === "LOADING" ? (
@@ -180,7 +179,7 @@ function DirectoryPanel({
             error={resource.error}
             action={
               <Button type="button" variant="outline" size="sm" onClick={view.refreshDirectory}>
-                <RotateCcw className="size-4" aria-hidden="true" />
+                <RotateCcw className="size-3.5" aria-hidden="true" />
                 {copy.retry}
               </Button>
             }
@@ -193,7 +192,7 @@ function DirectoryPanel({
             error={resource.error}
             action={
               <Button type="button" variant="outline" size="sm" onClick={view.refreshDirectory}>
-                <RotateCcw className="size-4" aria-hidden="true" />
+                <RotateCcw className="size-3.5" aria-hidden="true" />
                 {copy.retry}
               </Button>
             }
@@ -236,7 +235,7 @@ function DetailPanel({
   const key = resource.data;
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-3 sm:p-3.5 pb-0">
         <PanelHeader
           icon={<ShieldCheck className="size-5" />}
           title={copy.detail}
@@ -250,7 +249,7 @@ function DetailPanel({
           }
         />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 sm:p-3.5">
         {!view.selectedId ? (
           <StateNotice tone="neutral" title={copy.selectHelp} />
         ) : resource.state === "LOADING" ? (
@@ -309,16 +308,16 @@ function RevokePanel({
 }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-3 sm:p-3.5 pb-0">
         <PanelHeader icon={<ShieldAlert className="size-5" />} title={copy.stepRevoke} subtitle={copy.revokeHelp} />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 sm:p-3.5">
         <form
           onSubmit={(event) => {
             event.preventDefault();
             view.requestRevoke();
           }}
-          className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_180px_minmax(240px,1fr)_auto] lg:items-end"
+          className="grid gap-2.5 lg:grid-cols-[minmax(280px,1fr)_180px_minmax(240px,1fr)_auto] lg:items-end"
         >
           <TextField
             label={copy.publisherKeyId}
@@ -347,6 +346,7 @@ function RevokePanel({
           <Button
             type="submit"
             variant="destructive"
+            size="sm"
             disabled={
               !view.permissions.canRegisterOrRevoke ||
               view.mutation.state === "PENDING" ||
@@ -377,10 +377,10 @@ function ChallengePanel({
   const result = view.challengeResult;
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-3 sm:p-3.5 pb-0">
         <PanelHeader icon={<KeyRound className="size-5" />} title={copy.stepChallenge} subtitle={copy.challengeHelp} />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 sm:p-3.5">
         {!view.permissions.canManage ? (
           <StateNotice tone="warning" title={copy.noWriteAccess} body={copy.managePermission} />
         ) : (
@@ -389,7 +389,7 @@ function ChallengePanel({
               event.preventDefault();
               view.requestChallenge();
             }}
-            className="space-y-3"
+            className="space-y-2.5"
           >
             <TextField
               label={copy.keyId}
@@ -417,6 +417,7 @@ function ChallengePanel({
             <Button
               type="submit"
               variant="primary"
+              size="sm"
               disabled={view.mutation.state === "PENDING" || view.mutation.exactRetryAvailable}
             >
               {copy.createChallenge}
@@ -454,10 +455,10 @@ function RegistrationPanel({
 }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="p-3 sm:p-3.5 pb-0">
         <PanelHeader icon={<ShieldCheck className="size-5" />} title={copy.stepRegister} subtitle={copy.registerHelp} />
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 sm:p-3.5">
         {!view.permissions.canManage ? (
           <StateNotice tone="warning" title={copy.noWriteAccess} body={copy.managePermission} />
         ) : (
@@ -466,7 +467,7 @@ function RegistrationPanel({
               event.preventDefault();
               view.requestRegister();
             }}
-            className="space-y-3"
+            className="space-y-2.5"
           >
             <TextField
               label={copy.challengeId}
@@ -489,6 +490,7 @@ function RegistrationPanel({
             <Button
               type="submit"
               variant="primary"
+              size="sm"
               disabled={
                 !view.permissions.canRegisterOrRevoke ||
                 view.mutation.state === "PENDING" ||
@@ -585,7 +587,7 @@ function MutationFeedback({
           <div className="flex flex-wrap gap-2">
             {mutation.exactRetryAvailable ? (
               <Button type="button" variant="outline" size="sm" onClick={view.retryExactMutation}>
-                <RotateCcw className="size-4" aria-hidden="true" />
+                <RotateCcw className="size-3.5" aria-hidden="true" />
                 {copy.exactRetry}
               </Button>
             ) : null}
@@ -730,13 +732,14 @@ function TextField({
   inputMode?: "numeric";
 }) {
   return (
-    <Field label={label} error={error ?? undefined}>
+    <Field label={label} hideLabel error={error ?? undefined}>
       {(fieldProps) => (
         <Input
           {...fieldProps}
+          size="sm"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
+          placeholder={placeholder ?? label}
           disabled={disabled}
           dir={direction}
           inputMode={inputMode}

@@ -207,7 +207,7 @@ export function ApplicationDatabaseBindDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <p className="text-xs font-semibold text-primary">{copy.stepLabel}</p>
           <DialogTitle className="flex items-center gap-2 text-sm">
@@ -256,15 +256,17 @@ export function ApplicationDatabaseBindDialog({
               {bindableIds.length > 0 && fleet?.bindable === true && (
                 <Field
                   label={copy.reason}
+                  hideLabel
                   hint={copy.reasonHint.replace("{{count}}", String(reason.trim().length))}
                   required
                 >
                   {(fp) => (
                     <Textarea
                       {...fp}
+                      placeholder={`${copy.reason} *`}
                       minLength={8}
                       maxLength={500}
-                      rows={3}
+                      rows={2}
                       value={reason}
                       disabled={isSubmitting || unresolvedIntent !== null}
                       onChange={(event) => setReason(event.target.value)}
@@ -293,21 +295,22 @@ export function ApplicationDatabaseBindDialog({
           )}
 
           <footer className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={onClose}>
               {copy.close}
             </Button>
             {failedIds.length > 0 && (
               <Button
                 type="button"
-                 variant="secondary"
-                 loading={isSubmitting}
+                variant="secondary"
+                size="sm"
+                loading={isSubmitting}
                 disabled={unresolvedIntent !== null || !hasCurrentFleet || retryIds.length === 0}
                 onClick={() => void submitIds(retryIds)}
               >
                 {copy.retryFailed}
               </Button>
             )}
-            <Button type="submit" variant="primary" loading={isSubmitting} disabled={!canSubmit}>
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting} disabled={!canSubmit}>
               {unresolvedIntent ? copy.retryOriginal : copy.confirm}
             </Button>
           </footer>

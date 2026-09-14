@@ -1,24 +1,24 @@
 {
   "metadata": {
-    "generatedAt": "2026-09-09T17:42:05.616Z",
+    "generatedAt": "2026-09-12T00:38:57.431Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "9940d1053ff3",
-    "backendRevision": "22e119066314",
+    "frontendRevision": "602f0dac3576+dirty",
+    "backendRevision": "40c06870bc0c+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 282,
+    "total": 283,
     "byMethod": {
-      "GET": 114,
+      "GET": 115,
       "POST": 118,
       "DELETE": 17,
       "PATCH": 30,
       "PUT": 3
     },
     "byRouteClass": {
-      "AUTHENTICATED": 102,
+      "AUTHENTICATED": 103,
       "WRITE_SENSITIVE": 153,
       "PUBLIC": 6,
       "READ_HEAVY": 21
@@ -44,7 +44,7 @@
       "subscriptions": 12,
       "system-settings": 11,
       "tenant-fqdns": 1,
-      "tenants": 57,
+      "tenants": 58,
       "wallets": 6,
       "users": 10
     }
@@ -58,7 +58,7 @@
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-command.route-contracts.ts": "5cd09f208fe88bcecc34645e5d06ef8a9fb051441afb6a8adc4dbb3551ae2474",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "708333c057052443f3f19042cd71e94d7f7dbf342de325a4ebb53d497a33d282",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "93ed6f9c8bd64823da42530961312184a7acd3286eb332a12ebb54b6ecc6c7cc",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "c8ad6c2b7e5742cf845a118276575eef0d130f7a83dc564ce8784dd98039b794",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "8f988fc01a9bd98999499e5323c8d0aeb3b2a0888e4f2e88db3a40865180ca4e",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
@@ -3637,6 +3637,23 @@
       "bodyLimitClass": null,
       "timeoutClass": null,
       "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/tenants/:id/destroy",
+      "upstreamPath": "/api/v1/admin/tenants/:id/destroy",
+      "routeKey": "core.admin.tenants.destroy-status",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": null,
+      "requiredPermissions": [
+        "admin.tenants.read"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": null,
       "domainIdempotencyOperation": null
     },
     {

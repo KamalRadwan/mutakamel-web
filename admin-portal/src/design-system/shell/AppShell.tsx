@@ -53,7 +53,7 @@ export function AppShell({ children, defaultSidebarCollapsed }: { children: Reac
             id="admin-main-content"
             ref={mainRef}
             tabIndex={-1}
-            className="flex-1 scroll-mt-14 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:p-6"
+            className="flex-1 scroll-mt-14 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:p-[15px]"
           >
             {children}
           </main>

@@ -39,7 +39,7 @@ export function TradeDraftReferenceDrawer({
       }}
     >
       <Field label={t.tradeDocuments.draftReference} hint={t.tradeDocuments.draftReferenceHint}>
-        <Input
+        <Input size="sm" placeholder={t.tradeDocuments.draftReference}
           value={state.value}
           maxLength={TRADE_DRAFT_REFERENCE_MAX_LENGTH}
           onChange={(event) => state.setValue(event.target.value)}

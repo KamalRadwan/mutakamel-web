@@ -18,11 +18,11 @@ export default function WebphoneSettingsPage() {
   const copy = WEBPHONE_COPY[state.lang];
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-xl border border-border bg-card p-5 shadow-2xs">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+    <div className="space-y-3">
+      <header className="rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-2xs">
+        <h1 className="flex items-center gap-2 text-base font-semibold tracking-tight">
           <Phone
-            className="size-5 text-info"
+            className="size-4 text-info"
             aria-hidden="true"
           />
           {copy.title}
@@ -38,7 +38,7 @@ export default function WebphoneSettingsPage() {
         {!state.canUpdate ? (
           <p
             role="note"
-            className="rounded-xl border border-border bg-muted p-3 text-sm text-foreground"
+            className="rounded-lg border border-border bg-muted p-2.5 text-xs text-foreground"
           >
             {copy.readOnly}
           </p>

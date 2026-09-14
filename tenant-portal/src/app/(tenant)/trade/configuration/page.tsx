@@ -99,7 +99,7 @@ export default function TradeConfigurationPage() {
               : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void configuration.reload()}
               disabled={configuration.isRefreshing}

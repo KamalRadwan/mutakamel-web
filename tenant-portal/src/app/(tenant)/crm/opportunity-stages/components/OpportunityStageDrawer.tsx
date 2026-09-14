@@ -107,7 +107,7 @@ export function OpportunityStageDrawer({
       }}
     >
       <Field label={t.crmOpportunityStages.nameAr} error={nameArError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmOpportunityStages.nameAr}
           value={form.nameAr}
           maxLength={OPPORTUNITY_STAGE_NAME_MAX_LENGTH}
           onChange={(event) =>
@@ -117,7 +117,7 @@ export function OpportunityStageDrawer({
       </Field>
 
       <Field label={t.crmOpportunityStages.nameEn} error={nameEnError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmOpportunityStages.nameEn}
           value={form.nameEn}
           maxLength={OPPORTUNITY_STAGE_NAME_MAX_LENGTH}
           onChange={(event) =>
@@ -150,7 +150,7 @@ export function OpportunityStageDrawer({
             }));
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -177,7 +177,7 @@ export function OpportunityStageDrawer({
             }))
           }
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

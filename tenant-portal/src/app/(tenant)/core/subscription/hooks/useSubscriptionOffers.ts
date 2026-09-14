@@ -9,7 +9,7 @@ import { formatTemplate } from "@/lib/format/template";
 import type { SubscriptionOffer, SubscriptionOfferPage, SubscriptionOfferRequest } from "../subscription-offers";
 import { readSubscriptionOffers } from "../subscription-offers-api";
 
-interface Input { identity: string; request: SubscriptionOfferRequest; selectedTier: string | null }
+interface OffersFilterInput { identity: string; request: SubscriptionOfferRequest; selectedTier: string | null }
 interface State { key: string; data: SubscriptionOfferPage | null; error: NormalizedApiError | null }
 const defaultRequest: SubscriptionOfferRequest = { page: 1, limit: 20 };
 
@@ -18,7 +18,7 @@ export function useSubscriptionOffers() {
   const { t, lang } = useI18n();
   const allowed = isAuthenticated && !!user?.isTenantOwner;
   const identity = JSON.stringify([user?.id, realtimeAuthGeneration, allowed]);
-  const [input, setInput] = useState<Input | null>(null);
+  const [input, setInput] = useState<OffersFilterInput | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [state, setState] = useState<State | null>(null);
   const request = input?.identity === identity ? input.request : defaultRequest;

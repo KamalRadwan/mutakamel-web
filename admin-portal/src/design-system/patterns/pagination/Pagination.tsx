@@ -38,7 +38,7 @@ export function Pagination({
   return (
     <nav
       aria-label={lang === "ar" ? "ترقيم صفحات الجدول" : "Table pagination"}
-      className="flex flex-col items-stretch justify-between gap-3 border-t border-border bg-card p-4 text-xs sm:flex-row sm:items-center"
+      className="flex flex-col items-stretch justify-between gap-2.5 border-t border-border bg-card px-3 py-2 text-xs sm:flex-row sm:items-center"
     >
       <span className="font-medium text-muted-foreground">
         {lang === "ar"
@@ -52,6 +52,7 @@ export function Pagination({
             {lang === "ar" ? "لكل صفحة" : "Per page"}
             <Select value={String(limit)} onValueChange={(value) => onLimitChange(Number(value))}>
               <SelectTrigger
+                size="sm"
                 aria-label={lang === "ar" ? "عدد الصفوف في كل صفحة" : "Rows per page"}
                 className="h-(--size-control-sm) w-auto min-w-20 px-2 text-xs"
               >

@@ -53,32 +53,31 @@ export function CreateApplicationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !form.isSubmitting && form.close()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-sm">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto p-3 sm:p-3.5">
+        <DialogHeader className="pb-1">
+          <DialogTitle className="text-base font-semibold">
             {canOnboard ? copy.onboardTitle : copy.registerTitle}
           </DialogTitle>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {canOnboard ? copy.onboardDescription : copy.legacyDescription}
-          </p>
         </DialogHeader>
-        <form onSubmit={form.submit} noValidate className="space-y-4">
+        <form onSubmit={form.submit} noValidate className="space-y-2.5">
           {Object.keys(form.fieldErrors).length > 1 && (
-            <div ref={errorSummaryRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <div ref={errorSummaryRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <p className="font-semibold">{copy.errorSummary}</p>
-              <ul className="mt-2 list-disc space-y-1 ps-5">
+              <ul className="mt-1.5 list-disc space-y-0.5 ps-4">
                 {Object.entries(form.fieldErrors).map(([field, message]) => (
                   <li key={field}><a className="underline underline-offset-2" href={`#application-${field}`}>{message}</a></li>
                 ))}
               </ul>
             </div>
           )}
-          <Field id="application-key" label={copy.key} required error={form.fieldErrors.key}>
+          <Field id="application-key" label={copy.key} hideLabel required error={form.fieldErrors.key}>
             {(fp) => (
               <Input
                 {...fp}
                 autoFocus
                 required
+                size="sm"
+                placeholder={`${copy.key} *`}
                 invalid={Boolean(form.fieldErrors.key)}
                 pattern="^[a-z][a-z0-9_]{0,31}$"
                 maxLength={32}
@@ -90,15 +89,15 @@ export function CreateApplicationModal({
             )}
           </Field>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={copy.commercialMode}>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <Field label={copy.commercialMode} hideLabel>
               {(fp) => (
                 <Select
                   value={form.formData.commercialMode}
                   onValueChange={(value) => form.setCommercialMode(value as typeof form.formData.commercialMode)}
                 >
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue placeholder={copy.commercialMode} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem
@@ -115,14 +114,14 @@ export function CreateApplicationModal({
                 </Select>
               )}
             </Field>
-            <Field label={copy.visibility}>
+            <Field label={copy.visibility} hideLabel>
               {(fp) => (
                 <Select
                   value={form.formData.catalogueVisibility}
                   onValueChange={(value) => form.setVisibility(value as typeof form.formData.catalogueVisibility)}
                 >
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue placeholder={copy.visibility} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PUBLIC">{copy.public}</SelectItem>
@@ -133,11 +132,13 @@ export function CreateApplicationModal({
             </Field>
           </div>
 
-          <Field id="application-name" label={copy.name} required error={form.fieldErrors.name}>
+          <Field id="application-name" label={copy.name} hideLabel required error={form.fieldErrors.name}>
             {(fp) => (
               <Input
                 {...fp}
                 required
+                size="sm"
+                placeholder={`${copy.name} *`}
                 invalid={Boolean(form.fieldErrors.name)}
                 maxLength={128}
                 value={form.formData.name}
@@ -146,10 +147,12 @@ export function CreateApplicationModal({
             )}
           </Field>
 
-          <Field label={copy.description}>
+          <Field label={copy.description} hideLabel>
             {(fp) => (
               <Input
                 {...fp}
+                size="sm"
+                placeholder={copy.description}
                 maxLength={512}
                 value={form.formData.description}
                 onChange={(event) => form.setText("description", event.target.value)}
@@ -157,14 +160,14 @@ export function CreateApplicationModal({
             )}
           </Field>
 
-          <Field label={copy.applicationType}>
+          <Field label={copy.applicationType} hideLabel>
             {(fp) => (
               <Select
                 value={form.formData.applicationType}
                 onValueChange={(value) => form.setApplicationType(value as typeof form.formData.applicationType)}
               >
-                <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                  <SelectValue />
+                <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                  <SelectValue placeholder={copy.applicationType} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="TENANT">{copy.tenant}</SelectItem>
@@ -176,14 +179,14 @@ export function CreateApplicationModal({
 
           {canOnboard && (
             <>
-              <Field label={copy.databaseDeployment} hint={copy.deploymentHelp}>
+              <Field label={copy.databaseDeployment} hideLabel>
                 {(fp) => (
                   <Select
                     value={form.formData.databaseDeployment}
                     onValueChange={(value) => form.setDatabaseDeployment(value as typeof form.formData.databaseDeployment)}
                   >
-                    <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]}>
-                      <SelectValue />
+                    <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]}>
+                      <SelectValue placeholder={copy.databaseDeployment} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="NONE" disabled={form.formData.applicationType === "TENANT"}>
@@ -196,17 +199,17 @@ export function CreateApplicationModal({
                   </Select>
                 )}
               </Field>
-              <Field id="application-reason" label={copy.reason} required error={form.fieldErrors.reason}>
+              <Field id="application-reason" label={copy.reason} hideLabel required error={form.fieldErrors.reason}>
                 {(fp) => (
                   <Textarea
                     {...fp}
                     required
                     invalid={Boolean(form.fieldErrors.reason)}
                     maxLength={256}
-                    rows={3}
+                    rows={2}
                     value={form.formData.reason}
                     onChange={(event) => form.setText("reason", event.target.value)}
-                    placeholder={copy.reasonPlaceholder}
+                    placeholder={`${copy.reason} *`}
                   />
                 )}
               </Field>
@@ -220,10 +223,11 @@ export function CreateApplicationModal({
           )}
 
           <footer className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" disabled={form.isSubmitting} onClick={form.close}>
+            <Button size="sm" type="button" variant="outline" disabled={form.isSubmitting} onClick={form.close}>
               {copy.cancel}
             </Button>
             <Button
+              size="sm"
               type="submit"
               variant="primary"
               loading={form.isSubmitting}

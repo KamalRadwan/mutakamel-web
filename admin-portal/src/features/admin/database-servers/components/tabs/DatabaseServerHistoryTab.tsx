@@ -20,9 +20,9 @@ export function DatabaseServerHistoryTab({
   const d = t.databaseServerDetail.history;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <Card>
-        <div className="flex items-center justify-between border-b border-border bg-muted p-5">
+        <div className="flex items-center justify-between border-b border-border bg-muted p-3 sm:p-3.5">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground rtl:normal-case rtl:tracking-normal">
             <span className="rounded-lg bg-info-subtle p-1.5 text-info-subtle-foreground">
               <History className="size-4" aria-hidden="true" />
@@ -34,9 +34,9 @@ export function DatabaseServerHistoryTab({
           </Badge>
         </div>
 
-        <div className="p-6">
+        <div className="p-3 sm:p-3.5">
           {isHistoryLoading ? (
-            <div role="status" className="py-12 text-center text-xs text-muted-foreground">
+            <div role="status" className="py-8 text-center text-xs text-muted-foreground">
               <Loader2 className="me-2 inline size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               {d.loading}
             </div>
@@ -45,9 +45,9 @@ export function DatabaseServerHistoryTab({
           ) : history.length === 0 ? (
             <EmptyState icon={History} title={d.empty} />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {history.map((log) => (
-                <div key={log.id} className="border-b border-border pb-4 text-xs last:border-0 last:pb-0">
+                <div key={log.id} className="border-b border-border pb-2.5 text-xs last:border-0 last:pb-0">
                   <div className="mb-1.5 flex items-center justify-between font-mono">
                     <span dir="ltr" className="font-semibold uppercase tracking-wide text-info-subtle-foreground">
                       {log.action}
@@ -56,7 +56,7 @@ export function DatabaseServerHistoryTab({
                   </div>
 
                   {log.changes && log.changes.length > 0 && (
-                    <div className="mt-2 space-y-1.5 rounded-lg border border-border bg-muted p-3">
+                    <div className="mt-2 space-y-1.5 rounded-lg border border-border bg-muted p-2.5">
                       {log.changes.map((c, i) => (
                         <div key={i} className="flex flex-wrap items-center gap-2 font-mono text-xs">
                           <span className="font-semibold text-muted-foreground">{c.label || c.field}:</span>

@@ -136,7 +136,7 @@ export function ApplicationPublishActivateDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <p className="text-xs font-semibold text-primary">{copy.stepLabel}</p>
           <DialogTitle className="flex items-center gap-2 text-sm">
@@ -178,7 +178,7 @@ export function ApplicationPublishActivateDialog({
           )}
 
           {hasWork && !isComplete && (
-            <Field label={copy.reason} required error={reasonError ?? undefined}>
+            <Field label={copy.reason} hideLabel required error={reasonError ?? undefined}>
               {(fp) => (
                 <Textarea
                   {...fp}
@@ -187,13 +187,13 @@ export function ApplicationPublishActivateDialog({
                   required
                   invalid={Boolean(reasonError)}
                   maxLength={256}
-                  rows={3}
+                  rows={2}
                   value={reason}
                   onChange={(event) => {
                     setReason(event.target.value);
                     if (reasonError) setReasonError(null);
                   }}
-                  placeholder={copy.reasonPlaceholder}
+                  placeholder={`${copy.reasonPlaceholder || copy.reason} *`}
                 />
               )}
             </Field>
@@ -211,15 +211,15 @@ export function ApplicationPublishActivateDialog({
           )}
 
           <footer className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={onClose}>
               {t.applications.cancel}
             </Button>
             {isComplete || !hasWork ? (
-              <Button type="button" variant="primary" onClick={onContinueToBind}>
+              <Button type="button" variant="primary" size="sm" onClick={onContinueToBind}>
                 {copy.continueToBind}
               </Button>
             ) : (
-              <Button type="submit" variant="primary" loading={isSubmitting}>
+              <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
                 {republishOnly ? t.applications.detail.releaseAuthority.republish : copy.confirm}
               </Button>
             )}

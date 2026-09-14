@@ -66,7 +66,7 @@ export function AccountDetailScreen({ id }: { id: string }) {
           }
           secondaryActions={
             account && detail.canManage && !detail.writeScopeGap ? (
-              <Button
+              <Button size="sm"
                 variant="outline"
                 onClick={() => setTransition(account.status === "BLOCKED" ? "unblock" : "block")}
                 disabled={detail.isSubmitting}
@@ -175,6 +175,7 @@ export function AccountDetailScreen({ id }: { id: string }) {
                     dir="ltr"
                     className="font-mono"
                     aria-label={t.trade.branchRuleNarrowing}
+                    placeholder={t.trade.branchRuleNarrowing}
                     value={rulesValue}
                     onChange={(event) => setRules(event.target.value)}
                     disabled={!detail.canManage || detail.isSubmitting}

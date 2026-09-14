@@ -111,7 +111,7 @@ export function DirectoryWorkspace() {
             canManage ? { label: copy.partyCreate, onClick: directory.openCreate } : undefined
           }
           secondaryActions={
-            <Button variant="outline" onClick={directory.reload} disabled={isRefreshing}>
+            <Button size="sm" variant="outline" onClick={directory.reload} disabled={isRefreshing}>
               <RefreshCw
                 className={isRefreshing ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

@@ -10,6 +10,15 @@ Canonical prefix: `/api/tenant/core/v1/auth`
 
 Upstream: `/tenant/auth` (`@Controller('tenant/auth')`)
 
+Host forwarding verified **2026-09-12**: development requests pass through the
+Portal's Host-preserving API route handler to Gateway. On
+`http://mersany.mutakamel.ai:5002`, public branding returns 200 and an accept-invite
+POST with a deliberately unissued test token returns `400 INVALID_ACTION_TOKEN`,
+proving tenant resolution and the invitation lookup are reached. An unknown
+host still returns `404 TENANT_NOT_RESOLVABLE`. This check did not use the user's
+invitation or establish an authenticated session. See
+[development API forwarding](../architecture/routing.md#development-api-forwarding--verified-2026-09-12).
+
 Portal status: **partial** — login, bootstrap, refresh, logout, cross-tab
 coordination, session list and revoke are all built.
 

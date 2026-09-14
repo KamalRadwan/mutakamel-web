@@ -1,5 +1,6 @@
 "use client";
 
+import { Briefcase } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { JOB_TITLE_OPTIONS, matchJobTitle } from "@/lib/geo/job-titles";
 import { CatalogueSelect } from "./CatalogueSelect";
@@ -9,7 +10,9 @@ interface JobTitleSelectProps {
   name?: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
   disabled?: boolean;
+  leading?: React.ReactNode;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }
@@ -25,7 +28,9 @@ export function JobTitleSelect({
   name,
   value,
   onChange,
+  placeholder,
   disabled = false,
+  leading = <Briefcase className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
 }: JobTitleSelectProps) {
@@ -42,12 +47,13 @@ export function JobTitleSelect({
       preserveOrder
       maxLength={120}
       label={t.tenants.wizard.fieldLabels.jobTitle}
-      placeholder={t.tenants.wizard.chooseJobTitlePlaceholder}
+      placeholder={placeholder ?? t.tenants.wizard.chooseJobTitlePlaceholder}
       searchPlaceholder={t.tenants.wizard.searchJobTitlePlaceholder}
       emptyLabel={t.tenants.wizard.noMatchingJobTitle}
       otherLabel={t.tenants.wizard.jobTitleOther}
       otherPlaceholder={t.tenants.wizard.jobTitleOtherPlaceholder}
       disabled={disabled}
+      leading={leading}
       aria-describedby={ariaDescribedBy}
       aria-invalid={ariaInvalid}
     />

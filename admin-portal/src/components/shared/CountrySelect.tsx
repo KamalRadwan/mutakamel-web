@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Globe } from "lucide-react";
 import { Combobox, type ComboboxOption } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -17,13 +17,14 @@ interface CountrySelectProps {
   searchPlaceholder?: string;
   emptyLabel?: string;
   disabled?: boolean;
+  leading?: React.ReactNode;
   className?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }
 
 /** Country combobox with complete listbox keyboard and focus behavior. */
-export function CountrySelect({
+export const CountrySelect = memo(function CountrySelect({
   id,
   label,
   value,
@@ -34,6 +35,7 @@ export function CountrySelect({
   searchPlaceholder,
   emptyLabel,
   disabled = false,
+  leading = <Globe className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />,
   className,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
@@ -88,10 +90,11 @@ export function CountrySelect({
       emptyLabel={resolvedEmptyLabel}
       disabled={disabled}
       preferDownward
+      leading={leading}
       aria-describedby={ariaDescribedBy}
       aria-invalid={ariaInvalid}
       className={className}
       contentClassName="max-w-sm"
     />
   );
-}
+});

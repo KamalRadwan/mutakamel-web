@@ -110,7 +110,7 @@ export function ActivityFormDrawer({
                 }}
                 disabled={isSubmitting}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -129,7 +129,7 @@ export function ActivityFormDrawer({
                 onValueChange={(value) => change({ targetType: value, assigneeUserId: "" })}
                 disabled={isSubmitting}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -143,7 +143,7 @@ export function ActivityFormDrawer({
             </Field>
 
             <Field label={copy.targetId} hint={copy.targetIdHint} required>
-              <Input
+              <Input size="sm" placeholder={copy.targetId}
                 dir="ltr"
                 value={values.targetId}
                 onChange={(event) => change({ targetId: event.target.value.trim() })}
@@ -160,7 +160,7 @@ export function ActivityFormDrawer({
             onValueChange={(value) => change({ type: value })}
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -174,7 +174,7 @@ export function ActivityFormDrawer({
         </Field>
 
         <Field label={copy.subject} required>
-          <Input
+          <Input size="sm" placeholder={copy.subject}
             value={values.subject}
             onChange={(event) => change({ subject: event.target.value })}
             maxLength={ACTIVITY_SUBJECT_MAX}
@@ -184,7 +184,7 @@ export function ActivityFormDrawer({
         </Field>
 
         <Field label={copy.description}>
-          <Textarea
+          <Textarea placeholder={copy.description}
             value={values.description}
             onChange={(event) => change({ description: event.target.value })}
             maxLength={ACTIVITY_DESCRIPTION_MAX}
@@ -200,7 +200,7 @@ export function ActivityFormDrawer({
             }
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -223,7 +223,7 @@ export function ActivityFormDrawer({
             }
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -238,7 +238,7 @@ export function ActivityFormDrawer({
         </Field>
 
         <Field label={copy.dueAt} hint={copy.dueAtHint} required>
-          <Input
+          <Input size="sm" placeholder={copy.dueAt}
             dir="ltr"
             type="datetime-local"
             value={values.dueAt}

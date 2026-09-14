@@ -71,7 +71,7 @@ export function AddRoleDrawer({
           }
           disabled={isSubmitting}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

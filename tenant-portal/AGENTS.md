@@ -73,8 +73,8 @@ had to ask a human is a bug in the documentation.
 
 ## Design
 
-- The design system lives in `src/design-system/`. Feature code imports **only**
-  from the `@/design-system` barrel, never a deep path.
+- **Always follow the Tenant Portal design system**: Adhere strictly to the design system in `src/design-system/` and documentation under `docs/design/`. Feature code imports **only** from the `@/design-system` barrel, never a deep path or ad-hoc custom styles.
+- **UI/UX Intelligence (`ui-ux-pro-max`)**: Always consult and use the `ui-ux-pro-max` skill for UI and UX guidelines, accessibility standards, color palettes, and interaction patterns BEFORE starting any UI or UX design.
 - Four color roles: `brand`, `positive`, `caution`, `negative`, plus the `ink`
   neutral ramp. **A pipeline stage is never a color** — see
   `docs/design/tokens.md`.

@@ -155,7 +155,7 @@ export function WebphoneServerChainCard({
                         className="cursor-grab px-1 text-muted-foreground"
                         {...orderable.handleProps(row.serverId)}
                       >
-                        <GripVertical className="size-4" aria-hidden="true" />
+                        <GripVertical className="size-3.5" aria-hidden="true" />
                       </Button>
                     )}
                     <Badge
@@ -229,12 +229,13 @@ export function WebphoneServerChainCard({
                       {(fieldProps) => (
                         <Input
                           {...fieldProps}
+                          size="sm"
                           inputMode="numeric"
                           maxLength={3}
                           disabled={!canEdit || isSaving}
                           value={row.timeoutSeconds}
                           placeholder={
-                            server ? String(server.defaultTimeoutSeconds) : ""
+                            server ? String(server.defaultTimeoutSeconds) : `${t.users.chainTimeoutLabel} (1-30)`
                           }
                           onChange={(event) =>
                             onUpdateRow(
@@ -257,12 +258,13 @@ export function WebphoneServerChainCard({
                       {(fieldProps) => (
                         <Input
                           {...fieldProps}
+                          size="sm"
                           inputMode="numeric"
                           maxLength={2}
                           disabled={!canEdit || isSaving}
                           value={row.maxRetries}
                           placeholder={
-                            server ? String(server.defaultMaxRetries) : ""
+                            server ? String(server.defaultMaxRetries) : `${t.users.chainMaxRetriesLabel} (0-5)`
                           }
                           onChange={(event) =>
                             onUpdateRow(
@@ -291,7 +293,7 @@ export function WebphoneServerChainCard({
                   onValueChange={setServerToAdd}
                   disabled={isSaving}
                 >
-                  <SelectTrigger {...fieldProps}>
+                  <SelectTrigger {...fieldProps} size="sm">
                     <SelectValue placeholder={t.users.selectServerPlaceholder} />
                   </SelectTrigger>
                   <SelectContent>

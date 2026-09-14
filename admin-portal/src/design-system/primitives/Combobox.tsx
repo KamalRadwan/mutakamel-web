@@ -34,6 +34,9 @@ export interface ComboboxProps {
    * fields the user just filled in, which reads as the page jumping.
    */
   preferDownward?: boolean;
+  leading?: React.ReactNode;
+  triggerLabel?: string;
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }
@@ -49,6 +52,9 @@ export function Combobox({
   searchPlaceholder,
   emptyLabel,
   disabled,
+  size = "sm",
+  leading,
+  triggerLabel,
   className,
   contentClassName,
   preferDownward = false,
@@ -85,7 +91,7 @@ export function Combobox({
           id={id}
           type="button"
           variant="outline"
-          size="lg"
+          size={size}
           role="combobox"
           aria-label={label}
           aria-expanded={open}
@@ -93,15 +99,15 @@ export function Combobox({
           aria-describedby={ariaDescribedBy}
           aria-invalid={ariaInvalid}
           disabled={disabled}
-          className={cn("w-full min-w-0 justify-between gap-2 px-3 font-normal", className)}
+          className={cn("w-full min-w-0 justify-between gap-1.5 px-2.5 font-normal text-xs", className)}
         >
           <span className="flex min-w-0 items-center gap-2">
-            {selected?.leading}
-            <span className={cn("truncate", !selected && "text-muted-foreground")}>
-              {selected?.label ?? placeholder}
+            {selected?.leading ?? leading}
+            <span className={cn("truncate", !selected && !triggerLabel && "text-muted-foreground")}>
+              {triggerLabel ?? selected?.label ?? placeholder}
             </span>
           </span>
-          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
 
@@ -113,8 +119,8 @@ export function Combobox({
         className={cn("w-[--radix-popover-trigger-width] min-w-56 max-w-[calc(100vw-2rem)] p-0", contentClassName)}
       >
         <Command label={searchPlaceholder} loop shouldFilter className="flex max-h-80 flex-col">
-          <div className="flex items-center gap-2 border-b border-border px-3">
-            <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div className="flex items-center gap-2 border-b border-border px-2.5">
+            <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             <Command.Input
               autoFocus
               value={query}
@@ -122,14 +128,14 @@ export function Combobox({
               aria-label={searchPlaceholder}
               placeholder={searchPlaceholder}
               className={cn(
-                "h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground",
+                "h-8 min-w-0 flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground",
                 focusRing,
                 "focus-visible:ring-inset focus-visible:ring-offset-0",
               )}
             />
           </div>
-          <Command.List aria-label={label} className="overflow-y-auto p-1.5">
-            <Command.Empty className="px-3 py-6 text-center text-xs text-muted-foreground">
+          <Command.List aria-label={label} className="overflow-y-auto p-1">
+            <Command.Empty className="px-3 py-4 text-center text-xs text-muted-foreground">
               {emptyLabel}
             </Command.Empty>
             {options.map((option) => {
@@ -146,7 +152,7 @@ export function Combobox({
                     setOpenAndReset(false);
                   }}
                   className={cn(
-                    "flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground transition-colors motion-reduce:transition-none",
+                    "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground transition-colors motion-reduce:transition-none",
                     "data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground",
                     "aria-selected:bg-selected aria-selected:text-selected-foreground",
                     "data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
@@ -157,7 +163,7 @@ export function Combobox({
                   {option.leading}
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
                   <Check
-                    className={cn("size-4 shrink-0 text-primary", !isSelected && "invisible")}
+                    className={cn("size-3.5 shrink-0 text-primary", !isSelected && "invisible")}
                     aria-hidden="true"
                   />
                 </Command.Item>

@@ -206,7 +206,7 @@ export function CreateCustomerProfileModal({
           error={errors.description}
           className="max-w-prose"
         >
-          <Textarea
+          <Textarea placeholder={t.crmLeads.create.description}
             rows={4}
             value={form.description}
             maxLength={CUSTOMER_PROFILE_CREATE_LIMITS.description}

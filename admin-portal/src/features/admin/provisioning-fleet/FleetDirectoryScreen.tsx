@@ -99,10 +99,10 @@ export function FleetDirectoryScreen() {
         }
       />
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]">
-        <Card className="space-y-4 p-5">
+      <section className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]">
+        <Card className="space-y-3 p-3 sm:p-3.5">
           <header>
-            <h2 className="text-xl font-semibold text-foreground">{copy.directory}</h2>
+            <h2 className="text-lg font-semibold text-foreground">{copy.directory}</h2>
           </header>
           <FleetStatePanel
             state={view.authLoading ? "LOADING" : view.rollouts.state}
@@ -111,15 +111,15 @@ export function FleetDirectoryScreen() {
             onRetry={view.refresh}
           />
           {view.rollouts.state === "EMPTY" ? (
-            <p className="rounded-lg bg-muted p-5 text-center text-sm text-muted-foreground">
+            <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">
               {copy.emptyRollouts}
             </p>
           ) : null}
           {view.rollouts.data?.data.map((rollout) => (
-            <Card key={rollout.rolloutId} className="p-4">
+            <Card key={rollout.rolloutId} className="p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">
+                  <p className="text-xs font-semibold text-foreground">
                     {copy.operation[rollout.operationType]}
                   </p>
                   <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">
@@ -128,13 +128,13 @@ export function FleetDirectoryScreen() {
                 </div>
                 <FleetStatusBadge status={rollout.status} label={copy.rolloutStatus[rollout.status]} />
               </div>
-              <dl className="mt-4 grid gap-2 sm:grid-cols-4">
+              <dl className="mt-3 grid gap-2 sm:grid-cols-4">
                 <FleetDatum label={copy.total} value={rollout.totalCount} />
                 <FleetDatum label={copy.completed} value={rollout.completedCount} />
                 <FleetDatum label={copy.failed} value={rollout.failedCount} />
                 <FleetDatum label={copy.revision} value={rollout.revision} />
               </dl>
-              <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                 <span>{formatInstant(rollout.createdAt, lang)}</span>
                 <Button asChild variant="primary" size="sm">
                   <Link href={`/provisioning/fleet/rollouts/${rollout.rolloutId}`}>
@@ -151,12 +151,14 @@ export function FleetDirectoryScreen() {
 
         <Card className="h-fit">
           <form aria-label={copy.lookupPreview} onSubmit={openLookup}>
-            <CardContent className="space-y-3">
-              <h2 className="text-lg font-semibold text-foreground">{copy.lookupPreview}</h2>
-              <Field label={copy.previewId} error={lookupError ? FleetFieldErrorText(lookupError, copy) : undefined}>
+            <CardContent className="space-y-2.5 p-3 sm:p-3.5">
+              <h2 className="text-base font-semibold text-foreground">{copy.lookupPreview}</h2>
+              <Field label={copy.previewId} hideLabel error={lookupError ? FleetFieldErrorText(lookupError, copy) : undefined}>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
+                    placeholder={copy.previewId}
                     dir="ltr"
                     value={lookupId}
                     onChange={(event) => setLookupId(event.target.value)}
@@ -164,7 +166,7 @@ export function FleetDirectoryScreen() {
                   />
                 )}
               </Field>
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="primary" size="sm">
                 {copy.openPreview}
               </Button>
             </CardContent>
@@ -172,24 +174,24 @@ export function FleetDirectoryScreen() {
         </Card>
       </section>
 
-      <Card className="p-5">
+      <Card className="p-3 sm:p-3.5">
         <header>
-          <h2 className="text-xl font-semibold text-foreground">{copy.previewBuilder}</h2>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          <h2 className="text-lg font-semibold text-foreground">{copy.previewBuilder}</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
             {copy.previewBuilderHint}
           </p>
         </header>
         {view.authLoading ? (
           <FleetStatePanel state="LOADING" error={null} copy={copy} />
         ) : !view.permissions.canCreatePreview ? (
-          <p role="note" className="mt-4 rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm font-semibold text-warning-subtle-foreground">
+          <p role="note" className="mt-3 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs font-semibold text-warning-subtle-foreground">
             {copy.forbiddenPreviewCreate}
           </p>
         ) : (
-          <form onSubmit={submitPreview} noValidate className="mt-5 space-y-6">
-            <fieldset disabled={pending} className="space-y-4">
+          <form onSubmit={submitPreview} noValidate className="mt-4 space-y-4">
+            <fieldset disabled={pending} className="space-y-3">
               <legend className="sr-only">{copy.previewBuilder}</legend>
-              <Field label={copy.operationType}>
+              <Field label={copy.operationType} hideLabel>
                 {(fieldProps) => (
                   <Select
                     value={draft.operationType}
@@ -197,8 +199,8 @@ export function FleetDirectoryScreen() {
                       changeOperation(value as FleetOperationType, draft, setDraft)
                     }
                   >
-                    <SelectTrigger id={fieldProps.id}>
-                      <SelectValue />
+                    <SelectTrigger id={fieldProps.id} size="sm">
+                      <SelectValue placeholder={copy.operationType} />
                     </SelectTrigger>
                     <SelectContent>
                       {Object.entries(copy.operation).map(([value, label]) => (
@@ -215,7 +217,7 @@ export function FleetDirectoryScreen() {
                 <TextField label={copy.applicationKey} value={draft.applicationKey} error={errors.applicationKey} copy={copy} onChange={(applicationKey) => setDraft((current) => ({ ...current, applicationKey }))} />
               ) : null}
               {draft.operationType === "DECOMMISSION" ? (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <TextField label={copy.componentKey} value={draft.componentKey} error={errors.componentKey} copy={copy} onChange={(componentKey) => setDraft((current) => ({ ...current, componentKey }))} />
                   <CheckField id="fleet-retention" label={copy.retentionAcknowledged} checked={draft.retentionAcknowledged} error={errors.retentionAcknowledged} copy={copy} onChange={(retentionAcknowledged) => setDraft((current) => ({ ...current, retentionAcknowledged }))} />
                 </div>
@@ -223,8 +225,8 @@ export function FleetDirectoryScreen() {
                 <TargetEditor draft={draft} setDraft={setDraft} errors={errors} copy={copy} />
               )}
 
-              <fieldset className="space-y-4 rounded-lg border border-border p-4">
-                <legend className="px-2 text-sm font-semibold text-foreground">{copy.selection}</legend>
+              <fieldset className="space-y-3 rounded-lg border border-border p-3 sm:p-3.5">
+                <legend className="px-2 text-xs font-semibold text-foreground">{copy.selection}</legend>
                 <RadioGroup
                   value={draft.broadSelection ? "broad" : "explicit"}
                   onValueChange={(value) =>
@@ -246,13 +248,14 @@ export function FleetDirectoryScreen() {
                 {draft.broadSelection ? (
                   <CheckField id="fleet-broad-ack" label={copy.broadAcknowledge} checked={draft.allEligibleTenantsAcknowledged} error={errors.allEligibleTenantsAcknowledged} copy={copy} onChange={(allEligibleTenantsAcknowledged) => setDraft((current) => ({ ...current, allEligibleTenantsAcknowledged }))} />
                 ) : (
-                  <Field label={copy.tenantIds} hint={copy.tenantIdsHint} error={errors.tenantIds ? FleetFieldErrorText(errors.tenantIds, copy) : undefined}>
+                  <Field label={copy.tenantIds} hideLabel hint={copy.tenantIdsHint} error={errors.tenantIds ? FleetFieldErrorText(errors.tenantIds, copy) : undefined}>
                     {(fieldProps) => (
                       <Textarea
                         {...fieldProps}
+                        placeholder={copy.tenantIds}
                         dir="ltr"
                         spellCheck={false}
-                        rows={5}
+                        rows={4}
                         value={draft.tenantIdsText}
                         onChange={(event) => setDraft((current) => ({ ...current, tenantIdsText: event.target.value }))}
                         className="font-mono text-xs"
@@ -261,7 +264,7 @@ export function FleetDirectoryScreen() {
                   </Field>
                 )}
                 <fieldset className="space-y-2">
-                  <legend className="text-sm font-semibold text-foreground">{copy.tenantStatuses}</legend>
+                  <legend className="text-xs font-semibold text-foreground">{copy.tenantStatuses}</legend>
                   <div className="flex gap-4">
                     {(["ACTIVE", "SUSPENDED"] as TenantLifecycleStatus[]).map((status) => (
                       <CheckField key={status} id={`fleet-status-${status}`} label={status === "ACTIVE" ? copy.active : copy.suspended} checked={draft.tenantStatuses.includes(status)} copy={copy} onChange={(checked) => setDraft((current) => ({ ...current, tenantStatuses: toggleStatus(current.tenantStatuses, status, checked) }))} />
@@ -288,7 +291,7 @@ export function FleetDirectoryScreen() {
                 ) : null
               }
             />
-            <Button type="submit" variant="primary" disabled={pending} loading={pending}>
+            <Button type="submit" variant="primary" size="sm" disabled={pending} loading={pending}>
               {pending ? copy.creatingPreview : copy.createPreview}
             </Button>
           </form>
@@ -337,14 +340,14 @@ function TargetEditor({
     { key: "expectedCurrentManifestChecksum", label: copy.expectedCurrentManifestChecksum },
   ];
   return (
-    <fieldset className="space-y-4 rounded-lg border border-border p-4">
-      <legend className="px-2 text-sm font-semibold text-foreground">{copy.targets}</legend>
+    <fieldset className="space-y-3 rounded-lg border border-border p-3 sm:p-3.5">
+      <legend className="px-2 text-xs font-semibold text-foreground">{copy.targets}</legend>
       <p className="text-xs text-muted-foreground">{copy.currentFenceHint}</p>
       <FleetFieldError id="fleet-targets-error" code={errors.targets} copy={copy} />
       {draft.targets.map((target, index) => (
-        <Card key={index} className="space-y-3 bg-muted p-4">
+        <Card key={index} className="space-y-2.5 bg-muted p-3">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold text-foreground">{copy.targetNumber} {index + 1}</h3>
+            <h3 className="text-xs font-semibold text-foreground">{copy.targetNumber} {index + 1}</h3>
             <Button
               type="button"
               variant="outline"
@@ -352,10 +355,10 @@ function TargetEditor({
               disabled={draft.targets.length === 1 && draft.operationType === "REPAIR"}
               onClick={() => setDraft((current) => ({ ...current, targets: current.targets.filter((_, targetIndex) => targetIndex !== index) }))}
             >
-              <Trash2 className="size-4" aria-hidden="true" />{copy.removeTarget}
+              <Trash2 className="size-3.5" aria-hidden="true" />{copy.removeTarget}
             </Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-2.5 md:grid-cols-2">
             {fields.map((field) => {
               const error = errors[`targets.${index}.${field.key}`];
               return <TextField key={field.key} label={field.label} value={target[field.key]} error={error} copy={copy} mono={field.key !== "targetReleaseVersion" && field.key !== "componentKey"} onChange={(value) => setDraft((current) => ({ ...current, targets: current.targets.map((item, targetIndex) => targetIndex === index ? { ...item, [field.key]: value } : item) }))} />;
@@ -365,8 +368,8 @@ function TargetEditor({
         </Card>
       ))}
       {draft.operationType !== "REPAIR" && draft.targets.length < 100 ? (
-        <Button type="button" variant="outline" onClick={() => setDraft((current) => ({ ...current, targets: [...current.targets, emptyTargetDraft()] }))}>
-          <Plus className="size-4" aria-hidden="true" />{copy.addTarget}
+        <Button type="button" variant="outline" size="sm" onClick={() => setDraft((current) => ({ ...current, targets: [...current.targets, emptyTargetDraft()] }))}>
+          <Plus className="size-3.5" aria-hidden="true" />{copy.addTarget}
         </Button>
       ) : null}
     </fieldset>
@@ -375,10 +378,12 @@ function TargetEditor({
 
 function TextField({ label, value, error, copy, onChange, mono }: { label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void; mono?: boolean }) {
   return (
-    <Field label={label} error={error ? FleetFieldErrorText(error, copy) : undefined}>
+    <Field label={label} hideLabel error={error ? FleetFieldErrorText(error, copy) : undefined}>
       {(fieldProps) => (
         <Input
           {...fieldProps}
+          size="sm"
+          placeholder={label}
           dir={mono ? "ltr" : undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}

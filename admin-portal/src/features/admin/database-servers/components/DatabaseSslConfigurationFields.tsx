@@ -137,7 +137,7 @@ export function DatabaseSslConfigurationFields({
     accept: string,
     required = false,
   ) => (
-    <div className="rounded-lg border border-border bg-card p-3">
+    <div className="rounded-lg border border-border bg-card p-2.5">
       <Field
         id={`${idPrefix}-${field}`}
         label={label}
@@ -151,10 +151,10 @@ export function DatabaseSslConfigurationFields({
             size="xs"
             onClick={() => clearField(field)}
             disabled={disabled}
-            className="size-8 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
+            className="size-7 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
             aria-label={copy.clearSelected(label)}
           >
-            <Trash2 className="size-4" aria-hidden="true" />
+            <Trash2 className="size-3.5" aria-hidden="true" />
           </Button>
         ) : undefined}
       >
@@ -167,12 +167,12 @@ export function DatabaseSslConfigurationFields({
             required={required && !hasStoredConfig}
             disabled={disabled || removeStoredConfig}
             onChange={(event) => void handleFileChange(field, label, event.target.files?.[0])}
-            className="h-auto min-h-(--size-control-lg) cursor-pointer py-1 text-xs text-muted-foreground file:me-3 file:min-h-8 file:cursor-pointer file:rounded-md file:border-0 file:bg-info-subtle file:px-3 file:text-xs file:font-semibold file:text-info-subtle-foreground"
+            className="h-8 cursor-pointer py-1 text-xs text-muted-foreground file:me-2.5 file:h-6 file:cursor-pointer file:rounded-md file:border-0 file:bg-info-subtle file:px-2.5 file:text-xs file:font-semibold file:text-info-subtle-foreground"
           />
         )}
       </Field>
       {config[field] && (
-        <p role="status" className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-success-subtle-foreground">
+        <p role="status" className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-success-subtle-foreground">
           <ShieldCheck className="size-3.5" aria-hidden="true" /> {copy.readyToSend}
         </p>
       )}
@@ -181,25 +181,25 @@ export function DatabaseSslConfigurationFields({
 
   return (
     <section dir={dir} className="overflow-hidden rounded-lg border border-border bg-muted">
-      <div className="flex items-start gap-3 border-b border-border p-4">
-        <div className="rounded-lg bg-info-subtle p-2 text-info-subtle-foreground">
-          <LockKeyhole className="size-4" aria-hidden="true" />
+      <div className="flex items-start gap-2.5 border-b border-border p-2.5 sm:p-3">
+        <div className="rounded-lg bg-info-subtle p-1.5 text-info-subtle-foreground">
+          <LockKeyhole className="size-3.5" aria-hidden="true" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-foreground">
+          <h3 className="text-xs font-semibold text-foreground">
             {copy.title}
           </h3>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
             {copy.description}
           </p>
         </div>
       </div>
 
-      <div className="space-y-4 p-4">
+      <div className="space-y-3 p-3">
         <Field id={`${idPrefix}-mode`} label={copy.sslMode} required>
           {({ required, ...fieldProps }) => (
             <Select value={mode} onValueChange={(value) => handleModeChange(value as DatabaseServerSslMode)} disabled={disabled} dir={dir}>
-              <SelectTrigger {...fieldProps} aria-required={required}>
+              <SelectTrigger {...fieldProps} size="sm" aria-required={required}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -284,11 +284,13 @@ export function DatabaseSslConfigurationFields({
                 ".pem,.key,application/x-pem-file,text/plain",
               )}
               <div className="rounded-lg border border-border bg-card p-3">
-                <Field id={`${idPrefix}-passphrase`} label={copy.privateKeyPassphrase} hint={copy.privateKeyPassphraseHelp}>
+                <Field id={`${idPrefix}-passphrase`} label={copy.privateKeyPassphrase} hideLabel hint={copy.privateKeyPassphraseHelp}>
                   {(fieldProps) => (
                     <Input
                       {...fieldProps}
+                      size="sm"
                       type="password"
+                      placeholder={copy.privateKeyPassphrase}
                       autoComplete="new-password"
                       maxLength={1024}
                       value={config.passphrase ?? ""}

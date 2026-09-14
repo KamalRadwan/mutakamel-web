@@ -67,7 +67,7 @@ function DatabaseServerDetailContent({ id }: { id: string }) {
     page.credentialAction?.kind === "regenerate" || page.credentialAction?.kind === "reconcile";
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-3 w-full">
         {/* Modals & Dialogs */}
         <EditDatabaseServerModal
           isOpen={page.isEditModalOpen}
@@ -236,7 +236,7 @@ function DatabaseServerDetailBoundary({
   const { t } = useI18n();
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="grid place-items-center py-16">
-      <Card role={loading ? "status" : undefined} className="flex max-w-xl flex-col items-center p-8 text-center text-foreground">
+      <Card role={loading ? "status" : undefined} className="flex max-w-xl flex-col items-center p-3 sm:p-3.5 text-center text-foreground">
         {loading ? (
           <Loader2 className="size-8 animate-spin text-info motion-reduce:animate-none" aria-hidden="true" />
         ) : (

@@ -116,7 +116,7 @@ export function ShareDrawer({
           value={accessLevel}
           onValueChange={(next) => setAccessLevel(next as ShareAccessLevel)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

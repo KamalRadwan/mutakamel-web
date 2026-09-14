@@ -92,7 +92,7 @@ export function DashboardFormDrawer({
       }}
     >
       <Field label={t.crmDashboards.name} error={nameError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmDashboards.name}
           value={name}
           maxLength={DASHBOARD_NAME_MAX_LENGTH}
           autoComplete="off"
@@ -104,7 +104,7 @@ export function DashboardFormDrawer({
       </Field>
 
       <Field label={t.crmDashboards.description}>
-        <Textarea
+        <Textarea placeholder={t.crmDashboards.description}
           value={description}
           maxLength={DASHBOARD_DESCRIPTION_MAX_LENGTH}
           onChange={(event) => setDescription(event.target.value)}
@@ -118,7 +118,7 @@ export function DashboardFormDrawer({
       ) : (
         <Field label={t.crmDashboards.templateLabel} hint={t.crmDashboards.templateHint}>
           <Select value={templateKey} onValueChange={setTemplateKey}>
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -6,28 +6,18 @@ describe("Tenant Portal API ingress routing", () => {
     vi.resetModules();
   });
 
-  it("proxies same-origin /api requests to the local Gateway in development", async () => {
+  it("leaves development API handling to the Host-preserving route handler", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("DEV_API_TARGET", "http://localhost:9100/");
     const config = (await import("./next.config")).default;
 
-    await expect(runRewrites(config.rewrites)).resolves.toEqual([{
-      source: "/api/:path*",
-      destination: "http://localhost:9100/api/:path*",
-    }]);
+    expect(config.rewrites).toBeUndefined();
   });
 
   it("leaves production /api ingress ownership outside Next", async () => {
     vi.stubEnv("NODE_ENV", "production");
     const config = (await import("./next.config")).default;
 
-    await expect(runRewrites(config.rewrites)).resolves.toEqual([]);
+    expect(config.rewrites).toBeUndefined();
   });
 });
-
-function runRewrites(rewrites: unknown): Promise<unknown> {
-  if (typeof rewrites !== "function") {
-    throw new Error("Expected rewrites to be configured");
-  }
-  return rewrites();
-}

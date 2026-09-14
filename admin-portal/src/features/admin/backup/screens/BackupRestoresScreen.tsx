@@ -155,15 +155,14 @@ export function BackupRestoresScreen() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <BackupPageHeader
         eyebrow={copy.eyebrow}
         title={copy.title}
-        description={copy.description}
         actions={
           view.canRestore && (
-            <Button type="button" variant="primary" onClick={openStart} disabled={view.artifacts.length === 0 || Boolean(view.activeAction)}>
-              <Play className="size-4" aria-hidden="true" />
+            <Button type="button" variant="primary" size="sm" onClick={openStart} disabled={view.artifacts.length === 0 || Boolean(view.activeAction)}>
+              <Play className="size-3.5" aria-hidden="true" />
               {copy.startRestoreTestAction}
             </Button>
           )
@@ -179,14 +178,14 @@ export function BackupRestoresScreen() {
       )}
 
       <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+        <CardContent className="grid gap-2.5 p-3 sm:p-3.5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
           <Field label={copy.tenantIdLabel} error={!tenantValid ? copy.tenantIdError : undefined}>
-            {(fp) => <Input {...fp} dir="ltr" value={tenantId} onChange={(e) => setTenantId(e.target.value.trim())} placeholder="UUIDv7" />}
+            {(fp) => <Input {...fp} dir="ltr" size="sm" value={tenantId} onChange={(e) => setTenantId(e.target.value.trim())} placeholder="UUIDv7" />}
           </Field>
           <Field label={copy.statusLabel}>
             {(fp) => (
               <Select value={status} onValueChange={(v) => setStatus(v as RestoreRunStatus | "")} dir={dir}>
-                <SelectTrigger {...fp}>
+                <SelectTrigger {...fp} size="sm">
                   <SelectValue placeholder={copy.allStatusesPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,11 +196,11 @@ export function BackupRestoresScreen() {
               </Select>
             )}
           </Field>
-          <Button type="button" variant="primary" disabled={!tenantValid} onClick={() => view.setQuery(tenantId, status)}>
+          <Button type="button" variant="primary" size="sm" disabled={!tenantValid} onClick={() => view.setQuery(tenantId, status)}>
             {copy.applyButton}
           </Button>
-          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
-            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
+          <Button type="button" variant="outline" size="sm" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-3.5" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         </CardContent>
@@ -235,7 +234,7 @@ export function BackupRestoresScreen() {
             responsiveMode="record-cards"
             pagination={{ page: 1, limit: view.restores.length || 1, totalItems: view.restores.length, totalPages: 1, onPageChange: () => {} }}
           />
-          <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
             {copy.verificationNote}
           </p>
         </div>
@@ -264,7 +263,7 @@ export function BackupRestoresScreen() {
         <Field label={copy.completedArtifactLabel} required>
           {(fp) => (
             <Select value={artifactId} onValueChange={(value) => updateStartDraft({ artifactId: value })} dir={dir}>
-              <SelectTrigger {...fp}>
+              <SelectTrigger {...fp} size="sm">
                 <SelectValue placeholder={copy.selectArtifactPlaceholder} />
               </SelectTrigger>
               <SelectContent>
@@ -277,12 +276,13 @@ export function BackupRestoresScreen() {
         </Field>
         <Field
           label={copy.targetDbNameLabel}
+          hideLabel
           error={!targetValid ? copy.targetDbNameError : undefined}
         >
-          {(fp) => <Input {...fp} dir="ltr" value={targetDatabaseName} onChange={(e) => updateStartDraft({ targetDatabaseName: e.target.value })} maxLength={63} placeholder="restore_tenant_..." />}
+          {(fp) => <Input {...fp} dir="ltr" size="sm" value={targetDatabaseName} onChange={(e) => updateStartDraft({ targetDatabaseName: e.target.value })} maxLength={63} placeholder={`${copy.targetDbNameLabel} (restore_tenant_...)`} />}
         </Field>
-        <Field label={copy.auditReasonLabel} required>
-          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => updateStartDraft({ reason: e.target.value })} maxLength={500} rows={4} />}
+        <Field label={copy.auditReasonLabel} hideLabel required>
+          {(fp) => <Textarea {...fp} placeholder={`${copy.auditReasonLabel} *`} value={reason} onChange={(e) => updateStartDraft({ reason: e.target.value })} maxLength={500} rows={2} />}
         </Field>
       </BackupDialog>
 
@@ -308,15 +308,15 @@ export function BackupRestoresScreen() {
         destructive
         error={view.error ?? view.retryableCommandError}
       >
-        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-4 text-sm text-destructive-subtle-foreground">
+        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground">
           <p dir="ltr" className="font-mono font-semibold">{promotingRun?.targetDatabaseName}</p>
           <p className="mt-1 text-xs">{copy.verifiedOnlyNote}</p>
         </div>
-        <Field label={copy.promotionReasonLabel} required>
-          {(fp) => <Textarea {...fp} value={promotionReason} onChange={(e) => setPromotionReason(e.target.value)} maxLength={500} rows={3} />}
+        <Field label={copy.promotionReasonLabel} hideLabel required>
+          {(fp) => <Textarea {...fp} placeholder={`${copy.promotionReasonLabel} *`} value={promotionReason} onChange={(e) => setPromotionReason(e.target.value)} maxLength={500} rows={2} />}
         </Field>
-        <Field label={copy.targetConfirmationLabel} required>
-          {(fp) => <Input {...fp} dir="ltr" value={confirmationText} onChange={(e) => setConfirmationText(e.target.value)} maxLength={63} />}
+        <Field label={copy.targetConfirmationLabel} hideLabel required>
+          {(fp) => <Input {...fp} dir="ltr" size="sm" placeholder={`${copy.targetConfirmationLabel} *`} value={confirmationText} onChange={(e) => setConfirmationText(e.target.value)} maxLength={63} />}
         </Field>
       </BackupDialog>
     </div>

@@ -47,14 +47,14 @@ export function SystemPrincipalRotationPolicy({ binding, canUpdate, onSave }: Pr
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label={copy.intervalHours} required>
-          {(fieldProps) => <Input {...fieldProps} type="number" min={24} max={8760} value={editor.intervalHours} onChange={(event) => editor.setIntervalHours(Number(event.target.value))} disabled={disabled} />}
+        <Field label={copy.intervalHours} hideLabel required>
+          {(fieldProps) => <Input {...fieldProps} size="sm" type="number" min={24} max={8760} placeholder={`${copy.intervalHours} *`} value={editor.intervalHours} onChange={(event) => editor.setIntervalHours(Number(event.target.value))} disabled={disabled} />}
         </Field>
-        <Field label={copy.windowStartUtc} required>
-          {(fieldProps) => <Input {...fieldProps} type="number" min={0} max={23} value={editor.windowStart} onChange={(event) => editor.setWindowStart(Number(event.target.value))} disabled={disabled} />}
+        <Field label={copy.windowStartUtc} hideLabel required>
+          {(fieldProps) => <Input {...fieldProps} size="sm" type="number" min={0} max={23} placeholder={`${copy.windowStartUtc} *`} value={editor.windowStart} onChange={(event) => editor.setWindowStart(Number(event.target.value))} disabled={disabled} />}
         </Field>
-        <Field label={copy.windowHours} required>
-          {(fieldProps) => <Input {...fieldProps} type="number" min={1} max={24} value={editor.windowHours} onChange={(event) => editor.setWindowHours(Number(event.target.value))} disabled={disabled} />}
+        <Field label={copy.windowHours} hideLabel required>
+          {(fieldProps) => <Input {...fieldProps} size="sm" type="number" min={1} max={24} placeholder={`${copy.windowHours} *`} value={editor.windowHours} onChange={(event) => editor.setWindowHours(Number(event.target.value))} disabled={disabled} />}
         </Field>
       </div>
 
@@ -62,12 +62,13 @@ export function SystemPrincipalRotationPolicy({ binding, canUpdate, onSave }: Pr
         <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <Field
             label={copy.reasonPlaceholder}
+            hideLabel
             hint={lang === "ar" ? `${editor.reason.trim().length}/500 · 8 أحرف على الأقل` : `${editor.reason.trim().length}/500 · minimum 8 characters`}
           >
-            {(fieldProps) => <Input {...fieldProps} value={editor.reason} onChange={(event) => editor.setReason(event.target.value)} maxLength={500} disabled={editor.pending} />}
+            {(fieldProps) => <Input {...fieldProps} size="sm" placeholder={`${copy.reasonPlaceholder} *`} value={editor.reason} onChange={(event) => editor.setReason(event.target.value)} maxLength={500} disabled={editor.pending} />}
           </Field>
-          <Button type="submit" variant="primary" loading={editor.pending} disabled={editor.reason.trim().length < 8}>
-            <Save className="size-4" aria-hidden="true" />
+          <Button type="submit" variant="primary" size="sm" loading={editor.pending} disabled={editor.reason.trim().length < 8}>
+            <Save className="size-3.5" aria-hidden="true" />
             {copy.savePolicy}
           </Button>
         </div>

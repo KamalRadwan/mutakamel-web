@@ -68,7 +68,7 @@ export function LoggingScreen() {
   const live = useLiveLogging();
 
   return (
-    <div className="space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
+    <div className="space-y-3" dir={lang === "ar" ? "rtl" : "ltr"}>
       <PageHeader title={copy.title} />
 
       {!view.canRead && view.directory.state === "FORBIDDEN" ? (
@@ -80,9 +80,9 @@ export function LoggingScreen() {
         />
       ) : (
         <>
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.75fr)]">
+          <section className="grid gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.75fr)]">
             <DirectoryPanel view={view} copy={copy} lang={lang} />
-            <div className="space-y-4">
+            <div className="space-y-3">
               <OverrideEditor view={view} copy={copy} />
               <EffectiveInspector view={view} copy={copy} />
             </div>
@@ -206,7 +206,7 @@ function DirectoryPanel({
   ];
 
   return (
-    <Card className="p-4">
+    <Card className="p-3 sm:p-3.5">
       <PanelHeading
         icon={<Gauge className="size-4" />}
         title={copy.directory}
@@ -221,7 +221,7 @@ function DirectoryPanel({
         }
       />
       <form
-        className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+        className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3"
         onSubmit={(event) => {
           event.preventDefault();
           view.applyDirectoryFilters();
@@ -271,7 +271,7 @@ function DirectoryPanel({
             label: String(limit),
           }))}
         />
-        <label className="flex min-h-11 items-center gap-2 self-end rounded-md border border-input px-3 text-sm font-semibold">
+        <label className="flex min-h-8 items-center gap-2 self-end rounded-md border border-input px-2.5 text-xs font-semibold">
           <Checkbox
             checked={view.directoryDraft.includeExpired}
             onCheckedChange={(checked) =>
@@ -394,14 +394,15 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
   const needsTenant = draft.scope === "TENANT" || draft.scope === "TENANT_APP";
   const busy = view.mutationState === "SAVING" || view.mutationState === "DELETING";
   return (
-    <Card className="p-4">
+    <Card className="p-3 sm:p-3.5">
       <PanelHeading
         icon={<Save className="size-4" />}
         title={copy.editor}
         help={copy.editorHelp}
       />
       <form
-        className="mt-4 grid gap-3"
+        noValidate
+        className="mt-3 grid gap-2.5"
         onSubmit={(event) => {
           event.preventDefault();
           view.requestUpsert();
@@ -459,15 +460,16 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
           options={OVERRIDE_LOG_LEVELS.map((level) => ({ value: level, label: level }))}
           disabled={!view.canUpdate || busy}
         />
-        <Field label={copy.reason} hint={`${draft.reason.length}/255`} error={view.overrideErrors.reason ? copy.reasonInvalid : undefined}>
+        <Field label={copy.reason} hideLabel required hint={`${draft.reason.length}/255`} error={view.overrideErrors.reason ? copy.reasonInvalid : undefined}>
           {(fp) => (
             <Textarea
               {...fp}
               value={draft.reason}
               maxLength={255}
-              rows={3}
+              rows={2}
               disabled={!view.canUpdate || busy}
               invalid={Boolean(view.overrideErrors.reason)}
+              placeholder={`${copy.reason} *`}
               onChange={(event) => view.setOverrideDraftField("reason", event.target.value)}
             />
           )}
@@ -482,13 +484,14 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
           disabled={!view.canUpdate || busy}
         />
         {!view.canUpdate ? (
-          <p className="rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
+          <p className="rounded-md border border-warning bg-warning-subtle p-2.5 text-xs font-semibold text-warning-subtle-foreground">
             {copy.readOnlyEditor} {copy.updatePermission}
           </p>
         ) : null}
         <Button
           type="submit"
           variant="primary"
+          size="sm"
           disabled={!view.canUpdate || busy || view.mutationState === "STALE"}
           className="justify-center"
         >
@@ -506,14 +509,14 @@ function OverrideEditor({ view, copy }: { view: ConsoleView; copy: LoggingCopy }
 
 function EffectiveInspector({ view, copy }: { view: ConsoleView; copy: LoggingCopy }) {
   return (
-    <Card className="p-4">
+    <Card className="p-3 sm:p-3.5">
       <PanelHeading
         icon={<Gauge className="size-4" />}
         title={copy.effective}
         help={copy.effectiveHelp}
       />
       <form
-        className="mt-4 grid gap-3"
+        className="mt-3 grid gap-2.5"
         onSubmit={(event) => {
           event.preventDefault();
           void view.resolveEffective();
@@ -537,20 +540,20 @@ function EffectiveInspector({ view, copy }: { view: ConsoleView; copy: LoggingCo
           error={view.effectiveErrors.tenantId ? copy.invalidUuid : undefined}
           mono
         />
-        <Button type="submit" variant="secondary" className="justify-center">
+        <Button type="submit" variant="secondary" size="sm" className="justify-center">
           <Gauge className="size-3.5" aria-hidden="true" />
           {copy.resolve}
         </Button>
       </form>
       {view.effective.state === "LOADING" ? (
-        <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+        <p className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> {copy.loading}
         </p>
       ) : view.effective.data ? (
-        <div className="mt-4 rounded-md border border-info/30 bg-info-subtle p-4">
+        <div className="mt-3 rounded-md border border-info/30 bg-info-subtle p-3">
           <div className="flex items-center justify-between gap-3">
             <LevelPill level={view.effective.data.level} />
-            <span className="font-mono text-sm font-semibold">
+            <span className="font-mono text-xs font-semibold">
               {copy.source}: {view.effective.data.source === "FALLBACK" ? copy.fallback : view.effective.data.source}
             </span>
           </div>
@@ -638,10 +641,10 @@ function HistoryPanel({
   ];
 
   return (
-    <Card className="p-4">
+    <Card className="p-3 sm:p-3.5">
       <PanelHeading icon={<FileClock className="size-4" />} title={copy.history} help={copy.history} />
       <form
-        className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6"
+        className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-6"
         onSubmit={(event) => {
           event.preventDefault();
           view.applyHistoryFilters();
@@ -778,19 +781,19 @@ function LivePanel({
     live.connectionState,
   );
   return (
-    <Card className="p-4">
+    <Card className="p-3 sm:p-3.5">
       <PanelHeading
         icon={<Radio className="size-4" />}
         title={copy.live}
         help={copy.liveHelp}
         action={<LiveStatus state={live.connectionState} copy={copy} />}
       />
-      <div className="mt-3 rounded-md border border-info/30 bg-info-subtle p-3 text-sm leading-5 text-info-subtle-foreground">
+      <div className="mt-3 rounded-md border border-info/30 bg-info-subtle p-2.5 text-xs leading-5 text-info-subtle-foreground">
         <ShieldAlert className="me-2 inline size-4" aria-hidden="true" />
         {copy.privacy}
       </div>
       {live.canLive ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-2.5 md:grid-cols-3">
           <SelectField
             label={copy.app}
             value={live.draft.appName}
@@ -822,7 +825,7 @@ function LivePanel({
           />
         </div>
       ) : (
-        <p className="mt-4 rounded-md border border-warning bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
+        <p className="mt-3 rounded-md border border-warning bg-warning-subtle p-2.5 text-xs font-semibold text-warning-subtle-foreground">
           {copy.forbidden} {copy.livePermission}
         </p>
       )}
@@ -1134,13 +1137,13 @@ function LevelPill({ level }: { level: string }) {
 
 function PanelHeading({ icon, title, help, action }: { icon: ReactNode; title: string; help: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-wrap items-start justify-between gap-2.5">
       <div>
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <span className="text-primary">{icon}</span>
           {title}
         </h2>
-        <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">{help}</p>
+        <p className="mt-0.5 max-w-3xl text-xs leading-5 text-muted-foreground">{help}</p>
       </div>
       {action}
     </div>
@@ -1154,6 +1157,8 @@ function SelectField({
   onChange,
   error,
   disabled,
+  placeholder,
+  hideLabel = true,
 }: {
   label: string;
   value: string;
@@ -1161,18 +1166,20 @@ function SelectField({
   onChange: (value: string) => void;
   error?: string;
   disabled?: boolean;
+  placeholder?: string;
+  hideLabel?: boolean;
 }) {
   const toItemValue = (v: string) => (v === "" ? "__ANY__" : v);
   return (
-    <Field label={label} error={error}>
+    <Field label={label} error={error} hideLabel={hideLabel}>
       {(fp) => (
         <Select
           value={toItemValue(value)}
           onValueChange={(next) => onChange(next === "__ANY__" ? "" : next)}
           disabled={disabled}
         >
-          <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-            <SelectValue />
+          <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+            <SelectValue placeholder={placeholder ?? label} />
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (
@@ -1196,6 +1203,9 @@ function TextField({
   mono,
   disabled,
   type = "text",
+  placeholder,
+  required = false,
+  hideLabel = true,
 }: {
   label: string;
   value: string;
@@ -1205,17 +1215,22 @@ function TextField({
   mono?: boolean;
   disabled?: boolean;
   type?: string;
+  placeholder?: string;
+  required?: boolean;
+  hideLabel?: boolean;
 }) {
   return (
-    <Field label={label} error={error} hint={hint}>
+    <Field label={label} error={error} hint={hint} required={required} hideLabel={hideLabel}>
       {(fp) => (
         <Input
           {...fp}
+          size="sm"
           dir={mono ? "ltr" : undefined}
           type={type}
           value={value}
           disabled={disabled}
           invalid={Boolean(error)}
+          placeholder={placeholder ?? `${label}${required ? " *" : ""}`}
           onChange={(event) => onChange(event.target.value)}
           className={mono ? "font-mono" : undefined}
         />
@@ -1234,7 +1249,7 @@ function Metric({ label, value, lang }: { label: string; value: number; lang: "a
 
 function InlineEmpty({ text }: { text: string }) {
   return (
-    <p className="mt-4 rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+    <p className="mt-3 rounded-md border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
       {text}
     </p>
   );
@@ -1248,11 +1263,11 @@ function StatePanel({ icon, title, detail, tone = "neutral", action }: { icon: R
         ? "border-warning bg-warning-subtle text-warning-subtle-foreground"
         : "border-border bg-card text-muted-foreground";
   return (
-    <section role={tone === "neutral" ? "status" : "alert"} className={`mt-4 flex min-h-36 flex-col items-center justify-center rounded-lg border p-5 text-center ${colors}`}>
+    <section role={tone === "neutral" ? "status" : "alert"} className={`mt-3 flex min-h-32 flex-col items-center justify-center rounded-lg border p-4 text-center ${colors}`}>
       <span className="mb-2 opacity-75">{icon}</span>
       <h3 className="text-sm font-semibold">{title}</h3>
-      {detail ? <p className="mt-2 max-w-3xl break-all text-sm opacity-85">{detail}</p> : null}
-      {action ? <div className="mt-3">{action}</div> : null}
+      {detail ? <p className="mt-1.5 max-w-3xl break-all text-xs opacity-85">{detail}</p> : null}
+      {action ? <div className="mt-2.5">{action}</div> : null}
     </section>
   );
 }

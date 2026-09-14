@@ -66,14 +66,13 @@ export function ProvisioningGovernanceScreen() {
   const view = useProvisioningGovernance();
 
   return (
-    <div dir={lang === "ar" ? "rtl" : "ltr"} className="mx-auto w-full max-w-[1500px]">
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="mx-auto w-full max-w-[1500px] space-y-3">
       <PageHeader
         title={copy.title}
-        description={copy.subtitle}
         status={<Badge tone="neutral">{copy.readOnly}</Badge>}
       />
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <ProvisioningModuleLinks view={view} copy={copy} />
 
         <Tabs defaultValue="CATALOGUE">
@@ -111,19 +110,19 @@ function ProvisioningModuleLinks({
       href: "/provisioning/fleet",
       label: copy.fleet,
       allowed: view.permissions.canReadFleet,
-      icon: <Rocket className="size-4" aria-hidden="true" />,
+      icon: <Rocket className="size-3.5" aria-hidden="true" />,
     },
     {
       href: "/provisioning/releases",
       label: copy.releaseGovernance,
       allowed: view.permissions.canReadReleases,
-      icon: <Tags className="size-4" aria-hidden="true" />,
+      icon: <Tags className="size-3.5" aria-hidden="true" />,
     },
     {
       href: "/provisioning/publisher-keys",
       label: copy.publisherKeys,
       allowed: view.permissions.canReadPublisherKeys,
-      icon: <KeyRound className="size-4" aria-hidden="true" />,
+      icon: <KeyRound className="size-3.5" aria-hidden="true" />,
     },
   ].filter((module) => module.allowed);
   if (!modules.length) return null;
@@ -131,7 +130,7 @@ function ProvisioningModuleLinks({
     <nav aria-label={copy.openWorkspace} className="grid gap-2 md:grid-cols-3">
       {modules.map((module) => (
         <Link key={module.href} href={module.href}>
-          <Card className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary motion-reduce:transition-none">
+          <Card className="flex min-h-8.5 items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:border-primary motion-reduce:transition-none">
             <span className="inline-flex items-center gap-2">
               {module.icon}
               {module.label}
@@ -177,11 +176,13 @@ function CatalogueWorkspace({
               view.applyComponentFilters();
             }}
           >
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <Field label={copy.search}>
+            <CardContent className="grid gap-2.5 p-3 sm:p-3.5 md:grid-cols-2 xl:grid-cols-4">
+              <Field label={copy.search} hideLabel>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
+                    placeholder={copy.search}
                     value={view.componentDraft.search ?? ""}
                     onChange={(event) =>
                       view.setComponentDraft((current) => ({
@@ -193,10 +194,12 @@ function CatalogueWorkspace({
                   />
                 )}
               </Field>
-              <Field label={copy.componentKey} error={filterErrors.componentKey}>
+              <Field label={copy.componentKey} hideLabel error={filterErrors.componentKey}>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
+                    placeholder={copy.componentKey}
                     value={view.componentDraft.componentKey ?? ""}
                     onChange={(event) =>
                       view.setComponentDraft((current) => ({
@@ -209,10 +212,12 @@ function CatalogueWorkspace({
                   />
                 )}
               </Field>
-              <Field label={copy.ownerApp} error={filterErrors.ownerApp}>
+              <Field label={copy.ownerApp} hideLabel error={filterErrors.ownerApp}>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
+                    placeholder={copy.ownerApp}
                     value={view.componentDraft.ownerApp ?? ""}
                     onChange={(event) =>
                       view.setComponentDraft((current) => ({
@@ -298,6 +303,7 @@ function CatalogueWorkspace({
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={() => {
                     setValidateFilters(false);
                     view.resetComponentFilters();
@@ -309,13 +315,14 @@ function CatalogueWorkspace({
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={view.refreshComponents}
                   loading={catalogue.isRefreshing}
                 >
                   <RefreshCw className="size-3.5" aria-hidden="true" />
                   {copy.refresh}
                 </Button>
-                <Button type="submit" variant="primary">
+                <Button type="submit" variant="primary" size="sm">
                   {copy.apply}
                 </Button>
               </div>
@@ -466,7 +473,7 @@ function ReleaseDialog({
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && view.selectComponent(null)}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle>
             {copy.releases}: {view.selectedComponent?.key}
@@ -482,11 +489,13 @@ function ReleaseDialog({
               view.applyReleaseFilters();
             }}
           >
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <Field label={copy.search}>
+            <CardContent className="grid gap-2.5 p-3 sm:p-3.5 md:grid-cols-2 xl:grid-cols-4">
+              <Field label={copy.search} hideLabel>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
+                    placeholder={copy.search}
                     value={view.releaseDraft.search ?? ""}
                     onChange={(event) =>
                       view.setReleaseDraft((current) => ({
@@ -603,10 +612,10 @@ function ReleaseDialog({
                 }))}
               />
               <div className="flex items-end gap-2">
-                <Button type="submit" variant="primary">
+                <Button type="submit" variant="primary" size="sm">
                   {copy.apply}
                 </Button>
-                <Button type="button" variant="outline" onClick={view.resetReleaseFilters}>
+                <Button type="button" variant="outline" size="sm" onClick={view.resetReleaseFilters}>
                   <RotateCcw className="size-3.5" aria-hidden="true" />
                   {copy.reset}
                 </Button>
@@ -652,7 +661,7 @@ function ReleaseList({
     <Card>
       <div className="grid gap-3 p-3 lg:grid-cols-2">
         {data.items.map((release) => (
-          <Card key={release.id} className="p-4">
+          <Card key={release.id} className="p-3 sm:p-3.5">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 className="font-mono text-sm font-semibold">
@@ -747,9 +756,9 @@ function DiscoveryWorkspace({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Card>
-        <CardContent>
+        <CardContent className="p-3 sm:p-3.5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="font-semibold text-foreground">{copy.startDiscovery}</h2>
@@ -769,7 +778,7 @@ function DiscoveryWorkspace({
             </Button>
           </div>
           {view.permissions.canRunDiscovery ? (
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-2.5 md:grid-cols-3">
               <SelectField
                 label={copy.mode}
                 value={command.mode}
@@ -784,10 +793,12 @@ function DiscoveryWorkspace({
                   { value: "MANUAL", label: copy.manual },
                 ]}
               />
-              <Field label={copy.cutoff}>
+              <Field label={copy.cutoff} hideLabel>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
+                    placeholder={copy.cutoff}
                     type="datetime-local"
                     step={1}
                     value={isoToUtcInput(command.cutoffAt)}
@@ -800,10 +811,12 @@ function DiscoveryWorkspace({
                   />
                 )}
               </Field>
-              <Field label={copy.maxTenants}>
+              <Field label={copy.maxTenants} hideLabel>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
+                    placeholder={copy.maxTenants}
                     type="number"
                     min={1}
                     max={10_000}
@@ -819,7 +832,7 @@ function DiscoveryWorkspace({
                 )}
               </Field>
               <div className="flex justify-end md:col-span-3">
-                <Button type="button" variant="primary" onClick={requestConfirmation}>
+                <Button type="button" variant="primary" size="sm" onClick={requestConfirmation}>
                   {copy.validate}
                 </Button>
               </div>
@@ -999,7 +1012,7 @@ function DiscoveryDetailDialog({
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && view.selectRun(null)}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle>{copy.results}</DialogTitle>
           <p className="break-all font-mono text-xs text-muted-foreground">{view.selectedRunId}</p>
@@ -1161,14 +1174,14 @@ function SelectField({
 }) {
   const resolved = value === "" ? "__any__" : value;
   return (
-    <Field label={label}>
+    <Field label={label} hideLabel>
       {(fieldProps) => (
         <Select
           value={resolved}
           onValueChange={(next) => onChange(next === "__any__" ? "" : next)}
         >
-          <SelectTrigger id={fieldProps.id} aria-describedby={fieldProps["aria-describedby"]}>
-            <SelectValue />
+          <SelectTrigger id={fieldProps.id} size="sm" aria-describedby={fieldProps["aria-describedby"]}>
+            <SelectValue placeholder={label} />
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (

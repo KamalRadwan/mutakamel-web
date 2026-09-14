@@ -42,7 +42,7 @@ export default function BillingSettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader title={(lang === "ar" ? ar : en).settings.pages.billing.title} />
 
       <SettingsResourceBoundary
@@ -57,7 +57,7 @@ export default function BillingSettingsPage() {
           onSave={saveAll}
           lang={lang}
         />
-        <div className="space-y-4">
+        <div className="space-y-3">
           {settings.length ? (
             settings.map((setting) => (
               <SettingField
@@ -86,7 +86,7 @@ export default function BillingSettingsPage() {
 
 function EmptySettings({ lang }: { lang: "ar" | "en" }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
+    <div className="rounded-lg border border-border bg-card p-4 text-center text-xs text-muted-foreground">
       {(lang === "ar" ? ar : en).settings.pages.billing.empty}
     </div>
   );

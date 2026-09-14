@@ -16,7 +16,7 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
   const disabled = edit.saving || edit.loading || edit.mustReload;
   const identityField = (field: "displayName" | "firstName" | "lastName" | "honorificTitle" | "email", label: string, maxLength: number) => (
     <Field label={label} error={edit.errors[field]} readOnly={!edit.canEditIdentity}>
-      <Input value={form?.[field] ?? ""} disabled={disabled} maxLength={maxLength}
+      <Input size="sm" placeholder={label} value={form?.[field] ?? ""} disabled={disabled} maxLength={maxLength}
         type={field === "email" ? "email" : "text"} dir={field === "email" ? "ltr" : undefined}
         onChange={(event) => edit.setField(field, event.target.value)} />
     </Field>

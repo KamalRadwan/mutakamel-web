@@ -16,7 +16,7 @@ export function CommercialOperationWorkspace({ operationId }: { operationId: str
   return <div className="flex min-w-0 flex-col gap-4">
     <DetailHeader title={copy.title} subtitle={copy.description} backLabel={t.commercialReceipt.back} backHref={TENANT_ROUTES.coreSubscription}
       breadcrumbs={[{ label: t.nav.coreSubscription, href: TENANT_ROUTES.coreSubscription }]}
-      secondaryActions={<Button variant="outline" onClick={read.reload} disabled={read.isLoading}>{t.coreBilling.reload}</Button>} />
+      secondaryActions={<Button size="sm" variant="outline" onClick={read.reload} disabled={read.isLoading}>{t.coreBilling.reload}</Button>} />
     <OwnerGate denied={read.denied}>
       {read.isLoading && <div role="status" aria-label={copy.loading} aria-busy="true"><Skeleton className="h-64 w-full" /></div>}
       {read.isNotFound && <NotFoundState title={copy.notFound} description={copy.notFoundDescription}
@@ -36,7 +36,7 @@ export function CommercialOperationWorkspace({ operationId }: { operationId: str
           <DetailSection title={copy.projection} description={copy.projectionNotice} fields={[
             { label: copy.state, value: copy.projectionStatus[operation.projectionState] },
           ]} />
-          <div><Button variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/receipts/${operation.committedReceiptRef}`}>{copy.openReceipt}</Link></Button></div>
+          <div><Button size="sm" variant="outline" asChild><Link href={`${TENANT_ROUTES.coreSubscription}/receipts/${operation.committedReceiptRef}`}>{copy.openReceipt}</Link></Button></div>
           <CommercialReceiptPanel key={`${operation.operationId}:${operation.committedReceiptRef}`} reference={{ previewId: operation.committedReceiptRef, preparationId: operation.operationId }} />
         </>}
       </>}

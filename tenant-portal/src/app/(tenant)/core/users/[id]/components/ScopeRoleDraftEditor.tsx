@@ -112,7 +112,7 @@ export function ScopeRoleDraftEditor({
             setScopeTarget(SCOPE_ROLE_TARGETS.find((target) => target === next) ?? "TENANT")
           }
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger size="sm" className="w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

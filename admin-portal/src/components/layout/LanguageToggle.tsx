@@ -10,14 +10,14 @@ export function LanguageToggle() {
   return (
     <Button
       type="button"
-      variant="outline"
-      size="md"
+      variant="ghost"
+      size="sm"
       onClick={toggleLanguage}
-      className="gap-1.5 px-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+      className="h-7 gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 text-xs font-semibold text-slate-200 hover:border-white/25 hover:bg-white/15 hover:text-white"
       aria-label={title}
       title={title}
     >
-      <Globe className="size-3.5" aria-hidden="true" />
+      <Globe className="size-3.5 text-slate-300" aria-hidden="true" />
       <span>{buttonLabel}</span>
     </Button>
   );

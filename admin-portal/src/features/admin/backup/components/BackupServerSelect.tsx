@@ -26,7 +26,7 @@ export function BackupServerSelect({
     <Field label={label} required={required}>
       {(fieldProps) => (
         <Select value={value} onValueChange={onChange} disabled={disabled} dir={dir}>
-          <SelectTrigger {...fieldProps}>
+          <SelectTrigger size="sm" className="w-full text-xs" {...fieldProps}>
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>

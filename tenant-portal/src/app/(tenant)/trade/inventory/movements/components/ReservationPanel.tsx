@@ -47,7 +47,7 @@ export function ReservationPanel({
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 md:grid-cols-2">
         <Field label={t.tradeInventory.nodeId} required error={error ?? undefined}>
-          <Input
+          <Input size="sm"
             value={values.nodeId}
             disabled={disabled || pending !== null}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -55,21 +55,21 @@ export function ReservationPanel({
           />
         </Field>
         <Field label={t.tradeInventory.itemId} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.itemId}
             value={values.itemId}
             disabled={disabled || pending !== null}
             onChange={(event) => set({ itemId: event.target.value })}
           />
         </Field>
         <Field label={t.tradeInventory.uomId} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.uomId}
             value={values.uomId}
             disabled={disabled || pending !== null}
             onChange={(event) => set({ uomId: event.target.value })}
           />
         </Field>
         <Field label={t.tradeInventory.quantity} required hint={t.tradeCommon.decimalHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.quantity}
             value={values.quantity}
             inputMode="decimal"
             disabled={disabled || pending !== null}
@@ -77,21 +77,21 @@ export function ReservationPanel({
           />
         </Field>
         <Field label={t.tradeInventory.sourceDocumentId} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.sourceDocumentId}
             value={values.sourceDocumentId}
             disabled={disabled || pending !== null}
             onChange={(event) => set({ sourceDocumentId: event.target.value })}
           />
         </Field>
         <Field label={t.tradeInventory.sourceLineId} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.sourceLineId}
             value={values.sourceLineId}
             disabled={disabled || pending !== null}
             onChange={(event) => set({ sourceLineId: event.target.value })}
           />
         </Field>
         <Field label={t.tradeInventory.sourceDocumentVersion} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.sourceDocumentVersion}
             type="number"
             min={1}
             value={values.sourceDocumentVersion}
@@ -100,7 +100,7 @@ export function ReservationPanel({
           />
         </Field>
         <Field label={t.tradeInventory.sourceLineVersion} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.sourceLineVersion}
             type="number"
             min={1}
             value={values.sourceLineVersion}
@@ -110,7 +110,7 @@ export function ReservationPanel({
         </Field>
       </div>
       <div className="flex justify-end">
-        <Button
+        <Button size="sm"
           variant="outline"
           disabled={disabled}
           loading={pending === "reservation"}
@@ -133,14 +133,14 @@ export function ReservationPanel({
         <p className="text-xs text-muted-foreground">{t.tradeInventory.releaseHint}</p>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label={t.tradeInventory.reservationId} required>
-            <Input
+            <Input size="sm" placeholder={t.tradeInventory.reservationId}
               value={releaseId || (createdId ?? "")}
               disabled={disabled || pending !== null}
               onChange={(event) => setReleaseId(event.target.value)}
             />
           </Field>
           <Field label={t.tradeCommon.version} required hint={t.tradeCommon.ifMatchHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeCommon.version}
               type="number"
               min={1}
               value={releaseVersion}
@@ -149,7 +149,7 @@ export function ReservationPanel({
             />
           </Field>
           <Field label={t.tradeInventory.quantity} hint={t.tradeInventory.releaseQuantityHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeInventory.quantity}
               value={releaseQuantity}
               inputMode="decimal"
               disabled={disabled || pending !== null}
@@ -157,7 +157,7 @@ export function ReservationPanel({
             />
           </Field>
           <Field label={t.tradeInventory.reasonCode} hint={t.tradeInventory.reasonCodeHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeInventory.reasonCode}
               value={releaseReason}
               disabled={disabled || pending !== null}
               onChange={(event) => setReleaseReason(event.target.value)}
@@ -165,7 +165,7 @@ export function ReservationPanel({
           </Field>
         </div>
         <div className="flex justify-end">
-          <Button
+          <Button size="sm"
             variant="outline"
             disabled={disabled}
             loading={pending === "release"}

@@ -33,14 +33,14 @@ export function UserMetadataCard({ user }: { user: AdminUser }) {
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border bg-muted p-4">
+      <div className="flex items-center justify-between border-b border-border bg-muted p-3 sm:p-3.5">
         <h2 className="text-xs font-semibold text-foreground flex items-center gap-2">
           <Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
           <span>{t.users.metadataCardTitle}</span>
         </h2>
       </div>
 
-      <div className="p-4 space-y-3.5 text-xs">
+      <div className="p-3 space-y-2.5 text-xs">
         <div className="flex items-center justify-between py-1 border-b border-border/50">
           <span className="text-muted-foreground">{t.users.lastLogin}</span>
           <span className="font-mono text-foreground flex items-center gap-1.5">

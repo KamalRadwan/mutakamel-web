@@ -20,7 +20,7 @@ export const SheetClose = DialogPrimitive.Close;
 // slide-in-from-start. Each logical side therefore picks its physical
 // animation via the ltr:/rtl: variants instead of a single logical class.
 const sheetVariants = cva(
-  "fixed z-50 flex flex-col gap-4 border-border bg-card p-6 text-card-foreground shadow-overlay transition ease-in-out motion-reduce:animate-none motion-reduce:transition-none data-[state=closed]:duration-200 data-[state=open]:duration-300 data-[state=closed]:animate-out data-[state=open]:animate-in",
+  "fixed z-50 flex flex-col gap-3.5 border-border bg-card p-4 text-card-foreground shadow-overlay transition ease-in-out motion-reduce:animate-none motion-reduce:transition-none data-[state=closed]:duration-200 data-[state=open]:duration-300 data-[state=closed]:animate-out data-[state=open]:animate-in",
   {
     variants: {
       side: {
@@ -60,7 +60,7 @@ export const SheetContent = forwardRef<React.ComponentRef<typeof DialogPrimitive
           <DialogPrimitive.Close
             aria-label={resolvedCloseLabel}
             className={cn(
-              "absolute end-4 top-4 inline-flex items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100 motion-reduce:transition-none",
+              "absolute end-3 top-3 inline-flex items-center justify-center rounded-md opacity-60 transition-opacity hover:opacity-100 motion-reduce:transition-none",
               focusRing,
               hitArea,
             )}
@@ -86,7 +86,7 @@ export const SheetTitle = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title ref={ref} className={cn("text-lg font-semibold", className)} {...props} />
+  <DialogPrimitive.Title ref={ref} className={cn("text-base font-semibold", className)} {...props} />
 ));
 SheetTitle.displayName = "SheetTitle";
 
@@ -94,6 +94,6 @@ export const SheetDescription = forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+  <DialogPrimitive.Description ref={ref} className={cn("text-xs text-muted-foreground", className)} {...props} />
 ));
 SheetDescription.displayName = "SheetDescription";

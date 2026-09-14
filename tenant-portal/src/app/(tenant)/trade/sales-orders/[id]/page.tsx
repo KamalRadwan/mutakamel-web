@@ -110,14 +110,14 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
                 <>
                   {detail.scope.canWrite(SALES_ORDER_PERMISSIONS.update) &&
                   order.lifecycleStatus === "DRAFT" ? (
-                    <Button variant="outline" onClick={editReference.open}>
+                    <Button size="sm" variant="outline" onClick={editReference.open}>
                       {t.tradeDocuments.salesOrders.editTitle}
                     </Button>
                   ) : null}
                   {screen.canHold || screen.canRelease || screen.canCancel ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost">{t.common.actions}</Button>
+                        <Button size="sm" variant="ghost">{t.common.actions}</Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {screen.canHold && !screen.isHoldBlocked ? (

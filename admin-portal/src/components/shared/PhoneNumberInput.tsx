@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
-import { Combobox, Input, type ComboboxOption } from "@/design-system";
+import { memo, useMemo } from "react";
+import { Phone } from "lucide-react";
+import { Combobox, Input, cn, type ComboboxOption } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   getCountryOptions,
@@ -23,19 +24,15 @@ interface PhoneNumberInputProps {
   disabled?: boolean;
   required?: boolean;
   numberPlaceholder?: string;
+  className?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }
 
 /**
- * Calling code and national number as one control.
- *
- * The wizard previously asked for a free-text "+20" alongside a free-text
- * number, which let the two disagree and pushed E.164 knowledge onto the
- * admin. Pasting a full international number into the number field splits it
- * across both parts instead of being rejected.
+ * Calling code and national number as one compact control.
  */
-export function PhoneNumberInput({
+export const PhoneNumberInput = memo(function PhoneNumberInput({
   id,
   name,
   value,
@@ -43,10 +40,11 @@ export function PhoneNumberInput({
   disabled = false,
   required = false,
   numberPlaceholder,
+  className,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
 }: PhoneNumberInputProps) {
-  const { lang, t } = useI18n();
+  const { t } = useI18n();
 
   const options = useMemo<ComboboxOption[]>(
     () =>
@@ -102,35 +100,49 @@ export function PhoneNumberInput({
   };
 
   return (
-    <div className="flex flex-col gap-2 sm:flex-row" dir="ltr">
-      <Combobox
-        id={`${id}-code`}
-        value={selectedIso}
-        options={options}
-        onValueChange={(isoCode) => {
-          const country = getCountryOptions().find(
-            (candidate) => candidate.isoCode === isoCode,
-          );
-          if (!country) return;
-          onChange({
-            callingCode: country.callingCode,
-            nationalNumber: value.nationalNumber,
-          });
-        }}
-        label={t.tenants.wizard.fieldLabels.phoneCallingCode}
-        placeholder={t.tenants.wizard.choosePhoneCodePlaceholder}
-        searchPlaceholder={t.tenants.wizard.searchCountriesPlaceholder}
-        emptyLabel={t.tenants.wizard.noMatchingCountries}
-        disabled={disabled}
-        preferDownward
-        className="sm:w-56 sm:shrink-0"
-        contentClassName="max-w-sm"
-        aria-invalid={ariaInvalid}
-      />
+    <div
+      className={cn(
+        "flex items-center rounded-md border border-input bg-card h-(--size-control-sm) text-xs overflow-hidden transition-colors w-full min-w-0",
+        "focus-within:ring-2 focus-within:ring-ring focus-within:border-input",
+        ariaInvalid && "border-destructive focus-within:ring-destructive",
+        className,
+      )}
+      dir="ltr"
+    >
+      <div className="flex items-center ps-2.5 pe-1 shrink-0 h-full">
+        <Phone className="size-3.5 text-muted-foreground me-1.5 shrink-0" aria-hidden="true" />
+        <Combobox
+          id={`${id}-code`}
+          value={selectedIso}
+          options={options}
+          onValueChange={(isoCode) => {
+            const country = getCountryOptions().find(
+              (candidate) => candidate.isoCode === isoCode,
+            );
+            if (!country) return;
+            onChange({
+              callingCode: country.callingCode,
+              nationalNumber: value.nationalNumber,
+            });
+          }}
+          label={t.tenants.wizard.fieldLabels.phoneCallingCode}
+          placeholder={t.tenants.wizard.choosePhoneCodePlaceholder}
+          searchPlaceholder={t.tenants.wizard.searchCountriesPlaceholder}
+          emptyLabel={t.tenants.wizard.noMatchingCountries}
+          disabled={disabled}
+          preferDownward
+          triggerLabel={value.callingCode || undefined}
+          className="border-0 shadow-none px-1 h-full bg-transparent hover:bg-transparent focus-visible:ring-0 w-auto gap-1 text-xs font-mono"
+          contentClassName="max-w-sm"
+          aria-invalid={ariaInvalid}
+        />
+      </div>
+      <div className="h-4 w-px bg-border shrink-0" />
       <Input
         id={id}
         name={name}
         type="tel"
+        size="sm"
         inputMode="tel"
         autoComplete="tel-national"
         dir="ltr"
@@ -139,12 +151,11 @@ export function PhoneNumberInput({
         required={required}
         onChange={(event) => handleNumberChange(event.target.value)}
         placeholder={numberPlaceholder}
-        // The visible order is code-then-number in both locales because a
-        // phone number is not mirrored in Arabic.
-        className={`flex-1 ${lang === "ar" ? "text-start" : ""}`}
+        aria-label={numberPlaceholder}
+        className="flex-1 rounded-none border-0 bg-transparent px-2.5 h-8 shadow-none focus-visible:ring-0 text-xs text-foreground placeholder:text-muted-foreground min-w-0"
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
       />
     </div>
   );
-}
+});

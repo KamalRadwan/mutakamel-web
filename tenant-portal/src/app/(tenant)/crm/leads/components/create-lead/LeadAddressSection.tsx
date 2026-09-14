@@ -77,7 +77,7 @@ export function LeadAddressSection({
 
       {rows.map((row) => (
         <Field key={row.key} label={row.label} error={errors[`address.${row.key}`]}>
-          <Input
+          <Input size="sm" placeholder={row.label}
             value={address[row.key]}
             maxLength={row.max}
             disabled={disabled}

@@ -13,6 +13,7 @@ import {
   SelectContent,
   SelectItem,
 } from "../../primitives/Select";
+import { cn } from "../../lib/cn";
 import {
   getFilterDependencyFailure,
   getFilterValidationFailure,
@@ -31,6 +32,7 @@ export function FilterBar({
   ariaControls,
   isLoading = false,
   isRefreshing = false,
+  className,
 }: FilterBarProps) {
   const { lang } = useI18n();
   const idPrefix = useId();
@@ -67,7 +69,7 @@ export function FilterBar({
       aria-label={regionLabel}
       aria-controls={ariaControls}
       aria-busy={isLoading || isRefreshing || undefined}
-      className="flex flex-col gap-3 border-b border-border bg-card p-4"
+      className={cn("flex flex-col gap-2.5 border-b border-border bg-card p-3", className)}
     >
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         <span key={announcement.sequence}>{announcementText}</span>
@@ -123,7 +125,7 @@ export function FilterBar({
           size="sm"
           onClick={reset}
           disabled={disabledForInitialLoad || activeFields.length === 0}
-          className="w-full sm:w-auto"
+          className="h-8 px-2.5 text-xs w-full sm:w-auto"
         >
           <RotateCcw className="size-3.5" aria-hidden="true" />
           {lang === "ar" ? "إعادة تعيين" : "Reset"}
@@ -196,20 +198,21 @@ function FilterFieldControl({
         </label>
         <div className="relative">
           <Search
-            className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
             aria-hidden="true"
           />
           <Input
             id={id}
             name={field.key}
             type="search"
+            size="sm"
             value={searchDraft}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={placeholder}
             disabled={disabled}
             invalid={Boolean(error)}
             aria-describedby={describedBy}
-            className="ps-9"
+            className="h-8 ps-8 pe-2.5 text-xs"
           />
         </div>
         <FieldSupport
@@ -237,12 +240,18 @@ function FilterFieldControl({
           onValueChange={onFieldChange}
           disabled={disabled}
         >
-          <SelectTrigger id={id} aria-describedby={describedBy} aria-invalid={Boolean(error) || undefined}>
+          <SelectTrigger
+            id={id}
+            size="sm"
+            aria-describedby={describedBy}
+            aria-invalid={Boolean(error) || undefined}
+            className="h-8 px-2.5 text-xs"
+          >
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
             {field.options?.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
+              <SelectItem key={option.value} value={option.value} className="text-xs py-1.5">
                 {lang === "ar" ? option.labelAr : option.labelEn}
               </SelectItem>
             ))}
@@ -321,6 +330,8 @@ function FilterFieldControl({
             id={`${id}-from`}
             name={`${field.key}From`}
             type="date"
+            size="sm"
+            placeholder={fromLabel}
             value={range.from ?? ""}
             onChange={(event) => onFieldChange({ ...range, from: event.target.value })}
             disabled={disabled}
@@ -336,6 +347,8 @@ function FilterFieldControl({
             id={`${id}-to`}
             name={`${field.key}To`}
             type="date"
+            size="sm"
+            placeholder={toLabel}
             value={range.to ?? ""}
             onChange={(event) => onFieldChange({ ...range, to: event.target.value })}
             disabled={disabled}

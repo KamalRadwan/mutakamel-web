@@ -115,9 +115,6 @@ export function TenantProvisioningWorkspaceView({
               </Badge>
             )}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {copy.asyncNote}
-          </p>
         </div>
         <Button
           type="button"
@@ -154,7 +151,7 @@ export function TenantProvisioningWorkspaceView({
           ref={errorRef}
           role="alert"
           tabIndex={-1}
-          className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground"
+          className="mx-3 mt-3 flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground"
         >
           <span>
             <strong>{copy.actionErrorPrefix}</strong>
@@ -176,7 +173,7 @@ export function TenantProvisioningWorkspaceView({
         </div>
       )}
 
-      <div className="p-4">
+      <div className="p-3 sm:p-3.5">
         {model.section === "operations" && <OperationsSection model={model} />}
         {model.section === "updates" && <UpdatesSection model={model} />}
         {model.section === "state" && <StateSection model={model} />}
@@ -201,7 +198,7 @@ function OperationsSection({ model }: TenantProvisioningWorkspaceViewProps) {
         <div className="grid gap-4 xl:grid-cols-[19rem_minmax(0,1fr)]">
           <div className="max-h-[44rem] space-y-2 overflow-y-auto pe-1">
             {provisioning.operations.data.items.map((operation) => (
-              <Button
+              <Button size="sm"
                 type="button"
                 key={operation.id}
                 variant="outline"
@@ -509,7 +506,7 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
               const checked = model.selectedUpdateKeys.includes(update.componentKey);
               const selectable = !update.updateAlreadyPlanned && update.current.manifestChecksum !== null;
               return (
-                <Button
+                <Button size="sm"
                   type="button"
                   key={update.componentKey}
                   variant="outline"
@@ -587,8 +584,17 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
                   ["SKIP_THIS_RELEASE", "SKIP_THIS_RELEASE"],
                 ]}
               />
-              <Field id="seed-conflict-reason" label={copy.conflictReasonCodeAriaLabel}>
-                {(field) => <Input {...field} name="conflictReasonCode" value={model.conflictReasonCode} onChange={(event) => model.setConflictReasonCode(event.target.value)} />}
+              <Field id="seed-conflict-reason" label={copy.conflictReasonCodeAriaLabel} hideLabel>
+                {(field) => (
+                  <Input
+                    {...field}
+                    size="sm"
+                    name="conflictReasonCode"
+                    placeholder={copy.conflictReasonCodeAriaLabel}
+                    value={model.conflictReasonCode}
+                    onChange={(event) => model.setConflictReasonCode(event.target.value)}
+                  />
+                )}
               </Field>
             </div>
           </div>
@@ -646,8 +652,17 @@ function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
             )}
           </div>
           <div className="grid w-full items-end gap-2 sm:w-auto sm:grid-cols-[minmax(12rem,1fr)_auto]">
-            <Field id="prerequisite-reason" label={copy.prereqReasonAriaLabel}>
-              {(field) => <Input {...field} name="prerequisiteReasonCode" value={model.prerequisiteReasonCode} onChange={(event) => model.setPrerequisiteReasonCode(event.target.value)} />}
+            <Field id="prerequisite-reason" label={copy.prereqReasonAriaLabel} hideLabel>
+              {(field) => (
+                <Input
+                  {...field}
+                  size="sm"
+                  name="prerequisiteReasonCode"
+                  placeholder={copy.prereqReasonAriaLabel}
+                  value={model.prerequisiteReasonCode}
+                  onChange={(event) => model.setPrerequisiteReasonCode(event.target.value)}
+                />
+              )}
             </Field>
             <Button type="button" variant="primary" size="sm" onClick={() => void model.requestSelectedPrerequisites()} disabled={!provisioning.permissions.canRequestPrerequisites || !selectedOperation || !prerequisitesRequired || provisioning.mutation.name !== null}>{copy.requestButton}</Button>
           </div>
@@ -695,15 +710,43 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
     <div className="grid gap-4 xl:grid-cols-2">
       <CommandCard title={copy.addApplicationTitle} description={copy.addApplicationDescription}>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Field label={copy.applicationKeyLabel}>
-            {(fieldProps) => <Input {...fieldProps} name="applicationKey" value={model.applicationKey} onChange={(event) => model.setApplicationKey(event.target.value)} />}
+          <Field label={copy.applicationKeyLabel} hideLabel required>
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                size="sm"
+                name="applicationKey"
+                placeholder={`${copy.applicationKeyLabel} *`}
+                value={model.applicationKey}
+                onChange={(event) => model.setApplicationKey(event.target.value)}
+              />
+            )}
           </Field>
-          <Field label={copy.accessPolicyRevisionLabel}>
-            {(fieldProps) => <Input {...fieldProps} name="accessPolicyRevision" inputMode="numeric" value={model.accessPolicyRevision} onChange={(event) => model.setAccessPolicyRevision(event.target.value)} />}
+          <Field label={copy.accessPolicyRevisionLabel} hideLabel required>
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                size="sm"
+                name="accessPolicyRevision"
+                inputMode="numeric"
+                placeholder={`${copy.accessPolicyRevisionLabel} *`}
+                value={model.accessPolicyRevision}
+                onChange={(event) => model.setAccessPolicyRevision(event.target.value)}
+              />
+            )}
           </Field>
         </div>
-        <Field label={copy.reasonCodeLabel}>
-          {(fieldProps) => <Input {...fieldProps} name="addApplicationReasonCode" value={model.addApplicationReasonCode} onChange={(event) => model.setAddApplicationReasonCode(event.target.value)} />}
+        <Field label={copy.reasonCodeLabel} hideLabel required>
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              size="sm"
+              name="addApplicationReasonCode"
+              placeholder={`${copy.reasonCodeLabel} *`}
+              value={model.addApplicationReasonCode}
+              onChange={(event) => model.setAddApplicationReasonCode(event.target.value)}
+            />
+          )}
         </Field>
         <div className="space-y-2">
           {model.managedTargets.map((target, index) => (
@@ -716,11 +759,13 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {(["componentKey", "componentId", "targetReleaseId", "targetReleaseVersion", "targetManifestChecksum"] as const).map((field) => (
-                  <Field key={field} id={`managed-target-${target.key}-${field}`} label={managedTargetFieldLabel(field, ar)} className={field === "targetManifestChecksum" ? "sm:col-span-2" : undefined}>
+                  <Field key={field} id={`managed-target-${target.key}-${field}`} label={managedTargetFieldLabel(field, ar)} hideLabel className={field === "targetManifestChecksum" ? "sm:col-span-2" : undefined}>
                     {(fieldProps) => (
                       <Input
                         {...fieldProps}
+                        size="sm"
                         name={`targets.${index}.${field}`}
+                        placeholder={managedTargetFieldLabel(field, ar)}
                         value={target[field]}
                         onChange={(event) => model.updateManagedTarget(target.key, field, event.target.value)}
                       />
@@ -735,21 +780,39 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
         <Button type="button" variant="primary" size="sm" disabled={!provisioning.permissions.canAddApplication || provisioning.mutation.name !== null} onClick={() => void model.submitAddApplication()}>{copy.createAddOperationButton}</Button>
       </CommandCard>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <CommandCard title={copy.repairComponentTitle} description={copy.repairDescription}>
           <ComponentSelect model={model} id="repair-component" name="repairComponentId" label={copy.componentLabel} value={model.repairComponentId} onChange={model.setRepairComponentId} />
-          <Field label={copy.reasonCodeLabel}>
-            {(fieldProps) => <Input {...fieldProps} name="repairReasonCode" value={model.repairReasonCode} onChange={(event) => model.setRepairReasonCode(event.target.value)} />}
+          <Field label={copy.reasonCodeLabel} hideLabel required>
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                size="sm"
+                name="repairReasonCode"
+                placeholder={`${copy.reasonCodeLabel} *`}
+                value={model.repairReasonCode}
+                onChange={(event) => model.setRepairReasonCode(event.target.value)}
+              />
+            )}
           </Field>
           <Button type="button" variant="primary" size="sm" disabled={!provisioning.permissions.canRepair || provisioning.mutation.name !== null} onClick={() => void model.submitRepair()}>{copy.createRepairButton}</Button>
         </CommandCard>
 
         <CommandCard title={copy.retainedDecommissionTitle} description={copy.retainedDecommissionDescription}>
           <ComponentSelect model={model} id="decommission-component" name="decommissionComponentId" label={copy.componentLabel} value={model.decommissionComponentId} onChange={model.setDecommissionComponentId} />
-          <Field label={copy.reasonCodeLabel}>
-            {(fieldProps) => <Input {...fieldProps} name="decommissionReasonCode" value={model.decommissionReasonCode} onChange={(event) => model.setDecommissionReasonCode(event.target.value)} />}
+          <Field label={copy.reasonCodeLabel} hideLabel required>
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                size="sm"
+                name="decommissionReasonCode"
+                placeholder={`${copy.reasonCodeLabel} *`}
+                value={model.decommissionReasonCode}
+                onChange={(event) => model.setDecommissionReasonCode(event.target.value)}
+              />
+            )}
           </Field>
-          <label htmlFor="retention-acknowledged" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+          <label htmlFor="retention-acknowledged" className="flex min-h-8 items-center gap-2 text-xs text-muted-foreground">
             <Checkbox id="retention-acknowledged" name="retentionAcknowledged" checked={model.retentionAcknowledged} onCheckedChange={(checked) => model.setRetentionAcknowledged(checked === true)} />
             <span>{copy.retentionAckLabel}</span>
           </label>
@@ -777,11 +840,11 @@ function LabeledProvisioningSelect({
 }) {
   const labelId = `${id}-label`;
   return (
-    <div className="space-y-1.5">
-      <span id={labelId} className="text-sm font-medium text-foreground">{label}</span>
+    <div className="space-y-1">
+      <span id={labelId} className="text-xs font-medium text-foreground">{label}</span>
       <Select name={name} value={value} onValueChange={onValueChange}>
-        <SelectTrigger id={id} aria-labelledby={labelId}>
-          <SelectValue />
+        <SelectTrigger id={id} size="sm" aria-labelledby={labelId}>
+          <SelectValue placeholder={label} />
         </SelectTrigger>
         <SelectContent>
           {options.map(([optionValue, optionLabel]) => (
@@ -796,11 +859,11 @@ function LabeledProvisioningSelect({
 function ComponentSelect({ model, value, onChange, id, name, label }: TenantProvisioningWorkspaceViewProps & { value: string; onChange: (value: string) => void; id: string; name: string; label: string }) {
   const labelId = `${id}-label`;
   return (
-    <div className="space-y-1.5">
-      <span id={labelId} className="text-sm font-medium text-foreground">{label}</span>
+    <div className="space-y-1">
+      <span id={labelId} className="text-xs font-medium text-foreground">{label}</span>
       <Select name={name} value={value || undefined} onValueChange={onChange}>
-        <SelectTrigger id={id} aria-labelledby={labelId}>
-          <SelectValue placeholder="—" />
+        <SelectTrigger id={id} size="sm" aria-labelledby={labelId}>
+          <SelectValue placeholder={label} />
         </SelectTrigger>
         <SelectContent>
           {model.provisioning.components.data.items.map((component) => (

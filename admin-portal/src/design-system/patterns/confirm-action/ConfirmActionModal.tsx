@@ -135,6 +135,7 @@ export function ConfirmActionModal({
             <Input
               id={inputId}
               type="text"
+              size="sm"
               value={typedInput}
               onChange={(e) => setTypedInput(e.target.value)}
               placeholder={requiredConfirmationText}

@@ -124,7 +124,7 @@ export default function RolesDirectoryPage() {
               size="sm"
               onClick={() => openDeleteModal(role.id)}
               aria-label={t.roles.delete}
-              className="size-8 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
+              className="size-7 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
             </Button>
@@ -135,14 +135,13 @@ export default function RolesDirectoryPage() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <PageHeader
         title={t.roles.pageTitle}
-        description={t.roles.pageSubtitle}
         action={
           canCreate && (
-            <Button type="button" variant="primary" onClick={() => setIsCreateModalOpen(true)}>
-              <Plus className="size-4" />
+            <Button type="button" variant="primary" size="sm" onClick={() => setIsCreateModalOpen(true)}>
+              <Plus className="size-3.5" />
               {t.roles.createRole}
             </Button>
           )

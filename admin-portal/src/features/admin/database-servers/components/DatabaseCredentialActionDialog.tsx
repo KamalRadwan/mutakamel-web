@@ -82,26 +82,26 @@ export function DatabaseCredentialActionDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-      <DialogContent dir={dir}>
-        <DialogHeader className="flex-row items-start gap-3 space-y-0">
+      <DialogContent dir={dir} className="max-w-md p-3 sm:p-3.5">
+        <DialogHeader className="flex-row items-center gap-2.5 space-y-0 pb-2 border-b border-border">
           <span
-            className={`shrink-0 rounded-lg p-2 ${
+            className={`shrink-0 rounded-lg p-1.5 ${
               isCaution
                 ? "bg-warning-subtle text-warning-subtle-foreground"
                 : "bg-info-subtle text-info-subtle-foreground"
             }`}
           >
-            {isCaution ? <KeyRound className="h-5 w-5" aria-hidden="true" /> : <ShieldCheck className="h-5 w-5" aria-hidden="true" />}
+            {isCaution ? <KeyRound className="size-4" aria-hidden="true" /> : <ShieldCheck className="size-4" aria-hidden="true" />}
           </span>
           <div>
-            <DialogTitle className="text-base">{entry.title}</DialogTitle>
-            <DialogDescription className="mt-1 text-xs leading-5">{entry.description}</DialogDescription>
+            <DialogTitle className="text-sm font-semibold">{entry.title}</DialogTitle>
+            <DialogDescription className="mt-0.5 text-xs">{entry.description}</DialogDescription>
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {action.kind !== "retry-bootstrap" && (
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-lg bg-muted px-4 py-3 text-xs">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md bg-muted p-2.5 text-xs">
               <dt className="text-muted-foreground">{"applicationKey" in action ? copy.applicationLabel : copy.serviceLabel}</dt>
               <dd className="font-semibold text-foreground">{"applicationKey" in action ? action.applicationKey : "Provisioning"}</dd>
               <dt className="text-muted-foreground">{copy.principalLabel}</dt>
@@ -111,29 +111,29 @@ export function DatabaseCredentialActionDialog({
             </dl>
           )}
 
-          <div className="flex gap-2 rounded-lg border border-info/30 bg-info-subtle px-3 py-2.5 text-xs text-info-subtle-foreground">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div className="flex gap-2 rounded-md border border-info/30 bg-info-subtle p-2 text-xs text-info-subtle-foreground">
+            <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             <p>{copy.safetyNotice}</p>
           </div>
 
-          <Field label={copy.reasonLabel} hint={copy.reasonHint.replace("{{count}}", String(reason.trim().length))} required>
+          <Field label={copy.reasonLabel} hideLabel hint={copy.reasonHint.replace("{{count}}", String(reason.trim().length))} required>
             {(fieldProps) => (
               <Textarea
                 {...fieldProps}
                 value={reason}
                 onChange={(event) => onReasonChange(event.target.value)}
-                rows={3}
+                rows={2}
                 minLength={8}
                 maxLength={500}
                 autoFocus
-                placeholder={copy.reasonPlaceholder}
+                placeholder={`${copy.reasonPlaceholder || copy.reasonLabel} *`}
               />
             )}
           </Field>
 
           {error && (
-            <div ref={errorRef} tabIndex={-1} className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" role="alert">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div ref={errorRef} tabIndex={-1} className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-subtle p-2 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring" role="alert">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               <div className="min-w-0 space-y-1">
                 <p>{error}</p>
                 {errorCode && <code className="block break-words font-mono" dir="ltr">{errorCode}</code>}
@@ -147,10 +147,10 @@ export function DatabaseCredentialActionDialog({
             </div>
           )}
           {refreshError && (
-            <div role="alert" className="space-y-2 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground">
+            <div role="alert" className="space-y-2 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">
               <p>{refreshError}</p>
               {onRefresh && (
-                <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => void onRefresh()}>
+                <Button type="button" variant="outline" size="xs" disabled={pending} onClick={() => void onRefresh()}>
                   {lang === "ar" ? "تحديث الحالة" : "Refresh status"}
                 </Button>
               )}
@@ -158,13 +158,14 @@ export function DatabaseCredentialActionDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={pending}>
+        <DialogFooter className="mt-3">
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={pending}>
             {copy.cancel}
           </Button>
           <Button
             type="button"
             variant="primary"
+            size="sm"
             onClick={() => void onSubmit()}
             loading={pending}
             disabled={submitDisabled || reason.trim().length < 8}

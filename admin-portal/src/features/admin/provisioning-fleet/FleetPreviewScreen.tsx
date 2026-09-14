@@ -119,16 +119,16 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
         <>
           <PreviewSummary preview={preview} copy={copy} lang={lang} />
           {view.preview.data ? (
-            <Card className="p-5">
+            <Card className="p-3 sm:p-3.5">
               <FleetMeta result={view.preview.data} copy={copy} lang={lang} />
             </Card>
           ) : null}
           <PreviewTargets preview={preview} copy={copy} />
 
-          <Card className="space-y-4 p-5">
+          <Card className="space-y-3 p-3 sm:p-3.5">
             <header className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold text-foreground">{copy.tenantEvidence}</h2>
-              <span className="text-sm font-semibold text-muted-foreground">
+              <h2 className="text-lg font-semibold text-foreground">{copy.tenantEvidence}</h2>
+              <span className="text-xs font-semibold text-muted-foreground">
                 {copy.total}: {view.tenants.data?.total ?? 0}
               </span>
             </header>
@@ -140,7 +140,7 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
               onRetry={view.refresh}
             />
             {view.tenants.state === "EMPTY" ? (
-              <p className="rounded-lg bg-muted p-5 text-center text-sm text-muted-foreground">
+              <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">
                 {copy.emptyTenants}
               </p>
             ) : null}
@@ -164,18 +164,18 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
             {view.tenants.data ? <FleetMeta result={view.tenants.data} copy={copy} lang={lang} /> : null}
           </Card>
 
-          <Card className="space-y-4 border-destructive/30 p-5">
+          <Card className="space-y-3 border-destructive/30 p-3 sm:p-3.5">
             <header>
-              <h2 className="text-xl font-semibold text-foreground">{copy.launchRollout}</h2>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.launchHint}</p>
+              <h2 className="text-lg font-semibold text-foreground">{copy.launchRollout}</h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.launchHint}</p>
             </header>
             {!view.permissions.canCreateRollout ? (
-              <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm font-semibold text-warning-subtle-foreground">
+              <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs font-semibold text-warning-subtle-foreground">
                 {copy.forbiddenRolloutCreate}
               </p>
             ) : (
-              <form onSubmit={submit} noValidate className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <form onSubmit={submit} noValidate className="space-y-3">
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
                   <NumberField label={copy.canarySize} value={draft.canarySize} error={errors.canarySize} copy={copy} onChange={(canarySize) => setDraft((current) => ({ ...current, canarySize }))} />
                   <NumberField label={copy.batchSize} value={draft.batchSize} error={errors.batchSize} copy={copy} onChange={(batchSize) => setDraft((current) => ({ ...current, batchSize }))} />
                   <NumberField label={copy.maxParallel} value={draft.maxParallel} error={errors.maxParallel} copy={copy} onChange={(maxParallel) => setDraft((current) => ({ ...current, maxParallel }))} />
@@ -198,7 +198,7 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
                     ) : null
                   }
                 />
-                <Button type="submit" variant="destructive" disabled={pending} loading={pending}>
+                <Button type="submit" variant="destructive" size="sm" disabled={pending} loading={pending}>
                   {pending ? copy.launching : copy.launch}
                 </Button>
               </form>
@@ -230,15 +230,15 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
 
 function PreviewSummary({ preview, copy, lang }: { preview: FleetPreview; copy: ReturnType<typeof getProvisioningFleetCopy>; lang: "ar" | "en" }) {
   return (
-    <Card className="space-y-4 p-5">
+    <Card className="space-y-3 p-3 sm:p-3.5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">{copy.previewDetail}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{copy.previewDetail}</h2>
           <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">{preview.previewId}</code>
         </div>
         <Badge tone="neutral">{copy.operation[preview.operationType]}</Badge>
       </div>
-      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <FleetDatum label={copy.eligible} value={preview.eligibleCount} />
         <FleetDatum label={copy.ineligible} value={preview.ineligibleCount} />
         <FleetDatum label={copy.createdAt} value={formatInstant(preview.createdAt, lang)} />
@@ -254,10 +254,10 @@ function PreviewSummary({ preview, copy, lang }: { preview: FleetPreview; copy: 
 
 function PreviewTargets({ preview, copy }: { preview: FleetPreview; copy: ReturnType<typeof getProvisioningFleetCopy> }) {
   return (
-    <Card className="space-y-3 p-5">
-      <h2 className="text-xl font-semibold text-foreground">{copy.targets}</h2>
+    <Card className="space-y-3 p-3 sm:p-3.5">
+      <h2 className="text-lg font-semibold text-foreground">{copy.targets}</h2>
       {preview.targetSelection.length ? preview.targetSelection.map((target) => (
-        <dl key={target.componentKey} className="grid gap-2 rounded-lg bg-muted p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <dl key={target.componentKey} className="grid gap-2 rounded-lg bg-muted p-3 sm:grid-cols-2 lg:grid-cols-4">
           <FleetDatum label={copy.componentKey} value={target.componentKey} mono />
           <FleetDatum label={copy.componentId} value={target.componentId} mono />
           <FleetDatum label={copy.targetReleaseId} value={target.targetReleaseId} mono />
@@ -266,16 +266,16 @@ function PreviewTargets({ preview, copy }: { preview: FleetPreview; copy: Return
           <FleetDatum label={copy.expectedCurrentReleaseId} value={target.expectedCurrentReleaseId ?? copy.none} mono />
           <FleetDatum label={copy.expectedCurrentManifestChecksum} value={target.expectedCurrentManifestChecksum ?? copy.none} mono />
         </dl>
-      )) : <p className="text-sm text-muted-foreground">{copy.none}</p>}
+      )) : <p className="text-xs text-muted-foreground">{copy.none}</p>}
     </Card>
   );
 }
 
 function NumberField({ label, value, error, copy, onChange }: { label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; onChange: (value: string) => void }) {
   return (
-    <Field label={label} error={error ? (copy.validation[error as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
+    <Field label={label} hideLabel error={error ? (copy.validation[error as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
       {(fieldProps) => (
-        <Input {...fieldProps} type="number" min={1} step={1} inputMode="numeric" value={value} onChange={(event) => onChange(event.target.value)} />
+        <Input {...fieldProps} size="sm" placeholder={`${label} *`} type="number" min={1} step={1} inputMode="numeric" value={value} onChange={(event) => onChange(event.target.value)} />
       )}
     </Field>
   );

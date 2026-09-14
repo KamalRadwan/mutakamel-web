@@ -80,7 +80,7 @@ export default function ContractsPage() {
           title={t.tradeDocuments.contracts.title}
           description={t.tradeDocuments.contracts.subtitle}
           secondaryActions={
-            <Button variant="outline" onClick={() => void list.reload()} disabled={list.isRefreshing}>
+            <Button size="sm" variant="outline" onClick={() => void list.reload()} disabled={list.isRefreshing}>
               <RefreshCw
                 className={list.isRefreshing ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

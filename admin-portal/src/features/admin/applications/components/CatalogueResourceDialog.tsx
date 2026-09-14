@@ -111,14 +111,14 @@ export function CatalogueResourceDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle className="text-sm">
             {resource ? copy.edit : copy.create} {isFeature ? copy.feature : copy.tier}
           </DialogTitle>
           <p className="text-xs text-muted-foreground">{copy.immutableKey}</p>
         </DialogHeader>
-        <form onSubmit={submit} noValidate className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-3">
           {Object.keys(fieldErrors).length > 0 ? (
             <div role="alert" className="rounded-md border border-destructive bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground">
               <p className="font-semibold">{copy.validationSummary}</p>
@@ -132,10 +132,12 @@ export function CatalogueResourceDialog({
             </div>
           ) : null}
           {!resource && (
-            <Field id="catalogue-resource-key" label={copy.key} required error={fieldErrors.key}>
+            <Field id="catalogue-resource-key" label={copy.key} hideLabel required error={fieldErrors.key}>
               {(fieldProps) => (
                 <Input
                   {...fieldProps}
+                  size="sm"
+                  placeholder={`${copy.key} *`}
                   invalid={Boolean(fieldErrors.key)}
                   value={key}
                   onChange={(event) => { setKey(event.target.value); setFieldErrors({}); }}
@@ -146,10 +148,12 @@ export function CatalogueResourceDialog({
               )}
             </Field>
           )}
-          <Field id="catalogue-resource-name" label={copy.name} required error={fieldErrors.name}>
+          <Field id="catalogue-resource-name" label={copy.name} hideLabel required error={fieldErrors.name}>
             {(fieldProps) => (
               <Input
                 {...fieldProps}
+                size="sm"
+                placeholder={`${copy.name} *`}
                 invalid={Boolean(fieldErrors.name)}
                 value={name}
                 onChange={(event) => { setName(event.target.value); setFieldErrors({}); }}
@@ -159,25 +163,25 @@ export function CatalogueResourceDialog({
             )}
           </Field>
           {isFeature && (
-            <Field label={copy.description}>
+            <Field label={copy.description} hideLabel>
               {(fieldProps) => (
-                <Textarea {...fieldProps} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={512} rows={3} />
+                <Textarea {...fieldProps} rows={2} placeholder={copy.description} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={512} />
               )}
             </Field>
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {resource || isFeature ? (
-              <Field id="catalogue-resource-rank" label={copy.rank} error={fieldErrors.rank}>
-                {(fieldProps) => <Input {...fieldProps} invalid={Boolean(fieldErrors.rank)} type="number" min={0} step={1} value={rank} onChange={(event) => { setRank(event.target.value); setFieldErrors((current) => omitFieldError(current, "rank")); }} className="font-mono" />}
+              <Field id="catalogue-resource-rank" label={copy.rank} hideLabel error={fieldErrors.rank}>
+                {(fieldProps) => <Input {...fieldProps} size="sm" placeholder={copy.rank} invalid={Boolean(fieldErrors.rank)} type="number" min={0} step={1} value={rank} onChange={(event) => { setRank(event.target.value); setFieldErrors((current) => omitFieldError(current, "rank")); }} className="font-mono" />}
               </Field>
             ) : null}
             {!isFeature && (
-              <Field label={copy.colour}>
-                {(fieldProps) => <Input {...fieldProps} type="color" value={color} onChange={(event) => setColor(event.target.value)} className="p-1" />}
+              <Field label={copy.colour} hideLabel>
+                {(fieldProps) => <Input {...fieldProps} size="sm" type="color" value={color} onChange={(event) => setColor(event.target.value)} className="p-1" />}
               </Field>
             )}
           </div>
-          <div className="flex min-h-11 items-center gap-3 rounded-md border border-input px-3 py-2 text-xs font-semibold text-foreground">
+          <div className="flex min-h-8 items-center gap-2 rounded-md border border-input px-2.5 py-1 text-xs font-medium text-foreground">
             <Checkbox id="catalogue-resource-active" checked={isActive} onCheckedChange={(checked) => setIsActive(checked === true)} />
             <label htmlFor="catalogue-resource-active" className="cursor-pointer">{copy.active}</label>
           </div>
@@ -187,8 +191,8 @@ export function CatalogueResourceDialog({
             </div>
           )}
           <footer className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>{copy.cancel}</Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
+            <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={onClose}>{copy.cancel}</Button>
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
               {resource ? copy.save : `${copy.create} ${isFeature ? copy.feature : copy.tier}`}
             </Button>
           </footer>

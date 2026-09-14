@@ -135,7 +135,7 @@ export function ResolvePanel() {
           error={resolve.formError ?? undefined}
           required
         >
-          <Textarea
+          <Textarea placeholder={t.trade.resolveKeys}
             dir="ltr"
             className="font-mono"
             value={resolve.keys}
@@ -145,7 +145,7 @@ export function ResolvePanel() {
           />
         </Field>
         <Field label={t.trade.resolveFacts} hint={t.trade.resolveFactsHint}>
-          <Textarea
+          <Textarea placeholder={t.trade.resolveFacts}
             dir="ltr"
             className="font-mono"
             value={resolve.facts}
@@ -154,7 +154,7 @@ export function ResolvePanel() {
           />
         </Field>
         <div>
-          <Button
+          <Button size="sm"
             variant="outline"
             loading={resolve.isSubmitting}
             onClick={() => void resolve.resolve()}
@@ -197,7 +197,7 @@ export function DefaultPriceBooksPanel() {
                 onValueChange={(next) => books.setPurpose(next as PriceBookPurpose)}
                 disabled={books.isSubmitting}
               >
-                <SelectTrigger aria-label={t.trade.priceBookPurpose}>
+                <SelectTrigger size="sm" aria-label={t.trade.priceBookPurpose}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -215,7 +215,7 @@ export function DefaultPriceBooksPanel() {
               error={books.formError ?? undefined}
               required
             >
-              <Input
+              <Input size="sm" placeholder={t.trade.priceBookCurrency}
                 dir="ltr"
                 value={books.currencyCode}
                 onChange={(event) => books.setCurrencyCode(event.target.value.toUpperCase())}
@@ -225,7 +225,7 @@ export function DefaultPriceBooksPanel() {
               />
             </Field>
             <Field label={t.trade.priceBookId} hint={t.trade.priceBookVersionZeroHint}>
-              <Input
+              <Input size="sm" placeholder={t.trade.priceBookId}
                 dir="ltr"
                 className="font-mono"
                 value={books.priceBookId}
@@ -237,11 +237,11 @@ export function DefaultPriceBooksPanel() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" loading={books.isLoading} onClick={() => void books.load()}>
+            <Button size="sm" variant="outline" loading={books.isLoading} onClick={() => void books.load()}>
               {t.trade.priceBookLoad}
             </Button>
             {books.canManage ? (
-              <Button
+              <Button size="sm"
                 variant="outline"
                 loading={books.isSubmitting}
                 onClick={() => void books.save()}
@@ -250,7 +250,7 @@ export function DefaultPriceBooksPanel() {
               </Button>
             ) : null}
             {books.canManage && books.mapping ? (
-              <Button variant="outline" onClick={books.openDelete} disabled={books.isSubmitting}>
+              <Button size="sm" variant="outline" onClick={books.openDelete} disabled={books.isSubmitting}>
                 {t.trade.priceBookDelete}
               </Button>
             ) : null}

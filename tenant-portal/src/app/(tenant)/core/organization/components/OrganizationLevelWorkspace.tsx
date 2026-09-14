@@ -96,7 +96,7 @@ export function OrganizationLevelWorkspace<L extends OrgLevel>({ level }: { leve
           description={levelCopy.subtitle}
           primaryAction={canManage ? { label: levelCopy.add, onClick: openCreate } : undefined}
           secondaryActions={
-            <Button variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
+            <Button size="sm" variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
               <RefreshCw
                 className={`size-4 ${screen.isLoading ? "animate-spin" : ""}`}
                 aria-hidden="true"

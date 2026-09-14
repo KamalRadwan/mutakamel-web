@@ -49,10 +49,10 @@ const LOOPBACK_ADMISSION_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
  * localhost, like admin-portal" does not work on its own. Admin has no
  * admission layer; this app does.
  *
- * So when the browser is on loopback in development, admission asks about
- * `DEV_TENANT_HOST` instead. The API calls need no equivalent: `next.config.ts`
- * rewrites them to `DEV_API_TARGET`, which already carries the tenant `Host`
- * upstream.
+ * So when the browser is on loopback in development, page admission asks about
+ * `DEV_TENANT_HOST` instead. API requests preserve their actual browser Host;
+ * they do not use this page-admission override. The selected HTTP cookie profile
+ * supports the real tenant hostname directly, which should be used for auth.
  *
  * Three bounds, and none of them is incidental:
  *  - `NODE_ENV === 'development'` only.

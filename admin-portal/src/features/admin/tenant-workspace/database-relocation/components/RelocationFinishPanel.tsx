@@ -125,6 +125,7 @@ function ReleaseSourceCard({
               <Button
                 type="button"
                 variant="destructive"
+                size="sm"
                 disabled={!controller.canReleaseSource}
                 loading={controller.isReleasing}
                 aria-describedby={
@@ -132,7 +133,7 @@ function ReleaseSourceCard({
                 }
                 onClick={controller.openReleaseConfirm}
               >
-                <Trash2 className="size-4" aria-hidden="true" />
+                <Trash2 className="size-3.5" aria-hidden="true" />
                 {copy.releaseButton}
               </Button>
             </div>

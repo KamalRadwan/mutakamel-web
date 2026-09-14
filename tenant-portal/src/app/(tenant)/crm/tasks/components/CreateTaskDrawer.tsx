@@ -101,7 +101,7 @@ export function CreateTaskDrawer({
       ) : null}
 
       <Field label={t.crmTasks.title} error={titleError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmTasks.title}
           value={title}
           maxLength={ACTIVITY_SUBJECT_MAX_LENGTH}
           onChange={(event) => setTitle(event.target.value)}
@@ -117,7 +117,7 @@ export function CreateTaskDrawer({
             setSourceLabel(undefined);
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -156,7 +156,7 @@ export function CreateTaskDrawer({
           value={status}
           onValueChange={(next) => setStatus(next as CrmTaskStatus)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -174,7 +174,7 @@ export function CreateTaskDrawer({
           value={priority || undefined}
           onValueChange={(next) => setPriority(next as CrmPriority)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t.crmTasks.priorityUnset} />
           </SelectTrigger>
           <SelectContent>
@@ -197,7 +197,7 @@ export function CreateTaskDrawer({
       </Field>
 
       <Field label={t.crmTasks.description} hint={t.crmTasks.descriptionHint}>
-        <Textarea
+        <Textarea placeholder={t.crmTasks.description}
           value={description}
           maxLength={ACTIVITY_TEXT_MAX_LENGTH}
           onChange={(event) => setDescription(event.target.value)}

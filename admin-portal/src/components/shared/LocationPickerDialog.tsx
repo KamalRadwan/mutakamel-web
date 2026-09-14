@@ -136,7 +136,7 @@ export function LocationPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent dir={dir} className="max-w-3xl">
+      <DialogContent dir={dir} className="max-w-3xl p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle>{t.tenants.wizard.mapDialogTitle}</DialogTitle>
           <DialogDescription>
@@ -171,6 +171,7 @@ export function LocationPickerDialog({
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={() => onOpenChange(false)}
           >
             {t.tenants.wizard.mapCancel}
@@ -178,6 +179,7 @@ export function LocationPickerDialog({
           <Button
             type="button"
             variant="primary"
+            size="sm"
             onClick={() => {
               onConfirm(picked);
               onOpenChange(false);

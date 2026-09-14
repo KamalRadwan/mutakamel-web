@@ -40,10 +40,10 @@ export default function NewDatabaseServerPage() {
   );
 
   return (
-    <div dir={dir} className="space-y-6 w-full">
-      <Button variant="link" size="sm" asChild className="px-0">
+    <div dir={dir} className="space-y-3 w-full">
+      <Button variant="link" size="xs" asChild className="px-0">
         <Link href={canReadDetails ? "/database-servers" : "/dashboard"}>
-          {lang === "ar" ? <ArrowRight className="size-4" aria-hidden="true" /> : <ArrowLeft className="size-4" aria-hidden="true" />}
+          {lang === "ar" ? <ArrowRight className="size-3.5" aria-hidden="true" /> : <ArrowLeft className="size-3.5" aria-hidden="true" />}
           {canReadDetails ? copy.backToServers : copy.backToDashboard}
         </Link>
       </Button>

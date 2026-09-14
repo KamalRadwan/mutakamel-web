@@ -66,7 +66,7 @@ export function ApplicationReleaseAuthorityRail({
           {typeof application.hasPendingDraft !== "boolean" && application.publicationStatus === "PUBLISHED" && <p className="mt-2 text-xs text-muted-foreground">{copy.pendingDraftUnknown}</p>}
         </div>
         {canOfferPublish && canPublish && (
-          <Button type="button" variant="primary" loading={isPublishing} onClick={onPublish} className="shrink-0">
+          <Button size="sm" type="button" variant="primary" loading={isPublishing} onClick={onPublish} className="shrink-0">
             {!isPublishing && (
               <BookOpenCheck className="size-3.5" aria-hidden="true" />
             )}

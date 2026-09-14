@@ -37,10 +37,10 @@ export function AddonAssignmentCommand({ userId, source, onReload }: {
         </section>}
         {state?.refreshFailed && <p role="alert" className="text-sm text-muted-foreground">{copy.refreshFailed}</p>}
         <Dialog open={state?.open ?? false} onOpenChange={action.close}>
-          <DialogTrigger asChild><Button variant="outline" onClick={action.open} disabled={!action.canOpen}>
+          <DialogTrigger asChild><Button size="sm" variant="outline" onClick={action.open} disabled={!action.canOpen}>
             {state?.command ? copy.reviewOriginal : isRemoval ? copy.remove : copy.assign}
           </Button></DialogTrigger>
-          <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="max-h-[85dvh] overflow-y-auto">
+          <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="p-3 sm:p-3.5 max-h-[85dvh] overflow-y-auto">
             <DialogHeader><DialogTitle>{isRemoval ? copy.remove : copy.assign}</DialogTitle>
               <DialogDescription>{isRemoval ? copy.removeNotice : copy.assignNotice}</DialogDescription></DialogHeader>
             <dl className="grid min-w-0 gap-3">
@@ -56,8 +56,8 @@ export function AddonAssignmentCommand({ userId, source, onReload }: {
             </div>}
             {state?.phase === "storage" && <p role="alert" className="text-sm text-destructive">{copy.storageFailed}</p>}
             <DialogFooter>
-              <Button variant="outline" onClick={() => action.close()} disabled={pending}>{t.common.close}</Button>
-              <Button variant={isRemoval ? "destructive" : "outline"} loading={pending} onClick={action.confirm}
+              <Button size="sm" variant="outline" onClick={() => action.close()} disabled={pending}>{t.common.close}</Button>
+              <Button size="sm" variant={isRemoval ? "destructive" : "outline"} loading={pending} onClick={action.confirm}
                 disabled={!action.ready || state?.phase === "storage"}>{uncertain ? copy.retryOriginal : isRemoval ? copy.confirmRemove : copy.confirmAssign}</Button>
             </DialogFooter>
           </DialogContent>
@@ -65,7 +65,7 @@ export function AddonAssignmentCommand({ userId, source, onReload }: {
       </>}
     </PermissionGate>
     {(action.denied || state?.phase === "rejected" || state?.phase === "committed" || state?.phase === "storage") &&
-      <Button variant="outline" onClick={action.recheck} disabled={pending}>{copy.recheck}</Button>}
+      <Button size="sm" variant="outline" onClick={action.recheck} disabled={pending}>{copy.recheck}</Button>}
   </div>;
 }
 

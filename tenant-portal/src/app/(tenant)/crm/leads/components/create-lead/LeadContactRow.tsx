@@ -120,7 +120,7 @@ export function LeadContactRow({
                 });
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue placeholder={t.crmLeads.newContact} />
               </SelectTrigger>
               <SelectContent>

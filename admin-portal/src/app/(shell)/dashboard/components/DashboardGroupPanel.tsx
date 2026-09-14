@@ -66,7 +66,7 @@ export function DashboardGroupPanel({
   const headline = selectHeadlineCards(group.cards);
 
   return (
-    <div className="animate-in space-y-5 fade-in duration-150 motion-reduce:animate-none">
+    <div className="animate-in space-y-3 fade-in duration-150 motion-reduce:animate-none">
       {group.alerts.length > 0 && <ReportAlerts alerts={group.alerts} />}
 
       <GroupHeadlineStats cards={headline} />
@@ -74,20 +74,20 @@ export function DashboardGroupPanel({
       {visuals.length > 0 ? (
         <section
           aria-label={t.dashboard.visuals.chartsAriaLabel}
-          className="grid grid-cols-1 gap-4 xl:grid-cols-2"
+          className="grid grid-cols-1 gap-3 xl:grid-cols-2"
         >
           {visuals.map((visual) => (
             <DashboardVisualCard key={visual.key} visual={visual} />
           ))}
         </section>
       ) : (
-        <p className="rounded-lg border border-dashed border-border bg-muted p-4 text-xs text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border bg-muted p-3 text-xs text-muted-foreground">
           {t.dashboard.visuals.noVisuals}
         </p>
       )}
 
       <div>
-        <p className="mb-2 px-1 text-xs text-muted-foreground">{rangeLabel}</p>
+        <p className="mb-1.5 px-1 text-xs text-muted-foreground">{rangeLabel}</p>
         <GroupExactValues group={group} />
       </div>
     </div>
@@ -99,16 +99,16 @@ function ReportAlerts({ alerts }: { alerts: DashboardGroupAlert[] }) {
   const locale = lang === "ar" ? "ar-EG" : "en-US";
   return (
     <section aria-label={t.dashboard.reportAlertsAriaLabel}>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
         {alerts.map((alert) => {
           const style = alertStyle(alert.severity);
           const Icon = style.icon;
           return (
             <div
               key={alert.key}
-              className={`flex items-start gap-3 rounded-lg border p-4 ${style.className}`}
+              className={`flex items-start gap-2.5 rounded-lg border p-3 sm:p-3.5 ${style.className}`}
             >
-              <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <Icon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-xs font-semibold">
                   {new Intl.NumberFormat(locale).format(alert.count)}{" "}

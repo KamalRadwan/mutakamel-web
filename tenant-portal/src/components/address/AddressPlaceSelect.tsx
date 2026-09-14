@@ -102,9 +102,10 @@ export function AddressPlaceSelect({
 
   if (status === "unavailable") {
     return (
-      <Input
+      <Input size="sm"
         value={value}
         maxLength={maxLength}
+        placeholder={labels.placeholder}
         disabled={disabled}
         onChange={(event) => onChange({ name: event.target.value, fromCatalogue: false })}
         onBlur={onBlur}

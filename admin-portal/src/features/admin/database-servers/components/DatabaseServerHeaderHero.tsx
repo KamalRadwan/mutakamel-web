@@ -32,7 +32,7 @@ export function DatabaseServerHeaderHero({
       breadcrumb={
         <Button variant="link" size="sm" asChild className="w-fit px-0">
           <Link href="/database-servers">
-            <BackIcon className="size-4" aria-hidden="true" />
+            <BackIcon className="size-3.5" aria-hidden="true" />
             {d.backToList}
           </Link>
         </Button>

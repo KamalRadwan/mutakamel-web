@@ -197,7 +197,7 @@ export default function PurchaseQuotationDetailPage({
               }
               secondaryActions={
                 isDraft && canWrite(PURCHASE_QUOTATION_PERMISSIONS.update) ? (
-                  <Button variant="outline" onClick={form.open}>
+                  <Button size="sm" variant="outline" onClick={form.open}>
                     {t.tradeDocuments.purchaseQuotations.editTitle}
                   </Button>
                 ) : null

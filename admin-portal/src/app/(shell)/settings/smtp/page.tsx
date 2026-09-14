@@ -68,7 +68,7 @@ export default function SmtpSettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
         title={copy.pageTitle}
         action={
@@ -77,14 +77,15 @@ export default function SmtpSettingsPage() {
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => void verify()}
                 disabled={!smtp.canTestSavedConfig || pending}
                 title={smtp.hasUnsavedChanges ? copy.verifyDisabledHint : undefined}
               >
                 {pending && smtp.mutation.action === "VERIFY" ? (
-                  <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                  <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                 ) : (
-                  <PlayCircle className="size-4" aria-hidden="true" />
+                  <PlayCircle className="size-3.5" aria-hidden="true" />
                 )}
                 {copy.verifyButton}
               </Button>
@@ -93,13 +94,14 @@ export default function SmtpSettingsPage() {
               <Button
                 type="button"
                 variant="primary"
+                size="sm"
                 onClick={() => void save()}
                 disabled={!smtp.hasUnsavedChanges || pending || smtp.configState !== "READY"}
               >
                 {pending && smtp.mutation.action === "SAVE" ? (
-                  <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                  <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                 ) : (
-                  <Save className="size-4" aria-hidden="true" />
+                  <Save className="size-3.5" aria-hidden="true" />
                 )}
                 {copy.saveButton}
               </Button>
@@ -119,12 +121,12 @@ export default function SmtpSettingsPage() {
             <SmtpEvidence smtp={smtp} />
             <SmtpMutationNotice smtp={smtp} />
             {smtp.hasUnsavedChanges ? (
-              <p role="status" className="rounded-lg border border-warning/30 bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
+              <p role="status" className="rounded-lg border border-warning/30 bg-warning-subtle p-2.5 text-xs font-semibold text-warning-subtle-foreground">
                 {copy.unsavedChangesNote}
               </p>
             ) : null}
             {!smtp.canSaveCritical ? (
-              <p role="note" className="rounded-lg border border-border bg-muted p-3 text-sm text-foreground">
+              <p role="note" className="rounded-lg border border-border bg-muted p-2.5 text-xs text-foreground">
                 {copy.readOnlyNote}
               </p>
             ) : null}
@@ -144,13 +146,13 @@ export default function SmtpSettingsPage() {
       </SettingsResourceBoundary>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <History className="size-4 text-muted-foreground" aria-hidden="true" />
+        <div className="flex items-center justify-between border-b border-border p-3 sm:p-3.5">
+          <h2 className="flex items-center gap-1.5 text-xs font-semibold">
+            <History className="size-3.5 text-muted-foreground" aria-hidden="true" />
             {copy.auditTitle}
           </h2>
         </div>
-        <div className="p-4">
+        <div className="p-3 sm:p-3.5">
           <SettingsResourceBoundary
             state={smtp.auditState}
             error={smtp.auditError}
@@ -160,24 +162,24 @@ export default function SmtpSettingsPage() {
             {smtp.auditLogs.length ? (
               <div className="divide-y divide-border">
                 {smtp.auditLogs.map((log) => (
-                  <article key={log.id} className="space-y-2 py-4 first:pt-0 last:pb-0">
+                  <article key={log.id} className="space-y-1.5 py-2.5 first:pt-0 last:pb-0">
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <strong className="rounded-md bg-info-subtle px-2 py-1 text-info-subtle-foreground">
+                      <strong className="rounded-md bg-info-subtle px-1.5 py-0.5 text-xs text-info-subtle-foreground">
                         {log.action}
                       </strong>
-                      {log.revision === null ? null : <code>r{log.revision}</code>}
-                      <span className="inline-flex items-center gap-1 text-muted-foreground">
-                        <UserCheck className="size-3.5" aria-hidden="true" />
+                      {log.revision === null ? null : <code className="text-xs">r{log.revision}</code>}
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <UserCheck className="size-3" aria-hidden="true" />
                         {log.actor}
                       </span>
-                      <time className="text-muted-foreground" dateTime={log.createdAt}>
+                      <time className="text-xs text-muted-foreground" dateTime={log.createdAt}>
                         {new Date(log.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}
                       </time>
                     </div>
                     {log.changes.length ? (
-                      <ul className="flex flex-wrap gap-2">
+                      <ul className="flex flex-wrap gap-1.5">
                         {log.changes.map((change, index) => (
-                          <li key={`${change.field}-${index}`} className="rounded-lg bg-muted px-2 py-1 font-mono text-xs text-foreground">
+                          <li key={`${change.field}-${index}`} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
                             {change.label}: {String(change.previousValue ?? "—")} → {String(change.newValue ?? "—")}
                           </li>
                         ))}
@@ -187,7 +189,7 @@ export default function SmtpSettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="p-5 text-center text-xs text-muted-foreground">
+              <p className="p-4 text-center text-xs text-muted-foreground">
                 {copy.auditEmpty}
               </p>
             )}
@@ -204,7 +206,7 @@ function SmtpEvidence({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
   const config = smtp.snapshot?.data;
   if (!config) return null;
   return (
-    <section className="grid gap-3 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-3">
+    <section className="grid gap-2.5 rounded-lg border border-border bg-card p-3 sm:p-3.5 text-xs sm:grid-cols-3">
       <Evidence label={copy.status} value={config.configured ? copy.configuredValue : copy.notConfiguredValue} />
       <Evidence label={copy.revision} value={config.revision === null ? "—" : String(config.revision)} />
       <Evidence label={copy.updated} value={config.updatedAt ? new Date(config.updatedAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US") : "—"} />
@@ -213,7 +215,7 @@ function SmtpEvidence({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
 }
 
 function Evidence({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg bg-muted p-3"><span className="block text-xs font-semibold text-muted-foreground">{label}</span><strong className="mt-1 block">{value}</strong></div>;
+  return <div className="rounded-lg bg-muted p-2.5"><span className="block text-xs font-semibold text-muted-foreground">{label}</span><strong className="mt-0.5 block text-xs">{value}</strong></div>;
 }
 
 function SmtpMutationNotice({ smtp }: { smtp: ReturnType<typeof useSmtpSettings> }) {
@@ -221,7 +223,7 @@ function SmtpMutationNotice({ smtp }: { smtp: ReturnType<typeof useSmtpSettings>
   const succeeded = smtp.mutation.phase === "SUCCEEDED";
   const copy = dict(smtp.lang).mutation;
   return (
-    <p role={succeeded ? "status" : "alert"} className={`rounded-lg border p-3 text-sm font-semibold ${succeeded ? "border-success/30 bg-success-subtle text-success-subtle-foreground" : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"}`}>
+    <p role={succeeded ? "status" : "alert"} className={`rounded-lg border p-2.5 text-xs font-semibold ${succeeded ? "border-success/30 bg-success-subtle text-success-subtle-foreground" : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"}`}>
       {succeeded ? copy.succeeded : safeMutationMessage(smtp.mutation.localCode ?? smtp.mutation.error?.errorCode, smtp.lang)}
       {smtp.mutation.correlationId ? <code dir="ltr" className="ms-2">{smtp.mutation.correlationId}</code> : null}
     </p>
@@ -241,7 +243,7 @@ function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogg
 }) {
   const copy = dict(lang).form;
   return (
-    <form method="post" aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-lg border border-border bg-card p-5 lg:grid-cols-2">
+    <form method="post" aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-3 rounded-lg border border-border bg-card p-3 sm:p-3.5 lg:grid-cols-2">
       <TextField id="smtp-from-address" label={copy.fromAddress} type="email" value={form.fromAddress} maxLength={320} disabled={disabled} error={errors.fromAddress} lang={lang} onChange={(value) => onUpdate("fromAddress", value)} />
       <TextField id="smtp-from-name" label={copy.fromName} value={form.fromName} maxLength={200} disabled={disabled} error={errors.fromName} lang={lang} onChange={(value) => onUpdate("fromName", value)} />
       <TextField id="smtp-sender-domain" label={copy.senderDomain} value={form.senderDomain} maxLength={253} disabled={disabled} error={errors.senderDomain} lang={lang} onChange={(value) => onUpdate("senderDomain", value)} />
@@ -253,16 +255,17 @@ function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogg
       <FormField
         id="smtp-password"
         label={copy.passwordLabel}
+        hideLabel
         error={fieldErrorMessage(errors.smtpPassword, lang)}
         labelAction={
           <Button type="button" variant="ghost" size="xs" onClick={onTogglePassword} disabled={disabled} aria-label={showPassword ? copy.hidePassword : copy.showPassword} aria-pressed={showPassword} className="h-auto px-1.5 py-1">
-            {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+            {showPassword ? <EyeOff className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
           </Button>
         }
       >
-        {(field) => <Input {...field} type={showPassword ? "text" : "password"} autoComplete="new-password" value={password} maxLength={1024} disabled={disabled} onChange={(event) => onPassword(event.target.value)} className="font-mono" />}
+        {(field) => <Input {...field} size="sm" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder={copy.passwordLabel} value={password} maxLength={1024} disabled={disabled} onChange={(event) => onPassword(event.target.value)} className="font-mono text-xs" />}
       </FormField>
-      <p className="text-xs leading-5 text-muted-foreground lg:col-span-2">
+      <p className="text-xs leading-relaxed text-muted-foreground lg:col-span-2">
         {copy.portsNote}
       </p>
     </form>
@@ -270,12 +273,11 @@ function SmtpForm({ form, password, errors, lang, disabled, showPassword, onTogg
 }
 
 function TextField({ id, label, type = "text", value, maxLength, disabled, error, lang, onChange }: { id: string; label: string; type?: "text" | "email"; value: string; maxLength: number; disabled: boolean; error?: string; lang: "ar" | "en"; onChange: (value: string) => void }) {
-  return <FormField id={id} label={label} error={fieldErrorMessage(error, lang)}>{(field) => <Input {...field} type={type} value={value} maxLength={maxLength} disabled={disabled} onChange={(event) => onChange(event.target.value)} />}</FormField>;
+  return <FormField id={id} label={label} hideLabel error={fieldErrorMessage(error, lang)}>{(field) => <Input {...field} size="sm" type={type} placeholder={label} value={value} maxLength={maxLength} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="text-xs" />}</FormField>;
 }
 
 function SelectField({ id, label, value, disabled, error, lang, options, onChange }: { id: string; label: string; value: string; disabled: boolean; error?: string; lang: "ar" | "en"; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
-  const copy = dict(lang).form;
-  return <FormField id={id} label={label} error={fieldErrorMessage(error, lang)}>{(field) => <Select value={value || undefined} disabled={disabled} onValueChange={onChange}><SelectTrigger id={field.id} aria-describedby={field["aria-describedby"]} aria-invalid={field["aria-invalid"]}><SelectValue placeholder={copy.selectPlaceholder} /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>}</FormField>;
+  return <FormField id={id} label={label} hideLabel error={fieldErrorMessage(error, lang)}>{(field) => <Select value={value || undefined} disabled={disabled} onValueChange={onChange}><SelectTrigger id={field.id} size="sm" aria-describedby={field["aria-describedby"]} aria-invalid={field["aria-invalid"]} className="w-full text-xs"><SelectValue placeholder={label} /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>}</FormField>;
 }
 
 function fieldErrorMessage(code: string | undefined, lang: "ar" | "en"): string | undefined {

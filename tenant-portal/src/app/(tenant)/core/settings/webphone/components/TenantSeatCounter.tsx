@@ -29,7 +29,7 @@ export function TenantSeatCounter({
   const overage = seats ? Math.max(0, seats.occupied - seats.allowed) : 0;
 
   return (
-    <Card role="region" aria-label={copy.seatsSection} className="p-4">
+    <Card role="region" aria-label={copy.seatsSection} className="p-3 sm:p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-medium text-card-foreground">
           <Armchair className="size-4 text-muted-foreground" aria-hidden="true" />

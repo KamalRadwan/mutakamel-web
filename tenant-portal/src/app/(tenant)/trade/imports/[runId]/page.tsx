@@ -108,14 +108,14 @@ export default function ImportRunPage({
         secondaryActions={
           run ? (
             <>
-              <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+              <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
                 <RefreshCw
                   className={isLoading ? "size-4 animate-spin" : "size-4"}
                   aria-hidden="true"
                 />
                 {t.tradeCommon.reload}
               </Button>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canExecute || isExecuting}
                 loading={isExecuting}

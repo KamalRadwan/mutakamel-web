@@ -323,7 +323,7 @@ export function OpportunitiesWorkspace() {
           <>
             <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading || isMutating} />
             <Select value={selectedPipelineId ?? ""} onValueChange={setSelectedPipelineId} disabled={pipelines.length === 0 || isLoading}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger size="sm" className="w-48">
                 <SelectValue placeholder={pipelines.length === 0 ? t.crmOpportunities.noPipeline : t.crmOpportunities.selectPipeline} />
               </SelectTrigger>
               <SelectContent>

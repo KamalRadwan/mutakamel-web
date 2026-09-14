@@ -22,7 +22,7 @@ export function DatabaseServerOverviewTab({ server }: DatabaseServerOverviewTabP
           : { label: d.sslStatusRelaxed, tone: "warn" as const };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <StatGrid>
         <StatCard label={d.maxCapacity} value={server.maxTenants} description={d.maxCapacitySub} icon={HardDrive} />
         <StatCard label={d.currentTenants} value={server.currentTenants} description={d.currentTenantsSub} icon={Cpu} />
@@ -30,15 +30,15 @@ export function DatabaseServerOverviewTab({ server }: DatabaseServerOverviewTabP
         <StatCard label={d.connectTimeout} value={`${server.connectTimeoutMs}ms`} description={lang === "ar" ? "حد محاولة الاتصال" : "Connection attempt limit"} icon={Clock} />
       </StatGrid>
 
-      <Card className="p-5">
-        <div className="mb-3 flex items-center justify-between">
+      <Card className="p-3 sm:p-3.5">
+        <div className="mb-2.5 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">{d.capacityUtilization}</h3>
+            <h3 className="text-xs font-semibold text-foreground">{d.capacityUtilization}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {d.tenantPlacementStatus}: <span className="font-semibold text-foreground">{server.currentTenants} / {server.maxTenants}</span>
             </p>
           </div>
-          <span className="font-mono text-lg font-semibold text-foreground">{usageRatio}%</span>
+          <span className="font-mono text-base font-semibold text-foreground">{usageRatio}%</span>
         </div>
         <div
           role="progressbar"
@@ -53,50 +53,50 @@ export function DatabaseServerOverviewTab({ server }: DatabaseServerOverviewTabP
         </div>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="p-5">
-          <h3 className="flex items-center gap-2 border-b border-border pb-3 text-sm font-semibold text-foreground">
-            <Server className="size-4 text-info" aria-hidden="true" />
+      <div className="grid gap-2.5 md:grid-cols-2">
+        <Card className="p-3 sm:p-3.5">
+          <h3 className="flex items-center gap-2 border-b border-border pb-2 text-xs font-semibold text-foreground">
+            <Server className="size-3.5 text-info" aria-hidden="true" />
             {d.hostInformation}
           </h3>
-          <dl className="mt-3 space-y-2.5 text-xs">
-            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
+          <dl className="mt-2.5 space-y-2 text-xs">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-1.5">
               <dt className="font-medium text-muted-foreground">{d.hostAddress}</dt>
               <dd className="font-mono font-semibold text-foreground">{server.host}</dd>
             </div>
-            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-1.5">
               <dt className="font-medium text-muted-foreground">{d.port}</dt>
               <dd className="font-mono font-semibold text-foreground">{server.port}</dd>
             </div>
-            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-1.5">
               <dt className="font-medium text-muted-foreground">{d.countryRegion}</dt>
               <dd className="flex items-center gap-1.5 font-semibold text-foreground">
                 <Globe className="size-3.5 text-muted-foreground" aria-hidden="true" />
                 {server.countryName || server.countryIsoCode}
               </dd>
             </div>
-            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-2">
+            <div className="flex flex-wrap justify-between gap-2 border-b border-border py-1.5">
               <dt className="font-medium text-muted-foreground">{d.placementStatus}</dt>
               <dd><StatusBadge status={server.status} enumType="db-server" /></dd>
             </div>
-            <div className="flex flex-wrap justify-between gap-2 py-2">
+            <div className="flex flex-wrap justify-between gap-2 py-1.5">
               <dt className="font-medium text-muted-foreground">{d.createdAt}</dt>
               <dd className="font-mono text-foreground">{new Date(server.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</dd>
             </div>
           </dl>
         </Card>
 
-        <Card className="p-5">
-          <h3 className="flex items-center gap-2 border-b border-border pb-3 text-sm font-semibold text-foreground">
-            <CheckCircle2 className="size-4 text-info" aria-hidden="true" />
+        <Card className="p-3 sm:p-3.5">
+          <h3 className="flex items-center gap-2 border-b border-border pb-2 text-xs font-semibold text-foreground">
+            <CheckCircle2 className="size-3.5 text-info" aria-hidden="true" />
             {d.connectionParameters}
           </h3>
-          <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
-            <div className="space-y-2 rounded-lg border border-border bg-muted p-4">
+          <div className="mt-2.5 space-y-2 text-xs leading-relaxed text-muted-foreground">
+            <div className="space-y-1.5 rounded-lg border border-border bg-muted p-2.5">
               <div className="font-mono text-xs font-semibold uppercase text-info-subtle-foreground">
                 {d.driverConfigLabel}
               </div>
-              <div className="break-all rounded-lg border border-border bg-card p-2.5 font-mono text-xs text-foreground">
+              <div className="break-all rounded-lg border border-border bg-card p-2 font-mono text-xs text-foreground">
                 postgres://[principal]:***@{server.host}:{server.port}/[tenant_db]?sslmode={server.sslMode}&connect_timeout={Math.round(server.connectTimeoutMs / 1000)}
               </div>
             </div>

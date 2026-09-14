@@ -72,7 +72,7 @@ export function DeletionBlockerDialog({
       {/* One dismissal control, not two. The built-in corner X carries a
           hard-coded English "Close" in its sr-only span, so a second one would
           also be the only untranslated string in this dialog. */}
-      <DialogContent size="lg" showCloseButton={false}>
+      <DialogContent className="p-3 sm:p-3.5" size="lg" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle
@@ -122,7 +122,7 @@ export function DeletionBlockerDialog({
         </section>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
+          <Button size="sm" variant="outline" onClick={() => onOpenChange(false)} className="cursor-pointer">
             {labels.close}
           </Button>
         </DialogFooter>

@@ -164,34 +164,34 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
         <>
           <RolloutSummary rollout={rollout} copy={copy} lang={lang} />
           {view.rollout.data ? (
-            <Card className="p-5">
+            <Card className="p-3 sm:p-3.5">
               <FleetMeta result={view.rollout.data} copy={copy} lang={lang} />
             </Card>
           ) : null}
 
-          <Card className="space-y-4 border-warning/30 p-5">
+          <Card className="space-y-3 border-warning/30 p-3 sm:p-3.5">
             <header>
-              <h2 className="text-xl font-semibold text-foreground">{copy.lifecycleControls}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{copy.lifecycleControls}</h2>
               <p className="mt-1 text-xs text-muted-foreground">{copy.reasonHint}</p>
             </header>
             {!view.permissions.canManage ? (
-              <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm font-semibold text-warning-subtle-foreground">
+              <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs font-semibold text-warning-subtle-foreground">
                 {copy.forbiddenManage}
               </p>
             ) : (
               <form
                 onSubmit={(event) => event.preventDefault()}
-                className="space-y-4"
+                className="space-y-3"
               >
-                <fieldset disabled={pendingManage} className="grid gap-3 md:grid-cols-2">
-                  <Field label={copy.expectedRevision} error={manageErrors.expectedRevision ? (copy.validation[manageErrors.expectedRevision as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
+                <fieldset disabled={pendingManage} className="grid gap-2.5 md:grid-cols-2">
+                  <Field label={copy.expectedRevision} hideLabel error={manageErrors.expectedRevision ? (copy.validation[manageErrors.expectedRevision as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
                     {(fieldProps) => (
-                      <Input {...fieldProps} type="number" min={1} step={1} inputMode="numeric" value={manageDraft.expectedRevision || String(rollout.revision)} onChange={(event) => setManageDraft((current) => ({ ...current, expectedRevision: event.target.value }))} />
+                      <Input {...fieldProps} size="sm" placeholder={copy.expectedRevision} type="number" min={1} step={1} inputMode="numeric" value={manageDraft.expectedRevision || String(rollout.revision)} onChange={(event) => setManageDraft((current) => ({ ...current, expectedRevision: event.target.value }))} />
                     )}
                   </Field>
-                  <Field label={copy.reasonCode} error={manageErrors.reasonCode ? (copy.validation[manageErrors.reasonCode as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
+                  <Field label={copy.reasonCode} hideLabel error={manageErrors.reasonCode ? (copy.validation[manageErrors.reasonCode as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
                     {(fieldProps) => (
-                      <Input {...fieldProps} dir="ltr" value={manageDraft.reasonCode} onChange={(event) => setManageDraft((current) => ({ ...current, reasonCode: event.target.value }))} className="text-start font-mono text-xs uppercase" />
+                      <Input {...fieldProps} size="sm" placeholder={copy.reasonCode} dir="ltr" value={manageDraft.reasonCode} onChange={(event) => setManageDraft((current) => ({ ...current, reasonCode: event.target.value }))} className="text-start font-mono text-xs uppercase" />
                     )}
                   </Field>
                 </fieldset>
@@ -201,6 +201,7 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
                       key={action}
                       type="button"
                       variant={action === "cancel" ? "destructive" : action === "resume" ? "primary" : "outline"}
+                      size="sm"
                       disabled={pendingManage || !isFleetActionAllowed(rollout.status, action)}
                       onClick={() => prepareManage(action)}
                     >
@@ -222,8 +223,8 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
         </>
       ) : null}
 
-      <Card className="space-y-4 p-5">
-        <h2 className="text-xl font-semibold text-foreground">{copy.report}</h2>
+      <Card className="space-y-3 p-3 sm:p-3.5">
+        <h2 className="text-lg font-semibold text-foreground">{copy.report}</h2>
         <FleetStatePanel
           state={view.authLoading ? "LOADING" : view.report.state}
           error={view.report.error}
@@ -251,28 +252,28 @@ export function FleetRolloutScreen({ rolloutId }: { rolloutId: string }) {
 
             {report.status === "READY_FOR_ATTESTATION" ? (
               !view.permissions.canAttest ? (
-                <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-4 text-sm font-semibold text-warning-subtle-foreground">
+                <p role="note" className="rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs font-semibold text-warning-subtle-foreground">
                   {copy.forbiddenAttest}
                 </p>
               ) : (
                 <Card className="border-destructive/30 bg-destructive-subtle">
                   <form aria-label={copy.attestation} onSubmit={prepareAttestation} noValidate>
-                    <div className="space-y-4 p-4">
+                    <div className="space-y-3 p-3 sm:p-3.5">
                       <header>
-                        <h3 className="text-lg font-semibold text-foreground">{copy.attestation}</h3>
+                        <h3 className="text-base font-semibold text-foreground">{copy.attestation}</h3>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.signatureHint}</p>
                       </header>
-                      <fieldset disabled={pendingAttest} className="grid gap-3 md:grid-cols-2">
+                      <fieldset disabled={pendingAttest} className="grid gap-2.5 md:grid-cols-2">
                         <AttestationField label={copy.expectedRevision} value={attestationDraft.expectedRevision || String(report.revision)} error={attestationErrors.expectedRevision} copy={copy} type="number" onChange={(expectedRevision) => setAttestationDraft((current) => ({ ...current, expectedRevision }))} />
                         <AttestationField label={copy.publisherKeyId} value={attestationDraft.publisherKeyId} error={attestationErrors.publisherKeyId} copy={copy} onChange={(publisherKeyId) => setAttestationDraft((current) => ({ ...current, publisherKeyId }))} />
                       </fieldset>
-                      <Field label={copy.signatureBase64} hint={copy.signatureHint} error={attestationErrors.signatureBase64 ? (copy.validation[attestationErrors.signatureBase64 as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
+                      <Field label={copy.signatureBase64} hideLabel hint={copy.signatureHint} error={attestationErrors.signatureBase64 ? (copy.validation[attestationErrors.signatureBase64 as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
                         {(fieldProps) => (
-                          <Textarea {...fieldProps} dir="ltr" spellCheck={false} rows={4} value={attestationDraft.signatureBase64} onChange={(event) => setAttestationDraft((current) => ({ ...current, signatureBase64: event.target.value }))} className="font-mono text-xs" />
+                          <Textarea {...fieldProps} placeholder={`${copy.signatureBase64} *`} dir="ltr" spellCheck={false} rows={3} value={attestationDraft.signatureBase64} onChange={(event) => setAttestationDraft((current) => ({ ...current, signatureBase64: event.target.value }))} className="font-mono text-xs" />
                         )}
                       </Field>
                       <FleetCommandNotice view={view.attestCommand} copy={copy} onRetryExact={() => void view.retryAttestExact()} onClear={view.clearAttestCommand} />
-                      <Button type="submit" variant="destructive" disabled={pendingAttest} loading={pendingAttest}>
+                      <Button type="submit" variant="destructive" size="sm" disabled={pendingAttest} loading={pendingAttest}>
                         {pendingAttest ? copy.attesting : copy.attest}
                       </Button>
                     </div>
@@ -310,10 +311,10 @@ function RolloutSummary({ rollout, copy, lang }: { rollout: FleetRollout; copy: 
     ? Math.min(100, Math.round(((rollout.completedCount + rollout.failedCount) / rollout.totalCount) * 100))
     : 0;
   return (
-    <Card className="space-y-4 p-5">
+    <Card className="space-y-3 p-3 sm:p-3.5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">{copy.rolloutDetail}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{copy.rolloutDetail}</h2>
           <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">{rollout.rolloutId}</code>
         </div>
         <FleetStatusBadge status={rollout.status} label={copy.rolloutStatus[rollout.status]} />
@@ -322,7 +323,7 @@ function RolloutSummary({ rollout, copy, lang }: { rollout: FleetRollout; copy: 
         <div className="mb-1 flex justify-between text-xs font-semibold text-foreground"><span>{copy.progress}</span><span>{progress}%</span></div>
         <Progress value={progress} aria-label={copy.progress} />
       </div>
-      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <FleetDatum label={copy.previewId} value={rollout.previewId} mono />
         <FleetDatum label={copy.operationType} value={copy.operation[rollout.operationType]} />
         <FleetDatum label={copy.operationCommand} value={JSON.stringify(rollout.operationCommand)} mono />
@@ -367,13 +368,13 @@ function RolloutTenants({ view, copy, lang }: { view: ReturnType<typeof useFleet
     { key: "completedAt", headerEn: copy.completedAt, headerAr: copy.completedAt, cell: (t) => <span className="text-xs">{formatInstant(t.completedAt, lang)}</span> },
   ];
   return (
-    <Card className="space-y-4 p-5">
+    <Card className="space-y-3 p-3 sm:p-3.5">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold text-foreground">{copy.tenantEvidence}</h2>
-        <span className="text-sm font-semibold text-muted-foreground">{copy.total}: {view.tenants.data?.total ?? 0}</span>
+        <h2 className="text-lg font-semibold text-foreground">{copy.tenantEvidence}</h2>
+        <span className="text-xs font-semibold text-muted-foreground">{copy.total}: {view.tenants.data?.total ?? 0}</span>
       </header>
       <FleetStatePanel state={view.tenants.state} error={view.tenants.error} copy={copy} invalid={view.routeValid ? copy.contractError : copy.invalidRouteId} onRetry={view.refresh} />
-      {view.tenants.state === "EMPTY" ? <p className="rounded-lg bg-muted p-5 text-center text-sm text-muted-foreground">{copy.emptyTenants}</p> : null}
+      {view.tenants.state === "EMPTY" ? <p className="rounded-lg bg-muted p-4 text-center text-xs text-muted-foreground">{copy.emptyTenants}</p> : null}
       {view.tenants.data?.items.length ? (
         <DataTable
           labelEn="Fleet rollout tenant evidence"
@@ -420,7 +421,7 @@ function ReportDetail({ report, copy, lang, copied, onCopy }: { report: FleetRep
         <Field label={copy.payloadBase64}>
           {(fieldProps) => (
             <div className="space-y-2">
-              <Textarea {...fieldProps} dir="ltr" readOnly rows={7} value={report.payloadBase64 ?? ""} className="font-mono text-xs" />
+              <Textarea {...fieldProps} placeholder={copy.payloadBase64} dir="ltr" readOnly rows={7} value={report.payloadBase64 ?? ""} className="font-mono text-xs" />
               <Button type="button" variant="outline" size="sm" onClick={onCopy}>
                 {copied ? copy.copied : copy.copyPayload}
               </Button>
@@ -434,9 +435,9 @@ function ReportDetail({ report, copy, lang, copied, onCopy }: { report: FleetRep
 
 function AttestationField({ label, value, error, copy, type = "text", onChange }: { label: string; value: string; error?: string; copy: ReturnType<typeof getProvisioningFleetCopy>; type?: "text" | "number"; onChange: (value: string) => void }) {
   return (
-    <Field label={label} error={error ? (copy.validation[error as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
+    <Field label={label} hideLabel error={error ? (copy.validation[error as keyof typeof copy.validation] ?? copy.validationFailed) : undefined}>
       {(fieldProps) => (
-        <Input {...fieldProps} type={type} dir="ltr" min={type === "number" ? 1 : undefined} step={type === "number" ? 1 : undefined} value={value} onChange={(event) => onChange(event.target.value)} className="text-start font-mono text-xs" />
+        <Input {...fieldProps} size="sm" placeholder={`${label} *`} type={type} dir="ltr" min={type === "number" ? 1 : undefined} step={type === "number" ? 1 : undefined} value={value} onChange={(event) => onChange(event.target.value)} className="text-start font-mono text-xs" />
       )}
     </Field>
   );

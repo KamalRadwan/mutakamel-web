@@ -122,7 +122,7 @@ export default function DashboardsPage() {
               {/* `GET /dashboards/default` PROVISIONS when the actor has none,
                   so it is bound to an explicit action and never called on
                   mount. */}
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={isSubmitting}
                 onClick={() => {
@@ -141,7 +141,7 @@ export default function DashboardsPage() {
                 {t.crmDashboards.openDefault}
               </Button>
               {canCreate ? (
-                <Button
+                <Button size="sm"
                   variant="outline"
                   disabled={isSubmitting}
                   onClick={() => {
@@ -158,7 +158,7 @@ export default function DashboardsPage() {
                   {t.crmDashboards.standardDashboard}
                 </Button>
               ) : null}
-              <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+              <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
                 <RefreshCw
                   className={isLoading ? "size-4 animate-spin" : "size-4"}
                   aria-hidden="true"

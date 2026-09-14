@@ -41,6 +41,10 @@ export interface ComboboxProps extends ControlSizeProps {
   invalid?: boolean;
   onBlur?: () => void;
   id?: string;
+  /** When true, renders description inline beside label on the same line rather than below it. */
+  inlineDescription?: boolean;
+  /** Custom class names for the popover panel (e.g. `w-80 min-w-80`). */
+  popoverClassName?: string;
   className?: string;
 }
 
@@ -73,6 +77,8 @@ export function Combobox({
   onBlur,
   id,
   size = "sm",
+  inlineDescription = false,
+  popoverClassName,
   className,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
@@ -196,7 +202,7 @@ export function Combobox({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent align="start" className="w-(--radix-popover-trigger-width) p-0">
+        <PopoverContent align="start" className={cn("w-(--radix-popover-trigger-width) p-0", popoverClassName)}>
           <div className="border-b border-border p-1.5">
             <Input
               // ARIA 1.2 puts role="combobox" on the text field, not on the
@@ -250,10 +256,24 @@ export function Combobox({
                     className={cn("mt-0.5 size-3.5 shrink-0", option.value !== value && "invisible")}
                     aria-hidden="true"
                   />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate">{option.label}</span>
+                  <span
+                    className={cn(
+                      "flex min-w-0",
+                      inlineDescription ? "flex-1 items-center gap-2" : "flex-col",
+                    )}
+                  >
+                    <span className={cn(inlineDescription ? "shrink-0 font-medium" : "truncate")}>
+                      {option.label}
+                    </span>
                     {option.description && (
-                      <span className="truncate text-xs text-muted-foreground">{option.description}</span>
+                      <span
+                        className={cn(
+                          "truncate text-xs text-muted-foreground",
+                          inlineDescription && "min-w-0 flex-1",
+                        )}
+                      >
+                        {option.description}
+                      </span>
                     )}
                   </span>
                 </li>

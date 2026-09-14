@@ -30,7 +30,7 @@ export const controlSize = cva("", {
       xl: "h-(--size-control-xl) px-4 text-base",
     },
   },
-  defaultVariants: { size: "md" },
+  defaultVariants: { size: "sm" },
 });
 
 /**

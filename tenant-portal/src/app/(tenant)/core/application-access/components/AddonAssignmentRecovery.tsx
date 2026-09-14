@@ -15,7 +15,7 @@ export function AddonAssignmentRecovery({ userId, onReload, readSnapshotKey = nu
     <section aria-label={t.addonAssignmentCommand.recoveryTitle} className="min-w-0 space-y-3 rounded-md border border-border p-4">
       <h2 className="text-sm font-medium">{t.addonAssignmentCommand.recoveryTitle}</h2>
       <p className="text-xs text-muted-foreground">{t.addonAssignmentCommand.recoveryNotice}</p>
-      <Button variant="outline" onClick={recovery.reload} disabled={!recovery.ready || recovery.loading}>{t.coreBilling.reload}</Button>
+      <Button size="sm" variant="outline" onClick={recovery.reload} disabled={!recovery.ready || recovery.loading}>{t.coreBilling.reload}</Button>
       {recovery.loading ? <p role="status" className="text-sm">{t.addonAssignmentCommand.sessionPending}</p>
         : recovery.error ? <p role="alert" className="text-sm text-destructive">{t.addonAssignmentCommand.storageFailed}</p>
           : recovery.items.length === 0 ? <p className="text-sm text-muted-foreground">{t.addonAssignmentCommand.noRetained}</p>

@@ -28,7 +28,7 @@ function NotFoundScreen() {
           title={t.boundaries.notFoundTitle}
           description={t.boundaries.notFoundDescription}
         />
-        <Button variant="primary" asChild>
+        <Button size="sm" variant="primary" asChild>
           <Link href={TENANT_ROUTES.home}>{t.boundaries.notFoundBack}</Link>
         </Button>
       </section>

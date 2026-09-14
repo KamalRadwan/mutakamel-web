@@ -23,11 +23,12 @@ export interface FieldProps {
    */
   error?: string;
   required?: boolean;
+  hideLabel?: boolean;
   className?: string;
   children: (fieldProps: FieldRenderProps) => React.ReactNode;
 }
 
-export function Field({ id, label, labelAction, hint, error, required, className, children }: FieldProps) {
+export function Field({ id, label, labelAction, hint, error, required, hideLabel, className, children }: FieldProps) {
   const generatedId = useId();
   const fieldId = id ?? generatedId;
   const hintId = hint ? `${fieldId}-hint` : undefined;
@@ -35,16 +36,22 @@ export function Field({ id, label, labelAction, hint, error, required, className
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className={className ? `space-y-1.5 ${className}` : "space-y-1.5"}>
-      <div className="flex min-w-0 items-center justify-between gap-3">
-        <Label htmlFor={fieldId}>
+    <div className={className ? `space-y-1 ${className}` : "space-y-1"}>
+      {hideLabel ? (
+        <Label htmlFor={fieldId} className="sr-only">
           {label}
-          {required && (
-            <span className="ms-0.5 text-destructive before:content-['*']" aria-hidden="true" />
-          )}
         </Label>
-        {labelAction}
-      </div>
+      ) : (
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <Label htmlFor={fieldId}>
+            {label}
+            {required && (
+              <span className="ms-0.5 text-destructive before:content-['*']" aria-hidden="true" />
+            )}
+          </Label>
+          {labelAction}
+        </div>
+      )}
       {children({ id: fieldId, "aria-describedby": describedBy, "aria-invalid": !!error, required })}
       {hint && !error && (
         <p id={hintId} className="text-xs text-muted-foreground">

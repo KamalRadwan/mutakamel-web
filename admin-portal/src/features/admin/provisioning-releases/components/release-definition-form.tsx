@@ -18,9 +18,9 @@ export function ReleaseDefinitionFields({
   disabled?: boolean;
 }) {
   return (
-    <fieldset disabled={disabled} className="space-y-4 disabled:opacity-70">
+    <fieldset disabled={disabled} className="space-y-3 disabled:opacity-70">
       <legend className="sr-only">{copy.definition}</legend>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
         <TextField label={copy.componentId} value={value.componentId} error={errors.componentId} copy={copy} dir="ltr" onChange={(next) => onChange("componentId", next)} />
         <TextField label={copy.releaseVersion} value={value.releaseVersion} error={errors.releaseVersion} copy={copy} dir="ltr" maxLength={64} onChange={(next) => onChange("releaseVersion", next)} />
         <TextField label={copy.manifestVersion} value={value.manifestVersion} error={errors.manifestVersion} copy={copy} dir="ltr" inputMode="numeric" onChange={(next) => onChange("manifestVersion", next)} />
@@ -28,11 +28,11 @@ export function ReleaseDefinitionFields({
         <TextField label={copy.runtimeBuildSha} value={value.runtimeBuildSha} error={errors.runtimeBuildSha} copy={copy} dir="ltr" maxLength={64} onChange={(next) => onChange("runtimeBuildSha", next)} />
         <TextField label={copy.schemaTarget} value={value.schemaTarget} error={errors.schemaTarget} copy={copy} dir="ltr" maxLength={255} onChange={(next) => onChange("schemaTarget", next)} />
         <TextField label={copy.schemaChecksum} value={value.schemaChecksum} error={errors.schemaChecksum} copy={copy} dir="ltr" maxLength={64} onChange={(next) => onChange("schemaChecksum", next)} />
-        <Field label={copy.riskLevel}>
+        <Field label={copy.riskLevel} hideLabel>
           {(fieldProps) => (
             <Select value={value.riskLevel} onValueChange={(next) => onChange("riskLevel", next as ReleaseDefinitionDraft["riskLevel"])}>
-              <SelectTrigger id={fieldProps.id}>
-                <SelectValue />
+              <SelectTrigger id={fieldProps.id} size="sm">
+                <SelectValue placeholder={copy.riskLevel} />
               </SelectTrigger>
               <SelectContent>
                 {RELEASE_RISK_LEVELS.map((risk) => (
@@ -43,11 +43,11 @@ export function ReleaseDefinitionFields({
           )}
         </Field>
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-2.5 xl:grid-cols-2">
         <JsonField label={copy.manifestPayload} value={value.manifestPayload} error={errors.manifestPayload} copy={copy} onChange={(next) => onChange("manifestPayload", next)} />
         <JsonField label={copy.compatibility} value={value.compatibility} error={errors.compatibility} copy={copy} onChange={(next) => onChange("compatibility", next)} />
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-2.5 md:grid-cols-3">
         <BooleanField label={copy.selfServiceAllowed} checked={value.selfServiceAllowed} onChange={(next) => onChange("selfServiceAllowed", next)} />
         <BooleanField label={copy.requiresBackup} checked={value.requiresBackup} onChange={(next) => onChange("requiresBackup", next)} />
         <BooleanField label={copy.requiresMaintenance} checked={value.requiresMaintenance} onChange={(next) => onChange("requiresMaintenance", next)} />
@@ -76,13 +76,15 @@ function TextField({
   maxLength?: number;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} hideLabel>
       {(fieldProps) => {
         const errorId = `${fieldProps.id}-error`;
         return (
           <div className="space-y-1.5">
             <Input
               id={fieldProps.id}
+              size="sm"
+              placeholder={`${label} *`}
               aria-describedby={error ? errorId : undefined}
               value={value}
               dir={dir}
@@ -113,21 +115,22 @@ function JsonField({
   error?: ReleaseValidationErrors[string];
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} hideLabel>
       {(fieldProps) => {
         const errorId = `${fieldProps.id}-error`;
         return (
           <div className="space-y-1.5">
             <Textarea
               id={fieldProps.id}
+              placeholder={label}
               aria-describedby={error ? errorId : undefined}
               value={value}
               dir="ltr"
               spellCheck={false}
-              rows={16}
+              rows={14}
               invalid={Boolean(error)}
               onChange={(event) => onChange(event.target.value)}
-              className="min-h-72 resize-y bg-muted font-mono text-xs font-normal leading-5 text-foreground"
+              className="min-h-56 resize-y bg-muted font-mono text-xs font-normal leading-5 text-foreground"
             />
             <ReleaseFieldError id={errorId} code={error} copy={copy} />
           </div>
@@ -139,7 +142,7 @@ function JsonField({
 
 function BooleanField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
   return (
-    <label className="flex min-h-12 items-center gap-3 rounded-lg border border-border bg-muted px-3 text-sm font-semibold text-foreground">
+    <label className="flex min-h-8 items-center gap-2.5 rounded-lg border border-border bg-muted px-2.5 text-xs font-semibold text-foreground">
       <Checkbox checked={checked} onCheckedChange={(next) => onChange(next === true)} />
       <span>{label}</span>
     </label>

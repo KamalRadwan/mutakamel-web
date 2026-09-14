@@ -18,7 +18,7 @@ export function WebphoneSummaryCard({
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border bg-muted p-4">
+      <div className="flex items-center justify-between border-b border-border bg-muted p-3 sm:p-3.5">
         <h2 className="text-xs font-semibold text-foreground flex items-center gap-2">
           <PhoneCall className="size-4 text-muted-foreground" aria-hidden="true" />
           <span>{t.users.webphoneSummary}</span>
@@ -36,7 +36,7 @@ export function WebphoneSummaryCard({
         )}
       </div>
 
-      <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+      <div className="p-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
         <div>
           <span className="block text-xs text-muted-foreground mb-1">{t.users.status}</span>
           {webphone?.enabled ? (

@@ -52,7 +52,7 @@ export function PartyFormFields({
           onValueChange={(value) => onChange({ partyType: value as PartyFormValues["partyType"] })}
           disabled={typeReadOnly || isSubmitting}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -66,7 +66,7 @@ export function PartyFormFields({
       </Field>
 
       <Field label={copy.fieldDisplayName} hint={copy.fieldDisplayNameHint} required>
-        <Input
+        <Input size="sm" placeholder={copy.fieldDisplayName}
           value={values.displayName}
           onChange={(event) => onChange({ displayName: event.target.value })}
           maxLength={PARTY_DISPLAY_NAME_MAX}
@@ -78,7 +78,7 @@ export function PartyFormFields({
       {isOrganization ? (
         <>
           <Field label={copy.fieldOrganizationName}>
-            <Input
+            <Input size="sm" placeholder={copy.fieldOrganizationName}
               value={values.organizationName}
               onChange={(event) => onChange({ organizationName: event.target.value })}
               maxLength={PARTY_ORGANIZATION_NAME_MAX}
@@ -86,7 +86,7 @@ export function PartyFormFields({
             />
           </Field>
           <Field label={copy.fieldLegalName}>
-            <Input
+            <Input size="sm" placeholder={copy.fieldLegalName}
               value={values.legalName}
               onChange={(event) => onChange({ legalName: event.target.value })}
               maxLength={PARTY_LEGAL_NAME_MAX}
@@ -97,7 +97,7 @@ export function PartyFormFields({
       ) : (
         <>
           <Field label={copy.fieldHonorific}>
-            <Input
+            <Input size="sm" placeholder={copy.fieldHonorific}
               value={values.honorificTitle}
               onChange={(event) => onChange({ honorificTitle: event.target.value })}
               maxLength={PARTY_HONORIFIC_MAX}
@@ -105,7 +105,7 @@ export function PartyFormFields({
             />
           </Field>
           <Field label={copy.fieldFirstName}>
-            <Input
+            <Input size="sm" placeholder={copy.fieldFirstName}
               value={values.firstName}
               onChange={(event) => onChange({ firstName: event.target.value })}
               maxLength={PARTY_PERSON_NAME_MAX}
@@ -113,7 +113,7 @@ export function PartyFormFields({
             />
           </Field>
           <Field label={copy.fieldLastName}>
-            <Input
+            <Input size="sm" placeholder={copy.fieldLastName}
               value={values.lastName}
               onChange={(event) => onChange({ lastName: event.target.value })}
               maxLength={PARTY_PERSON_NAME_MAX}
@@ -124,7 +124,7 @@ export function PartyFormFields({
       )}
 
       <Field label={copy.fieldTaxNumber}>
-        <Input
+        <Input size="sm" placeholder={copy.fieldTaxNumber}
           dir="ltr"
           value={values.taxNumber}
           onChange={(event) => onChange({ taxNumber: event.target.value })}
@@ -134,7 +134,7 @@ export function PartyFormFields({
       </Field>
 
       <Field label={copy.fieldCommercialRegistration}>
-        <Input
+        <Input size="sm" placeholder={copy.fieldCommercialRegistration}
           dir="ltr"
           value={values.commercialRegistrationNumber}
           onChange={(event) => onChange({ commercialRegistrationNumber: event.target.value })}
@@ -150,7 +150,7 @@ export function PartyFormFields({
             onValueChange={(value) => status.onChange(value as PartyStatus)}
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

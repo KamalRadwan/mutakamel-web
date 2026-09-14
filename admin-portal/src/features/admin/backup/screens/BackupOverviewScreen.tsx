@@ -36,7 +36,7 @@ export function BackupOverviewScreen() {
         description={view.error.message}
         correlationId={view.error.correlationId}
         action={
-          <Button type="button" variant="primary" onClick={() => void view.refresh()}>
+          <Button size="sm" type="button" variant="primary" onClick={() => void view.refresh()}>
             {copy.retryButton}
           </Button>
         }
@@ -93,14 +93,13 @@ export function BackupOverviewScreen() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <BackupPageHeader
         eyebrow={copy.eyebrow}
         title={copy.title}
-        description={copy.description}
         actions={
-          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
-            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
+          <Button type="button" variant="outline" size="sm" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-3.5" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         }
@@ -121,7 +120,7 @@ export function BackupOverviewScreen() {
 
       {view.canReadDatabaseAccess ? (
         <Card>
-          <CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <CardContent className="grid gap-2.5 p-3 sm:p-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <BackupServerSelect
               label={copy.serverContextLabel}
               value={view.selectedServerId}
@@ -130,7 +129,7 @@ export function BackupOverviewScreen() {
               placeholder={t.backup.policiesScreen.selectServerPlaceholder}
             />
             {view.selectedServerId && (
-              <Button variant="primary" asChild>
+              <Button variant="primary" size="sm" asChild>
                 <Link href={`/backup/access?databaseServerId=${encodeURIComponent(view.selectedServerId)}`}>
                   {copy.inspectAccessButton}
                 </Link>
@@ -167,47 +166,47 @@ export function BackupOverviewScreen() {
         />
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <Card>
-          <CardHeader className="flex-col items-start justify-between gap-2 space-y-0 sm:flex-row sm:items-center">
-            <CardTitle className="text-base">{copy.latestRunTitle}</CardTitle>
+          <CardHeader className="flex-col items-start justify-between gap-2 space-y-0 p-3 sm:p-3.5 pb-2 sm:flex-row sm:items-center">
+            <CardTitle className="text-xs font-semibold">{copy.latestRunTitle}</CardTitle>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/backup/runs">{copy.viewAllLink}</Link>
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-3.5 pt-0">
             {view.selectedData.latestRun ? (
-              <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p dir="ltr" className="break-all font-mono text-sm font-semibold">{view.selectedData.latestRun.id}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRun.startedAt, locale)}</p>
+                  <p dir="ltr" className="break-all font-mono text-xs font-semibold">{view.selectedData.latestRun.id}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{formatBackupDate(view.selectedData.latestRun.startedAt, locale)}</p>
                 </div>
                 <StatusBadge status={view.selectedData.latestRun.status} />
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">{copy.noEvidenceText}</p>
+              <p className="text-xs text-muted-foreground">{copy.noEvidenceText}</p>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex-col items-start justify-between gap-2 space-y-0 sm:flex-row sm:items-center">
-            <CardTitle className="text-base">{copy.latestRestoreTitle}</CardTitle>
+          <CardHeader className="flex-col items-start justify-between gap-2 space-y-0 p-3 sm:p-3.5 pb-2 sm:flex-row sm:items-center">
+            <CardTitle className="text-xs font-semibold">{copy.latestRestoreTitle}</CardTitle>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/backup/restores">{copy.viewAllLink}</Link>
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-3.5 pt-0">
             {view.selectedData.latestRestore ? (
-              <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p dir="ltr" className="break-all font-mono text-sm font-semibold">{view.selectedData.latestRestore.id}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{formatBackupDate(view.selectedData.latestRestore.startedAt, locale)}</p>
+                  <p dir="ltr" className="break-all font-mono text-xs font-semibold">{view.selectedData.latestRestore.id}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{formatBackupDate(view.selectedData.latestRestore.startedAt, locale)}</p>
                 </div>
                 <StatusBadge status={view.selectedData.latestRestore.status} />
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">{copy.noEvidenceText}</p>
+              <p className="text-xs text-muted-foreground">{copy.noEvidenceText}</p>
             )}
           </CardContent>
         </Card>

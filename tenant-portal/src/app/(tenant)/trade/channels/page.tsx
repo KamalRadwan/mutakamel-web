@@ -127,7 +127,7 @@ export default function TradeChannelsPage() {
               : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void channels.reload()}
               disabled={channels.isRefreshing}

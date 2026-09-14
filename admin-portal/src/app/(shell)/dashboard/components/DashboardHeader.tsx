@@ -50,7 +50,6 @@ export function DashboardHeader({
   return (
     <PageHeader
       title={t.dashboard.title}
-      description={t.dashboard.welcome}
       status={
         <Badge
           tone={
@@ -73,14 +72,14 @@ export function DashboardHeader({
           <DashboardRangePicker value={range} onChange={onRangeChange} />
 
           {onAutoRefreshChange && (
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted p-1 text-xs">
+            <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/60 p-0.5 text-xs">
               <Clock className="ms-1 size-3.5 text-muted-foreground" aria-hidden="true" />
               <Select
                 value={autoRefreshInterval}
                 onValueChange={(value) => onAutoRefreshChange(value as AutoRefreshInterval)}
                 onOpenChange={onAutoRefreshMenuOpenChange}
               >
-                <SelectTrigger aria-label={t.dashboard.refresh} className="h-7 border-0 bg-transparent px-1.5 text-xs">
+                <SelectTrigger size="sm" aria-label={t.dashboard.refresh} className="h-7 border-0 bg-transparent px-1.5 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -111,11 +110,11 @@ export function DashboardHeader({
                 : t.dashboard.printPdfReport
             }
           >
-            <Printer className="size-4" aria-hidden="true" />
+            <Printer className="size-3.5" aria-hidden="true" />
           </Button>
 
           <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={isRefreshing} title={t.dashboard.refresh}>
-            <RotateCw className={`size-4 ${isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+            <RotateCw className={`size-3.5 ${isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
           </Button>
 
           {printFallbackReason && (

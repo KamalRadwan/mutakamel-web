@@ -49,8 +49,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           textEntrySize({ size }),
           className,
         )}
-        placeholder={props.placeholder ?? enclosing?.label}
         {...props}
+        placeholder={props.placeholder ?? enclosing?.label}
         {...field}
       />
     );

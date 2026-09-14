@@ -78,7 +78,7 @@ export function QuotePanel({
               disabled={isQuoting || options.length === 0}
               onValueChange={onCurrencyChange}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue placeholder={t.coreBilling.quoteCurrency} />
               </SelectTrigger>
               <SelectContent>
@@ -90,7 +90,7 @@ export function QuotePanel({
               </SelectContent>
             </Select>
           </Field>
-          <Button
+          <Button size="sm"
             variant="outline"
             onClick={onRequestQuote}
             loading={isQuoting}

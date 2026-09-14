@@ -85,7 +85,7 @@ export function LeadIdentityCards({ lead, sources, canEdit, allowedOwnerIds, onS
         {(["interestSummary", "expectedNeed", "description"] as const).map((field) => (
           <DetailsValue key={field} label={field === "description" ? t.crmLeadDetail.notes : t.crmLeadDetail[field]} wide>
             <Field label={field === "description" ? t.crmLeadDetail.notes : t.crmLeadDetail[field]} error={edit.errors[field]}>
-              <Textarea size="sm" value={edit.form?.[field] ?? lead[field] ?? ""} readOnly={!edit.form} disabled={edit.saving} onChange={(event) => edit.change(field, event.target.value)} onBlur={() => edit.validate(field)} rows={2} maxLength={LEAD_CREATE_LIMITS[field]} />
+              <Textarea placeholder={field === "description" ? t.crmLeadDetail.notes : t.crmLeadDetail[field]} size="sm" value={edit.form?.[field] ?? lead[field] ?? ""} readOnly={!edit.form} disabled={edit.saving} onChange={(event) => edit.change(field, event.target.value)} onBlur={() => edit.validate(field)} rows={2} maxLength={LEAD_CREATE_LIMITS[field]} />
             </Field>
           </DetailsValue>
         ))}

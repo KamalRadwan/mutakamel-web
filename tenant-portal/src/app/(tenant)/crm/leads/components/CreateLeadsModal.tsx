@@ -14,11 +14,13 @@ import { useCreateLeadTags } from "../hooks/useCreateLeadTags";
 import { useLeadCompanyOptions } from "../hooks/useLeadCompanyOptions";
 import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import type { LeadStage } from "../hooks/useLeads";
-import { isCorporateLead, usesExistingCompany, type CreateLeadForm } from "../lead-create-contract";
+import { isCorporateLead, usesExistingCompany, LEAD_CREATE_LIMITS, type CreateLeadForm } from "../lead-create-contract";
+import type { LeadTag } from "../lead-card-contract";
 import {
   leadCreateSectionErrorCount,
   type LeadCreateSectionId,
 } from "../lead-create-validation";
+import { CreateTagModal } from "./create-lead/CreateTagModal";
 import { LeadAddressSection } from "./create-lead/LeadAddressSection";
 import { LeadClassificationSection } from "./create-lead/LeadClassificationSection";
 import { LeadCompanySection } from "./create-lead/LeadCompanySection";
@@ -122,6 +124,21 @@ export function CreateLeadsModal({
   // `buildCreateLeadRequest`.
   const activeBranchId = form.branchId || branchId || "";
   const leadTags = useCreateLeadTags(isOpen);
+  const [createTagModalOpen, setCreateTagModalOpen] = useState(false);
+  const [createTagInitialName, setCreateTagInitialName] = useState("");
+
+  const handleOpenCreateTag = (initialName: string) => {
+    setCreateTagInitialName(initialName);
+    setCreateTagModalOpen(true);
+  };
+
+  const handleTagCreated = (newTag: LeadTag) => {
+    leadTags.addTag(newTag);
+    if (form.tagIds.length < LEAD_CREATE_LIMITS.tags && !form.tagIds.includes(newTag.id)) {
+      state.setField("tagIds", [...form.tagIds, newTag.id]);
+    }
+  };
+
   const companyId =
     pickedCompanyId && companyIds.includes(pickedCompanyId)
       ? pickedCompanyId
@@ -203,155 +220,168 @@ export function CreateLeadsModal({
   const errorCount = Object.keys(errors).length;
 
   return (
-    <FormModal
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (open) return;
-        state.reset();
-        companyOptions.reset();
-        setPickedCompanyId(null);
-        onClose();
-      }}
-      title={t.crmLeads.addTitle}
-      isDirty={state.isDirty}
-      isSubmitting={isSubmitting}
-      onSubmit={() => void handleSubmit()}
-      error={error ?? undefined}
-      sections={indexEntries}
-      labels={{
-        submit: isSubmitting ? t.crmLeads.creating : t.common.create,
-        cancel: t.common.cancel,
-        discardTitle: t.common.discardTitle,
-        discardDescription: t.common.discardDescription,
-        discardConfirm: t.common.discardConfirm,
-        discardCancel: t.common.cancel,
-        sections: t.crmShared.formSectionsNav,
-        sectionInvalid: t.crmShared.formSectionInvalid,
-        close: t.common.close,
-      }}
-      footerLeading={
-        errorCount > 0 ? (
-          // role="status", not "alert": the count updates as the user fixes
-          // fields, and an assertive re-announcement on every keystroke would
-          // talk over the field they are typing in.
-          <p role="status" className="text-xs text-destructive">
-            {formatTemplate(t.crmShared.formErrorCount, { count: errorCount })}
-          </p>
-        ) : undefined
-      }
-    >
-      {acquisitionSources.degraded && (
-        <DegradedBanner message={t.crmLeads.create.sourcesUnavailable} />
-      )}
-      {customFields.degraded && (
-        <DegradedBanner message={t.crmShared.customFieldsUnavailable} />
-      )}
-      {(leadTags.degraded || (!leadTags.canRead && form.tagIds.length > 0)) && (
-        <DegradedBanner message={t.crmLeads.create.tagsUnavailable} />
-      )}
-
-      <LeadClassificationSection
-        companyIds={companyIds}
-        companyId={companyId}
-        branchIds={branchIds}
-        branchId={activeBranchId}
-        leadProfileType={form.leadProfileType}
-        stageId={form.stageId}
-        acquisitionSourceId={form.acquisitionSourceId}
-        tagIds={form.tagIds}
-        stages={stages}
-        sources={acquisitionSources.items}
-        tags={leadTags.items}
-        showTags={leadTags.canRead || form.tagIds.length > 0}
-        tagsLoading={leadTags.isLoading}
-        tagsUnavailable={leadTags.degraded || !leadTags.canRead}
-        errors={errors}
-        disabled={isSubmitting}
-        onCompanyChange={chooseCompany}
-        onBranchChange={chooseBranch}
-        onProfileTypeChange={state.setProfileType}
-        onStageChange={(stageId) => state.setField("stageId", stageId)}
-        onSourceChange={(sourceId) => {
-          state.setField("acquisitionSourceId", sourceId);
-          // A select has no blur the user would recognise as "done with this
-          // field", so the pick itself is what lets its error speak.
-          state.touch("acquisitionSourceId");
+    <>
+      <FormModal
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (open) return;
+          state.reset();
+          companyOptions.reset();
+          setPickedCompanyId(null);
+          onClose();
         }}
-        onTagsChange={(tagIds) => state.setField("tagIds", tagIds)}
-        onTagsBlur={() => state.touch("tagIds")}
-      />
+        title={t.crmLeads.addTitle}
+        isDirty={state.isDirty}
+        isSubmitting={isSubmitting}
+        onSubmit={() => void handleSubmit()}
+        error={error ?? undefined}
+        sections={indexEntries}
+        labels={{
+          submit: isSubmitting ? t.crmLeads.creating : t.common.create,
+          cancel: t.common.cancel,
+          discardTitle: t.common.discardTitle,
+          discardDescription: t.common.discardDescription,
+          discardConfirm: t.common.discardConfirm,
+          discardCancel: t.common.cancel,
+          sections: t.crmShared.formSectionsNav,
+          sectionInvalid: t.crmShared.formSectionInvalid,
+          close: t.common.close,
+        }}
+        footerLeading={
+          errorCount > 0 ? (
+            // role="status", not "alert": the count updates as the user fixes
+            // fields, and an assertive re-announcement on every keystroke would
+            // talk over the field they are typing in.
+            <p role="status" className="text-xs text-destructive">
+              {formatTemplate(t.crmShared.formErrorCount, { count: errorCount })}
+            </p>
+          ) : undefined
+        }
+      >
+        {acquisitionSources.degraded && (
+          <DegradedBanner message={t.crmLeads.create.sourcesUnavailable} />
+        )}
+        {customFields.degraded && (
+          <DegradedBanner message={t.crmShared.customFieldsUnavailable} />
+        )}
+        {(leadTags.degraded || (!leadTags.canRead && form.tagIds.length > 0)) && (
+          <DegradedBanner message={t.crmLeads.create.tagsUnavailable} />
+        )}
 
-      {corporate ? (
-        <>
-          <LeadCompanySection
+        <LeadClassificationSection
+          companyIds={companyIds}
+          companyId={companyId}
+          branchIds={branchIds}
+          branchId={activeBranchId}
+          leadProfileType={form.leadProfileType}
+          stageId={form.stageId}
+          acquisitionSourceId={form.acquisitionSourceId}
+          tagIds={form.tagIds}
+          stages={stages}
+          sources={acquisitionSources.items}
+          tags={leadTags.items}
+          showTags={leadTags.canRead || form.tagIds.length > 0}
+          tagsLoading={leadTags.isLoading}
+          tagsUnavailable={leadTags.degraded || !leadTags.canRead}
+          canCreateTag={leadTags.canManage}
+          onCreateTag={leadTags.canManage ? handleOpenCreateTag : undefined}
+          errors={errors}
+          disabled={isSubmitting}
+          onCompanyChange={chooseCompany}
+          onBranchChange={chooseBranch}
+          onProfileTypeChange={state.setProfileType}
+          onStageChange={(stageId) => state.setField("stageId", stageId)}
+          onSourceChange={(sourceId) => {
+            state.setField("acquisitionSourceId", sourceId);
+            // A select has no blur the user would recognise as "done with this
+            // field", so the pick itself is what lets its error speak.
+            state.touch("acquisitionSourceId");
+          }}
+          onTagsChange={(tagIds) => state.setField("tagIds", tagIds)}
+          onTagsBlur={() => state.touch("tagIds")}
+        />
+
+        {corporate ? (
+          <>
+            <LeadCompanySection
+              form={form}
+              errors={errors}
+              options={companyOptions}
+              disabled={isSubmitting}
+              onSelectCompany={state.selectCompany}
+              onFieldChange={state.setField}
+              onPhoneChange={(index, value) => state.setPhone("companyPhones", index, value)}
+              onPhoneAdd={() => state.addPhone("companyPhones")}
+              onPhoneRemove={(index) => state.removePhone("companyPhones", index)}
+              onBlur={state.touch}
+            />
+            <LeadContactsSection
+              form={form}
+              errors={errors}
+              options={companyOptions}
+              disabled={isSubmitting}
+              onContactChange={state.updateContact}
+              onPrimaryChange={state.setContactPrimary}
+              onAdd={state.addContact}
+              onRemove={state.removeContact}
+              onPhoneChange={state.setContactPhone}
+              onPhoneAdd={state.addContactPhone}
+              onPhoneRemove={state.removeContactPhone}
+              onBlur={state.touch}
+            />
+          </>
+        ) : (
+          <LeadPersonSection
             form={form}
             errors={errors}
-            options={companyOptions}
             disabled={isSubmitting}
-            onSelectCompany={state.selectCompany}
             onFieldChange={state.setField}
-            onPhoneChange={(index, value) => state.setPhone("companyPhones", index, value)}
-            onPhoneAdd={() => state.addPhone("companyPhones")}
-            onPhoneRemove={(index) => state.removePhone("companyPhones", index)}
+            onPhoneChange={(index, value) => state.setPhone("phones", index, value)}
+            onPhoneAdd={() => state.addPhone("phones")}
+            onPhoneRemove={(index) => state.removePhone("phones", index)}
             onBlur={state.touch}
           />
-          <LeadContactsSection
-            form={form}
+        )}
+
+        {!existingCompany && (
+          <LeadAddressSection
+            address={form.address}
             errors={errors}
-            options={companyOptions}
             disabled={isSubmitting}
-            onContactChange={state.updateContact}
-            onPrimaryChange={state.setContactPrimary}
-            onAdd={state.addContact}
-            onRemove={state.removeContact}
-            onPhoneChange={state.setContactPhone}
-            onPhoneAdd={state.addContactPhone}
-            onPhoneRemove={state.removeContactPhone}
+            onChange={state.setAddressField}
             onBlur={state.touch}
           />
-        </>
-      ) : (
-        <LeadPersonSection
+        )}
+
+        <LeadQualificationSection
           form={form}
           errors={errors}
           disabled={isSubmitting}
-          onFieldChange={state.setField}
-          onPhoneChange={(index, value) => state.setPhone("phones", index, value)}
-          onPhoneAdd={() => state.addPhone("phones")}
-          onPhoneRemove={(index) => state.removePhone("phones", index)}
+          onChange={state.setField}
           onBlur={state.touch}
         />
-      )}
 
-      {!existingCompany && (
-        <LeadAddressSection
-          address={form.address}
-          errors={errors}
-          disabled={isSubmitting}
-          onChange={state.setAddressField}
-          onBlur={state.touch}
+        {customFields.definitions.length > 0 && (
+          <CrmCustomFieldsFormSection
+            definitions={customFields.definitions}
+            requiredFieldKeys={customFields.requiredFieldKeys}
+            values={form.customFields}
+            errors={errors}
+            disabled={isSubmitting}
+            onChange={state.setCustomField}
+            onBlur={state.touch}
+          />
+        )}
+      </FormModal>
+      {leadTags.canManage && (
+        <CreateTagModal
+          open={createTagModalOpen}
+          initialName={createTagInitialName}
+          existingTags={leadTags.items}
+          onSuccess={handleTagCreated}
+          onClose={() => setCreateTagModalOpen(false)}
         />
       )}
-
-      <LeadQualificationSection
-        form={form}
-        errors={errors}
-        disabled={isSubmitting}
-        onChange={state.setField}
-        onBlur={state.touch}
-      />
-
-      {customFields.definitions.length > 0 && (
-        <CrmCustomFieldsFormSection
-          definitions={customFields.definitions}
-          requiredFieldKeys={customFields.requiredFieldKeys}
-          values={form.customFields}
-          errors={errors}
-          disabled={isSubmitting}
-          onChange={state.setCustomField}
-          onBlur={state.touch}
-        />
-      )}
-    </FormModal>
+    </>
   );
 }

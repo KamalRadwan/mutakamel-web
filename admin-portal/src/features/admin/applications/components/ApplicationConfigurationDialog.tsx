@@ -117,20 +117,20 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle className="text-sm">{mode === "metadata" ? copy.metadataTitle : copy.policyTitle}</DialogTitle>
           <p className="text-xs text-muted-foreground">
             {copy.revisionPrefix} {mode === "metadata" ? application.catalogueRevision : application.databasePolicy.policyRevision} {copy.revisionSuffix}
           </p>
         </DialogHeader>
-        <form onSubmit={submit} noValidate className="space-y-4">
+        <form onSubmit={submit} noValidate className="space-y-3">
           {Object.keys(fieldErrors).length > 1 && (
             <div
               ref={errorSummaryRef}
               role="alert"
               tabIndex={-1}
-              className="rounded-md border border-destructive bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-md border border-destructive bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <p className="font-semibold">{validationCopy.summary}</p>
               <ul className="mt-2 list-disc space-y-1 ps-5">
@@ -145,19 +145,21 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
           {mode === "metadata" ? (
             <>
               {application.publicationStatus === "PUBLISHED" && (
-                <div role="note" className="flex gap-3 rounded-md border border-warning bg-warning-subtle p-3 text-warning-subtle-foreground">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <div className="flex gap-2.5 rounded-md border border-warning/40 bg-warning-subtle p-3 text-warning-subtle-foreground" role="note">
+                  <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden="true" />
                   <div>
                     <p className="text-xs font-semibold">{copy.publicationInvalidationTitle}</p>
                     <p className="mt-1 text-xs leading-relaxed">{copy.publicationInvalidationDescription}</p>
                   </div>
                 </div>
               )}
-              <Field id="application-name" label={copy.name} required error={fieldErrors["application-name"]}>
+              <Field id="application-name" label={copy.name} hideLabel required error={fieldErrors["application-name"]}>
                 {(fp) => (
                   <Input
                     {...fp}
+                    size="sm"
                     required
+                    placeholder={`${copy.name} *`}
                     invalid={Boolean(fieldErrors["application-name"])}
                     maxLength={128}
                     value={name}
@@ -168,15 +170,15 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
                   />
                 )}
               </Field>
-              <Field label={copy.description}>
-                {(fp) => <Textarea {...fp} rows={3} maxLength={512} value={description} onChange={(event) => setDescription(event.target.value)} />}
+              <Field label={copy.description} hideLabel>
+                {(fp) => <Textarea {...fp} rows={2} maxLength={512} placeholder={copy.description} value={description} onChange={(event) => setDescription(event.target.value)} />}
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={copy.commercialMode}>
+                <Field label={copy.commercialMode} hideLabel>
                   {(fp) => (
                     <Select value={commercialMode} onValueChange={(value) => setCommercialMode(value as ApplicationView["commercialMode"])}>
-                      <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                        <SelectValue />
+                      <SelectTrigger {...fp} size="sm">
+                        <SelectValue placeholder={copy.commercialMode} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="NON_BILLABLE">{copy.nonBillable}</SelectItem>
@@ -186,11 +188,11 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
                     </Select>
                   )}
                 </Field>
-                <Field label={copy.visibility}>
+                <Field label={copy.visibility} hideLabel>
                   {(fp) => (
                     <Select value={visibility} onValueChange={(value) => setVisibility(value as ApplicationView["catalogueVisibility"])}>
-                      <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                        <SelectValue />
+                      <SelectTrigger {...fp} size="sm">
+                        <SelectValue placeholder={copy.visibility} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="PUBLIC">{copy.public}</SelectItem>
@@ -208,18 +210,18 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
                 <Toggle label={copy.automaticRotation} checked={rotationEnabled} onChange={setRotationEnabled} />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <Field id="application-rotation-interval" label={copy.intervalHours} error={fieldErrors["application-rotation-interval"]}>
-                  {(fp) => <Input {...fp} invalid={Boolean(fieldErrors["application-rotation-interval"])} type="number" min={24} max={8760} value={rotationIntervalHours} onChange={(event) => { setRotationIntervalHours(event.target.value); clearFieldError("application-rotation-interval", setFieldErrors); }} />}
+                <Field id="application-rotation-interval" label={copy.intervalHours} hideLabel error={fieldErrors["application-rotation-interval"]}>
+                  {(fp) => <Input {...fp} size="sm" placeholder={copy.intervalHours} invalid={Boolean(fieldErrors["application-rotation-interval"])} type="number" min={24} max={8760} value={rotationIntervalHours} onChange={(event) => { setRotationIntervalHours(event.target.value); clearFieldError("application-rotation-interval", setFieldErrors); }} />}
                 </Field>
-                <Field id="application-window-start" label={copy.utcStartHour} error={fieldErrors["application-window-start"]}>
-                  {(fp) => <Input {...fp} invalid={Boolean(fieldErrors["application-window-start"])} type="number" min={0} max={23} value={windowStart} onChange={(event) => { setWindowStart(event.target.value); clearFieldError("application-window-start", setFieldErrors); }} />}
+                <Field id="application-window-start" label={copy.utcStartHour} hideLabel error={fieldErrors["application-window-start"]}>
+                  {(fp) => <Input {...fp} size="sm" placeholder={copy.utcStartHour} invalid={Boolean(fieldErrors["application-window-start"])} type="number" min={0} max={23} value={windowStart} onChange={(event) => { setWindowStart(event.target.value); clearFieldError("application-window-start", setFieldErrors); }} />}
                 </Field>
-                <Field id="application-window-hours" label={copy.windowHours} error={fieldErrors["application-window-hours"]}>
-                  {(fp) => <Input {...fp} invalid={Boolean(fieldErrors["application-window-hours"])} type="number" min={1} max={24} value={windowHours} onChange={(event) => { setWindowHours(event.target.value); clearFieldError("application-window-hours", setFieldErrors); }} />}
+                <Field id="application-window-hours" label={copy.windowHours} hideLabel error={fieldErrors["application-window-hours"]}>
+                  {(fp) => <Input {...fp} size="sm" placeholder={copy.windowHours} invalid={Boolean(fieldErrors["application-window-hours"])} type="number" min={1} max={24} value={windowHours} onChange={(event) => { setWindowHours(event.target.value); clearFieldError("application-window-hours", setFieldErrors); }} />}
                 </Field>
               </div>
-              <Field id="application-policy-reason" label={copy.changeReason} required error={fieldErrors["application-policy-reason"]}>
-                {(fp) => <Textarea {...fp} invalid={Boolean(fieldErrors["application-policy-reason"])} required maxLength={256} rows={2} value={reason} onChange={(event) => { setReason(event.target.value); clearFieldError("application-policy-reason", setFieldErrors); }} />}
+              <Field id="application-policy-reason" label={copy.changeReason} hideLabel required error={fieldErrors["application-policy-reason"]}>
+                {(fp) => <Textarea {...fp} placeholder={`${copy.changeReason} *`} invalid={Boolean(fieldErrors["application-policy-reason"])} required maxLength={256} rows={2} value={reason} onChange={(event) => { setReason(event.target.value); clearFieldError("application-policy-reason", setFieldErrors); }} />}
               </Field>
             </>
           )}
@@ -234,10 +236,10 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
             </div>
           )}
           <footer className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={onClose}>
               {t.applications.cancel}
             </Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
               {copy.save}
             </Button>
           </footer>
@@ -250,7 +252,7 @@ export function ApplicationConfigurationDialog({ mode, application, isSubmitting
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   const id = useId();
   return (
-    <div className="flex min-h-11 items-center gap-3 rounded-md border border-input px-3 py-2 text-xs font-semibold text-foreground">
+    <div className="flex min-h-8 items-center gap-2 rounded-md border border-input px-2.5 py-1 text-xs font-medium text-foreground">
       <Checkbox id={id} checked={checked} onCheckedChange={(next) => onChange(next === true)} />
       <label htmlFor={id} className="cursor-pointer">{label}</label>
     </div>

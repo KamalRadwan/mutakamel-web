@@ -78,7 +78,7 @@ export function CreateWebhookSubscriptionModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeAutomation.code} required hint={t.tradeGovernance.codeHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeAutomation.code}
             value={values.code}
             maxLength={100}
             disabled={isSubmitting}
@@ -100,7 +100,7 @@ export function CreateWebhookSubscriptionModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradeGovernance.scopeTarget}>
+            <SelectTrigger size="sm" aria-label={t.tradeGovernance.scopeTarget}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -113,7 +113,7 @@ export function CreateWebhookSubscriptionModal({
           </Select>
         </Field>
         <Field label={t.tradeAutomation.endpointUri} required hint={t.tradeAutomation.endpointHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeAutomation.endpointUri}
             value={values.endpointUri}
             maxLength={WEBHOOK_ENDPOINT_MAX_LENGTH}
             disabled={isSubmitting}
@@ -133,7 +133,7 @@ export function CreateWebhookSubscriptionModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradeAutomation.retryPolicy}>
+            <SelectTrigger size="sm" aria-label={t.tradeAutomation.retryPolicy}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -150,7 +150,7 @@ export function CreateWebhookSubscriptionModal({
           required
           hint={t.tradeAutomation.maxAttemptsHint}
         >
-          <Input
+          <Input size="sm" placeholder={t.tradeAutomation.maxAttempts}
             type="number"
             min={1}
             max={10}

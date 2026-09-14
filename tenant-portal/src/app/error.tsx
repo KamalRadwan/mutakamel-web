@@ -30,7 +30,7 @@ function RootErrorScreen({ digest, onRetry }: { digest?: string; onRetry: () => 
           digest={digest}
           onRetry={onRetry}
         />
-        <Button variant="primary" asChild>
+        <Button size="sm" variant="primary" asChild>
           <Link href={TENANT_ROUTES.home}>{t.boundaries.notFoundBack}</Link>
         </Button>
       </section>

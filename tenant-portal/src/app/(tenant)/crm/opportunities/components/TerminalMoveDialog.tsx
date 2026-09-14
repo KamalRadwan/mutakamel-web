@@ -55,7 +55,7 @@ export function TerminalMoveDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent
+      <DialogContent className="p-3 sm:p-3.5"
         showCloseButton={!isSubmitting}
         onEscapeKeyDown={(event) => (isSubmitting ? event.preventDefault() : undefined)}
         onPointerDownOutside={(event) => (isSubmitting ? event.preventDefault() : undefined)}
@@ -84,10 +84,11 @@ export function TerminalMoveDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={close} disabled={isSubmitting}>
+          <Button size="sm" variant="outline" onClick={close} disabled={isSubmitting}>
             {t.common.cancel}
           </Button>
           <Button
+            size="sm"
             variant={isWon ? "primary" : "destructive"}
             onClick={() => void handleConfirm()}
             loading={isSubmitting}

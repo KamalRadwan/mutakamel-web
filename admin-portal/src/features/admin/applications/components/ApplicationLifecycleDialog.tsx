@@ -54,7 +54,7 @@ export function ApplicationLifecycleDialog({ action, currentStatus, isSubmitting
 
   return (
     <Dialog open onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle className="text-sm">
             {t.applications.detail.lifecycle[action]} {t.applications.detail.lifecycle.titleSuffix}
@@ -63,16 +63,17 @@ export function ApplicationLifecycleDialog({ action, currentStatus, isSubmitting
             {t.applications.detail.lifecycle.transitionPrefix} {currentStatus} {t.applications.detail.lifecycle.transitionJoin} {targetStatus}.
           </p>
         </DialogHeader>
-        <form onSubmit={submit} noValidate className="space-y-4">
-          <Field label={t.applications.detail.lifecycle.reason} required error={reasonError ?? undefined}>
+        <form onSubmit={submit} noValidate className="space-y-3">
+          <Field label={t.applications.detail.lifecycle.reason} hideLabel required error={reasonError ?? undefined}>
             {(fp) => (
               <Textarea
                 {...fp}
                 ref={reasonRef}
                 required
+                placeholder={`${t.applications.detail.lifecycle.reason} *`}
                 invalid={Boolean(reasonError)}
                 maxLength={256}
-                rows={3}
+                rows={2}
                 value={reason}
                 onChange={(event) => {
                   setReason(event.target.value);
@@ -92,10 +93,10 @@ export function ApplicationLifecycleDialog({ action, currentStatus, isSubmitting
             </div>
           )}
           <footer className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={onClose}>
               {t.applications.cancel}
             </Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
               {t.applications.detail.lifecycle.confirm} {t.applications.detail.lifecycle[action]}
             </Button>
           </footer>

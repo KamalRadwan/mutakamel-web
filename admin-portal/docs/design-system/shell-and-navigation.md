@@ -2,7 +2,7 @@
 
 Status: **[Verified shell topology; navigation reachability gaps recorded]**
 
-Last source verification: **2026-08-29**
+Last source verification: **2026-09-10**
 
 Owner: **Admin Portal**
 
@@ -59,11 +59,11 @@ system `Dialog` with `showCloseButton={false}`), searching the same
 
 Current `NAV_SECTIONS` contains top-level destinations rather than a complete
 nested route tree. The command palette therefore does **not** currently search
-all 56 route destinations described below. Backup, Settings, Provisioning,
+all 57 route destinations described below. Backup, Settings, Provisioning,
 detail, creation, and tenant placement-move routes may exist without being
 individually searchable.
 
-## The 56-route inventory
+## The 57-route inventory
 
 `nav-config.ts`'s `NAV_SECTIONS` is the current source of truth for top-level
 sidebar entries; `useNavTree.ts` filters it against the exact same
@@ -78,30 +78,33 @@ migration still exists and is reachable after it.
 | 1 | Overview | Dashboard | `/dashboard` | `admin.reports.read` |
 | 2 | Tenancy | Tenants | `/tenants`, `/tenants/new`, `/tenants/[id]`, `/tenants/[id]/move-database`, `/tenants/[id]/move-storage` | `admin.tenants.read`; the two placement-move routes additionally gate on `admin.tenant_relocations.read` and `admin.storage_migrations.read` respectively |
 | 3 | | Applications | `/applications-catalogue`, `/applications-catalogue/[applicationKey]`, `/applications-catalogue/audit` | ANY of `admin.applications.read`, `admin.applications.create` |
-| 4 | | Subscriptions | `/subscriptions` | `admin.subscriptions.read` |
-| 5 | | Invoices | `/invoices`, `/invoices/new`, `/invoices/[id]` | `admin.invoices.read` |
-| 6 | Infrastructure | Database Servers | `/database-servers`, `/database-servers/new`, `/database-servers/[id]` | ANY of `admin.database_servers.read`, `admin.database_servers.create` |
-| 7 | | Storage Servers | `/storage-servers`, `/storage-servers/new`, `/storage-servers/[id]` | ANY of `admin.storage_servers.read`, `admin.storage_servers.create` |
-| 8 | | Backup & Restore *(SubNav × 6)* | `/backup`, `/backup/access`, `/backup/policies`, `/backup/runs`, `/backup/artifacts`, `/backup/restores` | `admin.backups.read` |
-| 9 | | Provisioning *(SubNav × 9)* | `/provisioning`, `/provisioning/fleet`, `/provisioning/fleet/previews/[previewId]`, `/provisioning/fleet/rollouts/[rolloutId]`, `/provisioning/publisher-keys`, `/provisioning/releases`, `/provisioning/releases/[releaseId]`, `/provisioning/releases/drafts/new`, `/provisioning/releases/drafts/[draftId]` | ANY of `admin.tenants.read`, `admin.provisioning.discovery.read`, `admin.provisioning.rollouts.read`, `admin.provisioning.rollouts.report`, `admin.provisioning.publisher-keys.read`, `admin.provisioning.releases.read` |
-| 10 | Governance | Admin staff | `/users`, `/users/[id]` | `admin.users.read` |
-| 11 | | Roles | `/roles`, `/roles/[id]` | `admin.roles.read` |
-| 12 | | Audit log | `/audit` | `admin.audit.read` |
-| 13 | | Reports | `/reports` | `admin.reports.read` |
-| 14 | | Logging | `/logging` | `admin.logging.read` |
-| 15 | System (pinned) | Settings *(SubNav × 8)* | `/settings`, `/settings/platform`, `/settings/auth`, `/settings/billing`, `/settings/notifications`, `/settings/webphone`, `/settings/smtp`, `/settings/fatal-alerts`, `/settings/storage` | Public entry; each child settings page gates itself via `SettingsResourceBoundary` (matches pre-migration behavior — no page-level gate on the settings index) |
+| 4 | | Addons | `/addons` | `admin.applications.read` |
+| 5 | | Subscriptions | `/subscriptions` | `admin.subscriptions.read` |
+| 6 | | Invoices | `/invoices`, `/invoices/new`, `/invoices/[id]` | `admin.invoices.read` |
+| 7 | Infrastructure | Database Servers | `/database-servers`, `/database-servers/new`, `/database-servers/[id]` | ANY of `admin.database_servers.read`, `admin.database_servers.create` |
+| 8 | | Storage Servers | `/storage-servers`, `/storage-servers/new`, `/storage-servers/[id]` | ANY of `admin.storage_servers.read`, `admin.storage_servers.create` |
+| 9 | | Backup & Restore *(SubNav × 6)* | `/backup`, `/backup/access`, `/backup/policies`, `/backup/runs`, `/backup/artifacts`, `/backup/restores` | `admin.backups.read` |
+| 10 | | Provisioning *(SubNav × 9)* | `/provisioning`, `/provisioning/fleet`, `/provisioning/fleet/previews/[previewId]`, `/provisioning/fleet/rollouts/[rolloutId]`, `/provisioning/publisher-keys`, `/provisioning/releases`, `/provisioning/releases/[releaseId]`, `/provisioning/releases/drafts/new`, `/provisioning/releases/drafts/[draftId]` | ANY of `admin.tenants.read`, `admin.provisioning.discovery.read`, `admin.provisioning.rollouts.read`, `admin.provisioning.rollouts.report`, `admin.provisioning.publisher-keys.read`, `admin.provisioning.releases.read` |
+| 11 | Governance | Admin staff | `/users`, `/users/[id]` | `admin.users.read` |
+| 12 | | Roles | `/roles`, `/roles/[id]` | `admin.roles.read` |
+| 13 | | Audit log | `/audit` | `admin.audit.read` |
+| 14 | | Reports | `/reports` | `admin.reports.read` |
+| 15 | | Logging | `/logging` | `admin.logging.read` |
+| 16 | System (pinned) | Settings *(SubNav × 8)* | `/settings`, `/settings/platform`, `/settings/auth`, `/settings/billing`, `/settings/notifications`, `/settings/webphone`, `/settings/smtp`, `/settings/fatal-alerts`, `/settings/storage` | Public entry; each child settings page gates itself via `SettingsResourceBoundary` (matches pre-migration behavior — no page-level gate on the settings index) |
 | — | Topbar | Notifications · Profile | `/notifications`, `/profile` | Authenticated |
 | — | `(auth)` route group, no shell | — | `/login`, `/admin/accept-invite`, `/admin/reset-password` | Public |
 | — | Root | Redirect | `/` | Public |
 
-**Total:** dashboard (1) + tenants (5) + applications (3) + subscriptions
-(1) + invoices (3) + database servers (3) + storage servers (3) + backup (6)
-+ provisioning (9) + admin staff (2) + roles (2) + audit (1) + reports (1) +
-logging (1) + settings incl. index (9) + notifications/profile (2) + auth
-group (3) + root redirect (1) = **56**. The 54 routes measured at the start
-of this migration are all still here; the two additions are the tenant
-placement-move wizards documented in
-[Tenant placement moves](../api/tenant-placement-moves.md). Nothing was
+**Total:** dashboard (1) + tenants (5) + applications (3) + addons (1) +
+subscriptions (1) + invoices (3) + database servers (3) + storage servers (3)
++ backup (6) + provisioning (9) + admin staff (2) + roles (2) + audit (1) +
+reports (1) + logging (1) + settings incl. index (9) + notifications/profile
+(2) + auth group (3) + root redirect (1) = **57**. The 54 routes measured at
+the start of this migration are all still here; the three additions are the
+two tenant placement-move wizards documented in
+[Tenant placement moves](../api/tenant-placement-moves.md) and the
+cross-application `/addons` index documented in
+[Application-owned Addons](../api/application-addons-target.md). Nothing was
 dropped.
 
 ## Approved navigation target

@@ -38,7 +38,7 @@ export function CurrencyFormFields({
         readOnly={codeReadOnly}
         required
       >
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.currencyCode}
           dir="ltr"
           value={values.code}
           onChange={(event) => onChange({ code: event.target.value.toUpperCase() })}
@@ -50,7 +50,7 @@ export function CurrencyFormFields({
       </Field>
 
       <Field label={t.coreSettings.currencyName} required>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.currencyName}
           value={values.name}
           onChange={(event) => onChange({ name: event.target.value })}
           maxLength={CURRENCY_NAME_MAX_LENGTH}
@@ -60,7 +60,7 @@ export function CurrencyFormFields({
       </Field>
 
       <Field label={t.coreSettings.currencySymbol}>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.currencySymbol}
           value={values.symbol}
           onChange={(event) => onChange({ symbol: event.target.value })}
           maxLength={CURRENCY_SYMBOL_MAX_LENGTH}
@@ -69,7 +69,7 @@ export function CurrencyFormFields({
       </Field>
 
       <Field label={t.coreSettings.currencyDecimalPlaces} hint={t.coreSettings.currencyDecimalPlacesHint}>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.currencyDecimalPlaces}
           dir="ltr"
           inputMode="numeric"
           value={values.decimalPlaces}
@@ -85,7 +85,7 @@ export function CurrencyFormFields({
         readOnly={rateLocked}
         required={!rateLocked}
       >
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.currencyExchangeRate}
           dir="ltr"
           inputMode="decimal"
           value={values.exchangeRate}

@@ -29,7 +29,7 @@ export function CompanyCommandStatus({ status, canRead, ready, loading, error, r
       ]} />
       <p role="status" className="text-sm text-muted-foreground">{status.state === "PENDING" ? copy.pendingNotice : copy.rejectedNotice}</p>
       {error && <p role="alert" className="text-sm text-destructive">{error.status === 404 ? copy.notFound : copy.failed}</p>}
-      {status.state === "PENDING" && <Button variant="outline" loading={loading} disabled={!ready || loading} onClick={reload}>{copy.read}</Button>}
+      {status.state === "PENDING" && <Button size="sm" variant="outline" loading={loading} disabled={!ready || loading} onClick={reload}>{copy.read}</Button>}
     </section>
   </PermissionGate>;
 }

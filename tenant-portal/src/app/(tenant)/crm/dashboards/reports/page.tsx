@@ -48,7 +48,7 @@ export default function PrebuiltReportsPage() {
                 onChange={selectBranch}
                 disabled={isLoading}
               />
-              <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+              <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
                 <RefreshCw
                   className={isLoading ? "size-4 animate-spin" : "size-4"}
                   aria-hidden="true"

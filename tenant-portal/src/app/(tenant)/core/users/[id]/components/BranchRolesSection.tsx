@@ -136,7 +136,7 @@ export function BranchRolesSection({
             disabled={panel.isSubmitting}
           />
         </div>
-        <Button
+        <Button size="sm"
           variant="outline"
           disabled={!newRoleId || !newBranchId || panel.isSubmitting}
           onClick={addRow}
@@ -145,7 +145,7 @@ export function BranchRolesSection({
           {copy.grants.addBranchRole}
         </Button>
         {draft === null ? (
-          <Button
+          <Button size="sm"
             variant="ghost"
             onClick={panel.startBranchReplace}
             disabled={panel.isSubmitting || panel.branchRoles.length === 0}

@@ -37,8 +37,8 @@ export const AlertDialogContent = forwardRef<
     <AlertDialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed start-1/2 top-1/2 z-(--z-overlay) grid w-full max-w-[448px] -translate-x-1/2 -translate-y-1/2 gap-4",
-        "rounded-lg border border-border bg-popover p-6 text-popover-foreground shadow-overlay",
+        "fixed start-1/2 top-1/2 z-(--z-overlay) grid w-full max-w-[448px] -translate-x-1/2 -translate-y-1/2 gap-3",
+        "rounded-lg border border-border bg-popover p-3 sm:p-3.5 text-popover-foreground shadow-overlay",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className,
       )}
@@ -91,7 +91,7 @@ export const AlertDialogAction = forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Action
     ref={ref}
-    className={cn(buttonVariantClasses("destructive"), className)}
+    className={cn(buttonVariantClasses("destructive", "sm"), className)}
     {...props}
   />
 ));
@@ -103,7 +103,7 @@ export const AlertDialogCancel = forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Cancel
     ref={ref}
-    className={cn(buttonVariantClasses("outline"), className)}
+    className={cn(buttonVariantClasses("outline", "sm"), className)}
     {...props}
   />
 ));

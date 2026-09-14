@@ -20,8 +20,8 @@ export function DefinitionAdoptionWorkspace() {
   const state = change.state, intent = state?.intent, operation = state?.operation;
   return <div className="flex min-w-0 flex-col gap-4">
     <PageHeader title={copy.title} description={copy.description} secondaryActions={<>
-      <Button variant="outline" asChild><Link href={TENANT_ROUTES.coreApplicationAccess}>{t.applicationAccess.title}</Link></Button>
-      <Button variant="outline" disabled={change.busy || discovery.busy} onClick={() => void change.recheck()}>{copy.recheck}</Button>
+      <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreApplicationAccess}>{t.applicationAccess.title}</Link></Button>
+      <Button size="sm" variant="outline" disabled={change.busy || discovery.busy} onClick={() => void change.recheck()}>{copy.recheck}</Button>
     </>} />
     <PermissionGate require={[]} denied={change.denied || discovery.denied}>
       {!state && <Skeleton className="h-48 w-full" />}
@@ -31,7 +31,7 @@ export function DefinitionAdoptionWorkspace() {
       {change.busy && <p role="status" aria-busy="true" className="text-sm text-muted-foreground">{commandCopy.waiting}</p>}
       {discovery.state?.changed && <p role="alert" className="text-sm text-muted-foreground">{copy.changed}</p>}
       {discovery.state?.error && <ErrorState title={copy.failed} onRetry={discovery.reload} retryLabel={copy.refresh} />}
-      {!change.busy && <div><Button variant="outline" disabled={discovery.busy} onClick={discovery.reload}>{copy.refresh}</Button></div>}
+      {!change.busy && <div><Button size="sm" variant="outline" disabled={discovery.busy} onClick={discovery.reload}>{copy.refresh}</Button></div>}
       {state?.phase === "idle" && <>
         {discovery.busy && <Skeleton className="h-24 w-full" />}
         <DefinitionAdoptionEditor discovery={discovery} change={change} />
@@ -55,8 +55,8 @@ export function DefinitionAdoptionWorkspace() {
           { label: commandCopy.recoveryReason, value: intent.pending.request.reason },
         ]} />}
         {state?.phase === "uncertain" && <div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">{commandCopy.uncertain}</p>
-          <div><Button variant="outline" disabled={!change.canRetry} onClick={() => void change.retry()}>{commandCopy.retryOriginal}</Button></div></div>}
-        {intent.operationId && <div><Button variant="outline" disabled={change.busy || !change.ready} onClick={() => void change.reload()}>{commandCopy.readProgress}</Button></div>}
+          <div><Button size="sm" variant="outline" disabled={!change.canRetry} onClick={() => void change.retry()}>{commandCopy.retryOriginal}</Button></div></div>}
+        {intent.operationId && <div><Button size="sm" variant="outline" disabled={change.busy || !change.ready} onClick={() => void change.reload()}>{commandCopy.readProgress}</Button></div>}
         {(intent.expiredApplies.length > 0 || intent.unresolvedPreviews.length > 0 || intent.rejectedRecoveries.length > 0) && <details className="rounded-md border border-border p-3">
           <summary className="cursor-pointer text-sm font-medium">{commandCopy.previousRequests}</summary>
           <div className="mt-3 flex min-w-0 flex-col gap-3">
@@ -86,12 +86,12 @@ export function DefinitionAdoptionWorkspace() {
         ]} />
         {(operation.state === "BLOCKED" || operation.state === "NEEDS_REVIEW") && <p role="status" className="text-sm text-muted-foreground">{copy.blocked}</p>}
       </>}
-      {change.canQuote && <div><Button variant="outline" onClick={() => void change.quote()}>{copy.preview}</Button></div>}
+      {change.canQuote && <div><Button size="sm" variant="outline" onClick={() => void change.quote()}>{copy.preview}</Button></div>}
       {state?.preview && state.phase !== "complete" && <>
         <p className="text-xs text-muted-foreground">{copy.previewNotice}</p><CommercialPreviewDetails preview={state.preview} />
         <p className="text-xs text-muted-foreground">{copy.noWallet}</p>
         {change.expired && <p role="status" className="text-sm text-muted-foreground">{commandCopy.expired}</p>}
-        <div><Button variant="outline" disabled={!change.canApply} onClick={() => void change.apply()}>{copy.apply}</Button></div>
+        <div><Button size="sm" variant="outline" disabled={!change.canApply} onClick={() => void change.apply()}>{copy.apply}</Button></div>
       </>}
       {change.canRecover && <CommercialRecoveryControls change={change} />}
       {state?.receiptError && <section className="rounded-md border border-border p-4" aria-label={t.commercialReceipt.loadFailed}>
@@ -102,7 +102,7 @@ export function DefinitionAdoptionWorkspace() {
         </PermissionGate>
       </section>}
       {state?.receipt && <CommercialReceiptDetails receipt={state.receipt} />}
-      {state?.phase === "complete" && <div><Button variant="outline" onClick={change.newChange}>{commandCopy.newChange}</Button></div>}
+      {state?.phase === "complete" && <div><Button size="sm" variant="outline" onClick={change.newChange}>{commandCopy.newChange}</Button></div>}
     </PermissionGate>
   </div>;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type KeyboardEvent } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, Plus, X } from "lucide-react";
 import { formatTemplate } from "@/lib/format/template";
 import { cn } from "../lib/cn";
 import { focusRing, textEntrySize, type ControlSizeProps } from "../lib/variants";
@@ -34,9 +34,39 @@ export interface MultiSelectProps extends ControlSizeProps {
   onBlur?: () => void;
   id?: string;
   className?: string;
+  /** Callback when user chooses to create an option for the current search query */
+  onCreate?: (query: string) => void;
+  /** Template or string for the create option in the list. e.g. "Create tag \"{name}\"" */
+  createLabel?: string;
 }
 
 const DEFAULT_MAX_VISIBLE = 3;
+
+const multiSelectSizeConfig: Record<
+  NonNullable<ControlSizeProps["size"]>,
+  { container: string; text: string }
+> = {
+  xs: {
+    container: "min-h-(--size-control-xs) px-2 py-0.5 rounded-sm",
+    text: "text-xs",
+  },
+  sm: {
+    container: "min-h-(--size-control-sm) px-2.5 py-0.5 rounded-md",
+    text: "text-xs",
+  },
+  md: {
+    container: "min-h-(--size-control-md) px-3 py-1 rounded-md",
+    text: "text-sm",
+  },
+  lg: {
+    container: "min-h-(--size-control-lg) px-3.5 py-1 rounded-md",
+    text: "text-sm",
+  },
+  xl: {
+    container: "min-h-(--size-control-xl) px-4 py-1.5 rounded-md",
+    text: "text-base",
+  },
+};
 
 export function MultiSelect({
   values,
@@ -57,11 +87,14 @@ export function MultiSelect({
   id,
   size = "sm",
   className,
+  onCreate,
+  createLabel,
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const optionRefs = useRef(new Map<string, HTMLLIElement>());
+  const createOptionRef = useRef<HTMLLIElement | null>(null);
   const listId = useId();
   const overflowHeadingId = useId();
   const field = useFieldControlContext();
@@ -85,6 +118,16 @@ export function MultiSelect({
     ? activeValue
     : enabledOptions[0]?.value;
 
+  const hasExactMatch = needle.length > 0 && options.some((option) => option.label.trim().toLowerCase() === needle);
+  const showCreateOption = Boolean(onCreate) && needle.length > 0 && !hasExactMatch;
+
+  function triggerCreate() {
+    if (!onCreate || !needle) return;
+    onCreate(query.trim());
+    setOpen(false);
+    setQuery("");
+  }
+
   function toggle(value: string) {
     onValuesChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
   }
@@ -102,13 +145,28 @@ export function MultiSelect({
   }
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (enabledOptions.length === 0) return;
+    if (event.key === "Enter" && filtered.length === 0 && showCreateOption) {
+      event.preventDefault();
+      triggerCreate();
+      return;
+    }
+    if (enabledOptions.length === 0) {
+      if (event.key === "ArrowDown" && showCreateOption) {
+        event.preventDefault();
+        createOptionRef.current?.focus();
+      }
+      return;
+    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       focusEnabledOption(0);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      focusEnabledOption(enabledOptions.length - 1);
+      if (showCreateOption) {
+        createOptionRef.current?.focus();
+      } else {
+        focusEnabledOption(enabledOptions.length - 1);
+      }
     }
   }
 
@@ -118,19 +176,48 @@ export function MultiSelect({
 
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      focusEnabledOption((currentIndex + 1) % enabledOptions.length);
+      if (currentIndex === enabledOptions.length - 1 && showCreateOption) {
+        createOptionRef.current?.focus();
+      } else {
+        focusEnabledOption((currentIndex + 1) % enabledOptions.length);
+      }
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      focusEnabledOption((currentIndex - 1 + enabledOptions.length) % enabledOptions.length);
+      if (currentIndex === 0 && showCreateOption) {
+        createOptionRef.current?.focus();
+      } else {
+        focusEnabledOption((currentIndex - 1 + enabledOptions.length) % enabledOptions.length);
+      }
     } else if (event.key === "Home") {
       event.preventDefault();
       focusEnabledOption(0);
     } else if (event.key === "End") {
       event.preventDefault();
-      focusEnabledOption(enabledOptions.length - 1);
+      if (showCreateOption) {
+        createOptionRef.current?.focus();
+      } else {
+        focusEnabledOption(enabledOptions.length - 1);
+      }
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       toggleOption(option);
+    }
+  }
+
+  function handleCreateOptionKeyDown(event: KeyboardEvent<HTMLLIElement>) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      triggerCreate();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (enabledOptions.length > 0) {
+        focusEnabledOption(enabledOptions.length - 1);
+      }
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (enabledOptions.length > 0) {
+        focusEnabledOption(0);
+      }
     }
   }
 
@@ -153,15 +240,17 @@ export function MultiSelect({
     );
   }
 
+  const sizeConfig = multiSelectSizeConfig[size ?? "sm"] ?? multiSelectSizeConfig.sm;
+
   return (
     // The trigger below has already claimed the field; the search box in the
     // popover must not claim it a second time.
     <FieldControlBoundary>
     <div
       className={cn(
-        "flex w-full flex-wrap items-center gap-1 rounded-sm border border-input bg-card p-1",
+        "flex w-full flex-wrap items-center gap-1 border border-input bg-card",
         "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
-        "min-h-(--size-control-md)",
+        sizeConfig.container,
         isInvalid && "border-destructive",
         disabled && "cursor-not-allowed opacity-50",
         isReadOnly && "bg-muted",
@@ -182,7 +271,7 @@ export function MultiSelect({
               variant="outline"
               size="xs"
               aria-label={`${overflowLabel} (${overflow.length})`}
-              className="cursor-pointer rounded-sm"
+              className="h-5 cursor-pointer rounded-sm px-1.5 text-[11px]"
             >
               {formatTemplate(moreLabel, { count: overflow.length })}
             </Button>
@@ -228,6 +317,8 @@ export function MultiSelect({
             aria-label={field ? undefined : placeholder}
             className={cn(
               "min-w-24 flex-1 cursor-pointer justify-between gap-1.5 bg-transparent font-normal",
+              "h-auto min-h-0 p-0 hover:bg-transparent shadow-none border-none",
+              sizeConfig.text,
               isReadOnly && "cursor-default",
             )}
           >
@@ -291,6 +382,27 @@ export function MultiSelect({
                 <bdi dir="auto" className="truncate">{option.label}</bdi>
               </li>
             ))}
+            {showCreateOption && (
+              <li
+                ref={createOptionRef}
+                role="option"
+                tabIndex={enabledOptions.length === 0 ? 0 : -1}
+                aria-selected={false}
+                onKeyDown={handleCreateOptionKeyDown}
+                onClick={triggerCreate}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 rounded-xs px-2 py-1.5 text-sm font-medium text-primary hover:bg-accent",
+                  focusRing,
+                )}
+              >
+                <Plus className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">
+                  {createLabel
+                    ? formatTemplate(createLabel, { name: query.trim() })
+                    : `Create "${query.trim()}"`}
+                </span>
+              </li>
+            )}
           </ul>
         </PopoverContent>
       </Popover>

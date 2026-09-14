@@ -50,14 +50,14 @@ export function CreatePeriodModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeInventory.periodCode} required hint={t.tradeInventory.codePatternHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.periodCode}
             value={values.code}
             disabled={isSubmitting}
             onChange={(event) => setValues((current) => ({ ...current, code: event.target.value }))}
           />
         </Field>
         <Field label={t.tradeInventory.periodStartsOn} required hint={t.tradeInventory.plainDateHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.periodStartsOn}
             type="date"
             value={values.startsOn}
             disabled={isSubmitting}
@@ -67,7 +67,7 @@ export function CreatePeriodModal({
           />
         </Field>
         <Field label={t.tradeInventory.periodEndsOn} required hint={t.tradeInventory.plainDateHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.periodEndsOn}
             type="date"
             value={values.endsOn}
             disabled={isSubmitting}
@@ -79,7 +79,7 @@ export function CreatePeriodModal({
           required
           hint={t.tradeInventory.periodMaxBackdateHint}
         >
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.periodMaxBackdateDays}
             type="number"
             min={0}
             max={366}

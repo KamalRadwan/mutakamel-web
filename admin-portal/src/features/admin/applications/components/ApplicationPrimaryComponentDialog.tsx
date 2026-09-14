@@ -69,7 +69,7 @@ export function ApplicationPrimaryComponentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-sm">
             <Boxes className="size-4 text-primary" aria-hidden="true" />
@@ -89,8 +89,8 @@ export function ApplicationPrimaryComponentDialog({
           </p>
         </DialogHeader>
 
-        <form onSubmit={submit} noValidate className="space-y-5">
-          <div className="rounded-md border border-info/30 bg-info-subtle p-4">
+        <form onSubmit={submit} noValidate className="space-y-4">
+          <div className="rounded-md border border-info/30 bg-info-subtle p-3 sm:p-3.5">
             <div className="flex items-center gap-2 text-xs font-semibold text-info-subtle-foreground">
               <ShieldCheck className="size-4" aria-hidden="true" />
               {t.applications.technicalProvisioning.authoritativeMapping}
@@ -117,6 +117,7 @@ export function ApplicationPrimaryComponentDialog({
 
           <Field
             label={t.applications.technicalProvisioning.changeReason}
+            hideLabel
             required
             error={validationError ?? undefined}
           >
@@ -128,10 +129,10 @@ export function ApplicationPrimaryComponentDialog({
                 required
                 invalid={Boolean(validationError)}
                 maxLength={256}
-                rows={3}
+                rows={2}
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
-                placeholder={t.applications.technicalProvisioning.reasonPlaceholder}
+                placeholder={`${t.applications.technicalProvisioning.reasonPlaceholder || t.applications.technicalProvisioning.changeReason} *`}
               />
             )}
           </Field>
@@ -152,13 +153,14 @@ export function ApplicationPrimaryComponentDialog({
           )}
 
           <footer className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
+            <Button type="button" variant="outline" size="sm" disabled={isSubmitting} onClick={close}>
               {t.applications.cancel}
             </Button>
             {isRecoverable && canRetryExactIntent && (
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={isSubmitting}
                 onClick={() => void onRetryExactIntent().then((completed) => completed && onClose())}
               >
@@ -166,7 +168,7 @@ export function ApplicationPrimaryComponentDialog({
                 {t.applications.technicalProvisioning.retryExactIntent}
               </Button>
             )}
-            <Button type="submit" variant="primary" loading={isSubmitting} disabled={isRecoverable}>
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting} disabled={isRecoverable}>
               {isSubmitting
                 ? isAdoption
                   ? t.applications.technicalProvisioning.adopting

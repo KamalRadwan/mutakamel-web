@@ -101,7 +101,7 @@ function InvoicesWorkspace() {
           { label: t.coreBilling.invoicesTitle },
         ]}
         secondaryActions={
-          <Button
+          <Button size="sm"
             variant="outline"
             onClick={() => void invoices.reload()}
             disabled={invoices.isRefreshing}

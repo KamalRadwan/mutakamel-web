@@ -1,11 +1,11 @@
 import { cn } from "../../lib/cn";
 
 /**
- * Title / description / breadcrumb / the single primary action / status —
- * replaces ~50 ad-hoc page headers. Only one variant="primary" Button
- * should ever be passed as `action` (docs/design-system/geometry-and-
- * density.md's one-primary-fill-per-page rule); this component doesn't
- * enforce that, it just gives the action a single, consistent slot.
+ * SecondNavBar / PageHeader —
+ * Renders the top secondary navigation bar across main pages, hosting
+ * the page title and status indicators on the start side, and action controllers
+ * (e.g. Register New Tenant button, lifecycle actions) on the end side.
+ * Seamlessly spans full width flush below the Topbar with compact height and clean borders.
  */
 export function PageHeader({
   title,
@@ -23,18 +23,29 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-3 pb-4", className)}>
-      {breadcrumb}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-            {status}
-          </div>
-          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+    <div
+      className={cn(
+        "-mx-3 -mt-3 md:-mx-[15px] md:-mt-[15px] mb-3 min-h-11 border-b border-border bg-card px-3 py-2 md:px-[15px] flex flex-wrap items-center justify-between gap-2.5 shadow-xs",
+        className,
+      )}
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2.5">
+        {breadcrumb}
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-sm font-semibold tracking-tight text-foreground sm:text-base">
+            {title}
+          </h1>
+          {status}
         </div>
-        {action && <div className="flex max-w-full shrink-0 items-center gap-2">{action}</div>}
+        {description && (
+          <p className="truncate text-xs text-muted-foreground sm:ms-1">
+            {description}
+          </p>
+        )}
       </div>
+      {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
     </div>
   );
 }
+
+export const SecondNavBar = PageHeader;

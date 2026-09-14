@@ -158,7 +158,7 @@ export default function CrmCustomFieldsPage() {
           description={t.crmCustomFields.subtitle}
           primaryAction={canCreate ? { label: t.crm.addACustomField, onClick: openCreate } : undefined}
           secondaryActions={
-            <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
               {t.crmCustomFields.reload}
             </Button>

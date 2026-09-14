@@ -160,7 +160,7 @@ export function PipelineStagesSection({
                 onValueChange={setSelectedStageId}
                 disabled={attachableStages.length === 0}
               >
-                <SelectTrigger aria-label={t.crmPipelines.attachStage}>
+                <SelectTrigger size="sm" aria-label={t.crmPipelines.attachStage}>
                   <SelectValue
                     placeholder={
                       attachableStages.length === 0
@@ -178,7 +178,7 @@ export function PipelineStagesSection({
                 </SelectContent>
               </Select>
             </div>
-            <Button
+            <Button size="sm"
               variant="outline"
               disabled={!selectedStageId || pendingStageId !== null}
               onClick={() => {

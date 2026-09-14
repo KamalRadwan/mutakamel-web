@@ -83,12 +83,12 @@ export default function CatalogueAuditPage() {
   ];
 
   return (
-    <div dir={dir} className="w-full space-y-6">
+    <div dir={dir} className="w-full space-y-3">
       <PageHeader
         breadcrumb={
           <Button variant="link" size="sm" asChild className="w-fit px-0">
             <Link href="/applications-catalogue">
-              <ArrowLeft className={`size-4 ${dir === "rtl" ? "rotate-180" : ""}`} />
+              <ArrowLeft className={`size-3.5 ${dir === "rtl" ? "rotate-180" : ""}`} />
               {text.back}
             </Link>
           </Button>
@@ -97,7 +97,7 @@ export default function CatalogueAuditPage() {
         action={
           canRead && (
             <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={isLoading}>
-              <RefreshCw className={`size-4 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+              <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {text.refresh}
             </Button>
           )
@@ -152,8 +152,8 @@ export default function CatalogueAuditPage() {
 function StateCard({ children, loading = false }: { children: React.ReactNode; loading?: boolean }) {
   return (
     <Card>
-      <CardContent role={loading ? "status" : "alert"} className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-        {loading ? <RefreshCw className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
+      <CardContent role={loading ? "status" : "alert"} className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+        {loading ? <RefreshCw className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
         {children}
       </CardContent>
     </Card>

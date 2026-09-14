@@ -527,21 +527,21 @@ export function CreateDatabaseServerWizard({
   return (
     <Card
       dir={dir}
-      className="mx-auto mt-6 max-w-3xl p-4 sm:p-6"
+      className="mx-auto max-w-3xl p-3 sm:p-3.5 rounded-xl border border-border bg-card shadow-xs"
     >
-      <h2 className="text-xl font-semibold mb-6">{copy.title}</h2>
+      <h2 className="text-sm sm:text-base font-semibold mb-3 pb-1.5 border-b border-border">{copy.title}</h2>
 
       {/* Basic Wizard Progress */}
-      <ol aria-label={lang === "ar" ? "خطوات تسجيل خادم قاعدة البيانات" : "Database server registration steps"} className="mb-8 grid grid-cols-2 gap-2 text-sm">
+      <ol aria-label={lang === "ar" ? "خطوات تسجيل خادم قاعدة البيانات" : "Database server registration steps"} className="mb-3 grid grid-cols-2 gap-2 text-xs">
         <li
           aria-current={step === 1 ? "step" : undefined}
-          className={`border-b-2 pb-2 ${step === 1 ? "border-primary font-semibold text-foreground" : "border-border text-muted-foreground"}`}
+          className={`border-b-2 pb-1.5 ${step === 1 ? "border-primary font-bold text-foreground" : "border-border text-muted-foreground"}`}
         >
           {copy.connectionStep}
         </li>
         <li
           aria-current={step === 2 ? "step" : undefined}
-          className={`border-b-2 pb-2 ${step === 2 ? "border-primary font-semibold text-foreground" : "border-border text-muted-foreground"}`}
+          className={`border-b-2 pb-1.5 ${step === 2 ? "border-primary font-bold text-foreground" : "border-border text-muted-foreground"}`}
         >
           {copy.accessStep}
         </li>
@@ -552,11 +552,11 @@ export function CreateDatabaseServerWizard({
           ref={errorSummaryRef}
           role="alert"
           tabIndex={-1}
-          className="mb-4 rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mb-3 rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <p>{wizardError.message}</p>
           {(wizardError.errorCode || wizardError.correlationId) && (
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs">
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs">
               {wizardError.errorCode && <CodeRef value={wizardError.errorCode} />}
               {wizardError.correlationId && (
                 <span className="flex flex-wrap items-center gap-1.5">
@@ -573,16 +573,16 @@ export function CreateDatabaseServerWizard({
         <section
           role="alert"
           aria-labelledby="database-connectivity-failure-title"
-          className="mb-4 overflow-hidden rounded-lg border border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+          className="mb-3 overflow-hidden rounded-md border border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
         >
-          <div className="border-b border-destructive/30 px-4 py-3">
+          <div className="border-b border-destructive/30 px-3 py-2">
             <h3
               id="database-connectivity-failure-title"
-              className="text-sm font-semibold"
+              className="text-xs font-semibold"
             >
               {copy.connectionChecksFailed}
             </h3>
-            <p className="mt-1 text-xs">
+            <p className="mt-0.5 text-xs">
               {copy.connectionChecksFailedDescription}
             </p>
           </div>
@@ -590,14 +590,14 @@ export function CreateDatabaseServerWizard({
             {connectivityResult.checks?.map((check) => (
               <li
                 key={check.principal}
-                className="flex items-start justify-between gap-4 px-4 py-3 text-xs"
+                className="flex items-start justify-between gap-3 px-3 py-2 text-xs"
               >
                 <div>
                   <p className="font-semibold text-foreground">
                     {copy.securityAdminCheck}
                   </p>
                   <p
-                    className={`mt-1 break-words ${check.connected ? "text-success-subtle-foreground" : "text-destructive-subtle-foreground"}`}
+                    className={`mt-0.5 break-words ${check.connected ? "text-success-subtle-foreground" : "text-destructive-subtle-foreground"}`}
                   >
                     {check.message}
                   </p>
@@ -612,56 +612,64 @@ export function CreateDatabaseServerWizard({
       )}
 
       {step === 1 && (
-        <div className="space-y-4">
-          <Field id="create-database-server-name" label={copy.serverName} required>
+        <div className="space-y-2.5">
+          <Field id="create-database-server-name" label={copy.serverName} hideLabel required>
             {(fieldProps) => (
               <Input
                 {...fieldProps}
+                size="sm"
                 dir="ltr"
                 minLength={DATABASE_SERVER_CREATE_CONSTRAINTS.name.minLength}
                 maxLength={DATABASE_SERVER_CREATE_CONSTRAINTS.name.maxLength}
+                placeholder={`${copy.serverName} *`}
                 value={formData.name}
                 onChange={(event) => updateFormData({ ...formData, name: event.target.value })}
               />
             )}
           </Field>
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
-            <Field id="create-database-server-host" label={copy.host} required>
+          <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_8rem]">
+            <Field id="create-database-server-host" label={copy.host} hideLabel required>
               {(fieldProps) => (
                 <Input
                   {...fieldProps}
+                  size="sm"
                   dir="ltr"
                   minLength={DATABASE_SERVER_CREATE_CONSTRAINTS.host.minLength}
                   maxLength={DATABASE_SERVER_CREATE_CONSTRAINTS.host.maxLength}
+                  placeholder={`${copy.host} *`}
                   value={formData.host}
                   onChange={(event) => updateFormData({ ...formData, host: event.target.value })}
                 />
               )}
             </Field>
-            <Field id="create-database-server-port" label={copy.port} required>
+            <Field id="create-database-server-port" label={copy.port} hideLabel required>
               {(fieldProps) => (
                 <Input
                   {...fieldProps}
+                  size="sm"
                   dir="ltr"
                   type="number"
                   min={DATABASE_SERVER_CREATE_CONSTRAINTS.port.min}
                   max={DATABASE_SERVER_CREATE_CONSTRAINTS.port.max}
                   step={1}
+                  placeholder={`${copy.port} *`}
                   value={formData.port}
                   onChange={(event) => updateFormData({ ...formData, port: Number(event.target.value) })}
                 />
               )}
             </Field>
           </div>
-          <Field id="create-database-server-max-tenants" label={copy.maxTenants} required>
+          <Field id="create-database-server-max-tenants" label={copy.maxTenants} hideLabel required>
             {(fieldProps) => (
               <Input
                 {...fieldProps}
+                size="sm"
                 dir="ltr"
                 type="number"
                 min={DATABASE_SERVER_CREATE_CONSTRAINTS.maxTenants.min}
                 max={DATABASE_SERVER_CREATE_CONSTRAINTS.maxTenants.max}
                 step={1}
+                placeholder={`${copy.maxTenants} *`}
                 value={formData.maxTenants}
                 onChange={(event) => updateFormData({ ...formData, maxTenants: Number(event.target.value) })}
               />
@@ -674,7 +682,7 @@ export function CreateDatabaseServerWizard({
             {copy.supportedEngine}: <strong>{copy.engineRequirement}</strong>.{" "}
             {copy.engineRestriction}
           </div>
-          <Button
+          <Button size="sm"
             type="button"
             variant="primary"
             onClick={() => setStep(2)}
@@ -687,19 +695,19 @@ export function CreateDatabaseServerWizard({
       )}
 
       {step === 2 && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Security Admin Credentials */}
-          <div className="rounded-lg border border-border p-4">
-            <h3 className="font-semibold mb-3 text-sm">
+          <div className="rounded-lg border border-border p-3">
+            <h3 className="font-semibold mb-1.5 text-xs">
               {copy.securityAdminCredentials}
             </h3>
-            <p className="mb-3 text-xs leading-5 text-muted-foreground">
+            <p className="mb-2 text-xs leading-4 text-muted-foreground">
               {copy.credentialsDescription}
             </p>
             <div
               role="note"
               aria-label={copy.postureAriaLabel}
-              className="mb-4 rounded-lg border border-border bg-muted px-3 py-3 text-xs leading-5 text-foreground"
+              className="mb-2.5 rounded-md border border-border bg-muted p-2 text-xs leading-4 text-foreground"
             >
               <p>
                 {copy.required}:{" "}
@@ -716,16 +724,17 @@ export function CreateDatabaseServerWizard({
                 </strong>
                 .
               </p>
-              <p className="mt-1">{copy.membershipRule}</p>
+              <p className="mt-0.5">{copy.membershipRule}</p>
             </div>
-            <p className="mb-3 text-xs leading-5 text-muted-foreground">
+            <p className="mb-2 text-xs leading-4 text-muted-foreground">
               {copy.usernameRule} <code>pg_</code>.
             </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field id="create-database-server-security-admin-username" label={copy.securityAdminUsername} hint={copy.usernameRuleTitle} required>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <Field id="create-database-server-security-admin-username" label={copy.securityAdminUsername} hideLabel hint={copy.usernameRuleTitle} required>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
                     dir="ltr"
                     disabled={pendingActivationId !== null || pendingBootstrapId !== null}
                     minLength={DATABASE_SERVER_CREATE_CONSTRAINTS.securityAdminUsername.minLength}
@@ -734,7 +743,7 @@ export function CreateDatabaseServerWizard({
                     autoCapitalize="none"
                     spellCheck={false}
                     autoComplete="off"
-                    placeholder={copy.username}
+                    placeholder={`${copy.username} *`}
                     value={formData.securityAdminCredentials.username}
                     onChange={(event) => updateFormData({
                       ...formData,
@@ -743,17 +752,18 @@ export function CreateDatabaseServerWizard({
                   />
                 )}
               </Field>
-              <Field id="create-database-server-security-admin-password" label={copy.securityAdminPassword} required>
+              <Field id="create-database-server-security-admin-password" label={copy.securityAdminPassword} hideLabel required>
                 {(fieldProps) => (
                   <Input
                     {...fieldProps}
+                    size="sm"
                     dir="ltr"
                     disabled={pendingActivationId !== null || pendingBootstrapId !== null}
                     minLength={DATABASE_SERVER_CREATE_CONSTRAINTS.securityAdminPassword.minLength}
                     maxLength={DATABASE_SERVER_CREATE_CONSTRAINTS.securityAdminPassword.maxLength}
                     autoComplete="new-password"
                     type="password"
-                    placeholder={copy.password}
+                    placeholder={`${copy.password} *`}
                     value={formData.securityAdminCredentials.password}
                     onChange={(event) => updateFormData({
                       ...formData,
@@ -858,7 +868,7 @@ export function CreateDatabaseServerWizard({
           )}
 
           <div className="grid gap-3 mt-6 sm:grid-cols-3">
-            <Button
+            <Button size="sm"
               type="button"
               variant="outline"
               onClick={() => setStep(1)}
@@ -870,7 +880,7 @@ export function CreateDatabaseServerWizard({
             >
               {copy.back}
             </Button>
-            <Button
+            <Button size="sm"
               type="button"
               variant="secondary"
               onClick={handleConnectivityCheck}
@@ -886,7 +896,7 @@ export function CreateDatabaseServerWizard({
                 ? copy.testing
                 : copy.optionalTest}
             </Button>
-            <Button
+            <Button size="sm"
               type="button"
               variant="primary"
               onClick={handleCreateDraft}

@@ -38,7 +38,7 @@ export default function TenantWebphoneSettingsPage() {
         title={copy.title}
         description={copy.subtitle}
         secondaryActions={
-          <Button
+          <Button size="sm"
             variant="outline"
             onClick={() => void state.refetch()}
             disabled={state.loadState === "LOADING"}
@@ -55,14 +55,14 @@ export default function TenantWebphoneSettingsPage() {
       />
 
       {state.loadState === "LOADING" ? (
-        <Card role="status" className="p-8 text-center text-xs text-muted-foreground">
+        <Card role="status" className="p-3 sm:p-3.5 text-center text-xs text-muted-foreground">
           {copy.loading}
         </Card>
       ) : state.loadState === "FORBIDDEN" ? (
         <Card
           role="note"
           level="sunken"
-          className="max-w-prose p-4 text-xs text-muted-foreground"
+          className="max-w-prose p-3 sm:p-3.5 text-xs text-muted-foreground"
         >
           {copy.noReadPermission}
         </Card>
@@ -88,7 +88,7 @@ export default function TenantWebphoneSettingsPage() {
             <Card
               role="note"
               level="sunken"
-              className="max-w-prose p-4 text-xs text-muted-foreground"
+              className="max-w-prose p-3 sm:p-3.5 text-xs text-muted-foreground"
             >
               {copy.readOnly}
             </Card>

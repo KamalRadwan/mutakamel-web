@@ -47,9 +47,9 @@ export function InvoicesListScreen() {
         copy={copy}
         action={
           invoices.permissions.canCreate ? (
-            <Button variant="primary" asChild>
+            <Button size="sm" variant="primary" asChild>
               <Link href="/invoices/new">
-                <Plus className="size-4" aria-hidden="true" />
+                <Plus className="size-3.5" aria-hidden="true" />
                 {copy.generate}
               </Link>
             </Button>
@@ -80,23 +80,25 @@ function InvoiceFilters({
 }) {
   return (
     <Card>
-      <CardContent>
-        <form aria-label={copy.filters} onSubmit={invoices.submitFilters} className="space-y-4">
+      <CardContent className="p-3 sm:p-3.5">
+        <form aria-label={copy.filters} onSubmit={invoices.submitFilters} className="space-y-2.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="inline-flex items-center gap-2 text-base font-semibold">
-              <Filter className="size-4 text-primary" aria-hidden="true" />
+            <h2 className="inline-flex items-center gap-1.5 text-xs font-semibold">
+              <Filter className="size-3.5 text-primary" aria-hidden="true" />
               {copy.filters}
             </h2>
             <Button type="button" variant="outline" size="sm" onClick={invoices.refresh} disabled={invoices.isRefreshing}>
-              <RefreshCw className={`size-4 ${invoices.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+              <RefreshCw className={`size-3.5 ${invoices.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {copy.refresh}
             </Button>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-            <Field label={copy.search} error={invoices.validationErrors.search ? errorText(invoices.validationErrors.search, copy) : undefined}>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <Field label={copy.search} hideLabel error={invoices.validationErrors.search ? errorText(invoices.validationErrors.search, copy) : undefined}>
               {(fp) => (
                 <Input
                   {...fp}
+                  size="sm"
+                  placeholder={copy.search}
                   value={invoices.draft.search}
                   maxLength={201}
                   invalid={Boolean(invoices.validationErrors.search)}
@@ -104,25 +106,27 @@ function InvoiceFilters({
                 />
               )}
             </Field>
-            <Field label={copy.tenantId} error={invoices.validationErrors.tenantId ? errorText(invoices.validationErrors.tenantId, copy) : undefined}>
+            <Field label={copy.tenantId} hideLabel error={invoices.validationErrors.tenantId ? errorText(invoices.validationErrors.tenantId, copy) : undefined}>
               {(fp) => (
                 <Input
                   {...fp}
+                  size="sm"
                   dir="ltr"
+                  placeholder={copy.tenantId}
                   value={invoices.draft.tenantId}
                   invalid={Boolean(invoices.validationErrors.tenantId)}
                   onChange={(event) => invoices.updateFilter("tenantId", event.target.value)}
                 />
               )}
             </Field>
-            <Field label={copy.status}>
+            <Field label={copy.status} hideLabel>
               {(fp) => (
                 <Select
                   value={invoices.draft.status || "ALL"}
                   onValueChange={(value) => invoices.updateFilter("status", (value === "ALL" ? "" : value) as InvoiceListFilterDraft["status"])}
                 >
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue placeholder={copy.status} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">{copy.allStatuses}</SelectItem>
@@ -135,11 +139,11 @@ function InvoiceFilters({
                 </Select>
               )}
             </Field>
-            <Field label={copy.sortBy}>
+            <Field label={copy.sortBy} hideLabel>
               {(fp) => (
                 <Select value={invoices.draft.sortBy} onValueChange={(value) => invoices.updateFilter("sortBy", value as InvoiceListFilterDraft["sortBy"])}>
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue placeholder={copy.sortBy} />
                   </SelectTrigger>
                   <SelectContent>
                     {INVOICE_SORT_FIELDS.map((field) => (
@@ -151,11 +155,11 @@ function InvoiceFilters({
                 </Select>
               )}
             </Field>
-            <Field label={copy.sortDirection}>
+            <Field label={copy.sortDirection} hideLabel>
               {(fp) => (
                 <Select value={invoices.draft.sortDir} onValueChange={(value) => invoices.updateFilter("sortDir", value as InvoiceListFilterDraft["sortDir"])}>
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue placeholder={copy.sortDirection} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="DESC">{copy.descending}</SelectItem>
@@ -164,11 +168,11 @@ function InvoiceFilters({
                 </Select>
               )}
             </Field>
-            <Field label={copy.pageSize} error={invoices.validationErrors.limit ? errorText(invoices.validationErrors.limit, copy) : undefined}>
+            <Field label={copy.pageSize} hideLabel error={invoices.validationErrors.limit ? errorText(invoices.validationErrors.limit, copy) : undefined}>
               {(fp) => (
                 <Select value={String(invoices.draft.limit)} onValueChange={(value) => invoices.updateFilter("limit", value)}>
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                    <SelectValue placeholder={copy.pageSize} />
                   </SelectTrigger>
                   <SelectContent>
                     {[10, 20, 25, 50, 100].map((limit) => (
@@ -181,13 +185,13 @@ function InvoiceFilters({
               )}
             </Field>
           </div>
-          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-3">
-            <Button type="button" variant="outline" onClick={invoices.clearFilters}>
-              <RotateCcw className="size-4" aria-hidden="true" />
+          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-2.5">
+            <Button size="sm" type="button" variant="outline" onClick={invoices.clearFilters}>
+              <RotateCcw className="size-3.5" aria-hidden="true" />
               {copy.reset}
             </Button>
-            <Button type="submit" variant="primary">
-              <Filter className="size-4" aria-hidden="true" />
+            <Button size="sm" type="submit" variant="primary">
+              <Filter className="size-3.5" aria-hidden="true" />
               {copy.apply}
             </Button>
           </div>

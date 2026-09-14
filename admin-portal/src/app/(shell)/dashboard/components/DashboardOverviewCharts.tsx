@@ -259,13 +259,13 @@ export function DashboardOverviewCharts({
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {kpis.length > 0 && (
         <section>
           <SectionHeading title={t.dashboard.overviewTab.kpisTitle} />
           {/* Denser than the default stat grid: six cards that each now carry
               a chart would otherwise push the real charts below the fold. */}
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             {kpis.map((kpi) => (
               <KpiCard key={kpi.key} card={kpi} compact />
             ))}
@@ -277,7 +277,7 @@ export function DashboardOverviewCharts({
           card is withheld rather than drawn empty — an empty frame reads as
           "no tenants" when the truth is "not yours to see". */}
       {(growth || overview.recentTenants) && (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
           {growth && (
             <DashboardChartCard
               className="xl:col-span-2"
@@ -428,7 +428,7 @@ function RecentTenantsList({
     );
   }
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-1.5">
       {items.slice(0, 6).map((tenant) => (
         <li key={tenant.id}>
           {/* The whole row is the target rather than the name alone: at this
@@ -436,7 +436,7 @@ function RecentTenantsList({
               status badge is part of what the reader is pointing at. */}
           <Link
             href={`/tenants/${tenant.id}`}
-            className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none"
+            className="flex min-h-9 items-center justify-between gap-2.5 rounded-md border border-border bg-card px-3 py-1.5 transition-colors hover:border-primary/40 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none"
           >
             <span className="min-w-0">
               {/* A tenant name is a proper noun, so `dir="auto"` keeps a Latin
@@ -452,11 +452,11 @@ function RecentTenantsList({
             <span className="flex shrink-0 items-center gap-1">
               <Badge tone="neutral">{tenant.status}</Badge>
               <ChevronLeft
-                className="size-4 text-muted-foreground rtl:block ltr:hidden"
+                className="size-3.5 text-muted-foreground rtl:block ltr:hidden"
                 aria-hidden="true"
               />
               <ChevronRight
-                className="size-4 text-muted-foreground ltr:block rtl:hidden"
+                className="size-3.5 text-muted-foreground ltr:block rtl:hidden"
                 aria-hidden="true"
               />
             </span>
@@ -468,5 +468,5 @@ function RecentTenantsList({
 }
 
 function SectionHeading({ title }: { title: string }) {
-  return <h2 className="mb-3 px-1 text-sm font-semibold text-foreground">{title}</h2>;
+  return <h2 className="mb-2 px-1 text-sm font-semibold text-foreground">{title}</h2>;
 }

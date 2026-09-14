@@ -117,15 +117,14 @@ export function StorageServersScreen() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <PageHeader
         title={copy.pageTitle}
-        description={copy.pageDescription}
         action={
           view.canCreate && (
-            <Button variant="primary" asChild>
+            <Button variant="primary" size="sm" asChild>
               <Link href="/storage-servers/new">
-                <Plus className="size-4" aria-hidden="true" />
+                <Plus className="size-3.5" aria-hidden="true" />
                 {copy.registerServerButton}
               </Link>
             </Button>
@@ -157,10 +156,11 @@ export function StorageServersScreen() {
         </div>
       )}
 
-      <div className="space-y-3">
-        <div className="flex flex-col items-stretch gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-end">
+      <div className="space-y-2.5">
+        <div className="flex flex-col items-stretch gap-2 rounded-lg border border-border bg-card p-2 sm:flex-row sm:items-center">
           <div className="flex-1">
             <FilterBar
+              className="border-0 p-0 bg-transparent shadow-none"
               labelEn="Storage server filters"
               labelAr="عوامل تصفية خوادم التخزين"
               ariaControls="storage-server-results"

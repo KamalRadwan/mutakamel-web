@@ -114,7 +114,7 @@ export default function TemplateAssetsPage() {
             assets.canManage ? { label: copy.assetUpload, onClick: assets.openUpload } : undefined
           }
           secondaryActions={
-            <Button variant="outline" onClick={assets.reload} disabled={assets.isLoading}>
+            <Button size="sm" variant="outline" onClick={assets.reload} disabled={assets.isLoading}>
               <RefreshCw
                 className={assets.isLoading ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

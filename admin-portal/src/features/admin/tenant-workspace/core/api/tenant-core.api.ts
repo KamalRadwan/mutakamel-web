@@ -9,12 +9,14 @@ import {
   readTenantFqdnList,
   readTenantProvisioningCommandResult,
   readTenantView,
+  readTenantDestroy,
 } from "../model/readers";
 import type {
   FqdnAvailabilityResult,
   TenantFqdnView,
   TenantProvisioningCommandResult,
   TenantView,
+  TenantDestroyView,
   UpdateTenantProfileDto,
 } from "../types";
 
@@ -136,14 +138,24 @@ export const tenantCoreApi = {
     tenantId: string,
     destroySubscriptions: boolean,
     idempotencyKey: string,
-  ): Promise<void> => {
+  ): Promise<TenantDestroyView> => {
     const query = new URLSearchParams({
       destroySubscriptions: destroySubscriptions ? "true" : "false",
     });
-    await axiosClient.delete(
+    const response = await axiosClient.delete<SuccessResponse<unknown>>(
       `${TENANTS_URL}/${tenantId}/destroy?${query.toString()}`,
       keyed(idempotencyKey),
     );
+    const result = readTenantDestroy(extractCoreData(response));
+    if (!result || result.tenantId !== tenantId) throw new Error('INVALID_TENANT_DESTROY_RESPONSE');
+    return result;
+  },
+
+  getDestroy: async (tenantId: string, signal?: AbortSignal): Promise<TenantDestroyView | null> => {
+    const response = await axiosClient.get<SuccessResponse<unknown>>(`${TENANTS_URL}/${tenantId}/destroy`, { signal });
+    const result = readTenantDestroy(extractCoreData(response));
+    if (result && result.tenantId !== tenantId) throw new Error('INVALID_TENANT_DESTROY_RESPONSE');
+    return result;
   },
 
   validateFqdn: async (

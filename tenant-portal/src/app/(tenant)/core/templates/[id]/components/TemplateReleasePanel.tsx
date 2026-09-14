@@ -119,7 +119,7 @@ export function TemplateReleasePanel({
       {canPublish ? (
         <div className="flex flex-col gap-3 pt-2">
           <Field label={copy.changeNote} hint={copy.changeNoteHint}>
-            <Input
+            <Input size="sm" placeholder={copy.changeNote}
               value={changeNote}
               onChange={(event) => setChangeNote(event.target.value)}
               maxLength={TEMPLATE_CHANGE_NOTE_MAX}
@@ -127,7 +127,7 @@ export function TemplateReleasePanel({
             />
           </Field>
           <span className="flex items-center gap-2">
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void release.publish(changeNote)}
               disabled={!release.canPublish}

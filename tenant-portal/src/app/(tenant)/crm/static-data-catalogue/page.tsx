@@ -72,7 +72,7 @@ export default function CrmStaticCataloguePage() {
           title={t.crm.staticDataCatalogAndRefere}
           description={t.crmStaticCatalogue.subtitle}
           secondaryActions={
-            <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
               {t.crmStaticCatalogue.reload}
             </Button>

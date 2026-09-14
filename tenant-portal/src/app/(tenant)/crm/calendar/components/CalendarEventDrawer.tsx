@@ -136,7 +136,7 @@ export function CalendarEventDrawer({
       ) : null}
 
       <Field label={t.crmCalendar.title} error={titleError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmCalendar.title}
           value={title}
           maxLength={ACTIVITY_SUBJECT_MAX_LENGTH}
           onChange={(input) => setTitle(input.target.value)}
@@ -154,7 +154,7 @@ export function CalendarEventDrawer({
                 setSourceLabel(undefined);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -206,11 +206,12 @@ export function CalendarEventDrawer({
               names, so the time input opts out of the field and keeps its own
               accessible name rather than claiming the same id. */}
           <FieldControlBoundary>
-            <Input
+            <Input size="sm"
               type="time"
               className="w-32"
               value={startTime}
               aria-label={t.crmCalendar.startTime}
+              placeholder={t.crmCalendar.startTime}
               onChange={(input) => setStartTime(input.target.value)}
             />
           </FieldControlBoundary>
@@ -227,11 +228,12 @@ export function CalendarEventDrawer({
             />
           </div>
           <FieldControlBoundary>
-            <Input
+            <Input size="sm"
               type="time"
               className="w-32"
               value={endTime}
               aria-label={t.crmCalendar.endTime}
+              placeholder={t.crmCalendar.endTime}
               onChange={(input) => setEndTime(input.target.value)}
             />
           </FieldControlBoundary>
@@ -245,14 +247,14 @@ export function CalendarEventDrawer({
       ) : (
         <>
           <Field label={t.crmCalendar.location}>
-            <Input
+            <Input size="sm" placeholder={t.crmCalendar.location}
               value={location}
               maxLength={ACTIVITY_LOCATION_MAX_LENGTH}
               onChange={(input) => setLocation(input.target.value)}
             />
           </Field>
           <Field label={t.crmCalendar.description}>
-            <Textarea
+            <Textarea placeholder={t.crmCalendar.description}
               value={description}
               maxLength={ACTIVITY_TEXT_MAX_LENGTH}
               onChange={(input) => setDescription(input.target.value)}

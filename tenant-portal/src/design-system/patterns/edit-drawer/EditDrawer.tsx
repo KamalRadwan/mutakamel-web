@@ -108,7 +108,7 @@ export function EditDrawer({
         footerLeading={
           <>
             {onDelete && labels.delete && (
-              <Button
+              <Button size="sm"
                 variant="destructive"
                 onClick={onDelete}
                 disabled={isSubmitting || unloaded}
@@ -118,7 +118,7 @@ export function EditDrawer({
               </Button>
             )}
             {onRevert && labels.revert && (
-              <Button
+              <Button size="sm"
                 variant="ghost"
                 onClick={onRevert}
                 disabled={!isDirty || isSubmitting || unloaded}

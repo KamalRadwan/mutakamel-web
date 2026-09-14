@@ -47,7 +47,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
       {fields.map((field, index) => (
         <div key={index} className="grid gap-3 border-t border-border pt-3 md:grid-cols-4">
           <Field label={t.tradeAutomation.fieldKey} required>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.fieldKey}
               value={field.fieldKey}
               maxLength={100}
               disabled={disabled}
@@ -62,7 +62,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
                 patch(index, { valueKind: next as ExtensionFieldDraft["valueKind"] })
               }
             >
-              <SelectTrigger aria-label={t.tradeAutomation.valueKind}>
+              <SelectTrigger size="sm" aria-label={t.tradeAutomation.valueKind}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -82,7 +82,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
                 patch(index, { scalarType: next as ExtensionFieldDraft["scalarType"] })
               }
             >
-              <SelectTrigger aria-label={t.tradeAutomation.scalarType}>
+              <SelectTrigger size="sm" aria-label={t.tradeAutomation.scalarType}>
                 <SelectValue placeholder={t.tradeCommon.notSet} />
               </SelectTrigger>
               <SelectContent>
@@ -102,7 +102,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
                 patch(index, { visibilityCode: next as ExtensionFieldDraft["visibilityCode"] })
               }
             >
-              <SelectTrigger aria-label={t.tradeAutomation.visibilityCode}>
+              <SelectTrigger size="sm" aria-label={t.tradeAutomation.visibilityCode}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -115,7 +115,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
             </Select>
           </Field>
           <Field label={t.tradeAutomation.maxLength}>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.maxLength}
               type="number"
               min={1}
               max={4096}
@@ -125,7 +125,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
             />
           </Field>
           <Field label={t.tradeAutomation.maxItems}>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.maxItems}
               type="number"
               min={1}
               max={100}
@@ -135,7 +135,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
             />
           </Field>
           <Field label={t.tradeAutomation.decimalScale} hint={t.tradeAutomation.decimalScaleHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.decimalScale}
               type="number"
               min={0}
               max={8}
@@ -152,7 +152,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
                 patch(index, { defaultStrategy: next as ExtensionFieldDraft["defaultStrategy"] })
               }
             >
-              <SelectTrigger aria-label={t.tradeAutomation.defaultStrategy}>
+              <SelectTrigger size="sm" aria-label={t.tradeAutomation.defaultStrategy}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -165,7 +165,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
             </Select>
           </Field>
           <Field label={t.tradeAutomation.minimumDecimal} hint={t.tradeCommon.decimalHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.minimumDecimal}
               value={field.minimumDecimal}
               inputMode="decimal"
               disabled={disabled}
@@ -173,7 +173,7 @@ export function ExtensionFieldRows({ fields, onChange, disabled }: ExtensionFiel
             />
           </Field>
           <Field label={t.tradeAutomation.maximumDecimal} hint={t.tradeCommon.decimalHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.maximumDecimal}
               value={field.maximumDecimal}
               inputMode="decimal"
               disabled={disabled}

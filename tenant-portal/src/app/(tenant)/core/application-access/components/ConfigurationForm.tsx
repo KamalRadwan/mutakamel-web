@@ -35,14 +35,14 @@ export function ConfigurationForm(props: ConfigurationFormProps) {
         {action.input.view && ((action.fresh && state?.phase === "editing") || (action.restoreReady && state?.phase === "restore")) && state && <>
           <ConfigurationFields node={action.input.view.inputSchema} draft={state.draft} path={[]} required action={action} />
           <Field label={copy.reason} hint={t.branchAddonRestriction.reasonHint} required error={state.invalidReason ? t.branchAddonRestriction.reasonInvalid : undefined}>
-            <Input value={state.reason} onChange={(event) => action.changeReason(event.target.value)} maxLength={500} disabled={!action.editable} />
+            <Input size="sm" value={state.reason} placeholder={copy.reason} onChange={(event) => action.changeReason(event.target.value)} maxLength={500} disabled={!action.editable} />
           </Field>
-          <Button variant="outline" disabled={!action.editable} onClick={action.review}>{state.phase === "restore" ? copy.verifyOriginal : copy.review}</Button>
+          <Button size="sm" variant="outline" disabled={!action.editable} onClick={action.review}>{state.phase === "restore" ? copy.verifyOriginal : copy.review}</Button>
         </>}
-        {command && state?.phase === "uncertain" && <Button variant="outline" disabled={!action.ready} onClick={action.reviewOriginal}>{t.addonAssignmentCommand.reviewOriginal}</Button>}
+        {command && state?.phase === "uncertain" && <Button size="sm" variant="outline" disabled={!action.ready} onClick={action.reviewOriginal}>{t.addonAssignmentCommand.reviewOriginal}</Button>}
       </section>
       <Dialog open={action.ready && (state?.open ?? false)} onOpenChange={action.changeOpen}>
-        <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="max-h-[85dvh] overflow-y-auto">
+        <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="p-3 sm:p-3.5 max-h-[85dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>{copy.review}</DialogTitle><DialogDescription>{state?.phase === "uncertain" ? copy.retryNotice : copy.replaceNotice}</DialogDescription></DialogHeader>
           {command && <DetailSection title={copy.exactTarget} fields={[
             { label: "companyId" in command.target ? t.applicationAccess.company : t.applicationAccess.branch,
@@ -56,8 +56,8 @@ export function ConfigurationForm(props: ConfigurationFormProps) {
             { label: copy.reason, value: command.body.reason },
           ]} />}
           {state?.phase === "review" && action.input.view && <ConfigurationFields node={action.input.view.inputSchema} draft={state.draft} path={[]} required action={action} review />}
-          <DialogFooter><Button variant="outline" disabled={pending} onClick={() => action.changeOpen(false)}>{t.common.cancel}</Button>
-            <Button variant="outline" loading={pending} disabled={!action.ready || pending} onClick={action.confirm}>{copy.confirm}</Button></DialogFooter>
+          <DialogFooter><Button size="sm" variant="outline" disabled={pending} onClick={() => action.changeOpen(false)}>{t.common.cancel}</Button>
+            <Button size="sm" variant="outline" loading={pending} disabled={!action.ready || pending} onClick={action.confirm}>{copy.confirm}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </PermissionGate>}
@@ -72,6 +72,6 @@ export function ConfigurationForm(props: ConfigurationFormProps) {
       { label: t.addonAssignmentCommand.completedAt, value: <DateTime value={state.receipt.completedAt} /> },
     ]} />}
     {(action.denied || (state && ["restore", "processing", "uncertain", "rejected", "committed", "storage"].includes(state.phase))) &&
-      <Button variant="outline" disabled={pending || state?.statusLoading} onClick={action.recheck}>{t.addonAssignmentCommand.recheck}</Button>}
+      <Button size="sm" variant="outline" disabled={pending || state?.statusLoading} onClick={action.recheck}>{t.addonAssignmentCommand.recheck}</Button>}
   </div>;
 }

@@ -33,7 +33,7 @@ export function SubNav({ items, ariaLabel }: { items: SubNavItem[]; ariaLabel: s
         <Button
           type="button"
           variant="outline"
-          size="md"
+          size="sm"
           onClick={canScrollStart ? scrollToStart : undefined}
           aria-disabled={!canScrollStart}
           aria-label={lang === "ar" ? `تمرير ${ariaLabel} نحو البداية` : `Scroll ${ariaLabel} toward the beginning`}
@@ -80,7 +80,7 @@ export function SubNav({ items, ariaLabel }: { items: SubNavItem[]; ariaLabel: s
         <Button
           type="button"
           variant="outline"
-          size="md"
+          size="sm"
           onClick={canScrollEnd ? scrollToEnd : undefined}
           aria-disabled={!canScrollEnd}
           aria-label={lang === "ar" ? `تمرير ${ariaLabel} نحو النهاية` : `Scroll ${ariaLabel} toward the end`}

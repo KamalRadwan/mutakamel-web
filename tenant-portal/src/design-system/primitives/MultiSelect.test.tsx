@@ -173,4 +173,59 @@ describe("MultiSelect", () => {
     expect(screen.getByText("New")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove New" })).toBeNull();
   });
+
+  it("applies the small dense control height token by default and respects size prop", () => {
+    const { container: containerSm } = renderMultiSelect();
+    expect(containerSm.firstElementChild).toHaveClass("min-h-(--size-control-sm)");
+
+    const { container: containerMd } = renderMultiSelect({ size: "md" });
+    expect(containerMd.firstElementChild).toHaveClass("min-h-(--size-control-md)");
+  });
+
+  it("shows create option when searching for non-existent item and calls onCreate", () => {
+    const onCreate = vi.fn();
+    renderMultiSelect({
+      searchPlaceholder: "Search stages",
+      onCreate,
+      createLabel: 'Create tag "{name}"',
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Any stage" }));
+    const search = screen.getByLabelText("Search stages");
+
+    fireEvent.change(search, { target: { value: "Unknown Tag" } });
+    const createOption = screen.getByRole("option", { name: 'Create tag "Unknown Tag"' });
+    expect(createOption).toBeInTheDocument();
+
+    fireEvent.click(createOption);
+    expect(onCreate).toHaveBeenCalledWith("Unknown Tag");
+  });
+
+  it("does not show create option if search matches an existing option exactly", () => {
+    const onCreate = vi.fn();
+    renderMultiSelect({
+      searchPlaceholder: "Search stages",
+      onCreate,
+      createLabel: 'Create tag "{name}"',
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Any stage" }));
+    const search = screen.getByLabelText("Search stages");
+
+    fireEvent.change(search, { target: { value: "won" } });
+    expect(screen.queryByText(/Create tag/)).toBeNull();
+  });
+
+  it("triggers onCreate when Enter is pressed in search input with no matching options", () => {
+    const onCreate = vi.fn();
+    renderMultiSelect({
+      searchPlaceholder: "Search stages",
+      onCreate,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Any stage" }));
+    const search = screen.getByLabelText("Search stages");
+
+    fireEvent.change(search, { target: { value: "Custom Value" } });
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(onCreate).toHaveBeenCalledWith("Custom Value");
+  });
 });
+

@@ -10,14 +10,28 @@ export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
 
+export interface SelectTriggerProps
+  extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> {
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
+}
+
+const selectSizeClasses: Record<"xs" | "sm" | "md" | "lg" | "xl", string> = {
+  xs: "h-(--size-control-xs) px-2 text-xs",
+  sm: "h-(--size-control-sm) px-2.5 text-xs",
+  md: "h-(--size-control-md) px-3 text-sm",
+  lg: "h-(--size-control-lg) px-3.5 text-sm",
+  xl: "h-(--size-control-xl) px-4 text-base",
+};
+
 export const SelectTrigger = forwardRef<
   React.ComponentRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+  SelectTriggerProps
+>(({ className, size = "sm", children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-(--size-control-lg) w-full items-center justify-between gap-2 rounded-md border border-input bg-card px-3 text-sm text-foreground outline-none transition-colors motion-reduce:transition-none",
+      "flex w-full items-center justify-between gap-1.5 rounded-md border border-input bg-card text-foreground outline-none transition-colors motion-reduce:transition-none",
+      selectSizeClasses[size],
       "data-[placeholder]:text-muted-foreground",
       "disabled:cursor-not-allowed disabled:opacity-50",
       focusRing,
@@ -28,7 +42,7 @@ export const SelectTrigger = forwardRef<
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="size-4 shrink-0 opacity-60" aria-hidden="true" />
+      <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -65,7 +79,7 @@ export const SelectItem = forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-none transition-colors motion-reduce:transition-none",
+      "relative flex w-full cursor-pointer select-none items-center rounded-md py-1.5 ps-7 pe-2 text-xs outline-none transition-colors motion-reduce:transition-none",
       "focus:bg-accent focus:text-accent-foreground",
       "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       hitArea,

@@ -150,4 +150,39 @@ describe("the tag picker", () => {
     fireEvent.click(extra);
     expect(onTagsChange).not.toHaveBeenCalled();
   });
+
+  it("exposes create tag option when canCreateTag is true and searches for unlisted tag", () => {
+    const onCreateTag = vi.fn();
+    renderSection({
+      showTags: true,
+      canCreateTag: true,
+      onCreateTag,
+      tags: [{ id: "tag-1", name: "Existing", color: null }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.tags }));
+    const search = screen.getByLabelText(en.crmLeads.create.tagsSearch);
+    fireEvent.change(search, { target: { value: "New Tag" } });
+
+    const createOption = screen.getByRole("option", { name: /Create tag "New Tag"|إنشاء وسم "New Tag"/ });
+    expect(createOption).toBeInTheDocument();
+    fireEvent.click(createOption);
+    expect(onCreateTag).toHaveBeenCalledWith("New Tag");
+  });
+
+  it("does not expose create tag option when canCreateTag is false", () => {
+    const onCreateTag = vi.fn();
+    renderSection({
+      showTags: true,
+      canCreateTag: false,
+      onCreateTag,
+      tags: [{ id: "tag-1", name: "Existing", color: null }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.tags }));
+    const search = screen.getByLabelText(en.crmLeads.create.tagsSearch);
+    fireEvent.change(search, { target: { value: "New Tag" } });
+
+    expect(screen.queryByText(/Create tag|إنشاء وسم/)).toBeNull();
+  });
 });

@@ -140,7 +140,7 @@ export function PipelineAssignmentsSection({
               }
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -161,7 +161,7 @@ export function PipelineAssignmentsSection({
                 limit: formatNumber(50, lang),
               })}
             >
-              <Input
+              <Input size="sm" placeholder={t.crmPipelines.optionsSearch}
                 value={state.optionsQuery}
                 autoComplete="off"
                 onChange={(event) => state.searchOptions(event.target.value)}

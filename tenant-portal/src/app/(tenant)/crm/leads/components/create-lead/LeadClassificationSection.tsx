@@ -49,6 +49,8 @@ export interface LeadClassificationSectionProps {
   tagsUnavailable: boolean;
   errors: LeadCreateErrors;
   disabled: boolean;
+  canCreateTag?: boolean;
+  onCreateTag?: (query: string) => void;
   onCompanyChange: (companyId: string) => void;
   onBranchChange: (branchId: string) => void;
   onProfileTypeChange: (profileType: CrmProfileType) => void;
@@ -103,6 +105,8 @@ export function LeadClassificationSection({
   tagsUnavailable,
   errors,
   disabled,
+  canCreateTag,
+  onCreateTag,
   onCompanyChange,
   onBranchChange,
   onProfileTypeChange,
@@ -130,7 +134,7 @@ export function LeadClassificationSection({
             disabled={disabled}
             onValueChange={onCompanyChange}
           >
-            <SelectTrigger dir="ltr" className="font-mono">
+            <SelectTrigger size="sm" dir="ltr" className="font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -151,7 +155,7 @@ export function LeadClassificationSection({
             disabled={disabled}
             onValueChange={onBranchChange}
           >
-            <SelectTrigger dir="ltr" className="font-mono">
+            <SelectTrigger size="sm" dir="ltr" className="font-mono">
               {/* No prompt: the inset label already says Branch. A
                   placeholder survives only where it says what leaving the
                   field empty MEANS — the stage default below. */}
@@ -174,7 +178,7 @@ export function LeadClassificationSection({
           disabled={disabled}
           onValueChange={(value) => onProfileTypeChange(value as CrmProfileType)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -193,7 +197,7 @@ export function LeadClassificationSection({
           disabled={disabled}
           onValueChange={(value) => onStageChange(value === DEFAULT_STAGE_VALUE ? "" : value)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t.crmLeads.defaultStage} />
           </SelectTrigger>
           <SelectContent>
@@ -219,7 +223,7 @@ export function LeadClassificationSection({
           disabled={disabled}
           onValueChange={onSourceChange}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             {/* Not "No source": that is the name of a STATE this form no
                 longer has, and reading it in an empty required box invites
                 the user to leave it alone. */}
@@ -245,6 +249,7 @@ export function LeadClassificationSection({
           })}
         >
           <MultiSelect
+            size="sm"
             values={tagIds}
             onValuesChange={(next) => {
               if (next.length <= LEAD_CREATE_LIMITS.tags) onTagsChange(next);
@@ -271,6 +276,8 @@ export function LeadClassificationSection({
             moreLabel={t.filters.more}
             removeLabel={t.filters.remove}
             overflowLabel={t.crmLeads.create.tagsOverflow}
+            onCreate={canCreateTag ? onCreateTag : undefined}
+            createLabel={t.crmLeads.create.createTagAction}
             // A degraded catalogue blocks new choices, not chip removal.
             disabled={disabled || tagsLoading}
             onBlur={onTagsBlur}

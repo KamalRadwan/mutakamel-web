@@ -22,9 +22,9 @@ export function AddonAssignments({ userId }: { userId: string }) {
   return <PermissionGate require={[]} denied={denied}>
     <div className="flex flex-col gap-4">
       <PageHeader title={copy.title} description={copy.description} secondaryActions={<>
-        <Button variant="outline" asChild><Link href={TENANT_ROUTES.coreAddonSeats}>{copy.own}</Link></Button>
-        {canBrowseUsers && <Button variant="outline" asChild><Link href={TENANT_ROUTES.coreUsers}>{copy.browseUsers}</Link></Button>}
-        <Button variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button>
+        <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreAddonSeats}>{copy.own}</Link></Button>
+        {canBrowseUsers && <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreUsers}>{copy.browseUsers}</Link></Button>}
+        <Button size="sm" variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button>
       </>} />
       <DetailSection title={copy.user} fields={[{ label: copy.user, value: <IdentifierText>{userId}</IdentifierText> }]} />
       <p className="text-sm text-muted-foreground">{copy.notice}</p>

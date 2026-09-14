@@ -100,7 +100,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
     >
       <div className="flex flex-col gap-4">
         <Field label={t.crmLeadStages.arabicName} required error={arabicName.error}>
-          <Input
+          <Input size="sm" placeholder={t.crmLeadStages.arabicName}
             dir="rtl"
             value={form.nameAr}
             onChange={(event) => setForm((current) => ({ ...current, nameAr: event.target.value }))}
@@ -111,7 +111,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
           />
         </Field>
         <Field label={t.crmLeadStages.englishName} required error={englishName.error}>
-          <Input
+          <Input size="sm" placeholder={t.crmLeadStages.englishName}
             dir="ltr"
             value={form.nameEn}
             onChange={(event) => setForm((current) => ({ ...current, nameEn: event.target.value }))}
@@ -129,7 +129,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
               setForm((current) => ({ ...current, flag, isDefault: flag === "CONVERTED" ? false : current.isDefault }));
             }}
           >
-            <SelectTrigger disabled={isSubmitting}>
+            <SelectTrigger size="sm" disabled={isSubmitting}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -146,7 +146,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
             value={form.category}
             onValueChange={(value) => setForm((current) => ({ ...current, category: value as LeadStageCategory }))}
           >
-            <SelectTrigger disabled={isSubmitting}>
+            <SelectTrigger size="sm" disabled={isSubmitting}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

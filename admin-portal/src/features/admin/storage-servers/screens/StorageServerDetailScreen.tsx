@@ -131,12 +131,12 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
   const canMakeDefault = server.status === "ACTIVE" && server.connectionEvidenceFresh && !server.isPlatformDefault;
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <PageHeader
         breadcrumb={
-          <Button variant="link" size="sm" asChild className="w-fit px-0">
+          <Button variant="link" size="xs" asChild className="w-fit px-0">
             <Link href="/storage-servers">
-              <BackIcon className="size-4" aria-hidden="true" />
+              <BackIcon className="size-3.5" aria-hidden="true" />
               {copy.backLabel}
             </Link>
           </Button>
@@ -153,7 +153,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
           view.canUpdate && (
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => void runProbe()} disabled={view.isMutating}>
-                <RefreshCw className={`size-4 ${view.isMutating ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+                <RefreshCw className={`size-3.5 ${view.isMutating ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
                 {copy.runConnectionTestButton}
               </Button>
               {["DRAFT", "OFFLINE"].includes(server.status) && (
@@ -164,28 +164,19 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                   onClick={() => void run(view.activate, copy.activationPassedMessage)}
                   disabled={view.isMutating}
                 >
-                  <Play className="size-4" aria-hidden="true" />
+                  <Play className="size-3.5" aria-hidden="true" />
                   {copy.testAndActivateButton}
                 </Button>
               )}
               {server.status === "ACTIVE" && !server.isPlatformDefault && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation("drain")} disabled={view.isMutating}>
-                  <Ban className="size-4" aria-hidden="true" />
+                  <Ban className="size-3.5" aria-hidden="true" />
                   {copy.drainButton}
                 </Button>
               )}
-              {/*
-                DRAINING belongs here as much as ACTIVE. Core's takeOffline
-                puts no restriction on the source status — it rejects only the
-                platform default and a server that still holds tenants, bytes
-                or open operations — and OFFLINE is the only door out of
-                DRAINING, since activate and delete both accept DRAFT/OFFLINE
-                alone. Without it a fully evacuated server stays DRAINING for
-                good. Emptiness stays Core's call, not this screen's.
-              */}
               {["ACTIVE", "DRAINING"].includes(server.status) && !server.isPlatformDefault && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setConfirmation("offline")} disabled={view.isMutating}>
-                  <StopCircle className="size-4" aria-hidden="true" />
+                  <StopCircle className="size-3.5" aria-hidden="true" />
                   {copy.takeOfflineButton}
                 </Button>
               )}
@@ -210,11 +201,11 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
           ref={actionErrorRef}
           role="alert"
           tabIndex={-1}
-          className="whitespace-pre-line rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="whitespace-pre-line rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <p>{actionError.message}</p>
           {(actionError.errorCode || actionError.correlationId) && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
               {actionError.errorCode && <CodeRef value={actionError.errorCode} />}
               {actionError.correlationId && <CodeRef value={actionError.correlationId} />}
             </div>
@@ -223,8 +214,8 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
       )}
       {view.lastProbe && <ProbeResultBanner result={view.lastProbe} lang={lang} />}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
-        <div className="space-y-6">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
+        <div className="space-y-3">
           <Panel
             title={copy.serverConfigurationTitle}
             icon={<HardDrive className="size-4" aria-hidden="true" />}
@@ -269,8 +260,8 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
               ))
             }
           >
-            <div className="flex items-start gap-3 rounded-md border border-info/30 bg-info-subtle p-4 text-info-subtle-foreground">
-              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-info" aria-hidden="true" />
+            <div className="flex items-start gap-2.5 rounded-md border border-info/30 bg-info-subtle p-2.5 text-info-subtle-foreground">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
               <div>
                 <p className="font-semibold">
                   {server.credentialsConfigured ? copy.credentialsConfiguredLabel : copy.credentialsNotConfiguredLabel}
@@ -280,7 +271,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                 </p>
               </div>
             </div>
-            <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+            <dl className="mt-3 grid gap-2.5 text-xs sm:grid-cols-2">
               <DatumRow label={copy.lastRotatedLabel} value={formatDate(server.credentialRotatedAt, lang)} />
               <DatumRow label={copy.rotationDueLabel} value={formatDate(server.credentialRotationDueAt, lang)} />
             </dl>
@@ -302,7 +293,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
           </Panel>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           <FreshnessPanel server={server} lang={lang} />
 
           <Panel title={copy.operationalPoliciesTitle} icon={<ShieldCheck className="size-4" aria-hidden="true" />}>
@@ -312,7 +303,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
               <PolicyRow label={copy.scheduledCheckLabel} value={copy.workerEvery12hValue} tone="info" />
             </div>
             {view.canUpdate && !server.isPlatformDefault && (
-              <Button
+              <Button size="sm"
                 type="button"
                 variant="outline"
                 className="mt-5 w-full"
@@ -336,7 +327,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
               <p className="text-xs leading-5 text-muted-foreground">
                 {copy.deleteRestrictionNote}
               </p>
-              <Button type="button" variant="destructive" className="mt-4 w-full" onClick={() => setConfirmation("delete")} disabled={deleteBlocked || view.isMutating}>
+              <Button size="sm" type="button" variant="destructive" className="mt-4 w-full" onClick={() => setConfirmation("delete")} disabled={deleteBlocked || view.isMutating}>
                 <Trash2 className="size-4" aria-hidden="true" />
                 {copy.deleteServerButton}
               </Button>
@@ -562,21 +553,21 @@ function StorageServerEditor({
       isSubmitting={isSubmitting}
       footerActions={
         <>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button size="sm" type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             {(lang === "ar" ? ar : en).common.cancel}
           </Button>
-          <Button type="submit" form="storage-server-editor-form" variant="primary" loading={isSubmitting}>
+          <Button size="sm" type="submit" form="storage-server-editor-form" variant="primary" loading={isSubmitting}>
             {copy.saveButton}
           </Button>
         </>
       }
     >
-      <form method="post" id="storage-server-editor-form" onSubmit={submit} className="space-y-4 py-1">
+      <form method="post" id="storage-server-editor-form" onSubmit={submit} className="space-y-2.5 py-1 text-xs">
         {error && (
-          <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p>{error.message}</p>
             {(error.errorCode || error.correlationId) && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {error.errorCode && <CodeRef value={error.errorCode} />}
                 {error.correlationId && <CodeRef value={error.correlationId} />}
               </div>
@@ -585,29 +576,29 @@ function StorageServerEditor({
         )}
         {mode === "credentials" ? (
           <>
-            <Field label={copy.accessKeyIdLabel} required>
-              {(fp) => <Input {...fp} dir="ltr" required minLength={3} maxLength={128} autoComplete="off" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} className="font-mono" />}
+            <Field label={copy.accessKeyIdLabel} hideLabel required>
+              {(fp) => <Input {...fp} size="sm" dir="ltr" required minLength={3} maxLength={128} autoComplete="off" placeholder={`${copy.accessKeyIdLabel} *`} value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} className="font-mono" />}
             </Field>
-            <Field label={copy.secretAccessKeyLabel} required>
-              {(fp) => <Input {...fp} dir="ltr" required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} className="font-mono" />}
+            <Field label={copy.secretAccessKeyLabel} hideLabel required>
+              {(fp) => <Input {...fp} size="sm" dir="ltr" required type="password" minLength={16} maxLength={256} autoComplete="new-password" placeholder={`${copy.secretAccessKeyLabel} *`} value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} className="font-mono" />}
             </Field>
           </>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={copy.nameLabel} required>
-              {(fp) => <Input {...fp} required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} />}
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Field label={copy.nameLabel} hideLabel required>
+              {(fp) => <Input {...fp} size="sm" required maxLength={120} placeholder={`${copy.nameLabel} *`} value={name} onChange={(e) => setName(e.target.value)} />}
             </Field>
-            <Field label={copy.maxTenantsLabel}>
-              {(fp) => <Input {...fp} dir="ltr" type="number" min={Math.max(1, server.assignedTenants)} max={1_000_000} value={maxTenants} onChange={(e) => setMaxTenants(e.target.value)} />}
+            <Field label={copy.maxTenantsLabel} hideLabel>
+              {(fp) => <Input {...fp} size="sm" dir="ltr" type="number" min={Math.max(1, server.assignedTenants)} max={1_000_000} placeholder={copy.maxTenantsLabel} value={maxTenants} onChange={(e) => setMaxTenants(e.target.value)} />}
             </Field>
-            <Field label={copy.endpointLabel} className="sm:col-span-2" required>
-              {(fp) => <Input {...fp} dir="ltr" required disabled={connectionEditBlocked} type="url" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="font-mono" />}
+            <Field label={copy.endpointLabel} hideLabel className="sm:col-span-2" required>
+              {(fp) => <Input {...fp} size="sm" dir="ltr" required disabled={connectionEditBlocked} type="url" placeholder={`${copy.endpointLabel} *`} value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="font-mono" />}
             </Field>
-            <Field label={copy.regionLabel} required>
-              {(fp) => <Input {...fp} dir="ltr" required disabled={connectionEditBlocked} value={region} onChange={(e) => setRegion(e.target.value)} className="font-mono" />}
+            <Field label={copy.regionLabel} hideLabel required>
+              {(fp) => <Input {...fp} size="sm" dir="ltr" required disabled={connectionEditBlocked} placeholder={`${copy.regionLabel} *`} value={region} onChange={(e) => setRegion(e.target.value)} className="font-mono" />}
             </Field>
-            <Field label={copy.bucketLabel} required>
-              {(fp) => <Input {...fp} dir="ltr" required disabled={connectionEditBlocked} value={bucketName} onChange={(e) => setBucketName(e.target.value)} className="font-mono" />}
+            <Field label={copy.bucketLabel} hideLabel required>
+              {(fp) => <Input {...fp} size="sm" dir="ltr" required disabled={connectionEditBlocked} placeholder={`${copy.bucketLabel} *`} value={bucketName} onChange={(e) => setBucketName(e.target.value)} className="font-mono" />}
             </Field>
           </div>
         )}
@@ -666,35 +657,35 @@ function SafeRotationEditor({
       isSubmitting={isSubmitting}
       footerActions={
         <>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
             {(lang === "ar" ? ar : en).common.cancel}
           </Button>
-          <Button type="submit" form="safe-rotation-form" variant="primary" loading={isSubmitting}>
+          <Button type="submit" form="safe-rotation-form" variant="primary" size="sm" loading={isSubmitting}>
             {copy.startRotationButton}
           </Button>
         </>
       }
     >
-      <form method="post" id="safe-rotation-form" onSubmit={submit} className="space-y-4 py-1">
+      <form method="post" id="safe-rotation-form" onSubmit={submit} className="space-y-2.5 py-1 text-xs">
         {error && (
-          <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p>{error.message}</p>
             {(error.errorCode || error.correlationId) && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {error.errorCode && <CodeRef value={error.errorCode} />}
                 {error.correlationId && <CodeRef value={error.correlationId} />}
               </div>
             )}
           </div>
         )}
-        <Field label={copy.newAccessKeyIdLabel} required>
-          {(fp) => <Input {...fp} dir="ltr" required minLength={3} maxLength={128} autoComplete="off" value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} className="font-mono" />}
+        <Field label={copy.newAccessKeyIdLabel} hideLabel required>
+          {(fp) => <Input {...fp} size="sm" dir="ltr" required minLength={3} maxLength={128} autoComplete="off" placeholder={`${copy.newAccessKeyIdLabel} *`} value={accessKeyId} onChange={(e) => setAccessKeyId(e.target.value)} className="font-mono" />}
         </Field>
-        <Field label={copy.newSecretAccessKeyLabel} required>
-          {(fp) => <Input {...fp} dir="ltr" required type="password" minLength={16} maxLength={256} autoComplete="new-password" value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} className="font-mono" />}
+        <Field label={copy.newSecretAccessKeyLabel} hideLabel required>
+          {(fp) => <Input {...fp} size="sm" dir="ltr" required type="password" minLength={16} maxLength={256} autoComplete="new-password" placeholder={`${copy.newSecretAccessKeyLabel} *`} value={secretAccessKey} onChange={(e) => setSecretAccessKey(e.target.value)} className="font-mono" />}
         </Field>
-        <Field label={copy.graceWindowLabel} hint={copy.graceWindowHint} required>
-          {(fp) => <Input {...fp} dir="ltr" required type="number" min={1} max={24} value={graceHours} onChange={(e) => setGraceHours(e.target.value)} />}
+        <Field label={copy.graceWindowLabel} hideLabel hint={copy.graceWindowHint} required>
+          {(fp) => <Input {...fp} size="sm" dir="ltr" required type="number" min={1} max={24} placeholder={`${copy.graceWindowLabel} *`} value={graceHours} onChange={(e) => setGraceHours(e.target.value)} />}
         </Field>
       </form>
     </FormDrawer>

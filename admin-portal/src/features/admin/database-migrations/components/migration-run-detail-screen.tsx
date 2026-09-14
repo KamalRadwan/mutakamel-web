@@ -11,6 +11,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
+import { Button, Input } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useMigrationRunDetail } from "../hooks/use-migration-run-detail";
 import { missingExecutePermissions } from "../model/migration-permissions";
@@ -69,9 +70,9 @@ export function MigrationRunDetailScreen({ runId }: { runId: string }) {
             />
             <Link
               href="/database-migrations"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-card px-4 text-sm font-semibold text-primary"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-semibold text-foreground hover:bg-accent"
             >
-              <BackIcon className="size-4" aria-hidden="true" />
+              <BackIcon className="size-3.5" aria-hidden="true" />
               {copy.back}
             </Link>
           </div>
@@ -149,18 +150,18 @@ function RunSummaryCard({
   lang: "ar" | "en";
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-xs">
       <div className="flex flex-wrap items-center gap-2">
         <RunStatusChip status={run.status} copy={copy} />
         <RunModeChip dryRun={run.progress.dryRun} copy={copy} />
-        <span className="rounded-full border border-border px-2.5 py-1 text-xs font-semibold">
+        <span className="rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold">
           {run.tenantScope
             ? copy.scopeTenantCount(run.tenantScope.length)
             : copy.scopeFleet}
         </span>
       </div>
 
-      <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         <Fact label={copy.application} value={run.applicationKey} mono />
         <Fact label={copy.targetVersion} value={run.targetVersion} mono />
         <Fact
@@ -180,14 +181,14 @@ function RunSummaryCard({
         <Fact label={copy.strategyLabel} value={run.strategy} mono />
       </dl>
 
-      <div className="mt-4">
+      <div className="mt-3">
         <RunProgressBar run={run} copy={copy} />
       </div>
 
       {run.error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border border-destructive/30 bg-destructive-subtle px-4 py-3 text-sm text-destructive-subtle-foreground"
+          className="mt-3 rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground"
         >
           {run.error}
         </p>
@@ -206,13 +207,13 @@ function Fact({
   mono?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-border p-3">
-      <dt className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="rounded-lg border border-border p-2.5">
+      <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">
         {label}
       </dt>
       <dd
         dir={mono ? "ltr" : undefined}
-        className={`mt-1 break-words text-sm font-semibold ${mono ? "font-mono" : ""}`}
+        className={`mt-0.5 break-words text-xs font-semibold ${mono ? "font-mono" : ""}`}
       >
         {value}
       </dd>
@@ -244,68 +245,75 @@ function RunControls({
   );
 
   return (
-    <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <h2 className="font-semibold">{copy.controlsTitle}</h2>
+    <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-xs">
+      <h2 className="text-xs font-semibold">{copy.controlsTitle}</h2>
 
-      <label className="mt-3 block">
+      <label className="mt-2.5 block">
         <span className={migrationLabelClass}>{copy.controlReasonLabel}</span>
-        <input
+        <Input
+          size="sm"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           maxLength={500}
-          className={migrationInputClass}
+          placeholder={`${copy.controlReasonLabel} *`}
         />
         <span className="mt-1 block text-xs text-muted-foreground">
           {copy.controlReasonHelp}
         </span>
       </label>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {detail.permissions.canExecute ? (
           <>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={!detail.availability.canPause || !reasonReady || pending}
               onClick={() => void detail.control("PAUSE", reason.trim())}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-warning/40 px-4 text-sm font-semibold text-warning disabled:opacity-40"
+              className="border-warning/40 text-warning hover:bg-warning/10"
             >
-              <PauseCircle className="size-4" aria-hidden="true" />
+              <PauseCircle className="size-3.5" aria-hidden="true" />
               {copy.pause}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={!detail.availability.canResume || !reasonReady || pending}
               onClick={() => void detail.control("RESUME", reason.trim())}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary/40 px-4 text-sm font-semibold text-primary disabled:opacity-40"
+              className="border-primary/40 text-primary hover:bg-primary/10"
             >
-              <PlayCircle className="size-4" aria-hidden="true" />
+              <PlayCircle className="size-3.5" aria-hidden="true" />
               {copy.resume}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={
                 !detail.availability.canRetryFailed || !reasonReady || pending
               }
               onClick={() => void detail.control("RETRY_FAILED", reason.trim())}
               title={copy.retryFailedHelp}
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-input px-4 text-sm font-semibold disabled:opacity-40"
             >
-              <RotateCcw className="size-4" aria-hidden="true" />
+              <RotateCcw className="size-3.5" aria-hidden="true" />
               {copy.retryFailed}
-            </button>
+            </Button>
           </>
         ) : null}
 
         {detail.permissions.canDestroy ? (
-          <button
+          <Button
             type="button"
+            variant="destructive"
+            size="sm"
             disabled={!detail.availability.canAbort || !reasonReady || pending}
             onClick={() => setAborting(true)}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-destructive px-4 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40"
           >
-            <OctagonX className="size-4" aria-hidden="true" />
+            <OctagonX className="size-3.5" aria-hidden="true" />
             {copy.abort}
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -354,16 +362,16 @@ function OutcomeSection({
   const summary = summarizeTenantOutcomes(results);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <header className="px-4 py-3">
-        <h2 className="font-semibold">{copy.outcomesTitle}</h2>
-        <p className="mt-1 text-xs text-muted-foreground">{copy.outcomesHelp}</p>
+    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+      <header className="px-3 py-2 sm:px-3.5">
+        <h2 className="text-xs font-semibold">{copy.outcomesTitle}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">{copy.outcomesHelp}</p>
       </header>
 
       {detail.outcomesError ? (
         <div
           role="status"
-          className="mx-4 mb-3 rounded-xl border border-warning/30 bg-warning-subtle px-4 py-3 text-sm text-warning-subtle-foreground"
+          className="mx-3 mb-2.5 rounded-lg border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground sm:mx-3.5"
         >
           <p className="font-semibold">{copy.outcomesUnavailable}</p>
           <p className="mt-1 text-xs leading-5">
@@ -416,13 +424,13 @@ function OutcomeSection({
       </div>
 
       {results.length === 0 ? (
-        <p className="border-t border-border p-5 text-sm text-muted-foreground">
+        <p className="border-t border-border p-3 text-xs text-muted-foreground">
           {copy.noOutcomes}
         </p>
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-sm">
+            <table className="w-full min-w-[1000px] text-xs">
               <caption className="sr-only">{copy.outcomesTitle}</caption>
               <thead className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
                 <tr>
@@ -484,15 +492,15 @@ function OutcomeGroupCard({
 
   return (
     <article
-      className={`rounded-lg border p-3 ${
+      className={`rounded-lg border p-2.5 ${
         group === "NEEDS_ATTENTION"
           ? "border-warning/40 bg-warning-subtle"
           : "border-border"
       }`}
     >
       <header className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <span className="font-mono text-lg font-semibold">{total}</span>
+        <h3 className="text-xs font-semibold">{title}</h3>
+        <span className="font-mono text-base font-semibold">{total}</span>
       </header>
       <dl className="mt-2 space-y-1.5">
         {members.map((outcome) => (
@@ -527,20 +535,20 @@ function OutcomeRow({
 
   return (
     <tr className="border-t border-border align-top">
-      <td className="px-4 py-3 text-start">
+      <td className="px-3 py-2 text-start text-xs">
         <p className="font-semibold">{result.tenantName ?? result.tenantId}</p>
-        <code dir="ltr" className="mt-1 block font-mono text-xs text-muted-foreground">
+        <code dir="ltr" className="mt-0.5 block font-mono text-xs text-muted-foreground">
           {result.tenantId}
         </code>
       </td>
-      <td className="px-4 py-3 text-start">
+      <td className="px-3 py-2 text-start text-xs">
         <OutcomeChip outcome={result.outcome} copy={copy} />
-        <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+        <p className="mt-0.5 max-w-sm text-xs leading-5 text-muted-foreground">
           {outcomeHelp(result.outcome, copy)}
         </p>
 
         {disclosure.kind === "EXCLUDED" ? (
-          <p className="mt-2 max-w-sm rounded-lg border border-warning/30 bg-warning-subtle px-2 py-1.5 text-xs leading-5 text-warning-subtle-foreground">
+          <p className="mt-1.5 max-w-sm rounded-lg border border-warning/30 bg-warning-subtle px-2 py-1 text-xs leading-5 text-warning-subtle-foreground">
             <strong>{copy.skipReasonLabel}:</strong> {disclosure.reason}
           </p>
         ) : null}
@@ -548,14 +556,14 @@ function OutcomeRow({
         {disclosure.kind === "EXCLUDED_REASON_MISSING" ? (
           <p
             role="alert"
-            className="mt-2 max-w-sm rounded-lg border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-xs leading-5 text-destructive-subtle-foreground"
+            className="mt-1.5 max-w-sm rounded-lg border border-destructive/30 bg-destructive-subtle px-2 py-1 text-xs leading-5 text-destructive-subtle-foreground"
           >
             {copy.skipReasonMissing}
           </p>
         ) : null}
 
         {result.errorCode || result.errorDetail ? (
-          <p className="mt-2 max-w-sm text-xs leading-5 text-destructive">
+          <p className="mt-1.5 max-w-sm text-xs leading-5 text-destructive">
             <strong>{copy.errorCode}:</strong>{" "}
             <code dir="ltr" className="font-mono">
               {result.errorCode ?? ""}
@@ -564,24 +572,24 @@ function OutcomeRow({
           </p>
         ) : null}
       </td>
-      <td dir="ltr" className="px-4 py-3 text-start font-mono text-xs">
+      <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
         {result.migrationName ?? copy.none}
         {result.migrationChecksum ? (
-          <span className="mt-1 block break-all text-2xs text-muted-foreground">
+          <span className="mt-0.5 block break-all text-2xs text-muted-foreground">
             {result.migrationChecksum}
           </span>
         ) : null}
       </td>
-      <td className="px-4 py-3 text-end font-mono text-xs">
+      <td className="px-3 py-2 text-end font-mono text-xs">
         {result.appliedCount}
         {result.pendingCount > 0 ? (
           <span className="block text-muted-foreground">/{result.pendingCount}</span>
         ) : null}
       </td>
-      <td className="px-4 py-3 text-end font-mono text-xs">
+      <td className="px-3 py-2 text-end font-mono text-xs">
         {formatDuration(result.durationMs, lang)}
       </td>
-      <td className="px-4 py-3 text-start text-xs text-muted-foreground">
+      <td className="px-3 py-2 text-start text-xs text-muted-foreground">
         {formatMigrationDate(result.finishedAt, lang)}
       </td>
     </tr>

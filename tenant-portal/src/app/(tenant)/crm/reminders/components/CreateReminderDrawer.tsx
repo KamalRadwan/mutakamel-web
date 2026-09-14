@@ -103,7 +103,7 @@ export function CreateReminderDrawer({
             setTargetLabel(undefined);
           }}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +142,7 @@ export function CreateReminderDrawer({
           value={channel}
           onValueChange={(next) => setChannel(next as CrmReminderChannel)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -171,11 +171,12 @@ export function CreateReminderDrawer({
               names, so the time input opts out of the field and keeps its own
               accessible name rather than claiming the same id. */}
           <FieldControlBoundary>
-            <Input
+            <Input size="sm"
               type="time"
               className="w-32"
               value={time}
               aria-label={t.crmReminders.timeOfDay}
+              placeholder={t.crmReminders.timeOfDay}
               onChange={(input) => {
                 setPastError(undefined);
                 setTime(input.target.value);

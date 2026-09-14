@@ -131,7 +131,7 @@ export default function DashboardPage() {
         onOperatorPausedChange={setOperatorRefreshPaused}
       />
 
-      <div ref={dataRefreshRegionRef} className="space-y-5">
+      <div ref={dataRefreshRegionRef} className="space-y-3">
         {error && (
           <ErrorBanner
             stale={Boolean(data)}
@@ -165,7 +165,7 @@ export default function DashboardPage() {
               // is the whole point of the grouping: a subscription, its
               // invoice and the payment that settled it now read together
               // instead of across three tab switches.
-              <div className="space-y-6">
+              <div className="space-y-3">
                 {activeGroups.map((key) => {
                   const group = data[key];
                   return group ? (
@@ -189,7 +189,7 @@ export default function DashboardPage() {
 }
 
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className="w-full space-y-5">{children}</div>;
+  return <div className="w-full space-y-3">{children}</div>;
 }
 
 function ErrorBanner({
@@ -211,19 +211,19 @@ function ErrorBanner({
   return (
     <section
       role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-destructive-subtle-foreground sm:flex-row sm:items-start sm:justify-between"
+      className="flex flex-col gap-2.5 rounded-lg border border-destructive/30 bg-destructive-subtle p-3 sm:p-3.5 text-destructive-subtle-foreground sm:flex-row sm:items-start sm:justify-between"
     >
-      <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <div>
           <h2 className="text-sm font-semibold">
             {stale ? t.dashboard.staleRefreshTitle : t.dashboard.loadFailedTitle}
           </h2>
-          <p className="mt-1 text-xs leading-5 opacity-90">
+          <p className="mt-0.5 text-xs leading-5 opacity-90">
             {rateLimited ? t.dashboard.rateLimitedMessage : message}
           </p>
           {(code || correlationId) && (
-            <p className="mt-2 font-mono text-xs opacity-70">
+            <p className="mt-1.5 font-mono text-xs opacity-70">
               {[code, correlationId].filter(Boolean).join(" · ")}
             </p>
           )}
@@ -242,12 +242,12 @@ function DashboardGroupSkeleton() {
   const { t } = useI18n();
   return (
     <div
-      className="space-y-4"
+      className="space-y-3"
       aria-label={t.dashboard.visuals.chartsAriaLabel}
       aria-busy="true"
     >
-      <Skeleton className="h-20 w-full" />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <Skeleton className="h-16 w-full" />
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-64 w-full" />
         ))}
@@ -258,9 +258,9 @@ function DashboardGroupSkeleton() {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-4" aria-label="Loading dashboard" aria-busy="true">
-      <Skeleton className="h-14 w-full" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="space-y-3" aria-label="Loading dashboard" aria-busy="true">
+      <Skeleton className="h-12 w-full" />
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-28 w-full" />
         ))}

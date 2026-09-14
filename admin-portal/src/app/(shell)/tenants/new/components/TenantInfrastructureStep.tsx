@@ -71,23 +71,25 @@ export function TenantInfrastructureStep({
   const { t } = useI18n();
   const copy = t.tenants.wizard.infrastructureStep;
   return (
-    <section className="space-y-5 rounded-lg border border-border bg-card p-5">
-      <header className="border-b border-border pb-4">
+    <section className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-3.5">
+      <header className="border-b border-border pb-2.5">
         <h2
           ref={headingRef}
           tabIndex={-1}
-          className="flex items-center gap-2 rounded-sm text-base font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex items-center gap-2 rounded-sm text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <Server aria-hidden="true" className="size-4 text-primary" />
           {copy.stepHeading}
         </h2>
-        <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
-          {copy.stepDescription}
-        </p>
+        {copy.stepDescription ? (
+          <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">
+            {copy.stepDescription}
+          </p>
+        ) : null}
       </header>
 
       <PlacementSection
-        icon={<Database className="size-4" />}
+        icon={<Database className="size-3.5" />}
         title={copy.databaseServerTitle}
         description={copy.databaseServerDescription}
         state={databaseState}
@@ -99,6 +101,7 @@ export function TenantInfrastructureStep({
         <Field
           id="tenant-database-server"
           label={copy.databaseServerTitle}
+          hideLabel
           required
           error={
             showDatabaseSelectionError && !selectedDatabase
@@ -115,10 +118,14 @@ export function TenantInfrastructureStep({
             >
               <SelectTrigger
                 id={field.id}
+                size="sm"
                 aria-describedby={field["aria-describedby"]}
                 aria-invalid={field["aria-invalid"]}
               >
-                <SelectValue placeholder={copy.selectDatabaseServerPlaceholder} />
+                <div className="flex items-center gap-2 truncate">
+                  <Database className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <SelectValue placeholder={`${copy.databaseServerTitle} *`} />
+                </div>
               </SelectTrigger>
               <SelectContent>
                 {databaseOptions.map((option) => (
@@ -132,7 +139,7 @@ export function TenantInfrastructureStep({
           )}
         </Field>
         {selectedDatabase ? (
-          <dl className="grid gap-3 rounded-lg border border-border bg-card p-3 text-xs sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-1.5 rounded-md border border-border bg-card p-2 text-xs sm:grid-cols-4">
             <Metric label={copy.nameLabel} value={selectedDatabase.name} />
             <Metric label={copy.statusLabel} value={selectedDatabase.status} />
             <Metric label={copy.capacityLabel} value={`${selectedDatabase.currentTenants}/${selectedDatabase.maxTenants}`} />
@@ -142,7 +149,7 @@ export function TenantInfrastructureStep({
       </PlacementSection>
 
       <PlacementSection
-        icon={<HardDrive className="size-4" />}
+        icon={<HardDrive className="size-3.5" />}
         title={copy.storageServerTitle}
         description={copy.storageServerDescription}
         state={storageState}
@@ -153,6 +160,7 @@ export function TenantInfrastructureStep({
         <Field
           id="tenant-storage-server"
           label={copy.storageServerTitle}
+          hideLabel
           required
           error={
             showStorageSelectionError && !selectedStorage
@@ -169,10 +177,14 @@ export function TenantInfrastructureStep({
             >
               <SelectTrigger
                 id={field.id}
+                size="sm"
                 aria-describedby={field["aria-describedby"]}
                 aria-invalid={field["aria-invalid"]}
               >
-                <SelectValue placeholder={copy.selectStorageServerPlaceholder} />
+                <div className="flex items-center gap-2 truncate">
+                  <HardDrive className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <SelectValue placeholder={`${copy.storageServerTitle} *`} />
+                </div>
               </SelectTrigger>
               <SelectContent>
                 {storageOptions.map((option) => (
@@ -186,7 +198,7 @@ export function TenantInfrastructureStep({
           )}
         </Field>
         {selectedStorage ? (
-          <dl className="grid gap-3 rounded-lg border border-border bg-card p-3 text-xs sm:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-1.5 rounded-md border border-border bg-card p-2 text-xs sm:grid-cols-4">
             <Metric label={copy.nameLabel} value={selectedStorage.name} />
             <Metric label={copy.regionLabel} value={selectedStorage.region} />
             <Metric
@@ -214,7 +226,7 @@ function PlacementSection({
 }: {
   icon: React.ReactNode;
   title: string;
-  description: string;
+  description?: string;
   state: TenantRegistrationLoadState;
   error: NormalizedApiError | null;
   onRetry: () => void;
@@ -225,12 +237,12 @@ function PlacementSection({
   const { t } = useI18n();
   const copy = t.tenants.wizard.infrastructureStep;
   return (
-    <section className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+    <section className="space-y-2.5 rounded-md border border-border bg-muted/40 p-3">
       <div>
         <h4 className="flex items-center gap-2 text-xs font-semibold text-foreground">
           <span className="text-muted-foreground">{icon}</span> {title}
         </h4>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
       </div>
       {state === "idle" ? <PlacementNotice tone="neutral" text={idleText ?? ""} /> : null}
       {state === "loading" ? (
@@ -247,7 +259,7 @@ function PlacementSection({
         />
       ) : null}
       {state === "empty" ? <PlacementNotice tone="amber" text={emptyText} /> : null}
-      {state === "ready" ? <div className="space-y-3">{children}</div> : null}
+      {state === "ready" ? <div className="space-y-2.5">{children}</div> : null}
     </section>
   );
 }
@@ -258,13 +270,13 @@ function PlacementNotice({ tone, text, loading = false }: { tone: "neutral" | "a
     amber: "border-warning/30 bg-warning-subtle text-warning-subtle-foreground",
   }[tone];
   return (
-    <div className={`flex items-center gap-2 rounded-lg border p-3 text-xs ${classes}`} role={loading ? "status" : "alert"}>
-      {loading ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" /> : tone === "amber" ? <AlertCircle className="size-4" /> : <ShieldCheck className="size-4" />}
+    <div className={`flex items-center gap-2 rounded-md border p-2 text-xs ${classes}`} role={loading ? "status" : "alert"}>
+      {loading ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" /> : tone === "amber" ? <AlertCircle className="size-3.5" /> : <ShieldCheck className="size-3.5" />}
       <span>{text}</span>
     </div>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0"><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 truncate font-semibold text-foreground" title={value}>{value}</dd></div>;
+  return <div className="min-w-0"><dt className="text-muted-foreground text-xs">{label}</dt><dd className="mt-0.5 truncate font-semibold text-foreground" title={value}>{value}</dd></div>;
 }

@@ -20,7 +20,7 @@ export function LeadIndividualContactFields({ lead, edit, disabled }: {
       ? LEAD_CONTACT_EDIT_LIMITS.name : LEAD_CONTACT_EDIT_LIMITS[field];
     return edit.form ? (
       <Field label={label} error={edit.errors[field]}>
-        <Input value={edit.form[field]} maxLength={maxLength} disabled={disabled}
+        <Input size="sm" placeholder={label} value={edit.form[field]} maxLength={maxLength} disabled={disabled}
           type={field === "email" ? "email" : "text"}
           dir={field === "email" ? "ltr" : undefined}
           onChange={(event) => edit.setField(field, event.target.value)} />

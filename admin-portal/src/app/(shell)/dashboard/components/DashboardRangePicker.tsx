@@ -128,10 +128,10 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
           type="button"
           variant="outline"
           size="sm"
-          className="gap-2"
+          className="gap-1.5"
           aria-label={`${copy.triggerLabel}: ${label}`}
         >
-          <CalendarDays className="size-4" aria-hidden="true" />
+          <CalendarDays className="size-3.5" aria-hidden="true" />
           <span className="truncate">{label}</span>
         </Button>
       </PopoverTrigger>
@@ -150,12 +150,12 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
                 onClick={() => setMonth(addMonths(month, -1))}
               >
                 {dir === "rtl" ? (
-                  <ChevronRight className="size-4" aria-hidden="true" />
+                  <ChevronRight className="size-3.5" aria-hidden="true" />
                 ) : (
-                  <ChevronLeft className="size-4" aria-hidden="true" />
+                  <ChevronLeft className="size-3.5" aria-hidden="true" />
                 )}
               </Button>
-              <span aria-live="polite" className="text-sm font-semibold text-foreground">
+              <span aria-live="polite" className="text-xs font-semibold text-foreground">
                 {monthName.format(month)}
               </span>
               <Button
@@ -166,9 +166,9 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
                 onClick={() => setMonth(addMonths(month, 1))}
               >
                 {dir === "rtl" ? (
-                  <ChevronLeft className="size-4" aria-hidden="true" />
+                  <ChevronLeft className="size-3.5" aria-hidden="true" />
                 ) : (
-                  <ChevronRight className="size-4" aria-hidden="true" />
+                  <ChevronRight className="size-3.5" aria-hidden="true" />
                 )}
               </Button>
             </div>
@@ -179,7 +179,7 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
                   <span
                     key={`head-${day.getDay()}`}
                     role="columnheader"
-                    className="py-1 text-center text-xs font-semibold text-muted-foreground"
+                    className="py-0.5 text-center text-[11px] font-semibold text-muted-foreground"
                   >
                     {dayName.format(day)}
                   </span>
@@ -202,7 +202,7 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
               ))}
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3">
+            <div className="mt-2.5 grid grid-cols-2 gap-2.5 border-t border-border pt-2.5">
               <TimeField
                 id="dashboard-range-from"
                 label={copy.fromTime}
@@ -221,7 +221,7 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
               />
             </div>
 
-            <div className="mt-3 flex justify-end gap-2">
+            <div className="mt-2.5 flex justify-end gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
                 {copy.cancel}
               </Button>
@@ -239,7 +239,7 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
             </div>
           </div>
 
-          <ul className="flex max-h-80 shrink-0 flex-col gap-0.5 overflow-y-auto border-border p-2 sm:w-44 sm:border-e">
+          <ul className="flex max-h-80 shrink-0 flex-col gap-0.5 overflow-y-auto border-border p-1.5 sm:w-40 sm:border-e">
             {DATE_RANGE_PRESET_KEYS.map((preset) => (
               <li key={preset}>
                 <Button
@@ -247,7 +247,7 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
                   variant="ghost"
                   size="sm"
                   aria-pressed={draftPreset === preset}
-                  className={`w-full justify-start ${
+                  className={`h-8 w-full justify-start text-xs ${
                     draftPreset === preset ? "bg-selected text-selected-foreground" : ""
                   }`}
                   onClick={() => stagePreset(preset)}
@@ -294,7 +294,7 @@ function DayCell({
       aria-current={isSameDay(day, today) ? "date" : undefined}
       onClick={() => onPick(day)}
       className={[
-        "h-9 text-sm tabular-nums transition-colors motion-reduce:transition-none",
+        "h-8 text-xs tabular-nums transition-colors motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
         outside ? "text-muted-foreground/60" : "text-foreground",
         inside ? "bg-selected/40" : "",
@@ -329,6 +329,9 @@ function TimeField({
       <Input
         id={id}
         type="time"
+        size="sm"
+        placeholder={label}
+        className="h-8 text-xs"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

@@ -146,7 +146,7 @@ export function ControlPlaneAuditScreen() {
   const audit = useControlPlaneAudit();
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-3">
       <PageHeader
         title={copy.title}
         action={
@@ -191,7 +191,7 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
 
   return (
     <Card>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border p-3 sm:p-3.5">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
           <Filter className="size-4 text-primary" aria-hidden="true" />
           {copy.filters}
@@ -217,8 +217,8 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
         </div>
       </div>
 
-      <form onSubmit={submit} className="space-y-4 p-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+      <form onSubmit={submit} className="space-y-3 p-3 sm:p-3.5">
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           <AuditSelect
             label={copy.actorType}
             value={audit.draft.actorType}
@@ -305,16 +305,16 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
             hint={copy.exclusiveEnd}
             onChange={(value) => audit.updateDraft("to", value)}
           />
-          <Field label={copy.pageSize}>
+          <Field label={copy.pageSize} hideLabel>
             {(fp) => (
               <Select value={String(audit.limit)} onValueChange={(value) => audit.setLimit(Number(value))}>
-                <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                  <SelectValue />
+                <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+                  <SelectValue placeholder={copy.pageSize} />
                 </SelectTrigger>
                 <SelectContent>
                   {[25, 50, 100].map((value) => (
                     <SelectItem key={value} value={String(value)}>
-                      {formatInteger(value, lang)}
+                      {`${copy.pageSize}: ${formatInteger(value, lang)}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -329,14 +329,15 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
-          <Button type="button" variant="outline" onClick={audit.clearFilters}>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+          <Button type="button" variant="outline" size="sm" onClick={audit.clearFilters}>
             <RotateCcw className="size-3.5" aria-hidden="true" />
             {copy.clear}
           </Button>
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={audit.refresh}
             disabled={audit.requestState === "IDLE"}
           >
@@ -346,7 +347,7 @@ function AuditFilters({ copy, audit, lang }: { copy: Copy; audit: AuditHook; lan
             />
             {copy.refresh}
           </Button>
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="primary" size="sm">
             <Filter className="size-3.5" aria-hidden="true" />
             {copy.apply}
           </Button>
@@ -386,7 +387,7 @@ function AuditResults({
         detail={detail}
         tone="danger"
         action={
-          <Button type="button" variant="outline" onClick={audit.refresh}>
+          <Button type="button" variant="outline" size="sm" onClick={audit.refresh}>
             {copy.retry}
           </Button>
         }
@@ -399,7 +400,7 @@ function AuditResults({
 
   return (
     <section aria-labelledby="audit-results-title" className="space-y-3">
-      <div className="flex items-center justify-between border-b border-border p-4">
+      <div className="flex items-center justify-between border-b border-border p-3 sm:p-3.5">
         <h2 id="audit-results-title" className="flex items-center gap-2 text-sm font-semibold">
           <Activity className="size-4 text-primary" aria-hidden="true" />
           {audit.mode === "ENTITY_HISTORY" ? copy.entityHistory : copy.allEvents}
@@ -408,7 +409,7 @@ function AuditResults({
           <Loader2 className="size-4 animate-spin text-primary motion-reduce:animate-none" aria-label={copy.loading} />
         ) : null}
       </div>
-      <div className="space-y-3 p-3 sm:p-4">
+      <div className="space-y-2.5 p-3 sm:p-3.5">
         {audit.data.items.map((event) => (
           <AuditEventCard key={event.id} event={event} copy={copy} lang={lang} />
         ))}
@@ -436,8 +437,8 @@ function AuditEventCard({
   const detail = useAuditEventDetail(event.id);
 
   return (
-    <article className="rounded-lg border border-border bg-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <article className="rounded-lg border border-border bg-card p-3 sm:p-3.5">
+      <div className="flex flex-wrap items-start justify-between gap-2.5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={event.outcome} />
@@ -485,7 +486,7 @@ function AuditEventCard({
         }}
       >
         <CollapsibleTrigger asChild>
-          <Button type="button" variant="ghost" className="group w-full justify-between rounded-none px-3 text-action" aria-label={`${copy.evidence}: ${event.action}`}>
+          <Button size="sm" type="button" variant="ghost" className="group w-full justify-between rounded-none px-3 text-action" aria-label={`${copy.evidence}: ${event.action}`}>
             {copy.evidence}
             <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
           </Button>
@@ -587,6 +588,8 @@ function AuditInput({
   required = false,
   error,
   hint,
+  placeholder,
+  hideLabel = true,
 }: {
   label: string;
   value: string;
@@ -596,12 +599,15 @@ function AuditInput({
   required?: boolean;
   error?: string;
   hint?: string;
+  placeholder?: string;
+  hideLabel?: boolean;
 }) {
   return (
-    <Field label={label} required={required} error={error} hint={hint}>
+    <Field label={label} required={required} error={error} hint={hint} hideLabel={hideLabel}>
       {(fp) => (
         <Input
           id={fp.id}
+          size="sm"
           aria-describedby={fp["aria-describedby"]}
           aria-invalid={fp["aria-invalid"]}
           aria-required={fp.required}
@@ -609,6 +615,7 @@ function AuditInput({
           value={value}
           maxLength={maxLength}
           invalid={Boolean(error)}
+          placeholder={placeholder ?? `${label}${required ? " *" : ""}`}
           onChange={(event) => onChange(event.target.value)}
         />
       )}
@@ -622,22 +629,24 @@ function AuditSelect({
   onChange,
   options,
   anyLabel,
+  hideLabel = true,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: readonly string[];
   anyLabel: string;
+  hideLabel?: boolean;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} hideLabel={hideLabel}>
       {(fp) => (
         <Select value={value || "ANY"} onValueChange={(next) => onChange(next === "ANY" ? "" : next)}>
-          <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-            <SelectValue />
+          <SelectTrigger id={fp.id} size="sm" aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
+            <SelectValue placeholder={label} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ANY">{anyLabel}</SelectItem>
+            <SelectItem value="ANY">{`${label}: ${anyLabel}`}</SelectItem>
             {options.map((option) => (
               <SelectItem key={option} value={option}>
                 {option.replaceAll("_", " ")}
@@ -669,11 +678,11 @@ function StatusPanel({
       ? "border-warning bg-warning-subtle text-warning-subtle-foreground"
       : "border-border bg-card text-muted-foreground";
   return (
-    <section role={tone === "neutral" ? "status" : "alert"} className={`flex min-h-52 flex-col items-center justify-center rounded-lg border p-6 text-center ${colors}`}>
-      <span className="mb-3 opacity-70">{icon}</span>
+    <section role={tone === "neutral" ? "status" : "alert"} className={`flex min-h-40 flex-col items-center justify-center rounded-lg border p-4 text-center ${colors}`}>
+      <span className="mb-2 opacity-70">{icon}</span>
       <h2 className="text-sm font-semibold">{title}</h2>
-      {detail ? <p className="mt-1 max-w-2xl break-all text-sm opacity-80">{detail}</p> : null}
-      {action ? <div className="mt-4">{action}</div> : null}
+      {detail ? <p className="mt-1 max-w-2xl break-all text-xs opacity-80">{detail}</p> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
     </section>
   );
 }

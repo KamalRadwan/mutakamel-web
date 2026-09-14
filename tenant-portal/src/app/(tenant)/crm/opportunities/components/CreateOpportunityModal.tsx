@@ -194,7 +194,7 @@ export function CreateOpportunityModal({
               create.touch("pipelineId");
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -221,7 +221,7 @@ export function CreateOpportunityModal({
               create.touch("stageId");
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -247,7 +247,7 @@ export function CreateOpportunityModal({
           required
           className="md:col-span-2"
         >
-          <Input
+          <Input size="sm" placeholder={t.crmOpportunities.title}
             value={form.title}
             maxLength={180}
             disabled={create.isSubmitting}
@@ -261,7 +261,7 @@ export function CreateOpportunityModal({
           hint={t.crmLeadConvert.amountHint}
           error={errors.amount}
         >
-          <Input
+          <Input size="sm" placeholder={t.crmOpportunityDetail.amount}
             value={form.amount}
             inputMode="decimal"
             dir="ltr"
@@ -276,7 +276,7 @@ export function CreateOpportunityModal({
           hint={t.crmLeadConvert.currencyHint}
           error={errors.currencyCode}
         >
-          <Input
+          <Input size="sm" placeholder={t.crmLeadConvert.currencyCode}
             value={form.currencyCode}
             maxLength={3}
             dir="ltr"
@@ -300,7 +300,7 @@ export function CreateOpportunityModal({
           hint={t.crmOpportunityDetail.create.importanceHint}
           error={errors.importance}
         >
-          <Input
+          <Input size="sm" placeholder={t.crmOpportunities.importance}
             value={form.importance}
             inputMode="numeric"
             dir="ltr"
@@ -316,7 +316,7 @@ export function CreateOpportunityModal({
           hint={t.crmOpportunityDetail.create.probabilityHint}
           error={errors.probabilityPercent}
         >
-          <Input
+          <Input size="sm" placeholder={t.crmOpportunityDetail.create.probabilityPercent}
             value={form.probabilityPercent}
             inputMode="numeric"
             dir="ltr"
@@ -339,7 +339,7 @@ export function CreateOpportunityModal({
           error={errors.description}
           className="max-w-prose"
         >
-          <Textarea
+          <Textarea placeholder={t.crmLeads.create.description}
             rows={4}
             value={form.description}
             maxLength={2000}

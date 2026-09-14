@@ -135,7 +135,7 @@ export function WidgetFormDrawer({
       error={error ?? message}
       footerLeading={
         canPreview ? (
-          <Button
+          <Button size="sm"
             variant="outline"
             disabled={formError !== null || isPreviewing}
             loading={isPreviewing}
@@ -164,7 +164,7 @@ export function WidgetFormDrawer({
       ) : null}
 
       <Field label={t.crmWidgets.name} required>
-        <Input
+        <Input size="sm" placeholder={t.crmWidgets.name}
           value={form.name}
           maxLength={WIDGET_NAME_MAX_LENGTH}
           autoComplete="off"
@@ -178,7 +178,7 @@ export function WidgetFormDrawer({
           disabled={catalog === null}
           onValueChange={(next) => update({ visualizationType: next as CrmVisualization })}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t.crmWidgets.selectVisualization} />
           </SelectTrigger>
           <SelectContent>
@@ -197,7 +197,7 @@ export function WidgetFormDrawer({
           disabled={!visualization}
           onValueChange={(next) => update({ metricKey: next })}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t.crmWidgets.selectMetric} />
           </SelectTrigger>
           <SelectContent>
@@ -216,7 +216,7 @@ export function WidgetFormDrawer({
           disabled={!metric}
           onValueChange={(next) => update({ dimensionKey: next })}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -232,7 +232,7 @@ export function WidgetFormDrawer({
       {grains.length > 0 ? (
         <Field label={t.crmWidgets.grain} hint={t.crmWidgets.grainHint} required>
           <Select value={form.grain} onValueChange={(next) => update({ grain: next as WidgetFormState["grain"] })}>
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -252,7 +252,7 @@ export function WidgetFormDrawer({
           disabled={visualization?.requiresTarget}
           onValueChange={(next) => update({ comparison: next as WidgetFormState["comparison"] })}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -270,7 +270,7 @@ export function WidgetFormDrawer({
 
       {form.comparison === "TARGET" ? (
         <Field label={t.crmWidgets.target} hint={t.crmWidgets.targetHint} required>
-          <Input
+          <Input size="sm" placeholder={t.crmWidgets.target}
             value={form.target}
             inputMode="decimal"
             onChange={(event) => update({ target: event.target.value })}

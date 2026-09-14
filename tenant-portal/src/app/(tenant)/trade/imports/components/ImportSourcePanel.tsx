@@ -88,14 +88,14 @@ export function ImportSourcePanel({
           hint={t.tradeAutomation.sourceIdHint}
           error={rejected ?? error ?? undefined}
         >
-          <Input
+          <Input size="sm" placeholder={t.tradeAutomation.sourceId}
             value={sourceId}
             disabled={disabled || pending !== null}
             onChange={(event) => onSourceIdChange(event.target.value)}
           />
         </Field>
         <Field label={t.tradeAutomation.mappingId} required hint={t.tradeAutomation.mappingIdHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeAutomation.mappingId}
             value={mappingId}
             disabled={disabled || pending !== null}
             onChange={(event) => onMappingIdChange(event.target.value)}
@@ -104,7 +104,7 @@ export function ImportSourcePanel({
       </div>
 
       <div className="flex justify-end">
-        <Button
+        <Button size="sm"
           variant="outline"
           disabled={disabled || pending !== null}
           loading={pending === "preview"}

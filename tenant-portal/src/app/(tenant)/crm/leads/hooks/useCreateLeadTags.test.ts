@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseLeadTagArray, useCreateLeadTags } from "./useCreateLeadTags";
 
@@ -98,5 +98,20 @@ describe("useCreateLeadTags", () => {
     view.rerender({ enabled: true });
     await waitFor(() => expect(view.result.current.degraded).toBe(true));
     expect(view.result.current.items[0]?.name).toBe("Priority");
+  });
+
+  it("reflects crm.tags.manage in canManage and adds created tag with addTag", async () => {
+    auth.mockReturnValue({ user: { permissions: ["crm.tags.read", "crm.tags.manage"] } });
+    const { result } = renderHook(() => useCreateLeadTags(true));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    expect(result.current.canManage).toBe(true);
+
+    const newTag = { id: "01900100-0000-7000-8000-000000000009", name: "Alpha", color: null as null };
+    act(() => {
+      result.current.addTag(newTag);
+    });
+    expect(result.current.items).toHaveLength(2);
+    expect(result.current.items[0]?.name).toBe("Alpha");
+    expect(result.current.items[1]?.name).toBe("Priority");
   });
 });

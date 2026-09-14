@@ -65,7 +65,7 @@ export function CreatePriceBookModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradePricing.bookCode} required>
-          <Input
+          <Input size="sm" placeholder={t.tradePricing.bookCode}
             value={values.code}
             maxLength={PRICE_BOOK_CODE_MAX_LENGTH}
             disabled={isSubmitting}
@@ -83,7 +83,7 @@ export function CreatePriceBookModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradePricing.bookPurpose}>
+            <SelectTrigger size="sm" aria-label={t.tradePricing.bookPurpose}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -100,7 +100,7 @@ export function CreatePriceBookModal({
           required
           hint={t.tradePricing.currencyCodeHint}
         >
-          <Input
+          <Input size="sm" placeholder={t.tradePricing.currencyCode}
             value={values.currencyCode}
             maxLength={3}
             disabled={isSubmitting}

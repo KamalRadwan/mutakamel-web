@@ -154,8 +154,8 @@ export function CrmContactLine({
           // cannot be read when squeezed; the email takes what is left.
           // Written out rather than composed: Tailwind reads these as text.
           showJobTitle
-            ? "@min-[64rem]:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(15rem,1.3fr)_minmax(0,1.3fr)]"
-            : "@min-[52rem]:grid-cols-[5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(15rem,1.3fr)_minmax(0,1.3fr)]",
+            ? "@min-[64rem]:grid-cols-[4.5rem_minmax(0,8.5rem)_minmax(0,8.5rem)_8rem_minmax(15rem,1.3fr)_minmax(0,1.3fr)]"
+            : "@min-[52rem]:grid-cols-[4.5rem_minmax(0,8.5rem)_minmax(0,8.5rem)_minmax(15rem,1.3fr)_minmax(0,1.3fr)]",
         )}
       >
         {!directoryOwned && (
@@ -171,7 +171,7 @@ export function CrmContactLine({
                 })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue placeholder={t.crmLeads.create.honorificTitle} />
               </SelectTrigger>
               <SelectContent>
@@ -190,7 +190,7 @@ export function CrmContactLine({
             record actually stores — the rendered name is CRM's to compose. */}
         {directoryOwned ? (
           <Field label={directoryNameLabel} readOnly hint={identityHint}>
-            <Input value={contact.fullName} disabled />
+            <Input size="sm" placeholder={directoryNameLabel} value={contact.fullName} disabled />
           </Field>
         ) : (
           <>
@@ -199,8 +199,9 @@ export function CrmContactLine({
               error={errors[`${path}.firstName`]}
               required
               hint={identityHint}
+              className="max-w-44"
             >
-              <Input
+              <Input size="sm" placeholder={t.crmLeads.create.firstName}
                 value={contact.firstName}
                 maxLength={limits.name}
                 disabled={disabled}
@@ -208,8 +209,8 @@ export function CrmContactLine({
                 onBlur={() => onBlur(`${path}.firstName`)}
               />
             </Field>
-            <Field label={t.crmLeads.create.lastName} error={errors[`${path}.lastName`]}>
-              <Input
+            <Field label={t.crmLeads.create.lastName} error={errors[`${path}.lastName`]} className="max-w-44">
+              <Input size="sm" placeholder={t.crmLeads.create.lastName}
                 value={contact.lastName}
                 maxLength={limits.name}
                 disabled={disabled}
@@ -238,6 +239,7 @@ export function CrmContactLine({
                 <CrmPhoneNumberInput
                   value={contact.phones[0] ?? ""}
                   maxLength={CRM_PHONE_MAX_LENGTH}
+                  label={t.crmLeads.phone}
                   disabled={disabled}
                   onChange={(next) => onPhoneChange(0, next)}
                   onBlur={() => onBlur(`${path}.phones.0`)}
@@ -273,6 +275,7 @@ export function CrmContactLine({
                     <CrmPhoneNumberInput
                       value={phone}
                       maxLength={CRM_PHONE_MAX_LENGTH}
+                      label={formatTemplate(t.crmShared.phoneNumbered, { number: index + 1 })}
                       disabled={disabled}
                       onChange={(next) => onPhoneChange(index, next)}
                       onBlur={() => onBlur(rowPath)}
@@ -298,7 +301,7 @@ export function CrmContactLine({
 
         {!directoryOwned && (
           <Field label={t.crmLeads.email} error={errors[`${path}.email`]}>
-            <Input
+            <Input size="sm" placeholder={t.crmLeads.email}
               type="email"
               dir="ltr"
               value={contact.email}

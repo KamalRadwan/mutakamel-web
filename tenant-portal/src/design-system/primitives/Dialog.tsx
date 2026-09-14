@@ -34,7 +34,7 @@ DialogOverlay.displayName = "DialogOverlay";
 // apart, and so `full` can opt out of centring wholesale instead of having to
 // unset six utilities the base string would otherwise have imposed.
 const CENTERED_CARD =
-  "start-1/2 top-1/2 grid w-full -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg p-6";
+  "start-1/2 top-1/2 grid w-full -translate-x-1/2 -translate-y-1/2 gap-3 rounded-lg p-3 sm:p-3.5";
 
 const dialogContentVariants = cva(
   "fixed z-(--z-overlay) border border-border bg-popover text-popover-foreground shadow-overlay",

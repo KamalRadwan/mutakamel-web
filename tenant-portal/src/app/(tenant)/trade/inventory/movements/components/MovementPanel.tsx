@@ -73,7 +73,7 @@ export function MovementPanel({
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 md:grid-cols-2">
         <Field label={t.tradeInventory.nodeId} required error={error ?? undefined}>
-          <Input
+          <Input size="sm"
             value={values.nodeId}
             disabled={disabled || pending !== null}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -81,14 +81,14 @@ export function MovementPanel({
           />
         </Field>
         <Field label={sourceDocumentLabel} required>
-          <Input
+          <Input size="sm" placeholder={sourceDocumentLabel}
             value={values.sourceDocumentId}
             disabled={disabled || pending !== null}
             onChange={(event) => set({ sourceDocumentId: event.target.value })}
           />
         </Field>
         <Field label={t.tradeInventory.sourceDocumentVersion} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.sourceDocumentVersion}
             type="number"
             min={1}
             value={values.sourceDocumentVersion}
@@ -97,7 +97,7 @@ export function MovementPanel({
           />
         </Field>
         <Field label={t.tradeInventory.businessEffectiveAt} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.businessEffectiveAt}
             type="datetime-local"
             value={values.businessEffectiveAt}
             disabled={disabled || pending !== null}
@@ -111,7 +111,7 @@ export function MovementPanel({
         {values.lines.map((line, index) => (
           <div key={index} className="grid gap-3 md:grid-cols-5">
             <Field label={t.tradeInventory.sourceLineId} required className="md:col-span-2">
-              <Input
+              <Input size="sm" placeholder={t.tradeInventory.sourceLineId}
                 value={line.sourceLineId}
                 disabled={disabled || pending !== null}
                 onChange={(event) =>
@@ -124,7 +124,7 @@ export function MovementPanel({
               />
             </Field>
             <Field label={t.tradeInventory.sourceLineVersion} required>
-              <Input
+              <Input size="sm" placeholder={t.tradeInventory.sourceLineVersion}
                 type="number"
                 min={1}
                 value={line.sourceLineVersion}
@@ -141,7 +141,7 @@ export function MovementPanel({
               />
             </Field>
             <Field label={t.tradeInventory.uomId} required>
-              <Input
+              <Input size="sm" placeholder={t.tradeInventory.uomId}
                 value={line.uomId}
                 disabled={disabled || pending !== null}
                 onChange={(event) =>
@@ -154,7 +154,7 @@ export function MovementPanel({
               />
             </Field>
             <Field label={t.tradeInventory.quantity} required>
-              <Input
+              <Input size="sm" placeholder={t.tradeInventory.quantity}
                 value={line.quantity}
                 inputMode="decimal"
                 disabled={disabled || pending !== null}
@@ -192,7 +192,7 @@ export function MovementPanel({
       </div>
 
       <div className="flex justify-end">
-        <Button
+        <Button size="sm"
           variant="outline"
           disabled={disabled}
           loading={pending === createPendingKey}
@@ -215,14 +215,14 @@ export function MovementPanel({
         <p className="text-xs text-muted-foreground">{t.tradeInventory.postOrReverseHint}</p>
         <div className="grid gap-3 md:grid-cols-2">
           <Field label={t.tradeInventory.movementId} required>
-            <Input
+            <Input size="sm" placeholder={t.tradeInventory.movementId}
               value={targetId}
               disabled={disabled || pending !== null}
               onChange={(event) => setActionId(event.target.value)}
             />
           </Field>
           <Field label={t.tradeCommon.version} required hint={t.tradeCommon.ifMatchHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeCommon.version}
               type="number"
               min={1}
               value={actionVersion}
@@ -231,14 +231,14 @@ export function MovementPanel({
             />
           </Field>
           <Field label={t.tradeInventory.reasonCode} hint={t.tradeInventory.reasonCodeHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradeInventory.reasonCode}
               value={reasonCode}
               disabled={disabled || pending !== null || !canReverse}
               onChange={(event) => setReasonCode(event.target.value)}
             />
           </Field>
           <Field label={t.tradeInventory.reversalEffectiveAt}>
-            <Input
+            <Input size="sm" placeholder={t.tradeInventory.reversalEffectiveAt}
               type="datetime-local"
               value={reversalAt}
               disabled={disabled || pending !== null || !canReverse}
@@ -247,7 +247,7 @@ export function MovementPanel({
           </Field>
         </div>
         <div className="flex justify-end gap-2">
-          <Button
+          <Button size="sm"
             variant="outline"
             disabled={disabled}
             loading={pending === postPendingKey}
@@ -255,7 +255,7 @@ export function MovementPanel({
           >
             {postLabel}
           </Button>
-          <Button
+          <Button size="sm"
             variant="outline"
             disabled={!canReverse}
             loading={pending === reversePendingKey}

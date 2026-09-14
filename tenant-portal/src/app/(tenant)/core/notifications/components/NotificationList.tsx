@@ -136,7 +136,7 @@ export function NotificationList({
       ))}
 
       {hasMore ? (
-        <Button variant="outline" onClick={onLoadMore} loading={isLoadingMore} className="self-center">
+        <Button size="sm" variant="outline" onClick={onLoadMore} loading={isLoadingMore} className="self-center">
           {t.coreNotifications.loadMore}
         </Button>
       ) : null}

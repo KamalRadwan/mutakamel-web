@@ -66,12 +66,12 @@ function ApplicationRegistrationOnlyContent() {
             <AppWindow className="mx-auto size-10 text-info" aria-hidden="true" />
             <h1 className="mt-4 text-xl font-semibold">{t.applications.registrationOnlyTitle}</h1>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.applications.registrationOnlyDescription}</p>
-            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-              <Button type="button" variant="primary" onClick={() => setIsCreateModalOpen(true)}>
-                <Plus className="size-4" aria-hidden="true" />
+            <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+              <Button size="sm" type="button" variant="primary" onClick={() => setIsCreateModalOpen(true)}>
+                <Plus className="size-3.5" aria-hidden="true" />
                 {canOnboard ? t.applications.onboardApplication : t.applications.registerApplication}
               </Button>
-              <Button type="button" variant="outline" asChild>
+              <Button size="sm" type="button" variant="outline" asChild>
                 <Link href="/dashboard">{t.applications.backToDashboard}</Link>
               </Button>
             </div>
@@ -180,7 +180,7 @@ function ApplicationsCatalogueContent() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <CreateApplicationModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
@@ -194,16 +194,16 @@ function ApplicationsCatalogueContent() {
         action={
           <div className="flex flex-wrap gap-2">
             {canReadAudit && (
-              <Button type="button" variant="outline" asChild>
+              <Button size="sm" type="button" variant="outline" asChild>
                 <Link href="/applications-catalogue/audit">
-                  <History className="size-4" />
+                  <History className="size-3.5" />
                   {t.applications.auditLink}
                 </Link>
               </Button>
             )}
             {canCreate && (
-              <Button type="button" variant="primary" onClick={() => setIsCreateModalOpen(true)}>
-                <Plus className="size-4" />
+              <Button size="sm" type="button" variant="primary" onClick={() => setIsCreateModalOpen(true)}>
+                <Plus className="size-3.5" />
                 {canOnboard ? t.applications.onboardApplication : t.applications.registerApplication}
               </Button>
             )}
@@ -230,7 +230,7 @@ function ApplicationsCatalogueContent() {
         />
       </StatGrid>
 
-      <div className="space-y-0 rounded-lg border border-border bg-card">
+      <div className="space-y-0 rounded-lg border border-border bg-card p-2 sm:p-2.5">
         <FilterBar
           fields={[
             { key: "search", type: "search", placeholderEn: t.applications.searchPlaceholder, placeholderAr: t.applications.searchPlaceholder },

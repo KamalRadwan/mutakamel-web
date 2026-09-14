@@ -173,7 +173,7 @@ export default function CrmCalendarPage() {
                 branchId={branchId}
                 onChange={selectBranch}
               />
-              <Button
+              <Button size="sm"
                 variant="outline"
                 onClick={() => void reload()}
                 disabled={isLoading || !branchId}

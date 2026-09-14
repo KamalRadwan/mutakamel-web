@@ -136,7 +136,7 @@ export function DrilldownSheet({
           </ul>
 
           {hasMore ? (
-            <Button variant="outline" onClick={onLoadMore} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={onLoadMore} disabled={isLoading}>
               {t.timeline.loadMore}
             </Button>
           ) : null}

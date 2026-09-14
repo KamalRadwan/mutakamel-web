@@ -48,7 +48,7 @@ export function UomFormFields({
         readOnly={codeReadOnly}
         required={!codeReadOnly}
       >
-        <Input
+        <Input size="sm" placeholder={t.trade.uomCode}
           dir="ltr"
           value={values.code}
           onChange={(event) => onChange({ code: event.target.value.toUpperCase() })}
@@ -60,7 +60,7 @@ export function UomFormFields({
       </Field>
 
       <Field label={t.trade.uomDisplayName} required>
-        <Input
+        <Input size="sm" placeholder={t.trade.uomDisplayName}
           value={values.displayName}
           onChange={(event) => onChange({ displayName: event.target.value })}
           maxLength={UOM_DISPLAY_NAME_MAX_LENGTH}
@@ -70,7 +70,7 @@ export function UomFormFields({
       </Field>
 
       <Field label={t.trade.nameAr} hint={t.trade.localizedNamesHint}>
-        <Input
+        <Input size="sm" placeholder={t.trade.nameAr}
           value={values.nameAr}
           onChange={(event) => onChange({ nameAr: event.target.value })}
           maxLength={UOM_DISPLAY_NAME_MAX_LENGTH}
@@ -79,7 +79,7 @@ export function UomFormFields({
       </Field>
 
       <Field label={t.trade.nameEn}>
-        <Input
+        <Input size="sm" placeholder={t.trade.nameEn}
           dir="ltr"
           value={values.nameEn}
           onChange={(event) => onChange({ nameEn: event.target.value })}
@@ -89,7 +89,7 @@ export function UomFormFields({
       </Field>
 
       <Field label={t.trade.uomSourceKind} hint={t.trade.uomSourceKindHint} required>
-        <Input
+        <Input size="sm" placeholder={t.trade.uomSourceKind}
           value={values.sourceKind}
           onChange={(event) => onChange({ sourceKind: event.target.value })}
           maxLength={UOM_SOURCE_KIND_MAX_LENGTH}
@@ -99,7 +99,7 @@ export function UomFormFields({
       </Field>
 
       <Field label={t.trade.uomReference}>
-        <Input
+        <Input size="sm" placeholder={t.trade.uomReference}
           value={values.reference}
           onChange={(event) => onChange({ reference: event.target.value })}
           maxLength={UOM_REFERENCE_MAX_LENGTH}
@@ -108,7 +108,7 @@ export function UomFormFields({
       </Field>
 
       <Field label={t.trade.uomNote}>
-        <Textarea
+        <Textarea placeholder={t.trade.uomNote}
           value={values.note}
           onChange={(event) => onChange({ note: event.target.value })}
           maxLength={UOM_NOTE_MAX_LENGTH}
@@ -123,7 +123,7 @@ export function UomFormFields({
             onValueChange={(next) => onChange({ status: next as UomStatus })}
             disabled={isSubmitting}
           >
-            <SelectTrigger aria-label={t.common.status}>
+            <SelectTrigger size="sm" aria-label={t.common.status}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

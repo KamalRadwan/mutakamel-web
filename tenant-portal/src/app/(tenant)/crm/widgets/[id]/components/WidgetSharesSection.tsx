@@ -90,7 +90,7 @@ export function WidgetSharesSection({
               value={accessLevel}
               onValueChange={(next) => setAccessLevel(next as ShareAccessLevel)}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -103,7 +103,7 @@ export function WidgetSharesSection({
             </Select>
           </Field>
         </div>
-        <Button
+        <Button size="sm"
           variant="outline"
           disabled={!selected || isSubmitting}
           onClick={() => {

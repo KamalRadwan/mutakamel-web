@@ -34,7 +34,7 @@ export function NodeFormFields({ values, onChange, isSubmitting, isEdit }: NodeF
   return (
     <div className="flex flex-col gap-3">
       <Field label={t.tradeInventory.nodeCode} required readOnly={isEdit}>
-        <Input
+        <Input size="sm" placeholder={t.tradeInventory.nodeCode}
           value={values.code}
           maxLength={NODE_CODE_MAX_LENGTH}
           readOnly={isEdit}
@@ -44,7 +44,7 @@ export function NodeFormFields({ values, onChange, isSubmitting, isEdit }: NodeF
       </Field>
 
       <Field label={t.tradeInventory.nodeName} required>
-        <Input
+        <Input size="sm" placeholder={t.tradeInventory.nodeName}
           value={values.name}
           maxLength={NODE_NAME_MAX_LENGTH}
           disabled={isSubmitting}
@@ -58,7 +58,7 @@ export function NodeFormFields({ values, onChange, isSubmitting, isEdit }: NodeF
           disabled={isSubmitting || isEdit}
           onValueChange={(next) => onChange({ nodeType: next as NodeFormValues["nodeType"] })}
         >
-          <SelectTrigger aria-label={t.tradeInventory.nodeType}>
+          <SelectTrigger size="sm" aria-label={t.tradeInventory.nodeType}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -78,7 +78,7 @@ export function NodeFormFields({ values, onChange, isSubmitting, isEdit }: NodeF
             disabled={isSubmitting}
             onValueChange={(next) => onChange({ status: next as NodeFormValues["status"] })}
           >
-            <SelectTrigger aria-label={t.common.status}>
+            <SelectTrigger size="sm" aria-label={t.common.status}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -93,7 +93,7 @@ export function NodeFormFields({ values, onChange, isSubmitting, isEdit }: NodeF
       ) : null}
 
       <Field label={t.tradeInventory.nodeTimezone} required hint={t.tradeInventory.nodeTimezoneHint}>
-        <Input
+        <Input size="sm" placeholder={t.tradeInventory.nodeTimezone}
           value={values.timezone}
           maxLength={NODE_TIMEZONE_MAX_LENGTH}
           disabled={isSubmitting}
@@ -106,7 +106,7 @@ export function NodeFormFields({ values, onChange, isSubmitting, isEdit }: NodeF
         required
         hint={t.tradeInventory.nodeBranchesHint}
       >
-        <Textarea
+        <Textarea placeholder={t.tradeInventory.nodeBranches}
           value={values.branchIds}
           rows={4}
           disabled={isSubmitting}

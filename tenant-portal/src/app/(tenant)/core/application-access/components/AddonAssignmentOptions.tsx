@@ -17,7 +17,7 @@ export function AddonAssignmentOptions({ userId }: { userId: string }) {
   return <PermissionGate require={[]} denied={read.denied}>
     <div className="flex min-w-0 flex-col gap-4">
       <PageHeader title={copy.title} description={copy.description} secondaryActions={
-        <Button variant="outline" onClick={read.reload} disabled={read.loading}>{t.coreBilling.reload}</Button>
+        <Button size="sm" variant="outline" onClick={read.reload} disabled={read.loading}>{t.coreBilling.reload}</Button>
       } />
       <DetailSection title={t.addonAssignments.user} fields={[{ label: t.addonAssignments.user, value: <IdentifierText>{userId}</IdentifierText> }]} />
       <p className="text-sm text-muted-foreground">{copy.notice}</p>

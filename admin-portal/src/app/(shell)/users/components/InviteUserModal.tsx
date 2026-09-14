@@ -62,13 +62,14 @@ export function InviteUserModal({
       isDirty={isDirty}
       footerActions={
         <>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting || isAmbiguous}>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting || isAmbiguous}>
             {t.users.cancel}
           </Button>
           <Button
             type="submit"
             form="invite-user-form"
             variant="primary"
+            size="sm"
             loading={isSubmitting}
             disabled={
               rolesForbidden || !email.trim() || !firstName.trim() || !lastName.trim() || !roleId
@@ -79,8 +80,8 @@ export function InviteUserModal({
         </>
       }
     >
-      <form id="invite-user-form" onSubmit={handleSubmit} className="space-y-4 py-1">
-        <div className="rounded-md border border-warning/30 bg-warning-subtle p-3 text-xs leading-relaxed text-warning-subtle-foreground">
+      <form id="invite-user-form" onSubmit={handleSubmit} className="space-y-2.5 py-1 text-xs">
+        <div className="rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs leading-relaxed text-warning-subtle-foreground">
           {t.users.invitedInfoBanner}
         </div>
 
@@ -93,37 +94,40 @@ export function InviteUserModal({
           />
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t.users.firstNameLabel} required>
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label={t.users.firstNameLabel} hideLabel required>
             {(fieldProps) => (
               <Input
                 {...fieldProps}
+                size="sm"
                 maxLength={80}
                 value={firstName}
                 disabled={isAmbiguous}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder={t.users.firstNamePlaceholder}
+                placeholder={`${t.users.firstNameLabel} *`}
               />
             )}
           </Field>
-          <Field label={t.users.lastNameLabel} required>
+          <Field label={t.users.lastNameLabel} hideLabel required>
             {(fieldProps) => (
               <Input
                 {...fieldProps}
+                size="sm"
                 maxLength={80}
                 value={lastName}
                 disabled={isAmbiguous}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder={t.users.lastNamePlaceholder}
+                placeholder={`${t.users.lastNameLabel} *`}
               />
             )}
           </Field>
         </div>
 
-        <Field label={t.users.emailLabel} required error={fieldErrors.email || undefined}>
+        <Field label={t.users.emailLabel} hideLabel required error={fieldErrors.email || undefined}>
           {(fieldProps) => (
             <Input
               {...fieldProps}
+              size="sm"
               type="email"
               maxLength={255}
               value={email}
@@ -132,23 +136,22 @@ export function InviteUserModal({
                 setEmail(e.target.value);
                 setFieldErrors((prev) => ({ ...prev, email: "" }));
               }}
-              placeholder="ops.manager@mutakamel.ai"
+              placeholder={`${t.users.emailLabel} *`}
             />
           )}
         </Field>
 
-        <Field label={t.users.roleLabel} required>
-
+        <Field label={t.users.roleLabel} hideLabel required>
           {(fieldProps) =>
             rolesForbidden ? (
-              <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground">
-                <ShieldAlert className="size-4 shrink-0" />
+              <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning-subtle-foreground">
+                <ShieldAlert className="size-3.5 shrink-0" />
                 <span>{t.users.rolesUnavailable}</span>
               </div>
             ) : (
               <Select value={roleId} onValueChange={setRoleId} disabled={isLoadingRoles || isAmbiguous}>
-                <SelectTrigger {...fieldProps}>
-                  <SelectValue placeholder={t.users.selectRolePlaceholder} />
+                <SelectTrigger {...fieldProps} size="sm">
+                  <SelectValue placeholder={`${t.users.roleLabel} *`} />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((r) => (
@@ -163,7 +166,7 @@ export function InviteUserModal({
         </Field>
 
         {user?.isSuperAdmin && (
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-border bg-card p-3 text-xs font-semibold text-foreground">
+          <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-card p-2 text-xs font-semibold text-foreground">
             <Checkbox
               checked={isSuperAdmin}
               disabled={isAmbiguous}

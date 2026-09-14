@@ -53,7 +53,7 @@ export const SheetContent = forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed inset-y-0 z-(--z-overlay) flex h-full w-3/4 flex-col gap-4 border-border bg-popover p-6 text-popover-foreground shadow-overlay sm:max-w-sm",
+          "fixed inset-y-0 z-(--z-overlay) flex h-full w-3/4 flex-col gap-3 border-border bg-popover p-4 sm:p-5 text-popover-foreground shadow-overlay sm:max-w-sm",
           side === "start" ? "start-0 border-e" : "end-0 border-s",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:duration-300",
           physicalSide === "left"

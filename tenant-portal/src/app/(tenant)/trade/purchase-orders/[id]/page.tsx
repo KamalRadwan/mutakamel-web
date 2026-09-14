@@ -126,14 +126,14 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 <>
                   {detail.scope.canWrite(PURCHASE_ORDER_PERMISSIONS.update) &&
                   order.lifecycleStatus === "DRAFT" ? (
-                    <Button variant="outline" onClick={editReference.open}>
+                    <Button size="sm" variant="outline" onClick={editReference.open}>
                       {t.tradeDocuments.purchaseOrders.editTitle}
                     </Button>
                   ) : null}
                   {allowed.withdraw || allowed.reject || allowed.cancel ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost">{t.common.actions}</Button>
+                        <Button size="sm" variant="ghost">{t.common.actions}</Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {allowed.withdraw ? (

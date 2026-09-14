@@ -55,7 +55,7 @@ export function CreateUomConversionModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeInventory.itemCompanyProfileId} required>
-          <Input
+          <Input size="sm"
             value={values.itemCompanyProfileId}
             disabled={isSubmitting}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -63,7 +63,7 @@ export function CreateUomConversionModal({
           />
         </Field>
         <Field label={t.tradeInventory.fromUom} required>
-          <Input
+          <Input size="sm"
             value={values.fromUomId}
             disabled={isSubmitting}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -71,7 +71,7 @@ export function CreateUomConversionModal({
           />
         </Field>
         <Field label={t.tradeInventory.toUom} required>
-          <Input
+          <Input size="sm"
             value={values.toUomId}
             disabled={isSubmitting}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -83,7 +83,7 @@ export function CreateUomConversionModal({
           required
           hint={t.tradeInventory.factorIntegerHint}
         >
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.factorNumerator}
             value={values.factorNumerator}
             disabled={isSubmitting}
             inputMode="numeric"
@@ -95,7 +95,7 @@ export function CreateUomConversionModal({
           required
           hint={t.tradeInventory.factorIntegerHint}
         >
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.factorDenominator}
             value={values.factorDenominator}
             disabled={isSubmitting}
             inputMode="numeric"
@@ -103,7 +103,7 @@ export function CreateUomConversionModal({
           />
         </Field>
         <Field label={t.tradeInventory.effectiveFrom} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.effectiveFrom}
             type="datetime-local"
             value={values.effectiveFrom}
             disabled={isSubmitting}

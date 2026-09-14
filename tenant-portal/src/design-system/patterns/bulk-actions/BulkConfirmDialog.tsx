@@ -51,7 +51,7 @@ export function BulkConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : dismiss())}>
-      <DialogContent
+      <DialogContent className="p-3 sm:p-3.5"
         showCloseButton={!loading}
         aria-busy={loading || undefined}
         onEscapeKeyDown={(event) => (loading ? event.preventDefault() : undefined)}
@@ -69,10 +69,11 @@ export function BulkConfirmDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={dismiss} disabled={loading}>
+          <Button size="sm" variant="outline" onClick={dismiss} disabled={loading}>
             {labels.cancel}
           </Button>
           <Button
+            size="sm"
             variant={destructive ? "destructive" : "primary"}
             onClick={onConfirm}
             loading={loading}

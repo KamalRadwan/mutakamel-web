@@ -38,7 +38,7 @@ export default function FatalAlertSettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader
         title={copy.title}
         action={
@@ -46,10 +46,11 @@ export default function FatalAlertSettingsPage() {
             <Button
               type="button"
               variant="primary"
+              size="sm"
               onClick={() => void save()}
               disabled={!state.hasUnsavedChanges || pending || state.loadState !== "READY"}
             >
-              {pending ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Save className="size-4" aria-hidden="true" />}
+              {pending ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Save className="size-3.5" aria-hidden="true" />}
               {copy.saveButton}
             </Button>
           ) : undefined
@@ -67,7 +68,7 @@ export default function FatalAlertSettingsPage() {
             <Evidence state={state} />
             <MutationNotice state={state} />
             {!state.canSaveCritical ? (
-              <p role="note" className="rounded-lg border border-border bg-muted p-3 text-sm text-foreground">
+              <p role="note" className="rounded-lg border border-border bg-muted p-2.5 text-xs text-foreground">
                 {copy.readOnlyNote}
               </p>
             ) : null}
@@ -96,7 +97,7 @@ function Evidence({ state }: { state: ReturnType<typeof useFatalAlertSettings> }
   const copy = dict(state.lang).evidence;
   const locale = state.lang === "ar" ? "ar-EG" : "en-US";
   return (
-    <section className="grid gap-3 rounded-lg border border-border bg-card p-4 text-sm sm:grid-cols-4">
+    <section className="grid gap-2.5 rounded-lg border border-border bg-card p-3 sm:p-3.5 text-xs sm:grid-cols-4">
       <EvidenceItem label={copy.delivery} value={config.enabled ? copy.enabledValue : copy.disabledValue} />
       <EvidenceItem label={copy.configuration} value={config.configured ? copy.completeValue : copy.incompleteValue} />
       <EvidenceItem label={copy.revision} value={config.revision === null ? "—" : String(config.revision)} />
@@ -106,7 +107,7 @@ function Evidence({ state }: { state: ReturnType<typeof useFatalAlertSettings> }
 }
 
 function EvidenceItem({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-lg bg-muted p-3"><span className="block text-xs font-semibold text-muted-foreground">{label}</span><strong className="mt-1 block">{value}</strong></div>;
+  return <div className="rounded-lg bg-muted p-2.5"><span className="block text-xs font-semibold text-muted-foreground">{label}</span><strong className="mt-0.5 block text-xs">{value}</strong></div>;
 }
 
 function FatalAlertForm({ form, token, errors, configured, lang, disabled, showToken, onToggleToken, onUpdate, onToken }: {
@@ -123,9 +124,9 @@ function FatalAlertForm({ form, token, errors, configured, lang, disabled, showT
 }) {
   const copy = dict(lang).form;
   return (
-    <form method="post" aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-5 rounded-lg border border-border bg-card p-5 lg:grid-cols-2">
-      <label htmlFor="fatal-alert-enabled" className="flex min-h-14 cursor-pointer items-center justify-between gap-4 rounded-lg border border-input bg-muted px-4 lg:col-span-2">
-        <span><strong className="block text-sm">{copy.enableLabel}</strong><span className="text-xs text-muted-foreground">{copy.enableHelp}</span></span>
+    <form method="post" aria-label={copy.ariaLabel} onSubmit={(event) => event.preventDefault()} className="grid gap-3 rounded-lg border border-border bg-card p-3 sm:p-3.5 lg:grid-cols-2">
+      <label htmlFor="fatal-alert-enabled" className="flex min-h-8 cursor-pointer items-center justify-between gap-2.5 rounded-lg border border-input bg-muted px-2.5 py-1.5 lg:col-span-2">
+        <span><strong className="block text-xs">{copy.enableLabel}</strong><span className="text-xs text-muted-foreground">{copy.enableHelp}</span></span>
         <Switch id="fatal-alert-enabled" checked={form.enabled} disabled={disabled} onCheckedChange={(enabled) => onUpdate("enabled", enabled)} />
       </label>
       <FatalAlertField id="fatal-alert-url" label={copy.webhookUrlLabel} type="url" value={form.webhookUrl} maxLength={2048} disabled={disabled} error={errors.webhookUrl} lang={lang} onChange={(value) => onUpdate("webhookUrl", value)} />
@@ -137,13 +138,13 @@ function FatalAlertForm({ form, token, errors, configured, lang, disabled, showT
         className="lg:col-span-2"
         labelAction={
           <Button type="button" variant="ghost" size="xs" onClick={onToggleToken} disabled={disabled} aria-label={showToken ? copy.hideToken : copy.showToken} aria-pressed={showToken} className="h-auto px-1.5 py-1">
-            {showToken ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+            {showToken ? <EyeOff className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
           </Button>
         }
       >
-        {(field) => <Input {...field} type={showToken ? "text" : "password"} autoComplete="new-password" value={token} maxLength={2048} disabled={disabled} placeholder={configured ? copy.tokenPlaceholderConfigured : copy.tokenPlaceholderRequired} onChange={(event) => onToken(event.target.value)} className="font-mono" />}
+        {(field) => <Input {...field} size="sm" type={showToken ? "text" : "password"} autoComplete="new-password" value={token} maxLength={2048} disabled={disabled} placeholder={configured ? copy.tokenPlaceholderConfigured : copy.tokenPlaceholderRequired} onChange={(event) => onToken(event.target.value)} className="font-mono text-xs" />}
       </FormField>
-      <p className="text-xs leading-5 text-muted-foreground lg:col-span-2">
+      <p className="text-xs leading-relaxed text-muted-foreground lg:col-span-2">
         {copy.footerNote}
       </p>
     </form>
@@ -151,7 +152,7 @@ function FatalAlertForm({ form, token, errors, configured, lang, disabled, showT
 }
 
 function FatalAlertField({ id, label, type, value, maxLength, disabled, error, lang, onChange }: { id: string; label: string; type: "text" | "url"; value: string; maxLength: number; disabled: boolean; error?: string; lang: "ar" | "en"; onChange: (value: string) => void }) {
-  return <FormField id={id} label={label} error={fieldErrorMessage(error, lang)}>{(field) => <Input {...field} type={type} value={value} maxLength={maxLength} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="font-mono" />}</FormField>;
+  return <FormField id={id} label={label} hideLabel error={fieldErrorMessage(error, lang)}>{(field) => <Input {...field} size="sm" type={type} placeholder={label} value={value} maxLength={maxLength} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="font-mono text-xs" />}</FormField>;
 }
 
 function fieldErrorMessage(code: string | undefined, lang: "ar" | "en"): string | undefined {
@@ -170,7 +171,7 @@ function MutationNotice({ state }: { state: ReturnType<typeof useFatalAlertSetti
   if (state.mutation.phase === "IDLE" || state.mutation.phase === "PENDING") return null;
   const succeeded = state.mutation.phase === "SUCCEEDED";
   const copy = dict(state.lang);
-  return <p role={succeeded ? "status" : "alert"} className={`rounded-lg border p-3 text-sm font-semibold ${succeeded ? "border-success/30 bg-success-subtle text-success-subtle-foreground" : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"}`}>{succeeded ? copy.mutation.saved : mutationMessage(state.mutation.localCode ?? state.mutation.error?.errorCode, state.lang)}{state.mutation.correlationId ? <code dir="ltr" className="ms-2">{state.mutation.correlationId}</code> : null}</p>;
+  return <p role={succeeded ? "status" : "alert"} className={`rounded-lg border p-2.5 text-xs font-semibold ${succeeded ? "border-success/30 bg-success-subtle text-success-subtle-foreground" : "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"}`}>{succeeded ? copy.mutation.saved : mutationMessage(state.mutation.localCode ?? state.mutation.error?.errorCode, state.lang)}{state.mutation.correlationId ? <code dir="ltr" className="ms-2">{state.mutation.correlationId}</code> : null}</p>;
 }
 
 function mutationMessage(code: string | undefined, lang: "ar" | "en"): string {

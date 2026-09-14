@@ -2,28 +2,25 @@
 
 import { useId, type ReactNode } from "react";
 import { Check, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
-import { Badge, Button, Field, cn, focusRing, hitArea } from "@/design-system";
+import {
+  Badge,
+  Button,
+  Field,
+  Input,
+  cn,
+  focusRing,
+} from "@/design-system";
 import { webphoneFieldErrorText } from "../webphone-copy";
 
 /**
  * The field vocabulary of the WebPhone screen.
  *
- * Every control here is the design system's `Field` wearing a native input:
+ * Every control here is the design system's `Field` wearing a design system Input:
  * one label position, one hint position (below the control), one error
  * position (below the hint, `role="alert"`, wired by `aria-describedby`), and
  * one focus ring. The screen is dense enough that a second arrangement of the
  * same three parts reads as a different kind of field when it is not.
  */
-
-/** One control surface, so every input on the screen has the same box. */
-const CONTROL = cn(
-  "h-(--size-control-lg) w-full rounded-md border border-input bg-card px-3 text-sm text-foreground",
-  "outline-none transition-colors motion-reduce:transition-none",
-  "placeholder:text-muted-foreground",
-  "disabled:cursor-not-allowed disabled:opacity-50",
-  focusRing,
-  hitArea,
-);
 
 function errorText(code: string | undefined, lang: "ar" | "en") {
   return code ? webphoneFieldErrorText(code, lang) : undefined;
@@ -55,17 +52,18 @@ export function TextField({
   return (
     <Field label={label} hint={help} error={errorText(error, lang)}>
       {(field) => (
-        <input
+        <Input
           {...field}
+          size="sm"
           type="text"
           dir="ltr"
           inputMode={inputMode}
           value={value}
           maxLength={maxLength}
-          placeholder={placeholder}
+          placeholder={placeholder ?? `${label} *`}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
-          className={cn(CONTROL, "text-start")}
+          className="text-start"
         />
       )}
     </Field>
@@ -131,16 +129,18 @@ export function SecretField({
     >
       {(field) => (
         <div className="relative">
-          <input
+          <Input
             {...field}
+            size="sm"
             type={revealed ? "text" : "password"}
             dir="ltr"
             autoComplete="new-password"
             value={value}
             maxLength={1024}
             disabled={disabled}
+            placeholder={storedLabel?.stored ? "••••••••••••" : `${label} *`}
             onChange={(event) => onChange(event.target.value)}
-            className={cn(CONTROL, "pe-11 font-mono")}
+            className="pe-11 font-mono"
           />
           <Button
             type="button"
@@ -153,9 +153,9 @@ export function SecretField({
             className="absolute end-1 top-1/2 -translate-y-1/2 px-1.5 text-muted-foreground"
           >
             {revealed ? (
-              <EyeOff className="size-4" aria-hidden="true" />
+              <EyeOff className="size-3.5" aria-hidden="true" />
             ) : (
-              <Eye className="size-4" aria-hidden="true" />
+              <Eye className="size-3.5" aria-hidden="true" />
             )}
           </Button>
         </div>
@@ -191,7 +191,12 @@ export function SelectField<T extends string>({
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value as T)}
-          className={CONTROL}
+          className={cn(
+            "h-8 w-full rounded-md border border-input bg-card px-2.5 text-xs text-foreground",
+            "outline-none transition-colors motion-reduce:transition-none",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            focusRing,
+          )}
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
@@ -231,13 +236,13 @@ export function SwitchField({
   const id = useId();
   const helpId = `${id}-help`;
   return (
-    <div className="flex items-start justify-between gap-4 rounded-md border border-border bg-card p-3">
-      <span className="grid gap-1">
-        <label htmlFor={id} className="text-sm font-medium">
+    <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-card p-2.5">
+      <span className="grid gap-0.5">
+        <label htmlFor={id} className="text-xs font-medium">
           {label}
         </label>
         {help ? (
-          <span id={helpId} className="text-xs leading-5 text-muted-foreground">
+          <span id={helpId} className="text-xs leading-relaxed text-muted-foreground">
             {help}
           </span>
         ) : null}
@@ -252,7 +257,7 @@ export function SwitchField({
         aria-describedby={help ? helpId : undefined}
         onChange={(event) => onChange(event.target.checked)}
         className={cn(
-          "mt-0.5 size-5 shrink-0 accent-primary",
+          "mt-0.5 size-4 shrink-0 accent-primary",
           "disabled:cursor-not-allowed disabled:opacity-50",
           focusRing,
         )}
@@ -281,9 +286,9 @@ export function FieldGroup({
 }) {
   const id = useId();
   return (
-    <div role="group" aria-labelledby={id} className="grid min-w-0 gap-3">
+    <div role="group" aria-labelledby={id} className="grid min-w-0 gap-2.5">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="grid gap-1">
+        <div className="grid gap-0.5">
           <h4
             id={id}
             className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
@@ -291,7 +296,7 @@ export function FieldGroup({
             {title}
           </h4>
           {help ? (
-            <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
+            <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
               {help}
             </p>
           ) : null}
@@ -305,7 +310,7 @@ export function FieldGroup({
 
 /** The two-column grid every group's fields sit on. */
 export function FieldRow({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 lg:grid-cols-2">{children}</div>;
+  return <div className="grid gap-2.5 lg:grid-cols-2">{children}</div>;
 }
 
 export function SectionCard({
@@ -324,21 +329,21 @@ export function SectionCard({
   return (
     <section
       aria-label={title}
-      className="grid gap-4 rounded-xl border border-border bg-card p-5 shadow-2xs"
+      className="grid gap-3 rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-2xs"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid gap-1">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
+        <div className="grid gap-0.5">
+          <h2 className="flex items-center gap-1.5 text-xs font-semibold">
             {icon}
             {title}
           </h2>
-          <p className="max-w-3xl text-xs leading-5 text-muted-foreground">
+          <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
             {help}
           </p>
         </div>
         {actions}
       </div>
-      <div className="grid gap-4">{children}</div>
+      <div className="grid gap-3">{children}</div>
     </section>
   );
 }
@@ -400,7 +405,7 @@ export function InlineError({
   return (
     <p
       role="alert"
-      className="rounded-md border border-destructive bg-destructive-subtle p-3 text-xs font-medium text-destructive-subtle-foreground"
+      className="rounded-md border border-destructive bg-destructive-subtle p-2.5 text-xs font-medium text-destructive-subtle-foreground"
     >
       {render(code, lang, details)}
     </p>
@@ -424,7 +429,7 @@ export function ActionBar({
   status?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
+    <div className="flex flex-wrap items-center gap-2.5 border-t border-border pt-2.5">
       <div className="flex flex-wrap items-center gap-2">{primary}</div>
       {status}
       {destructive ? <div className="ms-auto">{destructive}</div> : null}

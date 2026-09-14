@@ -187,17 +187,16 @@ export function TenantAccessPanel({
   return (
     <section
       dir={locale === "ar" ? "rtl" : "ltr"}
-      className="space-y-4"
+      className="space-y-3"
       aria-labelledby="tenant-access-title"
       aria-busy={directory.status === "loading" || undefined}
     >
-      <header className="flex flex-wrap items-start justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id="tenant-access-title" className="text-lg font-semibold text-foreground">{copy.title}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{copy.subtitle}</p>
+          <h2 id="tenant-access-title" className="text-base sm:text-lg font-semibold text-foreground">{copy.title}</h2>
         </div>
         {controller.permissions.canInvite && controller.ready ? (
-          <Button type="button" variant="primary" onClick={() => setDialog({ kind: "invite" })}>{copy.invite}</Button>
+          <Button type="button" variant="primary" size="sm" onClick={() => setDialog({ kind: "invite" })}>{copy.invite}</Button>
         ) : null}
       </header>
       {directory.status === "loading" ? <p role="status" aria-live="polite" className="text-xs text-muted-foreground">{copy.loading}</p> : null}
@@ -215,7 +214,7 @@ export function TenantAccessPanel({
           <GateCard
             tone="danger"
             message={`${copy.loadError}${directory.error?.correlationId ? ` · ${directory.error.correlationId}` : ""}`}
-            action={<Button type="button" variant="outline" onClick={() => void controller.refresh()}>{copy.retry}</Button>}
+            action={<Button size="sm" type="button" variant="outline" onClick={() => void controller.refresh()}>{copy.retry}</Button>}
           />
         </>
       ) : (
@@ -223,10 +222,11 @@ export function TenantAccessPanel({
           <SummaryCards controller={controller} locale={locale} />
           <Card>
             <form onSubmit={applyFilters} className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-              <Field id="tenant-user-search" label={copy.search} className="lg:col-span-2">
+              <Field id="tenant-user-search" label={copy.search} hideLabel className="lg:col-span-2">
                 {(field) => (
                   <Input
                     {...field}
+                    size="sm"
                     name="q"
                     type="search"
                     maxLength={200}
@@ -287,8 +287,8 @@ export function TenantAccessPanel({
               />
               <FilterSelect id="tenant-user-team" label={copy.team} disabled={!departmentId} value={teamId} placeholder={copy.allTeams} onValueChange={setTeamId} options={(controller.teams.data?.items ?? []).map((team) => [team.id, `${team.code} · ${team.name}`] as const)} />
               <div className="flex gap-2 lg:col-span-4 xl:col-span-8">
-                <Button type="submit" variant="secondary">{copy.apply}</Button>
-                <Button type="button" variant="outline" onClick={clearFilters}>{copy.clear}</Button>
+                <Button type="submit" variant="secondary" size="sm">{copy.apply}</Button>
+                <Button type="button" variant="outline" size="sm" onClick={clearFilters}>{copy.clear}</Button>
               </div>
             </form>
           </Card>
@@ -371,13 +371,13 @@ function UserDetailCard({ controller, locale, openDialog }: { controller: Return
   const copy = tenantAccessCopy(locale);
   const resource = controller.selectedUser;
   if (resource.status === "idle") return null;
-  if (resource.status === "loading") return <Card className="p-5 text-sm text-muted-foreground">{copy.loading}</Card>;
+  if (resource.status === "loading") return <Card className="p-3 sm:p-3.5 text-sm text-muted-foreground">{copy.loading}</Card>;
   if (!resource.data) return <GateCard tone="danger" message={resource.error?.message ?? copy.loadError} />;
   const user = resource.data;
   const deleted = user.deletedAt !== null;
   const protectedOwner = user.isTenantOwner;
   return (
-    <Card className="p-4" aria-label={copy.details}>
+    <Card className="p-3 sm:p-3.5" aria-label={copy.details}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-foreground">{user.firstName} {user.lastName}</h3>
@@ -458,16 +458,16 @@ function FilterSelect({
   const normalized = value || EMPTY_SELECT_VALUE;
   const labelId = `${id}-label`;
   return (
-    <div className="space-y-1.5">
-      <span id={labelId} className="text-sm font-medium text-foreground">{label}</span>
+    <div>
+      <span id={labelId} className="sr-only">{label}</span>
       <Select
         name={id}
         value={normalized}
         onValueChange={(next) => onValueChange(next === EMPTY_SELECT_VALUE ? "" : next)}
         disabled={disabled}
       >
-        <SelectTrigger id={id} aria-labelledby={labelId}>
-          <SelectValue />
+        <SelectTrigger id={id} size="sm" aria-labelledby={labelId}>
+          <SelectValue placeholder={placeholder ?? label} />
         </SelectTrigger>
         <SelectContent>
           {placeholder ? <SelectItem value={EMPTY_SELECT_VALUE}>{placeholder}</SelectItem> : null}

@@ -289,7 +289,7 @@ export function InvoicePageFrame({
   dir: "rtl" | "ltr";
 }) {
   return (
-    <div dir={dir} className="mx-auto w-full max-w-[1600px] space-y-4">
+    <div dir={dir} className="mx-auto w-full max-w-[1600px] space-y-3">
       {children}
     </div>
   );
@@ -361,18 +361,18 @@ export function InvoiceMutationNotice({ mutation, copy }: { mutation: InvoiceMut
         ? "border-info/30 bg-info-subtle text-info-subtle-foreground"
         : "border-warning/30 bg-warning-subtle text-warning-subtle-foreground";
   return (
-    <div role={danger || mutation.phase === "CONFLICT" || mutation.phase === "VALIDATION" || mutation.phase === "UNAVAILABLE" ? "alert" : "status"} aria-live="polite" className={`rounded-lg border px-4 py-3 text-sm ${tone}`}>
+    <div role={danger || mutation.phase === "CONFLICT" || mutation.phase === "VALIDATION" || mutation.phase === "UNAVAILABLE" ? "alert" : "status"} aria-live="polite" className={`rounded-md border px-3 py-2 text-xs ${tone}`}>
       <p className="font-semibold">{message}</p>
-      {mutation.error ? <p className="mt-1 leading-6">{mutation.error.message}</p> : null}
-      {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-sm">{mutation.error.errorCode}</code> : null}
-      {mutation.correlationId ? <p className="mt-1 text-sm"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{mutation.correlationId}</code></p> : null}
+      {mutation.error ? <p className="mt-1 leading-5">{mutation.error.message}</p> : null}
+      {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}
+      {mutation.correlationId ? <p className="mt-1 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr" className="select-all break-all">{mutation.correlationId}</code></p> : null}
     </div>
   );
 }
 
 export function InvoiceSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSnapshot<unknown>; copy: InvoiceCopy; lang: "ar" | "en" }) {
   return (
-    <footer className="grid gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground sm:grid-cols-2">
+    <footer className="grid gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground sm:grid-cols-2">
       <p><strong className="text-foreground">{copy.responseAt}:</strong> {formatInvoiceDate(snapshot.responseTimestamp, lang)}</p>
       <p className="min-w-0"><strong className="text-foreground">{copy.correlation}:</strong> <code dir="ltr" className="ms-1 select-all break-all">{snapshot.correlationId}</code></p>
     </footer>
@@ -451,8 +451,8 @@ export function formatInvoiceMoney(value: string, currency: string): string {
 
 export function RetryInvoiceButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <Button type="button" variant="primary" onClick={onClick}>
-      <RefreshCw className="size-4" aria-hidden="true" />
+    <Button size="sm" type="button" variant="primary" onClick={onClick}>
+      <RefreshCw className="size-3.5" aria-hidden="true" />
       {label}
     </Button>
   );

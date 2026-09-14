@@ -146,7 +146,7 @@ export function UserFormDrawer({
           readOnly={!isInvite}
           required={isInvite}
         >
-          <Input
+          <Input size="sm" placeholder={copy.users.email}
             type="email"
             dir="ltr"
             value={form.email}
@@ -160,7 +160,7 @@ export function UserFormDrawer({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={copy.users.firstName} required>
-            <Input
+            <Input size="sm" placeholder={copy.users.firstName}
               value={form.firstName}
               onChange={(event) => patch({ firstName: event.target.value })}
               maxLength={USER_NAME_MAX_LENGTH}
@@ -169,7 +169,7 @@ export function UserFormDrawer({
             />
           </Field>
           <Field label={copy.users.lastName} required>
-            <Input
+            <Input size="sm" placeholder={copy.users.lastName}
               value={form.lastName}
               onChange={(event) => patch({ lastName: event.target.value })}
               maxLength={USER_NAME_MAX_LENGTH}
@@ -250,7 +250,7 @@ export function UserFormDrawer({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={copy.users.employeeCode}>
-            <Input
+            <Input size="sm" placeholder={copy.users.employeeCode}
               dir="ltr"
               value={form.employeeCode}
               onChange={(event) => patch({ employeeCode: event.target.value })}
@@ -259,7 +259,7 @@ export function UserFormDrawer({
             />
           </Field>
           <Field label={copy.users.jobTitle}>
-            <Input
+            <Input size="sm" placeholder={copy.users.jobTitle}
               value={form.jobTitle}
               onChange={(event) => patch({ jobTitle: event.target.value })}
               maxLength={USER_JOB_TITLE_MAX_LENGTH}

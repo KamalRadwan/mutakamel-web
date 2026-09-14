@@ -73,7 +73,7 @@ export function OrganizationNodeForm({
 
       {mode === "create" ? (
         <Field label={copy.fields.code} hint={copy.fields.codeHint} required>
-          <Input
+          <Input size="sm" placeholder={copy.fields.code}
             dir="ltr"
             value={values.code}
             onChange={(event) => onChange({ code: event.target.value })}
@@ -85,7 +85,7 @@ export function OrganizationNodeForm({
       ) : null}
 
       <Field label={levelCopy.nameLabel} required>
-        <Input
+        <Input size="sm" placeholder={levelCopy.nameLabel}
           value={values.name}
           onChange={(event) => onChange({ name: event.target.value })}
           maxLength={ORG_NAME_MAX_LENGTH}
@@ -96,7 +96,7 @@ export function OrganizationNodeForm({
 
       {config.fields.includes("legalName") ? (
         <Field label={copy.fields.legalName}>
-          <Input
+          <Input size="sm" placeholder={copy.fields.legalName}
             value={values.legalName}
             onChange={(event) => onChange({ legalName: event.target.value })}
             maxLength={ORG_LEGAL_NAME_MAX_LENGTH}
@@ -107,7 +107,7 @@ export function OrganizationNodeForm({
 
       {config.fields.includes("taxNumber") ? (
         <Field label={copy.fields.taxNumber}>
-          <Input
+          <Input size="sm" placeholder={copy.fields.taxNumber}
             dir="ltr"
             value={values.taxNumber}
             onChange={(event) => onChange({ taxNumber: event.target.value })}
@@ -119,7 +119,7 @@ export function OrganizationNodeForm({
 
       {config.fields.includes("currencyCode") ? (
         <Field label={copy.fields.currencyCode} hint={copy.fields.currencyCodeHint}>
-          <Input
+          <Input size="sm" placeholder={copy.fields.currencyCode}
             dir="ltr"
             value={values.currencyCode}
             onChange={(event) => onChange({ currencyCode: event.target.value })}
@@ -131,7 +131,7 @@ export function OrganizationNodeForm({
 
       {config.fields.includes("address") ? (
         <Field label={copy.fields.address}>
-          <Textarea
+          <Textarea placeholder={copy.fields.address}
             value={values.address}
             onChange={(event) => onChange({ address: event.target.value })}
             maxLength={ORG_ADDRESS_MAX_LENGTH}
@@ -143,7 +143,7 @@ export function OrganizationNodeForm({
 
       {config.fields.includes("phone") ? (
         <Field label={copy.fields.phone}>
-          <Input
+          <Input size="sm" placeholder={copy.fields.phone}
             dir="ltr"
             value={values.phone}
             onChange={(event) => onChange({ phone: event.target.value })}
@@ -196,7 +196,7 @@ export function OrganizationNodeForm({
             }
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -37,7 +37,7 @@ export function EmailSenderFields({
   return (
     <div className="flex flex-col gap-4">
       <Field label={t.coreSettings.emailFromAddress} readOnly={readOnly} required>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.emailFromAddress}
           dir="ltr"
           type="email"
           value={values.fromAddress}
@@ -50,7 +50,7 @@ export function EmailSenderFields({
       </Field>
 
       <Field label={t.coreSettings.emailFromName} readOnly={readOnly} required>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.emailFromName}
           value={values.fromName}
           onChange={(event) => onChange({ fromName: event.target.value })}
           maxLength={FROM_NAME_MAX_LENGTH}
@@ -61,7 +61,7 @@ export function EmailSenderFields({
       </Field>
 
       <Field label={t.coreSettings.emailReplyTo} hint={t.coreSettings.emailReplyToHint} readOnly={readOnly}>
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.emailReplyTo}
           dir="ltr"
           type="email"
           value={values.replyTo}
@@ -78,7 +78,7 @@ export function EmailSenderFields({
         readOnly={readOnly}
         required
       >
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.emailSenderDomain}
           dir="ltr"
           value={values.senderDomain}
           onChange={(event) => onChange({ senderDomain: event.target.value })}
@@ -94,7 +94,7 @@ export function EmailSenderFields({
         hint={t.coreSettings.emailDkimSelectorHint}
         readOnly={readOnly}
       >
-        <Input
+        <Input size="sm" placeholder={t.coreSettings.emailDkimSelector}
           dir="ltr"
           value={values.dkimSelector}
           onChange={(event) => onChange({ dkimSelector: event.target.value.toLowerCase() })}
@@ -110,7 +110,7 @@ export function EmailSenderFields({
           onValueChange={(value) => onChange({ status: value as EmailConfigStatus })}
           disabled={disabled || readOnly}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

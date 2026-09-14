@@ -98,7 +98,8 @@ export default function LoginPage() {
                 type="email"
                 name="email"
                 autoComplete="username"
-                size="lg"
+                size="sm"
+                placeholder={t.auth.resetEmailPlaceholder}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
@@ -112,7 +113,8 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     name="password"
                     autoComplete="current-password"
-                    size="lg"
+                    size="sm"
+                    placeholder={t.auth.passwordLabel}
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     className="pe-9"
@@ -158,7 +160,7 @@ export default function LoginPage() {
               <span className="text-xs text-muted-foreground">{t.auth.rememberMe}</span>
             </label>
 
-            <Button type="submit" variant="primary" size="lg" loading={isSubmitting} className="w-full">
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting} className="w-full">
               {isSubmitting ? t.auth.submitting : t.auth.submit}
             </Button>
           </form>
@@ -168,14 +170,14 @@ export default function LoginPage() {
       <p className="pb-2 text-center text-2xs text-muted-foreground">{t.auth.footer}</p>
 
       <Dialog open={isForgotModalOpen} onOpenChange={setIsForgotModalOpen}>
-        <DialogContent size="sm">
+        <DialogContent className="p-3 sm:p-3.5" size="sm">
           <DialogHeader>
             <DialogTitle>{t.auth.resetTitle}</DialogTitle>
             <DialogDescription>{t.auth.resetDescription}</DialogDescription>
           </DialogHeader>
           <form method="post" onSubmit={handleForgotPassword} className="flex flex-col gap-4">
             <Field label={t.auth.emailLabel} required>
-              <Input
+              <Input size="sm"
                 type="email"
                 name="resetEmail"
                 autoComplete="email"
@@ -186,10 +188,10 @@ export default function LoginPage() {
               />
             </Field>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setIsForgotModalOpen(false)}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setIsForgotModalOpen(false)}>
                 {t.common.cancel}
               </Button>
-              <Button type="submit" variant="primary" loading={isSubmitting}>
+              <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
                 {t.auth.resetSubmit}
               </Button>
             </DialogFooter>

@@ -113,7 +113,7 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
                     onValueChange={(next) => state.setUom(index, next)}
                     disabled={disabled || uoms.length === 0}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger size="sm">
                       <SelectValue placeholder={t.tradeDocuments.lineEditor.selectUom} />
                     </SelectTrigger>
                     <SelectContent>
@@ -133,7 +133,7 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
                   required
                   error={isInvalid ? t.tradeDocuments.lineEditor.quantityInvalid : undefined}
                 >
-                  <Input
+                  <Input size="sm" placeholder={t.tradeDocuments.quantity}
                     inputMode="decimal"
                     value={line.quantity}
                     onChange={(event) => state.setQuantity(index, event.target.value)}

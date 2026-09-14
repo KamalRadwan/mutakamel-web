@@ -58,7 +58,7 @@ export function NodeDetailWorkspace({ nodeId }: { nodeId: string }) {
         backHref={TENANT_ROUTES.tradeInventoryNodes}
         secondaryActions={
           canManage && node ? (
-            <Button variant="outline" onClick={openEdit}>
+            <Button size="sm" variant="outline" onClick={openEdit}>
               <Pencil className="size-4" aria-hidden="true" />
               {t.tradeInventory.nodeEditTitle}
             </Button>

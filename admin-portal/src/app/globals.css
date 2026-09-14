@@ -280,10 +280,10 @@
    a bigger box (src/design-system/lib/variants.ts hitArea). */
 :root {
   --size-control-xs: 1.5rem; /* 24px */
-  --size-control-sm: 1.75rem; /* 28px */
-  --size-control-md: 2rem; /* 32px — default */
-  --size-control-lg: 2.25rem; /* 36px */
-  --size-control-xl: 2.5rem; /* 40px */
+  --size-control-sm: 2rem; /* 32px — Bootstrap *-sm equivalent (calc(1.5em + 0.5rem + 2px)) */
+  --size-control-md: 2.25rem; /* 36px */
+  --size-control-lg: 2.5rem; /* 40px */
+  --size-control-xl: 2.75rem; /* 44px */
 }
 
 /* Real pointer targets for dense controls. `ds-hit-area` increases the

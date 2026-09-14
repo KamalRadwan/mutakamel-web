@@ -65,7 +65,7 @@ function ChannelFields({
         readOnly={isEdit}
         required={!isEdit}
       >
-        <Input
+        <Input size="sm" placeholder={t.trade.channelCode}
           dir="ltr"
           value={values.code}
           onChange={(event) => onChange({ code: event.target.value.toUpperCase() })}
@@ -77,7 +77,7 @@ function ChannelFields({
       </Field>
 
       <Field label={t.trade.channelName} required>
-        <Input
+        <Input size="sm" placeholder={t.trade.channelName}
           value={values.name}
           onChange={(event) => onChange({ name: event.target.value })}
           maxLength={CHANNEL_NAME_MAX_LENGTH}
@@ -94,7 +94,7 @@ function ChannelFields({
           onValueChange={(next) => onChange({ channelType: next as ChannelType })}
           disabled={isSubmitting || isEdit}
         >
-          <SelectTrigger aria-label={t.trade.channelType} aria-readonly={isEdit}>
+          <SelectTrigger size="sm" aria-label={t.trade.channelType} aria-readonly={isEdit}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -109,7 +109,7 @@ function ChannelFields({
 
       {isEdit ? (
         <Field label={t.common.status} hint={t.trade.channelStatusHint}>
-          <Input
+          <Input size="sm" placeholder={t.common.status}
             dir="ltr"
             list="trade-channel-statuses"
             value={values.status}

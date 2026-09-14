@@ -83,7 +83,7 @@ export function AddWidgetDrawer({
       ) : (
         <Field label={t.crmDashboards.widget} required>
           <Select value={widgetId} onValueChange={setWidgetId} disabled={atCapacity}>
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue placeholder={t.crmDashboards.selectWidget} />
             </SelectTrigger>
             <SelectContent>

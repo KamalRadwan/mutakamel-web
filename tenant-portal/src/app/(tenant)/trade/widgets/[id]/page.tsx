@@ -78,7 +78,7 @@ export default function TradeWidgetPage({
         backHref={TENANT_ROUTES.tradeWidgets}
         secondaryActions={
           widget ? (
-            <Button
+            <Button size="sm"
               variant="outline"
               disabled={pending !== null}
               loading={pending === "preview"}
@@ -182,7 +182,7 @@ export default function TradeWidgetPage({
                       }
                     }}
                   >
-                    <SelectTrigger aria-label={t.tradeAnalytics.subjectId}>
+                    <SelectTrigger size="sm" aria-label={t.tradeAnalytics.subjectId}>
                       <SelectValue placeholder={t.tradeAnalytics.subjectPlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
@@ -194,7 +194,7 @@ export default function TradeWidgetPage({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input
+                  <Input size="sm"
                     value={subjectId}
                     disabled={pending !== null}
                     placeholder={t.tradeInventory.uuidPlaceholder}
@@ -208,7 +208,7 @@ export default function TradeWidgetPage({
                   disabled={pending !== null}
                   onValueChange={(next) => setSubjectType(next as DashboardShareSubjectType)}
                 >
-                  <SelectTrigger aria-label={t.tradeAnalytics.subjectType}>
+                  <SelectTrigger size="sm" aria-label={t.tradeAnalytics.subjectType}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -232,7 +232,7 @@ export default function TradeWidgetPage({
                     setAccessLevel(next as DashboardShareableAccessLevel)
                   }
                 >
-                  <SelectTrigger aria-label={t.tradeAnalytics.accessLevel}>
+                  <SelectTrigger size="sm" aria-label={t.tradeAnalytics.accessLevel}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -246,7 +246,7 @@ export default function TradeWidgetPage({
                   </SelectContent>
                 </Select>
               </Field>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={pending !== null}
                 loading={pending === "share"}

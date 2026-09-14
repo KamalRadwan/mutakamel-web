@@ -58,7 +58,7 @@ export function DashboardFilterBar({
             })
           }
         >
-          <SelectTrigger id="dashboard-date-preset">
+          <SelectTrigger size="sm" id="dashboard-date-preset">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -84,7 +84,7 @@ export function DashboardFilterBar({
             })
           }
         >
-          <SelectTrigger id="dashboard-compare">
+          <SelectTrigger size="sm" id="dashboard-compare">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -112,7 +112,7 @@ export function DashboardFilterBar({
                 as bare identifiers and no branch-name source is reachable
                 from CRM. Same treatment as `TenantBranchSelect`, which every
                 other CRM workspace uses. */}
-            <SelectTrigger id="dashboard-branch" dir="ltr" className="font-mono">
+            <SelectTrigger size="sm" id="dashboard-branch" dir="ltr" className="font-mono">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -137,7 +137,7 @@ export function DashboardFilterBar({
               onChange({ ...selection, currencyCode: next === ANY ? null : next })
             }
           >
-            <SelectTrigger id="dashboard-currency">
+            <SelectTrigger size="sm" id="dashboard-currency">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

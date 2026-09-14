@@ -100,7 +100,7 @@ export function PageHeader({
             {primaryAction && (
               <Button
                 variant="primary"
-                size={primaryAction.size}
+                size={primaryAction.size ?? "sm"}
                 onClick={primaryAction.onClick}
                 disabled={primaryAction.disabled}
                 loading={primaryAction.loading}

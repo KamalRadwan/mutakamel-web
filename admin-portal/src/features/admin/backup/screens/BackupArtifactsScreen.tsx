@@ -93,7 +93,7 @@ export function BackupArtifactsScreen() {
             {view.canRestore && artifact.status === BackupArtifactStatus.COMPLETED && (
               <Button type="button" variant="ghost" size="sm" asChild>
                 <Link href={`/backup/restores?artifactId=${encodeURIComponent(artifact.id)}`}>
-                  <ArchiveRestore className="size-4" aria-hidden="true" />
+                  <ArchiveRestore className="size-3.5" aria-hidden="true" />
                   {copy.restoreAction}
                 </Link>
               </Button>
@@ -109,9 +109,9 @@ export function BackupArtifactsScreen() {
                 }}
                 disabled={Boolean(view.activeAction)}
                 aria-label={copy.deleteAriaLabel}
-                className="size-9 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
+                className="size-8 p-0 text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"
               >
-                <Trash2 className="size-4" aria-hidden="true" />
+                <Trash2 className="size-3.5" aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -121,17 +121,16 @@ export function BackupArtifactsScreen() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <BackupPageHeader
         eyebrow={copy.eyebrow}
         title={copy.title}
-        description={copy.description}
       />
 
       <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto_auto] xl:items-end">
+        <CardContent className="grid gap-2.5 p-3 sm:p-3.5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto_auto] xl:items-end">
           <Field label={copy.runIdLabel} error={runIdError}>
-            {(fp) => <Input {...fp} dir="ltr" value={runId} onChange={(e) => updateFilterDraft({ runId: e.target.value.trim() })} placeholder="UUIDv7" />}
+            {(fp) => <Input {...fp} dir="ltr" size="sm" value={runId} onChange={(e) => updateFilterDraft({ runId: e.target.value.trim() })} placeholder="UUIDv7" />}
           </Field>
           <Field label={copy.serverLabel} error={serverIdError}>
             {(fp) => (
@@ -148,7 +147,7 @@ export function BackupArtifactsScreen() {
                 }
                 dir={dir}
               >
-                <SelectTrigger {...fp}>
+                <SelectTrigger {...fp} size="sm">
                   <SelectValue placeholder={copy.allServersPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -160,19 +159,20 @@ export function BackupArtifactsScreen() {
             )}
           </Field>
           <Field label={copy.tenantIdLabel} error={tenantIdError}>
-            {(fp) => <Input {...fp} dir="ltr" value={tenantId} onChange={(e) => updateFilterDraft({ tenantId: e.target.value.trim() })} placeholder="UUIDv7" />}
+            {(fp) => <Input {...fp} dir="ltr" size="sm" value={tenantId} onChange={(e) => updateFilterDraft({ tenantId: e.target.value.trim() })} placeholder="UUIDv7" />}
           </Field>
           <Button
             type="button"
             variant="primary"
+            size="sm"
             onClick={() => view.setQuery({ ...(runId ? { runId } : {}), ...(databaseServerId ? { databaseServerId } : {}), ...(tenantId ? { tenantId } : {}) })}
             disabled={invalidUuid}
           >
-            <Filter className="size-4" aria-hidden="true" />
+            <Filter className="size-3.5" aria-hidden="true" />
             {copy.applyButton}
           </Button>
-          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
-            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
+          <Button type="button" variant="outline" size="sm" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-3.5" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         </CardContent>
@@ -206,7 +206,7 @@ export function BackupArtifactsScreen() {
               descriptionAr: "غيّر الفلاتر أو راجع عمليات النسخ.",
             }}
           />
-          <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
             {copy.noSensitiveDataNote}
           </p>
         </div>
@@ -235,12 +235,12 @@ export function BackupArtifactsScreen() {
         destructive
         error={view.error}
       >
-        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground">
+        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground">
           <p>{lang === "ar" ? "معرّف النسخة المطلوب:" : "Required artifact ID:"}</p>
           <p dir="ltr" className="mt-1 break-all font-mono font-semibold">{deletingArtifact?.id}</p>
         </div>
-        <Field label={lang === "ar" ? "اكتب معرّف النسخة للتأكيد" : "Type the artifact ID to confirm"} required>
-          {(fp) => <Input {...fp} dir="ltr" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />}
+        <Field label={lang === "ar" ? "اكتب معرّف النسخة للتأكيد" : "Type the artifact ID to confirm"} hideLabel required>
+          {(fp) => <Input {...fp} dir="ltr" size="sm" placeholder={`${lang === "ar" ? "اكتب معرّف النسخة للتأكيد" : "Type the artifact ID to confirm"} *`} value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />}
         </Field>
       </BackupDialog>
     </div>

@@ -128,7 +128,7 @@ export function ServerCard({
   return (
     <article
       aria-label={`${copy.serverRegion} ${position}: ${server.name}`}
-      className={`grid gap-4 rounded-xl border bg-card p-4 ${
+      className={`grid gap-3 rounded-lg border bg-card p-3 sm:p-3.5 ${
         isDropTarget ? "border-info" : "border-border"
       } ${isDragging ? "opacity-50" : ""}`}
     >
@@ -143,7 +143,7 @@ export function ServerCard({
             disabled={pending}
             {...orderable.handleProps(server.id)}
           >
-            <GripVertical className="size-4" aria-hidden="true" />
+            <GripVertical className="size-3.5" aria-hidden="true" />
           </Button>
         ) : null}
 
@@ -263,7 +263,7 @@ export function ServerCard({
         <CollapsibleContent>
           <section
             aria-label={`${copy.advancedSection}: ${server.name}`}
-            className="mt-3 grid gap-5 rounded-lg border border-border bg-muted p-4"
+            className="mt-2.5 grid gap-3 rounded-lg border border-border bg-muted p-3 sm:p-3.5"
           >
             <p className="max-w-2xl text-xs leading-5 text-muted-foreground">
               {copy.advancedSectionHelp}
@@ -471,6 +471,7 @@ export function ServerCard({
             <Button
               type="button"
               variant="primary"
+              size="sm"
               onClick={() => void save()}
               disabled={pending || !dirty}
             >
@@ -497,6 +498,7 @@ export function ServerCard({
             <Button
               type="button"
               variant="destructive"
+              size="sm"
               onClick={onRequestDeletion}
               disabled={pending}
               aria-label={`${copy.removeServer}: ${server.name}`}

@@ -117,19 +117,19 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               secondaryActions={
                 <>
                   {screen.canRevise ? (
-                    <Button variant="outline" onClick={editReference.open}>
+                    <Button size="sm" variant="outline" onClick={editReference.open}>
                       {t.tradeDocuments.quotations.editTitle}
                     </Button>
                   ) : null}
                   {screen.canRevise ? (
-                    <Button variant="outline" onClick={revision.open}>
+                    <Button size="sm" variant="outline" onClick={revision.open}>
                       {t.tradeDocuments.quotations.newRevision}
                     </Button>
                   ) : null}
                   {screen.canReject || screen.canCancel ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost">{t.common.actions}</Button>
+                        <Button size="sm" variant="ghost">{t.common.actions}</Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {screen.canReject ? (

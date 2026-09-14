@@ -65,7 +65,7 @@ export default function CrmSettingsPage() {
 
         {isLoading ? (
           <Card>
-            <CardContent className="p-6 text-center text-xs text-muted-foreground">{t.crmSettings.loading}</CardContent>
+            <CardContent className="p-3 sm:p-3.5 text-center text-xs text-muted-foreground">{t.crmSettings.loading}</CardContent>
           </Card>
         ) : !settings || !draft ? (
           <ErrorState title={t.crmSettings.unavailable} onRetry={() => void fetchSettings()} retryLabel={t.crmSettings.retry} />
@@ -78,7 +78,7 @@ export default function CrmSettingsPage() {
                   void saveSettings();
                 }}
               >
-                <CardContent className="flex flex-col gap-5 p-6">
+                <CardContent className="flex flex-col gap-3 p-3 sm:p-3.5">
                   <label className="flex items-start gap-2.5 text-sm text-foreground">
                     <Checkbox
                       className="mt-0.5"
@@ -95,11 +95,12 @@ export default function CrmSettingsPage() {
 
                   <div className="max-w-sm">
                     <Field label={t.crmSettings.retention} hint={t.crmSettings.retentionHelp} required>
-                      <Input
+                      <Input size="sm"
                         type="number"
                         min={30}
                         max={2555}
                         step={1}
+                        placeholder={t.crmSettings.retention}
                         value={Number.isNaN(draft.outboundEmailContentRetentionDays) ? "" : draft.outboundEmailContentRetentionDays}
                         onChange={(event) =>
                           setDraft((current) =>
@@ -112,11 +113,11 @@ export default function CrmSettingsPage() {
                     </Field>
                   </div>
 
-                  <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                    <Button type="button" variant="ghost" onClick={resetDraft} disabled={!canManage || !isDirty || isSaving}>
+                  <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-3">
+                    <Button size="sm" type="button" variant="ghost" onClick={resetDraft} disabled={!canManage || !isDirty || isSaving}>
                       {t.crmSettings.reset}
                     </Button>
-                    <Button type="submit" variant="primary" loading={isSaving} disabled={!canManage || !isDirty || isSaving}>
+                    <Button size="sm" type="submit" variant="primary" loading={isSaving} disabled={!canManage || !isDirty || isSaving}>
                       {!isSaving && <Save className="size-4" aria-hidden="true" />}
                       {isSaving ? t.crmSettings.saving : t.crmSettings.save}
                     </Button>
@@ -129,7 +130,7 @@ export default function CrmSettingsPage() {
               <CardHeader>
                 <CardTitle>{t.crmSettings.serverState}</CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4 p-6 pt-0">
+              <CardContent className="flex flex-col gap-3 p-3 sm:p-3.5 pt-0">
                 <dl className="grid gap-4 text-xs md:grid-cols-2">
                   <div>
                     <dt className="text-muted-foreground">{t.crmSettings.defaultLeadStage}</dt>

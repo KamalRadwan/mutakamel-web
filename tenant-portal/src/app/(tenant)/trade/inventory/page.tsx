@@ -59,7 +59,7 @@ export default function InventoryAvailabilityPage() {
               onChange={selectBranch}
               disabled={isLoading}
             />
-            <Button variant="outline" onClick={reset} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={reset} disabled={isLoading}>
               <RotateCcw className="size-4" aria-hidden="true" />
               {t.tradeInventory.clearLookup}
             </Button>
@@ -73,34 +73,34 @@ export default function InventoryAvailabilityPage() {
 
       <div className="grid gap-3 md:grid-cols-3">
         <Field label={t.tradeInventory.nodeId} required error={formError ?? undefined}>
-          <Input
+          <Input size="sm"
             value={values.nodeId}
             onChange={(event) => setValue("nodeId", event.target.value)}
             placeholder={t.tradeInventory.uuidPlaceholder}
           />
         </Field>
         <Field label={t.tradeInventory.itemId} required>
-          <Input
+          <Input size="sm"
             value={values.itemId}
             onChange={(event) => setValue("itemId", event.target.value)}
             placeholder={t.tradeInventory.uuidPlaceholder}
           />
         </Field>
         <Field label={t.tradeInventory.uomId} hint={t.tradeInventory.uomHint}>
-          <Input
+          <Input size="sm"
             value={values.uomId}
             onChange={(event) => setValue("uomId", event.target.value)}
             placeholder={t.tradeInventory.uuidPlaceholder}
           />
         </Field>
         <Field label={t.tradeInventory.lotKey}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.lotKey}
             value={values.lotKey}
             onChange={(event) => setValue("lotKey", event.target.value)}
           />
         </Field>
         <Field label={t.tradeInventory.serialKey}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.serialKey}
             value={values.serialKey}
             onChange={(event) => setValue("serialKey", event.target.value)}
           />

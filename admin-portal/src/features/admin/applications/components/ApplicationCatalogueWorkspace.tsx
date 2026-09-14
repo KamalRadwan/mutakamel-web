@@ -369,17 +369,17 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                     const isGranted = grantedIds.has(feature.id);
                     const checkboxId = `catalogue-grant-${feature.id}`;
                     return (
-                      <div key={feature.id} className="rounded-md border border-border p-4">
-                        <div className="flex min-h-11 items-start gap-3">
+                      <div key={feature.id} className="rounded-md border border-border p-3 sm:p-3.5">
+                        <div className="flex min-h-8 items-start gap-2.5">
                           <Checkbox
                             id={checkboxId}
                             checked={isGranted}
                             onCheckedChange={(checked) => toggleGrant(feature, checked === true)}
                             disabled={!canMutate}
                             aria-describedby={`${checkboxId}-key`}
-                            className="mt-1"
+                            className="mt-0.5"
                           />
-                          <label htmlFor={checkboxId} className="min-w-0 cursor-pointer text-sm font-semibold text-foreground">
+                          <label htmlFor={checkboxId} className="min-w-0 cursor-pointer text-xs font-semibold text-foreground">
                             <span className="block">{feature.name}</span>
                             <code id={`${checkboxId}-key`} dir="ltr" className="text-xs font-normal text-info-subtle-foreground">
                               {feature.key}
@@ -388,22 +388,24 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                         </div>
                         {isGranted ? (
                           <Field
-                            className="mt-3"
+                            className="mt-2.5"
                             label={copy.configurationJson(feature.name)}
+                            hideLabel
                             hint={copy.configurationHint}
                           >
                             {(field) => (
                               <Textarea
                                 {...field}
+                                placeholder={copy.configurationJson(feature.name)}
                                 value={grantConfig[feature.id] ?? (grant?.config ? JSON.stringify(grant.config) : "")}
                                 onChange={(event) => {
                                   setFormError(null);
                                   setGrantConfig((current) => ({ ...current, [feature.id]: event.target.value }));
                                 }}
                                 disabled={!canMutate}
-                                rows={3}
+                                rows={2}
                                 dir="ltr"
-                                className="font-mono text-sm"
+                                className="font-mono text-xs"
                               />
                             )}
                           </Field>
@@ -417,6 +419,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                 <Button
                   type="button"
                   variant="primary"
+                  size="sm"
                   loading={Boolean(catalogue.pendingAction)}
                   disabled={!tierContextReady}
                   onClick={() => void saveGrants()}
@@ -427,7 +430,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
               ) : null}
             </div>
           ) : tab === "pricing" ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <TierSelector
                   label={copy.tier}
@@ -436,11 +439,11 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                   selected={catalogue.selectedTierId}
                   onChange={catalogue.setSelectedTierId}
                 />
-                <Field label={copy.billingCycle}>
+                <Field label={copy.billingCycle} hideLabel>
                   {(field) => (
                     <Select value={cycle} onValueChange={(value) => setCycle(value as BillingCycle)}>
-                      <SelectTrigger {...field}>
-                        <SelectValue />
+                      <SelectTrigger {...field} size="sm">
+                        <SelectValue placeholder={copy.billingCycle} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="MONTHLY">{copy.monthly}</SelectItem>
@@ -475,10 +478,11 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                           setBrackets((current) => current.map((item, rowIndex) => rowIndex === index ? { ...item, minUsers: value } : item));
                         }}
                       />
-                      <Field label={copy.maximumUsers} hint={index === brackets.length - 1 ? copy.openEndedHint : undefined}>
+                      <Field label={copy.maximumUsers} hideLabel hint={index === brackets.length - 1 ? copy.openEndedHint : undefined}>
                         {(field) => (
                           <Input
                             {...field}
+                            size="sm"
                             value={row.maxUsers ?? ""}
                             disabled={!canMutate || index === brackets.length - 1}
                             placeholder={copy.openEnded}
@@ -494,10 +498,12 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                           />
                         )}
                       </Field>
-                      <Field label={copy.usdPerUser}>
+                      <Field label={copy.usdPerUser} hideLabel>
                         {(field) => (
                           <Input
                             {...field}
+                            size="sm"
+                            placeholder={copy.usdPerUser}
                             value={row.unitPrice}
                             disabled={!canMutate}
                             inputMode="decimal"
@@ -533,7 +539,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                   ))}
                   {canMutate ? (
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                      <Button
+                      <Button size="sm"
                         type="button"
                         variant="outline"
                         onClick={() => {
@@ -551,7 +557,7 @@ export function ApplicationCatalogueWorkspace({ applicationId, applicationKey, c
                         <Plus className="size-4" aria-hidden="true" />
                         {copy.addBracket}
                       </Button>
-                      <Button
+                      <Button size="sm"
                         type="button"
                         variant="primary"
                         loading={Boolean(catalogue.pendingAction)}
@@ -759,10 +765,10 @@ function TierSelector({ label, placeholder, tiers, selected, onChange }: {
   onChange: (value: string) => void;
 }) {
   return (
-    <Field label={label} className="w-full sm:max-w-sm">
+    <Field label={label} hideLabel className="w-full sm:max-w-sm">
       {(field) => (
         <Select value={selected ?? undefined} onValueChange={onChange}>
-          <SelectTrigger {...field}>
+          <SelectTrigger {...field} size="sm">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
@@ -781,10 +787,12 @@ function NumberField({ label, value, disabled, onChange }: {
   onChange: (value: number) => void;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} hideLabel>
       {(field) => (
         <Input
           {...field}
+          size="sm"
+          placeholder={label}
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(Number(event.target.value))}

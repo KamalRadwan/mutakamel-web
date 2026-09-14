@@ -38,7 +38,7 @@ export const buttonVariants = cva(
 // asChild is not needed there.
 export function buttonVariantClasses(
   variant: VariantProps<typeof buttonVariants>["variant"] = "outline",
-  size: VariantProps<typeof controlSize>["size"] = "md",
+  size: VariantProps<typeof controlSize>["size"] = "sm",
 ): string {
   return cn(buttonVariants({ variant }), controlSize({ size }));
 }
@@ -52,7 +52,7 @@ export interface ButtonProps
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size = "md", loading, asChild, disabled, children, type, ...props }, ref) => {
+  ({ className, variant, size = "sm", loading, asChild, disabled, children, type, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
 
     return (

@@ -45,7 +45,7 @@ export function StorageMigrationSelectPanel({
     controller.hasBlockers || !controller.permissions.canExecute;
 
   return (
-    <div ref={regionRef} className="space-y-4">
+    <div ref={regionRef} className="space-y-3">
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
           <CardTitle className="text-sm">{copy.currentPlacement}</CardTitle>
@@ -79,7 +79,7 @@ export function StorageMigrationSelectPanel({
         <CardHeader>
           <CardTitle className="text-sm">{copy.destination}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {!controller.hasTargets ? (
             <EmptyState
               icon={HardDrive}
@@ -103,6 +103,7 @@ export function StorageMigrationSelectPanel({
                   >
                     <SelectTrigger
                       id={fieldProps.id}
+                      size="sm"
                       aria-describedby={fieldProps["aria-describedby"]}
                       aria-invalid={fieldProps["aria-invalid"]}
                       aria-label={copy.destination}
@@ -192,10 +193,11 @@ export function StorageMigrationSelectPanel({
         <CardHeader>
           <CardTitle className="text-sm">{copy.retentionTitle}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           <Field
             id="storage-migration-max-bytes"
             label={copy.maxBytes}
+            hideLabel
             hint={copy.maxBytesHint}
             error={controller.fieldErrors.maxBytes}
             required
@@ -203,13 +205,14 @@ export function StorageMigrationSelectPanel({
             {(fieldProps) => (
               <Input
                 {...fieldProps}
+                size="sm"
                 name="maxBytes"
                 inputMode="numeric"
                 dir="ltr"
                 value={controller.maxBytes}
                 disabled={writesDisabled}
                 onChange={(event) => controller.setMaxBytes(event.target.value)}
-                placeholder="1000000000"
+                placeholder={`${copy.maxBytes} * (1000000000)`}
                 className="max-w-64 font-mono"
               />
             )}
@@ -261,6 +264,7 @@ export function StorageMigrationSelectPanel({
 
           <div className="flex justify-end">
             <Button
+              size="sm"
               type="button"
               variant="primary"
               disabled={!controller.canSubmit}
@@ -296,7 +300,7 @@ function BackupEvidenceCard({
       <CardHeader>
         <CardTitle className="text-sm">{copy.evidenceTitle}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <p className="text-xs leading-5 text-muted-foreground">
           {copy.evidenceDescription}
         </p>
@@ -350,6 +354,7 @@ function BackupEvidenceCard({
                 >
                   <SelectTrigger
                     id={fieldProps.id}
+                    size="sm"
                     aria-describedby={fieldProps["aria-describedby"]}
                     aria-invalid={fieldProps["aria-invalid"]}
                     aria-label={copy.backupArtifact}
@@ -382,6 +387,7 @@ function BackupEvidenceCard({
                 >
                   <SelectTrigger
                     id={fieldProps.id}
+                    size="sm"
                     aria-describedby={fieldProps["aria-describedby"]}
                     aria-invalid={fieldProps["aria-invalid"]}
                     aria-label={copy.restoreRun}

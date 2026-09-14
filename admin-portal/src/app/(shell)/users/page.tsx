@@ -176,30 +176,30 @@ export default function UsersDirectoryPage() {
                 <Button
                   type="button"
                   variant="ghost"
-                  size="md"
+                  size="sm"
                   disabled={isActionLoading}
                   aria-label={`${t.users.actions}: ${usr.firstName} ${usr.lastName}`}
-                  className="size-8 p-0"
+                  className="size-7 p-0"
                 >
-                  <MoreHorizontal className="size-4" aria-hidden="true" />
+                  <MoreHorizontal className="size-3.5" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {rowPermissions.canSuspend && (
                   <DropdownMenuItem onSelect={() => openModal(usr.id, "suspend")} className="text-warning">
-                    <Ban className="size-4" aria-hidden="true" />
+                    <Ban className="size-3.5" aria-hidden="true" />
                     {t.users.suspendAccount}
                   </DropdownMenuItem>
                 )}
                 {rowPermissions.canActivate && (
                   <DropdownMenuItem onSelect={() => openModal(usr.id, "activate")}>
-                    <RefreshCw className="size-4 text-success" aria-hidden="true" />
+                    <RefreshCw className="size-3.5 text-success" aria-hidden="true" />
                     {t.users.activateAccount}
                   </DropdownMenuItem>
                 )}
                 {rowPermissions.canDelete && (
                   <DropdownMenuItem destructive onSelect={() => openModal(usr.id, "delete")}>
-                    <Trash2 className="size-4" aria-hidden="true" />
+                    <Trash2 className="size-3.5" aria-hidden="true" />
                     {t.users.delete}
                   </DropdownMenuItem>
                 )}
@@ -212,14 +212,13 @@ export default function UsersDirectoryPage() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <PageHeader
         title={t.users.pageTitle}
-        description={t.users.pageSubtitle}
         action={
           permissions.canInvite && (
-            <Button type="button" variant="primary" onClick={() => setIsInviteModalOpen(true)}>
-              <UserPlus className="size-4" />
+            <Button type="button" variant="primary" size="sm" onClick={() => setIsInviteModalOpen(true)}>
+              <UserPlus className="size-3.5" />
               {t.users.inviteMember}
             </Button>
           )

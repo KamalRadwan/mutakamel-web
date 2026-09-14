@@ -1,13 +1,14 @@
 # Admin Portal Navigation and Permission Mapping
 
-Last verified against current frontend routes and Core/Worker Gateway contracts
-on **2026-08-29**.
+Last verified against current frontend routes on **2026-09-10** (the `/addons`
+index); the Core/Worker Gateway contract mapping retains its **2026-08-29**
+verification.
 
 Frontend page paths and API paths are separate namespaces. Navigation uses
 paths such as `/tenants`; requests use `/api/admin/core/v1/tenants`.
 
 This guide is the RBAC-and-route-family reference. For the sidebar/topbar
-component structure, the full 15-section × 54-route table, and how the
+component structure, the full 16-section × 57-route table, and how the
 permission-filtered navigation is actually built (`nav-config.ts` +
 `useNavTree.ts`), see
 [design-system/shell-and-navigation.md](../design-system/shell-and-navigation.md)
@@ -34,6 +35,7 @@ mapping itself is unchanged by that replacement:
 | Storage Servers | `/storage-servers` | `admin.storage_servers.read` | `DONE/SOURCE_INTEGRATED` |
 | Tenants | `/tenants` | `admin.tenants.read` | `DONE/SOURCE_INTEGRATED` |
 | Applications | `/applications-catalogue` | `admin.applications.read` | `DONE/SOURCE_INTEGRATED` |
+| Addons | `/addons` | `admin.applications.read` | `DONE/PARTIAL/SOURCE_INTEGRATED` |
 | Admin - Users | `/users` | `admin.users.read` | `DONE/SOURCE_INTEGRATED` |
 | Admin - Roles | `/roles` | `admin.roles.read` | `DONE/SOURCE_INTEGRATED` |
 | Admin - Audit | `/audit` | `admin.audit.read` | `DONE/SOURCE_INTEGRATED` |
@@ -88,6 +90,8 @@ is not an authorization boundary.
 /applications-catalogue
 |-- /applications-catalogue/audit
 `-- /applications-catalogue/[applicationKey]
+
+/addons
 
 /provisioning
 |-- /provisioning/fleet

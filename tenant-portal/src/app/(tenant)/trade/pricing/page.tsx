@@ -69,7 +69,7 @@ export default function PricingEvaluationPage() {
               onChange={selectBranch}
               disabled={isEvaluating}
             />
-            <Button variant="outline" onClick={reset} disabled={isEvaluating}>
+            <Button size="sm" variant="outline" onClick={reset} disabled={isEvaluating}>
               <RotateCcw className="size-4" aria-hidden="true" />
               {t.tradeInventory.clearLookup}
             </Button>
@@ -84,7 +84,7 @@ export default function PricingEvaluationPage() {
             disabled={isEvaluating}
             onValueChange={(next) => setValue({ purpose: next as EvaluateFormValues["purpose"] })}
           >
-            <SelectTrigger aria-label={t.tradePricing.bookPurpose}>
+            <SelectTrigger size="sm" aria-label={t.tradePricing.bookPurpose}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -97,7 +97,7 @@ export default function PricingEvaluationPage() {
           </Select>
         </Field>
         <Field label={t.tradePricing.itemId} required>
-          <Input
+          <Input size="sm"
             value={values.itemId}
             disabled={isEvaluating}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -105,7 +105,7 @@ export default function PricingEvaluationPage() {
           />
         </Field>
         <Field label={t.tradePricing.uomId} required>
-          <Input
+          <Input size="sm"
             value={values.uomId}
             disabled={isEvaluating}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -113,7 +113,7 @@ export default function PricingEvaluationPage() {
           />
         </Field>
         <Field label={t.tradeInventory.quantity} required hint={t.tradeCommon.decimalHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.quantity}
             value={values.quantity}
             inputMode="decimal"
             disabled={isEvaluating}
@@ -121,7 +121,7 @@ export default function PricingEvaluationPage() {
           />
         </Field>
         <Field label={t.tradePricing.currencyCode} required hint={t.tradePricing.currencyCodeHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradePricing.currencyCode}
             value={values.currencyCode}
             maxLength={3}
             disabled={isEvaluating}
@@ -129,14 +129,14 @@ export default function PricingEvaluationPage() {
           />
         </Field>
         <Field label={t.tradePricing.priceBookId} hint={t.tradePricing.optionalHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradePricing.priceBookId}
             value={values.priceBookId}
             disabled={isEvaluating}
             onChange={(event) => setValue({ priceBookId: event.target.value })}
           />
         </Field>
         <Field label={t.tradePricing.partyId} hint={t.tradePricing.optionalHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradePricing.partyId}
             value={values.partyId}
             disabled={isEvaluating}
             onChange={(event) => setValue({ partyId: event.target.value })}

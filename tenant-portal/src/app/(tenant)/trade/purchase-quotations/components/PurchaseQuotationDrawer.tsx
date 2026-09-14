@@ -82,7 +82,7 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
           onValueChange={(next) => state.setValue({ supplierPartyId: next })}
           disabled={state.isLoadingSuppliers || state.suppliers.length === 0}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t.tradeDocuments.purchaseQuotations.supplierPlaceholder} />
           </SelectTrigger>
           <SelectContent>
@@ -96,7 +96,7 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
       </Field>
 
       <Field label={t.tradeDocuments.currency} hint={t.tradeDocuments.currencyHint} required>
-        <Input
+        <Input size="sm" placeholder={t.tradeDocuments.currency}
           value={state.values.currencyCode}
           maxLength={3}
           onChange={(event) => state.setValue({ currencyCode: event.target.value.toUpperCase() })}
@@ -104,7 +104,7 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
       </Field>
 
       <Field label={t.tradeDocuments.validUntil} required>
-        <Input
+        <Input size="sm" placeholder={t.tradeDocuments.validUntil}
           type="date"
           value={state.values.validUntil}
           onChange={(event) => state.setValue({ validUntil: event.target.value })}
@@ -112,7 +112,7 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
       </Field>
 
       <Field label={t.tradeDocuments.reference}>
-        <Input
+        <Input size="sm" placeholder={t.tradeDocuments.reference}
           value={state.values.reference}
           maxLength={TRADE_REFERENCE_MAX_LENGTH}
           onChange={(event) => state.setValue({ reference: event.target.value })}
@@ -120,7 +120,7 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
       </Field>
 
       <Field label={t.tradeDocuments.notes}>
-        <Textarea
+        <Textarea placeholder={t.tradeDocuments.notes}
           value={state.values.notes}
           maxLength={TRADE_NOTES_MAX_LENGTH}
           onChange={(event) => state.setValue({ notes: event.target.value })}

@@ -124,10 +124,10 @@ export function OpportunityDetailWorkspace({
         secondaryActions={
           canUpdate ? (
             <>
-              <Button variant="outline" onClick={edit.openDrawer}>
+              <Button size="sm" variant="outline" onClick={edit.openDrawer}>
                 {t.crmLeadDetail.edit}
               </Button>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 onClick={transfer.openDialog}
                 disabled={detail.pipelines.length < 2}

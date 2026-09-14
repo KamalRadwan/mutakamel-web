@@ -275,19 +275,21 @@ export function TenantUserEditorDialog({
               so. A checked role that falls out of a later page keeps its own
               checkbox below, so searching never silently drops a selection.
             */}
-            <input
+            <Input
               type="search"
+              size="sm"
               aria-label={copy.searchRoles}
+              placeholder={copy.searchRoles}
               onChange={(event) =>
                 void controller.loadRoles(
                   catalogueSearchQuery(event.target.value, 50),
                 )
               }
-              className="mb-2 h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+              className="mb-2"
             />
             <div className="flex flex-wrap gap-2">
               {rolesWithSelected.map((role) => (
-                <label key={role.id} htmlFor={`tenant-user-role-${role.id}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-3 py-1 text-xs">
+                <label key={role.id} htmlFor={`tenant-user-role-${role.id}`} className="inline-flex min-h-8 items-center gap-2 rounded-md border border-border px-2.5 py-1 text-xs">
                   <Checkbox
                     id={`tenant-user-role-${role.id}`}
                     name="roleIds"
@@ -318,8 +320,8 @@ export function TenantUserEditorDialog({
           localError={Object.keys(fieldErrors).length ? copy.validationSummary : null}
         />
         <div className="sm:col-span-2 flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
-          <Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button>
+          <Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+          <Button size="sm" type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button>
         </div>
       </form>
     </DialogFrame>
@@ -361,7 +363,7 @@ export function PasswordDialog({
         <DialogInputField id="tenant-user-password" name="newPassword" label={copy.password} type="password" minLength={12} maxLength={128} required value={password} error={localError ?? undefined} onChange={(value) => { setPassword(value); setLocalError(null); }} />
         <DialogInputField id="tenant-user-password-confirmation" name="passwordConfirmation" label={copy.passwordConfirmation} type="password" minLength={12} maxLength={128} required value={confirmation} error={localError ?? undefined} onChange={(value) => { setConfirmation(value); setLocalError(null); }} />
         <DialogError controller={controller} localError={localError} summary={copy.validationSummary} />
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
+        <div className="flex justify-end gap-2"><Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button size="sm" type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
   );
@@ -419,7 +421,7 @@ export function RolesDialog({
             ...branches.map((branch) => [branch.id, `${branch.company.name} · ${branch.name}`] as const),
           ]} />
           <DialogSelectField id="tenant-role-role" label={copy.roles} value={roleId} onValueChange={setRoleId} options={roles.map((role) => [role.id, role.name] as const)} />
-          <div className="flex items-end"><Button type="button" variant="outline" onClick={add}>{copy.addAssignment}</Button></div>
+          <div className="flex items-end"><Button size="sm" type="button" variant="outline" onClick={add}>{copy.addAssignment}</Button></div>
         </div>
         <div className="divide-y divide-border rounded-lg border border-border">
           {assignments.length ? assignments.map((assignment) => (
@@ -430,7 +432,7 @@ export function RolesDialog({
           )) : <p className="p-3 text-sm text-muted-foreground">{copy.noAssignments}</p>}
         </div>
         <DialogError controller={controller} />
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
+        <div className="flex justify-end gap-2"><Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button size="sm" type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
   );
@@ -510,8 +512,9 @@ export function TransferOwnershipDialog({
         )}
         <DialogError controller={controller} />
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+          <Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
           <Button
+            size="sm"
             type="submit"
             variant="primary"
             disabled={controller.command.pending || !newOwnerUserId}
@@ -569,29 +572,29 @@ export function ConfirmationDialog({
       <p className="mt-2 rounded-lg bg-muted p-2 text-sm font-semibold text-foreground">{user.firstName} {user.lastName} · {user.email}</p>
       <DialogError controller={controller} />
       <div className="mt-5 flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
-        <Button type="button" variant={action === "delete" ? "destructive" : "primary"} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</Button>
+        <Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
+        <Button size="sm" type="button" variant={action === "delete" ? "destructive" : "primary"} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</Button>
       </div>
     </DialogFrame>
   );
 }
 
 function DialogFrame({
-  title,
   locale,
+  title,
   onClose,
   children,
 }: {
-  title: string;
   locale: TenantAccessLocale;
+  title: string;
   onClose: () => void;
   children: ReactNode;
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg">{title}</DialogTitle>
+      <DialogContent dir={locale === "ar" ? "rtl" : "ltr"} className="max-h-[90vh] max-w-xl overflow-y-auto p-3 sm:p-3.5">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
         </DialogHeader>
         {children}
       </DialogContent>
@@ -617,13 +620,16 @@ function DialogInputField({
   wide?: boolean;
   error?: string;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "value" | "onChange">) {
+  const placeholderText = inputProps.placeholder ?? (inputProps.required ? `${label} *` : label);
   return (
-    <FormField id={id} label={label} required={inputProps.required} error={error} className={wide ? "sm:col-span-2" : undefined}>
+    <FormField id={id} label={label} hideLabel required={inputProps.required} error={error} className={wide ? "sm:col-span-2" : undefined}>
       {(field) => (
         <Input
           {...field}
           {...inputProps}
+          size="sm"
           name={name}
+          placeholder={placeholderText}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -663,19 +669,20 @@ function DialogSelectField({
   const labelId = `${id}-label`;
   const errorId = error ? `${id}-error` : undefined;
   return (
-    <div className={`space-y-1.5 ${wide ? "sm:col-span-2" : ""}`}>
-      <span id={labelId} className="text-sm font-medium text-foreground">
+    <div className={`space-y-1 ${wide ? "sm:col-span-2" : ""}`}>
+      <span id={labelId} className="text-xs font-medium text-foreground">
         {label}
         {required ? <span className="ms-0.5 text-destructive" aria-hidden="true">*</span> : null}
       </span>
       {onSearch ? (
-        <input
+        <Input
           type="search"
           id={`${id}-search`}
+          size="sm"
           aria-label={searchLabel ?? label}
+          placeholder={searchLabel ?? label}
           disabled={disabled}
           onChange={(event) => onSearch(event.target.value)}
-          className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
         />
       ) : null}
       <Select
@@ -686,6 +693,7 @@ function DialogSelectField({
       >
         <SelectTrigger
           id={id}
+          size="sm"
           aria-labelledby={labelId}
           aria-describedby={errorId}
           aria-invalid={Boolean(error)}
@@ -701,7 +709,7 @@ function DialogSelectField({
         </SelectContent>
       </Select>
       {reach?.truncated ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           {reach.shown} / {reach.total}
         </p>
       ) : null}
@@ -721,7 +729,7 @@ function DialogError({ controller, localError, summary }: { controller: TenantAc
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className="sm:col-span-2 rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="sm:col-span-2 rounded-md border border-destructive/30 bg-destructive-subtle p-2 text-xs text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       {summary ? <p className="font-semibold">{summary}</p> : null}
       {message !== summary ? (

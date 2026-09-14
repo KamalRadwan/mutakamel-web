@@ -96,7 +96,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
       {form && (
         <div className="flex flex-col gap-3">
           <Field label={t.crmOpportunities.title} required>
-            <Input
+            <Input size="sm" placeholder={t.crmOpportunities.title}
               value={form.title}
               onChange={(event) => edit.setField("title", event.target.value)}
               maxLength={180}
@@ -107,7 +107,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
             hint={t.crmLeadConvert.amountHint}
             error={amountInvalid ? t.crmLeadConvert.amountInvalid : undefined}
           >
-            <Input
+            <Input size="sm" placeholder={t.crmOpportunityDetail.amount}
               value={form.amount}
               onChange={(event) => edit.setField("amount", event.target.value)}
               inputMode="decimal"
@@ -119,7 +119,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
             label={t.crmLeadConvert.currencyCode}
             hint={t.crmLeadConvert.currencyHint}
           >
-            <Input
+            <Input size="sm" placeholder={t.crmLeadConvert.currencyCode}
               value={form.currencyCode}
               onChange={(event) =>
                 edit.setField("currencyCode", event.target.value)
@@ -132,7 +132,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
             label={t.crmOpportunities.importance}
             hint={t.crmOpportunityDetail.importanceHint}
           >
-            <Input
+            <Input size="sm" placeholder={t.crmOpportunities.importance}
               value={form.importance}
               onChange={(event) =>
                 edit.setField("importance", event.target.value)
@@ -145,7 +145,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
             label={t.crmOpportunityDetail.probability}
             hint={t.crmOpportunityDetail.probabilityHint}
           >
-            <Input
+            <Input size="sm" placeholder={t.crmOpportunityDetail.probability}
               value={form.probabilityPercent}
               onChange={(event) =>
                 edit.setField("probabilityPercent", event.target.value)
@@ -165,7 +165,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
             />
           </Field>
           <Field label={t.crmLeadDetail.description}>
-            <Textarea
+            <Textarea placeholder={t.crmLeadDetail.description}
               value={form.description}
               onChange={(event) =>
                 edit.setField("description", event.target.value)

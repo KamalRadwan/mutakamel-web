@@ -22,7 +22,7 @@ export function UnavailableState({ backHref }: UnavailableStateProps) {
         <Construction className="size-10 text-caution-500" aria-hidden="true" />
         <h1 className="text-lg font-semibold text-foreground">{t.unavailable.title}</h1>
         <p className={cn("text-sm leading-6 text-muted-foreground", proseMeasure)}>{t.unavailable.description}</p>
-        <Button variant="primary" asChild>
+        <Button size="sm" variant="primary" asChild>
           <Link href={backHref}>{t.unavailable.back}</Link>
         </Button>
       </div>

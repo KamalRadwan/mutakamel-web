@@ -80,7 +80,7 @@ export function CreateQuotationDrawer({ state }: { state: QuotationCreateState }
         hint={t.tradeDocuments.currencyHint}
         required
       >
-        <Input
+        <Input size="sm" placeholder={t.tradeDocuments.currency}
           value={state.currencyCode}
           maxLength={3}
           onChange={(event) => state.setCurrencyCode(event.target.value.toUpperCase())}
@@ -88,7 +88,7 @@ export function CreateQuotationDrawer({ state }: { state: QuotationCreateState }
       </Field>
 
       <Field label={t.tradeDocuments.draftReference} hint={t.tradeDocuments.draftReferenceHint}>
-        <Input
+        <Input size="sm" placeholder={t.tradeDocuments.draftReference}
           value={state.draftReference}
           maxLength={80}
           onChange={(event) => state.setDraftReference(event.target.value)}

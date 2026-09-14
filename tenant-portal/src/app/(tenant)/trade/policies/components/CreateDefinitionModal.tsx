@@ -75,7 +75,7 @@ export function CreateDefinitionModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeGovernance.code} required hint={t.tradeGovernance.codeHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeGovernance.code}
             value={values.code}
             maxLength={100}
             disabled={isSubmitting}
@@ -91,7 +91,7 @@ export function CreateDefinitionModal({
             disabled={isSubmitting}
             onValueChange={(next) => setValues((current) => ({ ...current, kind: next }))}
           >
-            <SelectTrigger aria-label={t.tradeGovernance.policyKind}>
+            <SelectTrigger size="sm" aria-label={t.tradeGovernance.policyKind}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -118,7 +118,7 @@ export function CreateDefinitionModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradeGovernance.scopeTarget}>
+            <SelectTrigger size="sm" aria-label={t.tradeGovernance.scopeTarget}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

@@ -15,7 +15,7 @@ export default function AuthSettingsPage() {
   const { lang } = settingsState;
   const copy = (lang === "ar" ? ar : en).settings.pages.auth;
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader title={copy.title} />
 
       <SettingsResourceBoundary
@@ -30,7 +30,7 @@ export default function AuthSettingsPage() {
           onSave={settingsState.saveAllSettings}
           lang={lang}
         />
-        <div className="space-y-4">
+        <div className="space-y-3">
           {settingsState.settings.length ? (
             settingsState.settings.map((setting) => (
               <SettingField
@@ -43,7 +43,7 @@ export default function AuthSettingsPage() {
               />
             ))
           ) : (
-            <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
+            <div className="rounded-lg border border-border bg-card p-4 text-center text-xs text-muted-foreground">
               {copy.empty}
             </div>
           )}

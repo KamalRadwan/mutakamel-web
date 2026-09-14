@@ -96,7 +96,7 @@ export function CreateWidgetModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeAnalytics.widgetName} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeAnalytics.widgetName}
             value={name}
             maxLength={DASHBOARD_LIMITS.nameMaxLength}
             disabled={isSubmitting}
@@ -109,7 +109,7 @@ export function CreateWidgetModal({
             disabled={isSubmitting}
             onValueChange={(next) => setVisualizationType(next as DashboardVisualizationType)}
           >
-            <SelectTrigger aria-label={t.tradeAnalytics.visualizationType}>
+            <SelectTrigger size="sm" aria-label={t.tradeAnalytics.visualizationType}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -122,7 +122,7 @@ export function CreateWidgetModal({
           </Select>
         </Field>
         <Field label={t.tradeAnalytics.displayTitle}>
-          <Input
+          <Input size="sm" placeholder={t.tradeAnalytics.displayTitle}
             value={displayTitle}
             maxLength={DASHBOARD_LIMITS.nameMaxLength}
             disabled={isSubmitting}
@@ -145,7 +145,7 @@ export function CreateWidgetModal({
                   )
                 }
               >
-                <SelectTrigger aria-label={t.tradeAnalytics.metricKey}>
+                <SelectTrigger size="sm" aria-label={t.tradeAnalytics.metricKey}>
                   <SelectValue placeholder={t.tradeAnalytics.metricPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -158,7 +158,7 @@ export function CreateWidgetModal({
               </Select>
             </Field>
             <Field label={t.tradeAnalytics.seriesLabel}>
-              <Input
+              <Input size="sm" placeholder={t.tradeAnalytics.seriesLabel}
                 value={entry.label}
                 maxLength={80}
                 disabled={isSubmitting}

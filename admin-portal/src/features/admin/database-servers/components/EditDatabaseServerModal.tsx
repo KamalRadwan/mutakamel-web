@@ -79,54 +79,54 @@ function EditDatabaseServerModalContent({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !isSubmitting && onClose()}>
-      <DialogContent dir={dir} className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader className="flex-row items-center gap-2.5 space-y-0">
-          <span className="rounded-lg bg-info-subtle p-2 text-info-subtle-foreground">
-            <Edit2 className="size-5" aria-hidden="true" />
+      <DialogContent dir={dir} className="max-h-[90vh] max-w-2xl overflow-y-auto p-3 sm:p-3.5">
+        <DialogHeader className="flex-row items-center gap-2 space-y-0 pb-2 border-b border-border">
+          <span className="rounded-lg bg-info-subtle p-1.5 text-info-subtle-foreground">
+            <Edit2 className="size-3.5" aria-hidden="true" />
           </span>
-          <DialogTitle className="text-base">{copy.title}</DialogTitle>
+          <DialogTitle className="text-sm font-semibold">{copy.title}</DialogTitle>
         </DialogHeader>
 
-        <form method="post" onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form method="post" onSubmit={handleSubmit} className="space-y-2.5 text-xs">
           {formError && (
             <p
               ref={errorRef}
               role="alert"
               tabIndex={-1}
-              className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-md border border-destructive/30 bg-destructive-subtle px-2.5 py-1.5 text-xs font-semibold text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {formError}
             </p>
           )}
 
-          <Field label={copy.displayName}>
+          <Field label={copy.displayName} hideLabel required>
             {(fieldProps) => (
-              <Input {...fieldProps} type="text" required value={name} onChange={(e) => setName(e.target.value)} className="font-semibold" />
+              <Input {...fieldProps} size="sm" type="text" required placeholder={`${copy.displayName} *`} value={name} onChange={(e) => setName(e.target.value)} className="font-semibold" />
             )}
           </Field>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={copy.hostAddress}>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Field label={copy.hostAddress} hideLabel required>
               {(fieldProps) => (
-                <Input {...fieldProps} type="text" required value={host} onChange={(e) => setHost(e.target.value)} className="font-mono font-semibold" />
+                <Input {...fieldProps} size="sm" type="text" required placeholder={`${copy.hostAddress} *`} value={host} onChange={(e) => setHost(e.target.value)} className="font-mono" />
               )}
             </Field>
-            <Field label={copy.port}>
+            <Field label={copy.port} hideLabel required>
               {(fieldProps) => (
-                <Input {...fieldProps} type="number" required value={port} onChange={(e) => setPort(Number(e.target.value))} className="font-mono font-semibold" />
+                <Input {...fieldProps} size="sm" type="number" required placeholder={`${copy.port} *`} value={port} onChange={(e) => setPort(Number(e.target.value))} className="font-mono" />
               )}
             </Field>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={copy.maxTenants}>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Field label={copy.maxTenants} hideLabel required>
               {(fieldProps) => (
-                <Input {...fieldProps} type="number" required min={1} value={maxTenants} onChange={(e) => setMaxTenants(Number(e.target.value))} className="font-mono font-semibold" />
+                <Input {...fieldProps} size="sm" type="number" required min={1} placeholder={`${copy.maxTenants} *`} value={maxTenants} onChange={(e) => setMaxTenants(Number(e.target.value))} className="font-mono" />
               )}
             </Field>
-            <Field label={copy.countryLocation}>
+            <Field label={copy.countryLocation} hideLabel>
               {(fieldProps) => (
-                <Input {...fieldProps} type="text" value={countryName} onChange={(e) => setCountryName(e.target.value)} placeholder={copy.countryPlaceholder} className="font-semibold" />
+                <Input {...fieldProps} size="sm" type="text" value={countryName} onChange={(e) => setCountryName(e.target.value)} placeholder={copy.countryLocation || copy.countryPlaceholder} />
               )}
             </Field>
           </div>
@@ -145,11 +145,11 @@ function EditDatabaseServerModalContent({
             disabled={isSubmitting}
           />
 
-          <div className="flex justify-end gap-2 border-t border-border pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <div className="flex justify-end gap-2 border-t border-border pt-3">
+            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
               {copy.cancel}
             </Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting}>
               {copy.save}
             </Button>
           </div>

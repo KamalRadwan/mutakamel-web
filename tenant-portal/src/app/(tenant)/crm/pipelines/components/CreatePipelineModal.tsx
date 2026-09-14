@@ -159,7 +159,7 @@ export function CreatePipelineModal({
           error={errors.code}
           required
         >
-          <Input
+          <Input size="sm" placeholder={t.crmPipelines.codeLabel}
             value={form.code}
             maxLength={PIPELINE_CODE_MAX_LENGTH}
             autoComplete="off"
@@ -172,7 +172,7 @@ export function CreatePipelineModal({
         </Field>
 
         <Field label={t.crmPipelines.nameAr} error={errors.nameAr} required>
-          <Input
+          <Input size="sm" placeholder={t.crmPipelines.nameAr}
             value={form.nameAr}
             maxLength={PIPELINE_NAME_MAX_LENGTH}
             disabled={isSubmitting}
@@ -182,7 +182,7 @@ export function CreatePipelineModal({
         </Field>
 
         <Field label={t.crmPipelines.nameEn} error={errors.nameEn} required>
-          <Input
+          <Input size="sm" placeholder={t.crmPipelines.nameEn}
             value={form.nameEn}
             maxLength={PIPELINE_NAME_MAX_LENGTH}
             disabled={isSubmitting}
@@ -196,7 +196,7 @@ export function CreatePipelineModal({
           error={errors.description}
           className="md:col-span-2 max-w-prose"
         >
-          <Textarea
+          <Textarea placeholder={t.crmPipelines.description}
             rows={3}
             value={form.description}
             maxLength={PIPELINE_DESCRIPTION_MAX_LENGTH}

@@ -41,8 +41,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           textEntrySize({ size }),
           className,
         )}
-        placeholder={props.placeholder ?? enclosing?.label}
         {...props}
+        placeholder={props.placeholder ?? enclosing?.label}
         {...field}
       />
     );

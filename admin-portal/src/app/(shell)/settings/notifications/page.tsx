@@ -13,7 +13,7 @@ export default function NotificationsSettingsPage() {
   const { lang } = settingsState;
   const copy = (lang === "ar" ? ar : en).settings.pages.notifications;
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <PageHeader title={copy.title} />
       <SettingsResourceBoundary
         state={settingsState.loadState}
@@ -27,7 +27,7 @@ export default function NotificationsSettingsPage() {
           onSave={settingsState.saveAllSettings}
           lang={lang}
         />
-        <div className="space-y-4">
+        <div className="space-y-3">
           {settingsState.settings.length ? (
             settingsState.settings.map((setting) => (
               <SettingField
@@ -50,7 +50,7 @@ export default function NotificationsSettingsPage() {
 
 function EmptyNotifications({ lang }: { lang: "ar" | "en" }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-8 text-center text-xs text-muted-foreground">
+    <div className="rounded-lg border border-border bg-card p-4 text-center text-xs text-muted-foreground">
       {(lang === "ar" ? ar : en).settings.pages.notifications.empty}
     </div>
   );

@@ -62,7 +62,7 @@ function AccountFields({
         readOnly={isEdit}
         required={!isEdit}
       >
-        <Input
+        <Input size="sm" placeholder={t.trade.accountParty}
           dir="ltr"
           className="font-mono"
           value={values.partyId}
@@ -81,7 +81,7 @@ function AccountFields({
           onValueChange={(next) => onChange({ accountRole: next as AccountRole })}
           disabled={isSubmitting || isEdit}
         >
-          <SelectTrigger aria-label={t.trade.accountRole} aria-readonly={isEdit}>
+          <SelectTrigger size="sm" aria-label={t.trade.accountRole} aria-readonly={isEdit}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -95,7 +95,7 @@ function AccountFields({
       </Field>
 
       <Field label={t.trade.accountCreditLimit} hint={t.trade.accountCreditLimitHint}>
-        <Input
+        <Input size="sm" placeholder={t.trade.accountCreditLimit}
           dir="ltr"
           inputMode="decimal"
           className="tabular-nums"
@@ -106,7 +106,7 @@ function AccountFields({
       </Field>
 
       <Field label={t.trade.accountCurrency} hint={t.trade.accountCurrencyHint}>
-        <Input
+        <Input size="sm" placeholder={t.trade.accountCurrency}
           dir="ltr"
           value={values.creditCurrencyCode}
           onChange={(event) => onChange({ creditCurrencyCode: event.target.value.toUpperCase() })}
@@ -116,7 +116,7 @@ function AccountFields({
       </Field>
 
       <Field label={t.trade.accountPaymentTerms}>
-        <Input
+        <Input size="sm" placeholder={t.trade.accountPaymentTerms}
           dir="ltr"
           className="font-mono"
           value={values.paymentTermsId}
@@ -126,7 +126,7 @@ function AccountFields({
       </Field>
 
       <Field label={t.trade.accountPriceBook}>
-        <Input
+        <Input size="sm" placeholder={t.trade.accountPriceBook}
           dir="ltr"
           className="font-mono"
           value={values.priceBookId}
@@ -136,7 +136,7 @@ function AccountFields({
       </Field>
 
       <Field label={t.trade.accountCreditPolicy}>
-        <Input
+        <Input size="sm" placeholder={t.trade.accountCreditPolicy}
           dir="ltr"
           className="font-mono"
           value={values.creditPolicyVersionId}
@@ -146,7 +146,7 @@ function AccountFields({
       </Field>
 
       <Field label={t.trade.accountTerms} hint={t.trade.accountTermsHint}>
-        <Textarea
+        <Textarea placeholder={t.trade.accountTerms}
           dir="ltr"
           className="font-mono"
           value={values.terms}

@@ -13,7 +13,7 @@ export function ApplicationAccessScopes() {
   const canAdopt = isAuthenticated && !!user && (user.isTenantOwner || user.permissions.includes(DEFINITION_ADOPTION_PERMISSION));
   const copy = t.applicationAccess;
   return <div className="flex min-w-0 flex-col gap-4">
-    {canAdopt && <div><Button variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscriptionDefinitionAdoption}>{t.commercialAdoption.open}</Link></Button></div>}
+    {canAdopt && <div><Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscriptionDefinitionAdoption}>{t.commercialAdoption.open}</Link></Button></div>}
     <PermissionGate require={[]} denied={!allowed}>
     <div className="flex flex-col gap-4">
       <PageHeader title={copy.title} description={copy.scopeDiscoveryNotice} />
@@ -21,7 +21,7 @@ export function ApplicationAccessScopes() {
         <div className="max-w-xl">
           <Field label={copy.chooseScope} hint={copy.exactScopeNotice}>
             <Select value="" onValueChange={open} disabled={pending}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {companies.length > 0 && <SelectGroup><SelectLabel>{copy.company}</SelectLabel>
                   {companies.map((id) => <SelectItem key={id} value={`companies:${id}`}><IdentifierText>{id}</IdentifierText></SelectItem>)}

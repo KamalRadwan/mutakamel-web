@@ -34,16 +34,16 @@ export function DashboardRefreshPauseControl({
   return (
     <section
       aria-label={t.dashboard.autoRefreshStatusLabel}
-      className={`flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${
+      className={`flex flex-col gap-2.5 rounded-lg border p-3 sm:p-3.5 sm:flex-row sm:items-center sm:justify-between ${
         isPaused
           ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
           : "border-info/30 bg-info-subtle text-info-subtle-foreground"
       }`}
     >
-      <div className="flex min-w-0 items-start gap-2.5">
-        <Clock3 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <div className="flex min-w-0 items-start gap-2">
+        <Clock3 className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
         <div className="min-w-0" role="status" aria-live="polite" aria-atomic="true">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <p className="text-sm font-semibold">
               {isPaused
                 ? t.dashboard.autoRefreshPausedTitle
@@ -53,7 +53,7 @@ export function DashboardRefreshPauseControl({
               {refreshIntervalLabel(interval, t.dashboard)}
             </Badge>
           </div>
-          <p className="mt-1 text-xs leading-5">
+          <p className="mt-0.5 text-xs leading-5">
             {isPaused
               ? pausedDescription(pauseReasons, t.dashboard)
               : t.dashboard.autoRefreshActiveDescription}

@@ -132,7 +132,7 @@ export function WidgetDetailWorkspace({ widgetId }: { widgetId: string }) {
         backLabel={t.crmWidgets.backToList}
         secondaryActions={
           canOpenEditor ? (
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => {
                 setPreview(null);

@@ -58,7 +58,7 @@ export function SalesOrderConfirmationPanel({
             label={t.tradeDocuments.salesOrders.requestedDeadline}
             hint={t.tradeDocuments.salesOrders.requestedDeadlineHint}
           >
-            <Input
+            <Input size="sm" placeholder={t.tradeDocuments.salesOrders.requestedDeadline}
               type="datetime-local"
               value={state.requestedDeadline}
               onChange={(event) => state.setRequestedDeadline(event.target.value)}

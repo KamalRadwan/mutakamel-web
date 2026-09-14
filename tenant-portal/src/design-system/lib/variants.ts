@@ -16,7 +16,7 @@ export const controlSize = cva("", {
       xl: "h-(--size-control-xl) px-4   text-base gap-1.5",
     },
   },
-  defaultVariants: { size: "md" },
+  defaultVariants: { size: "sm" },
 });
 
 export type ControlSizeProps = VariantProps<typeof controlSize>;
@@ -38,7 +38,7 @@ export const textEntrySize = cva("text-base", {
       xl: "sm:text-base",
     },
   },
-  defaultVariants: { size: "md" },
+  defaultVariants: { size: "sm" },
 });
 
 // readOnly is not disabled — the value still matters and keeps full text

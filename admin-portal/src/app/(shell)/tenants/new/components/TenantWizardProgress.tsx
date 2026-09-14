@@ -1,7 +1,6 @@
-"use client";
-
+import { memo } from "react";
 import { Check } from "lucide-react";
-import { Button } from "@/design-system";
+import { cn } from "@/design-system";
 
 export interface TenantWizardStep {
   number: number;
@@ -18,7 +17,7 @@ interface TenantWizardProgressProps {
   onStepChange: (step: number) => void;
 }
 
-export function TenantWizardProgress({
+export const TenantWizardProgress = memo(function TenantWizardProgress({
   steps,
   currentStep,
   navigationLabel,
@@ -30,63 +29,77 @@ export function TenantWizardProgress({
   return (
     <nav
       aria-label={navigationLabel}
-      className="overflow-x-auto rounded-lg border border-border bg-card p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:scroll-auto"
+      className="rounded-xl border border-border bg-card p-2.5 sm:py-3 sm:px-6 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:scroll-auto"
       tabIndex={0}
     >
-      <ol className="flex min-w-max items-stretch gap-1">
-        {steps.map((step) => {
+      <ol className="flex w-full items-center justify-between">
+        {steps.map((step, index) => {
           const isCurrent = step.number === currentStep;
           const isCompleted = step.number < currentStep;
+          const isLast = index === steps.length - 1;
+
           return (
-            <li key={step.number} className="flex-1">
-              <Button
+            <li
+              key={step.number}
+              className={cn("flex items-center", isLast ? "shrink-0" : "flex-1 min-w-0")}
+            >
+              <button
                 type="button"
-                variant="ghost"
-                size="xs"
                 aria-current={isCurrent ? "step" : undefined}
                 disabled={disabled}
                 onClick={() => onStepChange(step.number)}
-                className={`h-auto min-h-11 w-full justify-start gap-2 rounded-md border px-3 py-2 text-start text-sm ${
+                className={cn(
+                  "flex items-center gap-2 rounded-md outline-none text-xs font-medium transition-colors shrink-0",
+                  "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   isCurrent
-                    ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                    ? "text-primary font-bold"
                     : isCompleted
-                      ? "border-primary/30 bg-primary/10 text-foreground hover:bg-primary/15"
-                      : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
+                      ? "text-foreground hover:text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  disabled && "pointer-events-none opacity-50",
+                )}
               >
-                {/* One fixed-size marker in every state keeps the labels on a
-                    shared baseline; swapping a 20px circle for a 16px icon
-                    shifted each step's text sideways as you advanced. */}
                 <span
                   aria-hidden="true"
-                  className={`grid size-5 shrink-0 place-items-center rounded-full text-xs font-semibold ${
+                  className={cn(
+                    "grid size-5.5 shrink-0 place-items-center rounded-full text-[11px] font-semibold transition-colors",
                     isCurrent
-                      ? "bg-primary-foreground text-primary"
+                      ? "bg-primary text-primary-foreground font-bold shadow-xs"
                       : isCompleted
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-current"
-                  }`}
+                        ? "border border-primary bg-primary/10 text-primary"
+                        : "border border-muted-foreground/40 text-muted-foreground",
+                  )}
                 >
                   {isCompleted ? (
-                    <Check className="size-3" strokeWidth={3} />
+                    <Check className="size-3" strokeWidth={2.5} />
                   ) : (
                     step.number
                   )}
                 </span>
-                <span className="min-w-0 truncate">{step.label}</span>
-                {/* The state used to render as a second visible line inside a
-                    fixed-height control, which clipped it. Screen readers
-                    still get it; sighted users read it from the fill. */}
+                <span className="hidden min-w-0 truncate sm:inline">
+                  {step.label}
+                </span>
+                <span className="sr-only sm:hidden">{step.label}</span>
                 {isCurrent || isCompleted ? (
                   <span className="sr-only">
                     {isCurrent ? currentLabel : completedLabel}
                   </span>
                 ) : null}
-              </Button>
+              </button>
+
+              {!isLast ? (
+                <div
+                  className={cn(
+                    "h-px flex-1 mx-2 sm:mx-3 transition-colors",
+                    isCompleted ? "bg-primary/40" : "bg-border",
+                  )}
+                  aria-hidden="true"
+                />
+              ) : null}
             </li>
           );
         })}
       </ol>
     </nav>
   );
-}
+});

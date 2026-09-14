@@ -155,14 +155,12 @@ describe("tenant profile and lifecycle panels", () => {
     expect(screen.getByRole("button", { name: action })).toBeInTheDocument();
   });
 
-  it("passes explicit subscription purge choice to permanent destroy", async () => {
+  it("requests destruction with retained financial history", async () => {
     const destroy = vi.fn().mockResolvedValue(undefined);
-    const onDestroyed = vi.fn();
     render(
       <TenantLifecyclePanel
         locale="en"
         workspace={workspaceFixture("DELETED", { destroy })}
-        onDestroyed={onDestroyed}
       />,
     );
     fireEvent.click(
@@ -171,11 +169,19 @@ describe("tenant profile and lifecycle panels", () => {
     const dialog = screen.getByRole("alertdialog", {
       name: "Destroy permanently",
     });
-    fireEvent.click(within(dialog).getByRole("checkbox"));
+    expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
 
-    await vi.waitFor(() => expect(destroy).toHaveBeenCalledWith(true));
-    expect(onDestroyed).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(destroy).toHaveBeenCalledWith(false));
+  });
+
+  it("shows pending progress and disables restore and duplicate destroy", () => {
+    render(<TenantLifecyclePanel locale="en" workspace={workspaceFixture("DELETED", {
+      destroyOperation: { operationId: "op", tenantId: "tenant", phase: "STOPPING_PROVISIONING", requestedAt: "now", updatedAt: "now", completedAt: null, lastErrorCode: null },
+    })} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Stopping provisioning");
+    expect(screen.getByRole("button", { name: "Restore tenant" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Destroy permanently" })).toBeDisabled();
   });
 
   it("offers restore beside destroy on a deleted tenant", async () => {

@@ -13,15 +13,15 @@ export function SubscriptionOffersWorkspace() {
   return <OwnerGate denied={denied}>
     <div className="flex flex-col gap-4">
       <PageHeader title={copy.title} description={copy.description} secondaryActions={<>
-        <Button variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscriptionChange}>{t.commercialPurchase.title}</Link></Button>
-        <Button variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscription}>{copy.back}</Link></Button>
-        <Button variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button>
+        <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscriptionChange}>{t.commercialPurchase.title}</Link></Button>
+        <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscription}>{copy.back}</Link></Button>
+        <Button size="sm" variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button>
       </>} />
       <p className="text-sm text-muted-foreground">{copy.notice}</p>
       <p className="text-xs text-muted-foreground">{copy.graduated}</p>
       {selectedTier && <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm">{copy.filtered}: {selectedTier}</p>
-        <Button variant="outline" onClick={reset}>{copy.all}</Button>
+        <Button size="sm" variant="outline" onClick={reset}>{copy.all}</Button>
       </div>}
       {loading ? <Skeleton className="h-56 w-full" /> : error ? <ErrorState title={copy.loadFailed} description={copy.unavailable} onRetry={reload} retryLabel={t.common.retry} />
         : data && <>

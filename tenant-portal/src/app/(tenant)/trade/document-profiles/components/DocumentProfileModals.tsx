@@ -68,7 +68,7 @@ export function CreateDocumentProfileModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeGovernance.code} required hint={t.tradeGovernance.codeHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeGovernance.code}
             value={values.code}
             maxLength={100}
             disabled={isSubmitting}
@@ -90,7 +90,7 @@ export function CreateDocumentProfileModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradeGovernance.documentType}>
+            <SelectTrigger size="sm" aria-label={t.tradeGovernance.documentType}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -113,7 +113,7 @@ export function CreateDocumentProfileModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradeGovernance.scopeTarget}>
+            <SelectTrigger size="sm" aria-label={t.tradeGovernance.scopeTarget}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -165,7 +165,7 @@ export function CreateDocumentProfileVersionDrawer({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeGovernance.content} required hint={t.tradeGovernance.contentHint}>
-          <Textarea
+          <Textarea placeholder={t.tradeGovernance.content}
             value={values.content}
             rows={10}
             disabled={isSubmitting}
@@ -178,7 +178,7 @@ export function CreateDocumentProfileVersionDrawer({
           label={t.tradeGovernance.requiredCases}
           hint={t.tradeGovernance.requiredCasesHint}
         >
-          <Textarea
+          <Textarea placeholder={t.tradeGovernance.requiredCases}
             value={values.requiredCases}
             rows={5}
             disabled={isSubmitting}
@@ -188,7 +188,7 @@ export function CreateDocumentProfileVersionDrawer({
           />
         </Field>
         <Field label={t.tradeGovernance.effectiveFrom} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeGovernance.effectiveFrom}
             type="datetime-local"
             value={values.effectiveFrom}
             disabled={isSubmitting}
@@ -198,7 +198,7 @@ export function CreateDocumentProfileVersionDrawer({
           />
         </Field>
         <Field label={t.tradeGovernance.effectiveTo} hint={t.tradeGovernance.effectiveToHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeGovernance.effectiveTo}
             type="datetime-local"
             value={values.effectiveTo}
             disabled={isSubmitting}
@@ -245,7 +245,7 @@ export function PublishDocumentProfileVersionModal({
         required
         hint={t.tradeGovernance.expectedActivePointerVersionHint}
       >
-        <Input
+        <Input size="sm" placeholder={t.tradeGovernance.expectedActivePointerVersion}
           type="number"
           min={0}
           value={pointerVersion}

@@ -34,10 +34,18 @@ export function parseLeadTagArray(payload: unknown): LeadTag[] {
 export function useCreateLeadTags(enabled: boolean) {
   const { user } = useTenantAuth();
   const canRead = hasPermission(user?.permissions ?? [], "crm.tags.read");
+  const canManage = hasPermission(user?.permissions ?? [], "crm.tags.manage");
   const shouldLoad = enabled && canRead;
   const [items, setItems] = useState<LeadTag[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [degraded, setDegraded] = useState(false);
+
+  function addTag(tag: LeadTag) {
+    setItems((prev) => {
+      if (prev.some((item) => item.id.toLowerCase() === tag.id.toLowerCase())) return prev;
+      return [...prev, tag].sort((a, b) => a.name.localeCompare(b.name));
+    });
+  }
 
   useEffect(() => {
     if (!shouldLoad) return;
@@ -71,7 +79,9 @@ export function useCreateLeadTags(enabled: boolean) {
   return {
     items,
     canRead,
+    canManage,
     isLoading: shouldLoad && isLoading,
     degraded: shouldLoad && degraded,
+    addTag,
   };
 }

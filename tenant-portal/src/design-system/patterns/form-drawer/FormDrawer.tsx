@@ -137,12 +137,13 @@ export function FormDrawer({
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={shell.requestClose}
                 disabled={isSubmitting}
               >
                 {labels.cancel}
               </Button>
-              <Button type="submit" variant="primary" loading={isSubmitting} disabled={submitDisabled}>
+              <Button type="submit" variant="primary" size="sm" loading={isSubmitting} disabled={submitDisabled}>
                 {labels.submit}
               </Button>
             </SheetFooter>

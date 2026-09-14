@@ -46,14 +46,14 @@ export function MappingFieldRows({ fields, onChange, disabled }: MappingFieldRow
       {fields.map((field, index) => (
         <div key={index} className="grid gap-3 border-t border-border pt-3 md:grid-cols-5">
           <Field label={t.tradeAutomation.sourceColumnCode} required>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.sourceColumnCode}
               value={field.sourceColumnCode}
               disabled={disabled}
               onChange={(event) => patch(index, { sourceColumnCode: event.target.value })}
             />
           </Field>
           <Field label={t.tradeAutomation.sourceOrdinal} required>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.sourceOrdinal}
               type="number"
               min={0}
               max={999}
@@ -63,7 +63,7 @@ export function MappingFieldRows({ fields, onChange, disabled }: MappingFieldRow
             />
           </Field>
           <Field label={t.tradeAutomation.targetFieldCode} required>
-            <Input
+            <Input size="sm" placeholder={t.tradeAutomation.targetFieldCode}
               value={field.targetFieldCode}
               disabled={disabled}
               onChange={(event) => patch(index, { targetFieldCode: event.target.value })}
@@ -77,7 +77,7 @@ export function MappingFieldRows({ fields, onChange, disabled }: MappingFieldRow
                 patch(index, { transformCode: next as ImportMappingFieldDraft["transformCode"] })
               }
             >
-              <SelectTrigger aria-label={t.tradeAutomation.transformCode}>
+              <SelectTrigger size="sm" aria-label={t.tradeAutomation.transformCode}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

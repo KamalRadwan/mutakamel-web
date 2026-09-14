@@ -36,7 +36,7 @@ export const AlertDialogContent = forwardRef<
       ref={ref}
       className={cn(
         "fixed start-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2",
-        "rounded-lg border border-border bg-card p-6 text-card-foreground shadow-overlay",
+        "rounded-xl border border-border bg-card p-3 sm:p-3.5 text-card-foreground shadow-overlay",
         "data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95 motion-reduce:animate-none",
         "motion-reduce:animate-none",
         className,
@@ -48,18 +48,18 @@ export const AlertDialogContent = forwardRef<
 AlertDialogContent.displayName = "AlertDialogContent";
 
 export function AlertDialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mb-4 flex flex-col gap-1.5", className)} {...props} />;
+  return <div className={cn("mb-3 flex flex-col gap-1", className)} {...props} />;
 }
 
 export function AlertDialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mt-6 flex items-center justify-end gap-2", className)} {...props} />;
+  return <div className={cn("mt-4 flex items-center justify-end gap-2", className)} {...props} />;
 }
 
 export const AlertDialogTitle = forwardRef<
   React.ComponentRef<typeof AlertDialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Title ref={ref} className={cn("text-lg font-semibold", className)} {...props} />
+  <AlertDialogPrimitive.Title ref={ref} className={cn("text-sm sm:text-base font-semibold", className)} {...props} />
 ));
 AlertDialogTitle.displayName = "AlertDialogTitle";
 
@@ -69,7 +69,7 @@ export const AlertDialogDescription = forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Description
     ref={ref}
-    className={cn("text-base text-muted-foreground", className)}
+    className={cn("text-xs text-muted-foreground", className)}
     {...props}
   />
 ));

@@ -65,7 +65,7 @@ export function AuditFilterPanel({
     <DetailSection title={copy.filtersTitle} description={copy.filtersDescription}>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label={copy.filterEntityType} hint={copy.filterEntityTypeHint}>
-          <Input
+          <Input size="sm" placeholder={copy.filterEntityType}
             dir="ltr"
             value={draft.entityType ?? ""}
             onChange={(event) => change({ entityType: event.target.value || undefined })}
@@ -74,7 +74,7 @@ export function AuditFilterPanel({
         </Field>
 
         <Field label={copy.filterEntityId}>
-          <Input
+          <Input size="sm" placeholder={copy.filterEntityId}
             dir="ltr"
             value={draft.entityId ?? ""}
             onChange={(event) => change({ entityId: event.target.value || undefined })}
@@ -83,7 +83,7 @@ export function AuditFilterPanel({
         </Field>
 
         <Field label={copy.filterAction} hint={copy.filterActionHint}>
-          <Input
+          <Input size="sm" placeholder={copy.filterAction}
             dir="ltr"
             value={draft.action ?? ""}
             onChange={(event) => change({ action: event.target.value || undefined })}
@@ -92,7 +92,7 @@ export function AuditFilterPanel({
         </Field>
 
         <Field label={copy.filterActor} hint={copy.filterActorHint}>
-          <Input
+          <Input size="sm" placeholder={copy.filterActor}
             dir="ltr"
             value={draft.actorUserId ?? ""}
             onChange={(event) => change({ actorUserId: event.target.value || undefined })}
@@ -101,7 +101,7 @@ export function AuditFilterPanel({
         </Field>
 
         <Field label={copy.filterCorrelation} hint={copy.filterCorrelationHint}>
-          <Input
+          <Input size="sm" placeholder={copy.filterCorrelation}
             dir="ltr"
             value={draft.correlationId ?? ""}
             onChange={(event) => change({ correlationId: event.target.value || undefined })}
@@ -117,7 +117,7 @@ export function AuditFilterPanel({
             }
             disabled={disabled}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -139,7 +139,7 @@ export function AuditFilterPanel({
             }
             disabled={disabled}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -163,7 +163,7 @@ export function AuditFilterPanel({
             }
             disabled={disabled}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -191,11 +191,11 @@ export function AuditFilterPanel({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-2">
-        <Button variant="outline" onClick={() => onApply(draft)} disabled={disabled}>
+        <Button size="sm" variant="outline" onClick={() => onApply(draft)} disabled={disabled}>
           <Search className="size-4" aria-hidden="true" />
           {copy.applyFilters}
         </Button>
-        <Button variant="ghost" onClick={clear} disabled={disabled}>
+        <Button size="sm" variant="ghost" onClick={clear} disabled={disabled}>
           <X className="size-4" aria-hidden="true" />
           {t.filters.clearAll}
         </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Loader2, MapPinned } from "lucide-react";
 import { Button } from "@/design-system";
 import { LocationPickerDialog } from "@/components/shared/LocationPickerDialog";
@@ -15,44 +15,115 @@ import type { TenantReverseGeocodedAddress } from "../types";
 interface TenantAddressGeocodingProps {
   lang: string;
   disabled?: boolean;
+  compact?: boolean;
   onApply: (suggestion: TenantReverseGeocodedAddress) => void;
 }
 
-export function TenantAddressGeocoding({
+export const TenantAddressGeocoding = memo(function TenantAddressGeocoding({
   lang,
   disabled = false,
+  compact = false,
   onApply,
 }: TenantAddressGeocodingProps) {
   const state = useTenantReverseGeocode();
   const copy = lang === "ar" ? AR : EN;
   const { t } = useI18n();
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [dismissedSuggestion, setDismissedSuggestion] = useState<TenantReverseGeocodedAddress | null>(null);
+  const showCompactSuggestion = Boolean(state.suggestion && state.suggestion !== dismissedSuggestion);
+
+  if (compact) {
+    return (
+      <div className="relative inline-flex items-center">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setIsMapOpen(true)}
+          disabled={disabled || state.isLoading}
+          className="h-7.5 px-2.5 text-xs text-primary border-primary/30 hover:bg-primary/5 hover:border-primary gap-1.5 font-medium"
+        >
+          {state.isLoading ? (
+            <Loader2 aria-hidden="true" className="size-3.5 animate-spin motion-reduce:animate-none" />
+          ) : (
+            <MapPinned aria-hidden="true" className="size-3.5" />
+          )}
+          {t.tenants.wizard.pickOnMap}
+        </Button>
+
+        <LocationPickerDialog
+          open={isMapOpen}
+          onOpenChange={setIsMapOpen}
+          onConfirm={(location) => {
+            const latitude = String(location.latitude);
+            const longitude = String(location.longitude);
+            state.setLatitude(latitude);
+            state.setLongitude(longitude);
+            void state.lookup({ latitude, longitude }).catch(() => undefined);
+          }}
+        />
+
+        {showCompactSuggestion && state.suggestion ? (
+          <div
+            role="status"
+            className="absolute end-0 top-full mt-1.5 z-30 min-w-64 max-w-sm rounded-lg border border-info/30 bg-card p-2.5 text-xs text-foreground shadow-lg"
+          >
+            <p className="font-semibold text-primary">{copy.suggestion}</p>
+            <p className="mt-1 leading-4 text-muted-foreground">
+              {state.suggestion.formattedAddress ??
+                formatSuggestion(state.suggestion)}
+            </p>
+            <Button
+              type="button"
+              variant="primary"
+              size="xs"
+              onClick={() => {
+                onApply(state.suggestion!);
+                setDismissedSuggestion(state.suggestion);
+              }}
+              disabled={disabled}
+              className="mt-2 w-full"
+            >
+              {copy.apply}
+            </Button>
+          </div>
+        ) : null}
+
+        {state.error ? (
+          <div className="absolute end-0 top-full mt-1.5 z-30 max-w-xs">
+            <TenantReverseGeocodeError error={state.error} />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
-    <section className="rounded-lg border border-info/30 bg-info-subtle p-4">
+    <section className="rounded-md border border-info/30 bg-info-subtle p-2.5 sm:p-3">
       <div className="flex items-start gap-2">
         <MapPinned
           aria-hidden="true"
-          className="mt-0.5 h-4 w-4 shrink-0 text-info-subtle-foreground"
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-info-subtle-foreground"
         />
         <div>
           <h4 className="text-xs font-semibold text-foreground">
             {copy.title}
           </h4>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
             {copy.description}
           </p>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="outline"
+          size="sm"
           onClick={() => setIsMapOpen(true)}
           disabled={disabled || state.isLoading}
         >
-          <MapPinned aria-hidden="true" className="size-4" />
+          <MapPinned aria-hidden="true" className="size-3.5" />
           {t.tenants.wizard.pickOnMap}
         </Button>
         {/* The resolved point stays visible so a mis-drop is obvious before
@@ -63,10 +134,10 @@ export function TenantAddressGeocoding({
           </p>
         ) : null}
         {state.isLoading ? (
-          <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2
               aria-hidden="true"
-              className="size-4 animate-spin motion-reduce:animate-none"
+              className="size-3.5 animate-spin motion-reduce:animate-none"
             />
             {copy.lookingUp}
           </span>
@@ -120,7 +191,7 @@ export function TenantAddressGeocoding({
               ? ` · city:${state.suggestion.cityId}`
               : ""}
           </p>
-          <Button
+          <Button size="sm"
             type="button"
             variant="secondary"
             onClick={() => onApply(state.suggestion!)}
@@ -136,7 +207,7 @@ export function TenantAddressGeocoding({
       ) : null}
     </section>
   );
-}
+});
 
 export function TenantReverseGeocodeError({
   error,

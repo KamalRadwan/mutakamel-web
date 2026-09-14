@@ -10,3 +10,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Branch safety check**: Before editing a repository, verify that `git branch --show-current` returns `main`. Otherwise, stop and ask the user; do not switch branches or move existing changes yourself.
 
 - **Strict Backend Code Prohibition**: NEVER edit, modify, or update any backend file under `../backend/` or any backend application under any circumstances. Only read backend files for contract verification.
+- **Strict Design System Adherence**: Always strictly follow the design system in this application. All UI components, tokens, and layouts must adhere to design system standards and barrel imports (`@/design-system`).
+- **UI/UX Intelligence (`ui-ux-pro-max`)**: Always use and consult the `ui-ux-pro-max` skill for UI and UX guidelines, accessibility standards, color palettes, and interaction patterns BEFORE starting any UI or UX design.

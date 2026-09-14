@@ -66,7 +66,7 @@ export default function WorkspaceSettingsPage() {
               : undefined
           }
           secondaryActions={
-            <Button variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
               <RefreshCw className={isLoading ? "size-4 animate-spin" : "size-4"} aria-hidden="true" />
               {t.coreSettings.reload}
             </Button>
@@ -97,7 +97,7 @@ export default function WorkspaceSettingsPage() {
 
         {draft ? (
           <Card>
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className="flex flex-col gap-3">
               <Field
                 label={t.coreSettings.workspaceLanguage}
                 hint={t.coreSettings.workspaceLanguageHint}
@@ -109,7 +109,7 @@ export default function WorkspaceSettingsPage() {
                   onValueChange={(value) => updateDraft({ defaultLanguage: value })}
                   disabled={isReadOnly || isSaving}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger size="sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -144,8 +144,9 @@ export default function WorkspaceSettingsPage() {
                     readOnly={isReadOnly}
                   />
                 ) : (
-                  <Input
+                  <Input size="sm"
                     value={draft.timezone}
+                    placeholder={t.coreSettings.workspaceTimezonePlaceholder}
                     onChange={(event) => updateDraft({ timezone: event.target.value })}
                     maxLength={TIMEZONE_MAX_LENGTH}
                     disabled={isSaving}
@@ -167,7 +168,7 @@ export default function WorkspaceSettingsPage() {
                     onValueChange={(value) => updateDraft({ defaultCurrencyCode: value })}
                     disabled={isReadOnly || isSaving}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger size="sm">
                       <SelectValue placeholder={t.coreSettings.workspaceCurrencyPlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
@@ -179,8 +180,9 @@ export default function WorkspaceSettingsPage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input
+                  <Input size="sm"
                     value={draft.defaultCurrencyCode}
+                    placeholder={t.coreSettings.workspaceCurrencyPlaceholder}
                     onChange={(event) =>
                       updateDraft({ defaultCurrencyCode: event.target.value.toUpperCase() })
                     }
@@ -214,7 +216,7 @@ export default function WorkspaceSettingsPage() {
 function WorkspaceSkeleton() {
   return (
     <Card>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-3">
         <Skeleton className="h-9 w-full" />
         <Skeleton className="h-9 w-full" />
         <Skeleton className="h-9 w-full" />

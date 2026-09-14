@@ -84,7 +84,7 @@ export function EditTemplateDrawer({
     >
       <div className="flex flex-col gap-4">
         <Field label={copy.name} required>
-          <Input
+          <Input size="sm" placeholder={copy.name}
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={TEMPLATE_NAME_MAX}
@@ -94,7 +94,7 @@ export function EditTemplateDrawer({
         </Field>
 
         <Field label={copy.description}>
-          <Textarea
+          <Textarea placeholder={copy.description}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             maxLength={TEMPLATE_DESCRIPTION_MAX}
@@ -108,7 +108,7 @@ export function EditTemplateDrawer({
             onValueChange={setDirection}
             disabled={isSubmitting}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

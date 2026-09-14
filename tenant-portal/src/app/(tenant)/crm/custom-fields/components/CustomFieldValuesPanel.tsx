@@ -108,7 +108,7 @@ export function CustomFieldValuesPanel({
                   selectOwner(undefined);
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -194,7 +194,7 @@ export function CustomFieldValuesPanel({
                     </Field>
                   </div>
                   {canManage ? (
-                    <Button
+                    <Button size="sm"
                       variant="outline"
                       disabled={!(field.id in drafts) || values.isSaving}
                       onClick={() => {

@@ -38,8 +38,8 @@ export function DashboardGroupsOverview({
   );
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         <ScopeMetric
           label={t.dashboard.authorizedGroups}
           value={groups.length}
@@ -110,11 +110,11 @@ function ScopeMetric({
   const { lang } = useI18n();
 
   return (
-    <Card className={`p-4 ${current.topBorder}`}>
-      <div className={`inline-flex rounded-lg border p-2.5 ${current.bg} ${current.icon}`}>
-        <Icon className="size-4" aria-hidden="true" />
+    <Card className={`p-3 sm:p-3.5 ${current.topBorder}`}>
+      <div className={`inline-flex rounded-md border p-1.5 ${current.bg} ${current.icon}`}>
+        <Icon className="size-3.5" aria-hidden="true" />
       </div>
-      <p className="mt-3 text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
+      <p className="mt-2 text-xl font-semibold tabular-nums text-foreground sm:text-2xl">
         {formatLocaleNumber(lang, value)}
       </p>
       <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">

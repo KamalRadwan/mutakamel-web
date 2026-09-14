@@ -55,7 +55,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
         if (!open) transfer.closeDialog();
       }}
     >
-      <DialogContent>
+      <DialogContent className="p-3 sm:p-3.5">
         <DialogHeader>
           <DialogTitle>{t.crmOpportunityDetail.transferTitle}</DialogTitle>
           <DialogDescription>
@@ -98,7 +98,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
               onValueChange={transfer.setPipelineId}
               disabled={transfer.isSubmitting}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue placeholder={t.crmOpportunities.selectPipeline} />
               </SelectTrigger>
               <SelectContent>
@@ -124,7 +124,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
                 transfer.isSubmitting || transfer.targetStages.length === 0
               }
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue placeholder={t.crmOpportunityDetail.entryStage} />
               </SelectTrigger>
               <SelectContent>
@@ -146,6 +146,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
           >
             <Textarea
               value={transfer.reason}
+              placeholder={t.crmOpportunityDetail.transferReason}
               onChange={(event) => transfer.setReason(event.target.value)}
               maxLength={1000}
               disabled={transfer.isSubmitting}
@@ -155,6 +156,7 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
 
         <DialogFooter>
           <Button
+            size="sm"
             variant="ghost"
             onClick={transfer.closeDialog}
             disabled={transfer.isSubmitting}
@@ -162,6 +164,8 @@ export function PipelineTransferDialog({ transfer }: PipelineTransferDialogProps
             {t.common.cancel}
           </Button>
           <Button
+            size="sm"
+            variant="primary"
             onClick={() => void transfer.submit()}
             disabled={transfer.pipelineId.length === 0}
             loading={transfer.isSubmitting}

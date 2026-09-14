@@ -134,7 +134,7 @@ export default function ImportMappingPage({
         backHref={TENANT_ROUTES.tradeImportMappings}
         secondaryActions={
           mapping && canManage ? (
-            <Button variant="outline" loading={isSaving} onClick={() => void save()}>
+            <Button size="sm" variant="outline" loading={isSaving} onClick={() => void save()}>
               <Save className="size-4" aria-hidden="true" />
               {t.tradeAutomation.saveFields}
             </Button>

@@ -29,6 +29,7 @@ interface CatalogueSelectProps {
   preserveOrder?: boolean;
   maxLength?: number;
   disabled?: boolean;
+  leading?: React.ReactNode;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
 }
@@ -60,6 +61,7 @@ export function CatalogueSelect({
   preserveOrder = false,
   maxLength = 160,
   disabled = false,
+  leading,
   "aria-describedby": ariaDescribedBy,
   "aria-invalid": ariaInvalid,
 }: CatalogueSelectProps) {
@@ -108,6 +110,7 @@ export function CatalogueSelect({
         emptyLabel={emptyLabel}
         disabled={disabled}
         preferDownward
+        leading={leading}
         className={isOther ? "sm:w-48 sm:shrink-0" : "w-full"}
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
@@ -117,6 +120,7 @@ export function CatalogueSelect({
           id={`${id}-other`}
           name={name}
           type="text"
+          size="sm"
           value={value}
           disabled={disabled}
           maxLength={maxLength}

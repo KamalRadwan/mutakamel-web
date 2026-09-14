@@ -31,7 +31,7 @@ export function OpeningBalanceForm({
       <p className="text-xs text-muted-foreground">{t.tradeInventory.openingBalanceHint}</p>
       <div className="grid gap-3 md:grid-cols-2">
         <Field label={t.tradeInventory.nodeId} required error={error ?? undefined}>
-          <Input
+          <Input size="sm"
             value={values.nodeId}
             disabled={disabled || isPending}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -39,7 +39,7 @@ export function OpeningBalanceForm({
           />
         </Field>
         <Field label={t.tradeInventory.itemId} required>
-          <Input
+          <Input size="sm"
             value={values.itemId}
             disabled={disabled || isPending}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -47,7 +47,7 @@ export function OpeningBalanceForm({
           />
         </Field>
         <Field label={t.tradeInventory.uomId} required>
-          <Input
+          <Input size="sm"
             value={values.uomId}
             disabled={disabled || isPending}
             placeholder={t.tradeInventory.uuidPlaceholder}
@@ -55,7 +55,7 @@ export function OpeningBalanceForm({
           />
         </Field>
         <Field label={t.tradeInventory.quantity} required hint={t.tradeCommon.decimalHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.quantity}
             value={values.quantity}
             disabled={disabled || isPending}
             inputMode="decimal"
@@ -63,7 +63,7 @@ export function OpeningBalanceForm({
           />
         </Field>
         <Field label={t.tradeInventory.itemProfileVersion} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.itemProfileVersion}
             type="number"
             min={1}
             value={values.itemProfileVersion}
@@ -72,7 +72,7 @@ export function OpeningBalanceForm({
           />
         </Field>
         <Field label={t.tradeInventory.businessEffectiveAt} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeInventory.businessEffectiveAt}
             type="datetime-local"
             value={values.businessEffectiveAt}
             disabled={disabled || isPending}
@@ -81,7 +81,7 @@ export function OpeningBalanceForm({
         </Field>
       </div>
       <div className="flex justify-end">
-        <Button
+        <Button size="sm"
           variant="outline"
           disabled={disabled}
           loading={isPending}

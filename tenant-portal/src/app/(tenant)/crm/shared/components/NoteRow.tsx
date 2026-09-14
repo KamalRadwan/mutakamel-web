@@ -65,6 +65,7 @@ export function NoteRow({
             onChange={(event) => setDraft(event.target.value)}
             maxLength={CRM_NOTE_BODY_MAX_LENGTH}
             aria-label={t.crmNotes.editLabel}
+            placeholder={t.crmNotes.placeholder ?? t.crmNotes.editLabel}
             disabled={isPending}
           />
           <div className="flex justify-end gap-2">

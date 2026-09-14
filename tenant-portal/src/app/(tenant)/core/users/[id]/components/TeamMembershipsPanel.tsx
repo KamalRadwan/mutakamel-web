@@ -154,7 +154,7 @@ export function TeamMembershipsPanel({ userId, canManage, homeTeamId }: TeamMemb
                 setNewRole(TEAM_MEMBERSHIP_ROLES.find((role) => role === next) ?? "MEMBER")
               }
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger size="sm" className="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -165,7 +165,7 @@ export function TeamMembershipsPanel({ userId, canManage, homeTeamId }: TeamMemb
                 ))}
               </SelectContent>
             </Select>
-            <Button
+            <Button size="sm"
               variant="outline"
               disabled={newTeamId.length === 0 || panel.isSubmitting}
               onClick={() => {
@@ -175,7 +175,7 @@ export function TeamMembershipsPanel({ userId, canManage, homeTeamId }: TeamMemb
             >
               {copy.memberships.add}
             </Button>
-            <Button
+            <Button size="sm"
               variant="ghost"
               disabled={panel.isSubmitting || panel.memberships.length === 0}
               onClick={panel.startReplace}

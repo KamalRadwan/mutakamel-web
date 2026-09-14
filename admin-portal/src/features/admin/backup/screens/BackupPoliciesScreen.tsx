@@ -15,7 +15,6 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   CardFooter,
   Field,
@@ -149,9 +148,9 @@ export function BackupPoliciesScreen() {
               disabled={Boolean(view.activeAction)}
               loading={view.activeAction === `reset:${database.tenantId}`}
               aria-label={copy.resetOverrideAriaLabel}
-              className="size-9 p-0 text-muted-foreground"
+              className="size-8 p-0 text-muted-foreground"
             >
-              {view.activeAction !== `reset:${database.tenantId}` && <Undo2 className="size-4" aria-hidden="true" />}
+              {view.activeAction !== `reset:${database.tenantId}` && <Undo2 className="size-3.5" aria-hidden="true" />}
             </Button>
           )}
         </div>
@@ -160,15 +159,14 @@ export function BackupPoliciesScreen() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <BackupPageHeader
         eyebrow={copy.eyebrow}
         title={copy.title}
-        description={copy.description}
       />
 
       <Card>
-        <CardContent className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+        <CardContent className="grid gap-2.5 p-3 sm:p-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <BackupServerSelect
             label={copy.databaseServerLabel}
             value={view.selectedServerId}
@@ -178,8 +176,8 @@ export function BackupPoliciesScreen() {
             placeholder={copy.selectServerPlaceholder}
             required
           />
-          <Button type="button" variant="outline" onClick={() => void view.refresh()} disabled={!view.selectedServerId || view.isLoadingData} loading={view.isLoadingData}>
-            {!view.isLoadingData && <RefreshCw className="size-4" aria-hidden="true" />}
+          <Button type="button" variant="outline" size="sm" onClick={() => void view.refresh()} disabled={!view.selectedServerId || view.isLoadingData} loading={view.isLoadingData}>
+            {!view.isLoadingData && <RefreshCw className="size-3.5" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         </CardContent>
@@ -194,49 +192,46 @@ export function BackupPoliciesScreen() {
       ) : (
         <>
           <Card>
-            <CardHeader className="flex-col items-start justify-between gap-3 space-y-0 sm:flex-row">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Settings2 className="size-5 text-info" aria-hidden="true" />
-                  {copy.policyDefaultsTitle}
-                </CardTitle>
-                <CardDescription>{copy.policyDefaultsDescription}</CardDescription>
-              </div>
+            <CardHeader className="flex-col items-start justify-between gap-2.5 p-3 sm:p-3.5 space-y-0 sm:flex-row">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <Settings2 className="size-4 text-info" aria-hidden="true" />
+                {copy.policyDefaultsTitle}
+              </CardTitle>
               <Badge tone={enabled ? "success" : "neutral"}>{enabled ? copy.policyEnabledBadge : copy.policyDisabledBadge}</Badge>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <label htmlFor="backup-policy-enabled" className="flex min-h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
+            <CardContent className="grid gap-2.5 p-3 sm:p-3.5 pt-0 sm:pt-0 md:grid-cols-2 lg:grid-cols-4">
+              <label htmlFor="backup-policy-enabled" className="flex min-h-8 items-center gap-2.5 rounded-md border border-border px-2.5 text-xs font-semibold">
                 <Checkbox id="backup-policy-enabled" checked={enabled} onCheckedChange={(c) => updatePolicyDraft({ enabled: c === true })} disabled={!view.canManage} />
                 {copy.policyEnabledLabel}
               </label>
-              <Field label={copy.cronLabel} error={cronError} required>
-                {(fp) => <Input {...fp} dir="ltr" value={cronExpression} onChange={(e) => updatePolicyDraft({ cronExpression: e.target.value })} disabled={!view.canManage} maxLength={120} />}
+              <Field label={copy.cronLabel} hideLabel error={cronError} required>
+                {(fp) => <Input {...fp} dir="ltr" size="sm" placeholder={`${copy.cronLabel} *`} value={cronExpression} onChange={(e) => updatePolicyDraft({ cronExpression: e.target.value })} disabled={!view.canManage} maxLength={120} />}
               </Field>
-              <Field label={copy.timezoneLabel} error={timezoneError} required>
-                {(fp) => <Input {...fp} dir="ltr" value={timezone} onChange={(e) => updatePolicyDraft({ timezone: e.target.value })} disabled={!view.canManage} maxLength={80} />}
+              <Field label={copy.timezoneLabel} hideLabel error={timezoneError} required>
+                {(fp) => <Input {...fp} dir="ltr" size="sm" placeholder={`${copy.timezoneLabel} *`} value={timezone} onChange={(e) => updatePolicyDraft({ timezone: e.target.value })} disabled={!view.canManage} maxLength={80} />}
               </Field>
-              <Field label={copy.retentionDaysLabel} error={retentionError} required>
-                {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={3650} value={retentionDays} onChange={(e) => updatePolicyDraft({ retentionDays: e.target.value })} disabled={!view.canManage} placeholder="30" />}
+              <Field label={copy.retentionDaysLabel} hideLabel error={retentionError} required>
+                {(fp) => <Input {...fp} dir="ltr" size="sm" type="number" min={1} max={3650} value={retentionDays} onChange={(e) => updatePolicyDraft({ retentionDays: e.target.value })} disabled={!view.canManage} placeholder={`${copy.retentionDaysLabel} * (30)`} />}
               </Field>
-              <Field label={copy.serverConcurrencyLabel} error={serverConcurrencyError} required>
-                {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={10} value={serverConcurrency} onChange={(e) => updatePolicyDraft({ serverConcurrency: Number(e.target.value) })} disabled={!view.canManage} />}
+              <Field label={copy.serverConcurrencyLabel} hideLabel error={serverConcurrencyError} required>
+                {(fp) => <Input {...fp} dir="ltr" size="sm" type="number" min={1} max={10} placeholder={`${copy.serverConcurrencyLabel} *`} value={serverConcurrency} onChange={(e) => updatePolicyDraft({ serverConcurrency: Number(e.target.value) })} disabled={!view.canManage} />}
               </Field>
-              <Field label={copy.tenantConcurrencyLabel} error={tenantConcurrencyError} required>
-                {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={10} value={tenantConcurrency} onChange={(e) => updatePolicyDraft({ tenantConcurrency: Number(e.target.value) })} disabled={!view.canManage} />}
+              <Field label={copy.tenantConcurrencyLabel} hideLabel error={tenantConcurrencyError} required>
+                {(fp) => <Input {...fp} dir="ltr" size="sm" type="number" min={1} max={10} placeholder={`${copy.tenantConcurrencyLabel} *`} value={tenantConcurrency} onChange={(e) => updatePolicyDraft({ tenantConcurrency: Number(e.target.value) })} disabled={!view.canManage} />}
               </Field>
-              <label htmlFor="backup-policy-default-enabled" className="flex min-h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
+              <label htmlFor="backup-policy-default-enabled" className="flex min-h-8 items-center gap-2.5 rounded-md border border-border px-2.5 text-xs font-semibold">
                 <Checkbox id="backup-policy-default-enabled" checked={defaultBackupEnabled} onCheckedChange={(c) => updatePolicyDraft({ defaultBackupEnabled: c === true })} disabled={!view.canManage} />
                 {copy.backupByDefaultLabel}
               </label>
-              <label htmlFor="backup-policy-compression-enabled" className="flex min-h-(--size-control-lg) items-center gap-3 rounded-md border border-border px-3 text-sm font-semibold">
+              <label htmlFor="backup-policy-compression-enabled" className="flex min-h-8 items-center gap-2.5 rounded-md border border-border px-2.5 text-xs font-semibold">
                 <Checkbox id="backup-policy-compression-enabled" checked={defaultCompressionEnabled} onCheckedChange={(c) => updatePolicyDraft({ defaultCompressionEnabled: c === true })} disabled={!view.canManage} />
                 {copy.compressByDefaultLabel}
               </label>
-              <Field label={copy.defaultCompressionAlgorithmLabel} required>
+              <Field label={copy.defaultCompressionAlgorithmLabel} hideLabel required>
                 {(fp) => (
                   <Select value={defaultAlgorithm} onValueChange={(v) => updatePolicyDraft({ defaultAlgorithm: v as BackupCompressionAlgorithm })} disabled={!view.canManage} dir={dir}>
-                    <SelectTrigger {...fp}>
-                      <SelectValue />
+                    <SelectTrigger {...fp} size="sm">
+                      <SelectValue placeholder={copy.defaultCompressionAlgorithmLabel} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={BackupCompressionAlgorithm.GZIP}>gzip</SelectItem>
@@ -247,10 +242,11 @@ export function BackupPoliciesScreen() {
               </Field>
             </CardContent>
             {view.canManage && (
-              <CardFooter className="justify-end">
+              <CardFooter className="justify-end p-3 sm:p-3.5 pt-0 sm:pt-0">
                 <Button
                   type="button"
                   variant="primary"
+                  size="sm"
                   disabled={!policyValid || !view.ownsSelectedServerState || view.activeAction === "policy"}
                   loading={view.activeAction === "policy"}
                   onClick={() =>
@@ -269,7 +265,7 @@ export function BackupPoliciesScreen() {
                       .catch(() => undefined)
                   }
                 >
-                  {view.activeAction !== "policy" && <Settings2 className="size-4" aria-hidden="true" />}
+                  {view.activeAction !== "policy" && <Settings2 className="size-3.5" aria-hidden="true" />}
                   {copy.savePolicyButton}
                 </Button>
               </CardFooter>
@@ -277,13 +273,12 @@ export function BackupPoliciesScreen() {
           </Card>
 
           <section className="space-y-3" aria-labelledby="backup-database-config-title">
-            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col items-start justify-between gap-2.5 sm:flex-row sm:items-center">
               <div>
-                <h2 id="backup-database-config-title" className="flex items-center gap-2 text-base font-semibold">
-                  <SlidersHorizontal className="size-5 text-info" aria-hidden="true" />
+                <h2 id="backup-database-config-title" className="flex items-center gap-2 text-sm font-semibold">
+                  <SlidersHorizontal className="size-4 text-info" aria-hidden="true" />
                   {copy.databaseConfigTitle}
                 </h2>
-                <p className="mt-1 text-sm text-muted-foreground">{copy.databaseConfigDescription}</p>
               </div>
               <Badge tone="neutral">{formatBackupNumber(view.databases.length, locale)}</Badge>
             </div>
@@ -326,7 +321,7 @@ export function BackupPoliciesScreen() {
         <Field label={copy.backupEnabledFieldLabel} required>
           {(fp) => (
             <Select value={overrideBackup} onValueChange={setOverrideBackup} dir={dir}>
-              <SelectTrigger {...fp}>
+              <SelectTrigger {...fp} size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -340,7 +335,7 @@ export function BackupPoliciesScreen() {
         <Field label={copy.compressionEnabledFieldLabel} required>
           {(fp) => (
             <Select value={overrideCompression} onValueChange={setOverrideCompression} dir={dir}>
-              <SelectTrigger {...fp}>
+              <SelectTrigger {...fp} size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -354,7 +349,7 @@ export function BackupPoliciesScreen() {
         <Field label={copy.overrideAlgorithmFieldLabel} required>
           {(fp) => (
             <Select value={overrideAlgorithm} onValueChange={setOverrideAlgorithm} dir={dir}>
-              <SelectTrigger {...fp}>
+              <SelectTrigger {...fp} size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

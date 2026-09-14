@@ -159,7 +159,7 @@ export function PipelineStagePickerSection({
               onChange([...selectedIds, value]);
             }}
           >
-            <SelectTrigger aria-label={t.crmPipelines.create.addStage} className="max-w-xs">
+            <SelectTrigger size="sm" aria-label={t.crmPipelines.create.addStage} className="max-w-xs">
               <SelectValue placeholder={t.crmPipelines.create.addStage} />
             </SelectTrigger>
             <SelectContent>

@@ -82,7 +82,7 @@ export function CreateDefinitionDrawer({
     >
       <div className="flex flex-col gap-4">
         <Field label={t.trade.definitionKey} hint={t.trade.definitionKeyHint} required>
-          <Input
+          <Input size="sm" placeholder={t.trade.definitionKey}
             dir="ltr"
             className="font-mono"
             value={values.key}
@@ -97,7 +97,7 @@ export function CreateDefinitionDrawer({
           hint={t.trade.definitionValueSchemaHint}
           required
         >
-          <Textarea
+          <Textarea placeholder={t.trade.definitionValueSchema}
             dir="ltr"
             className="font-mono"
             value={values.valueSchema}
@@ -135,7 +135,7 @@ export function CreateDefinitionDrawer({
             onValueChange={(next) => change({ mergeStrategy: next as MergeStrategy })}
             disabled={isSubmitting}
           >
-            <SelectTrigger aria-label={t.trade.definitionMergeStrategy}>
+            <SelectTrigger size="sm" aria-label={t.trade.definitionMergeStrategy}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -153,7 +153,7 @@ export function CreateDefinitionDrawer({
             onValueChange={(next) => change({ riskClass: next as RiskClass })}
             disabled={isSubmitting}
           >
-            <SelectTrigger aria-label={t.trade.definitionRiskClass}>
+            <SelectTrigger size="sm" aria-label={t.trade.definitionRiskClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -213,7 +213,7 @@ export function CreateVersionDrawer({
             onValueChange={(next) => change({ scopeTarget: next as ConfigurationScope })}
             disabled={isSubmitting}
           >
-            <SelectTrigger aria-label={t.trade.versionScopeTarget}>
+            <SelectTrigger size="sm" aria-label={t.trade.versionScopeTarget}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -226,7 +226,7 @@ export function CreateVersionDrawer({
           </Select>
         </Field>
         <Field label={t.trade.versionValue} hint={t.trade.versionValueHint} required>
-          <Textarea
+          <Textarea placeholder={t.trade.versionValue}
             dir="ltr"
             className="font-mono"
             value={values.value}
@@ -236,7 +236,7 @@ export function CreateVersionDrawer({
           />
         </Field>
         <Field label={t.trade.versionEffectiveFrom} required>
-          <Input
+          <Input size="sm" placeholder={t.trade.versionEffectiveFrom}
             dir="ltr"
             type="datetime-local"
             value={values.effectiveFrom}
@@ -246,7 +246,7 @@ export function CreateVersionDrawer({
           />
         </Field>
         <Field label={t.trade.versionEffectiveTo}>
-          <Input
+          <Input size="sm" placeholder={t.trade.versionEffectiveTo}
             dir="ltr"
             type="datetime-local"
             value={values.effectiveTo}

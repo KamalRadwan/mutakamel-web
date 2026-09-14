@@ -390,7 +390,9 @@ and key files. Because both are supplied, Next uses them without generating or
 installing a local certificate authority. No HTTPS redirect, HSTS policy, or
 certificate installation is required for the HTTP deployment.
 
-`DEV_API_TARGET` remains a server-side rewrite target. Production ingress must
+`DEV_API_TARGET` is the development route handler's fixed server-side Gateway
+origin. It preserves the incoming Host and port using Node HTTP; Next's built-in
+external rewrite would replace that Host. Production ingress must
 route the same-origin `/api/*` namespace to Gateway and preserve the public
 tenant Host.
 

@@ -66,7 +66,7 @@ export function CreateExtensionProfileModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeAutomation.code} required hint={t.tradeGovernance.codeHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeAutomation.code}
             value={values.code}
             maxLength={100}
             disabled={isSubmitting}
@@ -84,7 +84,7 @@ export function CreateExtensionProfileModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradeAutomation.targetCode}>
+            <SelectTrigger size="sm" aria-label={t.tradeAutomation.targetCode}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -111,7 +111,7 @@ export function CreateExtensionProfileModal({
               }))
             }
           >
-            <SelectTrigger aria-label={t.tradeGovernance.scopeTarget}>
+            <SelectTrigger size="sm" aria-label={t.tradeGovernance.scopeTarget}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

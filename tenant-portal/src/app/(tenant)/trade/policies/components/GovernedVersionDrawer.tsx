@@ -56,7 +56,7 @@ export function GovernedVersionDrawer({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeGovernance.content} required hint={t.tradeGovernance.contentHint}>
-          <Textarea
+          <Textarea placeholder={t.tradeGovernance.content}
             value={values.content}
             rows={10}
             disabled={isSubmitting}
@@ -66,7 +66,7 @@ export function GovernedVersionDrawer({
           />
         </Field>
         <Field label={t.tradeGovernance.testCases} required hint={t.tradeGovernance.testCasesHint}>
-          <Textarea
+          <Textarea placeholder={t.tradeGovernance.testCases}
             value={values.testCases}
             rows={6}
             disabled={isSubmitting}
@@ -76,7 +76,7 @@ export function GovernedVersionDrawer({
           />
         </Field>
         <Field label={t.tradeGovernance.effectiveFrom} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeGovernance.effectiveFrom}
             type="datetime-local"
             value={values.effectiveFrom}
             disabled={isSubmitting}
@@ -86,7 +86,7 @@ export function GovernedVersionDrawer({
           />
         </Field>
         <Field label={t.tradeGovernance.effectiveTo} hint={t.tradeGovernance.effectiveToHint}>
-          <Input
+          <Input size="sm" placeholder={t.tradeGovernance.effectiveTo}
             type="datetime-local"
             value={values.effectiveTo}
             disabled={isSubmitting}

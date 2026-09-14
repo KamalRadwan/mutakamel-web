@@ -98,7 +98,7 @@ export function EditTaskDrawer({
       }}
     >
       <Field label={t.crmTasks.title} error={titleError} required>
-        <Input
+        <Input size="sm" placeholder={t.crmTasks.title}
           value={title}
           maxLength={ACTIVITY_SUBJECT_MAX_LENGTH}
           onChange={(event) => setTitle(event.target.value)}
@@ -110,7 +110,7 @@ export function EditTaskDrawer({
           value={status}
           onValueChange={(next) => setStatus(next as CrmTaskStatus)}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

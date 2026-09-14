@@ -55,6 +55,22 @@ DEV_API_TARGET                   development fallback, default
 
 Never expose the Gateway origin through `NEXT_PUBLIC_*`.
 
+### Development API forwarding — verified 2026-09-12
+
+`src/app/api/[...path]/route.ts` forwards canonical tenant Core/CRM/Trade v1
+requests through `src/lib/api/dev-gateway-proxy.server.ts` in development only.
+It connects to the fixed `DEV_API_TARGET` origin while preserving the browser's
+`Host`, including port `5002`. Gateway derives tenant authority from this Host
+and passes it to Core; caller-supplied forwarded headers are discarded.
+
+Next's built-in external rewrite changes Host to the destination service. That
+made page admission succeed but browser API calls fail with
+`TENANT_NOT_RESOLVABLE`. The Node HTTP forwarder preserves streamed bodies,
+Origin, CSRF headers, cookies, response status and separate Set-Cookie headers.
+It does not follow upstream redirects. Production `/api` routing remains the
+external ingress's responsibility. The loopback `DEV_TENANT_HOST` override
+applies only to page admission; use the real tenant host for authentication.
+
 **Suspended tenants keep pre-authentication access.** A suspended tenant's
 administrator must still be able to reach `/login` — the boundary shows the
 suspension state without removing the form. Everything else renders the

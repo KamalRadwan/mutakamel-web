@@ -57,14 +57,14 @@ export function DashboardTabsNav({
       className="sticky top-[61px] z-10 rounded-lg border border-border bg-card px-2"
     >
       <TabsList
-        className="h-auto w-full flex-wrap justify-start gap-1.5 border-b-0 py-2"
+        className="h-auto w-full flex-wrap justify-start gap-1 border-b-0 py-1.5"
         aria-label={t.dashboard.groupsAriaLabel}
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
-            <TabsTrigger key={tab.key} value={tab.key} className="h-9 shrink-0 gap-2 rounded-md px-3 py-1.5 after:hidden data-[state=active]:bg-selected">
-              <Icon className="size-4" aria-hidden="true" />
+            <TabsTrigger key={tab.key} value={tab.key} className="h-8 shrink-0 gap-1.5 rounded-md px-2.5 py-1 text-xs after:hidden data-[state=active]:bg-selected">
+              <Icon className="size-3.5" aria-hidden="true" />
               <span>{tab.label}</span>
             </TabsTrigger>
           );

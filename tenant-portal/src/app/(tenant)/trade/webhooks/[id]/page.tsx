@@ -65,7 +65,7 @@ export default function WebhookSubscriptionPage({
         secondaryActions={
           subscription && canManage ? (
             <>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={pending !== null}
                 loading={pending === "status"}
@@ -78,7 +78,7 @@ export default function WebhookSubscriptionPage({
                   ? t.tradeAutomation.disable
                   : t.tradeAutomation.enable}
               </Button>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={pending !== null}
                 loading={pending === "test"}
@@ -171,7 +171,7 @@ export default function WebhookSubscriptionPage({
                 label={t.tradeAutomation.overlapHours}
                 hint={t.tradeAutomation.overlapHoursHint}
               >
-                <Input
+                <Input size="sm" placeholder={t.tradeAutomation.overlapHours}
                   type="number"
                   min={0}
                   max={168}
@@ -180,7 +180,7 @@ export default function WebhookSubscriptionPage({
                   onChange={(event) => setOverlapHours(event.target.value)}
                 />
               </Field>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canManage || pending !== null}
                 loading={pending === "rotate"}
@@ -189,7 +189,7 @@ export default function WebhookSubscriptionPage({
                 <KeyRound className="size-4" aria-hidden="true" />
                 {t.tradeAutomation.rotateSecret}
               </Button>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canManage || pending !== null}
                 loading={pending === "revoke"}

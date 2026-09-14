@@ -148,7 +148,7 @@ export default function PriceBookVersionPage({
         secondaryActions={
           detail ? (
             <>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canTest || pending !== null}
                 loading={pending === "test"}
@@ -157,7 +157,7 @@ export default function PriceBookVersionPage({
                 <FlaskConical className="size-4" aria-hidden="true" />
                 {t.tradePricing.runTest}
               </Button>
-              <Button
+              <Button size="sm"
                 variant="outline"
                 disabled={!canPublish || pending !== null}
                 loading={pending === "publish"}

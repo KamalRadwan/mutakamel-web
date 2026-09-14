@@ -107,7 +107,7 @@ export default function PipelinesPage() {
               : undefined
           }
           secondaryActions={
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void reload()}
               disabled={isLoading}

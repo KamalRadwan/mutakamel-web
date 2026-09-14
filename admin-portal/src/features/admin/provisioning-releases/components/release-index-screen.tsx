@@ -30,9 +30,9 @@ export function ReleaseIndexScreen() {
           <div className="flex flex-wrap gap-2">
             <RefreshReleaseButton label={copy.refresh} onClick={index.refresh} pending={index.isRefreshing} />
             {index.permissions.canManageDrafts ? (
-              <Button asChild variant="primary">
+              <Button asChild variant="primary" size="sm">
                 <Link href="/provisioning/releases/drafts/new">
-                  <FilePlus2 className="size-4" aria-hidden="true" />
+                  <FilePlus2 className="size-3.5" aria-hidden="true" />
                   {copy.createDraft}
                 </Link>
               </Button>
@@ -81,7 +81,7 @@ function IndexBody({ index, copy, lang }: { index: ReturnType<typeof useReleaseI
     );
   }
   return (
-    <div className="space-y-4" aria-busy={index.isRefreshing}>
+    <div className="space-y-3" aria-busy={index.isRefreshing}>
       <DraftTable drafts={index.drafts.data} copy={copy} lang={lang} isRefreshing={index.isRefreshing} />
       <ReleaseTable releases={index.releases.data} copy={copy} lang={lang} isRefreshing={index.isRefreshing} />
       <div className="grid gap-3 xl:grid-cols-2">

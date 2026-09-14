@@ -59,7 +59,7 @@ export function CustomerCompanySection({
         hint={t.crmCustomerProfiles.create.companyNameHint}
         error={errors.companyName}
       >
-        <Input
+        <Input size="sm" placeholder={t.crmLeads.companyName}
           value={form.companyName}
           maxLength={limits.companyName}
           disabled={disabled}
@@ -69,7 +69,7 @@ export function CustomerCompanySection({
       </Field>
 
       <Field label={t.crmLeads.create.taxNumber} error={errors.taxNumber}>
-        <Input
+        <Input size="sm" placeholder={t.crmLeads.create.taxNumber}
           dir="ltr"
           value={form.taxNumber}
           maxLength={limits.taxNumber}
@@ -83,7 +83,7 @@ export function CustomerCompanySection({
         label={t.crmLeads.create.commercialRegistrationNumber}
         error={errors.commercialRegistrationNumber}
       >
-        <Input
+        <Input size="sm" placeholder={t.crmLeads.create.commercialRegistrationNumber}
           dir="ltr"
           value={form.commercialRegistrationNumber}
           maxLength={limits.commercialRegistrationNumber}
@@ -96,7 +96,7 @@ export function CustomerCompanySection({
       </Field>
 
       <Field label={t.crmCustomerProfiles.create.companyEmail} error={errors.companyEmail}>
-        <Input
+        <Input size="sm" placeholder={t.crmCustomerProfiles.create.companyEmail}
           type="email"
           dir="ltr"
           value={form.companyEmail}
@@ -114,7 +114,7 @@ export function CustomerCompanySection({
         hint={t.crmCustomerProfiles.create.companyWebsiteHint}
         error={errors.companyWebsite}
       >
-        <Input
+        <Input size="sm" placeholder={t.crmCustomerProfiles.create.companyWebsite}
           type="url"
           dir="ltr"
           value={form.companyWebsite}

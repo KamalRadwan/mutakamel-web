@@ -1,0 +1,49 @@
+# Deny by default, reopening only the files used by the Tenant development image.
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+
+# Reopen each parent for traversal, then exclude its unselected descendants.
+!tenant-portal/
+tenant-portal/**
+!tenant-portal/Dockerfile
+!tenant-portal/Dockerfile.dockerignore
+!tenant-portal/package.json
+!tenant-portal/next.config.ts
+!tenant-portal/next-env.d.ts
+!tenant-portal/tsconfig.json
+!tenant-portal/postcss.config.mjs
+!tenant-portal/src/
+!tenant-portal/src/**
+
+!packages/
+packages/**
+!packages/identifiers/
+packages/identifiers/**
+!packages/identifiers/package.json
+!packages/identifiers/src/
+!packages/identifiers/src/**
+
+# These exclusions also apply within the allowed source trees. The certificates
+# directory backs `dev:https` only; the container serves plain http on loopback,
+# so no key material enters the build context.
+**/node_modules
+**/.next
+**/dist
+**/build
+**/out
+**/coverage
+**/*.tsbuildinfo
+**/.git
+**/.env*
+**/.npmrc
+**/.pnpmrc
+**/certificates
+**/secrets
+**/.secrets
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.log

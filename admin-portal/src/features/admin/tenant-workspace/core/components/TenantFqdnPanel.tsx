@@ -48,9 +48,9 @@ export function TenantFqdnPanel({
 
   return (
     <section aria-labelledby="tenant-domains-title">
-    <Card className="space-y-4 p-4">
-      <div className="flex items-center justify-between gap-2 border-b border-border pb-3">
-        <h2 id="tenant-domains-title" className="text-sm font-semibold text-foreground">
+    <Card className="space-y-3 p-3 sm:p-3.5">
+      <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+        <h2 id="tenant-domains-title" className="text-xs font-semibold text-foreground">
           {text.domains}
         </h2>
         <span className="text-xs font-semibold text-muted-foreground">
@@ -59,21 +59,22 @@ export function TenantFqdnPanel({
       </div>
 
       {released && (
-        <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+        <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
           {text.domainsReleased}
         </p>
       )}
 
       {canAttach && (
         <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-          <Field id="tenant-fqdn" label={text.domainFieldLabel} error={fqdn.preflightError?.message}>
+          <Field id="tenant-fqdn" label={text.domainFieldLabel} hideLabel error={fqdn.preflightError?.message}>
             {(field) => (
               <Input
                 {...field}
+                size="sm"
                 name="fqdn"
                 value={fqdn.candidate}
                 disabled={busy}
-                placeholder={text.domainPlaceholder}
+                placeholder={`${text.domainPlaceholder} *`}
                 className="font-mono"
                 onChange={(event) => fqdn.setCandidate(event.target.value)}
               />
@@ -82,6 +83,7 @@ export function TenantFqdnPanel({
           <Button
             type="button"
             variant="outline"
+            size="sm"
             disabled={busy || !fqdn.candidate.trim()}
             onClick={() => void fqdn.preflight().catch(() => undefined)}
             loading={fqdn.isPreflighting}
@@ -92,6 +94,7 @@ export function TenantFqdnPanel({
             <Button
               type="button"
               variant="primary"
+              size="sm"
               disabled={busy || !fqdn.canAdd}
               onClick={() => void fqdn.add().catch(() => undefined)}
             >
@@ -123,7 +126,7 @@ export function TenantFqdnPanel({
       />
 
       {fqdn.listError ? (
-        <Button
+        <Button size="sm"
           type="button"
           variant="outline"
           onClick={() => void fqdn.reloadFqdns()}

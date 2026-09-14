@@ -190,35 +190,35 @@ export function AddDatabaseApplicationDialog({
         if (!open && !isSubmitting) onClose();
       }}
     >
-      <DialogContent dir={dir} showCloseButton={!isSubmitting} className="p-0">
-        <DialogHeader className="mb-0 border-b border-border px-5 py-4 pe-12">
+      <DialogContent dir={dir} showCloseButton={!isSubmitting} className="p-0 max-w-md">
+        <DialogHeader className="mb-0 border-b border-border px-4 py-3 pe-10">
           <DialogTitle
-            className="flex items-center gap-2 text-base"
+            className="flex items-center gap-1.5 text-sm font-semibold"
           >
-            <Plus className="size-4 text-info" aria-hidden="true" />
+            <Plus className="size-3.5 text-info" aria-hidden="true" />
             {copy.title}
           </DialogTitle>
-          <DialogDescription className="text-sm">
+          <DialogDescription className="text-xs">
             {copy.description}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4 p-5">
+        <form onSubmit={submit} className="space-y-3 p-3.5">
           {isLoading ? (
-            <div role="status" className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            <div role="status" className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               {copy.loading}
             </div>
           ) : !available.length ? (
-            <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
               {emptyMessage}
             </div>
           ) : (
             <>
-              <Field label={copy.application} required>
+              <Field label={copy.application} hideLabel required>
                 {({ required, ...fieldProps }) => (
                   <Select value={selectedKey} onValueChange={setSelectedKey} dir={dir}>
-                    <SelectTrigger {...fieldProps} aria-required={required}>
-                      <SelectValue />
+                    <SelectTrigger {...fieldProps} size="sm" aria-required={required}>
+                      <SelectValue placeholder={`${copy.application} *`} />
                     </SelectTrigger>
                     <SelectContent>
                       {available.map((application) => (
@@ -231,28 +231,29 @@ export function AddDatabaseApplicationDialog({
                 )}
               </Field>
               {selected && (
-                <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted p-3 text-sm">
+                <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-muted p-2 text-xs">
                   <div>
-                    <span className="block text-xs font-medium uppercase text-muted-foreground">
+                    <span className="block text-[11px] font-medium uppercase text-muted-foreground">
                       {copy.catalogueRevision}
                     </span>
                     <code>{selected.catalogueRevision}</code>
                   </div>
                   <div>
-                    <span className="block text-xs font-medium uppercase text-muted-foreground">
+                    <span className="block text-[11px] font-medium uppercase text-muted-foreground">
                       {copy.policyRevision}
                     </span>
                     <code>{selected.databasePolicy.policyRevision}</code>
                   </div>
                 </div>
               )}
-              <Field label={copy.reason} hint={copy.reasonHint.replace("{{count}}", String(reason.trim().length))} required>
+              <Field label={copy.reason} hideLabel hint={copy.reasonHint.replace("{{count}}", String(reason.trim().length))} required>
                 {(fieldProps) => (
                   <Textarea
                     {...fieldProps}
                     minLength={8}
                     maxLength={500}
-                    rows={3}
+                    rows={2}
+                    placeholder={`${copy.reason} *`}
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
                     className="resize-none"
@@ -266,7 +267,7 @@ export function AddDatabaseApplicationDialog({
               ref={errorRef}
               role="alert"
               tabIndex={-1}
-              className="rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-md border border-destructive/30 bg-destructive-subtle px-2.5 py-1.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {visibleError}
             </p>

@@ -21,8 +21,8 @@ export function BranchAddonRestriction(props: BranchAddonRestrictionProps) {
           {state?.phase === "submitted" && <p role="status" className="text-sm text-muted-foreground">{copy.rereadNotice}</p>}
         </>}
       {view?.resource.mode !== "DISABLED" && <Dialog open={action.ready && (state?.open ?? false)} onOpenChange={action.changeOpen}>
-        <DialogTrigger asChild><Button variant="outline" disabled={!action.canOpen}>{copy.review}</Button></DialogTrigger>
-        <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="max-h-[85dvh] overflow-y-auto">
+        <DialogTrigger asChild><Button size="sm" variant="outline" disabled={!action.canOpen}>{copy.review}</Button></DialogTrigger>
+        <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="p-3 sm:p-3.5 max-h-[85dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>{copy.title}</DialogTitle><DialogDescription>{copy.notice}</DialogDescription></DialogHeader>
           <p className="text-sm text-muted-foreground">{copy.provisional}</p>
           {view && <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -33,16 +33,16 @@ export function BranchAddonRestriction(props: BranchAddonRestrictionProps) {
             <div className="min-w-0"><dt className="text-xs text-muted-foreground">{t.applicationAccess.revision}</dt><dd><IdentifierText>{view.resource.revision}</IdentifierText></dd></div>
           </dl>}
           <Field label={copy.reason} hint={copy.reasonHint} required error={state?.invalidReason ? copy.reasonInvalid : undefined}>
-            <Input value={state?.reason ?? ""} onChange={action.changeReason} maxLength={500} disabled={pending || !action.ready} />
+            <Input size="sm" value={state?.reason ?? ""} placeholder={copy.reason} onChange={action.changeReason} maxLength={500} disabled={pending || !action.ready} />
           </Field>
           <DialogFooter>
-            <Button variant="outline" onClick={() => action.changeOpen(false)} disabled={pending}>{t.common.cancel}</Button>
-            <Button variant="destructive" onClick={action.confirm} loading={pending} disabled={!action.canOpen}>{copy.confirm}</Button>
+            <Button size="sm" variant="outline" onClick={() => action.changeOpen(false)} disabled={pending}>{t.common.cancel}</Button>
+            <Button size="sm" variant="destructive" onClick={action.confirm} loading={pending} disabled={!action.canOpen}>{copy.confirm}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>}
       {action.ready && (state?.phase === "stale" || state?.phase === "submitted") &&
-        <Button variant="outline" onClick={action.reread}>{copy.reread}</Button>}
+        <Button size="sm" variant="outline" onClick={action.reread}>{copy.reread}</Button>}
     </div>
   </PermissionGate>;
 }

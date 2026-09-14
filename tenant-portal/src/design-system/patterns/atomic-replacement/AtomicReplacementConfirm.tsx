@@ -134,7 +134,7 @@ export function AtomicReplacementConfirm({
         onOpenChange(next);
       }}
     >
-      <DialogContent size="lg" aria-busy={loading || undefined}>
+      <DialogContent className="p-3 sm:p-3.5" size="lg" aria-busy={loading || undefined}>
         <DialogHeader>
           <DialogTitle>{labels.title}</DialogTitle>
           <DialogDescription>{labels.description}</DialogDescription>
@@ -197,6 +197,7 @@ export function AtomicReplacementConfirm({
 
         <DialogFooter>
           <Button
+            size="sm"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
@@ -205,6 +206,7 @@ export function AtomicReplacementConfirm({
             {labels.cancel}
           </Button>
           <Button
+            size="sm"
             variant={diff.removed.length > 0 ? "destructive" : "primary"}
             onClick={onConfirm}
             loading={loading}

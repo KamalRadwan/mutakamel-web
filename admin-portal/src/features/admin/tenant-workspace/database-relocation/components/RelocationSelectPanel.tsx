@@ -39,7 +39,7 @@ export function RelocationSelectPanel({
   const missing = missingRelocationExecutePermissions(controller.permissions);
 
   return (
-    <div ref={regionRef} className="space-y-4">
+    <div ref={regionRef} className="space-y-3">
       <CurrentPlacementCard controller={controller} />
 
       <PlacementBlockersNotice
@@ -52,7 +52,7 @@ export function RelocationSelectPanel({
         <CardHeader>
           <CardTitle className="text-sm">{copy.destination}</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {!controller.hasTargets ? (
             <EmptyState
               icon={Database}
@@ -63,6 +63,7 @@ export function RelocationSelectPanel({
             <Field
               id="relocation-destination"
               label={copy.destination}
+              hideLabel
               hint={copy.destinationHint}
               error={controller.fieldErrors.target}
               required
@@ -78,8 +79,9 @@ export function RelocationSelectPanel({
                     aria-describedby={fieldProps["aria-describedby"]}
                     aria-invalid={fieldProps["aria-invalid"]}
                     aria-label={copy.destination}
+                    size="sm"
                   >
-                    <SelectValue placeholder={copy.destinationPlaceholder} />
+                    <SelectValue placeholder={`${copy.destinationPlaceholder} *`} />
                   </SelectTrigger>
                   <SelectContent>
                     {preflight.targets.map((target) => (
@@ -98,6 +100,7 @@ export function RelocationSelectPanel({
           <Field
             id="relocation-reason"
             label={copy.reason}
+            hideLabel
             hint={copy.reasonHint}
             error={controller.fieldErrors.reason}
             required
@@ -108,7 +111,8 @@ export function RelocationSelectPanel({
                 name="reason"
                 value={controller.reason}
                 maxLength={500}
-                rows={3}
+                rows={2}
+                placeholder={`${copy.reason} *`}
                 disabled={controller.hasBlockers || !controller.permissions.canExecute}
                 onChange={(event) => controller.setReason(event.target.value)}
               />
@@ -118,6 +122,7 @@ export function RelocationSelectPanel({
           <Field
             id="relocation-retention"
             label={`${copy.retentionDays} (${retention.minDays}–${retention.maxDays} ${copy.retentionUnit})`}
+            hideLabel
             hint={copy.retentionHint}
             error={controller.fieldErrors.retentionDays}
             required
@@ -125,12 +130,14 @@ export function RelocationSelectPanel({
             {(fieldProps) => (
               <Input
                 {...fieldProps}
+                size="sm"
                 name="sourceRetentionDays"
                 type="number"
                 inputMode="numeric"
                 min={retention.minDays}
                 max={retention.maxDays}
                 step={1}
+                placeholder={`${copy.retentionDays} * (${retention.minDays}–${retention.maxDays} ${copy.retentionUnit})`}
                 value={controller.retentionDays}
                 disabled={controller.hasBlockers || !controller.permissions.canExecute}
                 onChange={(event) => controller.setRetentionDays(event.target.value)}
@@ -156,6 +163,7 @@ export function RelocationSelectPanel({
 
           <div className="flex justify-end">
             <Button
+              size="sm"
               type="button"
               variant="primary"
               disabled={!controller.canSubmit}

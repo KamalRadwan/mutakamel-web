@@ -37,7 +37,7 @@ export function TemplatePreviewPanel({
     <DetailSection title={copy.previewTitle} description={copy.previewDescription}>
       <div className="flex flex-col gap-4">
         <Field label={copy.fixtureKey} hint={copy.fixtureKeyHint} required>
-          <Input
+          <Input size="sm" placeholder={copy.fixtureKey}
             dir="ltr"
             value={preview.fixtureKey}
             onChange={(event) => preview.setFixtureKey(event.target.value)}
@@ -77,20 +77,20 @@ export function TemplatePreviewPanel({
         {preview.email ? (
           <div className="flex flex-col gap-3">
             <Field label={copy.emailSubject} readOnly>
-              <Input value={preview.email.subject} readOnly dir="auto" />
+              <Input size="sm" placeholder={copy.emailSubject} value={preview.email.subject} readOnly dir="auto" />
             </Field>
             <Field label={copy.emailText} readOnly>
-              <Textarea value={preview.email.text} readOnly rows={8} dir="auto" />
+              <Textarea placeholder={copy.emailText} value={preview.email.text} readOnly rows={8} dir="auto" />
             </Field>
             <Field label={copy.emailHtml} hint={copy.renderedMarkupHint} readOnly>
-              <Textarea value={preview.email.html} readOnly rows={10} dir="ltr" />
+              <Textarea placeholder={copy.emailHtml} value={preview.email.html} readOnly rows={10} dir="ltr" />
             </Field>
           </div>
         ) : null}
 
         {preview.html ? (
           <Field label={copy.htmlOutput} hint={copy.renderedMarkupHint} readOnly>
-            <Textarea value={preview.html.html} readOnly rows={12} dir="ltr" />
+            <Textarea placeholder={copy.htmlOutput} value={preview.html.html} readOnly rows={12} dir="ltr" />
           </Field>
         ) : null}
 

@@ -43,14 +43,14 @@ export function LeadConvertModal({ convert }: { convert: LeadConvertState }) {
           {convert.reviewing && <p role="status" className="text-xs text-muted-foreground">{t.crmLeadConvert.reviewDescription}</p>}
           <FormSection id="profile" title={t.crmLeadConvert.steps.profile}>
             <Field label={t.crmLeadConvert.profileType} hint={t.crmLeadConvert.profileTypeFixed} error={errors.profileType}>
-              <Input readOnly value={t.crmCustomerProfiles.profileTypes[form.profileType]} />
+              <Input size="sm" placeholder={t.crmLeadConvert.profileType} readOnly value={t.crmCustomerProfiles.profileTypes[form.profileType]} />
             </Field>
             <Field label={t.crmLeads.name} hint={t.crmLeadConvert.nameFallback} error={errors.displayName}>
-              <Input value={form.displayName} maxLength={180} disabled={disabled}
+              <Input size="sm" placeholder={t.crmLeads.name} value={form.displayName} maxLength={180} disabled={disabled}
                 onChange={(event) => convert.setField("displayName", event.target.value)} />
             </Field>
             {form.profileType === "CORPORATE" && <Field label={t.crmLeads.companyName} hint={t.crmLeadConvert.nameFallback} error={errors.companyName}>
-              <Input value={form.companyName} maxLength={180} disabled={disabled}
+              <Input size="sm" placeholder={t.crmLeads.companyName} value={form.companyName} maxLength={180} disabled={disabled}
                 onChange={(event) => convert.setField("companyName", event.target.value)} />
             </Field>}
           </FormSection>

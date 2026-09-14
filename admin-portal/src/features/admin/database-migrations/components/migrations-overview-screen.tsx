@@ -78,9 +78,9 @@ export function MigrationsOverviewScreen() {
               <button
                 type="button"
                 onClick={openFleetStart}
-                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-card px-4 text-sm font-semibold text-primary"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-card px-2.5 text-xs font-semibold text-primary"
               >
-                <PlayCircle className="size-4" aria-hidden="true" />
+                <PlayCircle className="size-3.5" aria-hidden="true" />
                 {copy.startRun}
               </button>
             ) : null}
@@ -251,14 +251,14 @@ function AlarmBanner({
   return (
     <section
       role="alert"
-      className="rounded-lg border-2 border-destructive bg-destructive-subtle p-5 text-destructive-subtle-foreground shadow-md"
+      className="rounded-lg border border-destructive/40 bg-destructive-subtle p-3 sm:p-3.5 text-destructive-subtle-foreground shadow-sm"
     >
-      <div className="flex items-start gap-3">
-        <AlertOctagon className="mt-0.5 size-6 shrink-0" aria-hidden="true" />
+      <div className="flex items-start gap-2.5">
+        <AlertOctagon className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
-          <h2 className="text-base font-semibold">{copy.alarmTitle}</h2>
-          <p className="mt-1 text-sm leading-6">{copy.alarmBody}</p>
-          <ul className="mt-3 flex flex-wrap gap-2">
+          <h2 className="text-sm font-semibold">{copy.alarmTitle}</h2>
+          <p className="mt-0.5 text-xs leading-5">{copy.alarmBody}</p>
+          <ul className="mt-2.5 flex flex-wrap gap-1.5">
             {affected.map((entry) => (
               <li
                 key={entry.applicationKey}
@@ -457,8 +457,8 @@ function FilterBar({
   copy: MigrationsCopy;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5">
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         <label className="block">
           <span className={migrationLabelClass}>{copy.filterApplication}</span>
           <select
@@ -544,24 +544,24 @@ function TenantTable({
                     key={`${tenant.tenantId}:${tenant.applicationKey}`}
                     className="border-t border-border align-top"
                   >
-                    <td className="px-4 py-3 text-start">
-                      <p className="font-semibold">
+                    <td className="px-3 py-2 text-start">
+                      <p className="font-semibold text-xs">
                         {tenant.tenantName ?? tenant.tenantId}
                       </p>
                       <code
                         dir="ltr"
-                        className="mt-1 block font-mono text-xs text-muted-foreground"
+                        className="mt-0.5 block font-mono text-[11px] text-muted-foreground"
                       >
                         {tenant.tenantId}
                       </code>
                     </td>
-                    <td dir="ltr" className="px-4 py-3 text-start font-mono text-xs">
+                    <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
                       {tenant.applicationKey}
                     </td>
-                    <td className="px-4 py-3 text-start">
+                    <td className="px-3 py-2 text-start">
                       <SchemaStateChip state={tenant.state} copy={copy} />
                       {tenant.driftDetail ? (
-                        <p className="mt-2 max-w-sm text-xs leading-5 text-destructive">
+                        <p className="mt-1.5 max-w-sm text-xs leading-5 text-destructive">
                           <strong>{copy.driftDetail}:</strong>{" "}
                           <span dir="ltr" className="font-mono break-all">
                             {tenant.driftDetail}
@@ -569,20 +569,20 @@ function TenantTable({
                         </p>
                       ) : null}
                     </td>
-                    <td dir="ltr" className="px-4 py-3 text-start font-mono text-xs">
+                    <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
                       {tenant.schemaVersion || copy.none}
                     </td>
-                    <td className="px-4 py-3 text-start text-xs text-muted-foreground">
+                    <td className="px-3 py-2 text-start text-xs text-muted-foreground">
                       {formatMigrationDate(tenant.observedAt, lang)}
                     </td>
-                    <td className="px-4 py-3 text-end">
+                    <td className="px-3 py-2 text-end">
                       {canExecute ? (
                         <button
                           type="button"
                           onClick={() => onMigrateTenant(tenant.tenantId)}
-                          className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-primary/40 px-3 text-xs font-semibold text-primary"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-2.5 text-xs font-semibold text-primary"
                         >
-                          <PlayCircle className="size-4" aria-hidden="true" />
+                          <PlayCircle className="size-3.5" aria-hidden="true" />
                           {copy.migrateTenant}
                         </button>
                       ) : (
@@ -641,38 +641,38 @@ function RunTable({
                   key={run.id}
                   className="border-t border-border align-top"
                 >
-                  <td className="px-4 py-3 text-start">
+                  <td className="px-3 py-2 text-start">
                     <code dir="ltr" className="font-mono text-xs font-semibold">
                       {run.id}
                     </code>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {run.tenantScope
                         ? copy.scopeTenantCount(run.tenantScope.length)
                         : copy.scopeFleet}
                     </p>
                   </td>
-                  <td dir="ltr" className="px-4 py-3 text-start font-mono text-xs">
+                  <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
                     {run.applicationKey}
-                    <span className="mt-1 block text-muted-foreground">
+                    <span className="mt-0.5 block text-muted-foreground">
                       {run.targetVersion}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-start">
+                  <td className="px-3 py-2 text-start">
                     <RunModeChip dryRun={run.progress.dryRun} copy={copy} />
                   </td>
-                  <td className="px-4 py-3 text-start">
+                  <td className="px-3 py-2 text-start">
                     <RunStatusChip status={run.status} copy={copy} />
                   </td>
-                  <td className="px-4 py-3 text-start">
+                  <td className="px-3 py-2 text-start">
                     <RunProgressBar run={run} copy={copy} />
                   </td>
-                  <td className="px-4 py-3 text-start text-xs text-muted-foreground">
+                  <td className="px-3 py-2 text-start text-xs text-muted-foreground">
                     {formatMigrationDate(run.startedAt, lang)}
                   </td>
-                  <td className="px-4 py-3 text-end">
+                  <td className="px-3 py-2 text-end">
                     <Link
                       href={`/database-migrations/runs/${run.id}`}
-                      className="inline-flex min-h-10 items-center rounded-xl border border-primary/40 px-3 text-xs font-semibold text-primary"
+                      className="inline-flex h-8 items-center rounded-md border border-primary/40 px-2.5 text-xs font-semibold text-primary"
                     >
                       {copy.open}
                     </Link>

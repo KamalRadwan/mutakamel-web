@@ -5,7 +5,7 @@ import { isRetainedInvoice } from "../model/invoice-commercial";
 
 export function InvoiceCommercialEvidence({ value, lang }: { value: InvoiceCommercial; lang: "ar" | "en" }) {
   const copy = INVOICE_COMMERCIAL_COPY[lang];
-  return <Card className="min-w-0 space-y-3 p-4">
+  return <Card className="min-w-0 space-y-3 p-3 sm:p-3.5">
     <h2 className="text-base font-semibold">{copy.title}</h2>
     <p className="text-sm text-muted-foreground">{copy.hint}</p>
     {!isRetainedInvoice(value)
@@ -26,18 +26,18 @@ export function InvoiceCommercialEvidence({ value, lang }: { value: InvoiceComme
 }
 
 function Evidence({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0 rounded-md bg-muted px-3 py-2"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-all font-mono text-sm"><bdi>{value}</bdi></dd></div>;
+  return <div className="min-w-0 rounded-md bg-muted px-2.5 py-1.5"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-0.5 break-all font-mono text-xs"><bdi>{value}</bdi></dd></div>;
 }
 
 function RecordedBrackets({ line, lang }: { line: RetainedInvoiceLine; lang: "ar" | "en" }) {
   const copy = INVOICE_COMMERCIAL_COPY[lang];
-  return <details className="min-w-0 text-sm">
-    <summary className="min-h-11 cursor-pointer rounded-md py-3 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">{copy.breakdown}</summary>
+  return <details className="min-w-0 text-xs">
+    <summary className="min-h-8 cursor-pointer rounded-md py-1.5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">{copy.breakdown}</summary>
     <div className="overflow-x-auto"><table className="w-full text-start text-xs">
       <caption className="sr-only">{copy.breakdown}: {line.description}</caption>
-      <thead><tr>{[copy.from, copy.through, copy.charged, copy.unit, copy.lineAmount].map(label => <th key={label} scope="col" className="px-2 py-2 text-start font-semibold">{label}</th>)}</tr></thead>
+      <thead><tr>{[copy.from, copy.through, copy.charged, copy.unit, copy.lineAmount].map(label => <th key={label} scope="col" className="px-2 py-1.5 text-start font-semibold">{label}</th>)}</tr></thead>
       <tbody>{line.acceptedPricingSnapshot.breakdown?.map(row => <tr key={row.minUsers} className="border-t border-border">
-        {[String(row.minUsers), row.maxUsers === null ? copy.open : String(row.maxUsers), String(row.chargedUsers), row.unitPriceUsd, row.amountUsd].map((value, index) => <td key={index} className="px-2 py-2 font-mono"><bdi>{value}</bdi></td>)}
+        {[String(row.minUsers), row.maxUsers === null ? copy.open : String(row.maxUsers), String(row.chargedUsers), row.unitPriceUsd, row.amountUsd].map((value, index) => <td key={index} className="px-2 py-1.5 font-mono"><bdi>{value}</bdi></td>)}
       </tr>)}</tbody>
     </table></div>
   </details>;

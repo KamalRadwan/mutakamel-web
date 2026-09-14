@@ -94,11 +94,11 @@ export function ServersSection({ state }: { state: WebphoneSettingsState }) {
       />
 
       {ordered.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
           {copy.serversEmpty}
         </p>
       ) : (
-        <ol className="grid gap-3">
+        <ol className="grid gap-2.5">
           {ordered.map((server, index) => (
             <li key={server.id} {...orderable.rowProps(server.id)}>
               <ServerCard
@@ -152,11 +152,12 @@ function AddServerButton({ state }: { state: WebphoneSettingsState }) {
     state.mutation.target === "server:new";
 
   return (
-    <div className="grid gap-3 rounded-xl border border-dashed border-border p-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="grid gap-2.5 rounded-lg border border-dashed border-border p-3">
+      <div className="flex flex-wrap items-center gap-2.5">
         <Button
           type="button"
           variant="primary"
+          size="sm"
           disabled={pending}
           onClick={() =>
             void state.createServer(
@@ -165,9 +166,9 @@ function AddServerButton({ state }: { state: WebphoneSettingsState }) {
           }
         >
           {creating ? (
-            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
           ) : (
-            <Plus className="size-4" aria-hidden="true" />
+            <Plus className="size-3.5" aria-hidden="true" />
           )}
           {creating ? copy.adding : copy.addServer}
         </Button>

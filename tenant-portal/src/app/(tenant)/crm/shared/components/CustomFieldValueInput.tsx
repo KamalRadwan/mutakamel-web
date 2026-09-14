@@ -55,9 +55,12 @@ export function CustomFieldValueInput({
     );
   }
 
+  const fieldPlaceholder = localizedValue(field.nameAr, field.nameEn, lang) || t.crmCustomFields.valuePlaceholder;
+
   if (field.type === "TEXTAREA") {
     return (
       <Textarea
+        placeholder={fieldPlaceholder}
         value={typeof value === "string" ? value : ""}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
@@ -68,8 +71,10 @@ export function CustomFieldValueInput({
   if (field.type === "NUMBER") {
     return (
       <Input
+        size="sm"
         type="number"
         className="tabular-nums"
+        placeholder={fieldPlaceholder}
         value={typeof value === "number" ? String(value) : ""}
         disabled={disabled}
         onChange={(event) => {
@@ -114,7 +119,7 @@ export function CustomFieldValueInput({
         disabled={disabled || options.length === 0}
         onValueChange={onChange}
       >
-        <SelectTrigger>
+        <SelectTrigger size="sm">
           <SelectValue placeholder={t.crmCustomFields.valuePlaceholder} />
         </SelectTrigger>
         <SelectContent>
@@ -142,8 +147,9 @@ export function CustomFieldValueInput({
               : "text";
 
   return (
-    <Input
+    <Input size="sm"
       type={inputType}
+      placeholder={fieldPlaceholder}
       value={typeof value === "string" ? value : ""}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}

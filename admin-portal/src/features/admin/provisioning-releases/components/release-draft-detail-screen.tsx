@@ -26,9 +26,9 @@ export function ReleaseDraftDetailScreen({ draftId }: { draftId: string }) {
   const detail = useReleaseDraftDetail(draftId);
   return (
     <ReleasePageFrame dir={dir}>
-      <Button asChild variant="ghost" className="w-fit">
+      <Button asChild variant="ghost" size="sm" className="w-fit">
         <Link href="/provisioning/releases">
-          {dir === "rtl" ? <ArrowRight className="size-4" aria-hidden="true" /> : <ArrowLeft className="size-4" aria-hidden="true" />}
+          {dir === "rtl" ? <ArrowRight className="size-3.5" aria-hidden="true" /> : <ArrowLeft className="size-3.5" aria-hidden="true" />}
           {copy.back}
         </Link>
       </Button>
@@ -54,15 +54,15 @@ function DraftBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleas
   const draft = detail.snapshot.data;
   const pending = detail.mutation.phase === "PENDING";
   return (
-    <div className="space-y-4" aria-busy={pending || detail.isRefreshing}>
-      <Card className="p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-3" aria-busy={pending || detail.isRefreshing}>
+      <Card className="p-3 sm:p-3.5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 dir="ltr" className="font-mono text-xl font-semibold text-start text-foreground">{draft.releaseVersion}</h1>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 dir="ltr" className="font-mono text-lg font-semibold text-start text-foreground">{draft.releaseVersion}</h1>
               <StatusBadge status={draft.status} />
             </div>
-            <code dir="ltr" className="mt-2 block break-all text-start text-xs text-muted-foreground">{draft.draftId}</code>
+            <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">{draft.draftId}</code>
           </div>
           <RefreshReleaseButton label={copy.refresh} onClick={detail.refresh} pending={detail.isRefreshing} />
         </div>
@@ -71,10 +71,10 @@ function DraftBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleas
       <ReleaseMutationNotice mutation={detail.mutation} copy={copy} />
 
       {detail.published ? (
-        <Card className="border-success/30 bg-success-subtle p-4 text-success-subtle-foreground">
+        <Card className="border-success/30 bg-success-subtle p-3 sm:p-3.5 text-success-subtle-foreground">
           <section role="status">
             <h2 className="font-semibold">{copy.published}</h2>
-            <Button asChild variant="primary" className="mt-3">
+            <Button asChild variant="primary" size="sm" className="mt-2.5">
               <Link href={`/provisioning/releases/${detail.published.data.releaseId}`}>{copy.viewPublished}</Link>
             </Button>
           </section>
@@ -84,21 +84,21 @@ function DraftBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleas
       <EvidenceGrid draft={draft} copy={copy} lang={lang} />
 
       {detail.canEdit ? (
-        <Card className="p-5">
+        <Card className="p-3 sm:p-3.5">
           <form
             aria-label={copy.definition}
             onSubmit={(event) => {
               event.preventDefault();
               void detail.saveDraft();
             }}
-            className="space-y-4"
+            className="space-y-3"
           >
-            <h2 className="text-lg font-semibold text-foreground">{copy.definition}</h2>
-            <p className="text-sm leading-6 text-muted-foreground">{copy.disclosurePolicy}</p>
+            <h2 className="text-base font-semibold text-foreground">{copy.definition}</h2>
+            <p className="text-xs leading-5 text-muted-foreground">{copy.disclosurePolicy}</p>
             <ReleaseDefinitionFields value={detail.definition} errors={detail.definitionErrors} copy={copy} onChange={detail.updateDefinition} disabled={pending} />
             <div className="flex justify-end">
-              <Button type="submit" variant="primary" disabled={pending} loading={pending && detail.mutation.name === "UPDATE"}>
-                <Save className="size-4" aria-hidden="true" />
+              <Button type="submit" variant="primary" size="sm" disabled={pending} loading={pending && detail.mutation.name === "UPDATE"}>
+                <Save className="size-3.5" aria-hidden="true" />
                 {pending && detail.mutation.name === "UPDATE" ? copy.saving : copy.saveDraft}
               </Button>
             </div>
@@ -111,7 +111,7 @@ function DraftBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleas
       {draft.status === "DRAFT" && detail.permissions.canManageDrafts ? <ValidationForm detail={detail} copy={copy} /> : null}
       {draft.status === "VALIDATED" ? <PublishForm detail={detail} copy={copy} /> : null}
       {draft.status === "PUBLISHED" && draft.publishedReleaseId ? (
-        <Button asChild variant="primary" className="w-fit">
+        <Button asChild variant="primary" size="sm" className="w-fit">
           <Link href={`/provisioning/releases/${draft.publishedReleaseId}`}>{copy.viewPublished}</Link>
         </Button>
       ) : null}
@@ -123,28 +123,30 @@ function DraftBody({ detail, copy, lang }: { detail: ReturnType<typeof useReleas
 function ValidationForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDraftDetail>; copy: ReleaseCopy }) {
   const pending = detail.mutation.phase === "PENDING";
   return (
-    <Card className="border-border bg-muted p-5">
+    <Card className="border-border bg-muted p-3 sm:p-3.5">
       <form
         aria-label={copy.validationTitle}
         onSubmit={(event) => {
           event.preventDefault();
           void detail.validateDraft();
         }}
-        className="space-y-4"
+        className="space-y-3"
       >
         <div>
-          <h2 className="text-lg font-semibold text-foreground">{copy.validationTitle}</h2>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.validationHelp}</p>
+          <h2 className="text-base font-semibold text-foreground">{copy.validationTitle}</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.validationHelp}</p>
         </div>
         {detail.definitionDirty ? (
-          <p role="alert" className="rounded-lg border border-warning/30 bg-warning-subtle p-3 text-sm font-semibold text-warning-subtle-foreground">
+          <p role="alert" className="rounded-lg border border-warning/30 bg-warning-subtle p-2.5 text-xs font-semibold text-warning-subtle-foreground">
             {copy.unsavedDefinition}
           </p>
         ) : null}
-        <Field label={copy.publisherKeyId} className="max-w-2xl">
+        <Field label={copy.publisherKeyId} hideLabel className="max-w-2xl">
           {(fieldProps) => (
             <Input
               id={fieldProps.id}
+              size="sm"
+              placeholder={`${copy.publisherKeyId} *`}
               aria-describedby={detail.validationErrors.publisherKeyId ? "publisher-key-id-error" : undefined}
               dir="ltr"
               value={detail.publisherKeyId}
@@ -155,8 +157,8 @@ function ValidationForm({ detail, copy }: { detail: ReturnType<typeof useRelease
           )}
         </Field>
         <ReleaseFieldError id="publisher-key-id-error" code={detail.validationErrors.publisherKeyId} copy={copy} />
-        <Button type="submit" variant="primary" disabled={!detail.canValidate || pending} loading={pending && detail.mutation.name === "VALIDATE"}>
-          <CheckCircle2 className="size-4" aria-hidden="true" />
+        <Button type="submit" variant="primary" size="sm" disabled={!detail.canValidate || pending} loading={pending && detail.mutation.name === "VALIDATE"}>
+          <CheckCircle2 className="size-3.5" aria-hidden="true" />
           {pending && detail.mutation.name === "VALIDATE" ? copy.validating : copy.validate}
         </Button>
       </form>
@@ -167,14 +169,14 @@ function ValidationForm({ detail, copy }: { detail: ReturnType<typeof useRelease
 function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDraftDetail>; copy: ReleaseCopy }) {
   const pending = detail.mutation.phase === "PENDING";
   return (
-    <Card className="space-y-4 border-warning/30 bg-warning-subtle p-5">
+    <Card className="space-y-3 border-warning/30 bg-warning-subtle p-3 sm:p-3.5">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">{copy.publishTitle}</h2>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.publishHelp}</p>
+        <h2 className="text-base font-semibold text-foreground">{copy.publishTitle}</h2>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.publishHelp}</p>
       </div>
       <SigningPayload detail={detail} copy={copy} />
       {detail.definitionDirty ? (
-        <p role="alert" className="rounded-lg border border-warning/40 bg-card/70 p-3 text-sm font-semibold text-warning-subtle-foreground">
+        <p role="alert" className="rounded-lg border border-warning/40 bg-card/70 p-2.5 text-xs font-semibold text-warning-subtle-foreground">
           {copy.unsavedDefinition}
         </p>
       ) : null}
@@ -187,16 +189,17 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
             event.preventDefault();
             void detail.publish();
           }}
-          className="space-y-4"
+          className="space-y-3"
         >
-          <Field label={copy.signatureBase64}>
+          <Field label={copy.signatureBase64} hideLabel>
             {(fieldProps) => (
               <Textarea
                 id={fieldProps.id}
+                placeholder={`${copy.signatureBase64} *`}
                 aria-describedby={detail.publishErrors.signatureBase64 ? "release-signature-error" : undefined}
                 dir="ltr"
                 spellCheck={false}
-                rows={4}
+                rows={3}
                 value={detail.publishDraft.signatureBase64}
                 invalid={Boolean(detail.publishErrors.signatureBase64)}
                 onChange={(event) => detail.updatePublishDraft("signatureBase64", event.target.value)}
@@ -205,17 +208,17 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
             )}
           </Field>
           <ReleaseFieldError id="release-signature-error" code={detail.publishErrors.signatureBase64} copy={copy} />
-          <label className="flex items-start gap-3 rounded-lg border border-warning/30 bg-card/60 p-3 text-sm font-semibold text-foreground">
+          <label className="flex items-start gap-2.5 rounded-lg border border-warning/30 bg-card/60 p-2.5 text-xs font-semibold text-foreground">
             <Checkbox
               checked={detail.publishDraft.confirmed}
               onCheckedChange={(next) => detail.updatePublishDraft("confirmed", next === true)}
-              className="mt-1"
+              className="mt-0.5"
             />
             <span>{copy.publishConfirm}</span>
           </label>
           <ReleaseFieldError id="publish-confirm-error" code={detail.publishErrors.confirmed} copy={copy} />
-          <Button type="submit" variant="primary" disabled={!detail.canPublish || pending} loading={pending && detail.mutation.name === "PUBLISH"}>
-            <FileKey2 className="size-4" aria-hidden="true" />
+          <Button type="submit" variant="primary" size="sm" disabled={!detail.canPublish || pending} loading={pending && detail.mutation.name === "PUBLISH"}>
+            <FileKey2 className="size-3.5" aria-hidden="true" />
             {pending && detail.mutation.name === "PUBLISH" ? copy.publishing : copy.publish}
           </Button>
         </form>
@@ -225,14 +228,14 @@ function PublishForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDra
 }
 
 function SigningPayload({ detail, copy }: { detail: ReturnType<typeof useReleaseDraftDetail>; copy: ReleaseCopy }) {
-  if (detail.signingEvidence.phase === "CHECKING") return <p role="status" className="text-sm text-foreground">{copy.payloadChecking}</p>;
-  if (detail.signingEvidence.phase === "UNAVAILABLE") return <p role="alert" className="text-sm font-semibold text-destructive-subtle-foreground">{copy.payloadUnavailable}</p>;
-  if (detail.signingEvidence.phase === "MISMATCH") return <p role="alert" className="text-sm font-semibold text-destructive-subtle-foreground">{copy.payloadMismatch}</p>;
+  if (detail.signingEvidence.phase === "CHECKING") return <p role="status" className="text-xs text-foreground">{copy.payloadChecking}</p>;
+  if (detail.signingEvidence.phase === "UNAVAILABLE") return <p role="alert" className="text-xs font-semibold text-destructive-subtle-foreground">{copy.payloadUnavailable}</p>;
+  if (detail.signingEvidence.phase === "MISMATCH") return <p role="alert" className="text-xs font-semibold text-destructive-subtle-foreground">{copy.payloadMismatch}</p>;
   if (detail.signingEvidence.phase !== "VERIFIED") return null;
   return (
-    <Field label={copy.payloadBase64}>
+    <Field label={copy.payloadBase64} hideLabel>
       {(fieldProps) => (
-        <Textarea {...fieldProps} readOnly dir="ltr" rows={6} value={detail.signingEvidence.payloadBase64 ?? ""} className="bg-muted font-mono text-xs text-foreground" />
+        <Textarea {...fieldProps} placeholder={copy.payloadBase64} readOnly dir="ltr" rows={4} value={detail.signingEvidence.payloadBase64 ?? ""} className="bg-muted font-mono text-xs text-foreground" />
       )}
     </Field>
   );
@@ -240,7 +243,7 @@ function SigningPayload({ detail, copy }: { detail: ReturnType<typeof useRelease
 
 function EvidenceGrid({ draft, copy, lang }: { draft: NonNullable<ReturnType<typeof useReleaseDraftDetail>["snapshot"]>["data"]; copy: ReleaseCopy; lang: "ar" | "en" }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
+    <div className="grid gap-2.5 xl:grid-cols-3">
       <EvidenceCard title={copy.lifecycleEvidence}>
         <Evidence label={copy.revision} value={String(draft.revision)} />
         <Evidence label={copy.createdAt} value={formatDate(draft.createdAt, lang)} />
@@ -263,9 +266,9 @@ function EvidenceGrid({ draft, copy, lang }: { draft: NonNullable<ReturnType<typ
 
 function ManifestEvidence({ draft, copy }: { draft: NonNullable<ReturnType<typeof useReleaseDraftDetail>["snapshot"]>["data"]; copy: ReleaseCopy }) {
   return (
-    <Card className="space-y-3 p-5">
-      <p className="text-sm text-muted-foreground">{copy.disclosurePolicy}</p>
-      <div className="grid gap-3 xl:grid-cols-2">
+    <Card className="space-y-2.5 p-3 sm:p-3.5">
+      <p className="text-xs text-muted-foreground">{copy.disclosurePolicy}</p>
+      <div className="grid gap-2.5 xl:grid-cols-2">
         <JsonEvidence title={copy.manifestPayload} value={draft.manifestPayload} />
         <JsonEvidence title={copy.compatibility} value={draft.compatibility} />
       </div>
@@ -275,7 +278,7 @@ function ManifestEvidence({ draft, copy }: { draft: NonNullable<ReturnType<typeo
 
 function EvidenceCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Card className="p-4">
+    <Card className="p-3 sm:p-3.5">
       <h2 className="font-semibold text-foreground">{title}</h2>
       <dl className="mt-3 grid gap-2">{children}</dl>
     </Card>

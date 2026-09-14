@@ -73,7 +73,7 @@ function UomField({
   if (isUnavailable) {
     return (
       <Field label={label} hint={t.trade.errorMissingCompany}>
-        <Input
+        <Input size="sm" placeholder={label}
           dir="ltr"
           className="font-mono"
           value={value}
@@ -91,7 +91,7 @@ function UomField({
         onValueChange={(next) => onChange(next === NO_UOM ? "" : next)}
         disabled={isSubmitting || isLoading}
       >
-        <SelectTrigger aria-label={label}>
+        <SelectTrigger size="sm" aria-label={label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -174,7 +174,7 @@ export function CompanyProfileDrawer({
             onValueChange={(next) => change({ trackingMode: next as ItemTrackingMode })}
             disabled={isSubmitting}
           >
-            <SelectTrigger aria-label={t.trade.trackingMode}>
+            <SelectTrigger size="sm" aria-label={t.trade.trackingMode}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -201,7 +201,7 @@ export function CompanyProfileDrawer({
           onChange={(next) => change({ defaultPurchaseUomId: next })}
         />
         <Field label={t.trade.taxClassificationKey}>
-          <Input
+          <Input size="sm" placeholder={t.trade.taxClassificationKey}
             value={values.taxClassificationKey}
             onChange={(event) => change({ taxClassificationKey: event.target.value })}
             maxLength={80}
@@ -209,7 +209,7 @@ export function CompanyProfileDrawer({
           />
         </Field>
         <Field label={t.trade.accountingMappingKey}>
-          <Input
+          <Input size="sm" placeholder={t.trade.accountingMappingKey}
             value={values.accountingMappingKey}
             onChange={(event) => change({ accountingMappingKey: event.target.value })}
             maxLength={80}
@@ -217,7 +217,7 @@ export function CompanyProfileDrawer({
           />
         </Field>
         <Field label={t.trade.capabilitySet} hint={t.trade.capabilitySetHint}>
-          <Textarea
+          <Textarea placeholder={t.trade.capabilitySet}
             dir="ltr"
             className="font-mono"
             value={values.capabilitySet}
@@ -275,7 +275,7 @@ export function BranchProfileDrawer({
           />
         </Field>
         <Field label={t.trade.defaultFulfillmentNode}>
-          <Input
+          <Input size="sm" placeholder={t.trade.defaultFulfillmentNode}
             dir="ltr"
             className="font-mono"
             value={values.defaultFulfillmentNodeId}
@@ -284,7 +284,7 @@ export function BranchProfileDrawer({
           />
         </Field>
         <Field label={t.trade.replenishmentPolicyKey}>
-          <Input
+          <Input size="sm" placeholder={t.trade.replenishmentPolicyKey}
             value={values.replenishmentPolicyKey}
             onChange={(event) => change({ replenishmentPolicyKey: event.target.value })}
             maxLength={80}
@@ -292,7 +292,7 @@ export function BranchProfileDrawer({
           />
         </Field>
         <Field label={t.trade.restrictions} hint={t.trade.restrictionsHint}>
-          <Textarea
+          <Textarea placeholder={t.trade.restrictions}
             dir="ltr"
             className="font-mono"
             value={values.restrictions}
@@ -345,7 +345,7 @@ export function ListingDrawer({
         {/* The channel is part of the PATCH path, not its body, so it is
             information on edit rather than an editable field. */}
         <Field label={t.trade.listingChannel} readOnly={listing !== null} required={listing === null}>
-          <Input
+          <Input size="sm" placeholder={t.trade.listingChannel}
             dir="ltr"
             className="font-mono"
             value={values.channelId}
@@ -356,7 +356,7 @@ export function ListingDrawer({
           />
         </Field>
         <Field label={t.trade.publicationStatus} hint={t.trade.publicationStatusHint}>
-          <Input
+          <Input size="sm" placeholder={t.trade.publicationStatus}
             dir="ltr"
             value={values.publicationStatus}
             onChange={(event) => change({ publicationStatus: event.target.value.toUpperCase() })}
@@ -365,7 +365,7 @@ export function ListingDrawer({
           />
         </Field>
         <Field label={t.trade.saleConstraints} hint={t.trade.saleConstraintsHint}>
-          <Textarea
+          <Textarea placeholder={t.trade.saleConstraints}
             dir="ltr"
             className="font-mono"
             value={values.saleConstraints}

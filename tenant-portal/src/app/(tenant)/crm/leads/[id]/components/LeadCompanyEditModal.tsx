@@ -55,7 +55,7 @@ export function LeadCompanyEditModal({ state, edit, readOnly }: {
       <FormSection id="company" title={t.crmLeadDetail.companyTitle} columns={2}>
         {COMPANY_FIELDS.map((field) => (
           <Field key={field} label={labels[field]} error={state.errors[field]} required={field === "companyName"}>
-            <Input
+            <Input size="sm" placeholder={labels[field]}
               value={form[field]}
               dir={field === "companyName" ? undefined : "ltr"}
               maxLength={COMPANY_FIELD_LIMITS[field]}

@@ -86,7 +86,7 @@ export default function TenantRolesPage() {
             screen.canCreate ? { label: copy.create, onClick: screen.openCreate } : undefined
           }
           secondaryActions={
-            <Button variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
+            <Button size="sm" variant="outline" onClick={screen.reload} disabled={screen.isLoading}>
               <RefreshCw
                 className={`size-4 ${screen.isLoading ? "animate-spin" : ""}`}
                 aria-hidden="true"

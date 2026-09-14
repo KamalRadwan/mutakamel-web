@@ -25,7 +25,7 @@ export function GenerateInvoiceScreen() {
     <InvoicePageFrame dir={dir}>
       <Button variant="link" size="sm" asChild className="w-fit px-0">
         <Link href="/invoices">
-          {dir === "rtl" ? <ArrowRight className="size-4" /> : <ArrowLeft className="size-4" />}
+          {dir === "rtl" ? <ArrowRight className="size-3.5" /> : <ArrowLeft className="size-3.5" />}
           {copy.backToInvoices}
         </Link>
       </Button>
@@ -46,34 +46,36 @@ function GenerateForm({ generator, copy }: { generator: ReturnType<typeof useGen
   const pending = generator.mutation.phase === "PENDING";
   return (
     <Card className="mx-auto w-full max-w-4xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
-            <FilePlus2 className="size-4" aria-hidden="true" />
+      <CardHeader className="p-3 pb-0 sm:p-3.5 sm:pb-0">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
+          <span className="grid size-7 shrink-0 place-items-center rounded-md bg-info-subtle text-info-subtle-foreground">
+            <FilePlus2 className="size-3.5" aria-hidden="true" />
           </span>
           {copy.generationTitle}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={(event) => void generator.submit(event)} className="space-y-4" aria-label={copy.generationTitle}>
+      <CardContent className="p-3 sm:p-3.5">
+        <form onSubmit={(event) => void generator.submit(event)} className="space-y-3" aria-label={copy.generationTitle}>
           <InvoiceMutationNotice mutation={generator.mutation} copy={copy} />
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label={copy.tenantId} error={generator.validationErrors.tenantId ? invoiceFieldErrorText(generator.validationErrors.tenantId, copy) : undefined}>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label={copy.tenantId} hideLabel error={generator.validationErrors.tenantId ? invoiceFieldErrorText(generator.validationErrors.tenantId, copy) : undefined}>
               {(fp) => (
                 <Input
                   {...fp}
+                  size="sm"
                   dir="ltr"
+                  placeholder={`${copy.tenantId} *`}
                   value={generator.draft.tenantId}
                   invalid={Boolean(generator.validationErrors.tenantId)}
                   onChange={(event) => generator.updateDraft("tenantId", event.target.value)}
                 />
               )}
             </Field>
-            <Field label={copy.purpose}>
+            <Field label={copy.purpose} hideLabel>
               {(fp) => (
                 <Select value={generator.draft.purpose} onValueChange={(value) => generator.updateDraft("purpose", value as GenerateInvoiceDraft["purpose"])}>
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger {...fp} size="sm">
+                    <SelectValue placeholder={copy.purpose} />
                   </SelectTrigger>
                   <SelectContent>
                     {INVOICE_PURPOSES.map((purpose) => (
@@ -85,11 +87,13 @@ function GenerateForm({ generator, copy }: { generator: ReturnType<typeof useGen
                 </Select>
               )}
             </Field>
-            <Field label={copy.periodStart} error={generator.validationErrors.periodStart ? invoiceFieldErrorText(generator.validationErrors.periodStart, copy) : undefined}>
+            <Field label={copy.periodStart} hideLabel error={generator.validationErrors.periodStart ? invoiceFieldErrorText(generator.validationErrors.periodStart, copy) : undefined}>
               {(fp) => (
                 <Input
                   {...fp}
+                  size="sm"
                   type="datetime-local"
+                  placeholder={copy.periodStart}
                   value={generator.draft.periodStart}
                   invalid={Boolean(generator.validationErrors.periodStart)}
                   onChange={(event) => generator.updateDraft("periodStart", event.target.value)}
@@ -98,6 +102,7 @@ function GenerateForm({ generator, copy }: { generator: ReturnType<typeof useGen
             </Field>
             <Field
               label={copy.periodEnd}
+              hideLabel
               error={
                 generator.validationErrors.periodEnd || generator.validationErrors.periodRange
                   ? invoiceFieldErrorText(generator.validationErrors.periodEnd ?? generator.validationErrors.periodRange!, copy)
@@ -107,20 +112,22 @@ function GenerateForm({ generator, copy }: { generator: ReturnType<typeof useGen
               {(fp) => (
                 <Input
                   {...fp}
+                  size="sm"
                   type="datetime-local"
+                  placeholder={copy.periodEnd}
                   value={generator.draft.periodEnd}
                   invalid={Boolean(generator.validationErrors.periodEnd ?? generator.validationErrors.periodRange)}
                   onChange={(event) => generator.updateDraft("periodEnd", event.target.value)}
                 />
               )}
             </Field>
-            <Field label={copy.currency}>
-              {(fp) => <Input {...fp} readOnly dir="ltr" value={copy.canonicalUsd} className="text-muted-foreground" />}
+            <Field label={copy.currency} hideLabel className="md:col-span-2">
+              {(fp) => <Input {...fp} size="sm" readOnly dir="ltr" placeholder={copy.currency} value={copy.canonicalUsd} className="text-muted-foreground" />}
             </Field>
           </div>
-          <div className="flex justify-end border-t border-border pt-4">
-            <Button type="submit" variant="primary" loading={pending}>
-              <FilePlus2 className="size-4" aria-hidden="true" />
+          <div className="flex justify-end border-t border-border pt-3">
+            <Button size="sm" type="submit" variant="primary" loading={pending}>
+              <FilePlus2 className="size-3.5" aria-hidden="true" />
               {pending ? copy.generating : copy.submitGenerate}
             </Button>
           </div>
@@ -159,22 +166,22 @@ function GeneratedInvoice({ generator, copy, lang }: { generator: ReturnType<typ
   if (!created) return null;
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3">
-      <section role="status" aria-live="polite" className="rounded-lg border border-success/30 bg-success-subtle p-6 text-success-subtle-foreground">
-        <h1 className="text-xl font-semibold">{copy.generated}</h1>
-        <p className="mt-1 text-sm">{copy.generatedHelp}</p>
-        <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+      <section role="status" aria-live="polite" className="rounded-lg border border-success/30 bg-success-subtle p-4 sm:p-5 text-success-subtle-foreground">
+        <h1 className="text-lg font-semibold">{copy.generated}</h1>
+        <p className="mt-1 text-xs">{copy.generatedHelp}</p>
+        <dl className="mt-3 grid gap-2.5 sm:grid-cols-3">
           <Evidence label={copy.number} value={created.data.number} mono />
           <Evidence label={copy.status} value={created.data.status} mono />
           <Evidence label={copy.total} value={formatInvoiceMoney(created.data.total, created.data.currencyCode)} mono />
         </dl>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {generator.permissions.canRead ? (
-            <Button variant="primary" asChild>
+            <Button size="sm" variant="primary" asChild>
               <Link href={`/invoices/${created.data.id}`}>{copy.viewGenerated}</Link>
             </Button>
           ) : null}
-          <Button type="button" variant="outline" onClick={generator.startAnother}>
-            <RotateCcw className="size-4" />
+          <Button size="sm" type="button" variant="outline" onClick={generator.startAnother}>
+            <RotateCcw className="size-3.5" />
             {copy.startAnother}
           </Button>
         </div>

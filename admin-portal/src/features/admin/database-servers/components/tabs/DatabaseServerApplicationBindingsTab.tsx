@@ -149,29 +149,30 @@ export function DatabaseServerApplicationBindingsTab({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <Card>
-        <div className="border-b border-border bg-muted p-5">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div className="border-b border-border bg-muted p-3 sm:p-3.5">
+          <div className="flex flex-col justify-between gap-2.5 md:flex-row md:items-center">
             <div>
-              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-foreground rtl:normal-case rtl:tracking-normal">
-                <span className="rounded-lg bg-info-subtle p-1.5 text-info-subtle-foreground">
-                  <Database className="size-4" aria-hidden="true" />
+              <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground rtl:normal-case rtl:tracking-normal">
+                <span className="rounded-lg bg-info-subtle p-1 text-info-subtle-foreground">
+                  <Database className="size-3.5" aria-hidden="true" />
                 </span>
                 {d.title}
                 <Badge tone="neutral">{bindings.length}</Badge>
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">{d.subtitle}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{d.subtitle}</p>
             </div>
 
-            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end">
-              <Field label={lang === "ar" ? "البحث في الارتباطات" : "Search bindings"} className="min-w-0 flex-1 md:w-64">
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-end">
+              <Field label={lang === "ar" ? "البحث في الارتباطات" : "Search bindings"} hideLabel className="min-w-0 flex-1 md:w-64">
                 {(fieldProps) => (
                   <div className="relative">
-                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                    <Search className="pointer-events-none absolute start-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
                     <Input
                       {...fieldProps}
                       type="search"
+                      size="sm"
                       value={bindingsSearch}
                       onChange={(event) => onBindingsSearchChange(event.target.value)}
                       placeholder={d.searchPlaceholder}
@@ -182,21 +183,21 @@ export function DatabaseServerApplicationBindingsTab({
               </Field>
 
               {canBootstrapExisting && ["DRAFT", "ACTIVE", "DRAINING"].includes(server.status) && (
-                <Button type="button" variant="outline" className="shrink-0" disabled={Boolean(credentialActionPending)} onClick={onAddApplicationOpen}>
-                  <Plus className="size-4" aria-hidden="true" />
+                <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={Boolean(credentialActionPending)} onClick={onAddApplicationOpen}>
+                  <Plus className="size-3.5" aria-hidden="true" />
                   {d.addApplication}
                 </Button>
               )}
             </div>
           </div>
 
-          <div className="mt-4 flex items-start gap-3 rounded-lg border border-info/30 bg-info-subtle px-4 py-3 text-xs text-info-subtle-foreground">
-            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
+          <div className="mt-2.5 flex items-start gap-2.5 rounded-lg border border-info/30 bg-info-subtle p-2.5 text-xs text-info-subtle-foreground">
+            <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden="true" />
             <p className="leading-relaxed">{d.boundaryNotice}</p>
           </div>
 
           {lastCredentialReceipt && (
-            <div role="status" className="mt-3 grid gap-3 rounded-lg border border-success/30 bg-success-subtle px-4 py-3 text-xs text-success-subtle-foreground sm:grid-cols-3">
+            <div role="status" className="mt-2.5 grid gap-2 rounded-lg border border-success/30 bg-success-subtle p-2.5 text-xs text-success-subtle-foreground sm:grid-cols-3">
               <div>
                 <span className="block text-xs font-semibold uppercase tracking-wider rtl:normal-case rtl:tracking-normal">{d.lastOpTitle}</span>
                 <span className="font-semibold">{"applications" in lastCredentialReceipt ? d.accessInit : d.credUpdated}</span>

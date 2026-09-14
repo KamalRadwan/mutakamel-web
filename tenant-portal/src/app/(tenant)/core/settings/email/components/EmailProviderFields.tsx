@@ -50,7 +50,7 @@ export function EmailProviderFields({
           onValueChange={(value) => onChange({ providerDriver: value as EmailProviderDriver })}
           disabled={disabled || readOnly}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -78,7 +78,7 @@ export function EmailProviderFields({
       {isSmtp ? (
         <>
           <Field label={t.coreSettings.emailSmtpHost} readOnly={readOnly} required>
-            <Input
+            <Input size="sm" placeholder={t.coreSettings.emailSmtpHost}
               dir="ltr"
               value={values.smtpHost}
               onChange={(event) => onChange({ smtpHost: event.target.value })}
@@ -95,7 +95,7 @@ export function EmailProviderFields({
               onValueChange={(value) => onChange({ smtpPort: value })}
               disabled={disabled || readOnly}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue placeholder={t.coreSettings.emailSmtpPortPlaceholder} />
               </SelectTrigger>
               <SelectContent>
@@ -114,7 +114,7 @@ export function EmailProviderFields({
               onValueChange={(value) => onChange({ smtpProtocol: value as SmtpProtocol })}
               disabled={disabled || readOnly}
             >
-              <SelectTrigger>
+              <SelectTrigger size="sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -136,7 +136,7 @@ export function EmailProviderFields({
           </Field>
 
           <Field label={t.coreSettings.emailSmtpUsername} readOnly={readOnly} required>
-            <Input
+            <Input size="sm" placeholder={t.coreSettings.emailSmtpUsername}
               dir="ltr"
               value={values.smtpUsername}
               onChange={(event) => onChange({ smtpUsername: event.target.value })}
@@ -158,7 +158,7 @@ export function EmailProviderFields({
           >
             {/* Write-only: never pre-filled, and left blank on save so the
                 stored secret survives an edit that did not retype it. */}
-            <Input
+            <Input size="sm" placeholder={t.coreSettings.emailSmtpPassword}
               dir="ltr"
               type="password"
               autoComplete="new-password"

@@ -123,7 +123,7 @@ export function VersionLadderSheet({
                   label={t.tradeGovernance.reason}
                   hint={t.tradeGovernance.reasonHint}
                 >
-                  <Input
+                  <Input size="sm" placeholder={t.tradeGovernance.reason}
                     value={reason}
                     maxLength={GOVERNANCE_REASON_MAX_LENGTH}
                     disabled={pendingAction !== null}

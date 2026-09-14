@@ -189,7 +189,7 @@ export function FormModal({
           <form noValidate onSubmit={shell.handleSubmit} className="flex min-h-0 flex-1 flex-col">
             {/* pe-14 clears DialogContent's own close button, which is
                 positioned against the content box rather than this band. */}
-            <div className={cn("flex shrink-0 items-start justify-between border-b border-border", density === "compact" ? "gap-2 px-3 py-2 pe-14" : "gap-3 px-4 py-3 pe-14 sm:px-6")}>
+            <div className={cn("flex shrink-0 items-start justify-between border-b border-border", density === "compact" ? "gap-2 px-3 py-2 pe-14" : "gap-3 px-4 py-3 pe-14 sm:px-5")}>
               <div className="flex min-w-0 flex-col gap-1">
                 <DialogTitle className={density === "compact" ? "text-sm" : undefined}>{title}</DialogTitle>
                 {description && (
@@ -250,13 +250,13 @@ export function FormModal({
               <div
                 ref={setBody}
                 // Contains Radix's absolute native select so focus cannot scroll the entire dialog.
-                className={cn("relative flex min-w-0 flex-1 scroll-smooth flex-col overflow-y-auto", density === "compact" ? "gap-2 px-3 py-2" : "gap-6 px-4 py-4 sm:px-6")}
+                className={cn("relative flex min-w-0 flex-1 scroll-smooth flex-col overflow-y-auto", density === "compact" ? "gap-2 px-3 py-2" : "gap-4 px-4 py-3.5 sm:px-5")}
               >
                 {children}
               </div>
             </div>
 
-            <div className={cn("flex shrink-0 flex-col gap-2 border-t border-border", density === "compact" ? "px-3 py-2" : "px-4 py-3 sm:px-6")}>
+            <div className={cn("flex shrink-0 flex-col gap-2 border-t border-border", density === "compact" ? "px-3 py-2" : "px-4 py-2.5 sm:px-5")}>
               <FormErrorSummary error={error} />
               <div className="flex flex-wrap items-center gap-2">
                 {footerLeading && (
@@ -266,7 +266,7 @@ export function FormModal({
                   {/* Deliberately not DialogClose — that closes via Radix's own
                       context and would bypass the dirty guard. */}
                   <Button
-                    size={density === "compact" ? "sm" : "md"}
+                    size="sm"
                     type="button"
                     variant="outline"
                     onClick={shell.requestClose}
@@ -274,15 +274,17 @@ export function FormModal({
                   >
                     {labels.cancel}
                   </Button>
-                  {!hideSubmit && <Button
-                    size={density === "compact" ? "sm" : "md"}
-                    type="submit"
-                    variant="primary"
-                    loading={isSubmitting}
-                    disabled={submitDisabled}
-                  >
-                    {labels.submit}
-                  </Button>}
+                  {!hideSubmit && (
+                    <Button
+                      size="sm"
+                      type="submit"
+                      variant="primary"
+                      loading={isSubmitting}
+                      disabled={submitDisabled}
+                    >
+                      {labels.submit}
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

@@ -86,7 +86,7 @@ export default function SalesOrdersPage() {
           title={t.tradeDocuments.salesOrders.title}
           description={t.tradeDocuments.salesOrders.subtitle}
           secondaryActions={
-            <Button variant="outline" onClick={() => void list.reload()} disabled={list.isRefreshing}>
+            <Button size="sm" variant="outline" onClick={() => void list.reload()} disabled={list.isRefreshing}>
               <RefreshCw
                 className={list.isRefreshing ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

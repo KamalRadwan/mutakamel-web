@@ -61,7 +61,7 @@ export function CustomerProfileFormFields({
             }
             disabled={disabled}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -77,7 +77,7 @@ export function CustomerProfileFormFields({
       )}
 
       <Field label={t.crmCustomerProfiles.name} required>
-        <Input
+        <Input size="sm" placeholder={t.crmCustomerProfiles.name}
           value={form.displayName}
           onChange={(event) => setField("displayName", event.target.value)}
           maxLength={180}
@@ -93,7 +93,7 @@ export function CustomerProfileFormFields({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -117,7 +117,7 @@ export function CustomerProfileFormFields({
           }
           disabled={disabled}
         >
-          <SelectTrigger>
+          <SelectTrigger size="sm">
             <SelectValue placeholder={t.crmLeadDetail.noSource} />
           </SelectTrigger>
           <SelectContent>
@@ -136,7 +136,7 @@ export function CustomerProfileFormFields({
       {isCorporate && (
         <>
           <Field label={t.crmLeads.companyName}>
-            <Input
+            <Input size="sm" placeholder={t.crmLeads.companyName}
               value={form.companyName}
               onChange={(event) => setField("companyName", event.target.value)}
               maxLength={180}
@@ -144,7 +144,7 @@ export function CustomerProfileFormFields({
             />
           </Field>
           <Field label={t.crmLeadDetail.companyEmail}>
-            <Input
+            <Input size="sm" placeholder={t.crmLeadDetail.companyEmail}
               type="email"
               dir="ltr"
               value={form.companyEmail}
@@ -169,7 +169,7 @@ export function CustomerProfileFormFields({
             label={t.crmLeadDetail.companyWebsite}
             hint={t.crmCustomerProfileActions.websiteHint}
           >
-            <Input
+            <Input size="sm" placeholder={t.crmLeadDetail.companyWebsite}
               dir="ltr"
               value={form.companyWebsite}
               onChange={(event) =>
@@ -180,7 +180,7 @@ export function CustomerProfileFormFields({
             />
           </Field>
           <Field label={t.crmCustomerProfileActions.taxNumber}>
-            <Input
+            <Input size="sm" placeholder={t.crmCustomerProfileActions.taxNumber}
               dir="ltr"
               value={form.taxNumber}
               onChange={(event) => setField("taxNumber", event.target.value)}
@@ -189,7 +189,7 @@ export function CustomerProfileFormFields({
             />
           </Field>
           <Field label={t.crmCustomerProfileActions.commercialRegistration}>
-            <Input
+            <Input size="sm" placeholder={t.crmCustomerProfileActions.commercialRegistration}
               dir="ltr"
               value={form.commercialRegistrationNumber}
               onChange={(event) =>
@@ -203,7 +203,7 @@ export function CustomerProfileFormFields({
       )}
 
       <Field label={t.crmLeadDetail.description}>
-        <Textarea
+        <Textarea placeholder={t.crmLeadDetail.description}
           value={form.description}
           onChange={(event) => setField("description", event.target.value)}
           maxLength={2000}

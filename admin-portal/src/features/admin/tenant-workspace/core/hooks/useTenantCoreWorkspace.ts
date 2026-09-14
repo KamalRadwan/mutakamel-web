@@ -31,6 +31,7 @@ import type {
   TenantProvisioningCommandResult,
   TenantResourceState,
   TenantView,
+  TenantDestroyView,
 } from "../types";
 
 export interface TenantCoreWorkspaceOptions {
@@ -82,6 +83,8 @@ export function useTenantCoreWorkspace(
   >({ name: null, error: null });
   const [lastProvisioningCommand, setLastProvisioningCommand] =
     useState<TenantProvisioningCommandResult | null>(null);
+  const [destroyOperation, setDestroyOperation] = useState<TenantDestroyView | null>(null);
+  const [destroyError, setDestroyError] = useState<NormalizedApiError | null>(null);
   const [pollAttempts, setPollAttempts] = useState(0);
   const [pollExhausted, setPollExhausted] = useState(false);
 
@@ -112,6 +115,29 @@ export function useTenantCoreWorkspace(
     },
     [],
   );
+
+  const applyDestruction = useCallback((operation: TenantDestroyView | null) => {
+    setDestroyOperation(operation);
+    setDestroyError(null);
+    if (operation?.phase === "SUCCEEDED") {
+      tenantRef.current = null;
+      profileExpectedUpdatedAtRef.current = null;
+      setTenant(null);
+      setProfileDraftState(null);
+      setResourceState("destroyed");
+    }
+  }, []);
+
+  const loadDestruction = useCallback(async () => {
+    const identityGeneration = tenantIdentityGeneration.current;
+    try {
+      const operation = await tenantCoreApi.getDestroy(tenantId);
+      if (identityGeneration !== tenantIdentityGeneration.current || tenantIdRef.current !== tenantId) return;
+      applyDestruction(operation);
+    } catch (caught) {
+      if (identityGeneration === tenantIdentityGeneration.current && tenantIdRef.current === tenantId) setDestroyError(normalizeApiError(caught));
+    }
+  }, [applyDestruction, tenantId]);
 
   const loadTenant = useCallback(
     async (background = false): Promise<TenantView | null> => {
@@ -148,6 +174,7 @@ export function useTenantCoreWorkspace(
           );
         }
         applyTenant(next, !profileDirtyRef.current);
+        if (next.status === "DELETED") await loadDestruction();
         return next;
       } catch (caught) {
         if (
@@ -163,7 +190,7 @@ export function useTenantCoreWorkspace(
         return null;
       }
     },
-    [applyTenant, isAuthLoading, permissions.canRead, tenantId],
+    [applyTenant, isAuthLoading, loadDestruction, permissions.canRead, tenantId],
   );
 
   useEffect(() => {
@@ -185,6 +212,8 @@ export function useTenantCoreWorkspace(
       setProfileStale(false);
       setMutation({ name: null, error: null });
       setLastProvisioningCommand(null);
+      setDestroyOperation(null);
+      setDestroyError(null);
       setPollAttempts(0);
       setPollExhausted(false);
       void loadTenant(false);
@@ -210,6 +239,12 @@ export function useTenantCoreWorkspace(
       shouldContinue: () => tenantRef.current?.status === "PROVISIONING",
       deps: [loadTenant],
     },
+  );
+
+  usePollWhile(
+    !!destroyOperation && destroyOperation.tenantId === tenantId && destroyOperation.phase !== "SUCCEEDED" && permissions.canRead,
+    loadDestruction,
+    { intervalMs: pollIntervalMs, deps: [loadDestruction] },
   );
 
   const assertCurrentTenant = useCallback((): TenantView => {
@@ -504,7 +539,7 @@ export function useTenantCoreWorkspace(
       requirePermission(permissions.canDestroy, "TENANT_DESTROY_FORBIDDEN");
       const current = assertCurrentTenant();
       requireState(current.status === "DELETED", "TENANT_DESTROY_NOT_ALLOWED");
-      await runWrite(
+      const operation = await runWrite(
         "destroy",
         {
           action: "tenant.destroy",
@@ -513,15 +548,13 @@ export function useTenantCoreWorkspace(
         },
         (key) => tenantCoreApi.destroy(tenantId, destroySubscriptions, key),
       );
-      tenantRef.current = null;
-      profileExpectedUpdatedAtRef.current = null;
-      setTenant(null);
-      setProfileDraftState(null);
-      setResourceState("destroyed");
+      applyDestruction(operation);
+      return operation;
     },
     [
       assertCurrentTenant,
       permissions.canDestroy,
+      applyDestruction,
       runWrite,
       tenantId,
     ],
@@ -549,6 +582,8 @@ export function useTenantCoreWorkspace(
     profileStale,
     mutation,
     lastProvisioningCommand,
+    destroyOperation: destroyOperation?.tenantId === tenantId ? destroyOperation : null,
+    destroyError,
     pollAttempts,
     pollExhausted,
     isPolling: currentTenant?.status === "PROVISIONING" && !pollExhausted,

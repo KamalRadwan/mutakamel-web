@@ -87,16 +87,16 @@ export function SubscriptionWorkspace() {
         }
         secondaryActions={
           <>
-            <Button variant="outline" asChild>
+            <Button size="sm" variant="outline" asChild>
               <Link href={TENANT_ROUTES.coreSubscriptionChange}>{t.commercialPurchase.title}</Link>
             </Button>
-            <Button variant="outline" asChild>
+            <Button size="sm" variant="outline" asChild>
               <Link href={TENANT_ROUTES.coreSubscriptionCatalogue}>{t.subscriptionOffers.browse}</Link>
             </Button>
-            <Button variant="outline" asChild>
+            <Button size="sm" variant="outline" asChild>
               <Link href={TENANT_ROUTES.coreBilling}>{t.coreBilling.title}</Link>
             </Button>
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void subscription.reload()}
               disabled={subscription.isRefreshing}

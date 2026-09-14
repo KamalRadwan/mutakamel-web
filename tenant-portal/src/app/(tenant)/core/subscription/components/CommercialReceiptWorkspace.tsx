@@ -15,7 +15,7 @@ export function CommercialReceiptWorkspace({ reference }: { reference: Commercia
   return <div className="flex min-w-0 flex-col gap-4">
     <DetailHeader title={copy.title} subtitle={copy.description} backLabel={copy.back} backHref={TENANT_ROUTES.coreSubscription}
       breadcrumbs={[{ label: t.nav.coreSubscription, href: TENANT_ROUTES.coreSubscription }]}
-      secondaryActions={<Button variant="outline" onClick={read.reload} disabled={read.isLoading}>{t.coreBilling.reload}</Button>} />
+      secondaryActions={<Button size="sm" variant="outline" onClick={read.reload} disabled={read.isLoading}>{t.coreBilling.reload}</Button>} />
     <ReceiptResult read={read} />
   </div>;
 }

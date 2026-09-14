@@ -91,7 +91,7 @@ export function AssignmentDrawer({
     >
       <div className="flex flex-col gap-4">
         <Field label={copy.assignmentVersionId} hint={copy.assignmentVersionIdHint} required>
-          <Input
+          <Input size="sm" placeholder={copy.assignmentVersionId}
             dir="ltr"
             value={values.versionId}
             onChange={(event) => change({ versionId: event.target.value.trim() })}
@@ -108,7 +108,7 @@ export function AssignmentDrawer({
                 onValueChange={(value) => change({ documentType: value })}
                 disabled={isSubmitting}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -127,7 +127,7 @@ export function AssignmentDrawer({
                 onValueChange={(value) => change({ outputChannel: value })}
                 disabled={isSubmitting}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -146,7 +146,7 @@ export function AssignmentDrawer({
                 onValueChange={(value) => change({ adapterKey: value })}
                 disabled={isSubmitting}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -165,7 +165,7 @@ export function AssignmentDrawer({
                 onValueChange={(value) => change({ locale: value })}
                 disabled={isSubmitting}
               >
-                <SelectTrigger>
+                <SelectTrigger size="sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -181,7 +181,7 @@ export function AssignmentDrawer({
         )}
 
         <Field label={copy.assignmentPriority} hint={copy.assignmentPriorityHint} required>
-          <Input
+          <Input size="sm" placeholder={copy.assignmentPriority}
             dir="ltr"
             inputMode="numeric"
             value={values.priority}
@@ -201,7 +201,7 @@ export function AssignmentDrawer({
         </Field>
 
         <Field label={copy.assignmentEffectiveFrom} required>
-          <Input
+          <Input size="sm" placeholder={copy.assignmentEffectiveFrom}
             dir="ltr"
             type="datetime-local"
             value={values.effectiveFrom}
@@ -212,7 +212,7 @@ export function AssignmentDrawer({
         </Field>
 
         <Field label={copy.assignmentEffectiveTo} hint={copy.assignmentEffectiveToHint}>
-          <Input
+          <Input size="sm" placeholder={copy.assignmentEffectiveTo}
             dir="ltr"
             type="datetime-local"
             value={values.effectiveTo}

@@ -46,6 +46,7 @@ export function BackupDialog({
       <DialogContent
         dir={dir}
         showCloseButton={!isSubmitting}
+        className="p-3 sm:p-3.5"
         onOpenAutoFocus={(event) => {
           returnFocusRef.current = document.activeElement instanceof HTMLElement
             ? document.activeElement
@@ -67,17 +68,17 @@ export function BackupDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {error && (
             <div
               ref={errorRef}
               role="alert"
               tabIndex={-1}
-              className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-lg border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <p>{error.message}</p>
               {(error.errorCode || error.correlationId) && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {error.errorCode && <CodeRef value={error.errorCode} />}
                   {error.correlationId && <CodeRef value={error.correlationId} />}
                 </div>
@@ -88,10 +89,10 @@ export function BackupDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
             {t.common.cancel}
           </Button>
-          <Button type="button" variant={destructive ? "destructive" : "primary"} onClick={onConfirm} disabled={isSubmitting || confirmDisabled} loading={isSubmitting}>
+          <Button type="button" variant={destructive ? "destructive" : "primary"} size="sm" onClick={onConfirm} disabled={isSubmitting || confirmDisabled} loading={isSubmitting}>
             {confirmLabel}
           </Button>
         </DialogFooter>

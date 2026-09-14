@@ -60,30 +60,31 @@ export function TenantStorageMigrationPanel() {
           {t.storageMigration.panelTitle}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         <p className="text-xs leading-5 text-muted-foreground">
           {t.storageMigration.panelDescription}
         </p>
         <form onSubmit={submit} className="grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           <div className="min-w-0">
-            <Field id="tenant-storage-migration-id" label={t.storageMigration.migrationIdLabel} error={validationError ?? undefined}>
+            <Field id="tenant-storage-migration-id" label={t.storageMigration.migrationIdLabel} hideLabel error={validationError ?? undefined}>
               {(fp) => (
                 <Input
                   {...fp}
+                  size="sm"
                   name="migrationId"
                   value={input}
                   onChange={(e) => {
                     setInput(e.target.value);
                     if (validationError) setValidationError(null);
                   }}
-                  placeholder="019f0000-0000-7000-8000-000000000000"
+                  placeholder={`${t.storageMigration.migrationIdLabel} (UUIDv7)`}
                   className="font-mono"
                 />
               )}
             </Field>
           </div>
-          <Button type="submit" variant="outline" loading={view.isLoading}>
-            <Search className="size-4" aria-hidden="true" />
+          <Button type="submit" variant="outline" size="sm" loading={view.isLoading}>
+            <Search className="size-3.5" aria-hidden="true" />
             {t.storageMigration.lookupButton}
           </Button>
         </form>

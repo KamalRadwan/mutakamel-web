@@ -127,7 +127,7 @@ export default function PipelineDetailPage({
               }
               secondaryActions={
                 detail.canManage && pipeline.isDefault ? (
-                  <Button
+                  <Button size="sm"
                     variant="outline"
                     onClick={() => setIsResetOpen(true)}
                     disabled={detail.isSaving}

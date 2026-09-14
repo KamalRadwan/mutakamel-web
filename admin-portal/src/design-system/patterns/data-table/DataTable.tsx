@@ -26,8 +26,8 @@ const ALIGN_CLASS = { start: "text-start", center: "text-center", end: "text-end
  * never opens the profile sees no change.
  */
 const DENSITY_ROW_CLASS = {
-  compact: "h-11 py-2.5",
-  comfortable: "h-14 py-4",
+  compact: "h-8 py-1 text-xs",
+  comfortable: "h-9 py-1.5 text-xs",
 } as const;
 
 interface VisibleRow<T> {
@@ -318,13 +318,13 @@ export function DataTable<T>(props: DataTableProps<T>) {
         {responsiveMode === "record-cards" && (
           <div className="divide-y divide-border md:hidden">
             {initialLoading ? (
-              <div className="space-y-3 p-4" aria-hidden="true">
+              <div className="space-y-2.5 p-3" aria-hidden="true">
                 {Array.from({ length: 3 }, (_, index) => (
                   <div key={index} className="h-28 animate-pulse rounded-md bg-muted motion-reduce:animate-none" />
                 ))}
               </div>
             ) : visibleRows.length === 0 ? (
-              <div className="px-4 py-10 text-center">{emptyContent}</div>
+              <div className="px-3 py-6 text-center text-xs">{emptyContent}</div>
             ) : (
               visibleRows.map((row) => {
                 const rowSelected = isSelected(row);
@@ -333,7 +333,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     key={row.id}
                     aria-label={rowLabel(row)}
                     data-state={rowSelected ? "selected" : undefined}
-                    className="border-s-4 border-s-transparent p-4 data-[state=selected]:border-s-primary data-[state=selected]:bg-selected"
+                    className="border-s-4 border-s-transparent p-3 data-[state=selected]:border-s-primary data-[state=selected]:bg-selected"
                   >
                     {selectable && (
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -380,7 +380,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
           <TableHeader>
             <TableRow className="hover:bg-transparent dark:hover:bg-transparent">
               {selectable && (
-                <TableHead className="w-12 px-4 text-xs normal-case tracking-normal">
+                <TableHead className="w-10 px-2.5 text-xs normal-case tracking-normal">
                   <Checkbox
                     checked={allSelected ? true : someSelected ? "indeterminate" : false}
                     disabled={visibleEligibleRows.length === 0}
@@ -392,7 +392,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
               {showRowNumbers && (
                 <TableHead
                   scope="col"
-                  className="w-12 text-xs normal-case tracking-normal text-muted-foreground"
+                  className="w-10 px-2.5 text-xs normal-case tracking-normal text-muted-foreground"
                   title={lang === "ar" ? "رقم الصف" : "Row number"}
                 >
                   {lang === "ar" ? "م" : "N"}
@@ -426,18 +426,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
                         size="xs"
                         onClick={() => handleSort(column)}
                         className={cn(
-                          "h-auto gap-1.5 rounded-sm px-1 py-1 text-start font-semibold text-muted-foreground hover:text-foreground",
+                          "h-auto gap-1 rounded-sm px-1 py-0.5 text-start font-semibold text-muted-foreground hover:text-foreground",
                         )}
                       >
                         {lang === "ar" ? column.headerAr : column.headerEn}
                         {activeSort ? (
                           sort?.sortDir === "ASC" ? (
-                            <ArrowUp className="size-4" aria-hidden="true" />
+                            <ArrowUp className="size-3.5" aria-hidden="true" />
                           ) : (
-                            <ArrowDown className="size-4" aria-hidden="true" />
+                            <ArrowDown className="size-3.5" aria-hidden="true" />
                           )
                         ) : (
-                          <ArrowUpDown className="size-4 opacity-60" aria-hidden="true" />
+                          <ArrowUpDown className="size-3.5 opacity-60" aria-hidden="true" />
                         )}
                       </Button>
                     ) : (

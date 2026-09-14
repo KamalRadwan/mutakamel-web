@@ -7,6 +7,8 @@
 - **Styling**: Always use Tailwind CSS first for all Admin Portal pages and components.
 - **Navigation**: Always use `Link` from `next/link` for internal routes.
 - **Design & Layout**: Ensure admin dashboard views, data tables, and metrics utilize screen space efficiently without awkward empty spaces.
+- **Strict Design System Adherence**: Always strictly follow the Admin Portal design system (`docs/design-system/README.md` and `src/design-system/`). Import exclusively from `@/design-system` and conform strictly to design tokens, typography, and component patterns without inventing ad-hoc styles.
+- **UI/UX Intelligence (`ui-ux-pro-max`)**: Always use and consult the `ui-ux-pro-max` skill for UI and UX guidelines, accessibility standards, color palettes, and interaction patterns BEFORE starting any UI or UX design.
 - **File Modifications**: Only modify files when explicitly requested by the user.
 - **Continuous Documentation**: Update this `AGENTS.md` file whenever architectural decisions, ports, or portal-specific rules change.
 - **API Documentation**: Start with `docs/README.md` and `docs/frontend-integration-guide.md`. For dashboard work, read `docs/api/dashboard.md`; for database-server work, read `docs/api/database-servers.md`; for module, feature, tier, pricing, or managed-currency work, read `docs/api/catalog.md`; for tenant work, read `docs/api/tenants.md` and the relevant nested `docs/api/tenant-users.md` and `docs/api/tenant-operations.md` contracts; for platform, auth, billing, notification, Asterisk, or SMTP settings work, read `docs/api/system-settings.md`. Update the relevant documentation whenever a route, DTO, enum, permission, adapter, or live/mock boundary changes.

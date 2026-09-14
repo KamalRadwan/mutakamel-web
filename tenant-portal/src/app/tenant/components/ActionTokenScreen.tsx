@@ -40,7 +40,7 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
             <div role="alert" className="flex flex-col gap-3">
               <p className="text-sm font-medium text-foreground">{copy.missingTokenTitle}</p>
               <p className="text-xs text-muted-foreground">{copy.missingTokenDescription}</p>
-              <Button variant="primary" asChild>
+              <Button size="sm" variant="primary" asChild>
                 <Link href="/login">{copy.goToLogin}</Link>
               </Button>
             </div>
@@ -62,7 +62,7 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
                   {t.errors.reference}: {screen.error.correlationId}
                 </p>
               ) : null}
-              <Button variant="primary" asChild>
+              <Button size="sm" variant="primary" asChild>
                 <Link href="/login">{copy.goToLogin}</Link>
               </Button>
             </div>
@@ -93,7 +93,8 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
                     type={screen.showPassword ? "text" : "password"}
                     name="new-password"
                     autoComplete="new-password"
-                    size="lg"
+                    size="sm"
+                    placeholder={copy.newPassword}
                     value={screen.newPassword}
                     onChange={(event) => screen.setNewPassword(event.target.value)}
                     maxLength={NEW_PASSWORD_MAX_LENGTH}
@@ -131,7 +132,8 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
                   type="password"
                   name="confirm-password"
                   autoComplete="new-password"
-                  size="lg"
+                  size="sm"
+                  placeholder={copy.confirmPassword}
                   value={screen.confirmPassword}
                   onChange={(event) => screen.setConfirmPassword(event.target.value)}
                   maxLength={NEW_PASSWORD_MAX_LENGTH}
@@ -151,7 +153,7 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
               <Button
                 type="submit"
                 variant="primary"
-                size="lg"
+                size="sm"
                 loading={isSubmitting}
                 disabled={!screen.isPasswordValid || !screen.isConfirmed || isSubmitting}
                 className="w-full"

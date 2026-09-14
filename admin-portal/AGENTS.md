@@ -78,11 +78,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
   Compact and dense means small spacing and a controlled type scale, not
   microscopic type; see `docs/design-system/typography.md` for the exact
   7-step scale and 3-weight policy this app enforces everywhere else.
-- **Design system imports**: Feature code (`src/app/**`, `src/features/**`)
-  must import design-system pieces only from the `@/design-system` barrel
-  (`import { Button, DataTable } from "@/design-system"`), never by reaching
-  into `src/design-system/primitives/Button` or `src/design-system/patterns/
-  data-table/DataTable` directly. See `docs/design-system/README.md`.
+- **Design System Enforcement**: Always strictly follow the Admin Portal design system (`docs/design-system/README.md` and `src/design-system/`). Feature code (`src/app/**`, `src/features/**`) must import design-system pieces only from the `@/design-system` barrel (`import { Button, DataTable } from "@/design-system"`), never by reaching into `src/design-system/primitives/Button` or `src/design-system/patterns/data-table/DataTable` directly. Never write ad-hoc or unvetted styles.
+- **UI/UX Intelligence (`ui-ux-pro-max`)**: Always use and consult the `ui-ux-pro-max` skill for UI and UX guidelines, design intelligence, accessibility requirements, color palettes, and interaction patterns before starting any UI or UX design.
 - **Navigation**: Use `Link` from `next/link` for internal routes.
 - **Bilingual and Theme Support**: Every screen must support Arabic RTL and
   English LTR plus dark and light themes. Prefer logical Tailwind properties

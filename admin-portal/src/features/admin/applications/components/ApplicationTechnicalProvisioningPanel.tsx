@@ -94,7 +94,7 @@ export function ApplicationTechnicalProvisioningPanel({
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <Button
+        <Button size="sm"
           type="button"
           variant="outline"
           onClick={onRetry}
@@ -243,7 +243,7 @@ export function ApplicationTechnicalProvisioningPanel({
                   )}
                 </div>
                 {canManage && (
-                  <Button variant="primary" className="shrink-0" onClick={onOpenAdoption}>
+                  <Button size="sm" variant="primary" className="shrink-0" onClick={onOpenAdoption}>
                     {copy.adoptIdentity}
                   </Button>
                 )}
@@ -260,7 +260,7 @@ export function ApplicationTechnicalProvisioningPanel({
                   )}
                 </div>
                 {canManage && (
-                  <Button variant="primary" className="shrink-0" onClick={onOpenBinding}>
+                  <Button size="sm" variant="primary" className="shrink-0" onClick={onOpenBinding}>
                     {copy.linkComponent}
                   </Button>
                 )}

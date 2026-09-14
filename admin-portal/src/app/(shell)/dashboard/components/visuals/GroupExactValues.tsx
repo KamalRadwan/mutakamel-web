@@ -65,14 +65,14 @@ export function GroupExactValues({ group }: { group: DashboardGroup }) {
 
   return (
     <details className="rounded-lg border border-border bg-card">
-      <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 text-sm font-semibold text-foreground">
+      <summary className="flex min-h-8 cursor-pointer items-center justify-between gap-2.5 px-3 py-1.5 text-xs font-semibold text-foreground">
         <span>{copy.allValuesTitle}</span>
         <span className="font-mono text-xs font-normal text-muted-foreground">
           {rows.length}
         </span>
       </summary>
-      <div className="border-t border-border px-4 pb-2 pt-3">
-        <p className="mb-3 text-xs text-muted-foreground">{copy.allValuesSubtitle}</p>
+      <div className="border-t border-border px-3 pb-2 pt-2.5">
+        <p className="mb-2 text-xs text-muted-foreground">{copy.allValuesSubtitle}</p>
         <div
           role="region"
           aria-label={copy.allValuesTitle}

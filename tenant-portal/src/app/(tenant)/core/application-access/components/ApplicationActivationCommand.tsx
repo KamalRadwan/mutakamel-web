@@ -26,12 +26,12 @@ export function ApplicationActivationCommand(props: ActivationCommandProps) {
       {state?.phase === "rejected" && state.status?.state !== "REJECTED" && <p role="alert" className="text-sm text-muted-foreground">{copy.stale}</p>}
       {state?.refreshFailed && <p role="status" className="text-sm text-muted-foreground">{t.addonAssignmentCommand.refreshFailed}</p>}
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={!action.canEnable} onClick={() => action.review(true)}>{branch ? copy.inherit : copy.enable}</Button>
-        <Button variant="outline" disabled={!action.canDisable} onClick={() => action.review(false)}>{branch ? copy.restrict : copy.disable}</Button>
-        {state?.command && state.phase === "uncertain" && <Button variant="outline" disabled={!action.ready} onClick={action.reviewOriginal}>{t.addonAssignmentCommand.reviewOriginal}</Button>}
+        <Button size="sm" variant="outline" disabled={!action.canEnable} onClick={() => action.review(true)}>{branch ? copy.inherit : copy.enable}</Button>
+        <Button size="sm" variant="outline" disabled={!action.canDisable} onClick={() => action.review(false)}>{branch ? copy.restrict : copy.disable}</Button>
+        {state?.command && state.phase === "uncertain" && <Button size="sm" variant="outline" disabled={!action.ready} onClick={action.reviewOriginal}>{t.addonAssignmentCommand.reviewOriginal}</Button>}
       </div>
       <Dialog open={action.ready && (state?.open ?? false)} onOpenChange={action.changeOpen}>
-        <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="max-h-[85dvh] overflow-y-auto">
+        <DialogContent dir={dir} showCloseButton={!pending} aria-busy={pending || undefined} className="p-3 sm:p-3.5 max-h-[85dvh] overflow-y-auto">
           <DialogHeader><DialogTitle>{state?.command ? t.addonAssignmentCommand.reviewOriginal : copy.confirmTitle}</DialogTitle>
             <DialogDescription>{state?.command ? t.addonAssignmentCommand.retryNotice : copy.confirmNotice}</DialogDescription></DialogHeader>
           <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -43,11 +43,11 @@ export function ApplicationActivationCommand(props: ActivationCommandProps) {
           </dl>
           {state?.command && <p className="text-xs text-muted-foreground">{t.addonAssignmentCommand.originalKey}: <IdentifierText>{state.command.idempotencyKey}</IdentifierText></p>}
           <Field label={copy.reason} hint={t.branchAddonRestriction.reasonHint} required error={state?.invalidReason ? t.branchAddonRestriction.reasonInvalid : undefined}>
-            <Input value={state?.reason ?? ""} onChange={(event) => action.changeReason(event.target.value)} maxLength={500} disabled={pending || !!state?.command || !action.ready} />
+            <Input size="sm" value={state?.reason ?? ""} placeholder={copy.reason} onChange={(event) => action.changeReason(event.target.value)} maxLength={500} disabled={pending || !!state?.command || !action.ready} />
           </Field>
           <DialogFooter>
-            <Button variant="outline" onClick={() => action.changeOpen(false)} disabled={pending}>{t.common.cancel}</Button>
-            <Button variant={!enabled ? "destructive" : "outline"} loading={pending} disabled={!action.ready || pending} onClick={action.confirm}>
+            <Button size="sm" variant="outline" onClick={() => action.changeOpen(false)} disabled={pending}>{t.common.cancel}</Button>
+            <Button size="sm" variant={!enabled ? "destructive" : "outline"} loading={pending} disabled={!action.ready || pending} onClick={action.confirm}>
               {state?.command ? t.addonAssignmentCommand.retryOriginal : copy.confirm}
             </Button>
           </DialogFooter>
@@ -70,6 +70,6 @@ export function ApplicationActivationCommand(props: ActivationCommandProps) {
       </dl>
     </div>}
     {(action.denied || (state && ["processing", "uncertain", "rejected", "committed", "storage"].includes(state.phase))) &&
-      <Button variant="outline" disabled={pending || state?.statusLoading} onClick={action.recheck}>{t.addonAssignmentCommand.recheck}</Button>}
+      <Button size="sm" variant="outline" disabled={pending || state?.statusLoading} onClick={action.recheck}>{t.addonAssignmentCommand.recheck}</Button>}
   </div>;
 }

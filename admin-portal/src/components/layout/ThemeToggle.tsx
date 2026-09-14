@@ -11,16 +11,16 @@ export function ThemeToggle() {
     <Button
       type="button"
       variant="ghost"
-      size="md"
+      size="sm"
       onClick={toggleTheme}
-      className="size-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+      className="size-7 shrink-0 p-0 text-slate-300 hover:bg-white/10 hover:text-white"
       aria-label={title}
       title={title}
     >
       {isDark ? (
-        <Sun className="size-4" aria-hidden="true" />
+        <Sun className="size-3.5" aria-hidden="true" />
       ) : (
-        <Moon className="size-4" aria-hidden="true" />
+        <Moon className="size-3.5" aria-hidden="true" />
       )}
     </Button>
   );

@@ -43,7 +43,7 @@ export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisi
       }}
     >
       <Field label={t.tradeDocuments.validUntil} required>
-        <Input
+        <Input size="sm" placeholder={t.tradeDocuments.validUntil}
           type="date"
           value={state.validUntil}
           onChange={(event) => state.setValidUntil(event.target.value)}

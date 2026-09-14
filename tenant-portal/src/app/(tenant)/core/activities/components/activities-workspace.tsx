@@ -55,7 +55,7 @@ export function ActivitiesWorkspace() {
               : undefined
           }
           secondaryActions={
-            <Button variant="outline" onClick={list.reload} disabled={list.isLoading}>
+            <Button size="sm" variant="outline" onClick={list.reload} disabled={list.isLoading}>
               <RefreshCw
                 className={list.isLoading ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

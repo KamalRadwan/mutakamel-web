@@ -50,10 +50,10 @@ export function BillingWorkspace() {
         description={t.coreBilling.subtitle}
         secondaryActions={
           <>
-            <Button variant="outline" asChild>
+            <Button size="sm" variant="outline" asChild>
               <Link href={TENANT_ROUTES.coreBillingInvoices}>{t.coreBilling.invoicesTitle}</Link>
             </Button>
-            <Button
+            <Button size="sm"
               variant="outline"
               onClick={() => void billing.reload()}
               disabled={billing.isRefreshing}

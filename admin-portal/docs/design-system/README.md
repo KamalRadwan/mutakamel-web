@@ -2,7 +2,8 @@
 
 Status: **[Verified current-source index; approved target linked below]**
 
-Last source verification: **2026-08-29**
+Last source verification: **2026-09-10** (shell route-inventory count only;
+every other map row retains its 2026-08-29 scope)
 
 Owner: **Admin Portal**
 
@@ -51,7 +52,7 @@ verified. New design work follows the approved target.
 | Radius, spacing, control/row heights, elevation budgets | [geometry-and-density.md](geometry-and-density.md) |
 | The 26 primitives (Button, Field, Dialog, Table, …) | [primitives.md](primitives.md) |
 | The 15 composite patterns (DataTable, FormDrawer, …) | [patterns.md](patterns.md) |
-| Sidebar, topbar, command palette, and 54-route inventory | [shell-and-navigation.md](shell-and-navigation.md) |
+| Sidebar, topbar, command palette, and 57-route inventory | [shell-and-navigation.md](shell-and-navigation.md) |
 | Local-storage-resolved theme/language and RTL direction wiring | [theming-and-direction.md](theming-and-direction.md) |
 | Where a write result belongs — toast vs. in-body | [toast-contract.md](toast-contract.md) |
 | Codemod inventory, phase gates, census baselines | [migration.md](migration.md) |

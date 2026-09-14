@@ -127,7 +127,7 @@ describe("tenant core API", () => {
   });
 
   it("uses exact soft-delete and destroy query contracts", async () => {
-    deleteMock.mockResolvedValue({ data: undefined });
+    deleteMock.mockResolvedValue(envelope({ tenantId: TENANT_ID, operationId: OPERATION_ID, phase: "STOPPING_PROVISIONING", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null }));
 
     await tenantCoreApi.softDelete(TENANT_ID, key);
     await tenantCoreApi.destroy(TENANT_ID, true, key);
@@ -172,7 +172,7 @@ describe("tenant core API", () => {
 
   it("adds from POST evidence and reconciles remove/promotion through tenant detail", async () => {
     postMock.mockResolvedValueOnce(envelope(customFqdnFixture()));
-    deleteMock.mockResolvedValue({ data: undefined });
+    deleteMock.mockResolvedValue(envelope({ tenantId: TENANT_ID, operationId: OPERATION_ID, phase: "STOPPING_PROVISIONING", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null }));
     postMock.mockResolvedValueOnce({ data: undefined });
 
     await expect(

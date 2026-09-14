@@ -48,7 +48,7 @@ export function StatCard({
   icon: Icon,
   tone,
   trend,
-  compact = false,
+  compact = true,
   className,
 }: {
   label: string;
@@ -73,7 +73,7 @@ export function StatCard({
     <div
       className={cn(
         "rounded-lg border border-border bg-card",
-        compact ? "p-3" : "p-4",
+        compact ? "p-2.5" : "p-3",
         tone && TONE_TOP_BORDER[tone],
         className,
       )}
@@ -89,14 +89,14 @@ export function StatCard({
               tone ? TONE_ICON[tone] : "text-muted-foreground",
             )}
           >
-            <Icon className="size-4" aria-hidden="true" />
+            <Icon className="size-3.5" aria-hidden="true" />
           </span>
         )}
       </div>
       <p
         className={cn(
-          "font-semibold tabular-nums text-foreground",
-          compact ? "mt-1.5 text-xl" : "mt-2 text-2xl",
+          "font-bold tabular-nums text-foreground",
+          compact ? "mt-1 text-lg sm:text-xl" : "mt-1.5 text-xl",
         )}
       >
         {displayValue}

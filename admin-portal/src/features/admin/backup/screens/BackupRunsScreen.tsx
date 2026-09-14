@@ -126,7 +126,7 @@ export function BackupRunsScreen() {
             }}
             disabled={Boolean(view.activeAction)}
           >
-            <Trash2 className="size-4" aria-hidden="true" />
+            <Trash2 className="size-3.5" aria-hidden="true" />
             {copy.deleteAction}
           </Button>
         ) : (
@@ -137,15 +137,14 @@ export function BackupRunsScreen() {
   ];
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-3">
       <BackupPageHeader
         eyebrow={copy.eyebrow}
         title={copy.title}
-        description={copy.description}
         actions={
           view.canStart && (
-            <Button type="button" variant="primary" onClick={openStart} disabled={Boolean(view.activeAction)}>
-              <Play className="size-4" aria-hidden="true" />
+            <Button type="button" variant="primary" size="sm" onClick={openStart} disabled={Boolean(view.activeAction)}>
+              <Play className="size-3.5" aria-hidden="true" />
               {copy.startManualBackupAction}
             </Button>
           )
@@ -161,11 +160,11 @@ export function BackupRunsScreen() {
       )}
 
       <Card>
-        <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto] lg:items-end">
+        <CardContent className="grid gap-2.5 p-3 sm:p-3.5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto] lg:items-end">
           <Field label={copy.serverFilterLabel}>
             {(fp) => (
               <Select value={view.databaseServerId} onValueChange={view.setDatabaseServerId} dir={dir}>
-                <SelectTrigger {...fp}>
+                <SelectTrigger {...fp} size="sm">
                   <SelectValue placeholder={copy.allServersPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -179,7 +178,7 @@ export function BackupRunsScreen() {
           <Field label={copy.statusFilterLabel}>
             {(fp) => (
               <Select value={view.status} onValueChange={(v) => view.setStatus(v as BackupRunStatus | "")} dir={dir}>
-                <SelectTrigger {...fp}>
+                <SelectTrigger {...fp} size="sm">
                   <SelectValue placeholder={copy.allStatusesPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -190,8 +189,8 @@ export function BackupRunsScreen() {
               </Select>
             )}
           </Field>
-          <Button type="button" variant="outline" className="sm:col-span-2 lg:col-span-1" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
-            {!view.isLoading && <RefreshCw className="size-4" aria-hidden="true" />}
+          <Button type="button" variant="outline" size="sm" className="sm:col-span-2 lg:col-span-1" onClick={() => void view.refresh()} disabled={view.isLoading} loading={view.isLoading}>
+            {!view.isLoading && <RefreshCw className="size-3.5" aria-hidden="true" />}
             {copy.refreshButton}
           </Button>
         </CardContent>
@@ -225,7 +224,7 @@ export function BackupRunsScreen() {
               descriptionAr: "لا توجد نتائج مطابقة للفلاتر الحالية.",
             }}
           />
-          <p className="rounded-md border border-border bg-muted px-4 py-3 text-xs text-muted-foreground">
+          <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
             {copy.boundedHistoryNote}
           </p>
         </div>
@@ -254,15 +253,15 @@ export function BackupRunsScreen() {
         {view.canReadServers ? (
           <BackupServerSelect label={copy.databaseServerFieldLabel} value={startServerId} servers={view.servers} onChange={setStartServerId} placeholder={copy.selectServerPlaceholder} required />
         ) : (
-          <Field label={copy.databaseServerIdLabel} hint={copy.databaseServerIdHint} required>
-            {(fp) => <Input {...fp} dir="ltr" value={startServerId} onChange={(e) => setStartServerId(e.target.value.trim())} placeholder="UUIDv7" />}
+          <Field label={copy.databaseServerIdLabel} hideLabel hint={copy.databaseServerIdHint} required>
+            {(fp) => <Input {...fp} dir="ltr" size="sm" value={startServerId} onChange={(e) => setStartServerId(e.target.value.trim())} placeholder={`${copy.databaseServerIdLabel} * (UUIDv7)`} />}
           </Field>
         )}
-        <Field label={copy.concurrencyLabel} required>
-          {(fp) => <Input {...fp} dir="ltr" type="number" min={1} max={10} value={tenantConcurrency} onChange={(e) => setTenantConcurrency(Number(e.target.value))} />}
+        <Field label={copy.concurrencyLabel} hideLabel required>
+          {(fp) => <Input {...fp} dir="ltr" size="sm" type="number" min={1} max={10} placeholder={`${copy.concurrencyLabel} *`} value={tenantConcurrency} onChange={(e) => setTenantConcurrency(Number(e.target.value))} />}
         </Field>
-        <Field label={copy.auditReasonLabel} required>
-          {(fp) => <Textarea {...fp} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={4} />}
+        <Field label={copy.auditReasonLabel} hideLabel required>
+          {(fp) => <Textarea {...fp} placeholder={`${copy.auditReasonLabel} *`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} />}
         </Field>
       </BackupDialog>
 
@@ -289,12 +288,12 @@ export function BackupRunsScreen() {
         destructive
         error={view.error}
       >
-        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground">
+        <div className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground">
           <p>{lang === "ar" ? "معرّف العملية المطلوب:" : "Required run ID:"}</p>
           <p dir="ltr" className="mt-1 break-all font-mono font-semibold">{deletingRun?.id}</p>
         </div>
-        <Field label={lang === "ar" ? "اكتب معرّف العملية للتأكيد" : "Type the run ID to confirm"} required>
-          {(fp) => <Input {...fp} dir="ltr" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />}
+        <Field label={lang === "ar" ? "اكتب معرّف العملية للتأكيد" : "Type the run ID to confirm"} hideLabel required>
+          {(fp) => <Input {...fp} dir="ltr" size="sm" placeholder={`${lang === "ar" ? "اكتب معرّف العملية للتأكيد" : "Type the run ID to confirm"} *`} value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} />}
         </Field>
       </BackupDialog>
     </div>

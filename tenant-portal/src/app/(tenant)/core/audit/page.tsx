@@ -69,7 +69,7 @@ export default function AuditPage() {
           title={copy.title}
           description={copy.subtitle}
           secondaryActions={
-            <Button variant="outline" onClick={ledger.reload} disabled={isLoading}>
+            <Button size="sm" variant="outline" onClick={ledger.reload} disabled={isLoading}>
               <RefreshCw
                 className={isLoading ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

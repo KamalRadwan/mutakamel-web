@@ -53,7 +53,7 @@ function BrandingWorkspace() {
             : undefined
         }
         secondaryActions={
-          <Button
+          <Button size="sm"
             variant="outline"
             onClick={() => void branding.reload()}
             disabled={branding.isRefreshing}
@@ -108,7 +108,7 @@ function BrandingWorkspace() {
                   hint={t.coreBilling.brandingAppNameHint}
                   readOnly={!branding.canManage}
                 >
-                  <Input
+                  <Input size="sm" placeholder={t.coreBilling.brandingAppName}
                     value={branding.values.appName}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
@@ -120,7 +120,7 @@ function BrandingWorkspace() {
                   hint={t.coreBilling.brandingTabTitleHint}
                   readOnly={!branding.canManage}
                 >
-                  <Input
+                  <Input size="sm" placeholder={t.coreBilling.brandingTabTitle}
                     value={branding.values.tabTitle}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
@@ -133,7 +133,7 @@ function BrandingWorkspace() {
                   error={branding.formError ?? undefined}
                   readOnly={!branding.canManage}
                 >
-                  <Input
+                  <Input size="sm"
                     value={branding.values.primaryColor}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
@@ -146,7 +146,7 @@ function BrandingWorkspace() {
                   hint={t.coreBilling.brandingSecondaryColorHint}
                   readOnly={!branding.canManage}
                 >
-                  <Input
+                  <Input size="sm" placeholder={t.coreBilling.brandingSecondaryColor}
                     value={branding.values.secondaryColor}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
@@ -159,7 +159,7 @@ function BrandingWorkspace() {
                   readOnly={!branding.canManage}
                   className="sm:col-span-2"
                 >
-                  <Input
+                  <Input size="sm" placeholder={t.coreBilling.brandingFontFamily}
                     value={branding.values.fontFamily}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}

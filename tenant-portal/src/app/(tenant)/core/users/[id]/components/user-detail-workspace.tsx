@@ -91,29 +91,29 @@ export function UserDetailWorkspace({ id }: { id: string }) {
           }
           secondaryActions={
             <>
-              {screen.canReadAddonAssignments && <Button variant="outline" asChild>
+              {screen.canReadAddonAssignments && <Button size="sm" variant="outline" asChild>
                 <Link href={`${TENANT_ROUTES.coreAddonSeats}/${id}`}>{t.addonAssignments.nav}</Link>
               </Button>}
               {screen.canUpdate ? (
-                <Button variant="outline" onClick={screen.openEdit}>
+                <Button size="sm" variant="outline" onClick={screen.openEdit}>
                   <Pencil className="size-4" aria-hidden="true" />
                   {copy.actions.edit}
                 </Button>
               ) : null}
               {screen.canDeactivate && screen.allowedActions.suspend ? (
-                <Button variant="outline" onClick={() => screen.requestAction("suspend")}>
+                <Button size="sm" variant="outline" onClick={() => screen.requestAction("suspend")}>
                   <ShieldOff className="size-4" aria-hidden="true" />
                   {copy.users.suspend}
                 </Button>
               ) : null}
               {screen.canDeactivate && screen.allowedActions.activate ? (
-                <Button variant="outline" onClick={() => screen.requestAction("activate")}>
+                <Button size="sm" variant="outline" onClick={() => screen.requestAction("activate")}>
                   <UserCheck className="size-4" aria-hidden="true" />
                   {copy.users.activate}
                 </Button>
               ) : null}
               {screen.canDelete && screen.allowedActions.delete ? (
-                <Button variant="outline" onClick={() => screen.requestAction("delete")}>
+                <Button size="sm" variant="outline" onClick={() => screen.requestAction("delete")}>
                   <Trash2 className="size-4 text-destructive" aria-hidden="true" />
                   {user.status === "INVITED" ? copy.users.revokeInvite : t.common.delete}
                 </Button>

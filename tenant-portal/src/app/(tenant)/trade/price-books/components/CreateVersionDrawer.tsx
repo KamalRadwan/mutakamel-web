@@ -92,7 +92,7 @@ export function CreateVersionDrawer({
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 md:grid-cols-2">
           <Field label={t.tradePricing.effectiveFrom} required>
-            <Input
+            <Input size="sm" placeholder={t.tradePricing.effectiveFrom}
               type="datetime-local"
               value={draft.effectiveFrom}
               disabled={isSubmitting}
@@ -102,7 +102,7 @@ export function CreateVersionDrawer({
             />
           </Field>
           <Field label={t.tradePricing.effectiveTo} hint={t.tradePricing.effectiveToHint}>
-            <Input
+            <Input size="sm" placeholder={t.tradePricing.effectiveTo}
               type="datetime-local"
               value={draft.effectiveTo}
               disabled={isSubmitting}
@@ -118,21 +118,21 @@ export function CreateVersionDrawer({
           {draft.entries.map((entry, index) => (
             <div key={index} className="grid gap-3 md:grid-cols-4">
               <Field label={t.tradePricing.itemId} required>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.itemId}
                   value={entry.itemId}
                   disabled={isSubmitting}
                   onChange={(event) => patchEntry(index, { itemId: event.target.value })}
                 />
               </Field>
               <Field label={t.tradePricing.uomId} required>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.uomId}
                   value={entry.uomId}
                   disabled={isSubmitting}
                   onChange={(event) => patchEntry(index, { uomId: event.target.value })}
                 />
               </Field>
               <Field label={t.tradePricing.currencyCode} required>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.currencyCode}
                   value={entry.currencyCode}
                   maxLength={3}
                   disabled={isSubmitting}
@@ -140,7 +140,7 @@ export function CreateVersionDrawer({
                 />
               </Field>
               <Field label={t.tradePricing.unitPrice} required hint={t.tradeCommon.decimalHint}>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.unitPrice}
                   value={entry.unitPrice}
                   inputMode="decimal"
                   disabled={isSubmitting}
@@ -148,7 +148,7 @@ export function CreateVersionDrawer({
                 />
               </Field>
               <Field label={t.tradePricing.minimumQuantity} required>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.minimumQuantity}
                   value={entry.minimumQuantity}
                   inputMode="decimal"
                   disabled={isSubmitting}
@@ -156,7 +156,7 @@ export function CreateVersionDrawer({
                 />
               </Field>
               <Field label={t.tradePricing.maximumQuantity}>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.maximumQuantity}
                   value={entry.maximumQuantity}
                   inputMode="decimal"
                   disabled={isSubmitting}
@@ -164,7 +164,7 @@ export function CreateVersionDrawer({
                 />
               </Field>
               <Field label={t.tradePricing.minimumAllowedPrice}>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.minimumAllowedPrice}
                   value={entry.minimumAllowedPrice}
                   inputMode="decimal"
                   disabled={isSubmitting}
@@ -174,7 +174,7 @@ export function CreateVersionDrawer({
                 />
               </Field>
               <Field label={t.tradePricing.priority} hint={t.tradePricing.priorityHint}>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.priority}
                   type="number"
                   min={0}
                   max={10000}
@@ -219,14 +219,14 @@ export function CreateVersionDrawer({
           {draft.promotions.map((promotion, index) => (
             <div key={index} className="grid gap-3 md:grid-cols-3">
               <Field label={t.tradePricing.promotionCode} required>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.promotionCode}
                   value={promotion.code}
                   disabled={isSubmitting}
                   onChange={(event) => patchPromotion(index, { code: event.target.value })}
                 />
               </Field>
               <Field label={t.tradePricing.promotionName} required>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.promotionName}
                   value={promotion.name}
                   disabled={isSubmitting}
                   onChange={(event) => patchPromotion(index, { name: event.target.value })}
@@ -242,7 +242,7 @@ export function CreateVersionDrawer({
                     })
                   }
                 >
-                  <SelectTrigger aria-label={t.tradePricing.benefitType}>
+                  <SelectTrigger size="sm" aria-label={t.tradePricing.benefitType}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -255,7 +255,7 @@ export function CreateVersionDrawer({
                 </Select>
               </Field>
               <Field label={t.tradePricing.discountValue} required hint={t.tradeCommon.decimalHint}>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.discountValue}
                   value={promotion.discountValue}
                   inputMode="decimal"
                   disabled={isSubmitting}
@@ -263,7 +263,7 @@ export function CreateVersionDrawer({
                 />
               </Field>
               <Field label={t.tradePricing.stackGroup}>
-                <Input
+                <Input size="sm" placeholder={t.tradePricing.stackGroup}
                   value={promotion.stackGroup}
                   disabled={isSubmitting}
                   onChange={(event) => patchPromotion(index, { stackGroup: event.target.value })}

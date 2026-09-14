@@ -91,7 +91,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
         <WorkspaceState alert>
           <p>{core.loadError?.message ?? copy.unavailable}</p>
           {core.loadError?.correlationId ? <p className="mt-2 font-mono text-xs">{copy.correlation}: {core.loadError.correlationId}</p> : null}
-          <Button type="button" variant="primary" className="mt-4" onClick={() => void core.refresh()}>{copy.retry}</Button>
+          <Button size="sm" type="button" variant="primary" className="mt-4" onClick={() => void core.refresh()}>{copy.retry}</Button>
         </WorkspaceState>
       </PageFrame>
     );
@@ -135,19 +135,19 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
 
   return (
     <PageFrame>
-      <div dir={dir} className="space-y-4">
-        <Button type="button" variant="link" className="px-0" onClick={() => router.push("/tenants")}>
-          {dir === "rtl" ? <ArrowRight size={16} aria-hidden="true" /> : <ArrowLeft size={16} aria-hidden="true" />}
+      <div dir={dir} className="space-y-3">
+        <Button type="button" variant="link" size="xs" className="px-0" onClick={() => router.push("/tenants")}>
+          {dir === "rtl" ? <ArrowRight size={14} aria-hidden="true" /> : <ArrowLeft size={14} aria-hidden="true" />}
           {copy.back}
         </Button>
 
         <header>
-        <Card className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <Card className="p-3 sm:p-3.5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">{copy.tenantWorkspace}</p>
-              <h1 className="mt-1 text-2xl font-semibold text-foreground">{tenant.companyName}</h1>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">{tenant.name} · {tenant.id}</p>
+              <h1 className="mt-0.5 text-base sm:text-lg font-semibold text-foreground">{tenant.companyName}</h1>
+              <p className="mt-0.5 font-mono text-xs text-muted-foreground">{tenant.name} · {tenant.id}</p>
             </div>
             <div
               className="text-end"
@@ -157,24 +157,20 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
               aria-busy={core.isPolling || undefined}
             >
               <Badge tone={statusTone(tenant.status)} className="font-mono">{tenant.status}</Badge>
-              <p className="mt-2 text-xs text-muted-foreground">{databaseReady ? copy.databaseReady : copy.databaseNotReady}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{databaseReady ? copy.databaseReady : copy.databaseNotReady}</p>
               {tenant.status === "PROVISIONING" && core.isPolling ? (
-                <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <RefreshCw className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
                   {copy.polling}
                 </p>
               ) : null}
-              {core.pollExhausted ? <Button type="button" variant="link" size="sm" className="mt-1 px-0" onClick={() => void core.refresh()}>{copy.resumePolling}</Button> : null}
+              {core.pollExhausted ? <Button type="button" variant="link" size="xs" className="mt-0.5 px-0" onClick={() => void core.refresh()}>{copy.resumePolling}</Button> : null}
             </div>
           </div>
         </Card>
         </header>
 
-        {/* Placement moves are full wizards with their own progress monitor, so
-            they are routes rather than panels. `fallback={null}` keeps an
-            unauthorized operator's page unchanged instead of stamping a
-            forbidden block into the middle of the workspace — the routes
-            themselves still render the real permission boundary. */}
+        {/* Placement moves are full wizards with their own progress monitor */}
         <div className="flex flex-wrap items-center gap-2">
           <PermissionGate permission={TENANT_RELOCATION_READ_PERMISSION} fallback={null}>
             <PlacementMoveAction
@@ -196,8 +192,8 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
           </PermissionGate>
         </div>
 
-        <nav className="overflow-x-auto rounded-lg border border-border bg-card p-2" aria-label={copy.sectionsLabel} tabIndex={0}>
-          <div className="flex min-w-max gap-2">
+        <nav className="overflow-x-auto rounded-lg border border-border bg-card p-1.5" aria-label={copy.sectionsLabel} tabIndex={0}>
+          <div className="flex min-w-max gap-1.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const selected = activeTab === tab.key;
@@ -209,7 +205,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
                 aria-current={selected ? "page" : undefined}
                 aria-describedby={tab.disabled ? tab.hintId : undefined}
                 variant={selected ? "primary" : "ghost"}
-                size="lg"
+                size="sm"
                 className="min-w-max"
                 onClick={() => {
                   setTabSelection({
@@ -219,7 +215,7 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
                   });
                 }}
               >
-                <Icon size={16} aria-hidden="true" />
+                <Icon size={14} aria-hidden="true" />
                 {tab.label}
               </Button>
             );
@@ -253,7 +249,6 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
               <TenantLifecyclePanel
                 locale={lang}
                 workspace={core}
-                onDestroyed={() => router.replace("/tenants")}
               />
               <TenantFqdnPanel
                 locale={lang}

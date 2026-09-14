@@ -79,7 +79,7 @@ export function CreateTemplateDrawer({
             onValueChange={(value) => change({ scopeIndex: value })}
             disabled={create.isSubmitting || create.scopes.length === 0}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -167,7 +167,7 @@ export function CreateTemplateDrawer({
             }
             disabled={create.isSubmitting || create.isLoadingStarters}
           >
-            <SelectTrigger>
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -182,7 +182,7 @@ export function CreateTemplateDrawer({
         </Field>
 
         <Field label={copy.code} hint={copy.codeHint} required>
-          <Input
+          <Input size="sm" placeholder={copy.code}
             dir="ltr"
             value={values.code}
             onChange={(event) => change({ code: event.target.value.toUpperCase() })}
@@ -193,7 +193,7 @@ export function CreateTemplateDrawer({
         </Field>
 
         <Field label={copy.name} required>
-          <Input
+          <Input size="sm" placeholder={copy.name}
             value={values.name}
             onChange={(event) => change({ name: event.target.value })}
             maxLength={TEMPLATE_NAME_MAX}
@@ -203,7 +203,7 @@ export function CreateTemplateDrawer({
         </Field>
 
         <Field label={copy.description}>
-          <Textarea
+          <Textarea placeholder={copy.description}
             value={values.description}
             onChange={(event) => change({ description: event.target.value })}
             maxLength={TEMPLATE_DESCRIPTION_MAX}
@@ -233,7 +233,7 @@ function TupleSelect({
   return (
     <Field label={label} required>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger>
+        <SelectTrigger size="sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

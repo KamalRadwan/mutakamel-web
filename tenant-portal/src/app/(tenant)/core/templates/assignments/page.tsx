@@ -124,7 +124,7 @@ export default function TemplateAssignmentsPage() {
               : undefined
           }
           secondaryActions={
-            <Button variant="outline" onClick={assignments.reload} disabled={assignments.isLoading}>
+            <Button size="sm" variant="outline" onClick={assignments.reload} disabled={assignments.isLoading}>
               <RefreshCw
                 className={assignments.isLoading ? "size-4 animate-spin" : "size-4"}
                 aria-hidden="true"

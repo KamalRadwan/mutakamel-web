@@ -36,22 +36,22 @@ export function UserDropdown() {
           variant="ghost"
           size="sm"
           aria-label={accountMenuLabel}
-          className="h-auto gap-2.5 px-1.5 py-1 ps-2"
+          className="h-auto gap-2.5 px-1.5 py-1 ps-2 text-white hover:bg-white/10 hover:text-white"
         >
           <span className="relative flex size-8 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
             <span>{currentAdmin.firstName[0]}</span>
-            <span className="absolute bottom-0 end-0 size-2.5 rounded-full border-2 border-card bg-success" aria-hidden="true" />
+            <span className="absolute bottom-0 end-0 size-2.5 rounded-full border-2 border-[#0f172a] bg-success" aria-hidden="true" />
           </span>
 
           <span className="hidden flex-col text-start md:flex">
-            <span className="text-xs font-semibold leading-none text-foreground">
+            <span className="text-xs font-semibold leading-none text-white">
               {fullName}
             </span>
-            <span className="mt-0.5 text-xs leading-none text-muted-foreground">
+            <span className="mt-0.5 text-xs leading-none text-slate-300">
               {currentAdmin.roleName}
             </span>
           </span>
-          <ChevronDown className="ms-0.5 size-3.5 text-muted-foreground" aria-hidden="true" />
+          <ChevronDown className="ms-0.5 size-3.5 text-slate-300" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
 

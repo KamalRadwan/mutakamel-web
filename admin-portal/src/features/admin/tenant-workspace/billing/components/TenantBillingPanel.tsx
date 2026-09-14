@@ -57,20 +57,19 @@ export function TenantBillingPanel({
     workspace.billingSummaryState,
   ].includes("loading");
   return (
-    <section className="space-y-4" dir={rtl ? "rtl" : "ltr"} aria-busy={refreshing || undefined}>
+    <section className="space-y-3" dir={rtl ? "rtl" : "ltr"} aria-busy={refreshing || undefined}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="text-base sm:text-lg font-semibold text-foreground">
             {copy.title}
           </h2>
-          <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <Button type="button" variant="outline" loading={refreshing} onClick={() => void workspace.refresh()}>
+        <Button type="button" variant="outline" size="sm" loading={refreshing} onClick={() => void workspace.refresh()}>
           {copy.refresh}
         </Button>
       </div>
 
-      <Tabs value={section} onValueChange={(value) => setSection(value as BillingSection)} className="space-y-4">
+      <Tabs value={section} onValueChange={(value) => setSection(value as BillingSection)} className="space-y-3">
         <TabsList aria-label={copy.title} className="max-w-full overflow-x-auto">
           {(["subscription", "wallet", "payments"] as const).map((key) => (
             <TabsTrigger key={key} value={key} className="shrink-0 px-3">
@@ -117,7 +116,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
   }
   if (workspace.subscriptionState === "empty") {
     return (
-      <Card className="p-5">
+      <Card className="p-3 sm:p-3.5">
         <h3 className="font-semibold">{copy.noSubscription}</h3>
         {workspace.permissions.canCreateSubscription ? (
           <div className="mt-4">
@@ -197,7 +196,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           value={`${header.currencyCode ?? "USD"} ${header.totalPrice ?? "—"}`}
         />
       </div>
-      <Card className="p-5">
+      <Card className="p-3 sm:p-3.5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{copy.subscriptionItems}</h3>
@@ -214,7 +213,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
           header.status !== "CANCELLED" &&
           header.cancelAt === null ? (
             <div className="flex items-center gap-2">
-              <label htmlFor="cancel-subscription-confirmation" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+              <label htmlFor="cancel-subscription-confirmation" className="flex min-h-8 items-center gap-2 text-xs text-muted-foreground">
                 <Checkbox
                   id="cancel-subscription-confirmation"
                   name="cancelSubscriptionConfirmed"
@@ -226,6 +225,7 @@ function SubscriptionSection({ workspace, lang }: TenantBillingPanelProps) {
               <Button
                 type="button"
                 variant="destructive"
+                size="sm"
                 disabled={!cancelConfirmed || Boolean(workspace.mutation.name)}
                 onClick={() => void workspace.cancelSubscription()}
               >
@@ -346,7 +346,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
       </div>
       {workspace.permissions.canPreviewWalletAdjustment &&
       wallet.status === "ACTIVE" ? (
-        <Card className="p-5">
+        <Card className="p-3 sm:p-3.5">
           <h3 className="font-semibold">{copy.walletAdjustment}</h3>
           <p className="text-xs text-muted-foreground">{copy.fxAuthority}</p>
           {workspace.inputCurrenciesState === "loading" ||
@@ -416,7 +416,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                 options={currencyOptions}
               />
               <div>
-                <Button type="submit" variant="primary" disabled={Boolean(workspace.mutation.name)}>
+                <Button size="sm" type="submit" variant="primary" disabled={Boolean(workspace.mutation.name)}>
                   {copy.previewAdjustment}
                 </Button>
               </div>
@@ -464,7 +464,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                     minLength={1}
                     maxLength={255}
                   />
-                  <Button
+                  <Button size="sm"
                     type="button"
                     variant="primary"
                     disabled={
@@ -476,7 +476,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
                   >
                     {copy.confirmAdjustment}
                   </Button>
-                  <Button type="button" variant="outline" onClick={workspace.clearWalletPreview}>
+                  <Button size="sm" type="button" variant="outline" onClick={workspace.clearWalletPreview}>
                     {copy.dismiss}
                   </Button>
                 </div>
@@ -491,7 +491,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
       ) : workspace.permissions.canPreviewWalletAdjustment ? (
         <StateCard>{copy.walletAdjustmentUnavailable}</StateCard>
       ) : null}
-      <Card className="p-5">
+      <Card className="p-3 sm:p-3.5">
         <h3 className="font-semibold">{copy.ledger}</h3>
         {workspace.ledgerState === "loading" ||
         workspace.ledgerState === "idle" ? (
@@ -591,11 +591,13 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
           {workspace.permissions.canRefundPayment &&
           payment.status === "SUCCEEDED" ? (
             <>
-              <Field id={`refund-note-${payment.paymentId}`} label={copy.refundNote}>
+              <Field id={`refund-note-${payment.paymentId}`} label={copy.refundNote} hideLabel>
                 {(field) => (
                   <Input
                     {...field}
+                    size="sm"
                     name={`refundNote.${payment.paymentId}`}
+                    placeholder={copy.refundNote}
                     value={refundNotes[payment.paymentId] ?? ""}
                     onChange={(event) =>
                       setRefundNotes((current) => ({
@@ -607,7 +609,7 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
                   />
                 )}
               </Field>
-              <label htmlFor={`refund-confirmation-${payment.paymentId}`} className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground">
+              <label htmlFor={`refund-confirmation-${payment.paymentId}`} className="flex min-h-8 items-center gap-2 text-xs text-muted-foreground">
                 <Checkbox
                   id={`refund-confirmation-${payment.paymentId}`}
                   name={`refundConfirmed.${payment.paymentId}`}
@@ -657,7 +659,7 @@ function PaymentsSection({ workspace, lang }: TenantBillingPanelProps) {
 
   return (
     <div className="space-y-4">
-      <Card className="p-5">
+      <Card className="p-3 sm:p-3.5">
         <h3 className="font-semibold">{copy.paymentHistory}</h3>
         {workspace.payments.items.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">{copy.noPayments}</p>
@@ -734,10 +736,10 @@ function PaymentReconciliationPanel({
     authoritativeProviderReference ?? providerReference;
 
   return (
-    <Card className="p-5">
+    <Card className="p-3 sm:p-3.5">
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-semibold">{copy.reconciliation}</h3>
-        <Button type="button" variant="outline" onClick={() => void workspace.selectPayment(null)}>
+        <Button size="sm" type="button" variant="outline" onClick={() => void workspace.selectPayment(null)}>
           {copy.close}
         </Button>
       </div>
@@ -822,7 +824,7 @@ function PaymentReconciliationPanel({
                 maxLength={500}
               />
               <div>
-                <Button
+                <Button size="sm"
                   type="submit"
                   variant="primary"
                   disabled={
@@ -883,7 +885,7 @@ function PaymentReconciliationPanel({
                         minLength={10}
                         maxLength={500}
                       />
-                      <Button
+                      <Button size="sm"
                         type="button"
                         variant="primary"
                         disabled={
@@ -900,7 +902,7 @@ function PaymentReconciliationPanel({
                       >
                         {copy.approve}
                       </Button>
-                      <Button
+                      <Button size="sm"
                         type="button"
                         variant="destructive"
                         disabled={
@@ -938,7 +940,7 @@ function BillingSummary({ workspace, lang }: TenantBillingPanelProps) {
     return <ErrorNotice error={workspace.billingSummaryError} lang={lang} />;
   const invoice = workspace.billingSummary?.currentCollectionInvoice;
   return (
-    <Card className="p-5">
+    <Card className="p-3 sm:p-3.5">
       <h3 className="font-semibold">{copy.collectionInvoice}</h3>
       {invoice ? (
         <>
@@ -1046,7 +1048,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
         onChange={(value) => updateDraft(() => setNote(value))}
         maxLength={500}
       />
-      <label htmlFor="offline-payment-confirmation" className="flex min-h-11 items-center gap-3 text-xs text-muted-foreground md:col-span-2">
+      <label htmlFor="offline-payment-confirmation" className="flex min-h-8 items-center gap-2 text-xs text-muted-foreground md:col-span-2">
         <Checkbox
           id="offline-payment-confirmation"
           name="offlinePaymentConfirmed"
@@ -1059,6 +1061,7 @@ function OfflinePaymentForm({ workspace, lang }: TenantBillingPanelProps) {
         <Button
           type="submit"
           variant="destructive"
+          size="sm"
           disabled={
             !confirmed ||
             !amount ||
@@ -1098,7 +1101,7 @@ function Metric({
 
 function StateCard({ children }: { children: ReactNode }) {
   return (
-    <Card className="p-5 text-sm text-muted-foreground">{children}</Card>
+    <Card className="p-3 sm:p-3.5 text-sm text-muted-foreground">{children}</Card>
   );
 }
 
@@ -1153,6 +1156,7 @@ function TextField({
   value,
   onChange,
   type = "text",
+  placeholder,
   ...inputProps
 }: {
   label: string;
@@ -1165,13 +1169,15 @@ function TextField({
   "value" | "onChange" | "type"
 >) {
   return (
-    <Field label={label}>
+    <Field label={label} hideLabel>
       {(fp) => (
         <Input
           id={fp.id}
+          size="sm"
           {...inputProps}
           name={name}
           type={type}
+          placeholder={placeholder ?? label}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -1214,7 +1220,7 @@ function SelectField({
         value={value || EMPTY_SELECT_VALUE}
         onValueChange={(next) => onChange(next === EMPTY_SELECT_VALUE ? "" : next)}
       >
-        <SelectTrigger id={id} aria-labelledby={labelId} aria-required={required || undefined}>
+        <SelectTrigger id={id} size="sm" aria-labelledby={labelId} aria-required={required || undefined}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

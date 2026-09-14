@@ -59,7 +59,7 @@ export function CreateDashboardModal({
     >
       <div className="flex flex-col gap-3">
         <Field label={t.tradeAnalytics.dashboardName} required>
-          <Input
+          <Input size="sm" placeholder={t.tradeAnalytics.dashboardName}
             value={name}
             maxLength={DASHBOARD_LIMITS.nameMaxLength}
             disabled={isSubmitting}
@@ -67,7 +67,7 @@ export function CreateDashboardModal({
           />
         </Field>
         <Field label={t.tradeAnalytics.dashboardDescription}>
-          <Textarea
+          <Textarea placeholder={t.tradeAnalytics.dashboardDescription}
             value={description}
             rows={3}
             maxLength={DASHBOARD_LIMITS.descriptionMaxLength}

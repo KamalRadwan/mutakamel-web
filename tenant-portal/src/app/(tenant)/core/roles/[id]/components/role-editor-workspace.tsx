@@ -83,12 +83,12 @@ export function RoleEditorWorkspace({ id }: { id: string }) {
           secondaryActions={
             <>
               {isReadOnly ? null : (
-                <Button variant="outline" onClick={screen.openRename} disabled={screen.isSubmitting}>
+                <Button size="sm" variant="outline" onClick={screen.openRename} disabled={screen.isSubmitting}>
                   {copy.rename}
                 </Button>
               )}
               {screen.isDirty && !isReadOnly ? (
-                <Button variant="outline" onClick={screen.resetSelection} disabled={screen.isSubmitting}>
+                <Button size="sm" variant="outline" onClick={screen.resetSelection} disabled={screen.isSubmitting}>
                   {t.editDrawer.revert}
                 </Button>
               ) : null}

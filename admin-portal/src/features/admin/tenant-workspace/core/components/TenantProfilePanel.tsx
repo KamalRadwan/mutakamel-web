@@ -117,9 +117,9 @@ export function TenantProfilePanel({
 
   return (
     <section aria-labelledby="tenant-profile-title">
-    <Card className="space-y-4 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-        <h2 id="tenant-profile-title" className="text-sm font-semibold text-foreground">
+    <Card className="space-y-3 p-3 sm:p-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+        <h2 id="tenant-profile-title" className="text-xs font-semibold text-foreground">
           {text.profile}
         </h2>
         <Badge tone="neutral" className="normal-case tracking-normal">
@@ -131,13 +131,13 @@ export function TenantProfilePanel({
       {workspace.profileStale && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning-subtle p-3 text-xs text-warning-subtle-foreground"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning-subtle-foreground"
         >
           <span>{text.stale}</span>
           <Button
             type="button"
             variant="secondary"
-            size="sm"
+            size="xs"
             onClick={() => void workspace.reloadStaleProfile()}
           >
             {text.reload}
@@ -145,23 +145,23 @@ export function TenantProfilePanel({
         </div>
       )}
 
-      <form noValidate onSubmit={submit} className="space-y-4">
+      <form noValidate onSubmit={submit} className="space-y-3">
         {Object.keys(errors).length ? (
           <div
             ref={errorSummaryRef}
             role="alert"
             tabIndex={-1}
-            className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-md border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <p className="font-semibold">{labels.validationTitle}</p>
-            <ul className="mt-2 list-disc space-y-1 ps-5">
+            <ul className="mt-1 list-disc space-y-0.5 ps-5">
               {Object.entries(errors).map(([key, message]) => (
                 <li key={key}><a className="underline" href={`#tenant-profile-${key}`}>{profileErrorLabel(key, labels)}: {message}</a></li>
               ))}
             </ul>
           </div>
         ) : null}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <ProfileField
             id="tenant-profile-companyName"
             name="companyName"
@@ -233,15 +233,15 @@ export function TenantProfilePanel({
           />
         </div>
 
-        <div className="rounded-lg border border-border p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="rounded-lg border border-border p-2.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold text-foreground">
               {text.address}
             </span>
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="xs"
               disabled={disabled || draft.address === null}
               onClick={workspace.clearAddress}
               className="text-destructive"
@@ -249,7 +249,7 @@ export function TenantProfilePanel({
               {text.clearAddress}
             </Button>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {(
               [
                 "city",
@@ -279,6 +279,7 @@ export function TenantProfilePanel({
           <Button
             type="submit"
             variant="primary"
+            size="sm"
             loading={workspace.mutation.name === "profile"}
             disabled={disabled || !workspace.profileDirty}
           >
@@ -315,12 +316,14 @@ function ProfileField({
   onChange,
 }: FieldProps) {
   return (
-    <FormField id={id} label={label} required={required} error={error}>
+    <FormField id={id} label={label} hideLabel required={required} error={error}>
       {(field) => (
         <Input
           {...field}
+          size="sm"
           name={name}
           value={value}
+          placeholder={`${label}${required ? " *" : ""}`}
           maxLength={maxLength}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}

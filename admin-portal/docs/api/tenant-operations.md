@@ -280,6 +280,13 @@ exceed the safe integer range.
 
 ## Retry and cancel
 
+Destruction amendment, source verified **2026-09-12**: an accepted tenant
+destruction request uses the existing authenticated cancellation protocol
+even for its soft-deleted tenant. This exception is bound to the retained
+destruction intent and requesting actor. Ordinary cancellation continues to
+reject deleted tenants. Worker waits for real stop evidence before database
+teardown; accepting cancellation never authorizes an immediate drop.
+
 Both return:
 
 ```ts

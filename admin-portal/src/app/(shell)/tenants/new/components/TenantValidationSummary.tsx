@@ -32,18 +32,18 @@ export const TenantValidationSummary = forwardRef<
       tabIndex={-1}
       aria-labelledby="tenant-validation-summary-title"
       aria-describedby="tenant-validation-summary-description"
-      className="rounded-lg border border-destructive/30 bg-destructive-subtle p-4 text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="rounded-md border border-destructive/30 bg-destructive-subtle p-3 text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="flex items-start gap-3">
-        <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+      <div className="flex items-start gap-2.5">
+        <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <div className="min-w-0">
-          <h2 id="tenant-validation-summary-title" className="text-sm font-semibold">
+          <h2 id="tenant-validation-summary-title" className="text-xs font-semibold">
             {title}
           </h2>
-          <p id="tenant-validation-summary-description" className="mt-1 text-sm">
+          <p id="tenant-validation-summary-description" className="mt-0.5 text-xs">
             {description}
           </p>
-          <ul className="mt-2 list-disc space-y-1 ps-5 text-sm">
+          <ul className="mt-1.5 list-disc space-y-0.5 ps-4 text-xs">
             {errors.map((error) => (
               <li key={error.fieldId}>
                 <a
@@ -52,7 +52,7 @@ export const TenantValidationSummary = forwardRef<
                     event.preventDefault();
                     onFieldFocus(error.fieldId);
                   }}
-                  className="inline-flex min-h-6 items-center rounded-sm font-medium underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex min-h-5 items-center rounded-sm font-medium underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {error.message}
                 </a>

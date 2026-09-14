@@ -59,7 +59,7 @@ export function SubscriptionsScreen() {
   const showControls = view.canRead && view.requestState !== "FORBIDDEN";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <PageHeader
         title={copy.title}
         action={
@@ -97,31 +97,31 @@ function SubscriptionFilters({
 }) {
   return (
     <Card>
-      <CardContent>
+      <CardContent className="p-3 sm:p-3.5">
         <form
           onSubmit={(event) => {
             event.preventDefault();
             view.applyFilters();
           }}
-          className="space-y-4"
+          className="space-y-2.5"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <Filter className="size-4 text-primary" aria-hidden="true" />
+            <h2 className="flex items-center gap-1.5 text-xs font-semibold">
+              <Filter className="size-3.5 text-primary" aria-hidden="true" />
               {copy.filters}
             </h2>
             {view.activeFilterCount ? (
-              <Badge tone="info">
+              <Badge tone="info" className="text-[11px]">
                 {formatInteger(view.activeFilterCount, lang)} {copy.activeFilters}
               </Badge>
             ) : null}
           </div>
-          <div className="grid gap-3 lg:grid-cols-[180px_minmax(260px,1fr)_220px_130px]">
-            <Field label={copy.status}>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[180px_minmax(220px,1fr)_200px_120px]">
+            <Field label={copy.status} hideLabel>
               {(fp) => (
                 <Select value={view.draft.status || "ALL"} onValueChange={(value) => view.setDraftField("status", (value === "ALL" ? "" : value) as "" | SubscriptionStatus)}>
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger {...fp} size="sm">
+                    <SelectValue placeholder={copy.status} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">{copy.allStatuses}</SelectItem>
@@ -134,10 +134,11 @@ function SubscriptionFilters({
                 </Select>
               )}
             </Field>
-            <Field label={copy.tenantId} error={view.tenantIdError ? copy.invalidTenantId : undefined}>
+            <Field label={copy.tenantId} hideLabel error={view.tenantIdError ? copy.invalidTenantId : undefined}>
               {(fp) => (
                 <Input
                   {...fp}
+                  size="sm"
                   dir="ltr"
                   value={view.draft.tenantId}
                   onChange={(event) => view.setDraftField("tenantId", event.target.value)}
@@ -147,7 +148,7 @@ function SubscriptionFilters({
                 />
               )}
             </Field>
-            <Field label={copy.sort}>
+            <Field label={copy.sort} hideLabel>
               {(fp) => (
                 <Select
                   value={`${view.draft.sortBy}:${view.draft.sortDir}`}
@@ -160,8 +161,8 @@ function SubscriptionFilters({
                     view.setDraftField("sortDir", sortDir);
                   }}
                 >
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger {...fp} size="sm">
+                    <SelectValue placeholder={copy.sort} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="createdAt:DESC">{copy.newest}</SelectItem>
@@ -174,11 +175,11 @@ function SubscriptionFilters({
                 </Select>
               )}
             </Field>
-            <Field label={copy.pageSize}>
+            <Field label={copy.pageSize} hideLabel>
               {(fp) => (
                 <Select value={String(view.limit)} onValueChange={(value) => view.setLimit(Number(value))}>
-                  <SelectTrigger id={fp.id} aria-describedby={fp["aria-describedby"]} aria-invalid={fp["aria-invalid"]}>
-                    <SelectValue />
+                  <SelectTrigger {...fp} size="sm">
+                    <SelectValue placeholder={copy.pageSize} />
                   </SelectTrigger>
                   <SelectContent>
                     {[20, 50, 100].map((value) => (
@@ -192,15 +193,15 @@ function SubscriptionFilters({
             </Field>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={view.clearFilters}>
+            <Button size="sm" type="button" variant="outline" onClick={view.clearFilters}>
               <RotateCcw className="size-3.5" />
               {copy.clear}
             </Button>
-            <Button type="button" variant="outline" onClick={view.refresh} disabled={view.isRefreshing}>
+            <Button size="sm" type="button" variant="outline" onClick={view.refresh} disabled={view.isRefreshing}>
               <RefreshCw className={`size-3.5 ${view.isRefreshing ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
               {copy.refresh}
             </Button>
-            <Button type="submit" variant="primary">
+            <Button size="sm" type="submit" variant="primary">
               <Filter className="size-3.5" />
               {copy.apply}
             </Button>
@@ -413,7 +414,7 @@ function SubscriptionResults({
         }}
         emptyState={{ titleEn: copy.empty, titleAr: copy.empty }}
       />
-      <p className="break-all rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+      <p className="break-all rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
         <strong className="font-semibold text-foreground">{copy.correlation}:</strong>{" "}
         <code dir="ltr" className="select-all font-mono">{view.data.correlationId}</code>{" · "}
         <strong className="font-semibold text-foreground">{copy.responseAt}:</strong>{" "}
@@ -439,7 +440,7 @@ function FailurePanel({
       detail={errorDetail(view, copy)}
       tone="danger"
       action={
-        <Button type="button" variant="outline" onClick={view.refresh}>
+        <Button size="sm" type="button" variant="outline" onClick={view.refresh}>
           {copy.retry}
         </Button>
       }
