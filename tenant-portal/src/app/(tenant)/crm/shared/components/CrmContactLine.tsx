@@ -146,14 +146,13 @@ export function CrmContactLine({
         className={cn(
           "grid grid-cols-1 gap-x-3 gap-y-3 @min-[28rem]:grid-cols-2",
           // One row as soon as one row FITS — 52rem of container without a job
-          // title, 64rem with one. Name boxes and email share equal fractional
-          // space (`minmax(0,1fr)`) so that first name, last name, and email
-          // have balanced, harmonious proportions in both individual and company
-          // forms, preventing email from dominating the row.
+          // title, 64rem with one. Calibrated column metrics keep first name and
+          // last name comfortable (~175px), job title balanced (~150px), email
+          // proportional (~210px), and phone protected from wrapping (~264px+).
           // Written out rather than composed: Tailwind reads these as text.
           showJobTitle
-            ? "@min-[64rem]:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(15rem,1fr)_minmax(0,1fr)]"
-            : "@min-[52rem]:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(15rem,1fr)_minmax(0,1fr)]",
+            ? "@min-[64rem]:grid-cols-[4.5rem_minmax(0,11rem)_minmax(0,11rem)_minmax(0,9.5rem)_minmax(16.5rem,1fr)_minmax(0,13rem)]"
+            : "@min-[52rem]:grid-cols-[4.5rem_minmax(0,11.5rem)_minmax(0,11.5rem)_minmax(16.5rem,1fr)_minmax(0,13.5rem)]",
         )}
       >
         {!directoryOwned && (

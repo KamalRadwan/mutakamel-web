@@ -193,7 +193,7 @@ export function CrmPhoneNumberInput({
   return (
     // dir="ltr" on the row, not just the input: a phone number is Latin digits
     // behind a plus and reads code-then-number in both languages.
-    <div className="flex flex-1 flex-wrap items-center gap-1.5" dir="ltr">
+    <div className="flex flex-1 items-center gap-1.5" dir="ltr">
       {/* One label covers two controls, and it names the number. The picker
           opts out of the field rather than claiming the same id, and takes its
           accessible name from its own trigger text. See field-control.tsx. */}
