@@ -6,11 +6,11 @@
  * What these prove: the four counts come from four different services and one
  * refusing tells the others nothing; opportunities join on the LEAD and trade
  * documents on its PARTY, which are different ids and not interchangeable; the
- * scope headers go to the one route whose Gateway policy asks for them; and a
+ * scope headers go to all three Trade routes whose owning guards require them; and a
  * count that did not come back reads as a dash rather than as zero.
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { api, authMock } = vi.hoisted(() => ({
@@ -25,8 +25,7 @@ const { api, authMock } = vi.hoisted(() => ({
       ],
       isTenantOwner: false,
       // A LIST of pairs, which is the shape `resolveCompanyForBranch`
-      // validates. Without it the scope does not resolve and the invoices
-      // count is skipped outright, because that route is BRANCH_REQUIRED.
+      // validates. Without it no Trade count can be requested.
       accessibleBranches: ["01900100-0000-7000-8000-0000000000c1"],
       accessibleBranchCompanies: [
         {
@@ -44,6 +43,13 @@ vi.mock("@/lib/api/axiosClient", async (importOriginal) => ({
   axiosClient: api,
 }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => authMock }));
+// Exercise the real related-nav primitives without unrelated navigation exports.
+vi.mock("@/design-system", async () => ({
+  ...await import("@/design-system/primitives/Badge"),
+  ...await import("@/design-system/primitives/Button"),
+  ...await import("@/design-system/lib/cn"),
+  ...await import("@/design-system/lib/icons"),
+}));
 
 import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
@@ -58,6 +64,7 @@ const copy = en.crmLeadDetail.related;
 const LEAD_ID = "01900100-0000-7000-8000-0000000000a1";
 const PARTY_ID = "01900100-0000-7000-8000-0000000000b1";
 const BRANCH_ID = "01900100-0000-7000-8000-0000000000c1";
+const COMPANY_ID = "01900100-0000-7000-8000-0000000000d1";
 
 /** Trade lists put the pager inside `data`; CRM's search answers it flat. */
 const tradeTotal = (total: number) => ({
@@ -78,6 +85,9 @@ const link = (kind: keyof typeof copy.labels) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  authMock.user = { isTenantOwner: false, permissions: [
+    "crm.opportunities.read", "trade.quotations.read", "trade.sales_orders.read", "trade.invoices.read",
+  ], accessibleBranches: [BRANCH_ID], accessibleBranchCompanies: [{ branchId: BRANCH_ID, companyId: COMPANY_ID }] };
   api.post.mockResolvedValue(crmTotal(2));
   api.get.mockImplementation((path: string) => {
     if (path.includes("/quotations")) return Promise.resolve(tradeTotal(3));
@@ -120,15 +130,45 @@ describe("the lead's related records", () => {
     expect(link("invoices")).toHaveAccessibleName(`${copy.labels.invoices}: 5`);
   });
 
-  it("sends the scope headers to invoices and to nothing else", async () => {
+  it("sends the Lead's company and branch on all Trade counts, with no Trade headers on CRM", async () => {
     renderNav();
     await waitFor(() => expect(api.get).toHaveBeenCalledTimes(3));
-    // Only `trading.invoices.get` declares BRANCH_REQUIRED. A route that
-    // declares none rejects the headers outright.
-    for (const [path, config] of api.get.mock.calls as [string, { headers?: unknown }][]) {
-      if (path.includes("/invoices")) expect(config.headers).toBeTruthy();
-      else expect(config.headers).toBeUndefined();
+    // Missing Gateway metadata is legacy validation, not an explicit NONE policy.
+    // QuotationsController/SalesOrdersController both require TradeScopeTarget.BRANCH.
+    for (const [, config] of api.get.mock.calls as [string, { headers?: unknown }][]) {
+      expect(config.headers).toEqual({ "x-mutakamel-company-id": COMPANY_ID, "x-mutakamel-branch-id": BRANCH_ID });
     }
+    expect(api.post.mock.calls[0][2].headers).toBeUndefined();
+  });
+
+  it("waits for a verified company mapping before any Trade read, while CRM still loads", async () => {
+    authMock.user.accessibleBranchCompanies = [];
+    const { rerender } = render(<LeadRelatedNav leadId={LEAD_ID} partyId={PARTY_ID} branchId={BRANCH_ID} />);
+    await waitFor(() => expect(link("opportunities")).toHaveTextContent("2"));
+    expect(api.get).not.toHaveBeenCalled();
+    for (const kind of ["quotations", "salesOrders", "invoices"] as const) expect(link(kind)).toHaveTextContent("—");
+    authMock.user = { ...authMock.user, accessibleBranchCompanies: [{ branchId: BRANCH_ID, companyId: COMPANY_ID }] };
+    rerender(<LeadRelatedNav leadId={LEAD_ID} partyId={PARTY_ID} branchId={BRANCH_ID} />);
+    await waitFor(() => expect(link("quotations")).toHaveTextContent("3"));
+    expect(api.get).toHaveBeenCalledTimes(3);
+  });
+
+  it("discards in-flight counts when the company context changes", async () => {
+    const newCompany = "01900100-0000-7000-8000-0000000000d2";
+    const pending: Array<(response: ReturnType<typeof tradeTotal>) => void> = [];
+    api.get.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    const { rerender } = render(<LeadRelatedNav leadId={LEAD_ID} partyId={PARTY_ID} branchId={BRANCH_ID} />);
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(3));
+    const oldSignal = api.get.mock.calls[0][1].signal as AbortSignal;
+    authMock.user = { ...authMock.user, accessibleBranchCompanies: [{ branchId: BRANCH_ID, companyId: newCompany }] };
+    api.get.mockResolvedValue(tradeTotal(9));
+    rerender(<LeadRelatedNav leadId={LEAD_ID} partyId={PARTY_ID} branchId={BRANCH_ID} />);
+    await waitFor(() => expect(link("quotations")).toHaveTextContent("9"));
+    expect(oldSignal.aborted).toBe(true);
+    for (const [, config] of api.get.mock.calls.slice(3)) expect(config.headers["x-mutakamel-company-id"]).toBe(newCompany);
+    await act(async () => { for (const resolve of pending) resolve(tradeTotal(3)); });
+    expect(link("quotations")).toHaveTextContent("9");
+    expect(link("salesOrders")).toHaveTextContent("9");
   });
 
   it("leaves a refused count as a dash, and keeps the other three", async () => {

@@ -103,6 +103,22 @@ describe("CRM attachments contract", () => {
     });
   });
 
+  it.each([1, 123_456, CRM_ATTACHMENT_MAX_BYTES])(
+    "reads the PostgreSQL bigint byte count %i without losing precision",
+    (sizeBytes) => {
+      expect(parseCrmAttachment({ ...attachment, sizeBytes: String(sizeBytes) }))
+        .toEqual({ ...attachment, sizeBytes });
+    },
+  );
+
+  it.each([
+    "", " ", "123 ", "123\n", "00123", "+123", "-1", "0", "1.5", "1e3", "0x10",
+    "123bytes", "NaN", "Infinity", "9007199254740993", String(CRM_ATTACHMENT_MAX_BYTES + 1),
+    null, undefined, true, {}, 1.5, Number.NaN, Number.POSITIVE_INFINITY,
+  ])("rejects an invalid byte count %j", (sizeBytes) => {
+    expect(() => parseCrmAttachment({ ...attachment, sizeBytes })).toThrow();
+  });
+
   it("rejects a size outside the storage cap", () => {
     expect(() => parseCrmAttachment({ ...attachment, sizeBytes: 0 })).toThrow();
     expect(() =>

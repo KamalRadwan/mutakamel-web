@@ -4,6 +4,20 @@ Status: **verified**
 
 Last source verification: **2026-08-31** (re-verified while building Phase 11)
 
+Quotation/sales-order list context re-verified **2026-09-14** against Gateway
+route metadata, `RouteContextMiddleware`, `UpstreamClientService`,
+`QuotationsController.list`, `SalesOrdersController.list`, and `TradeScopeGuard`.
+Both list handlers require `TradeScopeTarget.BRANCH`: send
+`x-mutakamel-company-id` and `x-mutakamel-branch-id`. Their Gateway rows are
+legacy rows with no `organizationScopeMode`; the Gateway forwards these
+selectors for owning-app validation. This differs from explicit `NONE`, which
+forbids them. A `partyId` query filter never replaces the required context.
+The Lead related-count hook now sends the same resolved context on all three
+Trade counts and skips those reads until the company/branch pair is known.
+Lead Card View uses the three `counts-by-party` POST reads instead of one list
+request per Lead; these Gateway rows are explicitly `BRANCH_REQUIRED` and the
+POSTs are read-only/replay-safe.
+
 Owning app: **trade-app**
 
 Canonical prefixes: `/api/tenant/trade/v1/quotations`, `.../sales-orders`,
@@ -20,12 +34,12 @@ are **not** built: each needs an evidence object with no published schema
 (Q32, Q85). Nine statements on this page were corrected against source while
 building it — see [Q84](../build/OPEN-QUESTIONS.md#q84--nine-corrections-to-trade-documentsmd-verified-from-source).
 
-**60 routes.** Quotations 14 · Sales orders 12 · Purchase orders 12 ·
-Purchase quotations 8 · Invoices 7 · Contracts 7.
+**63 routes.** Quotations 15 · Sales orders 13 · Purchase orders 12 ·
+Purchase quotations 8 · Invoices 8 · Contracts 7.
 
 Together with [trade-foundation.md](trade-foundation.md) (42) and
 [trade-advanced.md](trade-advanced.md) (129) this accounts for all
-**231** Trade routes exactly once. 42 + 60 + 129 = 231.
+**234** Trade routes exactly once. 42 + 63 + 129 = 234.
 
 Source inspected:
 `trade-app/src/modules/documents/documents.controller.ts`,
@@ -167,16 +181,17 @@ invoice raised from it.
 
 ---
 
-## Quotations — 14 routes
+## Quotations — 15 routes
 
 Feature gate: **`trade.sales`**. Every route targets **`BRANCH`**, so both
 `x-mutakamel-company-id` and `x-mutakamel-branch-id` are required on all
-fourteen.
+fifteen.
 
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/quotations` | `trade.quotations.read` | `DocumentListQueryDto` |
 | POST | `/api/tenant/trade/v1/quotations/search` | `trade.quotations.read` | `DocumentListQueryDto` — **200** |
+| POST | `/api/tenant/trade/v1/quotations/counts-by-party` | `trade.quotations.read` | `DocumentPartyCountsDto` — **200**, read-only bulk count |
 | GET | `/api/tenant/trade/v1/quotations/customer-options` | **`trade.quotations.create`** | `QuotationCustomerOptionsQueryDto` |
 | GET | `/api/tenant/trade/v1/quotations/:id` | `trade.quotations.read` | — |
 | POST | `/api/tenant/trade/v1/quotations` | `trade.quotations.create` | `CreateQuotationDto` |
@@ -259,6 +274,7 @@ was not confirmed — see [Not verified](#not-verified).
 | `DocumentReasonDto` | `reasonCode` (≤ 80) **required**, `evidenceRef?` (≤ 240) |
 | `ConvertQuotationDto` | `lines[]` (1–1000 `{ clientLineId, financial }`), `totals` (`OrderTotalsEvidenceDto`), `terms` (**required, must exactly reproduce the accepted revision's terms**) |
 | `DocumentListQueryDto` | `page`, `limit` (≤ 100, default 25), `status?` (free string ≤ 32), `partyId?` |
+| `DocumentPartyCountsDto` | `partyIds[]` — 1–100 unique UUIDv7 values; response has one `{ partyId, count }` row per requested id, including explicit zeroes |
 | `QuotationCustomerOptionsQueryDto` | `search?` (≤ 120), `cursor?` (≤ 512), `limit` (≤ 100, default 25) |
 
 Note that **the quotation's lines live on the revision, not the quotation.**
@@ -333,13 +349,14 @@ inside the exception rather than named on the throw line:
 
 ---
 
-## Sales orders — 12 routes
+## Sales orders — 13 routes
 
 Feature gate: **`trade.sales`**. Every route targets **`BRANCH`**.
 
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/sales-orders` | `trade.sales_orders.read` | `DocumentListQueryDto` |
+| POST | `/api/tenant/trade/v1/sales-orders/counts-by-party` | `trade.sales_orders.read` | `DocumentPartyCountsDto` — **200**, read-only bulk count |
 | POST | `/api/tenant/trade/v1/sales-orders` | `trade.sales_orders.create` | `CreateSalesOrderDto` |
 | GET | `/api/tenant/trade/v1/sales-orders/:id` | `trade.sales_orders.read` | — |
 | PATCH | `/api/tenant/trade/v1/sales-orders/:id` | `trade.sales_orders.update` | `UpdateSalesOrderDto` · `If-Match` |
@@ -627,7 +644,7 @@ book on issue.
 
 ---
 
-## Invoices — 7 routes
+## Invoices — 8 routes
 
 > **Invoices are not feature-gated.** `TradeInvoicesController` carries **no**
 > `@RequireTradeFeature` decorator. The only entitlement check is
@@ -637,6 +654,7 @@ book on issue.
 | Method | Canonical path | Permission | Body / query |
 | --- | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/invoices` | `trade.invoices.read` | `DocumentListQueryDto` |
+| POST | `/api/tenant/trade/v1/invoices/counts-by-party` | `trade.invoices.read` | `DocumentPartyCountsDto` — **200**, read-only bulk count |
 | POST | `/api/tenant/trade/v1/invoices` | `trade.invoices.create` | `CreateInvoiceDto` |
 | GET | `/api/tenant/trade/v1/invoices/:id` | `trade.invoices.read` | — |
 | PATCH | `/api/tenant/trade/v1/invoices/:id` | `trade.invoices.update` | `UpdateInvoiceDto` · `If-Match` |

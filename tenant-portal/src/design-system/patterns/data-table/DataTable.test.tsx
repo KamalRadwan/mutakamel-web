@@ -160,6 +160,29 @@ describe("DataTable", () => {
     expect(row.className).toContain("scroll-mt-(--size-row)");
     expect(row.className).toContain("scroll-me-16");
   });
+
+  it("uses the compact header, row and cell spacing only when requested", () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ id: "1", name: "Alice" }]}
+        isLoading={false}
+        rowKey={(row) => row.id}
+        labels={labels}
+        density="compact"
+      />,
+    );
+
+    const header = screen.getByRole("columnheader", { name: /Name/ });
+    const row = screen.getByRole("row", { name: /Alice/ });
+    const cell = screen.getByRole("cell", { name: "Alice" });
+    expect(header.className).toContain("h-8");
+    expect(header.className).toContain("px-2.5");
+    expect(row.className).toContain("h-9");
+    expect(row.className).toContain("scroll-mt-9");
+    expect(cell.className).toContain("px-2.5");
+    expect(cell.className).toContain("py-1");
+  });
 });
 
 /**

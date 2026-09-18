@@ -68,6 +68,8 @@ export interface BoardViewProps<T> extends Omit<WorkspaceViewProps<T>, "sort" | 
   // know what creating means — the screen opens its own modal and decides what
   // the column id seeds in it. Requires `labels.addToColumn`.
   onAddToColumn?: (columnId: string) => void;
+  columnPage?: (columnId: string) => { hasMore: boolean; isLoadingMore: boolean };
+  onLoadMoreColumn?: (columnId: string) => void;
   labels: BoardViewLabels;
 }
 
@@ -90,6 +92,8 @@ export function BoardView<T>({
   confirmMove,
   onCardMove,
   onAddToColumn,
+  columnPage,
+  onLoadMoreColumn,
   isLoading,
   error,
   onRetry,
@@ -227,6 +231,9 @@ export function BoardView<T>({
               isCollapsed={collapsed.isCollapsed(column.id)}
               onToggleCollapse={collapsed.toggle}
               onAdd={onAddToColumn}
+              hasMore={columnPage?.(column.id).hasMore}
+              isLoadingMore={columnPage?.(column.id).isLoadingMore}
+              onLoadMore={onLoadMoreColumn}
               labels={labels}
             />
           ))}

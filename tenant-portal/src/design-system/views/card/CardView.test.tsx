@@ -49,6 +49,12 @@ function renderCards(overrides: Partial<Parameters<typeof CardView<Lead>>[0]> = 
 }
 
 describe("CardView", () => {
+  it("uses the denser grid and card padding only when compact density is requested", () => {
+    renderCards({ density: "compact" });
+    expect(document.querySelector(".xl\\:grid-cols-4")).toBeInTheDocument();
+    expect(document.querySelectorAll(".p-2")).toHaveLength(items.length);
+  });
+
   it("paginates, which switching away from the table no longer drops (V2)", () => {
     const onPageChange = vi.fn();
     renderCards({ onPageChange });

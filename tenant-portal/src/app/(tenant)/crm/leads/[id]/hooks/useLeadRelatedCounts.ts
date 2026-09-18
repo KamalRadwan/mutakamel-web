@@ -52,10 +52,10 @@ const RESPONSE_LIMIT_BYTES = 64 * 1024;
  * because re-running it changes nothing. The same two flags the opportunities
  * screen sends on the same route.
  *
- * Only `trading.invoices.get` declares `organizationScopeMode: BRANCH_REQUIRED`
- * in the Gateway contract; the other three declare none. The scope headers are
- * therefore sent on exactly that one route — a route declaring NONE rejects
- * them, which is the same asymmetry `useLeadCompanyOptions` documents.
+ * All three Trade counts require company + branch. QuotationsController.list
+ * and SalesOrdersController.list declare TradeScopeTarget.BRANCH even though
+ * their legacy Gateway rows omit organizationScopeMode. Omission leaves
+ * validation to TradeScopeGuard; it is not the explicit NONE policy.
  */
 export function useLeadRelatedCounts(
   leadId: string | null,
@@ -85,6 +85,7 @@ export function useLeadRelatedCounts(
     // is what `react-hooks/set-state-in-effect` rejects.
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
+      setCounts(EMPTY_COUNTS);
       setIsLoading(true);
       const config = {
         signal: controller.signal,
@@ -105,22 +106,14 @@ export function useLeadRelatedCounts(
             );
             return parseRelatedTotal(response.data);
           }
-          if (kind === "quotations") {
-            return parseRelatedTotal(
-              await readTradeData(leadQuotationsCountPath(partyId as string), config),
-            );
-          }
-          if (kind === "salesOrders") {
-            return parseRelatedTotal(
-              await readTradeData(leadSalesOrdersCountPath(partyId as string), config),
-            );
-          }
-          // Invoices, the one route that declares BRANCH_REQUIRED. No scope, no
-          // request: sending it bare is a 400 from the Gateway reported to the
-          // user as a server rejection, which is defect D4 all over again.
+          // Do not send a Trade read until the Lead branch has a verified
+          // owning company. Bare reads fail TRADE.CONTEXT.MISSING_COMPANY.
           if (!scopeHeaders) return null;
+          const path = kind === "quotations" ? leadQuotationsCountPath(partyId as string)
+            : kind === "salesOrders" ? leadSalesOrdersCountPath(partyId as string)
+              : leadInvoicesCountPath(partyId as string);
           return parseRelatedTotal(
-            await readTradeData(leadInvoicesCountPath(partyId as string), {
+            await readTradeData(path, {
               ...config,
               headers: scopeHeaders,
             }),

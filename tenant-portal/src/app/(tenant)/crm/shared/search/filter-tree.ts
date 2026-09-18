@@ -23,11 +23,11 @@
 //     send a JSON number, not the control's string: `new Date("500")` parses
 //     as the year 500, so a numeric string passes validation and then compares
 //     as a timestamp.
-//  4. **`like` is case-SENSITIVE while `startsWith`/`endsWith` are not** —
-//     both of those compile to `ILIKE`. Offering `like` beside them would put
-//     the odd one out in the middle of a case-insensitive set, so only `ilike`
-//     is offered. `eqAny`/`neqAny` are literally `In`/`Not(In)` and are left
-//     out for the same reason: two names for one operator.
+//  4. **`like` is case-SENSITIVE while `ilike`, `startsWith` and `endsWith`
+//     are not.** Both contains variants are exposed because they answer
+//     different questions; the labels make that distinction explicit.
+//     `eqAny`/`neqAny` are aliases of `in`/`nin` and remain omitted so one
+//     operation does not appear twice under different wire names.
 
 /** Every operator this portal may send. A subset of `FindOperatorsEnum`. */
 export type CrmFilterOperator =
@@ -40,9 +40,14 @@ export type CrmFilterOperator =
   | "lt"
   | "lte"
   | "between"
+  | "like"
   | "ilike"
   | "startsWith"
   | "endsWith"
+  | "likeAny"
+  | "ilikeAny"
+  | "startsWithAny"
+  | "endsWithAny"
   | "isNull"
   | "isNotNull";
 
@@ -79,13 +84,25 @@ export type CrmSearchValueKind =
 
 /** The operators each kind may offer, in the order the picker lists them. */
 const OPERATORS_BY_KIND: Record<CrmSearchValueKind, readonly CrmFilterOperator[]> = {
-  // No `like`: it is the only case-SENSITIVE operator in the family (fact 4).
-  text: ["ilike", "startsWith", "endsWith", "eq", "neq"],
+  text: [
+    "eq",
+    "neq",
+    "like",
+    "ilike",
+    "startsWith",
+    "endsWith",
+    "in",
+    "nin",
+    "likeAny",
+    "ilikeAny",
+    "startsWithAny",
+    "endsWithAny",
+  ],
   enum: ["eq", "neq", "in", "nin"],
   uuid: ["eq", "neq", "in", "nin"],
   catalogue: ["eq", "neq", "in", "nin"],
-  date: ["gte", "lte", "gt", "lt", "between"],
-  number: ["eq", "neq", "gt", "gte", "lt", "lte", "between"],
+  date: ["eq", "neq", "gt", "gte", "lt", "lte", "between", "in", "nin"],
+  number: ["eq", "neq", "gt", "gte", "lt", "lte", "between", "in", "nin"],
 };
 
 /** The two operators that take no value, and may only be offered on a nullable field. */
@@ -100,7 +117,14 @@ export function crmOperatorTakesTwoValues(operator: CrmFilterOperator): boolean 
 }
 
 export function crmOperatorTakesManyValues(operator: CrmFilterOperator): boolean {
-  return operator === "in" || operator === "nin";
+  return [
+    "in",
+    "nin",
+    "likeAny",
+    "ilikeAny",
+    "startsWithAny",
+    "endsWithAny",
+  ].includes(operator);
 }
 
 /**
@@ -132,12 +156,32 @@ export interface CrmSearchFieldDef<Id extends string> {
   /** The whitelisted column this field filters on. */
   readonly field: string;
   readonly kind: CrmSearchValueKind;
-  /** `true` only where the column really is nullable — see `crmOperatorsFor`. */
+  /**
+   * A screen may narrow the kind's technical operator set to the questions
+   * that make sense for this field. A two-value type, for example, is a direct
+   * choice and needs only equality; exposing inequality and list membership
+   * makes the user translate a simple question into database language.
+   * Null checks are still derived from `nullable` below.
+   */
+  readonly operators?: readonly CrmFilterOperator[];
+  /** `true` only where the column really is nullable — see `crmOperatorsForField`. */
   readonly nullable?: boolean;
   /** The accepted wire values, for `kind: "enum"` only. */
   readonly values?: readonly string[];
   /** `@MaxLength` equivalent for a text control; a longer value is clamped. */
   readonly maxLength?: number;
+}
+
+/** The field-aware policy used by the builder and compiler. */
+export function crmOperatorsForField<Id extends string>(
+  definition: CrmSearchFieldDef<Id>,
+): readonly CrmFilterOperator[] {
+  const base = definition.operators ?? OPERATORS_BY_KIND[definition.kind];
+  if (!definition.nullable) return base;
+  return [
+    ...base.filter((operator) => !NULL_OPERATORS.includes(operator)),
+    ...NULL_OPERATORS,
+  ];
 }
 
 /**
@@ -149,6 +193,8 @@ export interface CrmSearchFieldDef<Id extends string> {
  */
 export interface CrmSearchCondition<Id extends string> {
   field: Id;
+  /** False while the field picker is still on its placeholder. */
+  fieldSelected?: boolean;
   operator: CrmFilterOperator;
   /** The single value, `between`'s lower bound, or `in`'s comma-joined list. */
   value: string;
@@ -159,9 +205,9 @@ export interface CrmSearchCondition<Id extends string> {
 /**
  * A section of the card: conditions AND-ed together.
  *
- * OR lives BETWEEN groups and nowhere else. A per-row AND/OR selector reads as
- * a flat list whose meaning depends on operator precedence a user cannot see;
- * a second section is a boundary they can point at.
+ * The visible connector before a row is normalized into this shape: AND keeps
+ * the row in its current group, while OR starts a new group. That preserves the
+ * row-by-row editing model without relying on hidden boolean precedence.
  */
 export interface CrmSearchGroup<Id extends string> {
   conditions: readonly CrmSearchCondition<Id>[];
@@ -170,11 +216,11 @@ export interface CrmSearchGroup<Id extends string> {
 /** The separator `in`/`nin` lists are typed with, and split on. */
 const LIST_SEPARATOR = ",";
 
-/** A blank condition on `field` — the shape both "add" controls produce. */
+/** A selected field with an empty value. */
 export function crmBlankCondition<Id extends string>(
   definition: CrmSearchFieldDef<Id>,
 ): CrmSearchCondition<Id> {
-  const [operator] = crmOperatorsFor(definition.kind, definition.nullable ?? false);
+  const [operator] = crmOperatorsForField(definition);
   return {
     field: definition.id,
     // Never undefined: every kind's operator list is non-empty by construction.
@@ -184,11 +230,11 @@ export function crmBlankCondition<Id extends string>(
   };
 }
 
-/** One group holding one blank condition — what an empty card starts from. */
-function crmBlankGroup<Id extends string>(
+/** A progressive-disclosure row: only its field picker is active initially. */
+export function crmUnselectedCondition<Id extends string>(
   definition: CrmSearchFieldDef<Id>,
-): CrmSearchGroup<Id> {
-  return { conditions: [crmBlankCondition(definition)] };
+): CrmSearchCondition<Id> {
+  return { ...crmBlankCondition(definition), fieldSelected: false };
 }
 
 /**
@@ -202,12 +248,13 @@ function crmBlankGroup<Id extends string>(
 function conditionValue<Id extends string>(
   condition: CrmSearchCondition<Id>,
   definition: CrmSearchFieldDef<Id>,
+  operator: CrmFilterOperator,
 ): { present: false } | { present: true; value?: unknown } {
-  if (crmOperatorTakesNoValue(condition.operator)) return { present: true };
+  if (crmOperatorTakesNoValue(operator)) return { present: true };
 
   const value = condition.value.trim();
 
-  if (crmOperatorTakesTwoValues(condition.operator)) {
+  if (crmOperatorTakesTwoValues(operator)) {
     const to = condition.valueTo.trim();
     // Both bounds or neither: `between` is a 2-tuple and a one-sided range is
     // a `gte`, which the user can pick instead (fact 2).
@@ -215,7 +262,7 @@ function conditionValue<Id extends string>(
     return { present: true, value: [scalar(value, definition), scalar(to, definition)] };
   }
 
-  if (crmOperatorTakesManyValues(condition.operator)) {
+  if (crmOperatorTakesManyValues(operator)) {
     const parts = value
       .split(LIST_SEPARATOR)
       .map((part) => part.trim())
@@ -273,19 +320,26 @@ export function crmCompileFilterTree<Id extends string>(
   for (const group of groups) {
     const leaves: CrmFilterTreeNode[] = [];
     for (const condition of group.conditions) {
+      if (condition.fieldSelected === false) continue;
       const definition = resolve(condition.field);
+      const allowedOperators = crmOperatorsForField(definition);
+      // A one-operator field is a direct value choice. Its wire operator is
+      // implicit even if stale state from an older UI still names another one.
+      const operator = allowedOperators.length === 1
+        ? allowedOperators[0]!
+        : condition.operator;
       // A field may appear as often as a user likes: the tree has a node per
       // leaf, unlike the query string's one slot per key. `stageFlag = NEW OR
       // stageFlag = CONTACTED` is a normal question and used to be unaskable.
-      const outcome = conditionValue(condition, definition);
+      const outcome = conditionValue(condition, definition, operator);
       if (!outcome.present) continue;
       leaves.push(
         "value" in outcome
-          ? { field: definition.field, operator: condition.operator, value: outcome.value }
+          ? { field: definition.field, operator, value: outcome.value }
           : // No `value` KEY at all, not `value: undefined`: `JSON.stringify`
             // drops an undefined property, but the object would still carry it
             // for any caller that inspects the body before it is serialised.
-            { field: definition.field, operator: condition.operator },
+            { field: definition.field, operator },
       );
     }
     if (leaves.length === 0) continue;
@@ -363,10 +417,16 @@ export function crmGroupsWithConditionAdded<Id extends string>(
   groups: readonly CrmSearchGroup<Id>[],
   groupIndex: number,
   definition: CrmSearchFieldDef<Id>,
+  fieldSelected = true,
 ): readonly CrmSearchGroup<Id>[] {
   return groups.map((group, index) =>
     index === groupIndex
-      ? { conditions: [...group.conditions, crmBlankCondition(definition)] }
+      ? {
+          conditions: [
+            ...group.conditions,
+            fieldSelected ? crmBlankCondition(definition) : crmUnselectedCondition(definition),
+          ],
+        }
       : group,
   );
 }
@@ -383,6 +443,7 @@ export function crmGroupsWithConditionRemoved<Id extends string>(
   groupIndex: number,
   conditionIndex: number,
   definition: CrmSearchFieldDef<Id>,
+  fieldSelected = true,
 ): readonly CrmSearchGroup<Id>[] {
   const next = groups
     .map((group, index) =>
@@ -395,22 +456,73 @@ export function crmGroupsWithConditionRemoved<Id extends string>(
         : group,
     )
     .filter((group) => group.conditions.length > 0);
-  return next.length > 0 ? next : [crmBlankGroup(definition)];
+  return next.length > 0
+    ? next
+    : [{ conditions: [fieldSelected ? crmBlankCondition(definition) : crmUnselectedCondition(definition)] }];
 }
 
 /** A new OR section, opened on a blank condition. */
 export function crmGroupsWithGroupAdded<Id extends string>(
   groups: readonly CrmSearchGroup<Id>[],
   definition: CrmSearchFieldDef<Id>,
+  fieldSelected = true,
 ): readonly CrmSearchGroup<Id>[] {
-  return [...groups, crmBlankGroup(definition)];
+  return [
+    ...groups,
+    { conditions: [fieldSelected ? crmBlankCondition(definition) : crmUnselectedCondition(definition)] },
+  ];
 }
 
 export function crmGroupsWithGroupRemoved<Id extends string>(
   groups: readonly CrmSearchGroup<Id>[],
   groupIndex: number,
   definition: CrmSearchFieldDef<Id>,
+  fieldSelected = true,
 ): readonly CrmSearchGroup<Id>[] {
   const next = groups.filter((_group, index) => index !== groupIndex);
-  return next.length > 0 ? next : [crmBlankGroup(definition)];
+  return next.length > 0
+    ? next
+    : [{ conditions: [fieldSelected ? crmBlankCondition(definition) : crmUnselectedCondition(definition)] }];
+}
+
+export type CrmSearchConnector = "AND" | "OR";
+
+/**
+ * Changes the visible connector before one row without changing the wire
+ * grammar: AND rows live in one group; an OR row starts the next group.
+ */
+export function crmGroupsWithConnector<Id extends string>(
+  groups: readonly CrmSearchGroup<Id>[],
+  groupIndex: number,
+  conditionIndex: number,
+  connector: CrmSearchConnector,
+): readonly CrmSearchGroup<Id>[] {
+  if (groupIndex === 0 && conditionIndex === 0) return groups;
+
+  if (connector === "OR" && conditionIndex > 0) {
+    const group = groups[groupIndex];
+    if (!group) return groups;
+    const before = group.conditions.slice(0, conditionIndex);
+    const after = group.conditions.slice(conditionIndex);
+    if (before.length === 0 || after.length === 0) return groups;
+    return [
+      ...groups.slice(0, groupIndex),
+      { conditions: before },
+      { conditions: after },
+      ...groups.slice(groupIndex + 1),
+    ];
+  }
+
+  if (connector === "AND" && conditionIndex === 0 && groupIndex > 0) {
+    const previous = groups[groupIndex - 1];
+    const current = groups[groupIndex];
+    if (!previous || !current) return groups;
+    return [
+      ...groups.slice(0, groupIndex - 1),
+      { conditions: [...previous.conditions, ...current.conditions] },
+      ...groups.slice(groupIndex + 1),
+    ];
+  }
+
+  return groups;
 }

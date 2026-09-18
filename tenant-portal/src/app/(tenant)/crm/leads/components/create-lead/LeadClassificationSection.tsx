@@ -130,7 +130,7 @@ export function LeadClassificationSection({
         // the trigger is what keeps the UUID readable in an RTL paragraph.
         <Field label={t.organization.parentCompany}>
           <Select
-            value={companyId ?? undefined}
+            value={companyId ?? ""}
             disabled={disabled}
             onValueChange={onCompanyChange}
           >
@@ -151,7 +151,7 @@ export function LeadClassificationSection({
       {branchIds.length > 1 && (
         <Field label={t.common.branch} required>
           <Select
-            value={branchId || undefined}
+            value={branchId}
             disabled={disabled}
             onValueChange={onBranchChange}
           >
@@ -219,7 +219,7 @@ export function LeadClassificationSection({
           value once a source has been picked. */}
       <Field label={t.crmLeads.source} error={errors.acquisitionSourceId} required>
         <Select
-          value={acquisitionSourceId || undefined}
+          value={acquisitionSourceId}
           disabled={disabled}
           onValueChange={onSourceChange}
         >

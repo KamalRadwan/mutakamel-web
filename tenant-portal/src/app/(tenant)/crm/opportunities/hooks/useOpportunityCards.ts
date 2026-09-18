@@ -4,23 +4,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
-import { CUSTOMER_PROFILE_TYPES, type CustomerProfileType } from "../../customer-profiles/hooks/useCustomerProfiles";
+import {
+  appendOpportunityBasicQuery,
+  EMPTY_OPPORTUNITY_BASIC_SEARCH,
+  type OpportunityBasicSearch,
+} from "../opportunity-basic-search-contract";
+import {
+  parseOpportunityReadFields,
+  type OpportunityReadFields,
+} from "../opportunity-read-model";
 
-export interface OpportunityCardItem {
+export interface OpportunityCardItem extends OpportunityReadFields {
   id: string;
   title: string;
   stageId: string;
-  customerProfileType: CustomerProfileType;
-  customerDisplayName: string;
-  customerCompanyName: string | null;
-  customerPhone: string | null;
-  customerCountry: string | null;
-  customerCity: string | null;
-  leadSourceName: string | null;
-  ownerDisplayName: string | null;
-  ownerAvatarUrl: string | null;
+  customerPartyId: string | null;
+  ownerUserId: string | null;
   importance: number;
-  openActivityCount: number;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -43,10 +43,6 @@ function requiredUuidV7(value: Record<string, unknown>, key: string): string {
   return candidate;
 }
 
-function nullableString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
 function requiredInteger(value: Record<string, unknown>, key: string, minimum = 0): number {
   const candidate = value[key];
   if (!Number.isInteger(candidate) || (candidate as number) < minimum) {
@@ -58,30 +54,28 @@ function requiredInteger(value: Record<string, unknown>, key: string, minimum = 
 function parseCard(value: unknown): OpportunityCardItem {
   const item = record(value);
   if (!item) throw new Error("Invalid opportunity cards response.");
-  const profileType = item.customerProfileType;
-  if (
-    typeof profileType !== "string" ||
-    !(CUSTOMER_PROFILE_TYPES as readonly string[]).includes(profileType)
-  ) {
-    throw new Error("Invalid opportunity cards response.");
-  }
   const importance = requiredInteger(item, "importance");
   if (importance > 3) throw new Error("Invalid opportunity cards response.");
+  let readFields: OpportunityReadFields;
+  try {
+    readFields = parseOpportunityReadFields(item);
+  } catch {
+    throw new Error("Invalid opportunity cards response.");
+  }
   return {
+    ...readFields,
     id: requiredUuidV7(item, "id"),
     title: requiredString(item, "title"),
     stageId: requiredUuidV7(item, "stageId"),
-    customerProfileType: profileType as CustomerProfileType,
-    customerDisplayName: requiredString(item, "customerDisplayName"),
-    customerCompanyName: nullableString(item.customerCompanyName),
-    customerPhone: nullableString(item.customerPhone),
-    customerCountry: nullableString(item.customerCountry),
-    customerCity: nullableString(item.customerCity),
-    leadSourceName: nullableString(item.leadSourceName),
-    ownerDisplayName: nullableString(item.ownerDisplayName),
-    ownerAvatarUrl: nullableString(item.ownerAvatarUrl),
+    customerPartyId:
+      item.customerPartyId === null || item.customerPartyId === undefined
+        ? null
+        : requiredUuidV7(item, "customerPartyId"),
+    ownerUserId:
+      item.ownerUserId === null || item.ownerUserId === undefined
+        ? null
+        : requiredUuidV7(item, "ownerUserId"),
     importance,
-    openActivityCount: requiredInteger(item, "openActivityCount"),
   };
 }
 
@@ -139,6 +133,8 @@ export function useOpportunityCards(
   pipelineId: string | null,
   branchId: string | null,
   stageId: string | null,
+  basicSearch: OpportunityBasicSearch = EMPTY_OPPORTUNITY_BASIC_SEARCH,
+  actorUserId?: string,
 ) {
   const [items, setItems] = useState<OpportunityCardItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -173,6 +169,10 @@ export function useOpportunityCards(
         // first." So All sends no key at all — not an empty one, which
         // `@IsOptional()` would still hand to `@IsUUID('7')` for a 400.
         if (stageId) query.set("stageId", stageId);
+        appendOpportunityBasicQuery(query, basicSearch, actorUserId, {
+          includePipeline: false,
+          includeStage: false,
+        });
         const response = await axiosClient.get<unknown>(
           `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/cards?${query.toString()}`,
           { signal, cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 },
@@ -192,7 +192,7 @@ export function useOpportunityCards(
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }
     },
-    [branchId, pipelineId, stageId],
+    [actorUserId, basicSearch, branchId, pipelineId, stageId],
   );
 
   // A new stage is a new fetch key, so the cursor restarts here rather than
@@ -223,6 +223,10 @@ export function useOpportunityCards(
       // the context it is validated against — dropping it here would not
       // return an unfiltered page, it would reject the cursor.
       if (stageId) query.set("stageId", stageId);
+      appendOpportunityBasicQuery(query, basicSearch, actorUserId, {
+        includePipeline: false,
+        includeStage: false,
+      });
       const response = await axiosClient.get<unknown>(
         `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/cards?${query.toString()}`,
         { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 },
@@ -240,7 +244,7 @@ export function useOpportunityCards(
     } finally {
       setIsLoadingMore(false);
     }
-  }, [branchId, isLoadingMore, items, pageInfo, pipelineId, stageId]);
+  }, [actorUserId, basicSearch, branchId, isLoadingMore, items, pageInfo, pipelineId, stageId]);
 
   return {
     items,

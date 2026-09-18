@@ -1,15 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { Search } from "lucide-react";
-import {
-  Input,
-  PageActions,
-  ToggleGroup,
-  ToggleGroupItem,
-  cn,
-  iconSize,
-} from "@/design-system";
+import { SlidersHorizontal } from "lucide-react";
+import { Button, PageActions, iconSize } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import {
@@ -19,15 +12,13 @@ import {
 import {
   OPPORTUNITY_ADVANCED_FIELDS,
   opportunitySearchCleared,
-  opportunitySearchWithBasicText,
   opportunitySearchWithGroups,
   opportunitySearchWithMode,
-  opportunitySearchWithText,
   type OpportunityAdvancedFieldId,
-  type OpportunitySearchMode,
   type OpportunitySearchState,
 } from "../opportunity-search-contract";
 import type { OpportunityPipeline } from "../hooks/pipeline-types";
+import { OpportunityBasicSearch } from "./OpportunityBasicSearch";
 
 export interface OpportunitySearchBarProps {
   value: OpportunitySearchState;
@@ -42,6 +33,8 @@ export interface OpportunitySearchBarProps {
    * request on every load of a screen that already has one.
    */
   pipelines: OpportunityPipeline[];
+  resetKey: string;
+  advancedEnabled?: boolean;
   disabled?: boolean;
 }
 
@@ -59,6 +52,8 @@ export function OpportunitySearchBar({
   onChange,
   onSubmit,
   pipelines,
+  resetKey,
+  advancedEnabled = true,
   disabled,
 }: OpportunitySearchBarProps) {
   const { t, lang } = useI18n();
@@ -147,48 +142,37 @@ export function OpportunitySearchBar({
   return (
     <>
       <PageActions slot="search">
-      <ToggleGroup
-        type="single"
-        size="sm"
-        value={value.mode}
-        disabled={disabled}
-        // Radix emits "" when the pressed segment is deselected, and a search
-        // bar with no mode has nothing to draw — so a press on the active
-        // segment is ignored rather than blanking the panel.
-        onValueChange={(next) => {
-          if (next) onChange(opportunitySearchWithMode(value, next as OpportunitySearchMode));
-        }}
-        aria-label={copy.searchMode.label}
-      >
-        <ToggleGroupItem value="basic">{copy.searchMode.basic}</ToggleGroupItem>
-        <ToggleGroupItem value="advanced">{copy.searchMode.advanced}</ToggleGroupItem>
-      </ToggleGroup>
-
-      {value.mode === "basic" && (
-        <div className="relative w-72">
-          <Search
-            className={cn(
-              iconSize({ size: "md" }),
-              "pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground",
-            )}
-            aria-hidden="true"
-          />
-          <Input
-            size="sm"
-            className="ps-8"
-            value={value.basic.text}
+        {advancedEnabled && (
+          <Button
+            variant={value.mode === "advanced" ? "secondary" : "outline"}
+            size="xs"
             disabled={disabled}
-            // The wire's `@MaxLength(200)`, so a paste is clamped where it
-            // happens rather than rejected as a whole request.
-            maxLength={200}
-            placeholder={t.common.search}
-            aria-label={t.crmAdvancedSearch.textLabel}
-            onChange={(event) =>
-              onChange(opportunitySearchWithBasicText(value, event.target.value))
+            aria-pressed={value.mode === "advanced"}
+            aria-label={copy.searchMode.advanced}
+            title={`${copy.searchMode.label}: ${copy.searchMode.advanced}`}
+            onClick={() =>
+              onChange(
+                opportunitySearchWithMode(
+                  value,
+                  value.mode === "advanced" ? "basic" : "advanced",
+                ),
+              )
             }
+          >
+            <SlidersHorizontal className={iconSize({ size: "sm" })} aria-hidden="true" />
+            {copy.searchMode.advanced}
+          </Button>
+        )}
+
+        {value.mode === "basic" && (
+          <OpportunityBasicSearch
+            key={resetKey}
+            state={value}
+            pipelines={pipelines}
+            disabled={disabled}
+            onChange={onChange}
           />
-        </div>
-      )}
+        )}
       </PageActions>
 
       {value.mode === "advanced" && (
@@ -197,17 +181,12 @@ export function OpportunitySearchBar({
           fieldLabels={fieldLabels}
           enumLabel={enumLabel}
           catalogueOptions={catalogueOptions}
-          // This screen's free text is `title ILIKE` and nothing else — the
-          // repository's searchableFields holds only 'title' — so the shared
-          // hint about names, phones and emails would be wrong here.
-          textHint={t.crmAdvancedSearch.textHintTitleOnly}
-          text={value.text}
-          onTextChange={(next) => onChange(opportunitySearchWithText(value, next))}
           groups={value.groups}
           onGroupsChange={(next) => onChange(opportunitySearchWithGroups(value, next))}
           onSubmit={onSubmit}
           onReset={() => onChange(opportunitySearchCleared(value))}
           disabled={disabled}
+          requireFieldSelection
         />
       )}
     </>

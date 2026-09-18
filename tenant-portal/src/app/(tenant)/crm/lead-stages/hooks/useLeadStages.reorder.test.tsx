@@ -59,15 +59,39 @@ const QUALIFIED = {
   flag: "QUALIFIED",
   sortOrder: 3,
 };
-const CATALOGUE = [ENTRY, CONTACTED, QUALIFIED];
+const DISQUALIFIED = {
+  ...CONTACTED,
+  id: "01900100-0000-7000-8000-000000000004",
+  nameAr: "غير مؤهل",
+  nameEn: "Disqualified",
+  flag: "DISQUALIFIED",
+  category: "NEGATIVE",
+  sortOrder: 4,
+};
+const CONVERTED = {
+  ...CONTACTED,
+  id: "01900100-0000-7000-8000-000000000005",
+  nameAr: "تم التحويل",
+  nameEn: "Converted",
+  flag: "CONVERTED",
+  category: "POSITIVE",
+  sortOrder: 5,
+};
+const CATALOGUE = [ENTRY, CONTACTED, QUALIFIED, DISQUALIFIED, CONVERTED];
 const REORDER_PATH = "/api/tenant/crm/v1/lead-stages/reorder";
-const DROPPED_ORDER = [ENTRY.id, QUALIFIED.id, CONTACTED.id];
+const DROPPED_ORDER = [
+  ENTRY.id,
+  QUALIFIED.id,
+  CONTACTED.id,
+  DISQUALIFIED.id,
+  CONVERTED.id,
+];
 
 const wrapper = ({ children }: { children: ReactNode }) => <I18nProvider>{children}</I18nProvider>;
 
 async function loadedCatalogue() {
   const view = renderHook(() => useLeadStages(), { wrapper });
-  await waitFor(() => expect(view.result.current.items).toHaveLength(3));
+  await waitFor(() => expect(view.result.current.items).toHaveLength(5));
   return view;
 }
 
@@ -82,7 +106,13 @@ afterEach(cleanup);
 describe("useLeadStages — the reorder write", () => {
   it("sends the WHOLE order, and takes the response as the new list", async () => {
     api.patch.mockResolvedValue({
-      data: [ENTRY, { ...QUALIFIED, sortOrder: 2 }, { ...CONTACTED, sortOrder: 3 }],
+      data: [
+        ENTRY,
+        { ...QUALIFIED, sortOrder: 2 },
+        { ...CONTACTED, sortOrder: 3 },
+        DISQUALIFIED,
+        CONVERTED,
+      ],
     });
     const { result } = await loadedCatalogue();
 
@@ -99,8 +129,10 @@ describe("useLeadStages — the reorder write", () => {
       "New",
       "Qualified",
       "Contacted",
+      "Disqualified",
+      "Converted",
     ]);
-    expect(result.current.items.map(({ sortOrder }) => sortOrder)).toEqual([1, 2, 3]);
+    expect(result.current.items.map(({ sortOrder }) => sortOrder)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("rolls the order back and says why when the write fails", async () => {
@@ -113,6 +145,8 @@ describe("useLeadStages — the reorder write", () => {
       "New",
       "Contacted",
       "Qualified",
+      "Disqualified",
+      "Converted",
     ]);
     expect(result.current.error).toBe("Stage order rejected.");
   });
@@ -122,16 +156,24 @@ describe("useLeadStages — the reorder write", () => {
   it("refuses an order that displaces the entry stage, or that drops a stage", async () => {
     const { result } = await loadedCatalogue();
 
-    await act(() => result.current.handleReorder([CONTACTED.id, ENTRY.id, QUALIFIED.id]));
+    await act(() => result.current.handleReorder([
+      CONTACTED.id,
+      ENTRY.id,
+      QUALIFIED.id,
+      DISQUALIFIED.id,
+      CONVERTED.id,
+    ]));
     expect(api.patch).not.toHaveBeenCalled();
 
     await act(() => result.current.handleReorder([ENTRY.id, CONTACTED.id]));
     expect(api.patch).not.toHaveBeenCalled();
-    expect(result.current.error).toContain("entry stage stays first");
+    expect(result.current.error).toContain("New stays first");
     expect(result.current.items.map(({ nameEn }) => nameEn)).toEqual([
       "New",
       "Contacted",
       "Qualified",
+      "Disqualified",
+      "Converted",
     ]);
   });
 });

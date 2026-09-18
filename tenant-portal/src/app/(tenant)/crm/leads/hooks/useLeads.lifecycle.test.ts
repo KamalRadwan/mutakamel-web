@@ -7,7 +7,12 @@ import { emptyCreateLeadForm } from "../lead-create-contract";
 import { useLeadCapabilities } from "./useLeadCapabilities";
 import { useLeads } from "./useLeads";
 
-const { auth, get, post } = vi.hoisted(() => ({ auth: vi.fn(), get: vi.fn(), post: vi.fn() }));
+const { auth, get, patch, post } = vi.hoisted(() => ({
+  auth: vi.fn(),
+  get: vi.fn(),
+  patch: vi.fn(),
+  post: vi.fn(),
+}));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => auth() as unknown }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({
@@ -16,6 +21,9 @@ vi.mock("@/i18n/I18nContext", () => ({
         messages: {
           tagUnknown: "Selected tags changed. Remove them or choose again.",
           createFailed: "Unable to create the lead.",
+          cardNotPermitted: "You cannot update this lead.",
+          cardUpdateAmbiguous: "The update could not be verified.",
+          cardUpdateFailed: "Unable to update the lead.",
         },
       },
     },
@@ -23,7 +31,7 @@ vi.mock("@/i18n/I18nContext", () => ({
 }));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/axiosClient")>();
-  return { ...actual, axiosClient: { ...actual.axiosClient, get, post } };
+  return { ...actual, axiosClient: { ...actual.axiosClient, get, patch, post } };
 });
 
 const COMPANY = "0192f3a0-0000-7000-8000-000000000001";
@@ -33,6 +41,8 @@ const STAGE = "0192f3a0-0000-7000-8000-000000000004";
 const LEAD = "0192f3a0-0000-7000-8000-000000000005";
 const TAG = "0192f3a0-0000-7000-8000-000000000006";
 const SECOND_TAG = "0192f3a0-0000-7000-8000-000000000007";
+const ACTOR = "0192f3a0-0000-7000-8000-000000000099";
+const CONTACT = "0192f3a0-0000-7000-8000-000000000098";
 const LEADS_PATH = "/api/tenant/crm/v1/leads";
 const LEADS_SEARCH_PATH = "/api/tenant/crm/v1/leads/search";
 
@@ -91,6 +101,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   auth.mockReturnValue({
     user: {
+      id: ACTOR,
       accessibleBranches: [BRANCH, OTHER_BRANCH],
       accessibleCompanies: [COMPANY],
       teamMemberships: [
@@ -101,6 +112,7 @@ beforeEach(() => {
   });
   get.mockImplementation((url: string) => Promise.reject(serverError(url.includes("capabilities") ? 400 : 500)));
   post.mockImplementation(() => Promise.reject(serverError(500)));
+  patch.mockImplementation(() => Promise.reject(serverError(500)));
 });
 
 afterEach(() => {
@@ -109,6 +121,7 @@ afterEach(() => {
   auth.mockReset();
   get.mockReset();
   post.mockReset();
+  patch.mockReset();
 });
 
 describe("leads request lifecycle", () => {
@@ -116,6 +129,8 @@ describe("leads request lifecycle", () => {
     get.mockImplementation(allowCreateReads);
     post.mockResolvedValue(response({
       id: LEAD,
+      partyId: LEAD,
+      leadProfileType: "INDIVIDUAL",
       displayName: "Mona Hassan",
       branchId: BRANCH,
       stageId: STAGE,
@@ -229,7 +244,7 @@ describe("leads request lifecycle", () => {
   // this is what proves the screen goes THROUGH `lead-search-contract` instead
   // of hand-assembling a query of its own. An extra or misspelled key is a 400
   // the user reads as an empty list.
-  it("sends the unfiltered window, then one filter key, resetting to page 1", async () => {
+  it("defaults to My Leads and retains its owner filter across paging and basic edits", async () => {
     const { result } = renderHook(() => useLeads());
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
     const listUrl = () =>
@@ -239,32 +254,124 @@ describe("leads request lifecycle", () => {
         .at(-1);
     const unfiltered = `branchId=${BRANCH}&page=1&limit=50&sortBy=createdAt&sortDir=DESC`;
 
-    // A blank value sends no filter key at all — `search=` is not "no filter".
-    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}`);
+    // My Leads is applied before the first page, even with no other filter.
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&ownerUserId=${ACTOR}`);
 
     act(() => result.current.setPage(2));
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
-    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered.replace("page=1", "page=2")}`);
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered.replace("page=1", "page=2")}&ownerUserId=${ACTOR}`);
 
     // Changing the filter starts the result set over, exactly as the old
     // free-text search did.
     act(() =>
       result.current.setSearch({
         ...result.current.search,
-        basic: { field: "status", value: "OPEN" },
+        basic: { myLeads: true, filters: [{ field: "status", value: "OPEN" }] },
       }),
     );
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
-    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&status=OPEN`);
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&status=OPEN&ownerUserId=${ACTOR}`);
 
     act(() =>
       result.current.setSearch({
         ...result.current.search,
-        basic: { field: "text", value: " acme " },
+        basic: { myLeads: true, filters: [{ field: "lead", value: " acme " }] },
       }),
     );
     await act(async () => { await vi.advanceTimersByTimeAsync(250); });
-    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&search=acme`);
+    expect(listUrl()).toBe(`${LEADS_PATH}?${unfiltered}&search=acme&searchField=lead&ownerUserId=${ACTOR}`);
+  });
+
+  it("keeps the latest company contact and phone when a rating PATCH settles", async () => {
+    let listRead = 0;
+    const companyLead = (displayName: string, phone: string) => ({
+      id: LEAD,
+      partyId: "0192f3a0-0000-7000-8000-000000000097",
+      leadProfileType: "CORPORATE",
+      displayName: "Acme Company",
+      companyName: "Acme Company",
+      companyPhone: "+20200000000",
+      phones: ["+20200000000"],
+      branchId: BRANCH,
+      stageId: STAGE,
+      ownerUserId: ACTOR,
+      rating: 1,
+      primaryContact: {
+        partyId: CONTACT,
+        displayName,
+        jobTitle: "Buyer",
+        email: "buyer@acme.test",
+        phones: [phone],
+        isPrimary: true,
+      },
+    });
+    const page = (item: ReturnType<typeof companyLead>) => ({
+      items: [item],
+      total: 1,
+      page: 1,
+      limit: 50,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false,
+    });
+    get.mockImplementation((url: string) => {
+      if (url.startsWith(`${LEADS_PATH}?`)) {
+        listRead += 1;
+        return Promise.resolve(response(page(
+          listRead === 1
+            ? companyLead("Nora Saleh", "+201111111111")
+            : companyLead("Mona Adel", "+201222222222"),
+        )));
+      }
+      if (url === "/api/tenant/crm/v1/lead-stages") return Promise.resolve(response([]));
+      if (url.startsWith(`${LEADS_PATH}/capabilities?`)) {
+        return Promise.resolve(response({
+          branchId: BRANCH,
+          leads: {
+            create: null,
+            update: { scope: "all", ownerUserIds: null },
+            delete: null,
+          },
+        }));
+      }
+      return Promise.reject(serverError(500));
+    });
+
+    let resolvePatch!: (value: ReturnType<typeof response>) => void;
+    patch.mockReturnValue(new Promise((resolve) => { resolvePatch = resolve; }));
+    const { result } = renderHook(() => useLeads());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+
+    let ratingWrite!: Promise<void>;
+    act(() => {
+      const lead = result.current.items[0]!;
+      ratingWrite = result.current.updateLeadCard(lead.id, { rating: 3 }, lead);
+    });
+    await act(async () => { await result.current.refreshData(); });
+    expect(result.current.items[0]?.primaryContact).toMatchObject({
+      displayName: "Mona Adel",
+      phones: ["+201222222222"],
+    });
+
+    await act(async () => {
+      resolvePatch(response({
+        ...companyLead("Mona Adel", "+201222222222"),
+        rating: 3,
+        // PATCH returns the detail projection (`contacts`) rather than the
+        // list projection (`primaryContact`). The table row must stay rich.
+        primaryContact: undefined,
+        contacts: [],
+      }));
+      await ratingWrite;
+    });
+
+    expect(result.current.items[0]).toMatchObject({
+      rating: 3,
+      primaryContact: {
+        displayName: "Mona Adel",
+        phones: ["+201222222222"],
+      },
+    });
   });
 
   // Requirement 4: advanced is BUTTON-DRIVEN. Editing a condition builds a

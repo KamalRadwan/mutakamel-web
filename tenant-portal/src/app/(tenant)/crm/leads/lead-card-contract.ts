@@ -167,14 +167,12 @@ export function leadOwnerInitials(owner: LeadOwner): string {
 /**
  * The card's two title lines.
  *
- * A corporate lead is filed under its COMPANY, and the person named on it is
- * the contact to ring; an individual lead is the person, and there is no
- * second party to name. The list parser already resolves `company` to the
- * display name when there is no company, so the two being equal IS the
- * individual case — no `leadProfileType` is needed, and none is projected onto
- * the list row.
+ * A corporate lead is filed under its company, with the named contact below.
+ * An individual lead is the person and has no second identity line. The
+ * explicit profile type decides the shape; display names are never compared.
  */
 export function leadCardHeading(lead: {
+  leadProfileType: "INDIVIDUAL" | "CORPORATE";
   leadName: string;
   company: string;
   primaryContactName: string;
@@ -182,17 +180,14 @@ export function leadCardHeading(lead: {
   title: string;
   contactName: string | null;
 } {
-  // The contact is what decides the shape, not the names.
-  //
-  // Comparing `company` with `leadName` looked like it separated a company
-  // from a person and does not: CRM composes a corporate lead's display name
-  // FROM its company name, so the two are equal precisely on the corporate
-  // leads — and the card collapsed to one line exactly where the second one
-  // belonged. `primaryContactName` is empty on an individual lead, whose party
-  // is the person and therefore has no contact hanging off it.
+  if (lead.leadProfileType === "INDIVIDUAL") {
+    return { title: lead.leadName, contactName: null };
+  }
   const contactName = lead.primaryContactName.trim();
-  if (!contactName) return { title: lead.leadName, contactName: null };
-  return { title: lead.company || lead.leadName, contactName };
+  return {
+    title: lead.company || lead.leadName,
+    contactName: contactName || null,
+  };
 }
 
 export interface LeadCardPatch {

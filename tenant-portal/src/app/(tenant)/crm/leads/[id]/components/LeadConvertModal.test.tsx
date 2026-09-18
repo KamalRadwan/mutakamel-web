@@ -47,6 +47,8 @@ describe("LeadConvertModal", () => {
     expect(modal.getByLabelText(copy.crmLeadConvert.profileType)).toHaveValue(copy.crmCustomerProfiles.profileTypes.CORPORATE);
     expect(modal.getByRole("switch", { name: copy.crmLeadConvert.newContact })).not.toBeChecked();
     expect(modal.getByRole("switch", { name: copy.crmLeadConvert.createOpportunity })).toBeDisabled();
+    expect(modal.getByRole("radio", { name: copy.crmLeadConvert.keepLead })).toBeChecked();
+    expect(modal.getByRole("radio", { name: copy.crmLeadConvert.deleteLead })).not.toBeChecked();
     expect(modal.queryByLabelText(copy.crmLeadConvert.contactFullName)).toBeNull();
     expect(modal.getByRole("button", { name: copy.crmLeadConvert.reviewTitle })).toHaveClass("h-(--size-control-sm)");
   });
@@ -62,7 +64,7 @@ describe("LeadConvertModal", () => {
     expect(runCrmWrite).not.toHaveBeenCalled();
   });
   it("reviews read-only before confirmation, then keeps the actual response links without another submit", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValue({ kind: "success", replayed: false, value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false) });
+    vi.mocked(runCrmWrite).mockResolvedValue({ kind: "success", replayed: false, value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false, true) });
     const modal = open();
     await act(async () => fireEvent.click(modal.getByRole("button", { name: en.crmLeadConvert.reviewTitle })));
     expect(modal.getByLabelText(en.crmLeads.name)).toBeDisabled();
@@ -73,6 +75,39 @@ describe("LeadConvertModal", () => {
     expect(modal.queryByRole("link", { name: en.crmLeadConvert.viewOpportunity })).toBeNull();
     expect(modal.queryByRole("button", { name: en.crmLeadConvert.confirm })).toBeNull();
     expect(runCrmWrite).toHaveBeenCalledOnce();
+  });
+  it("asks explicitly whether the converted lead is kept or removed", async () => {
+    const modal = open();
+    fireEvent.click(modal.getByRole("radio", { name: en.crmLeadConvert.deleteLead }));
+    await act(async () => fireEvent.click(modal.getByRole("button", { name: en.crmLeadConvert.reviewTitle })));
+    expect(modal.getByRole("radio", { name: en.crmLeadConvert.deleteLead })).toBeChecked();
+    expect(modal.getByText(en.crmLeadConvert.deleteLeadHint)).toBeInTheDocument();
+  });
+  it("confirms that removing the lead preserves the converted customer", async () => {
+    vi.mocked(runCrmWrite).mockResolvedValue({
+      kind: "success",
+      replayed: false,
+      value: parseLeadConversionResponse(
+        conversionReceipt(false, false),
+        ids.lead,
+        false,
+        false,
+      ),
+    });
+    const modal = open();
+    fireEvent.click(modal.getByRole("radio", { name: en.crmLeadConvert.deleteLead }));
+    await act(async () =>
+      fireEvent.click(modal.getByRole("button", { name: en.crmLeadConvert.reviewTitle })),
+    );
+    await act(async () =>
+      fireEvent.click(modal.getByRole("button", { name: en.crmLeadConvert.confirm })),
+    );
+
+    expect(modal.getByText(en.crmLeadConvert.successDescriptionDeleted)).toBeInTheDocument();
+    expect(modal.getByRole("link", { name: en.crmLeadConvert.viewCustomer })).toHaveAttribute(
+      "href",
+      `/crm/customer-profiles/${ids.customer}`,
+    );
   });
   it("guards dirty cancellation without sending a conversion", () => {
     const modal = open();

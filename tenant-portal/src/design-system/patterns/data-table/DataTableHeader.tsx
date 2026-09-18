@@ -13,7 +13,7 @@ import {
   type ColumnLayout,
   type ColumnLayoutState,
 } from "./column-layout";
-import type { ColumnDef, DataTableLabels, SortState } from "./types";
+import type { ColumnDef, DataTableDensity, DataTableLabels, SortState } from "./types";
 
 /** Width a resize handle reports before the column has ever been sized. */
 const FALLBACK_COLUMN_WIDTH = 160;
@@ -32,6 +32,7 @@ interface DataTableHeaderProps<T> {
   columnLayout?: ColumnLayoutState;
   layoutLabels?: ColumnLayoutLabels;
   labels: DataTableLabels;
+  density?: DataTableDensity;
 }
 
 /**
@@ -55,8 +56,10 @@ export function DataTableHeader<T>({
   columnLayout,
   layoutLabels,
   labels,
+  density = "default",
 }: DataTableHeaderProps<T>) {
   const t = useDictionary();
+  const compactCell = density === "compact" ? "h-8 px-2.5" : undefined;
 
   return (
     <TableHeader className="sticky top-0 z-(--z-sticky-header)">
@@ -66,12 +69,12 @@ export function DataTableHeader<T>({
           // reorderable catalogue, plus the cell's own padding. The label is
           // sr-only: the column has no heading to show, but an unnamed one
           // reads as an empty header to a screen reader.
-          <TableHead scope="col" className="w-10">
+          <TableHead scope="col" className={cn("w-10", compactCell)}>
             <span className="sr-only">{reorderLabel}</span>
           </TableHead>
         )}
         {hasSelection && (
-          <TableHead className="w-8">
+          <TableHead className={cn("w-8", compactCell)}>
             <Checkbox
               checked={selectAllState}
               onCheckedChange={onToggleSelectAll}
@@ -82,7 +85,7 @@ export function DataTableHeader<T>({
         {showRowNumbers && (
           <TableHead
             scope="col"
-            className="w-10 text-muted-foreground"
+            className={cn("w-10 text-muted-foreground", compactCell)}
             // Defaulted through the dictionary, never through English: about 70
             // Table and DataTable views pass neither key.
             title={labels.rowNumber ?? t.common.rowNumber}
@@ -119,6 +122,7 @@ export function DataTableHeader<T>({
                   : undefined
               }
               className={cn(
+                compactCell,
                 column.align === "end" && "text-end",
                 column.sticky === "start" && "sticky start-0 z-(--z-sticky-header) bg-card",
                 column.sticky === "end" && "sticky end-0 z-(--z-sticky-header) bg-card",

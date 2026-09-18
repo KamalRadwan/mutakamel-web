@@ -59,6 +59,28 @@ export function NavMenu({ section, activeItemId }: NavMenuProps) {
   const label = (item: NavItem) => t.nav[item.labelKey as keyof typeof t.nav] as string;
   const isActive = section.items.some((item) => item.id === activeItemId);
 
+  if (section.globalNavDisplay === "items") {
+    return (
+      <>
+        {section.items.map((item) => {
+          const Icon = item.icon;
+          const itemIsActive = item.id === activeItemId;
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-current={itemIsActive ? "page" : undefined}
+              className={cn(TRIGGER, itemIsActive && TRIGGER_ACTIVE, focusRing)}
+            >
+              <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="whitespace-nowrap">{label(item)}</span>
+            </Link>
+          );
+        })}
+      </>
+    );
+  }
+
   const only = section.items.length === 1 ? section.items[0] : undefined;
   if (only) {
     const Icon = only.icon;

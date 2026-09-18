@@ -19,7 +19,7 @@ vi.mock("../../../shared/crm-write", async (original) => ({ ...await original<ty
 const all: CrmActionCapability = { scope: "all", ownerUserIds: null };
 const defaults = { canConvert: true, capability: all as CrmActionCapability | null, lead: conversionLead };
 const success = (): CrmWriteOutcome<LeadConversionResult> => ({ kind: "success", replayed: false,
-  value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false) });
+  value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false, true) });
 
 function setup(overrides: Partial<typeof defaults> = {}) {
   const reload = vi.fn();
@@ -56,7 +56,30 @@ describe("useLeadConvert", () => {
     expect(reload).toHaveBeenCalledOnce();
     expect(result.current.result?.customerProfileId).toBe(ids.customer);
     expect(runCrmWrite).toHaveBeenCalledWith(expect.objectContaining({ method: "post", path: `/api/tenant/crm/v1/leads/${ids.lead}/convert`,
-      body: { profileType: "CORPORATE", displayName: "Acme", companyName: "Acme Trading", createOpportunity: false } }));
+      body: { profileType: "CORPORATE", displayName: "Acme", companyName: "Acme Trading", keepLead: true, createOpportunity: false } }));
+  });
+  it("sends the explicit remove choice and keeps the receipt visible without reloading a deleted lead", async () => {
+    vi.mocked(runCrmWrite).mockResolvedValue({
+      kind: "success",
+      replayed: false,
+      value: parseLeadConversionResponse(
+        conversionReceipt(false, false),
+        ids.lead,
+        false,
+        false,
+      ),
+    });
+    const { result, reload } = setup();
+    act(() => result.current.setField("keepLead", false));
+
+    await act(async () => result.current.submit());
+    await act(async () => result.current.submit());
+
+    expect(runCrmWrite).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.objectContaining({ keepLead: false }) }),
+    );
+    expect(result.current.result).toMatchObject({ lead: null, leadDeleted: true });
+    expect(reload).not.toHaveBeenCalled();
   });
   it("freezes an ambiguous attempt across close/reopen and retries the identical body/key", async () => {
     vi.mocked(runCrmWrite).mockResolvedValueOnce({ kind: "ambiguous", error: { status: 0 } }).mockResolvedValueOnce(success());

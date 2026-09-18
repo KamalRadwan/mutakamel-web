@@ -69,6 +69,27 @@ function renderBoard(overrides: Partial<Parameters<typeof BoardView<Lead>>[0]> =
 }
 
 describe("BoardView", () => {
+  it("loads the next page only for the column whose control was pressed", () => {
+    const onLoadMoreColumn = vi.fn();
+    renderBoard({
+      columns: [{ ...columns[0], count: 7 }, ...columns.slice(1)],
+      columnPage: (columnId) => ({
+        hasMore: columnId === "new",
+        isLoadingMore: false,
+      }),
+      onLoadMoreColumn,
+      labels: {
+        ...labels,
+        loadMore: (loaded, total) => `Load more (${loaded}/${total})`,
+        loadingMore: "Loading more",
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more (1/7)" }));
+    expect(onLoadMoreColumn).toHaveBeenCalledWith("new");
+    expect(screen.getAllByRole("button", { name: /Load more/ })).toHaveLength(1);
+  });
+
   // WCAG 2.2 AA dragging-alternative. This is the single highest-severity
   // item in docs/build/MASTER-PLAN.md — without it the board is unusable to
   // anyone who cannot complete a press-move-release.

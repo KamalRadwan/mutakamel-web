@@ -2,8 +2,9 @@
 
 import { useCallback, useState } from "react";
 import {
-  EditDrawer,
+  Button,
   Field,
+  FormModal,
   Input,
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
+  CREATABLE_LEAD_STAGE_FLAGS,
   LEAD_STAGE_CATEGORIES,
   isProtectedLeadStage,
   toUpdateLeadStageForm,
@@ -24,7 +26,7 @@ import {
   type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
 
-interface EditLeadStageDrawerProps {
+interface EditLeadStageModalProps {
   stage: LeadStageItem | null;
   isSubmitting: boolean;
   error: string | null;
@@ -43,13 +45,13 @@ const EMPTY: UpdateLeadStageFormData = {
 // PATCH /lead-stages/:id — task 8.17. `isDefault` is not here: the DTO has no
 // such field and the service writes the stored value back over any patch. The
 // default moves through POST /lead-stages/:id/default, on the list row.
-export function EditLeadStageDrawer({
+export function EditLeadStageModal({
   stage,
   isSubmitting,
   error,
   onClose,
   onSubmit,
-}: EditLeadStageDrawerProps) {
+}: EditLeadStageModalProps) {
   const { t } = useI18n();
   // Seeded once; the caller remounts this drawer per stage it opens for.
   const [form, setForm] = useState<UpdateLeadStageFormData>(() =>
@@ -71,29 +73,26 @@ export function EditLeadStageDrawer({
 
   const baseline = stage ? toUpdateLeadStageForm(stage) : EMPTY;
   const isDirty = JSON.stringify(form) !== JSON.stringify(baseline);
-  // The stage flagged NEW is protected end to end: no rename, no flag change,
-  // no deactivation (LEAD_STAGE_PROTECTED). Read-only with a reason, never
-  // `disabled` — the values matter and are readable, they just cannot change
-  // here. Every other flag is offered EXCEPT NEW, which nothing may become.
+  // The three lifecycle anchors are protected end to end. The list does not
+  // offer this modal for them; this read-only fallback also protects a stale
+  // open surface if the catalogue changes under it.
   const isProtected = stage ? isProtectedLeadStage(stage) : false;
-  const selectableFlags = stage
-    ? (["CONTACTED", "QUALIFYING", "QUALIFIED", "NURTURING", "ON_HOLD", "DISQUALIFIED", "CONVERTED"] as const)
-    : [];
   const canDeactivate = !isProtected && !(stage?.isDefault ?? false);
 
   return (
-    <EditDrawer
+    <FormModal
       open={stage !== null}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
       title={t.crmLeadStages.editTitle}
       description={t.crmLeadStages.editDescription}
-      notFound={false}
+      size="card"
+      density="compact"
       isDirty={isDirty}
       isSubmitting={isSubmitting}
-      onRevert={() => setForm(baseline)}
       error={error ?? undefined}
+      submitDisabled={isProtected}
       onSubmit={() => {
         arabicName.reveal();
         englishName.reveal();
@@ -107,12 +106,23 @@ export function EditLeadStageDrawer({
         discardDescription: t.common.discardDescription,
         discardConfirm: t.common.discardConfirm,
         discardCancel: t.common.cancel,
-        loadErrorTitle: t.crmLeadStages.loadFailed,
-        retry: t.common.retry,
-        notFoundTitle: t.crmLeadStages.loadFailed,
-        notFoundBack: t.common.back,
-        revert: t.crmLeadStages.revert,
+        sections: t.crmShared.formSectionsNav,
+        sectionInvalid: t.crmShared.formSectionInvalid,
+        close: t.common.close,
       }}
+      footerLeading={
+        isDirty && !isProtected ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isSubmitting}
+            onClick={() => setForm(baseline)}
+          >
+            {t.crmLeadStages.revert}
+          </Button>
+        ) : undefined
+      }
     >
       <Field
         label={t.crmLeadStages.arabicName}
@@ -125,6 +135,7 @@ export function EditLeadStageDrawer({
           value={form.nameAr}
           maxLength={80}
           readOnly={isProtected}
+          disabled={isSubmitting}
           {...arabicName.fieldProps}
           onChange={(event) =>
             setForm((current) => ({ ...current, nameAr: event.target.value }))
@@ -142,6 +153,7 @@ export function EditLeadStageDrawer({
           value={form.nameEn}
           maxLength={80}
           readOnly={isProtected}
+          disabled={isSubmitting}
           {...englishName.fieldProps}
           onChange={(event) =>
             setForm((current) => ({ ...current, nameEn: event.target.value }))
@@ -156,7 +168,7 @@ export function EditLeadStageDrawer({
       >
         <Select
           value={form.flag}
-          disabled={isProtected}
+          disabled={isProtected || isSubmitting}
           onValueChange={(next) =>
             setForm((current) => ({ ...current, flag: next as LeadStageFlag }))
           }
@@ -165,7 +177,7 @@ export function EditLeadStageDrawer({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {selectableFlags.map((flag) => (
+            {CREATABLE_LEAD_STAGE_FLAGS.map((flag) => (
               <SelectItem key={flag} value={flag}>
                 {t.statusValues[`LeadStageFlag.${flag}`] ?? flag}
               </SelectItem>
@@ -174,9 +186,14 @@ export function EditLeadStageDrawer({
         </Select>
       </Field>
 
-      <Field label={t.crmLeadStages.category}>
+      <Field
+        label={t.crmLeadStages.category}
+        readOnly={isProtected}
+        hint={isProtected ? t.crmLeadStages.protectedHint : undefined}
+      >
         <Select
           value={form.category}
+          disabled={isProtected || isSubmitting}
           onValueChange={(next) =>
             setForm((current) => ({
               ...current,
@@ -205,7 +222,7 @@ export function EditLeadStageDrawer({
         <div className="flex items-center gap-2">
           <Switch
             checked={form.isActive}
-            disabled={!canDeactivate}
+            disabled={!canDeactivate || isSubmitting}
             aria-label={t.common.active}
             onCheckedChange={(checked) =>
               setForm((current) => ({ ...current, isActive: checked }))
@@ -216,6 +233,6 @@ export function EditLeadStageDrawer({
           </span>
         </div>
       </Field>
-    </EditDrawer>
+    </FormModal>
   );
 }

@@ -25,6 +25,14 @@ vi.mock("@/lib/api/axiosClient", async (importOriginal) => ({
   axiosClient: api,
 }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => authMock }));
+// Keep these integration tests on the real history primitives, independent of
+// the workspace's unrelated navigation exports.
+vi.mock("@/design-system", async () => ({
+  ...(await import("@/design-system/patterns/detail-section/DetailSection")),
+  ...(await import("@/design-system/patterns/error-state/ErrorState")),
+  ...(await import("@/design-system/patterns/timeline/Timeline")),
+  ...(await import("@/design-system/primitives/RatingStars")),
+}));
 
 import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";

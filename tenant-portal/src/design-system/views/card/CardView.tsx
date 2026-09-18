@@ -18,6 +18,7 @@ import { CardViewToolbar } from "./CardViewToolbar";
 const VIRTUALIZE_ABOVE = 100;
 const ESTIMATED_ROW_PX = 160;
 const GRID_CLASS = "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
+const COMPACT_GRID_CLASS = "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
 
 export interface CardViewLabels extends WorkspaceViewLabels {
   sortBy: string;
@@ -34,6 +35,7 @@ export interface CardViewProps<T> extends Omit<WorkspaceViewProps<T>, "labels"> 
   // the same callbacks instead of maintaining two card designs.
   renderFooter?: (item: T) => ReactNode;
   cardClassName?: (item: T) => string | undefined;
+  density?: "compact" | "default";
   // The entity's sortable fields, already translated. Omit them and the sort
   // control does not render — which is the honest state for a list the server
   // will not sort.
@@ -52,6 +54,7 @@ export function CardView<T>({
   renderActions,
   renderFooter,
   cardClassName,
+  density = "default",
   sortOptions = [],
   isLoading,
   error,
@@ -66,6 +69,7 @@ export function CardView<T>({
   labels,
   className,
 }: CardViewProps<T>) {
+  const gridClass = density === "compact" ? COMPACT_GRID_CLASS : GRID_CLASS;
   const [columnCount, setColumnCount] = useState(1);
   const setScrollElement = useScrollRestoration("card");
   const { scrollRef, itemRef, range } = useVirtualWindow({
@@ -120,7 +124,7 @@ export function CardView<T>({
 
   if (isLoading) {
     return (
-      <div className={cn(GRID_CLASS, className)}>
+      <div className={cn(gridClass, className)}>
         {Array.from({ length: 8 }).map((_, index) => (
           <Skeleton key={`card-skeleton-${index}`} className="h-32 rounded-md" />
         ))}
@@ -151,7 +155,7 @@ export function CardView<T>({
       />
 
       <div ref={setScrollContainer} className={cn("min-h-0 flex-1", range && "overflow-y-auto")}>
-        <div ref={setGridElement} className={GRID_CLASS}>
+        <div ref={setGridElement} className={gridClass}>
           {range && range.paddingStart > 0 && (
             <div aria-hidden="true" className="col-span-full" style={{ height: range.paddingStart }} />
           )}
@@ -167,6 +171,7 @@ export function CardView<T>({
                 selectLabel={labels.selectRow}
                 actions={renderActions?.(item)}
                 footer={renderFooter?.(item)}
+                density={density}
                 className={cardClassName?.(item)}
               >
                 {renderCard(item)}

@@ -1,50 +1,44 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
+  ConfirmActionModal,
   DegradedBanner,
   DetailHeader,
-  DetailSection,
   ErrorState,
   NotFoundState,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  PageActions,
   Skeleton,
+  StageBar,
   StatusBadge,
 } from "@/design-system";
 import { useAccessMode } from "@/hooks/useAccessMode";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedValue } from "@/lib/format/localized";
+import { formatTemplate } from "@/lib/format/template";
 import { CrmScopeGate } from "../../../shared/components/CrmScopeGate";
 import { CustomFieldsCard } from "../../../shared/components/CustomFieldsCard";
-import { RecordAttachmentsSection } from "../../../shared/components/RecordAttachmentsSection";
-import { RecordNotesSection } from "../../../shared/components/RecordNotesSection";
 import { crmCapabilityAllowsOwner } from "../../../shared/crm-capabilities";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import { useCrmRecordCapabilities } from "../../../shared/hooks/useCrmRecordCapabilities";
 import { useCrmAcquisitionSources } from "../../../shared/hooks/useCrmAcquisitionSources";
-import { BLACKLISTED_STATUS, CUSTOMER_STATUSES } from "../../customer-profile-contract";
+import {
+  BLACKLISTED_STATUS,
+  CUSTOMER_STATUSES,
+} from "../../customer-profile-contract";
 import { useCustomerProfilesCapabilities } from "../../hooks/useCustomerProfilesCapabilities";
 import type { CustomerProfileStatus } from "../../hooks/useCustomerProfiles";
 import { useCustomerProfileActions } from "../hooks/useCustomerProfileActions";
 import { useCustomerProfileDetail } from "../hooks/useCustomerProfileDetail";
 import { CustomerProfileActionDialogs } from "./CustomerProfileActionDialogs";
-import { CustomerProfileFacts } from "./CustomerProfileFacts";
+import { CustomerCompanyCard } from "./CustomerCompanyCard";
+import { CustomerContactsCard } from "./CustomerContactsCard";
+import { CustomerProfileIdentityCard } from "./CustomerProfileIdentityCard";
+import { CustomerProfileRelatedNav } from "./CustomerProfileRelatedNav";
+import { CustomerProfileDetailSidePanel } from "./CustomerProfileDetailSidePanel";
 
-/**
- * `/crm/customer-profiles/[id]` — MASTER-PLAN 8.7-8.9, resolving Q12.
- *
- * The action cluster follows docs/design/detail-screens.md exactly: **Add
- * contact** is the one filled primary and only on a `CORPORATE` profile, since
- * `addContact` refuses an individual with
- * `422 CUSTOMER_PROFILE_CONTACTS_CORPORATE_ONLY`. An `INDIVIDUAL` profile
- * therefore has **no** primary action — the one-primary rule is a ceiling, not
- * a quota, so Edit is not promoted to fill the slot.
- */
 export function CustomerProfileDetailWorkspace({
   profileId,
 }: {
@@ -55,7 +49,9 @@ export function CustomerProfileDetailWorkspace({
   const describeError = useCrmErrorText();
   const detail = useCustomerProfileDetail(profileId);
   const profile = detail.profile;
-  const capabilities = useCustomerProfilesCapabilities(profile?.branchId ?? null);
+  const capabilities = useCustomerProfilesCapabilities(
+    profile?.branchId ?? null,
+  );
   const attached = useCrmRecordCapabilities(profile?.branchId ?? null);
   const sources = useCrmAcquisitionSources();
   const { canMutate } = useAccessMode();
@@ -64,17 +60,17 @@ export function CustomerProfileDetailWorkspace({
     profile,
     detail.setProfile,
     () => router.push("/crm/customer-profiles"),
-    // The D2 reconciliation: when a write applies and its body cannot be read,
-    // the record is re-read from the server rather than patched from a response
-    // nothing could parse.
     detail.reload,
   );
 
+  const [pendingStatus, setPendingStatus] =
+    useState<CustomerProfileStatus | null>(null);
+
   if (detail.isLoading) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
         <Skeleton className="h-12 rounded-md" />
-        <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_320px]">
           <Skeleton className="h-72 rounded-md" />
           <Skeleton className="h-72 rounded-md" />
         </div>
@@ -109,21 +105,61 @@ export function CustomerProfileDetailWorkspace({
   const isCorporate = profile.profileType === "CORPORATE";
   const canUpdate =
     canMutate &&
-    crmCapabilityAllowsOwner(capabilities.capabilities.update, profile.ownerUserId);
+    crmCapabilityAllowsOwner(
+      capabilities.capabilities.update,
+      profile.ownerUserId,
+    );
   const canDelete =
     canMutate &&
-    crmCapabilityAllowsOwner(capabilities.capabilities.delete, profile.ownerUserId);
+    crmCapabilityAllowsOwner(
+      capabilities.capabilities.delete,
+      profile.ownerUserId,
+    );
 
-  function changeStatus(next: CustomerProfileStatus) {
-    actions.requestStatus(next);
-    // Only BLACKLISTED confirms: it is terminal in practice and blocks new
-    // opportunities on this customer. Everything else applies straight away.
-    if (next !== BLACKLISTED_STATUS) void actions.submitStatus(next);
+  function handleStageChange(nextStatus: CustomerProfileStatus) {
+    if (nextStatus === profile?.status) return;
+    if (nextStatus === BLACKLISTED_STATUS) {
+      actions.requestStatus(BLACKLISTED_STATUS);
+    } else {
+      setPendingStatus(nextStatus);
+    }
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
+      {/* Action bar related items: Opportunities, Quotations, Sales Orders, Invoices */}
+      <PageActions slot="related">
+        <CustomerProfileRelatedNav
+          customerProfileId={profile.id}
+          partyId={profile.partyId}
+          branchId={profile.branchId}
+        />
+      </PageActions>
+
+      {/* Action bar actions: Edit & Delete buttons */}
+      <PageActions slot="actions">
+        <div className="flex items-center gap-1.5">
+          {canUpdate && (
+            <Button size="sm" variant="outline" onClick={actions.openEdit}>
+              {t.crmLeadDetail.edit}
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:bg-destructive/10"
+              onClick={actions.requestDelete}
+            >
+              {t.common.delete}
+            </Button>
+          )}
+        </div>
+      </PageActions>
+
+      {/* Screen-reader heading outline and back link mirroring Leads */}
       <DetailHeader
+        className="sr-only"
         title={profile.displayName}
         subtitle={[
           t.crmCustomerProfiles.profileTypes[profile.profileType],
@@ -138,57 +174,57 @@ export function CustomerProfileDetailWorkspace({
         status={<StatusBadge value={profile.status} kind="CustomerStatus" />}
         backLabel={t.crmCustomerProfiles.back}
         backHref="/crm/customer-profiles"
-        primaryAction={
-          canUpdate && isCorporate
-            ? {
-                label: t.crmCustomerProfileActions.addContact,
-                onClick: actions.openContact,
-              }
-            : undefined
-        }
-        secondaryActions={
-          <>
-            {canUpdate && (
-              <Button size="sm" variant="outline" onClick={actions.openEdit}>
-                {t.crmLeadDetail.edit}
-              </Button>
-            )}
-            {canUpdate && (
-              <Select
-                value={profile.status}
-                onValueChange={(value) =>
-                  changeStatus(value as CustomerProfileStatus)
-                }
-                disabled={actions.busy === "status"}
-              >
-                <SelectTrigger size="sm"
-                  className="w-40"
-                  aria-label={t.crmCustomerProfileActions.changeStatus}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CUSTOMER_STATUSES.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {t.statusValues[`CustomerStatus.${status}`] ?? status}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {canDelete && (
-              <Button size="sm"
-                variant="ghost"
-                className="text-destructive"
-                onClick={actions.requestDelete}
-              >
-                {t.common.delete}
-              </Button>
-            )}
-          </>
-        }
       />
 
+      {/* Customer Status Pipeline StageBar */}
+      <StageBar
+        label={t.crmCustomerProfileActions.changeStatus}
+        steps={CUSTOMER_STATUSES.map((status) => ({
+          id: status,
+          label: t.statusValues[`CustomerStatus.${status}`] ?? status,
+          tone:
+            status === "ACTIVE_CUSTOMER"
+              ? "positive"
+              : status === "BLACKLISTED"
+                ? "negative"
+                : undefined,
+        }))}
+        value={profile.status}
+        onChange={
+          canUpdate && actions.busy !== "status"
+            ? (next) => next && handleStageChange(next as CustomerProfileStatus)
+            : undefined
+        }
+        disabled={actions.busy === "status"}
+      />
+
+      {/* Status move confirmation modal */}
+      <ConfirmActionModal
+        open={pendingStatus !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingStatus(null);
+        }}
+        title={t.crmCustomerProfileActions.changeStatus}
+        description={formatTemplate(t.crmLeadDetail.moveStageDescription, {
+          from:
+            t.statusValues[`CustomerStatus.${profile.status}`] ??
+            profile.status,
+          to: pendingStatus
+            ? (t.statusValues[`CustomerStatus.${pendingStatus}`] ??
+              pendingStatus)
+            : "",
+        })}
+        confirmLabel={t.filters.yes}
+        cancelLabel={t.common.cancel}
+        loading={actions.busy === "status"}
+        onConfirm={() => {
+          const target = pendingStatus;
+          setPendingStatus(null);
+          if (target) void actions.submitStatus(target);
+        }}
+      />
+
+      {/* Degraded Banners */}
       {capabilities.error && (
         <DegradedBanner
           message={t.crmCustomerProfileActions.capabilitiesUnavailable}
@@ -204,47 +240,43 @@ export function CustomerProfileDetailWorkspace({
         <DegradedBanner message={describeError(actions.error) ?? ""} />
       )}
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
-        <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
-          <CustomerProfileFacts profile={profile} />
-          <RecordNotesSection
-            branchId={profile.branchId}
-            sourceType="CUSTOMER_PROFILE"
-            sourceId={profile.id}
-            sourceOwnerUserId={profile.ownerUserId}
-            createCapability={attached.capabilities.notesCreate}
-            deleteCapability={attached.capabilities.notesDelete}
-            readOnly={!canMutate}
-          />
-          <RecordAttachmentsSection
-            branchId={profile.branchId}
-            sourceType="CUSTOMER_PROFILE"
-            sourceId={profile.id}
-            sourceOwnerUserId={profile.ownerUserId}
-            createCapability={attached.capabilities.attachmentsCreate}
-            deleteCapability={attached.capabilities.attachmentsDelete}
-            readOnly={!canMutate}
-          />
-        </div>
+      {/* 2-column responsive layout matching Leads */}
+      <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="order-2 flex min-w-0 flex-col gap-2 lg:order-1">
+          {isCorporate && (
+            <CustomerCompanyCard
+              profile={profile}
+              onEdit={canUpdate ? actions.openEdit : undefined}
+              readOnly={!canUpdate}
+            />
+          )}
 
-        <div className="order-1 flex flex-col gap-3 lg:order-2">
-          <DetailSection
-            title={t.crmLeadDetail.ownershipTitle}
-            columns={1}
-            emptyValueLabel={t.detail.notRecorded}
-            fields={[
-              { label: t.crmOpportunities.owner, value: profile.ownerUserId },
-              { label: t.crmCustomerProfiles.branch, value: profile.branchId },
-              {
-                label: t.crmCustomerProfileActions.sourceLead,
-                value: profile.sourceLeadId,
-              },
-            ]}
+          <CustomerContactsCard
+            profile={profile}
+            canEdit={canUpdate}
+            onAddContact={
+              isCorporate && canUpdate ? actions.openContact : undefined
+            }
           />
+
+          <CustomerProfileIdentityCard
+            profile={profile}
+            sources={sources.items}
+          />
+
           <CustomFieldsCard
+            density="compact"
             branchId={profile.branchId}
             ownerType="CUSTOMER_PROFILE"
             ownerId={profile.id}
+          />
+        </div>
+
+        <div className="order-3 min-w-0">
+          <CustomerProfileDetailSidePanel
+            profile={profile}
+            attached={attached}
+            readOnly={!canMutate}
           />
         </div>
       </div>

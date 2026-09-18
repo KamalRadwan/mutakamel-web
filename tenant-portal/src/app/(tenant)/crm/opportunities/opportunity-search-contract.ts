@@ -27,16 +27,9 @@
 //     basic's filters are naturally unique; a filter tree has a node per leaf,
 //     so `stageFlag = PROPOSAL OR stageFlag = NEGOTIATION` is a normal
 //     question and `amount >= 1000 AND amount < 5000` is one row plus one row.
-//  3. **`search` is the TITLE, and only the title.** The repository declares
-//     `searchableFields: ['title']`
-//     (crm-app/src/crm/opportunities/repo/opportunities.repository.ts), so the
-//     free-text box is one `ILIKE %term%` over `title` on both routes. Unlike
-//     leads, it reaches nothing the tree cannot: `title` is whitelisted, so
-//     free text here is a shorthand for `title ilike …` rather than the only
-//     door to a raw-join column. The customer and contact DISPLAY names the
-//     board and card projections show are reachable by neither — they come
-//     from a party join that exists only on those two routes, and the table's
-//     rows carry raw ids for exactly that reason.
+//  3. **`search` is semantic.** `searchField` chooses opportunity, customer,
+//     email or phone. The server resolves party-backed fields while returning
+//     the same rich read model used by the table and card views.
 //  4. **`sortBy` is one of five, and falls back rather than failing.**
 //     `safeSortBy(query.sortBy, 'createdAt', OPPORTUNITY_SORT_FIELDS)` on the
 //     GET and `searchSort(dto.sort, 'createdAt', …)` on the POST run the same
@@ -57,6 +50,13 @@ import {
   type CrmSearchGroup,
   type CrmSearchRequestBody,
 } from "../shared/search/filter-tree";
+import {
+  DEFAULT_OPPORTUNITY_BASIC_SEARCH,
+  EMPTY_OPPORTUNITY_BASIC_SEARCH,
+  appendOpportunityBasicQuery,
+  compileOpportunityBasicSearch,
+  type OpportunityBasicSearch,
+} from "./opportunity-basic-search-contract";
 
 /**
  * `OPPORTUNITY_SORT_FIELDS` in crm-app/src/crm/opportunities/opportunities.service.ts.
@@ -92,14 +92,7 @@ type OpportunitySortDir = "ASC" | "DESC";
  * accepts is a raw uuid or an equality the advanced card asks better, with an
  * operator beside it.
  */
-interface OpportunitySearchRow {
-  /** Raw control value. Empty means "no filter", never an empty filter. */
-  text: string;
-}
-
 /** `@MaxLength(200)` on `PaginationQueryDto.search`; a longer term is a 400. */
-const OPPORTUNITY_SEARCH_TEXT_MAX_LENGTH = 200;
-
 /* ----------------------------- advanced mode ---------------------------- */
 
 /**
@@ -277,8 +270,8 @@ export type OpportunitySearchMode = "basic" | "advanced";
 
 export interface OpportunitySearchState {
   mode: OpportunitySearchMode;
-  /** Basic mode's single condition. A blank term means no filter. */
-  basic: OpportunitySearchRow;
+  /** Basic mode's visible token set. */
+  basic: OpportunityBasicSearch;
   /** Advanced mode's free-text term — the same `title` match, on the POST. */
   text: string;
   /**
@@ -292,7 +285,7 @@ export interface OpportunitySearchState {
 /** Nothing asked: basic, blank term, one blank condition. */
 export const EMPTY_OPPORTUNITY_SEARCH: OpportunitySearchState = {
   mode: "basic",
-  basic: { text: "" },
+  basic: EMPTY_OPPORTUNITY_BASIC_SEARCH,
   text: "",
   groups: [
     {
@@ -306,6 +299,12 @@ export const EMPTY_OPPORTUNITY_SEARCH: OpportunitySearchState = {
       ],
     },
   ],
+};
+
+/** Default page scope: opportunities assigned to the authenticated actor. */
+export const DEFAULT_OPPORTUNITY_SEARCH: OpportunitySearchState = {
+  ...EMPTY_OPPORTUNITY_SEARCH,
+  basic: DEFAULT_OPPORTUNITY_BASIC_SEARCH,
 };
 
 /**
@@ -329,7 +328,14 @@ export function opportunitySearchWithBasicText(
   state: OpportunitySearchState,
   text: string,
 ): OpportunitySearchState {
-  return { ...state, basic: { text } };
+  return { ...state, basic: { ...state.basic, text, filters: [] } };
+}
+
+export function opportunitySearchWithBasic(
+  state: OpportunitySearchState,
+  basic: OpportunityBasicSearch,
+): OpportunitySearchState {
+  return { ...state, mode: "basic", basic };
 }
 
 /** Advanced mode's groups, replaced wholesale by the card's editors. */
@@ -361,11 +367,9 @@ export function opportunitySearchCleared(
  * Every key `buildOpportunitiesListQuery` may produce.
  *
  * Exported so the test can assert the builder never steps outside it: an
- * unknown key is a 400 that empties the table, not a no-op. The DTO accepts
- * four more — `status`, `customerProfileId`, `ownerUserId`, `expectedCloseFrom`
- * / `expectedCloseTo` — that this builder deliberately never sends, because
- * advanced mode asks each of them with an operator beside it instead of as a
- * bare equality.
+ * unknown key is a 400 that empties the table, not a no-op. Basic chips use
+ * the semantic and equality keys below; operator-based questions stay in the
+ * Advanced filter tree.
  */
 export const OPPORTUNITY_LIST_QUERY_KEYS: readonly string[] = [
   "branchId",
@@ -376,6 +380,11 @@ export const OPPORTUNITY_LIST_QUERY_KEYS: readonly string[] = [
   "pipelineId",
   "stageId",
   "search",
+  "searchField",
+  "status",
+  "stageFlag",
+  "ownerUserId",
+  "tagIds",
 ];
 
 export interface OpportunitiesListQueryInput {
@@ -391,6 +400,7 @@ export interface OpportunitiesListQueryInput {
   /** The workspace's stage bar, or `null` for "all stages". */
   stageId: string | null;
   search: OpportunitySearchState;
+  actorUserId?: string;
 }
 
 /**
@@ -409,7 +419,9 @@ export function buildOpportunitiesListQuery({
   pipelineId,
   stageId,
   search,
+  actorUserId,
 }: OpportunitiesListQueryInput): URLSearchParams {
+  const basicValues = compileOpportunityBasicSearch(search.basic, actorUserId);
   const query = new URLSearchParams({
     branchId,
     page: String(page),
@@ -421,22 +433,19 @@ export function buildOpportunitiesListQuery({
     sortDir,
   });
 
-  if (pipelineId) query.set("pipelineId", pipelineId);
+  const effectivePipelineId = basicValues.pipelineId ?? pipelineId;
+  const effectiveStageId = basicValues.stageId ?? stageId;
+  if (effectivePipelineId) query.set("pipelineId", effectivePipelineId);
   // Absent rather than empty when nothing is chosen: `@IsOptional()` skips only
   // null/undefined, so `stageId=` would reach `@IsUUID('7')` in
   // `OpportunitiesQueryDto` and answer 400 instead of "every stage". The same
   // is true of `pipelineId` above.
-  if (stageId) query.set("stageId", stageId);
+  if (effectiveStageId) query.set("stageId", effectiveStageId);
 
-  const term = search.basic.text.trim();
-  if (term) {
-    // Clamped rather than sent long: `@MaxLength(200)` rejects the request
-    // outright, so a 201st character would blank the table instead of narrowing
-    // it. The input control caps at the same number, so this is the belt to its
-    // braces — a pasted value is the only way to reach it.
-    query.set("search", term.slice(0, OPPORTUNITY_SEARCH_TEXT_MAX_LENGTH));
-  }
-  return query;
+  return appendOpportunityBasicQuery(query, search.basic, actorUserId, {
+    includePipeline: false,
+    includeStage: false,
+  });
 }
 
 export interface OpportunitySearchRequestInput {

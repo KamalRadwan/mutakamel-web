@@ -44,7 +44,6 @@ export interface PipelineTransferAmbiguity {
 export function usePipelineTransfer(
   item: OpportunityDetail | null,
   pipelines: OpportunityPipeline[],
-  onTransferred: (item: OpportunityDetail) => void,
   /**
    * Re-read the record from the server — defect D2. Used when a write applied
    * but its response body could not be parsed: there is no value to hand the
@@ -115,8 +114,8 @@ export function usePipelineTransfer(
         });
         if (outcome.kind === "success") {
           setAmbiguity(null);
-          onTransferred(outcome.value);
           setOpen(false);
+          onReconcile();
           return;
         }
         if (outcome.kind === "ambiguous") {
@@ -144,7 +143,7 @@ export function usePipelineTransfer(
     // `onReconcile` is called on the applied_unreadable path and belongs here,
     // because without this dependency the callback keeps
     // the first one the parent passed and reconciles against a stale closure.
-  }, [isSubmitting, item, onReconcile, onTransferred, pipelineId, reason, stageId]);
+  }, [isSubmitting, item, onReconcile, pipelineId, reason, stageId]);
 
   return {
     open,

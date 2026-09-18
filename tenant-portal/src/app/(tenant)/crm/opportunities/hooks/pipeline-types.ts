@@ -104,6 +104,16 @@ export function formatCurrencyAmount(
   return `${currencyCode ? `${currencyCode} ` : ""}${negative ? "-" : ""}${grouped}${decimal}`;
 }
 
+export function formatOpportunityAmountSummary(
+  amountsByCurrency: Readonly<Record<string, string>>,
+): string | undefined {
+  const summary = Object.entries(amountsByCurrency)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, amount]) => formatCurrencyAmount(amount, currency))
+    .join(" · ");
+  return summary || undefined;
+}
+
 export interface OpportunityActionCapability {
   scope: "own" | "team" | "all";
   ownerUserIds: string[] | null;

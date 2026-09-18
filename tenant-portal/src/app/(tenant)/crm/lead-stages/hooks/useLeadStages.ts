@@ -6,8 +6,9 @@ import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
-  entryLeadStageId,
   parseLeadStageCatalogueResponse,
+  isProtectedLeadStage,
+  protectedLeadStageIds,
   type LeadStageItem,
   type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
@@ -101,6 +102,7 @@ export function useLeadStages() {
       ),
     );
   }, [items, searchQuery]);
+  const fixedStageIds = useMemo(() => protectedLeadStageIds(items), [items]);
 
   return {
     t,
@@ -116,7 +118,7 @@ export function useLeadStages() {
     // unfiltered list and the controls are suppressed while a search narrows
     // the view — the visible order would not be the order being written.
     isFiltered: searchQuery.trim().length > 0,
-    entryStageId: entryLeadStageId(items),
+    fixedStageIds,
     isCreating: mutations.isCreating,
     isDeleting: mutations.isDeleting,
     isUpdating: mutations.isUpdating,
@@ -147,7 +149,7 @@ export function useLeadStages() {
     },
     selectedForEdit,
     openEdit: (stage: LeadStageItem) => {
-      if (!canManage) return;
+      if (!canManage || isProtectedLeadStage(stage)) return;
       mutations.clearEditError();
       setSelectedForEdit(stage);
     },

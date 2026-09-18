@@ -11,7 +11,7 @@ import { TableCell, TableRow } from "../../primitives/Table";
 import { cn } from "../../lib/cn";
 import { focusRing } from "../../lib/variants";
 import { iconSize } from "../../lib/icons";
-import type { ColumnDef, DataTableLabels } from "./types";
+import type { ColumnDef, DataTableDensity, DataTableLabels } from "./types";
 
 /** Everything the handle cell of one reorderable row needs, already resolved. */
 interface RowHandle {
@@ -44,6 +44,7 @@ export interface DataTableRowProps<T> {
    * re-sizes to its content mid-drag unless the widths are pinned back on.
    */
   cellWidths?: number[];
+  density?: DataTableDensity;
 }
 
 /**
@@ -68,6 +69,7 @@ export function DataTableRow<T>({
   rowRef,
   draggableProps,
   cellWidths,
+  density = "default",
 }: DataTableRowProps<T>) {
   const leadingCells = (handle ? 1 : 0) + (hasSelection ? 1 : 0) + (rowNumber === undefined ? 0 : 1);
   const lockedWidth = (index: number): CSSProperties | undefined => {
@@ -94,7 +96,7 @@ export function DataTableRow<T>({
       // sticky header or a sticky column with no visual indication
       // at all — WCAG 2.2 AA focus-not-obscured.
       className={cn(
-        "scroll-mt-(--size-row)",
+        density === "compact" ? "h-9 scroll-mt-9 text-xs" : "scroll-mt-(--size-row)",
         hasStickyStart && "scroll-ms-16",
         hasStickyEnd && "scroll-me-16",
         onRowClick &&
@@ -104,7 +106,7 @@ export function DataTableRow<T>({
       {handle && (
         <TableCell
           style={lockedWidth(0)}
-          className="px-2 py-0"
+          className={density === "compact" ? "px-1.5 py-0" : "px-2 py-0"}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex items-center">
@@ -137,6 +139,7 @@ export function DataTableRow<T>({
       {hasSelection && (
         <TableCell
           style={lockedWidth(handle ? 1 : 0)}
+          className={density === "compact" ? "px-2.5 py-1" : undefined}
           onClick={(event) => event.stopPropagation()}
         >
           <Checkbox
@@ -149,7 +152,10 @@ export function DataTableRow<T>({
       {rowNumber !== undefined && (
         <TableCell
           style={lockedWidth(leadingCells - 1)}
-          className="text-xs tabular-nums text-muted-foreground"
+          className={cn(
+            "text-xs tabular-nums text-muted-foreground",
+            density === "compact" && "px-2.5 py-1",
+          )}
         >
           {rowNumber}
         </TableCell>
@@ -159,6 +165,7 @@ export function DataTableRow<T>({
           key={column.id}
           style={lockedWidth(leadingCells + index)}
           className={cn(
+            density === "compact" && "px-2.5 py-1",
             (column.numeric || column.align === "end") && "text-end tabular-nums font-mono",
             column.sticky === "start" && "sticky start-0 z-(--z-sticky-cell) bg-inherit",
             column.sticky === "end" && "sticky end-0 z-(--z-sticky-cell) bg-inherit",

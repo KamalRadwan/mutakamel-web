@@ -1,6 +1,16 @@
 "use client";
 
-import { Button, DegradedBanner, Field, FormModal, FormSection, Input, Switch } from "@/design-system";
+import {
+  Button,
+  DegradedBanner,
+  Field,
+  FormModal,
+  FormSection,
+  Input,
+  RadioGroup,
+  RadioGroupItem,
+  Switch,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import { CrmCustomFieldsFormSection } from "../../../shared/components/CrmCustomFieldsFormSection";
@@ -88,6 +98,59 @@ export function LeadConvertModal({ convert }: { convert: LeadConvertState }) {
               onChange={(key, value) => convert.setField("customFields", { ...form.customFields, [key]: value })}
               onBlur={() => { convert.validate(); }} />
           )}
+          <FormSection id="lead-record" title={t.crmLeadConvert.leadRecordSection}>
+            <fieldset className="flex flex-col gap-1.5 md:col-span-2">
+              <legend className="text-sm font-medium text-foreground">
+                {t.crmLeadConvert.leadAfterConversion}
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                {t.crmLeadConvert.leadAfterConversionHint}
+              </p>
+              <RadioGroup
+                aria-label={t.crmLeadConvert.leadAfterConversion}
+                value={form.keepLead ? "keep" : "delete"}
+                disabled={disabled}
+                onValueChange={(value) => convert.setField("keepLead", value === "keep")}
+              >
+                <label
+                  htmlFor="lead-conversion-keep"
+                  className="flex cursor-pointer items-start gap-2 rounded-sm border border-border p-2.5"
+                >
+                  <RadioGroupItem
+                    id="lead-conversion-keep"
+                    value="keep"
+                    aria-label={t.crmLeadConvert.keepLead}
+                  />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm font-medium text-foreground">
+                      {t.crmLeadConvert.keepLead}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {t.crmLeadConvert.keepLeadHint}
+                    </span>
+                  </span>
+                </label>
+                <label
+                  htmlFor="lead-conversion-delete"
+                  className="flex cursor-pointer items-start gap-2 rounded-sm border border-border p-2.5"
+                >
+                  <RadioGroupItem
+                    id="lead-conversion-delete"
+                    value="delete"
+                    aria-label={t.crmLeadConvert.deleteLead}
+                  />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-sm font-medium text-foreground">
+                      {t.crmLeadConvert.deleteLead}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {t.crmLeadConvert.deleteLeadHint}
+                    </span>
+                  </span>
+                </label>
+              </RadioGroup>
+            </fieldset>
+          </FormSection>
         </>
       )}
     </FormModal>

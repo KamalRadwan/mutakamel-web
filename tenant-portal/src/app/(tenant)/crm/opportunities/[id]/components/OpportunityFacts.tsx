@@ -1,6 +1,6 @@
 "use client";
 
-import { CopyButton, DateTime, DetailSection, Money } from "@/design-system";
+import { CopyButton, DateTime, DetailSection, Money, RatingStars } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import type { OpportunityDetail } from "../../opportunity-contract";
@@ -31,9 +31,22 @@ export function OpportunityFacts({ item }: { item: OpportunityDetail }) {
           },
           {
             label: t.crmOpportunities.importance,
-            value: formatTemplate(t.crmOpportunities.importanceValue, {
-              level: item.importance,
-            }),
+            value: (
+              <span className="inline-flex items-center gap-2">
+                <RatingStars
+                  value={item.importance}
+                  max={3}
+                  label={formatTemplate(t.crmOpportunities.importanceValue, {
+                    level: item.importance,
+                  })}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {formatTemplate(t.crmOpportunities.importanceValue, {
+                    level: item.importance,
+                  })}
+                </span>
+              </span>
+            ),
           },
           {
             label: t.crmOpportunityDetail.probability,

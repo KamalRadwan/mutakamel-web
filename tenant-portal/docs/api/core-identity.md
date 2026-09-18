@@ -4,6 +4,9 @@ Status: **verified**
 
 Last source verification: **2026-08-31** (re-verified against controllers and services while building Phase 4)
 
+User/contact and organization detail reads re-verified **2026-09-14** for the
+shared audit-name and contact-card integration described below.
+
 Owning app: **core-app**
 
 Canonical prefixes: `/api/tenant/core/v1/organization`, `.../users`,
@@ -136,6 +139,34 @@ it has children or directly-placed users.
   still has active children is rejected.
 
 ---
+
+## Shared user contact projection
+
+Verified **2026-09-14** against Gateway `core.tenant.users.get`,
+`TenantUsersController.findOne`, `TenantUsersService.findOne`, and its
+`TenantUserView` / `toUserView` projection.
+
+`lib/people/user-profile.ts` reads `GET /api/tenant/core/v1/users/:id` through
+the Core envelope reader. It validates the exact requested UUID and projects
+only `id`, combined `firstName` + `lastName`, and `email`. The modal never
+receives administrative attributes, roles, or organization placement data.
+`users.user.read` is required; Core's `assertCanReadUser` also checks scope.
+For the authenticated actor, the existing `/auth/me` profile supplies these
+same display fields without a second read. Other references are never matched
+by name or email.
+
+The source provides **no phone, image URL, or Party ID** in `TenantUserView`.
+The internal entity has a Party relationship, but that does not authorize the
+frontend to invent a relation. `users/me/profile` contains UI preferences,
+not contact information. Phone and photo remain unavailable in user-backed
+cards; the reusable template supports them for callers with a verified source.
+See [Q138](../build/OPEN-QUESTIONS.md#q138--tenant-user-contact-cards-have-no-phone-or-photo-contract).
+
+The shared audit also resolves organization names through existing individual
+company, branch, department and team GETs, gated by their `org.*.read`
+permission and server scope. Only validated `{id, name}` enters the labels.
+The CRM acquisition-source detail reader separately consumes raw
+`AcquisitionSourceView.nameAr/nameEn` under `crm.acquisition_sources.read`.
 
 ## Users — 22 routes
 

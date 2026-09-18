@@ -131,6 +131,20 @@ function invalid(): never {
   throw new Error("Invalid CRM attachments response.");
 }
 
+function parseSizeBytes(value: unknown): number {
+  // crm-app/packages/database/src/entities/tenant/crm.entities.ts stores
+  // size_bytes as bigint: persisted reads return strings, uploads can return numbers.
+  const bytes = typeof value === "string" ? Number.parseInt(value, 10) : value;
+  if (
+    typeof bytes !== "number" || !Number.isSafeInteger(bytes) ||
+    bytes < 1 || bytes > CRM_ATTACHMENT_MAX_BYTES ||
+    (typeof value === "string" && String(bytes) !== value)
+  ) {
+    invalid();
+  }
+  return bytes;
+}
+
 export function parseCrmAttachment(payload: unknown): CrmAttachment {
   const attachment = crmRecord(payload);
   if (
@@ -147,9 +161,6 @@ export function parseCrmAttachment(payload: unknown): CrmAttachment {
     typeof attachment.mimeType !== "string" ||
     attachment.mimeType.length === 0 ||
     attachment.mimeType.length > 120 ||
-    !Number.isSafeInteger(attachment.sizeBytes) ||
-    (attachment.sizeBytes as number) < 1 ||
-    (attachment.sizeBytes as number) > CRM_ATTACHMENT_MAX_BYTES ||
     typeof attachment.createdAt !== "string" ||
     Number.isNaN(new Date(attachment.createdAt).getTime())
   ) {
@@ -162,7 +173,7 @@ export function parseCrmAttachment(payload: unknown): CrmAttachment {
     sourceId: attachment.sourceId,
     fileName: attachment.fileName,
     mimeType: attachment.mimeType,
-    sizeBytes: attachment.sizeBytes as number,
+    sizeBytes: parseSizeBytes(attachment.sizeBytes),
     uploadedByUserId: isUUIDv7(attachment.uploadedByUserId)
       ? attachment.uploadedByUserId
       : null,

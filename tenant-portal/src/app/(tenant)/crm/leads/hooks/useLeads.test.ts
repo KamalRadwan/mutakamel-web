@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   capabilityAllowsOwner,
+  mergeLeadCardResponse,
   parseLeadResponse,
   parseLeadCapabilitiesResponse,
   parseLeadStagesResponse,
@@ -9,17 +10,32 @@ import {
 
 const lead = {
   id: "01900100-0000-7000-8000-000000000001",
+  partyId: "01900100-0000-7000-8000-000000000002",
+  leadProfileType: "CORPORATE",
   branchId: "01900100-0000-7000-8000-000000000099",
   displayName: "Acme Trading",
   companyName: "Acme Trading",
-  email: "owner@example.com",
+  email: "contact@example.com",
+  companyEmail: "owner@example.com",
   companyPhone: "+201001112223",
+  phones: ["+201001112223", "+201009998887"],
+  address: { country: "Egypt" },
+  primaryContact: {
+    partyId: "01900100-0000-7000-8000-000000000003",
+    displayName: "Dina Ali",
+    jobTitle: "Purchasing Manager",
+    email: "contact@example.com",
+    phones: ["+201055566677"],
+    isPrimary: true,
+  },
   stageId: "01900100-0000-7000-8000-000000000010",
   ownerUserId: "01900100-0000-7000-8000-000000000020",
   acquisitionSource: {
     nameAr: "إحالة",
     nameEn: "Referral",
   },
+  acquisitionSourceIconUrl:
+    "/api/tenant/crm/v1/acquisition-sources/01900100-0000-7000-8000-000000000030/icon?v=1789560000000",
 };
 
 // The four board-card fields, kept OFF the base row on purpose: `lead` above
@@ -51,12 +67,18 @@ describe("Leads API contracts", () => {
       items: [
         {
           id: lead.id,
+          partyId: lead.partyId,
+          leadProfileType: "CORPORATE",
           leadName: "Acme Trading",
           company: "Acme Trading",
           email: "owner@example.com",
           phone: "+201001112223",
+          phones: ["+201001112223", "+201009998887"],
+          country: "Egypt",
+          primaryContact: lead.primaryContact,
           sourceNameAr: "إحالة",
           sourceNameEn: "Referral",
+          sourceIconUrl: lead.acquisitionSourceIconUrl,
           stageId: lead.stageId,
           ownerUserId: lead.ownerUserId,
           rating: 0,
@@ -95,6 +117,31 @@ describe("Leads API contracts", () => {
         lead.branchId,
       ),
     ).toMatchObject({ rating: 0, cardColor: null, owner: null, nextActivity: null });
+  });
+
+  it("preserves list-only company contact data after a rating update", () => {
+    const previous = parseLeadResponse({ ...lead, ...cardFields }, lead.branchId);
+    const responseWithoutListEnrichments = {
+      ...lead,
+      ...cardFields,
+      rating: 3,
+      primaryContact: undefined,
+      primaryContactName: undefined,
+    };
+
+    expect(
+      mergeLeadCardResponse(
+        previous,
+        { rating: 3 },
+        responseWithoutListEnrichments,
+        lead.branchId,
+      ),
+    ).toMatchObject({
+      rating: 3,
+      primaryContact: lead.primaryContact,
+      primaryContactName: previous.primaryContactName,
+      phones: previous.phones,
+    });
   });
 
   it("rejects a board-card field of the wrong shape rather than rendering a default over it", () => {

@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from controller DTO source)
 
-Last source verification: **2026-09-09**
+Last source verification: **2026-09-18**
 
-Classes: **46** · Fields: **303**
+Classes: **46** · Fields: **312**
 
 ## How to read this
 
@@ -187,6 +187,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `companyName` | string | no | non-empty, max 180 |
 | `primaryContact` | LeadConversionContactPersonDto | no | nested, of `LeadConversionContactPersonDto` |
 | `createOpportunity` | boolean | no | transformed |
+| `keepLead` | boolean | no | transformed |
 | `opportunity` | ConvertLeadOpportunityDto | no | nested, of `ConvertLeadOpportunityDto` |
 
 ## Customer profiles
@@ -340,9 +341,12 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities/dto/opportunity
 | --- | --- | --- | --- |
 | `branchId` | UUIDv7 | **yes** | — |
 | `search` | string | no | max 200 |
+| `searchField` | one of a fixed set | no | — |
 | `status` | one of a fixed set | no | — |
+| `stageFlag` | enum OpportunityStageFlagEnum | no | — |
 | `ownerUserId` | UUIDv7 | no | — |
 | `closing` | one of a fixed set | no | — |
+| `tagIds` | UUIDv7[] | no | transformed, max MAX_SEARCH_TAG_IDS items, unique items |
 
 ### `OpportunityBoardQueryDto` — extends `OpportunityBoardFiltersDto`
 
@@ -553,6 +557,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/common/dto/crm-list-query.dto
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
+| `searchField` | one of a fixed set | no | — |
 | `acquisitionSourceId` | UUIDv7 | no | — |
 | `profileType` | enum CrmProfileTypeEnum | no | — |
 | `status` | enum CustomerStatusEnum | no | — |
@@ -562,6 +567,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/common/dto/crm-list-query.dto
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
+| `searchField` | one of a fixed set | no | — |
 | `acquisitionSourceId` | UUIDv7 | no | — |
 | `leadProfileType` | enum CrmProfileTypeEnum | no | — |
 | `status` | enum LeadStatusEnum | no | — |
@@ -573,13 +579,16 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/common/dto/crm-list-query.dto
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
+| `searchField` | one of a fixed set | no | — |
 | `pipelineId` | UUIDv7 | no | — |
 | `stageId` | UUIDv7 | no | — |
 | `status` | enum OpportunityStatusEnum | no | — |
+| `stageFlag` | enum OpportunityStageFlagEnum | no | — |
 | `customerProfileId` | UUIDv7 | no | — |
 | `ownerUserId` | UUIDv7 | no | — |
 | `expectedCloseFrom` | ISO date string | no | — |
 | `expectedCloseTo` | ISO date string | no | — |
+| `tagIds` | UUIDv7[] | no | transformed, max MAX_SEARCH_TAG_IDS items, unique items |
 
 ### `ActivitiesQueryDto` — extends `BranchListQueryDto`
 

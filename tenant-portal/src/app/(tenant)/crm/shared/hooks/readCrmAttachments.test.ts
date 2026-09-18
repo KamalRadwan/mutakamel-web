@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
 import { readAllCrmAttachments } from "./readCrmAttachments";
 
-vi.mock("@/lib/api/axiosClient", () => ({ axiosClient: { get: vi.fn() } }));
+vi.mock("@/lib/api/axiosClient", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/api/axiosClient")>(),
+  axiosClient: { get: vi.fn() },
+}));
 const source = { branchId: "01900100-0000-7000-8000-000000000001", sourceType: "LEAD" as const,
   sourceId: "01900100-0000-7000-8000-000000000002" };
 const rows = Array.from({ length: 51 }, (_, index) => ({
@@ -31,6 +35,29 @@ describe("all CRM record attachments", () => {
   it("accepts an empty CRM page (totalPages is zero)", async () => {
     vi.mocked(axiosClient.get).mockResolvedValue(reply({ ...page(1), items: [], total: 0, totalPages: 0, hasNext: false }));
     await expect(readAllCrmAttachments(source)).resolves.toEqual([]);
+  });
+  it("loads persisted attachments whose bigint sizes are JSON strings", async () => {
+    vi.mocked(axiosClient.get).mockResolvedValueOnce(reply({
+      ...page(1), items: page(1).items.map((row) => ({ ...row, sizeBytes: String(row.sizeBytes) })),
+    })).mockResolvedValueOnce(reply({
+      ...page(2), items: page(2).items.map((row) => ({ ...row, sizeBytes: String(row.sizeBytes) })),
+    }));
+    await expect(readAllCrmAttachments(source)).resolves.toEqual(rows);
+  });
+  it.each([
+    { ...page(1), items: [{ ...rows[0], sizeBytes: "invalid" }] },
+    { ...page(1), hasNext: false },
+  ])("keeps an unreadable HTTP response distinct from a network failure", async (data) => {
+    vi.mocked(axiosClient.get).mockResolvedValue({
+      ...reply(data), headers: new Headers({ "x-correlation-id": "attachments-read" }),
+    });
+    const error = await readAllCrmAttachments(source).catch(normalizeApiError);
+    expect(error).toMatchObject({ status: 200, correlationId: "attachments-read" });
+  });
+  it("retains the offline outcome when no HTTP response arrives", async () => {
+    vi.mocked(axiosClient.get).mockRejectedValue(new TypeError("Failed to fetch"));
+    await expect(readAllCrmAttachments(source).catch(normalizeApiError))
+      .resolves.toMatchObject({ status: 0 });
   });
   it("fails the whole read if a later page fails", async () => {
     vi.mocked(axiosClient.get).mockResolvedValueOnce(reply(page(1))).mockRejectedValueOnce(new Error("offline"));

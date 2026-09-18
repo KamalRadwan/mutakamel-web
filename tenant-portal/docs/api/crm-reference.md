@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-09-09**
+Last source verification: **2026-09-18**
 
-Generated at: **2026-09-09T17:42:21.852Z**
+Generated at: **2026-09-18T09:27:07.633Z**
 
-Backend revision: `22e119066314`
+Backend revision: `40c06870bc0c+dirty`
 
 Owning app: **crm-app**
 
-Routes: **160**
+Routes: **164**
 
 ## What this page is
 
@@ -73,6 +73,8 @@ browser code.
 | GET | `/api/tenant/crm/v1/customer-profiles/:id/tags` | `crm.customer.profiles.by.id.tags.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/customer-profiles/:id/tags` | `crm.customer.profiles.by.id.tags.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | DELETE | `/api/tenant/crm/v1/customer-profiles/:id/tags/:tagId` | `crm.customer.profiles.by.id.tags.by.tag.id.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/customer-profiles/board` | `crm.customer.profiles.board.post` | AUTHENTICATED | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/customer-profiles/board/statuses/:status` | `crm.customer.profiles.board.statuses.by.status.post` | AUTHENTICATED | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/customer-profiles/capabilities` | `crm.customer.profiles.capabilities.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/customer-profiles/search` | `crm.customer.profiles.search.post` | AUTHENTICATED | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/dashboards` | `crm.dashboard.builder.list.get` | AUTHENTICATED | yes | TENANT_PORTAL |
@@ -120,6 +122,8 @@ browser code.
 | GET | `/api/tenant/crm/v1/leads/:id/tags` | `crm.leads.by.id.tags.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/crm/v1/leads/:id/tags` | `crm.leads.by.id.tags.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | DELETE | `/api/tenant/crm/v1/leads/:id/tags/:tagId` | `crm.leads.by.id.tags.by.tag.id.delete` | WRITE_SENSITIVE | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/leads/board` | `crm.leads.board.post` | AUTHENTICATED | no | TENANT_PORTAL |
+| POST | `/api/tenant/crm/v1/leads/board/stages/:stageId` | `crm.leads.board.stages.by.stage.id.post` | AUTHENTICATED | no | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/leads/capabilities` | `crm.leads.capabilities.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/leads/company-options` | `crm.leads.company.options.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/crm/v1/leads/company-options/:companyPartyId/contacts` | `crm.leads.company.options.contacts.get` | AUTHENTICATED | yes | TENANT_PORTAL |

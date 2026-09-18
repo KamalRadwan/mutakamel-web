@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BoardView,
@@ -31,10 +31,12 @@ import {
   useLeadViewLabels,
 } from "./components/lead-view-config";
 import { LeadSearchBar } from "./components/LeadSearchBar";
-import { leadSearchValueOf, leadSearchWithField } from "./lead-search-contract";
+import { leadSearchValuesOf, leadSearchWithField } from "./lead-search-contract";
 import { useLeadCardSlots } from "./components/useLeadCardSlots";
 import { useLeadColumns } from "./components/useLeadColumns";
 import { type LeadItem, useLeads } from "./hooks/useLeads";
+import { useLeadBoard } from "./hooks/useLeadBoard";
+import { useLeadDocumentCounts } from "./hooks/useLeadDocumentCounts";
 
 // A lead in a CONVERTED stage is finished: the backend rejects the move and
 // the board must not offer it as a destination either — see
@@ -60,11 +62,15 @@ export default function LeadsPage() {
     loadError,
     degraded,
     search,
+    appliedSearch,
     setSearch,
     submitSearch,
     pageInfo,
     setPage,
     setSort,
+    sort,
+    activeView,
+    setActiveView,
     isCreateOpen,
     setIsCreateOpen,
     openCreate,
@@ -75,17 +81,14 @@ export default function LeadsPage() {
     moveLead,
     updateLeadCard,
     fetchLeads,
+    dataRevision,
+    refreshData,
   } = useLeads();
 
-  // The lead whose activities are open, as the two fields the dialog needs
-  // rather than the whole row: booking an activity reloads the list, and a
-  // `LeadItem` captured here would go on describing the version before it.
+  // Keep identity only: booking an activity reloads the lead's current data.
   const [activityLead, setActivityLead] = useState<LeadActivityTarget | null>(null);
 
-  // The stage a board column's `+` was pressed in, or null for the bar's own
-  // "Add lead". It only seeds the form's stage field — the user can still
-  // change it in the modal, because a preset that cannot be corrected is a
-  // trap rather than a shortcut.
+  // A column's add action seeds the editable stage; the header leaves it unset.
   const [createStageId, setCreateStageId] = useState<string | null>(null);
   const openCreateInStage = useCallback(
     (stageId: string | null) => {
@@ -96,9 +99,6 @@ export default function LeadsPage() {
   );
 
   const applyPage = useCallback((next: number) => setPage(next), [setPage]);
-  // Enter on a board card and a click on a card tile both open the record —
-  // docs/design/detail-screens.md#routes. The table uses a real link in its
-  // first column instead, so its address stays copyable.
   const openLead = useCallback(
     (lead: LeadItem) => router.push(`/crm/leads/${lead.id}`),
     [router],
@@ -114,68 +114,60 @@ export default function LeadsPage() {
   });
   const { view, setView } = workspace;
 
+  useEffect(() => {
+    const next = view === "table" ? "list" : view;
+    if (activeView !== next) setActiveView(next);
+  }, [activeView, setActiveView, view]);
+
+  const board = useLeadBoard({
+    enabled: view === "board",
+    branchId,
+    stages,
+    search: appliedSearch,
+    sort,
+    revision: dataRevision,
+  });
+  const documentCounts = useLeadDocumentCounts(items, branchId, view === "card");
+
   const stageById = useMemo(() => new Map(stages.map((stage) => [stage.id, stage])), [stages]);
-  const tableColumns = useLeadColumns({ stageById, canDelete: canDeleteLead, onDelete: setSelectedForDelete });
+  const tableColumns = useLeadColumns({
+    stageById,
+    canUpdate: canUpdateLead,
+    canDelete: canDeleteLead,
+    onDelete: setSelectedForDelete,
+    onRatingChange: (lead, rating) => void updateLeadCard(lead.id, { rating }, lead),
+    onOpenActivities: (lead) => setActivityLead({ id: lead.id, name: lead.leadName }),
+  });
   const cardSlots = useLeadCardSlots({
     canUpdate: canUpdateLead,
     canDelete: canDeleteLead,
     onOpen: openLead,
     onDelete: setSelectedForDelete,
-    onCardChange: (leadId, patch) => void updateLeadCard(leadId, patch),
+    onCardChange: (leadId, patch, lead) => void updateLeadCard(leadId, patch, lead),
     onOpenActivities: (lead) => setActivityLead({ id: lead.id, name: lead.leadName }),
-    // `moveTargets` and `onMove` are deliberately NOT passed, which is what
-    // takes the "Move to…" section out of the card's menu.
-    //
-    // **This is a known WCAG 2.2 AA gap, not a tidy-up.** 2.5.7 Dragging
-    // Movements requires a single-pointer alternative to every drag, and
-    // dragging a card between stage columns is the board's whole point. That
-    // menu section was the alternative, and nothing else in the product moves
-    // a lead's stage: the detail screen only DISPLAYS it, and the update DTO
-    // carries no `stageId` — a stage move is `POST /leads/:id/stage`, which
-    // only the board calls. Until a stage control exists somewhere a pointer
-    // can reach without dragging, a user who cannot drag cannot move a lead.
-    // See LeadCardMenu's own note and docs/design/views.md#board-view.
+    documentCountsByParty: documentCounts.countsByParty,
+    documentCountVisibility: documentCounts.visible,
+    // The detail page's stage control provides the alternative to board dragging.
   });
 
-  const boardColumns = useLeadBoardColumns(stages, items);
+  const boardColumns = useLeadBoardColumns(stages, board.items, board.totals);
   const viewLabels = useLeadViewLabels();
 
-  // A missing branch is a precondition, not a failure: the CRM list route
-  // is a 422 without branchId, so nothing was asked. Say that instead of
-  // rendering "no matching leads" over an unasked question.
+  // The API requires a branch; an unrequested list is not an empty search result.
   const branchEmptyState = branchId ? undefined : <EmptyState title={t.crmLeads.selectBranchFirst} />;
 
-  // A CRM route is reachable by direct URL even when the sidebar hides it, so
-  // the 403 is reachable in-body and gets the mandated surface rather than a
-  // load error — AGENTS.md, docs/design/states.md. Permission string and
-  // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
   return (
     <PermissionGate require="crm.leads.read" scoped>
       <div className="flex h-full flex-col gap-4">
-        {/* `sr-only`, not deleted. The action bar above already says CRM ›
-            Leads, so a second "Leads" in the body was the same sentence twice
-            and cost the board a heading's worth of height. What it is NOT is
-            surplus: the <h1> is this document's outline, and the bar's location
-            is a <p> — docs/design/shell.md, "What does not move". Hidden
-            visually, it still names the screen for a screen reader and for
-            anything walking the heading tree.
-
-            The header keeps its props: `primaryAction` and `secondaryActions`
-            portal into the bar from inside PageHeader, and a portal's DOM lands
-            in the bar's subtree, so hiding this block does not hide them. */}
+        {/* Preserve the accessible heading; actions render in the shell's action bar. */}
         <PageHeader
           className="sr-only"
           title={t.crmLeads.title}
-          // `null`, so the bar's own Add lead opens an unseeded form even
-          // straight after a column's `+` left a stage behind.
           primaryAction={
             canCreate
               ? { label: t.crmLeads.addLead, onClick: () => openCreateInStage(null) }
               : undefined
           }
-          // The branch scopes every read on this screen, so it belongs with
-          // the actions rather than beside the search box — which is where the
-          // other two dozen branch-scoped screens already put it.
           secondaryActions={
             <TenantBranchSelect
               branchIds={branchIds}
@@ -186,18 +178,29 @@ export default function LeadsPage() {
           }
         />
 
-        {/* Not a FilterBar: that pattern's chips carry operators this endpoint
-            has none of, and its own 300ms debounce sat on top of the hook's
-            250ms. It was called here with `filters={[]}` and no-op handlers — a
-            bare search box. This asks the six equality filters instead, one or
-            several AND-ed. Its basic row renders in the action bar; its
-            advanced card renders here, which is the only place a multi-row
-            panel can go. */}
+        {view !== "board" && stages.length > 0 && search.mode === "basic" && (
+          <StageBar
+            label={t.crmLeads.stage}
+            allLabel={t.crmLeads.basicSearch.any}
+            steps={stages.map((stage) => ({
+              id: stage.id,
+              label: localizedName(stage, lang),
+              tone: LEAD_STAGE_BAR_TONE[stage.flag],
+            }))}
+            value={leadSearchValuesOf(search, "stage")}
+            onChange={(stageId: string | undefined) =>
+              setSearch(leadSearchWithField(search, "stage", stageId ?? ""))
+            }
+            disabled={!branchId}
+          />
+        )}
+
         <LeadSearchBar
           value={search}
           onChange={setSearch}
           onSubmit={submitSearch}
           stages={stages}
+          resetKey={branchId ?? "no-branch"}
           disabled={!branchId}
         />
 
@@ -213,9 +216,7 @@ export default function LeadsPage() {
         {degraded.stages && <DegradedBanner message={t.crmLeads.stagesUnavailable} />}
         {degraded.capabilities && <DegradedBanner message={t.crmLeads.capabilitiesUnavailable} />}
 
-        {/* Write feedback only. A failed LOAD is handed to the view below, so
-            the error state replaces the empty state instead of stacking with
-            it — see docs/design/patterns.md#where-a-result-belongs. */}
+        {/* Load errors belong to the view; this alert carries write feedback. */}
         {error && (
           <div
             role="alert"
@@ -228,39 +229,12 @@ export default function LeadsPage() {
           </div>
         )}
 
-        {/* The board shows its stages as columns; the other two views have
-            nowhere to put them, so the pipeline's shape comes back as a bar
-            above them. It is the stage filter as well as the picture: pressing
-            a stage here writes the same condition the search bar's Stage field
-            writes, and "all" removes it again.
-
-            Basic mode only. In advanced mode the stage is one leaf of a tree
-            the user is still composing, and a one-click bar would both edit
-            that draft and run it — which is the single thing the card's Search
-            button exists to prevent. */}
-        {view !== "board" && stages.length > 0 && search.mode === "basic" && (
-          <StageBar
-            label={t.crmLeads.stage}
-            allLabel={t.crmLeads.basicSearch.any}
-            steps={stages.map((stage) => ({
-              id: stage.id,
-              label: localizedName(stage, lang),
-              tone: LEAD_STAGE_BAR_TONE[stage.flag],
-            }))}
-            value={leadSearchValueOf(search, "stage") || undefined}
-            onChange={(stageId: string | undefined) =>
-              setSearch(leadSearchWithField(search, "stage", stageId ?? ""))
-            }
-            disabled={!branchId}
-          />
-        )}
-
         <div className="min-h-0 flex-1">
           {view === "board" && (
             <BoardView
               columns={boardColumns}
               columnOf={(item) => item.stageId}
-              items={items}
+              items={board.items}
               itemKey={(item) => item.id}
               renderCard={cardSlots.renderCard}
               renderActions={cardSlots.renderActions}
@@ -272,36 +246,28 @@ export default function LeadsPage() {
               canMoveTo={(_item, columnId) => stageById.get(columnId)?.flag !== TERMINAL_STAGE_FLAG}
               onCardMove={(move) => {
                 if (stageById.get(move.toColumnId)?.flag === TERMINAL_STAGE_FLAG) return;
-                void moveLead(move.itemId, move.toColumnId);
+                const lead = board.items.find(({ id }) => id === move.itemId);
+                void moveLead(move.itemId, move.toColumnId, lead);
               }}
               onActivate={openLead}
-              // The `+` in a column header. It opens the same modal the bar's
-              // Add lead opens, with the stage already filled in — the column
-              // the user pressed IS the answer to the first question the form
-              // would have asked. Gated by the same capability as the bar's,
-              // so the board cannot offer a create the header refuses.
               onAddToColumn={canCreate ? openCreateInStage : undefined}
-              isLoading={isLoading}
-              error={loadError}
-              onRetry={() => void fetchLeads()}
-              page={pageInfo}
-              onPageChange={workspace.setPage}
+              isLoading={board.isLoading || (isLoading && stages.length === 0)}
+              error={board.error ?? loadError}
+              onRetry={() => void board.reload()}
+              columnPage={(columnId) => ({
+                hasMore: board.lanes[columnId]?.hasMore ?? false,
+                isLoadingMore: board.loadingStageIds.has(columnId),
+              })}
+              onLoadMoreColumn={(columnId) => void board.loadMoreStage(columnId)}
               emptyState={branchEmptyState}
-              // No `moveTo` and no `selection`: the redesigned card carries
-              // one overflow menu and nothing else, so neither BoardView's own
-              // "Move to…" trigger nor the selection checkbox is rendered on
-              // it. The move itself is not lost — it is an item inside that
-              // menu, which is what keeps the board's `dragging-alternative`
-              // conformance. Bulk selection still lives in the card and table
-              // views below.
               labels={{
                 ...viewLabels,
                 emptyColumn: t.crmLeads.emptyColumn,
                 collapseColumn: t.views.collapseColumn,
                 expandColumn: t.views.expandColumn,
-                // The screen's own word, not a generic one: the button's name
-                // ends up "Add lead: Qualifying".
                 addToColumn: t.crmLeads.addLead,
+                loadMore: t.crmLeads.loadMore,
+                loadingMore: t.crmLeads.loadingMore,
               }}
             />
           )}
@@ -311,9 +277,9 @@ export default function LeadsPage() {
               itemKey={(item) => item.id}
               renderCard={cardSlots.renderCard}
               renderActions={cardSlots.renderActions}
-              renderFooter={cardSlots.renderFooter}
+              renderFooter={cardSlots.renderCardViewFooter}
               cardClassName={cardSlots.cardClassName}
-              selection={workspace.selection}
+              density="compact"
               onActivate={openLead}
               isLoading={isLoading}
               error={loadError}
@@ -328,6 +294,7 @@ export default function LeadsPage() {
           {view === "table" && (
             <TableView
               columns={tableColumns}
+              density="compact"
               items={items}
               itemKey={(item) => item.id}
               selection={workspace.selection}
@@ -344,10 +311,7 @@ export default function LeadsPage() {
           )}
         </div>
 
-        {/* The stage is in the key as well as in the prop. The modal seeds its
-            form once, on mount, so opening it from Contacted after opening it
-            from New has to be a new mount — otherwise the second `+` would
-            show the first one's stage. */}
+        {/* Remount so opening a different column's modal seeds its stage again. */}
         <CreateLeadsModal
           key={isCreateOpen ? `create-open-${createStageId ?? "any"}` : "create-closed"}
           isOpen={isCreateOpen}
@@ -359,17 +323,12 @@ export default function LeadsPage() {
           onClose={() => setIsCreateOpen(false)}
         />
 
-        {/* Keyed by lead so a second card opens a clean form, and namespaced
-            because the create modal above is a sibling: two "closed" keys in
-            one parent is a duplicate-key warning, and React is entitled to
-            treat the pair as one child. `fetchLeads` is what re-reads
-            `nextActivity` — the server owns that bucket, so guessing the
-            mark's new colour here would contradict the next load. */}
+        {/* A different lead opens a clean form; activity changes reload server data. */}
         <LeadActivityDialog
           key={`activity-${activityLead?.id ?? "closed"}`}
           lead={activityLead}
           onClose={() => setActivityLead(null)}
-          onCreated={() => void fetchLeads()}
+          onCreated={() => void refreshData()}
         />
 
         <DeleteLeadsConfirmModal

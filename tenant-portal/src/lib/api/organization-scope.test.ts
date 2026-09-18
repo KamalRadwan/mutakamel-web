@@ -204,11 +204,11 @@ describe("route inventory coverage", () => {
     expect([...declared].sort()).toEqual([...declared].filter((mode) => HANDLED.includes(mode as OrganizationScopeMode)).sort());
   });
 
-  it("still covers 77 scope-carrying routes across all three apps", () => {
+  it("still covers 80 scope-carrying routes across all three apps", () => {
     const scoped = routes.filter(
       (route) => route.organizationScopeMode && route.organizationScopeMode !== "NONE",
     );
-    expect(scoped).toHaveLength(77);
+    expect(scoped).toHaveLength(80);
     // L4-3's point: this is not a CRM-only concern.
     expect(new Set(scoped.map((route) => route.app))).toEqual(new Set(["core", "crm", "trade"]));
   });

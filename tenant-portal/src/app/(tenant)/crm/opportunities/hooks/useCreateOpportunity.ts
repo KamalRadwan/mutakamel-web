@@ -90,13 +90,16 @@ export function useCreateOpportunity(
     [errors],
   );
 
-  const openModal = useCallback(() => {
+  const openModal = useCallback((initialStageId?: string | null) => {
     reset();
     setCustomerLabel("");
     setError(null);
     setAmbiguity(null);
+    if (initialStageId) {
+      setForm((prev) => ({ ...prev, stageId: initialStageId }));
+    }
     setOpen(true);
-  }, [reset]);
+  }, [reset, setForm]);
 
   const closeModal = useCallback(() => {
     reset();

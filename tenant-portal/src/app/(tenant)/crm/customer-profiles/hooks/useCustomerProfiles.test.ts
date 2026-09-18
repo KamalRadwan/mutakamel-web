@@ -13,11 +13,13 @@ import {
 const PROFILE_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b3";
 const BRANCH_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b4";
 const OTHER_BRANCH_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b5";
+const PARTY_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b6";
+const CONTACT_PARTY_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b9";
 
 const profile = {
   id: PROFILE_ID,
   branchId: BRANCH_ID,
-  partyId: "0191e9a8-7f51-7b32-8d72-19f9217a41b6",
+  partyId: PARTY_ID,
   profileType: "CORPORATE",
   status: "ACTIVE_CUSTOMER",
   displayName: "Acme Retail",
@@ -45,16 +47,54 @@ describe("CRM customer-profile contract", () => {
     expect(parseCustomerProfileResponse(profile)).toEqual({
       id: PROFILE_ID,
       branchId: BRANCH_ID,
+      partyId: PARTY_ID,
       displayName: "Acme Retail",
       profileType: "CORPORATE",
       status: "ACTIVE_CUSTOMER",
       companyName: "Acme Retail LLC",
       phone: "+201001112223",
+      phones: ["+201001112223"],
       email: "info@acme.test",
+      country: "",
+      primaryContact: null,
       ownerUserId: null,
+      owner: null,
+      nextActivity: null,
       acquisitionSourceNameAr: null,
       acquisitionSourceNameEn: null,
+      sourceIconUrl: null,
     });
+  });
+
+  it("retains a corporate primary contact and all rich fields after a local row update", () => {
+    const parsed = parseCustomerProfileResponse({
+      ...profile,
+      address: { country: "Egypt" },
+      phones: ["+201001112223", "+201009998887"],
+      primaryContact: {
+        partyId: CONTACT_PARTY_ID,
+        displayName: "Mona Saleh",
+        jobTitle: "Procurement Manager",
+        email: "mona@acme.test",
+        phones: ["+201055500000"],
+        isPrimary: true,
+      },
+    });
+
+    const afterStatusUpdate = { ...parsed, status: "INACTIVE" as const };
+    expect(afterStatusUpdate.primaryContact).toEqual({
+      partyId: CONTACT_PARTY_ID,
+      displayName: "Mona Saleh",
+      jobTitle: "Procurement Manager",
+      email: "mona@acme.test",
+      phones: ["+201055500000"],
+      isPrimary: true,
+    });
+    expect(afterStatusUpdate.phones).toEqual([
+      "+201001112223",
+      "+201009998887",
+    ]);
+    expect(afterStatusUpdate.country).toBe("Egypt");
   });
 
   it("parses the joined ownerUserId and acquisitionSource when present — docs/design/views.md's card-fields", () => {
@@ -119,7 +159,7 @@ describe("CRM customer-profile contract", () => {
       CUSTOMER_PROFILES_PATH +
         "?branchId=" +
         BRANCH_ID +
-        "&page=2&limit=25&sortBy=createdAt&sortDir=DESC&search=Acme+Retail",
+        "&page=2&limit=25&sortBy=createdAt&sortDir=DESC&search=Acme+Retail&searchField=customer",
     );
     expect(customerProfilePath(PROFILE_ID)).toBe(
       CUSTOMER_PROFILES_PATH + "/" + PROFILE_ID,

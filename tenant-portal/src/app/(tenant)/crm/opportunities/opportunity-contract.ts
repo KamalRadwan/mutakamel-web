@@ -1,17 +1,13 @@
-// Opportunity detail, stage history, create, edit and pipeline transfer —
-// MASTER-PLAN 8.10-8.12.
+// Opportunity detail, create, edit and pipeline transfer — MASTER-PLAN 8.10-8.12.
 //
 //   GET  /api/tenant/crm/v1/opportunities/:id                200
-//   GET  /api/tenant/crm/v1/opportunities/:id/stage-history  200, a plain array
 //   POST /api/tenant/crm/v1/opportunities                    201
 //   PATCH /api/tenant/crm/v1/opportunities/:id               200
 //   PUT  /api/tenant/crm/v1/opportunities/:id/pipeline       200
 //
-// `GET /:id` returns the raw `OpportunityEntity` — `OpportunitiesService
-// .findOne` hands the row straight back, with **no** read-model projection. So
-// it carries none of the board's derived fields: no `activityState`, no
-// `nextOpenActivityAt`, no customer or owner display name. Reading one of those
-// here would be reading a field that does not exist on this route.
+// `GET /:id` returns the rich Opportunity read model. Command responses remain
+// persisted entities, so mutation hooks reload this route before replacing the
+// detail state.
 //
 // `amount` is a **decimal string** on the way out (`amount?: string | null`)
 // and a **number** on the way in (`@IsNumber({ maxDecimalPlaces: 2 })`). That
@@ -21,6 +17,10 @@
 
 import { isUUIDv7 } from "@/lib/uuid";
 import type { OpportunityStatus, StageFlag } from "./hooks/pipeline-types";
+import {
+  parseOpportunityReadFields,
+  type OpportunityReadFields,
+} from "./opportunity-read-model";
 
 export const OPPORTUNITIES_PATH = "/api/tenant/crm/v1/opportunities";
 
@@ -46,7 +46,7 @@ const STAGE_FLAGS: readonly StageFlag[] = [
 /** A decimal string with no exponent — never converted, only rendered. */
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 
-export interface OpportunityDetail {
+export interface OpportunityDetail extends OpportunityReadFields {
   id: string;
   branchId: string;
   customerProfileId: string;
@@ -154,6 +154,7 @@ export function parseOpportunityDetailResponse(
   if (importance === null) invalid();
 
   return {
+    ...parseOpportunityReadFields(item),
     id: item.id,
     branchId: item.branchId,
     customerProfileId: item.customerProfileId,

@@ -89,12 +89,25 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void,
     try {
       const outcome = await runCrmWrite({
         attempt: intent.attempt, method: "post", path: leadConvertPath(intent.leadId), body: intent.body,
-        parse: (payload) => parseLeadConversionResponse(payload, intent.leadId, intent.body.createOpportunity === true),
+        parse: (payload) => parseLeadConversionResponse(
+          payload,
+          intent.leadId,
+          intent.body.createOpportunity === true,
+          intent.body.keepLead,
+        ),
         config: { maxResponseBytes: 512 * 1024 },
       });
-      if (outcome.kind === "success") { setAmbiguous(null); setResult(outcome.value); onConverted(); }
+      if (outcome.kind === "success") {
+        setAmbiguous(null);
+        setResult(outcome.value);
+        if (!outcome.value.leadDeleted) onConverted();
+      }
       else if (outcome.kind === "ambiguous") setAmbiguous(outcome.error);
-      else if (outcome.kind === "applied_unreadable") { setAmbiguous(null); setAppliedUnreadable(outcome.error); onConverted(); }
+      else if (outcome.kind === "applied_unreadable") {
+        setAmbiguous(null);
+        setAppliedUnreadable(outcome.error);
+        if (intent.body.keepLead) onConverted();
+      }
       else { setAmbiguous(null); setError(outcome.error); if (outcome.error.status === 409) onConverted(); }
     } finally { inFlight.current = false; setIsSubmitting(false); }
   }

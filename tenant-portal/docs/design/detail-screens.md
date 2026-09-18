@@ -193,6 +193,14 @@ definitions display the shared degraded notice; the server remains authoritative
 for requirements. The user may turn the opportunity off and convert just the
 customer profile.
 
+### Lead record after conversion
+
+The modal always asks what happens to the source Lead. **Keep as a converted
+lead** is the default and sends `keepLead: true`. **Remove from Leads** sends
+`keepLead: false` and states beside the choice that only the Lead record is
+removed; the customer profile, shared Party, contacts and optional opportunity
+remain.
+
 ### Review, submit and success
 
 The first footer action validates and switches to a read-only review of the
@@ -201,8 +209,10 @@ fields; **Confirm conversion** sends the validated DTO. In-flight requests
 disable fields, close and submit; a synchronous guard prevents double posting.
 Authorization and reference membership are checked again before the write.
 
-The actual 201 response is `{ lead, customerProfileId, opportunityId? }`.
-Validate the full lead and matching converted references. Show a persistent
+The actual 201 response is
+`{ lead, leadId, leadDeleted, customerProfileId, opportunityId? }`. Validate
+the retained converted Lead, or `lead: null` when `leadDeleted` is true, plus
+the matching flat references. Show a persistent
 receipt with View customer profile, optional View opportunity, and Back to leads
 links using the returned IDs. Hide and block Submit in a receipt-only state.
 Closing and reopening retains the receipt. Navigating to another lead remounts

@@ -6,11 +6,8 @@ import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
   opportunityPath,
-  opportunityStageHistoryPath,
   parseOpportunityDetailResponse,
-  parseOpportunityStageHistory,
   type OpportunityDetail,
-  type OpportunityStageHistoryEntry,
 } from "../../opportunity-contract";
 import { parsePipelinesResponse } from "../../hooks/usePipelineWorkspace";
 import type { OpportunityPipeline } from "../../hooks/pipeline-types";
@@ -22,27 +19,22 @@ function isAbortError(error: unknown): boolean {
 }
 
 export interface OpportunityDetailDegradation {
-  history: boolean;
   pipelines: boolean;
 }
 
 const NO_DEGRADATION: OpportunityDetailDegradation = {
-  history: false,
   pipelines: false,
 };
 
 /**
- * One opportunity, its stage history and the pipelines it can move between —
- * MASTER-PLAN 8.10.
+ * One opportunity and the pipelines it can move between — MASTER-PLAN 8.10.
  *
- * Three sources under `allSettled`. Only the opportunity itself may fail the
- * screen: a stage history the actor cannot read, or a pipeline list that
- * times out, degrades to a named absence rather than blanking a record that
- * loaded.
+ * Two sources run under `allSettled`. Only the opportunity itself may fail the
+ * screen; a pipeline list that times out degrades to a named absence rather
+ * than blanking a record that loaded.
  */
 export function useOpportunityDetail(opportunityId: string) {
   const [item, setItem] = useState<OpportunityDetail | null>(null);
-  const [history, setHistory] = useState<OpportunityStageHistoryEntry[]>([]);
   const [pipelines, setPipelines] = useState<OpportunityPipeline[]>([]);
   const [degraded, setDegraded] =
     useState<OpportunityDetailDegradation>(NO_DEGRADATION);
@@ -61,21 +53,13 @@ export function useOpportunityDetail(opportunityId: string) {
       setIsLoading(true);
       setError(null);
       try {
-        const [detailSettled, historySettled, pipelinesSettled] =
+        const [detailSettled, pipelinesSettled] =
           await Promise.allSettled([
             axiosClient.get<unknown>(opportunityPath(opportunityId), {
               signal,
               cache: "no-store",
               maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
             }),
-            axiosClient.get<unknown>(
-              opportunityStageHistoryPath(opportunityId),
-              {
-                signal,
-                cache: "no-store",
-                maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
-              },
-            ),
             axiosClient.get<unknown>("/api/tenant/crm/v1/pipelines", {
               signal,
               cache: "no-store",
@@ -83,7 +67,7 @@ export function useOpportunityDetail(opportunityId: string) {
             }),
           ]);
         if (
-          [detailSettled, historySettled, pipelinesSettled].some(
+          [detailSettled, pipelinesSettled].some(
             (settled) =>
               settled.status === "rejected" && isAbortError(settled.reason),
           )
@@ -92,22 +76,15 @@ export function useOpportunityDetail(opportunityId: string) {
         }
         if (detailSettled.status === "rejected") throw detailSettled.reason;
 
-        const nextHistory = degradable(
-          historySettled,
-          parseOpportunityStageHistory,
-        );
         const nextPipelines = degradable(pipelinesSettled, parsePipelinesResponse);
         setItem(parseOpportunityDetailResponse(detailSettled.value.data));
-        setHistory(nextHistory ?? []);
         setPipelines(nextPipelines ?? []);
         setDegraded({
-          history: nextHistory === null,
           pipelines: nextPipelines === null,
         });
       } catch (caught) {
         if (isAbortError(caught)) return;
         setItem(null);
-        setHistory([]);
         setPipelines([]);
         setDegraded(NO_DEGRADATION);
         setError(normalizeApiError(caught));
@@ -132,7 +109,6 @@ export function useOpportunityDetail(opportunityId: string) {
 
   return {
     item,
-    history,
     pipelines,
     degraded,
     isLoading,

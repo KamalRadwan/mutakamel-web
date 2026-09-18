@@ -32,6 +32,7 @@ interface ConversionOpportunity {
 }
 export interface ConvertLeadRequest {
   profileType: CrmProfileType;
+  keepLead: boolean;
   displayName?: string;
   companyName?: string;
   primaryContact?: ConversionContact;
@@ -61,6 +62,7 @@ export interface LeadConversionForm {
   expectedCloseDate: string;
   probabilityPercent: string;
   customFields: Record<string, unknown>;
+  keepLead: boolean;
 }
 
 export function initialLeadConversion(lead: LeadDetail): LeadConversionForm {
@@ -72,12 +74,17 @@ export function initialLeadConversion(lead: LeadDetail): LeadConversionForm {
     createOpportunity: false, pipelineId: "", stageId: "", title: lead.displayName,
     importance: "", amount: "", description: "", currencyCode: "",
     ownerUserId: "", expectedCloseDate: "", probabilityPercent: "", customFields: {},
+    keepLead: true,
   };
 }
 
 export function buildConvertLeadRequest(form: LeadConversionForm): ConvertLeadRequest {
   if (Object.keys(validateLeadConversion(form)).length) throw new Error("Invalid conversion form.");
-  const request: ConvertLeadRequest = { profileType: form.profileType, createOpportunity: form.createOpportunity };
+  const request: ConvertLeadRequest = {
+    profileType: form.profileType,
+    keepLead: form.keepLead,
+    createOpportunity: form.createOpportunity,
+  };
   if (form.displayName.trim()) request.displayName = form.displayName.trim();
   if (form.profileType === "CORPORATE" && form.companyName.trim()) request.companyName = form.companyName.trim();
   // Supplying primaryContact creates a NEW person. Never resend an existing contact.
@@ -111,24 +118,53 @@ export function buildConvertLeadRequest(form: LeadConversionForm): ConvertLeadRe
 }
 
 export interface LeadConversionResult {
-  lead: LeadDetail;
+  lead: LeadDetail | null;
+  leadId: string;
+  leadDeleted: boolean;
   customerProfileId: string;
   opportunityId: string | null;
 }
 
 /** The service returns flat ids, NOT the stale Swagger customerProfile/opportunity objects. */
-export function parseLeadConversionResponse(payload: unknown, expectedLeadId: string, expectsOpportunity: boolean): LeadConversionResult {
+export function parseLeadConversionResponse(
+  payload: unknown,
+  expectedLeadId: string,
+  expectsOpportunity: boolean,
+  keepLead: boolean,
+): LeadConversionResult {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Invalid conversion response.");
   const result = payload as Record<string, unknown>;
-  const lead = parseLeadDetailResponse(result.lead);
-  if (!isUUIDv7(result.customerProfileId) || lead.id !== expectedLeadId ||
-    lead.status !== "CONVERTED" || lead.convertedCustomerProfileId !== result.customerProfileId) {
+  if (
+    !isUUIDv7(result.leadId) ||
+    result.leadId !== expectedLeadId ||
+    typeof result.leadDeleted !== "boolean" ||
+    result.leadDeleted !== !keepLead ||
+    !isUUIDv7(result.customerProfileId)
+  ) {
+    throw new Error("Invalid conversion receipt.");
+  }
+  const lead = result.lead === null ? null : parseLeadDetailResponse(result.lead);
+  if (
+    (result.leadDeleted && lead !== null) ||
+    (!result.leadDeleted &&
+      (lead === null ||
+        lead.id !== expectedLeadId ||
+        lead.status !== "CONVERTED" ||
+        lead.convertedCustomerProfileId !== result.customerProfileId))
+  ) {
     throw new Error("Invalid conversion receipt.");
   }
   const opportunityId = result.opportunityId ?? null;
   if ((opportunityId !== null && !isUUIDv7(opportunityId)) ||
-    expectsOpportunity !== (opportunityId !== null) || lead.convertedOpportunityId !== opportunityId) {
+    expectsOpportunity !== (opportunityId !== null) ||
+    (lead !== null && lead.convertedOpportunityId !== opportunityId)) {
     throw new Error("Invalid conversion opportunity receipt.");
   }
-  return { lead, customerProfileId: result.customerProfileId, opportunityId: opportunityId as string | null };
+  return {
+    lead,
+    leadId: result.leadId,
+    leadDeleted: result.leadDeleted,
+    customerProfileId: result.customerProfileId,
+    opportunityId: opportunityId as string | null,
+  };
 }

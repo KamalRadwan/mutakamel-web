@@ -18,6 +18,7 @@ import { DataTableSkeleton } from "./DataTableSkeleton";
 import { captureCellWidths, moveRowKey } from "./row-reorder";
 import type {
   ColumnDef,
+  DataTableDensity,
   DataTableLabels,
   PageInfo,
   RowReorderState,
@@ -74,6 +75,8 @@ export interface DataTableProps<T> {
    * the whole order, and a searched view is not the order being written.
    */
   rowReorder?: RowReorderState<T>;
+  /** Reduces header height and cell padding for information-dense lists. */
+  density?: DataTableDensity;
   className?: string;
 }
 
@@ -101,6 +104,7 @@ export function DataTable<T>({
   layoutLabels,
   showRowNumbers = true,
   rowReorder,
+  density = "default",
   className,
 }: DataTableProps<T>) {
   // Resolved every render rather than stored: the declared column set is the
@@ -118,7 +122,7 @@ export function DataTable<T>({
     // body instead — virtualized dragging is the board's problem, solved there
     // with react-window (D9).
     threshold: rowReorder ? Number.POSITIVE_INFINITY : VIRTUALIZE_ABOVE,
-    estimatedRowSize: ESTIMATED_ROW_PX,
+    estimatedRowSize: density === "compact" ? 36 : ESTIMATED_ROW_PX,
   });
 
   const selectedCount = selection ? rows.filter((row) => selection.selectedIds.has(rowKey(row))).length : 0;
@@ -181,7 +185,7 @@ export function DataTable<T>({
   if (isLoading) {
     return (
       <div className={cn("overflow-x-auto", className)}>
-        <DataTableSkeleton columns={orderedColumns} />
+        <DataTableSkeleton columns={orderedColumns} density={density} />
       </div>
     );
   }
@@ -210,6 +214,7 @@ export function DataTable<T>({
       onRowClick,
       hasStickyStart,
       hasStickyEnd,
+      density,
     };
   };
 
@@ -277,6 +282,7 @@ export function DataTable<T>({
             layoutLabels={layoutLabels}
             labels={labels}
             reorderLabel={rowReorder?.dragHandleLabel}
+            density={density}
           />
           {body}
         </Table>

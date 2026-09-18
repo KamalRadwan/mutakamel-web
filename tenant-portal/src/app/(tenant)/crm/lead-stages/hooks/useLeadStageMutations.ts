@@ -7,6 +7,8 @@ import {
   buildCreateLeadStageRequest,
   buildLeadStageReorderRequest,
   buildUpdateLeadStageRequest,
+  canBeDefaultLeadStage,
+  isProtectedLeadStage,
   parseLeadStageCatalogueResponse,
   parseLeadStageResponse,
   type CreateLeadStageFormData,
@@ -193,6 +195,10 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
 
   const remove = async (target: LeadStageItem): Promise<boolean> => {
     if (isDeleting) return false;
+    if (isProtectedLeadStage(target)) {
+      setDeleteError(t.crmLeadStages.protectedHint);
+      return false;
+    }
     if (!canManage) {
       notify(t.crmLeadStages.manageForbidden);
       setDeleteError(null);
@@ -280,12 +286,11 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
   };
 
   const setDefault = async (stage: LeadStageItem): Promise<void> => {
-    // CONVERTED can never be the default (LEAD_STAGE_DEFAULT_CONVERTED) and an
-    // inactive stage cannot either (LEAD_STAGE_DEFAULT_INACTIVE).
+    // Terminal anchors can never be the default and an inactive stage cannot
+    // either. The service repeats this rule authoritatively.
     if (
-      !stage.isActive ||
+      !canBeDefaultLeadStage(stage) ||
       stage.isDefault ||
-      stage.flag === "CONVERTED" ||
       settingDefaultId
     ) {
       return;

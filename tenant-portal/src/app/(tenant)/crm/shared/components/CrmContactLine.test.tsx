@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
 import { CrmContactLine, type CrmContactLineProps } from "./CrmContactLine";
@@ -48,6 +49,27 @@ function renderLine(overrides: Partial<CrmContactLineProps> = {}) {
 }
 
 describe("CrmContactLine", () => {
+  it("keeps the honorific controlled while its default is seeded and the user changes it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    function ControlledLine() {
+      const [contact, setContact] = useState(EMPTY);
+      return <I18nProvider><CrmContactLine
+        path="contacts.0" contact={contact} errors={{}}
+        limits={{ name: 80, jobTitle: 120, email: 180 }} directoryNameLabel="Contact name"
+        onFieldChange={(patch) => setContact((current) => ({ ...current, ...patch }))}
+        onPhoneChange={vi.fn()} onBlur={vi.fn()}
+      /></I18nProvider>;
+    }
+    try {
+      render(<ControlledLine />);
+      await waitFor(() => expect(screen.getByRole("combobox", { name: "Honorific" })).toHaveTextContent("Mr"));
+      fireEvent.click(screen.getByRole("combobox", { name: "Honorific" }));
+      fireEvent.click(screen.getByRole("option", { name: "Dr" }));
+      expect(screen.getByRole("combobox", { name: "Honorific" })).toHaveTextContent("Dr");
+      expect(warn.mock.calls.flat().join(" ")).not.toMatch(/uncontrolled|controlled to/i);
+    } finally { warn.mockRestore(); }
+  });
+
   function labels(): string[] {
     // The labels themselves, not every node that happens to carry the same
     // words — a picker's placeholder repeats its own label.

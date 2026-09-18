@@ -50,19 +50,20 @@ individual updates races and can produce duplicate ranks. `POST
 
 The body is `{ orderedIds }`, and `assertExactOrder` in
 `../backend/mutakamel-apps/crm-app/src/crm/lead-stages/lead-stages.service.ts`
-answers `422 LEAD_STAGE_REORDER_INVALID` unless **both** hold:
+answers `422 LEAD_STAGE_REORDER_INVALID` unless **all** hold:
 
 | Rule | What the UI must do |
 | --- | --- |
 | Every non-deleted stage appears exactly once | Build the list from the unfiltered catalogue, never a searched subset — so the reorder controls are suppressed while a search is active |
 | The single `NEW`-flagged stage stays first, at rank 1 | Pin it: refuse a move that would drag it or drop another stage above it, rather than round-tripping into a 422 |
+| The single `DISQUALIFIED` and `CONVERTED` stages stay in the final two ranks, in that order | Pin both terminal rows. Tenant-created stages are inserted before them and may only move through the middle of the catalogue |
 
 The response is the whole catalogue in its new order, densely re-ranked from 1
 — so it replaces the list rather than patching one row into it.
 
-Both rules re-verified against that service on **2026-09-04**, when the portal
-started calling this route: the lead-stages table reorders by dragging a row's
-grip.
+All rules re-verified against that service on **2026-09-18**. The lead-stages
+table reorders by dragging a row's grip, while the three protected rows carry
+no grip.
 
 Consequences for the UI:
 
@@ -70,6 +71,9 @@ Consequences for the UI:
 - Never hardcode a stage name or assume a count.
 - The flag, not the name, determines the status badge role and whether a move
   into it is terminal.
+- `NEW`, `DISQUALIFIED`, and `CONVERTED` are system stages. They cannot be
+  created, renamed, re-flagged, deactivated, or deleted. Create and update use
+  centered `FormModal` surfaces; protected rows do not open the update modal.
 
 Deleting a stage that holds leads is a `409`. Surface it and refetch.
 
@@ -105,7 +109,7 @@ lead can legitimately start in:
 | --- | --- |
 | The first stage created becomes the default whether or not you ask | line 33 |
 | Setting a default clears the previous one in the same transaction | line 92 |
-| A `CONVERTED`-flagged stage cannot be the default | `422 LEAD_STAGE_DEFAULT_CONVERTED` |
+| A `DISQUALIFIED`- or `CONVERTED`-flagged stage cannot be the default | `422 LEAD_STAGE_DEFAULT_TERMINAL` |
 | The default stage cannot be deactivated | `422 LEAD_STAGE_DEFAULT_DEACTIVATE` |
 | The default stage cannot be deleted | `422 LEAD_STAGE_DEFAULT_DELETE` |
 

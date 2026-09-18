@@ -24,7 +24,7 @@ const BRANCH_A = "01900100-0000-7000-8000-0000000000b1";
 const BRANCH_B = "01900100-0000-7000-8000-0000000000b2";
 
 function renderSection(overrides: Partial<LeadClassificationSectionProps> = {}) {
-  render(
+  const element = (props: Partial<LeadClassificationSectionProps>) => (
     <I18nProvider>
       <LeadClassificationSection
         companyIds={[COMPANY_A]}
@@ -50,11 +50,42 @@ function renderSection(overrides: Partial<LeadClassificationSectionProps> = {}) 
         onSourceChange={vi.fn()}
         onTagsChange={vi.fn()}
         onTagsBlur={vi.fn()}
-        {...overrides}
+        {...props}
       />
-    </I18nProvider>,
+    </I18nProvider>
   );
+  const view = render(element(overrides));
+  return { ...view, rerenderSection: (props: Partial<LeadClassificationSectionProps>) => view.rerender(element(props)) };
 }
+
+it("keeps empty, selected and reset pickers controlled throughout the form lifetime", () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  const empty: Partial<LeadClassificationSectionProps> = {
+    companyIds: [COMPANY_A, COMPANY_B], companyId: null,
+    branchIds: [BRANCH_A, BRANCH_B], branchId: "",
+    acquisitionSourceId: "",
+    sources: [{ id: "01900100-0000-7000-8000-0000000000c1", nameAr: "الموقع", nameEn: "Website",
+      isActive: true, sortOrder: 0, createdAt: "2026-09-14T00:00:00.000Z",
+      updatedAt: "2026-09-14T00:00:00.000Z", iconUrl: null }],
+  };
+  try {
+    const view = renderSection(empty);
+    view.rerenderSection({ ...empty, companyId: COMPANY_B, branchId: BRANCH_B,
+      acquisitionSourceId: "01900100-0000-7000-8000-0000000000c1" });
+    expect(screen.getByRole("combobox", { name: en.organization.parentCompany })).toHaveTextContent(COMPANY_B);
+    expect(screen.getByRole("combobox", { name: en.common.branch })).toHaveTextContent(BRANCH_B);
+    expect(screen.getByRole("combobox", { name: en.crmLeads.source })).toHaveTextContent("Website");
+    view.rerenderSection(empty);
+    for (const name of [en.organization.parentCompany, en.common.branch, en.crmLeads.source]) {
+      expect(screen.getByRole("combobox", { name })).toHaveAttribute("data-placeholder");
+    }
+    const messages = [...warn.mock.calls, ...error.mock.calls].flat().join(" ");
+    expect(messages).not.toMatch(/uncontrolled|controlled to/i);
+  } finally {
+    warn.mockRestore(); error.mockRestore();
+  }
+});
 
 describe("the company and branch pickers", () => {
   it("renders neither when the account has one of each", () => {

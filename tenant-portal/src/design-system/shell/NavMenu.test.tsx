@@ -66,6 +66,34 @@ describe("NavMenu", () => {
     expect(screen.queryByText(en.nav.crmSetup)).toBeNull();
   });
 
+  it("renders a promoted multi-item section as first-level links", () => {
+    const promoted = {
+      ...section([
+        item("leads", "leads", "/crm/leads"),
+        item("customerProfiles", "customerProfiles", "/crm/customer-profiles"),
+        item("opportunities", "opportunities", "/crm/opportunities"),
+      ]),
+      globalNavDisplay: "items" as const,
+    };
+
+    render(<NavMenu section={promoted} activeItemId="leads" />);
+
+    expect(screen.queryByText(en.nav.navMenuRecords)).toBeNull();
+    expect(screen.getByRole("link", { name: en.nav.leads })).toHaveAttribute("href", "/crm/leads");
+    expect(screen.getByRole("link", { name: en.nav.customerProfiles })).toHaveAttribute(
+      "href",
+      "/crm/customer-profiles",
+    );
+    expect(screen.getByRole("link", { name: en.nav.opportunities })).toHaveAttribute(
+      "href",
+      "/crm/opportunities",
+    );
+    expect(screen.getByRole("link", { name: en.nav.leads })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
   it("marks the trigger while any item in the section is the active route", () => {
     const items = [
       item("leadStages", "leadStages", "/crm/lead-stages"),
@@ -90,7 +118,9 @@ describe("NavMenu", () => {
 // longer the same claim as "the user can still reach it" — this opens each of
 // the fifteen sections and reads back what is inside.
 describe("every nav item survives the move to menus", () => {
-  it.each(NAV_SECTIONS.filter((entry) => entry.items.length > 1).map((entry) => [entry.id, entry]))(
+  it.each(NAV_SECTIONS.filter(
+    (entry) => entry.items.length > 1 && entry.globalNavDisplay !== "items",
+  ).map((entry) => [entry.id, entry]))(
     "lists all of %s's items",
     (_id, entry) => {
       render(<NavMenu section={entry} activeItemId={null} />);

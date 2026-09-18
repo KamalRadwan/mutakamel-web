@@ -39,7 +39,6 @@ export interface OpportunityEditAmbiguity {
  */
 export function useOpportunityEdit(
   item: OpportunityDetail | null,
-  onSaved: (item: OpportunityDetail) => void,
   /**
    * Re-read the record from the server — defect D2. Used when a write applied
    * but its response body could not be parsed: there is no value to hand
@@ -139,8 +138,8 @@ export function useOpportunityEdit(
         });
         if (outcome.kind === "success") {
           setAmbiguity(null);
-          onSaved(outcome.value);
           setForm(null);
+          onReconcile();
           return;
         }
         if (outcome.kind === "ambiguous") {
@@ -172,7 +171,6 @@ export function useOpportunityEdit(
     isSubmitting,
     item,
     onReconcile,
-    onSaved,
   ]);
 
   return {

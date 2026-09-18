@@ -271,7 +271,7 @@ export function MultiSelect({
               variant="outline"
               size="xs"
               aria-label={`${overflowLabel} (${overflow.length})`}
-              className="h-5 cursor-pointer rounded-sm px-1.5 text-[11px]"
+              className="h-5 cursor-pointer rounded-sm px-1.5 text-xs"
             >
               {formatTemplate(moreLabel, { count: overflow.length })}
             </Button>

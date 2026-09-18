@@ -1,6 +1,7 @@
 "use client";
 
-import { cardColorFill, cn } from "@/design-system";
+import { Tag } from "lucide-react";
+import { cardColorFill, cn, iconSize } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
 import type { LeadTag } from "../../lead-card-contract";
 
@@ -41,12 +42,15 @@ export function LeadTagList({ tags, moreLabel }: LeadTagListProps) {
   const hidden = tags.slice(MAX_VISIBLE_LEAD_TAGS);
 
   return (
-    <ul className="flex flex-wrap items-center gap-1">
+    <ul className="flex flex-wrap items-center gap-1 pt-0.5">
+      <li className="flex shrink-0 items-center text-muted-foreground" aria-hidden="true">
+        <Tag className={iconSize({ size: "sm" })} />
+      </li>
       {visible.map((tag) => (
         <li
           key={tag.id}
           title={tag.name}
-          className="flex min-w-0 max-w-full items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground"
+          className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-muted/60 px-2 py-0.5 text-xs font-medium leading-none text-muted-foreground"
         >
           {tag.color && (
             <span
@@ -62,7 +66,7 @@ export function LeadTagList({ tags, moreLabel }: LeadTagListProps) {
           lead, where the full set is listed. What must not happen is the card
           silently claiming three tags when there are nine. */}
       {hidden.length > 0 && (
-        <li className="rounded-sm bg-muted px-1.5 py-0.5 text-2xs text-muted-foreground">
+        <li className="inline-flex items-center rounded-full border border-border/70 bg-muted/60 px-1.5 py-0.5 text-xs font-medium leading-none text-muted-foreground">
           <span aria-hidden="true">{formatTemplate(moreLabel, { count: hidden.length })}</span>
           <span className="sr-only">{hidden.map((tag) => tag.name).join(", ")}</span>
         </li>

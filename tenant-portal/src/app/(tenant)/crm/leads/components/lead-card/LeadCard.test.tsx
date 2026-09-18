@@ -9,18 +9,31 @@ import { LeadCard } from "../LeadCard";
 import { LeadCardFooter, type LeadCardFooterLabels } from "./LeadCardFooter";
 import { LeadCardMenu, type LeadCardMenuLabels } from "./LeadCardMenu";
 
-const cardLabels = { moreTags: "+{count}" };
+const cardLabels = { moreTags: "+{count}", individual: "Individual", company: "Company" };
 
 afterEach(cleanup);
 
 const lead: LeadItem = {
   id: "01900100-0000-7000-8000-000000000001",
+  partyId: "01900100-0000-7000-8000-000000000002",
+  leadProfileType: "CORPORATE",
   leadName: "Kamal Radwan",
   company: "Acme Trading",
   email: "owner@example.com",
   phone: "+201001112223",
+  phones: ["+201001112223"],
+  country: "Egypt",
+  primaryContact: {
+    partyId: "01900100-0000-7000-8000-000000000003",
+    displayName: "Dina Ali",
+    jobTitle: "Purchasing Manager",
+    email: "dina@example.com",
+    phones: ["+201009998887"],
+    isPrimary: true,
+  },
   sourceNameAr: "إحالة",
   sourceNameEn: "Referral",
+  sourceIconUrl: null,
   stageId: "01900100-0000-7000-8000-000000000010",
   ownerUserId: "01900100-0000-7000-8000-000000000020",
   rating: 2,
@@ -84,12 +97,15 @@ describe("LeadCard", () => {
           ...lead,
           leadName: "Kamal Radwan",
           company: "Kamal Radwan",
+          leadProfileType: "INDIVIDUAL",
+          primaryContact: null,
           primaryContactName: "",
         }}
         labels={cardLabels}
       />,
     );
     expect(screen.getAllByText("Kamal Radwan")).toHaveLength(1);
+    expect(screen.getByText("Individual")).toBeInTheDocument();
     expect(screen.queryByText("Dina Ali")).toBeNull();
   });
 

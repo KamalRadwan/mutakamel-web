@@ -16,6 +16,12 @@ import {
 } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
+import {
+  appendOpportunityBasicQuery,
+  DEFAULT_OPPORTUNITY_BASIC_SEARCH,
+  EMPTY_OPPORTUNITY_BASIC_SEARCH,
+  type OpportunityBasicSearch,
+} from "../opportunity-basic-search-contract";
 import type {
   OpportunityActionCapability,
   OpportunityActivityState,
@@ -490,6 +496,12 @@ export function opportunityCapabilityAllowsOwner(
   );
 }
 
+export interface OpportunityImportanceCandidate {
+  id: string;
+  importance: number;
+  ownerUserId?: string | null;
+}
+
 export function buildStageMoveRequest(
   stageId: string,
   targetFlag: StageFlag,
@@ -558,9 +570,10 @@ async function opportunityReachedStage(
 // from their own purpose-built/generic endpoints in sibling hooks
 // (useOpportunityCards, useOpportunitiesList) but read branchId/pipelineId
 // from here, so the pipeline selector stays a single shared control.
-export function usePipelineWorkspace() {
+export function usePipelineWorkspace(boardEnabled = true) {
   const { lang, t } = useI18n();
   const { user } = useTenantAuth();
+  const actorUserId = user?.id;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -574,6 +587,11 @@ export function usePipelineWorkspace() {
     },
   );
   const [board, setBoard] = useState<OpportunityBoard | null>(null);
+  const [basicSearch, setBasicSearch] = useState<OpportunityBasicSearch>(() =>
+    isUUIDv7(actorUserId)
+      ? DEFAULT_OPPORTUNITY_BASIC_SEARCH
+      : EMPTY_OPPORTUNITY_BASIC_SEARCH,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [loadingStageId, setLoadingStageId] = useState<string | null>(null);
@@ -586,6 +604,7 @@ export function usePipelineWorkspace() {
   // Distinguishes "not asked yet" from "asked, and this tenant has none" —
   // without it the unconfigured-tenant empty state flashes on first paint.
   const [hasLoadedPipelines, setHasLoadedPipelines] = useState(false);
+  const [pipelinesRevision, setPipelinesRevision] = useState(0);
   const mutationInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
   const boardRequestEpochRef = useRef(0);
@@ -642,7 +661,6 @@ export function usePipelineWorkspace() {
       setError(null);
       setLoadError(null);
       setCapabilitiesUnavailable(false);
-      setBoard(null);
       try {
         // Two independent sources. Under Promise.all a capabilities 403 also
         // nulled the pipeline list, so a permission gap on ACTIONS looked
@@ -694,6 +712,7 @@ export function usePipelineWorkspace() {
           // reader something broke when nothing did.
           setPipelines([]);
           setSelectedPipelineIdState(null);
+          setBoard(null);
           return;
         }
         setPipelines(available);
@@ -702,6 +721,7 @@ export function usePipelineWorkspace() {
             ? current
             : (available.find(({ isDefault }) => isDefault) ?? available[0]).id,
         );
+        setPipelinesRevision((current) => current + 1);
       } catch (caught) {
         if (isAbortError(caught)) return;
         setPipelines([]);
@@ -727,8 +747,13 @@ export function usePipelineWorkspace() {
       setLoadError(null);
       setBoard(null);
       try {
+        const query = new URLSearchParams({ branchId, limitPerStage: "50" });
+        appendOpportunityBasicQuery(query, basicSearch, actorUserId, {
+          includePipeline: false,
+          includeStage: false,
+        });
         const response = await axiosClient.get<unknown>(
-          `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/board?branchId=${encodeURIComponent(branchId)}&limitPerStage=50`,
+          `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/board?${query.toString()}`,
           {
             signal,
             cache: "no-store",
@@ -765,7 +790,7 @@ export function usePipelineWorkspace() {
         }
       }
     },
-    [branchId],
+    [actorUserId, basicSearch, branchId],
   );
 
   const loadMoreStage = useCallback(
@@ -792,6 +817,10 @@ export function usePipelineWorkspace() {
           branchId,
           limit: String(lane.pageInfo.limit),
           cursor,
+        });
+        appendOpportunityBasicQuery(query, basicSearch, actorUserId, {
+          includePipeline: false,
+          includeStage: false,
         });
         const response = await axiosClient.get<unknown>(
           `/api/tenant/crm/v1/pipelines/${encodeURIComponent(selectedPipelineId)}/stages/${encodeURIComponent(stageId)}/opportunities?${query.toString()}`,
@@ -847,7 +876,7 @@ export function usePipelineWorkspace() {
         setLoadingStageId(null);
       }
     },
-    [board, branchId, loadingStageId, selectedPipelineId],
+    [actorUserId, basicSearch, board, branchId, loadingStageId, selectedPipelineId],
   );
 
   useEffect(() => {
@@ -859,7 +888,7 @@ export function usePipelineWorkspace() {
   }, [fetchPipelines]);
 
   useEffect(() => {
-    if (!selectedPipelineId) return;
+    if (!boardEnabled || !hasLoadedPipelines || !selectedPipelineId) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) {
@@ -867,7 +896,7 @@ export function usePipelineWorkspace() {
       }
     });
     return () => controller.abort();
-  }, [fetchBoardData, selectedPipelineId]);
+  }, [boardEnabled, fetchBoardData, hasLoadedPipelines, pipelinesRevision, selectedPipelineId]);
 
   const canUpdateOpportunity = useCallback(
     (opportunity: OpportunityCardRecord) =>
@@ -1006,7 +1035,11 @@ export function usePipelineWorkspace() {
   }, [isMutating]);
 
   const updateImportance = useCallback(
-    async (cardId: string, newImportance: number) => {
+    async (
+      cardId: string,
+      newImportance: number,
+      candidate?: OpportunityImportanceCandidate,
+    ): Promise<boolean> => {
       if (
         mutationInFlightRef.current ||
         loadMoreInFlightRef.current ||
@@ -1014,17 +1047,20 @@ export function usePipelineWorkspace() {
         newImportance < 0 ||
         newImportance > 3
       ) {
-        return;
+        return false;
       }
       const opportunity = board?.stages
         .flatMap(({ items }) => items)
-        .find(({ id }) => id === cardId);
+        .find(({ id }) => id === cardId) ?? candidate;
       if (
         !opportunity ||
-        !canUpdateOpportunity(opportunity) ||
+        !opportunityCapabilityAllowsOwner(
+          capabilities?.update ?? null,
+          opportunity.ownerUserId,
+        ) ||
         opportunity.importance === newImportance
       ) {
-        return;
+        return false;
       }
       mutationInFlightRef.current = true;
       setIsMutating(true);
@@ -1040,25 +1076,30 @@ export function usePipelineWorkspace() {
             maxResponseBytes: 512 * 1024,
           },
         );
-        if (selectedPipelineId) await fetchBoardData(selectedPipelineId);
+        if (boardEnabled && selectedPipelineId) {
+          await fetchBoardData(selectedPipelineId);
+        }
+        return true;
       } catch (caught) {
         const message = errorMessage(
           caught,
           "Unable to update opportunity importance.",
         );
-        if (selectedPipelineId && isAmbiguousMutationError(caught)) {
+        if (boardEnabled && selectedPipelineId && isAmbiguousMutationError(caught)) {
           await fetchBoardData(selectedPipelineId);
         }
         setError(message);
+        return false;
       } finally {
         mutationInFlightRef.current = false;
         setIsMutating(false);
       }
     },
-    [board, canUpdateOpportunity, fetchBoardData, selectedPipelineId],
+    [board, boardEnabled, capabilities?.update, fetchBoardData, selectedPipelineId],
   );
 
   return {
+    actorUserId,
     lang,
     t,
     board,
@@ -1092,6 +1133,7 @@ export function usePipelineWorkspace() {
     needsBranchSelection: branchId === null,
     fetchPipelines,
     fetchBoardData,
+    setBasicSearch,
     loadMoreStage,
     canUpdateOpportunity,
     canDeleteOpportunity,

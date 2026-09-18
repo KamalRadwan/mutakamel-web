@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-09-09T17:42:21.852Z**
+Generated at: **2026-09-18T09:27:07.633Z**
 
-Frontend revision: `9940d1053ff3+dirty`
+Frontend revision: `145dcfeb94fa+dirty`
 
-Backend revision: `22e119066314`
+Backend revision: `40c06870bc0c+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -18,10 +18,10 @@ canonical Gateway path mappings.
 | App | Routes |
 | --- | ---: |
 | core | 224 |
-| crm | 160 |
-| trade | 231 |
+| crm | 164 |
+| trade | 234 |
 | webphone | 20 |
-| **Total** | **635** |
+| **Total** | **642** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -293,6 +293,8 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/customer-profiles/:id/tags` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.by.id.tags.get` |
 | crm | POST | `/api/tenant/crm/v1/customer-profiles/:id/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.tags.post` |
 | crm | DELETE | `/api/tenant/crm/v1/customer-profiles/:id/tags/:tagId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.customer.profiles.by.id.tags.by.tag.id.delete` |
+| crm | POST | `/api/tenant/crm/v1/customer-profiles/board` | TENANT_PORTAL | AUTHENTICATED | no | `crm.customer.profiles.board.post` |
+| crm | POST | `/api/tenant/crm/v1/customer-profiles/board/statuses/:status` | TENANT_PORTAL | AUTHENTICATED | no | `crm.customer.profiles.board.statuses.by.status.post` |
 | crm | GET | `/api/tenant/crm/v1/customer-profiles/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.customer.profiles.capabilities.get` |
 | crm | POST | `/api/tenant/crm/v1/customer-profiles/search` | TENANT_PORTAL | AUTHENTICATED | no | `crm.customer.profiles.search.post` |
 | crm | GET | `/api/tenant/crm/v1/dashboards` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.builder.list.get` |
@@ -340,6 +342,8 @@ Machine-readable source:
 | crm | GET | `/api/tenant/crm/v1/leads/:id/tags` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.by.id.tags.get` |
 | crm | POST | `/api/tenant/crm/v1/leads/:id/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.tags.post` |
 | crm | DELETE | `/api/tenant/crm/v1/leads/:id/tags/:tagId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.tags.by.tag.id.delete` |
+| crm | POST | `/api/tenant/crm/v1/leads/board` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.board.post` |
+| crm | POST | `/api/tenant/crm/v1/leads/board/stages/:stageId` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.board.stages.by.stage.id.post` |
 | crm | GET | `/api/tenant/crm/v1/leads/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options/:companyPartyId/contacts` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.contacts.get` |
@@ -536,6 +540,7 @@ Machine-readable source:
 | trade | GET | `/api/tenant/trade/v1/invoices/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.invoices.by-id.get` |
 | trade | PATCH | `/api/tenant/trade/v1/invoices/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.invoices.by-id.patch` |
 | trade | POST | `/api/tenant/trade/v1/invoices/:id/issue` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.invoices.by-id.issue.post` |
+| trade | POST | `/api/tenant/trade/v1/invoices/counts-by-party` | TENANT_PORTAL | READ_HEAVY | yes | `trading.invoices.counts.by.party.post` |
 | trade | GET | `/api/tenant/trade/v1/items` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.items.get` |
 | trade | POST | `/api/tenant/trade/v1/items` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.post` |
 | trade | GET | `/api/tenant/trade/v1/items/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.items.by-id.get` |
@@ -599,6 +604,7 @@ Machine-readable source:
 | trade | POST | `/api/tenant/trade/v1/quotations/:id/send` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.quotations.by-id.send.post` |
 | trade | GET | `/api/tenant/trade/v1/quotations/:quotationId/render-jobs/:renderJobId` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.quotations.render-pdf.get` |
 | trade | POST | `/api/tenant/trade/v1/quotations/:quotationId/render-pdf` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.quotations.render-pdf` |
+| trade | POST | `/api/tenant/trade/v1/quotations/counts-by-party` | TENANT_PORTAL | READ_HEAVY | yes | `trading.quotations.counts.by.party.post` |
 | trade | GET | `/api/tenant/trade/v1/quotations/customer-options` | TENANT_PORTAL | READ_HEAVY | yes | `trading.quotations.customer-options.get` |
 | trade | POST | `/api/tenant/trade/v1/quotations/search` | TENANT_PORTAL | READ_HEAVY | yes | `trading.quotations.search.post` |
 | trade | GET | `/api/tenant/trade/v1/sales-orders` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.sales.orders.get` |
@@ -613,6 +619,7 @@ Machine-readable source:
 | trade | POST | `/api/tenant/trade/v1/sales-orders/:id/confirmation-attempts/:attemptId/cancel` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.sales.orders.by-id.confirmation.attempts.by-attempt-id.cancel.post` |
 | trade | POST | `/api/tenant/trade/v1/sales-orders/:id/hold` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.sales.orders.by-id.hold.post` |
 | trade | POST | `/api/tenant/trade/v1/sales-orders/:id/release-hold` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.sales.orders.by-id.release.hold.post` |
+| trade | POST | `/api/tenant/trade/v1/sales-orders/counts-by-party` | TENANT_PORTAL | READ_HEAVY | yes | `trading.sales.orders.counts.by.party.post` |
 | trade | GET | `/api/tenant/trade/v1/uoms` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.uoms.get` |
 | trade | POST | `/api/tenant/trade/v1/uoms` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.uoms.post` |
 | trade | GET | `/api/tenant/trade/v1/uoms/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.uoms.by-id.get` |

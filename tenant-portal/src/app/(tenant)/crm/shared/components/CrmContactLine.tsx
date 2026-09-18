@@ -158,7 +158,7 @@ export function CrmContactLine({
         {!directoryOwned && (
           <Field label={t.crmLeads.create.honorificTitle} error={errors[`${path}.honorificTitle`]}>
             <Select
-              value={honorific?.key}
+              value={honorific?.key ?? ""}
               disabled={disabled}
               onValueChange={(key) =>
                 onFieldChange({

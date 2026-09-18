@@ -13,12 +13,16 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
-  EMPTY_CUSTOMER_PROFILE_SEARCH,
+  DEFAULT_CUSTOMER_PROFILE_SEARCH,
   buildCustomerProfileSearchRequest,
   buildCustomerProfilesListQuery,
   type CustomerProfileSearchState,
   type CustomerProfileSortBy,
 } from "../customer-profile-search-contract";
+import {
+  buildCustomerProfileBasicSearchRequest,
+  customerProfileBasicSearchNeedsPost,
+} from "../customer-profile-basic-search-contract";
 
 export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
 /**
@@ -43,24 +47,47 @@ export type CustomerProfileType = (typeof CUSTOMER_PROFILE_TYPES)[number];
 export type CustomerProfileStatus =
   (typeof CUSTOMER_PROFILE_STATUSES)[number];
 
+export type CustomerProfilesView = "board" | "card" | "list";
+
+export interface CustomerProfileOwner {
+  userId: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface CustomerProfileNextActivity {
+  activityAt: string;
+  bucket: "OVERDUE" | "TODAY" | "FUTURE";
+}
+
+export interface CustomerProfilePrimaryContact {
+  partyId: string;
+  displayName: string;
+  jobTitle: string;
+  email: string;
+  phones: string[];
+  isPrimary: boolean;
+}
+
 export interface CustomerProfileItem {
   id: string;
   branchId: string;
+  partyId: string;
   displayName: string;
   profileType: CustomerProfileType;
   status: CustomerProfileStatus;
   companyName: string | null;
   phone: string | null;
+  phones: string[];
   email: string | null;
-  // Additive for the phase-4 card/board views (docs/design/views.md's
-  // per-screen card-fields table) — ownerUserId and the joined
-  // acquisitionSource are both genuinely on the response
-  // (CustomerProfileEntity / party-read-model.ts), verified against
-  // backend source since neither has a docs/api/*.md example. No
-  // owner-name enrichment exists server-side, so this is the raw id.
+  country: string;
+  primaryContact: CustomerProfilePrimaryContact | null;
   ownerUserId: string | null;
+  owner: CustomerProfileOwner | null;
+  nextActivity: CustomerProfileNextActivity | null;
   acquisitionSourceNameAr: string | null;
   acquisitionSourceNameEn: string | null;
+  sourceIconUrl: string | null;
 }
 
 export interface CustomerProfilesPage {
@@ -132,6 +159,106 @@ function nullableText(
   return value;
 }
 
+function optionalText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function parseOwner(value: unknown): CustomerProfileOwner | null {
+  if (value === undefined || value === null) return null;
+  const owner = record(value);
+  if (!owner || !isUUIDv7(owner.userId)) invalidResponse();
+  if (
+    (owner.firstName !== undefined &&
+      owner.firstName !== null &&
+      typeof owner.firstName !== "string") ||
+    (owner.lastName !== undefined &&
+      owner.lastName !== null &&
+      typeof owner.lastName !== "string")
+  ) {
+    invalidResponse();
+  }
+  return {
+    userId: owner.userId,
+    firstName: optionalText(owner.firstName),
+    lastName: optionalText(owner.lastName),
+  };
+}
+
+function parseNextActivity(value: unknown): CustomerProfileNextActivity | null {
+  if (value === undefined || value === null) return null;
+  const activity = record(value);
+  if (
+    !activity ||
+    typeof activity.activityAt !== "string" ||
+    Number.isNaN(new Date(activity.activityAt).getTime()) ||
+    !["OVERDUE", "TODAY", "FUTURE"].includes(String(activity.bucket))
+  ) {
+    invalidResponse();
+  }
+  return {
+    activityAt: activity.activityAt,
+    bucket: activity.bucket as CustomerProfileNextActivity["bucket"],
+  };
+}
+
+function parsePrimaryContact(value: unknown): CustomerProfilePrimaryContact | null {
+  if (value === undefined || value === null) return null;
+  const contact = record(value);
+  if (
+    !contact ||
+    !isUUIDv7(contact.partyId) ||
+    typeof contact.displayName !== "string" ||
+    !contact.displayName ||
+    typeof contact.isPrimary !== "boolean" ||
+    !Array.isArray(contact.phones) ||
+    !contact.phones.every((phone) => typeof phone === "string")
+  ) {
+    invalidResponse();
+  }
+  return {
+    partyId: contact.partyId,
+    displayName: contact.displayName,
+    jobTitle: optionalText(contact.jobTitle),
+    email: optionalText(contact.email),
+    phones: contact.phones,
+    isPrimary: contact.isPrimary,
+  };
+}
+
+function phoneNumbers(
+  source: Record<string, unknown>,
+  profileType: CustomerProfileType,
+): string[] {
+  const candidates = [
+    optionalText(
+      profileType === "CORPORATE"
+        ? source.companyPhone
+        : source.primaryMobile,
+    ),
+    ...(Array.isArray(source.phones) ? source.phones : []),
+  ];
+  const phones = new Set<string>();
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string" || !candidate.trim()) continue;
+    phones.add(candidate.trim());
+    if (phones.size === 10) break;
+  }
+  return [...phones];
+}
+
+function sourceIconUrl(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (
+    typeof value !== "string" ||
+    !/^\/api\/tenant\/crm\/v1\/acquisition-sources\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/icon\?v=\d+$/iu.test(
+      value,
+    )
+  ) {
+    invalidResponse();
+  }
+  return value;
+}
+
 function safeInteger(
   source: Record<string, unknown>,
   key: string,
@@ -172,19 +299,31 @@ export function parseCustomerProfileResponse(
   const companyEmail = nullableText(source, "companyEmail", 180);
   const ownerUserId = typeof source.ownerUserId === "string" && isUUIDv7(source.ownerUserId) ? source.ownerUserId : null;
   const acquisitionSource = record(source.acquisitionSource);
+  const address = record(source.address);
+  const phones = phoneNumbers(source, source.profileType);
 
   return {
     id: requiredUuidV7(source, "id"),
     branchId,
+    partyId: requiredUuidV7(source, "partyId"),
     displayName: requiredText(source, "displayName", 180),
     profileType: source.profileType,
     status: source.status,
     companyName: nullableText(source, "companyName", 180),
-    phone: primaryMobile ?? companyPhone,
-    email: primaryEmail ?? companyEmail,
+    phone: phones[0] ?? primaryMobile ?? companyPhone,
+    phones,
+    email:
+      source.profileType === "CORPORATE"
+        ? companyEmail ?? primaryEmail
+        : primaryEmail ?? companyEmail,
+    country: address ? optionalText(address.country) : "",
+    primaryContact: parsePrimaryContact(source.primaryContact),
     ownerUserId,
+    owner: parseOwner(source.owner),
+    nextActivity: parseNextActivity(source.nextActivity),
     acquisitionSourceNameAr: acquisitionSource ? nullableText(acquisitionSource, "nameAr", 120) : null,
     acquisitionSourceNameEn: acquisitionSource ? nullableText(acquisitionSource, "nameEn", 120) : null,
+    sourceIconUrl: sourceIconUrl(source.acquisitionSourceIconUrl),
   };
 }
 
@@ -262,12 +401,14 @@ export function buildCustomerProfilesListPath({
   branchId,
   page,
   search,
+  actorId,
   sortBy = "createdAt",
   sortDir = "DESC",
 }: {
   branchId: string;
   page: number;
   search: CustomerProfileSearchState;
+  actorId?: string;
   sortBy?: CustomerProfileSortBy;
   sortDir?: "ASC" | "DESC";
 }): string {
@@ -285,6 +426,7 @@ export function buildCustomerProfilesListPath({
     sortBy,
     sortDir,
     search,
+    actorId,
   });
   return CUSTOMER_PROFILES_PATH + "?" + query.toString();
 }
@@ -319,18 +461,20 @@ export function useCustomerProfiles() {
   // or advanced's filter tree. `customer-profile-search-contract` owns which
   // wire key or column each field becomes.
   const [search, setSearch] = useState<CustomerProfileSearchState>(
-    EMPTY_CUSTOMER_PROFILE_SEARCH,
+    DEFAULT_CUSTOMER_PROFILE_SEARCH,
   );
   // The APPLIED question — the one the list on screen answers. Basic keeps the
   // two in step through the debounce below; advanced only ever copies across on
   // an explicit submit, so a half-built tree never reaches the wire.
   const [serverSearch, setServerSearch] = useState<CustomerProfileSearchState>(
-    EMPTY_CUSTOMER_PROFILE_SEARCH,
+    DEFAULT_CUSTOMER_PROFILE_SEARCH,
   );
+  const [activeView, setActiveView] = useState<CustomerProfilesView>("board");
   const [page, setPage] = useState(1);
   const sortRef = useRef(DEFAULT_CUSTOMER_PROFILES_SORT);
   const [sort, setSortState] = useState(DEFAULT_CUSTOMER_PROFILES_SORT);
   const [reloadToken, setReloadToken] = useState(0);
+  const [dataRevision, setDataRevision] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   // A precondition that stops the request being made at all — no session, or
   // no single trusted branch. It is not a failure, so it renders as an empty
@@ -373,10 +517,15 @@ export function useCustomerProfiles() {
     // still re-reads. A button that promises a search and does nothing reads
     // as a broken control, not as an already-answered one.
     setReloadToken((current) => current + 1);
+    setDataRevision((current) => current + 1);
   }, [search]);
 
   const load = useCallback(
     async (signal: AbortSignal) => {
+      if (activeView === "board") {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       setPrecondition(null);
       setLoadError(null);
@@ -399,17 +548,32 @@ export function useCustomerProfiles() {
         // Two endpoints, ONE parser: the search route answers the list route's
         // envelope byte for byte, so nothing downstream of here knows which of
         // them replied.
+        const useSearchEndpoint =
+          serverSearch.mode === "advanced" ||
+          customerProfileBasicSearchNeedsPost(serverSearch.basic);
         const response =
-          serverSearch.mode === "advanced"
+          useSearchEndpoint
             ? await axiosClient.post<unknown>(
                 CUSTOMER_PROFILES_SEARCH_PATH,
-                buildCustomerProfileSearchRequest(serverSearch, {
-                  branchId,
-                  page,
-                  limit: CUSTOMER_PROFILES_PAGE_SIZE,
-                  sortBy,
-                  sortDir,
-                }),
+                serverSearch.mode === "advanced"
+                  ? buildCustomerProfileSearchRequest(serverSearch, {
+                      branchId,
+                      page,
+                      limit: CUSTOMER_PROFILES_PAGE_SIZE,
+                      sortBy,
+                      sortDir,
+                    })
+                  : buildCustomerProfileBasicSearchRequest(
+                      serverSearch.basic,
+                      {
+                        branchId,
+                        page,
+                        limit: CUSTOMER_PROFILES_PAGE_SIZE,
+                        sortBy,
+                        sortDir,
+                      },
+                      userId,
+                    ),
                 {
                   signal,
                   cache: "no-store",
@@ -418,6 +582,7 @@ export function useCustomerProfiles() {
                   // record for a query, and the client would then refuse to
                   // repeat a search the user is entitled to repeat.
                   skipAutoIdempotency: true,
+                  replayAfterRefresh: true,
                 },
               )
             : await axiosClient.get<unknown>(
@@ -425,6 +590,7 @@ export function useCustomerProfiles() {
                   branchId,
                   page,
                   search: serverSearch,
+                  actorId: userId,
                   sortBy,
                   sortDir,
                 }),
@@ -454,7 +620,7 @@ export function useCustomerProfiles() {
     // the state, so listing it here declared a read that does not happen. It
     // moves to the effect below, where it is what it actually is -- a re-run
     // trigger.
-    [branchId, page, serverSearch, t, userId],
+    [activeView, branchId, page, serverSearch, t, userId],
   );
 
   useEffect(() => {
@@ -476,7 +642,10 @@ export function useCustomerProfiles() {
 
   // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
   // an ALL-scoped resync, a realtime reconnect, and a return from offline.
-  const reload = useCallback(() => setReloadToken((current) => current + 1), []);
+  const reload = useCallback(() => {
+    setReloadToken((current) => current + 1);
+    setDataRevision((current) => current + 1);
+  }, []);
   useRealtimeResync(reload);
 
   const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
@@ -498,14 +667,15 @@ export function useCustomerProfiles() {
     selectBranch: (nextBranchId: string) => {
       selectBranch(nextBranchId);
       setResult(null);
-      setSearch(EMPTY_CUSTOMER_PROFILE_SEARCH);
-      setServerSearch(EMPTY_CUSTOMER_PROFILE_SEARCH);
+      setSearch(DEFAULT_CUSTOMER_PROFILE_SEARCH);
+      setServerSearch(DEFAULT_CUSTOMER_PROFILE_SEARCH);
       setPage(1);
       setPrecondition(null);
       setLoadError(null);
     },
     pagination: result,
     search,
+    appliedSearch: serverSearch,
     setSearch,
     submitSearch,
     isLoading: isAuthLoading || isLoading,
@@ -514,5 +684,8 @@ export function useCustomerProfiles() {
     previousPage,
     nextPage,
     reload,
+    activeView,
+    setActiveView,
+    dataRevision,
   };
 }

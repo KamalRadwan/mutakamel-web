@@ -515,8 +515,15 @@ step first, then a segment per stage, each pointing into the next.
 
 It is the filter as well as the picture. Pressing a stage narrows the list to
 it and pressing it again clears — there is no separate control to keep in sync,
-and on Leads it writes the same single filter the search bar's Stage field
-writes, because the endpoint answers one filter at a time.
+and on Leads it replaces only the search bar's Stage tokens, preserving
+My Leads and other fields. **Updated 2026-09-16:** the strip is the first visible
+content above both Leads card and table views. It reuses the detail screen's
+`StageBar`, labels, ordering, and outcome tones. Multiple selected Stage tokens
+highlight their matching segments. Pressing a stage (or `All`) edits the same
+Basic search state shown in the Odoo-style search bar. The Advanced UI is
+available through one compact `Advanced` toggle button and keeps its own explicit-submit
+draft. The stage strip is hidden in Advanced so it cannot mutate or apply that
+draft. The board keeps its stage columns.
 
 - **The arrow is a `clip-path`**, not a rotated square or a border trick: those
   leave a seam at a non-integer device pixel ratio, and a border chevron cannot
@@ -561,6 +568,8 @@ grid gap-3
 
 Each card is the shared `WorkspaceCard` at `density="default"` — a 2px border,
 no shadow, `rounded-md`, `p-3`. See [The card object](#the-card-object).
+Screens may opt into `density="compact"`; Leads uses it with `p-2`, tighter
+gaps and up to five columns at `2xl`.
 
 Card view is the **sortable** view. Its sort control — a field `Select` plus a
 direction toggle — is rendered by `CardView` itself, in a strip above the grid,
@@ -572,6 +581,9 @@ dead one. Sort state goes in the URL (`sort`, `dir`).
 
 Same card renderer as the board, at a wider measure. Cards are focusable and
 `Enter` opens the detail route.
+
+Selection is opt-in. Leads Card View deliberately omits the selection contract,
+so there is no checkbox on a card and no Select All control above the grid.
 
 **Windowed above 100 items**, inside its own scroll container. Below that the
 grid renders whole and the page scrolls, exactly as before.
@@ -621,16 +633,22 @@ The only per-screen code. Everything above is shared.
 | | |
 | --- | --- |
 | Hook | `useLeads()` |
-| List | `GET /api/tenant/crm/v1/leads` |
+| Card/Table data | `GET /api/tenant/crm/v1/leads` or read-only `POST /leads/search` |
+| Board data | `POST /api/tenant/crm/v1/leads/board` — independent 50-record page per stage |
+| Board column paging | `POST /api/tenant/crm/v1/leads/board/stages/:stageId` |
 | Board axis | Lead-stage catalogue, by `sortOrder` |
 | Move | `POST /api/tenant/crm/v1/leads/:id/stage` |
 | Capabilities | `GET /api/tenant/crm/v1/leads/capabilities?branchId=` |
 | Card write | `PATCH /api/tenant/crm/v1/leads/:id` — `rating`, `cardColor` |
 | Card activities | `GET` + `POST /api/tenant/core/v1/activities` — **Core's**, not CRM's |
 | Default view | `board` |
-| Card fields | Company name (contact name beneath, corporate only) · tag chips · activity mark · 0–3 rating · owner initials · overflow menu |
+| Board card fields | Type icon/badge · company/person name · primary-contact name (corporate) · tag chips · activity mark · 0–3 rating · owner initials · overflow menu |
+| Card View fields | Board identity plus country flag/name · company/person phones and call/WhatsApp/Telegram actions · email · primary contact name/position/email/phones/compact Primary badge · source avatar/name · bottom-anchored `PQ`/`SO`/`IN`, salesperson, rating and activity block |
+| Card View selection | None — no per-card checkbox and no Select All |
 | Column bar | Next-activity buckets — overdue / today / upcoming / none — over the cards **loaded** in that column |
-| Table columns | Name · Type · Stage · Status · Owner · Source · Branch · Created · Actions |
+| Table density | Compact — 32px header, 36px minimum rows and reduced horizontal padding |
+| Table columns | Lead + type · Primary contact/email · Phone + call/WhatsApp/Telegram · Country · Stage · Source · Salesperson · Rating/activity · Actions |
+| Table interactions | Lead, Contact and Phone cells open the Lead · rating stars update the Lead · activity opens the shared modal |
 | Sortable | `createdAt`, `updatedAt`, `name` |
 | Filters | `leadProfileType`, `status`, `stageId`, `stageFlag`, `acquisitionSourceId`, `ownerUserId` |
 | Terminal stages | Any stage whose flag is `CONVERTED` or `DISQUALIFIED` |

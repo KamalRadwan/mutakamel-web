@@ -1,11 +1,12 @@
 "use client";
 
 import { DataTable } from "../../patterns/data-table/DataTable";
-import type { ColumnDef } from "../../patterns/data-table/types";
+import type { ColumnDef, DataTableDensity } from "../../patterns/data-table/types";
 import type { WorkspaceViewProps } from "../types";
 
 export interface TableViewProps<T> extends WorkspaceViewProps<T> {
   columns: ColumnDef<T>[];
+  density?: DataTableDensity;
 }
 
 // The shared contract's table implementation. It adapts the contract's names
@@ -19,6 +20,7 @@ export interface TableViewProps<T> extends WorkspaceViewProps<T> {
 // (V1). Screens render TableView; DataTable is not for feature code.
 export function TableView<T>({
   columns,
+  density,
   items,
   itemKey,
   onActivate,
@@ -37,6 +39,7 @@ export function TableView<T>({
   return (
     <DataTable
       columns={columns}
+      density={density}
       rows={items}
       rowKey={itemKey}
       onRowClick={onActivate}

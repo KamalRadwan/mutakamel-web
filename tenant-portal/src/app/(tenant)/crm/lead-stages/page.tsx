@@ -20,8 +20,12 @@ import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import { CreateLeadStagesModal } from "./components/CreateLeadStagesModal";
 import { DeleteLeadStagesConfirmModal } from "./components/DeleteLeadStagesConfirmModal";
-import { EditLeadStageDrawer } from "./components/EditLeadStageDrawer";
+import { EditLeadStageModal } from "./components/EditLeadStageModal";
 import { useLeadStages, type LeadStageItem } from "./hooks/useLeadStages";
+import {
+  canBeDefaultLeadStage,
+  isProtectedLeadStage,
+} from "./lead-stage-contract";
 
 const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
@@ -57,7 +61,7 @@ export default function LeadStagesPage() {
     closeEdit,
     handleUpdate,
     isFiltered,
-    entryStageId,
+    fixedStageIds,
     isReordering,
     handleReorder,
     lang,
@@ -121,13 +125,17 @@ export default function LeadStagesPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => openEdit(item)}
-                      disabled={isUpdating}
+                      disabled={isProtectedLeadStage(item) || isUpdating}
                       aria-label={`${t.crmLeadStages.editTitle}: ${item.nameEn}`}
                     >
                       <Pencil className="size-4" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{t.crmLeadStages.editTitle}</TooltipContent>
+                  <TooltipContent>
+                    {isProtectedLeadStage(item)
+                      ? t.crmLeadStages.protectedHint
+                      : t.crmLeadStages.editTitle}
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -135,14 +143,18 @@ export default function LeadStagesPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => void handleSetDefault(item)}
-                      disabled={!item.isActive || item.isDefault || item.flag === "CONVERTED" || settingDefaultId !== null}
+                      disabled={!canBeDefaultLeadStage(item) || item.isDefault || settingDefaultId !== null}
                       loading={settingDefaultId === item.id}
                       aria-label={`${t.crmLeadStages.setDefault}: ${item.nameEn}`}
                     >
                       <Star className="size-4" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{t.crmLeadStages.setDefault}</TooltipContent>
+                  <TooltipContent>
+                    {item.flag === "DISQUALIFIED" || item.flag === "CONVERTED"
+                      ? t.crmLeadStages.terminalDefaultHint
+                      : t.crmLeadStages.setDefault}
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -150,13 +162,17 @@ export default function LeadStagesPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => openDelete(item)}
-                      disabled={item.flag === "NEW" || item.isDefault || isDeleting}
+                      disabled={isProtectedLeadStage(item) || item.isDefault || isDeleting}
                       aria-label={`${t.common.delete}: ${item.nameEn}`}
                     >
                       <Trash2 className="size-4 text-destructive" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{t.common.delete}</TooltipContent>
+                  <TooltipContent>
+                    {isProtectedLeadStage(item)
+                      ? t.crmLeadStages.protectedHint
+                      : t.common.delete}
+                  </TooltipContent>
                 </Tooltip>
               </div>
             ),
@@ -224,14 +240,14 @@ export default function LeadStagesPage() {
           error={loadError}
           onRetry={() => void fetchStages()}
           rowKey={(item) => item.id}
-          // The entry stage is pinned to rank 1 by the server, so a drop that
-          // would displace it is refused here rather than round-tripped into a
-          // 422 the user cannot act on — lead-stage-contract.ts.
+          // NEW is pinned first and the terminal anchors are pinned in the
+          // last two positions. A drop through any of them is refused before
+          // it becomes a server round trip.
           rowReorder={
             canManage && !isFiltered
               ? {
                   onReorder: (orderedIds) => void handleReorder(orderedIds),
-                  isPinned: (id) => id === entryStageId,
+                  isPinned: (id) => fixedStageIds.has(id),
                   isPending: isReordering,
                   rowLabel: (item) => localizedName(item, lang),
                   dragHandleLabel: t.crmLeadStages.dragHandle,
@@ -268,7 +284,7 @@ export default function LeadStagesPage() {
           onSubmit={handleCreate}
         />
 
-        <EditLeadStageDrawer
+        <EditLeadStageModal
           key={`edit-${selectedForEdit?.id ?? "closed"}`}
           stage={selectedForEdit}
           isSubmitting={isUpdating}

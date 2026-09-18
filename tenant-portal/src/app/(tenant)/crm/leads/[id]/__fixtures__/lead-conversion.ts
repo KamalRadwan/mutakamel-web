@@ -19,12 +19,19 @@ export const conversionLead = parseLeadDetailResponse({
   createdAt: "2026-09-07T00:00:00.000Z", updatedAt: "2026-09-07T00:00:00.000Z",
 });
 
-export function conversionReceipt(withOpportunity = false) {
+export function conversionReceipt(withOpportunity = false, keepLead = true) {
+  const convertedLead = {
+    ...conversionLead,
+    status: "CONVERTED",
+    stageFlag: "CONVERTED",
+    convertedCustomerProfileId: CONVERSION_IDS.customer,
+    convertedOpportunityId: withOpportunity ? CONVERSION_IDS.opportunity : null,
+    convertedAt: "2026-09-07T01:00:00.000Z",
+  };
   return {
-    lead: { ...conversionLead, status: "CONVERTED", stageFlag: "CONVERTED",
-      convertedCustomerProfileId: CONVERSION_IDS.customer,
-      convertedOpportunityId: withOpportunity ? CONVERSION_IDS.opportunity : null,
-      convertedAt: "2026-09-07T01:00:00.000Z" },
+    lead: keepLead ? convertedLead : null,
+    leadId: CONVERSION_IDS.lead,
+    leadDeleted: !keepLead,
     customerProfileId: CONVERSION_IDS.customer,
     ...(withOpportunity ? { opportunityId: CONVERSION_IDS.opportunity } : {}),
   };

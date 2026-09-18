@@ -15,15 +15,16 @@ describe("ConvertLeadDto request", () => {
     const initial = initialLeadConversion(conversionLead);
     expect(initial.newContact).toBe(false);
     expect(initial.createOpportunity).toBe(false);
+    expect(initial.keepLead).toBe(true);
     expect(initial.contactFullName).toBe("");
     expect(buildConvertLeadRequest(initial)).toEqual({
-      profileType: "CORPORATE", displayName: "Acme", companyName: "Acme Trading", createOpportunity: false,
+      profileType: "CORPORATE", displayName: "Acme", companyName: "Acme Trading", keepLead: true, createOpportunity: false,
     });
   });
   it("omits blank optional names and hidden contact/opportunity values", () => {
     expect(buildConvertLeadRequest(form({ profileType: "INDIVIDUAL", displayName: " ",
       companyName: "Do not send", newContact: true, contactFullName: "Do not create", amount: "invalid" })))
-      .toEqual({ profileType: "INDIVIDUAL", createOpportunity: false });
+      .toEqual({ profileType: "INDIVIDUAL", keepLead: true, createOpportunity: false });
   });
   it("maps every contact DTO field without sending UI row ids", () => {
     const payload = buildConvertLeadRequest(form({ newContact: true, contactFullName: " Noura Saleh ",
@@ -85,9 +86,30 @@ describe("ConvertLeadDto request", () => {
 
 describe("actual conversion service receipt", () => {
   it.each([false, true])("accepts flat ids with opportunity=%s", (withOpportunity) => {
-    const receipt = parseLeadConversionResponse(conversionReceipt(withOpportunity), ids.lead, withOpportunity);
+    const receipt = parseLeadConversionResponse(
+      conversionReceipt(withOpportunity),
+      ids.lead,
+      withOpportunity,
+      true,
+    );
     expect(receipt.customerProfileId).toBe(ids.customer);
     expect(receipt.opportunityId).toBe(withOpportunity ? ids.opportunity : null);
+    expect(receipt.leadDeleted).toBe(false);
+    expect(receipt.lead?.id).toBe(ids.lead);
+  });
+  it("accepts a receipt that removes only the converted lead", () => {
+    const receipt = parseLeadConversionResponse(
+      conversionReceipt(false, false),
+      ids.lead,
+      false,
+      false,
+    );
+    expect(receipt).toMatchObject({
+      lead: null,
+      leadId: ids.lead,
+      leadDeleted: true,
+      customerProfileId: ids.customer,
+    });
   });
   it("rejects the obsolete Swagger shape, foreign record ids and inconsistent receipts", () => {
     const receipt = conversionReceipt(true);
@@ -98,8 +120,9 @@ describe("actual conversion service receipt", () => {
       { ...receipt, lead: { ...receipt.lead, status: "OPEN" } },
       { ...receipt, lead: { ...receipt.lead, convertedCustomerProfileId: ids.party } },
       { ...receipt, opportunityId: ids.party },
-    ]) expect(() => parseLeadConversionResponse(payload, ids.lead, true)).toThrow();
-    expect(() => parseLeadConversionResponse(receipt, ids.lead, false)).toThrow();
-    expect(() => parseLeadConversionResponse(conversionReceipt(), ids.lead, true)).toThrow();
+    ]) expect(() => parseLeadConversionResponse(payload, ids.lead, true, true)).toThrow();
+    expect(() => parseLeadConversionResponse(receipt, ids.lead, false, true)).toThrow();
+    expect(() => parseLeadConversionResponse(conversionReceipt(), ids.lead, true, true)).toThrow();
+    expect(() => parseLeadConversionResponse(conversionReceipt(false, false), ids.lead, false, true)).toThrow();
   });
 });

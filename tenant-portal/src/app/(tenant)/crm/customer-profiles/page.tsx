@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import {
@@ -12,12 +12,14 @@ import {
   EmptyState,
   PageHeader,
   PermissionGate,
+  StageBar,
   TableView,
   PageActions,
   ViewSwitcher,
   useWorkspaceState,
   type BoardCardMove,
   type BoardColumnDef,
+  type MoveToTarget,
   type WorkspaceViewLabels,
 } from "@/design-system";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
@@ -29,21 +31,30 @@ import {
   useCustomerProfiles,
 } from "./hooks/useCustomerProfiles";
 import { CreateCustomerProfileModal } from "./components/CreateCustomerProfileModal";
-import { CustomerProfileCard } from "./components/CustomerProfileCard";
 import { CustomerProfileSearchBar } from "./components/CustomerProfileSearchBar";
 import { useCustomerProfileColumns } from "./components/useCustomerProfileColumns";
 import { useCustomerProfilesCapabilities } from "./hooks/useCustomerProfilesCapabilities";
 import { useCreateCustomerProfile } from "./hooks/useCreateCustomerProfile";
+import { useDeleteCustomerProfile } from "./hooks/useDeleteCustomerProfile";
 import { useCrmCreateCustomFields } from "../shared/hooks/useCrmCreateCustomFields";
 import { useCrmFieldMessages } from "../shared/hooks/useCrmFieldMessages";
 import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
+import { useCustomerProfileCardSlots } from "./components/useCustomerProfileCardSlots";
 import { crmCapabilityAllowsOwner } from "../shared/crm-capabilities";
 import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
+import { crmActivitySegments } from "../shared/crm-activity-tone";
+import { CrmActivityDialog } from "../shared/components/CrmActivityDialog";
+import {
+  CUSTOMER_PROFILE_BOARD_STATUSES,
+  useCustomerProfileBoard,
+} from "./hooks/useCustomerProfileBoard";
+import {
+  customerProfileSearchValuesOf,
+  customerProfileSearchWithField,
+} from "./customer-profile-search-contract";
 
-// Board axis is CustomerStatusEnum — fixed, 4 values, no catalogue fetch,
-// unlike leads/opportunities. See
-// docs/api/crm-customer-profiles.md#frontend-notes.
-const BOARD_STATUS_ORDER: CustomerProfileStatus[] = ["PROSPECT", "ACTIVE_CUSTOMER", "INACTIVE", "BLACKLISTED"];
+const BOARD_STATUS_ORDER: readonly CustomerProfileStatus[] =
+  CUSTOMER_PROFILE_BOARD_STATUSES;
 const TERMINAL_STATUS: CustomerProfileStatus = "BLACKLISTED";
 
 export default function CustomerProfilesPage() {
@@ -55,6 +66,7 @@ export default function CustomerProfilesPage() {
     selectBranch,
     pagination,
     search,
+    appliedSearch,
     setSearch,
     submitSearch,
     isLoading,
@@ -64,30 +76,23 @@ export default function CustomerProfilesPage() {
     nextPage,
     reload,
     setSort,
+    sort,
+    activeView,
+    setActiveView,
+    dataRevision,
   } = useCustomerProfiles();
+
   const { capabilities, error: capabilitiesError } =
     useCustomerProfilesCapabilities(branchId);
-  // D7. `capabilities.update !== null` says the actor may update SOMETHING in
-  // this branch, not that they may update THIS card. With `read.all +
-  // update.own` that let a user drag a colleague's customer, watch the
-  // optimistic move land, and watch the backend reject it a moment later. The
-  // detail workspace has always asked the owner-aware question; the board asks
-  // it too now, per card.
+
   const canUpdateProfile = useCallback(
     (item: CustomerProfileItem) =>
       crmCapabilityAllowsOwner(capabilities.update, item.ownerUserId),
     [capabilities.update],
   );
-  const { displayItems, handleCardMove } = useCustomerProfileBoardMove(
-    items,
-    reload,
-    // The same owner-aware question `canDrag` asks, enforced on the drop.
-    canUpdateProfile,
-  );
+
   const router = useRouter();
-  // The Pagination control only ever steps by one, and this hook exposes
-  // cursors rather than a page setter — so a page written to the URL is
-  // applied here as the equivalent step.
+
   const applyPage = useCallback(
     (target: number) => {
       if (target > (pagination?.page ?? 1)) nextPage();
@@ -95,60 +100,152 @@ export default function CustomerProfilesPage() {
     },
     [nextPage, pagination?.page, previousPage],
   );
+
   const applySort = useCallback(
     (next: { id: string; direction: "asc" | "desc" }) => setSort(next),
     [setSort],
   );
+
   const workspace = useWorkspaceState("customerProfiles", {
-    defaultView: "table",
+    defaultView: "board",
     onPageChange: applyPage,
     onSortChange: applySort,
   });
   const { view, setView } = workspace;
-  // BLACKLISTED is terminal in practice — confirms via a real modal, not
-  // window.confirm. confirmMove needs a Promise<boolean>, so the pending
-  // move sits in state until the user resolves it here.
+
+  useEffect(() => {
+    const next = view === "table" ? "list" : view;
+    if (activeView !== next) setActiveView(next);
+  }, [activeView, setActiveView, view]);
+
+  const board = useCustomerProfileBoard({
+    enabled: view === "board",
+    branchId,
+    search: appliedSearch,
+    sort,
+    revision: dataRevision,
+  });
+  const { displayItems, handleCardMove } = useCustomerProfileBoardMove(
+    board.items,
+    reload,
+    canUpdateProfile,
+  );
+
   const [pendingTerminalMove, setPendingTerminalMove] = useState<{
     move: BoardCardMove;
     resolve: (confirmed: boolean) => void;
   } | null>(null);
 
-  const boardColumns: BoardColumnDef[] = BOARD_STATUS_ORDER.map((status) => ({
-    id: status,
-    label: t.statusValues[`CustomerStatus.${status}`] ?? status,
-    count: displayItems.filter((item) => item.status === status).length,
-    outcomeRole: status === "ACTIVE_CUSTOMER" ? "positive" : status === "BLACKLISTED" ? "negative" : status === "INACTIVE" ? "caution" : undefined,
-  }));
+  const [activityCustomer, setActivityCustomer] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [selectedForDelete, setSelectedForDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const {
+    deleteProfile,
+    isDeleting: isDeletingProfile,
+    error: deleteError,
+    clearError: clearDeleteError,
+  } = useDeleteCustomerProfile();
+
+  const moveTargets: MoveToTarget[] = useMemo(
+    () =>
+      BOARD_STATUS_ORDER.map((status) => ({
+        id: status,
+        label: t.statusValues[`CustomerStatus.${status}`] ?? status,
+      })),
+    [t],
+  );
+
+  const cardSlots = useCustomerProfileCardSlots({
+    canUpdate: canUpdateProfile,
+    canDelete: (item) => Boolean(capabilities.delete) && canUpdateProfile(item),
+    onOpen: (item) => openProfile(item),
+    onDelete: (item) => {
+      clearDeleteError();
+      setSelectedForDelete({ id: item.id, name: item.displayName });
+    },
+    onOpenActivities: (item) => {
+      setActivityCustomer({ id: item.id, name: item.displayName });
+    },
+    moveTargets:
+      view === "board"
+        ? (item) => moveTargets.filter((target) => target.id !== item.status)
+        : undefined,
+    onMove: view === "board" ? (item, status) => {
+      const move: BoardCardMove = {
+        itemId: item.id,
+        fromColumnId: item.status,
+        toColumnId: status,
+        toIndex: 0,
+      };
+      if (status === TERMINAL_STATUS) {
+        setPendingTerminalMove({
+          move,
+          resolve: (confirmed) => {
+            if (confirmed) {
+              void handleCardMove(move);
+            }
+          },
+        });
+      } else {
+        void handleCardMove(move);
+      }
+    } : undefined,
+  });
+
+  const boardColumns: BoardColumnDef[] = useMemo(
+    () =>
+      BOARD_STATUS_ORDER.map((status) => ({
+        id: status,
+        label: t.statusValues[`CustomerStatus.${status}`] ?? status,
+        count: board.totals.get(status) ?? 0,
+        outcomeRole:
+          status === "ACTIVE_CUSTOMER"
+            ? "positive"
+            : status === "BLACKLISTED"
+              ? "negative"
+              : status === "INACTIVE"
+                ? "caution"
+                : undefined,
+        segments: crmActivitySegments(
+          displayItems
+            .filter((item) => item.status === status)
+            .map((item) => ({ nextActivity: item.nextActivity })),
+          t.crmLeads.card.activityStates,
+        ),
+        segmentsLabel: t.crmLeads.card.activityBar,
+      })),
+    [board.totals, displayItems, t],
+  );
 
   const sources = useCrmAcquisitionSources();
-  // Fetched with the screen rather than with the modal: the create hook needs
-  // the required-field keys to build its validator, and the modal's open state
-  // comes back OUT of that hook — gating the fetch on it would be a cycle. The
-  // catalogue is small, tenant-wide and already cached by the browser.
   const customFields = useCrmCreateCustomFields("CUSTOMER_PROFILE", true);
-  // A new profile opens on its own detail screen: the list defaults to page
-  // one sorted by createdAt DESC, but a filter or a later page would hide the
-  // record that was just created.
   const fieldMessages = useCrmFieldMessages();
   const create = useCreateCustomerProfile(
     branchId,
     fieldMessages,
     customFields.requiredFieldKeys,
     (profileId) => router.push(`/crm/customer-profiles/${profileId}`),
-    // D2: a create whose response could not be read has still created the
-    // record, so the list re-reads instead of leaving a Save to press again.
     reload,
   );
-  const tableColumns = useCustomerProfileColumns();
+  const tableColumns = useCustomerProfileColumns({
+    canDelete: (item) => Boolean(capabilities.delete) && canUpdateProfile(item),
+    onDelete: (item) => {
+      clearDeleteError();
+      setSelectedForDelete({ id: item.id, name: item.displayName });
+    },
+    onOpenActivities: (item) => {
+      setActivityCustomer({ id: item.id, name: item.displayName });
+    },
+  });
 
-  // No session or no single trusted branch means the request was never
-  // made. That is an empty state next to the control that resolves it, not
-  // an error banner about a failure that did not happen.
   const preconditionState = precondition ? <EmptyState title={precondition} /> : undefined;
 
-  // One label set, three views — the shared contract, so a view switch cannot
-  // silently drop a control the way it used to. See
-  // docs/design/views.md#the-shared-contract.
   const viewLabels: WorkspaceViewLabels = {
     retry: t.common.retry,
     errorTitle: t.crmCustomerProfiles.loadFailed,
@@ -175,16 +272,13 @@ export default function CustomerProfilesPage() {
     router.push(`/crm/customer-profiles/${encodeURIComponent(item.id)}`);
   }
 
-  // A CRM route is reachable by direct URL even when the sidebar hides it, so
-  // the 403 is reachable in-body and gets the mandated surface rather than a
-  // load error — AGENTS.md, docs/design/states.md. Permission string and
-  // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
   return (
     <PermissionGate require="crm.customer_profiles.read" scoped>
-      <div className="flex h-full flex-col gap-4">
+      <div className="flex h-full flex-col gap-4 overflow-hidden">
+        {/* Preserve the accessible heading; actions render in the shell's action bar. */}
         <PageHeader
+          className="sr-only"
           title={t.crm.customerProfilesAndCards}
-          description={t.crmCustomerProfiles.subtitle}
           primaryAction={
             capabilities.create && branchId
               ? {
@@ -193,9 +287,6 @@ export default function CustomerProfilesPage() {
                 }
               : undefined
           }
-          // The branch scopes every read on this screen, so it belongs with
-          // the actions rather than beside the search box — which is where the
-          // other two dozen branch-scoped screens already put it.
           secondaryActions={
             <>
               <TenantBranchSelect
@@ -205,25 +296,23 @@ export default function CustomerProfilesPage() {
                 disabled={isLoading}
               />
               <Button size="sm" variant="outline" onClick={reload} disabled={isLoading}>
-                <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+                <RefreshCw
+                  className={`size-4 ${isLoading ? "animate-spin" : ""}`}
+                  aria-hidden="true"
+                />
                 {t.common.retry}
               </Button>
             </>
           }
         />
 
-        {/* Not a FilterBar: that pattern's chips carry a fixed vocabulary, and
-            its own 300ms debounce sat on top of the hook's 300ms. It was called
-            here with `filters={[]}` and no-op handlers — a bare search box.
-            This asks one equality filter as you type, or the whole filter tree
-            `POST /customer-profiles/search` accepts, which runs only on its own
-            Search button. Its basic row renders in the action bar; its advanced
-            card renders here. */}
         <CustomerProfileSearchBar
           value={search}
           onChange={setSearch}
           onSubmit={submitSearch}
           sources={sources.items}
+          sourcesDegraded={sources.degraded}
+          resetKey={branchId ?? "no-branch"}
           disabled={!branchId}
         />
 
@@ -236,10 +325,37 @@ export default function CustomerProfilesPage() {
           />
         </PageActions>
 
-        {/* A capabilities fetch that FAILED is not the same as a 403, and the
-            hook no longer conflates them — the controls are hidden either way,
-            but only this case is a degradation worth naming. */}
-        {capabilitiesError && <DegradedBanner message={t.crmCustomerProfiles.capabilitiesUnavailable} />}
+        {capabilitiesError && (
+          <DegradedBanner message={t.crmCustomerProfiles.capabilitiesUnavailable} />
+        )}
+
+        {view !== "board" && search.mode === "basic" && (
+          <StageBar
+            label={t.common.status}
+            allLabel={t.crmCustomerProfiles.basicSearch.any}
+            steps={BOARD_STATUS_ORDER.map((status) => ({
+              id: status,
+              label: t.statusValues[`CustomerStatus.${status}`] ?? status,
+              tone:
+                status === "ACTIVE_CUSTOMER"
+                  ? "positive"
+                  : status === "BLACKLISTED"
+                    ? "negative"
+                    : undefined,
+            }))}
+            value={customerProfileSearchValuesOf(search, "status")}
+            onChange={(status: string | undefined) =>
+              setSearch(
+                customerProfileSearchWithField(
+                  search,
+                  "status",
+                  status ?? "",
+                ),
+              )
+            }
+            disabled={!branchId}
+          />
+        )}
 
         <div className="min-h-0 flex-1">
           {view === "board" && (
@@ -248,7 +364,10 @@ export default function CustomerProfilesPage() {
               columnOf={(item) => item.status}
               items={displayItems}
               itemKey={(item) => item.id}
-              renderCard={(item) => <CustomerProfileCard item={item} />}
+              renderCard={cardSlots.renderCard}
+              renderActions={cardSlots.renderActions}
+              renderFooter={cardSlots.renderFooter}
+              cardClassName={cardSlots.cardClassName}
               canDrag={canUpdateProfile}
               confirmMove={(move) =>
                 move.toColumnId === TERMINAL_STATUS
@@ -257,12 +376,17 @@ export default function CustomerProfilesPage() {
               }
               onCardMove={(move) => void handleCardMove(move)}
               onActivate={openProfile}
-              selection={workspace.selection}
-              isLoading={isLoading}
-              error={loadError}
-              onRetry={reload}
-              page={pageInfo}
-              onPageChange={workspace.setPage}
+              onAddToColumn={
+                capabilities.create && branchId ? () => create.openModal() : undefined
+              }
+              isLoading={board.isLoading}
+              error={board.error}
+              onRetry={() => void board.reload()}
+              columnPage={(status) => ({
+                hasMore: board.lanes[status]?.hasMore ?? false,
+                isLoadingMore: board.loadingStatuses.has(status),
+              })}
+              onLoadMoreColumn={(status) => void board.loadMoreStatus(status)}
               emptyState={preconditionState}
               labels={{
                 ...viewLabels,
@@ -270,16 +394,23 @@ export default function CustomerProfilesPage() {
                 moveTo: t.views.moveTo,
                 collapseColumn: t.views.collapseColumn,
                 expandColumn: t.views.expandColumn,
+                addToColumn: t.crmCustomerProfileActions.createAction,
+                loadMore: t.crmLeads.loadMore,
+                loadingMore: t.crmLeads.loadingMore,
               }}
             />
           )}
+
           {view === "card" && (
             <CardView
-              items={displayItems}
+              items={items}
               itemKey={(item) => item.id}
-              renderCard={(item) => <CustomerProfileCard item={item} />}
+              renderCard={cardSlots.renderCard}
+              renderActions={cardSlots.renderActions}
+              renderFooter={cardSlots.renderCardViewFooter}
+              cardClassName={cardSlots.cardClassName}
+              density="compact"
               onActivate={openProfile}
-              selection={workspace.selection}
               isLoading={isLoading}
               error={loadError}
               onRetry={reload}
@@ -290,10 +421,12 @@ export default function CustomerProfilesPage() {
               labels={{ ...viewLabels, sortBy: t.views.sortBy }}
             />
           )}
+
           {view === "table" && (
             <TableView
               columns={tableColumns}
-              items={displayItems}
+              density="compact"
+              items={items}
               itemKey={(item) => item.id}
               onActivate={openProfile}
               selection={workspace.selection}
@@ -333,6 +466,50 @@ export default function CustomerProfilesPage() {
             pendingTerminalMove?.resolve(true);
             setPendingTerminalMove(null);
           }}
+        />
+
+        <ConfirmActionModal
+          open={selectedForDelete !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              clearDeleteError();
+              setSelectedForDelete(null);
+            }
+          }}
+          title={t.crmCustomerProfileActions.deleteTitle}
+          description={
+            deleteError ??
+            (selectedForDelete
+              ? formatTemplate(t.crmCustomerProfileActions.deleteDescription, {
+                  name: selectedForDelete.name,
+                })
+              : "")
+          }
+          confirmLabel={t.common.delete}
+          cancelLabel={t.common.cancel}
+          loading={isDeletingProfile}
+          onConfirm={async () => {
+            if (!selectedForDelete) return;
+            if (await deleteProfile(selectedForDelete.id)) {
+              setSelectedForDelete(null);
+              void reload();
+            }
+          }}
+        />
+
+        <CrmActivityDialog
+          key={`activity-${activityCustomer?.id ?? "closed"}`}
+          target={
+            activityCustomer
+              ? {
+                  id: activityCustomer.id,
+                  name: activityCustomer.name,
+                  targetType: "CUSTOMER_PROFILE",
+                }
+              : null
+          }
+          onClose={() => setActivityCustomer(null)}
+          onCreated={reload}
         />
       </div>
     </PermissionGate>

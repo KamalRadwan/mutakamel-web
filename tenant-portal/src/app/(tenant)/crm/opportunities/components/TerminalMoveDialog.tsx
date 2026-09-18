@@ -13,12 +13,12 @@ import {
   Textarea,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import type { OpportunityCardRecord, StageFlag } from "../hooks/pipeline-types";
+import type { StageFlag } from "../hooks/pipeline-types";
 
 interface TerminalMoveDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  opportunity: OpportunityCardRecord | null;
+  opportunity: { title: string } | null;
   targetFlag: StageFlag;
   onConfirm: (reason: string) => Promise<boolean>;
   isSubmitting: boolean;

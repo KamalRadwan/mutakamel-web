@@ -1,7 +1,7 @@
 "use client";
 
 import { Droppable } from "@hello-pangea/dnd";
-import { ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Loader2, Plus } from "lucide-react";
 import { Badge } from "../../primitives/Badge";
 import { Button } from "../../primitives/Button";
 import { cn } from "../../lib/cn";
@@ -54,6 +54,9 @@ export interface BoardColumnProps {
   // Absent on a board whose screen has nothing to create — the `+` is then not
   // drawn at all rather than drawn dead.
   onAdd?: (columnId: string) => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: (columnId: string) => void;
   labels: BoardColumnLabels;
 }
 
@@ -76,6 +79,9 @@ export function BoardColumn({
   isCollapsed,
   onToggleCollapse,
   onAdd,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
   labels,
 }: BoardColumnProps) {
   // Both control labels name the column, because five identical "Collapse
@@ -183,6 +189,24 @@ export function BoardColumn({
         <VirtualColumnBody columnId={column.id} cards={cards} className={COLUMN_BODY_PADDING} />
       ) : (
         <StandardColumnBody columnId={column.id} cards={cards} emptyLabel={emptyLabel} />
+      )}
+
+      {hasMore && onLoadMore && labels.loadMore && labels.loadingMore && (
+        <div className="shrink-0 border-t border-border p-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            disabled={isLoadingMore}
+            onClick={() => onLoadMore(column.id)}
+          >
+            {isLoadingMore && (
+              <Loader2 className={cn(iconSize({ size: "sm" }), "animate-spin")} aria-hidden="true" />
+            )}
+            {isLoadingMore ? labels.loadingMore : labels.loadMore(cards.length, column.count)}
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-09-09**
+Last source verification: **2026-09-18**
 
-Generated at: **2026-09-09T17:42:21.852Z**
+Generated at: **2026-09-18T09:27:07.633Z**
 
-Backend revision: `22e119066314`
+Backend revision: `40c06870bc0c+dirty`
 
 Owning app: **trade-app**
 
-Routes: **231**
+Routes: **234**
 
 ## What this page is
 
@@ -155,6 +155,7 @@ browser code.
 | GET | `/api/tenant/trade/v1/invoices/:id` | `trading.invoices.by-id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/trade/v1/invoices/:id` | `trading.invoices.by-id.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/invoices/:id/issue` | `trading.invoices.by-id.issue.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/invoices/counts-by-party` | `trading.invoices.counts.by.party.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/items` | `trading.items.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/items` | `trading.items.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/items/:id` | `trading.items.by-id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
@@ -218,6 +219,7 @@ browser code.
 | POST | `/api/tenant/trade/v1/quotations/:id/send` | `trading.quotations.by-id.send.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/quotations/:quotationId/render-jobs/:renderJobId` | `trading.quotations.render-pdf.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/quotations/:quotationId/render-pdf` | `trading.quotations.render-pdf` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/quotations/counts-by-party` | `trading.quotations.counts.by.party.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/quotations/customer-options` | `trading.quotations.customer-options.get` | READ_HEAVY | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/quotations/search` | `trading.quotations.search.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/sales-orders` | `trading.sales.orders.get` | AUTHENTICATED | yes | TENANT_PORTAL |
@@ -232,6 +234,7 @@ browser code.
 | POST | `/api/tenant/trade/v1/sales-orders/:id/confirmation-attempts/:attemptId/cancel` | `trading.sales.orders.by-id.confirmation.attempts.by-attempt-id.cancel.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/sales-orders/:id/hold` | `trading.sales.orders.by-id.hold.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/sales-orders/:id/release-hold` | `trading.sales.orders.by-id.release.hold.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/sales-orders/counts-by-party` | `trading.sales.orders.counts.by.party.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/uoms` | `trading.uoms.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/uoms` | `trading.uoms.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/uoms/:id` | `trading.uoms.by-id.get` | AUTHENTICATED | yes | TENANT_PORTAL |

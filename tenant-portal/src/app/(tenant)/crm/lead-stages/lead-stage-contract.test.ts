@@ -3,11 +3,14 @@ import {
   buildCreateLeadStageRequest,
   buildLeadStageReorderRequest,
   buildUpdateLeadStageRequest,
+  canBeDefaultLeadStage,
   entryLeadStageId,
   isProtectedLeadStage,
   parseLeadStageCatalogueResponse,
   parseLeadStageResponse,
+  protectedLeadStageIds,
   toUpdateLeadStageForm,
+  type CreateLeadStageFormData,
   type LeadStageItem,
 } from "./lead-stage-contract";
 
@@ -74,15 +77,17 @@ describe("Lead-stage API contract", () => {
       category: "IN_PROGRESS",
       isDefault: false,
     });
-    expect(() =>
-      buildCreateLeadStageRequest({
+    for (const flag of ["NEW", "DISQUALIFIED", "CONVERTED"] as const) {
+      expect(() =>
+        buildCreateLeadStageRequest({
         nameAr: "تم التحويل",
         nameEn: "Converted",
-        flag: "CONVERTED",
+        flag,
         category: "POSITIVE",
         isDefault: true,
-      }),
-    ).toThrow("Invalid lead stage form.");
+        } as unknown as CreateLeadStageFormData),
+      ).toThrow("Invalid lead stage form.");
+    }
   });
 });
 
@@ -131,26 +136,48 @@ describe("Lead-stage update contract", () => {
     expect(body).not.toHaveProperty("isDefault");
   });
 
-  it("refuses every mutation the NEW stage is protected from", () => {
-    expect(isProtectedLeadStage(newStage)).toBe(true);
-    for (const form of [
-      { ...toUpdateLeadStageForm(newStage), nameEn: "Fresh" },
-      { ...toUpdateLeadStageForm(newStage), flag: "CONTACTED" as const },
-      { ...toUpdateLeadStageForm(newStage), isActive: false },
+  it("refuses every mutation of NEW, DISQUALIFIED, and CONVERTED", () => {
+    for (const protectedStage of [
+      newStage,
+      { ...contacted, flag: "DISQUALIFIED" as const, category: "NEGATIVE" as const },
+      { ...contacted, flag: "CONVERTED" as const, category: "POSITIVE" as const },
     ]) {
-      expect(() => buildUpdateLeadStageRequest(form, newStage)).toThrow(
-        "Invalid lead stage form.",
-      );
+      expect(isProtectedLeadStage(protectedStage)).toBe(true);
+      for (const form of [
+        { ...toUpdateLeadStageForm(protectedStage), nameEn: "Changed" },
+        { ...toUpdateLeadStageForm(protectedStage), flag: "CONTACTED" as const },
+        {
+          ...toUpdateLeadStageForm(protectedStage),
+          category:
+            protectedStage.category === "IN_PROGRESS"
+              ? ("POSITIVE" as const)
+              : ("IN_PROGRESS" as const),
+        },
+        { ...toUpdateLeadStageForm(protectedStage), isActive: false },
+      ]) {
+        expect(() => buildUpdateLeadStageRequest(form, protectedStage)).toThrow(
+          "Invalid lead stage form.",
+        );
+      }
     }
   });
 
-  it("refuses turning another stage into NEW", () => {
-    expect(() =>
-      buildUpdateLeadStageRequest(
-        { ...toUpdateLeadStageForm(contacted), flag: "NEW" },
-        contacted,
-      ),
-    ).toThrow("Invalid lead stage form.");
+  it("refuses turning another stage into a protected lifecycle anchor", () => {
+    for (const flag of ["NEW", "DISQUALIFIED", "CONVERTED"] as const) {
+      expect(() =>
+        buildUpdateLeadStageRequest(
+          { ...toUpdateLeadStageForm(contacted), flag },
+          contacted,
+        ),
+      ).toThrow("Invalid lead stage form.");
+    }
+  });
+
+  it("allows defaults only for active non-terminal stages", () => {
+    expect(canBeDefaultLeadStage(contacted)).toBe(true);
+    expect(canBeDefaultLeadStage({ ...contacted, isActive: false })).toBe(false);
+    expect(canBeDefaultLeadStage({ ...contacted, flag: "DISQUALIFIED" })).toBe(false);
+    expect(canBeDefaultLeadStage({ ...contacted, flag: "CONVERTED" })).toBe(false);
   });
 
   it("refuses deactivating the default stage or flagging it CONVERTED", () => {
@@ -190,10 +217,36 @@ describe("Lead-stage reorder contract", () => {
     flag: "QUALIFIED",
     sortOrder: 3,
   };
-  const catalogue: LeadStageItem[] = [entry, stage as LeadStageItem, qualified];
+  const disqualified: LeadStageItem = {
+    ...qualified,
+    id: "01900100-0000-7000-8000-000000000040",
+    flag: "DISQUALIFIED",
+    category: "NEGATIVE",
+    sortOrder: 4,
+  };
+  const converted: LeadStageItem = {
+    ...qualified,
+    id: "01900100-0000-7000-8000-000000000050",
+    flag: "CONVERTED",
+    category: "POSITIVE",
+    sortOrder: 5,
+  };
+  const catalogue: LeadStageItem[] = [
+    entry,
+    stage as LeadStageItem,
+    qualified,
+    disqualified,
+    converted,
+  ];
 
   it("sends the COMPLETE order the endpoint replaces, as its own array", () => {
-    const orderedIds = [entry.id, qualified.id, stage.id];
+    const orderedIds = [
+      entry.id,
+      qualified.id,
+      stage.id,
+      disqualified.id,
+      converted.id,
+    ];
     const request = buildLeadStageReorderRequest(catalogue, orderedIds);
 
     expect(request).toEqual({ orderedIds });
@@ -209,17 +262,49 @@ describe("Lead-stage reorder contract", () => {
       buildLeadStageReorderRequest(catalogue, [entry.id, stage.id]),
     ).toThrow("Invalid lead stage order.");
     expect(() =>
-      buildLeadStageReorderRequest(catalogue, [entry.id, stage.id, stage.id]),
+      buildLeadStageReorderRequest(catalogue, [
+        entry.id,
+        stage.id,
+        qualified.id,
+        disqualified.id,
+        disqualified.id,
+      ]),
     ).toThrow("Invalid lead stage order.");
     expect(() =>
       buildLeadStageReorderRequest(catalogue, [
         entry.id,
         stage.id,
+        qualified.id,
+        disqualified.id,
         "01900100-0000-7000-8000-0000000000ff",
       ]),
     ).toThrow("Invalid lead stage order.");
     expect(() =>
-      buildLeadStageReorderRequest(catalogue, [stage.id, entry.id, qualified.id]),
+      buildLeadStageReorderRequest(catalogue, [
+        stage.id,
+        entry.id,
+        qualified.id,
+        disqualified.id,
+        converted.id,
+      ]),
+    ).toThrow("Invalid lead stage order.");
+    expect(() =>
+      buildLeadStageReorderRequest(catalogue, [
+        entry.id,
+        stage.id,
+        disqualified.id,
+        qualified.id,
+        converted.id,
+      ]),
+    ).toThrow("Invalid lead stage order.");
+    expect(() =>
+      buildLeadStageReorderRequest(catalogue, [
+        entry.id,
+        stage.id,
+        qualified.id,
+        converted.id,
+        disqualified.id,
+      ]),
     ).toThrow("Invalid lead stage order.");
     expect(() => buildLeadStageReorderRequest([], [])).toThrow(
       "Invalid lead stage order.",
@@ -230,5 +315,13 @@ describe("Lead-stage reorder contract", () => {
     expect(entryLeadStageId(catalogue)).toBe(entry.id);
     expect(entryLeadStageId([stage as LeadStageItem, qualified])).toBeNull();
     expect(entryLeadStageId([entry, { ...qualified, flag: "NEW" }])).toBeNull();
+  });
+
+  it("pins all three server-owned lifecycle stages", () => {
+    expect([...protectedLeadStageIds(catalogue)]).toEqual([
+      entry.id,
+      disqualified.id,
+      converted.id,
+    ]);
   });
 });

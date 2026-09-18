@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import {
   Checkbox,
   Field,
-  FormDrawer,
+  FormModal,
   Input,
   Select,
   SelectContent,
@@ -67,7 +67,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
 
   const handleSubmit = async () => {
     // Reveal before checking: a never-blurred empty field has no error text
-    // yet, and FormDrawer's focus rule needs one to aim at.
+    // yet, and FormModal's focus rule needs one to aim at.
     arabicName.reveal();
     englishName.reveal();
     if (!arabicName.isValid || !englishName.isValid) return;
@@ -79,12 +79,14 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
   };
 
   return (
-    <FormDrawer
+    <FormModal
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) close();
       }}
       title={t.crmLeadStages.addTitle}
+      size="card"
+      density="compact"
       isDirty={isDirty}
       isSubmitting={isSubmitting}
       onSubmit={() => void handleSubmit()}
@@ -96,6 +98,9 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
         discardDescription: t.common.discardDescription,
         discardConfirm: t.common.discardConfirm,
         discardCancel: t.common.cancel,
+        sections: t.crmShared.formSectionsNav,
+        sectionInvalid: t.crmShared.formSectionInvalid,
+        close: t.common.close,
       }}
     >
       <div className="flex flex-col gap-4">
@@ -126,7 +131,7 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
             value={form.flag}
             onValueChange={(value) => {
               const flag = value as CreateLeadStageFormData["flag"];
-              setForm((current) => ({ ...current, flag, isDefault: flag === "CONVERTED" ? false : current.isDefault }));
+              setForm((current) => ({ ...current, flag }));
             }}
           >
             <SelectTrigger size="sm" disabled={isSubmitting}>
@@ -162,11 +167,11 @@ export function CreateLeadStagesModal({ isOpen, isSubmitting, error, onClose, on
           <Checkbox
             checked={form.isDefault}
             onCheckedChange={(checked) => setForm((current) => ({ ...current, isDefault: checked === true }))}
-            disabled={isSubmitting || form.flag === "CONVERTED"}
+            disabled={isSubmitting}
           />
           {t.crmLeadStages.isDefaultOption}
         </label>
       </div>
-    </FormDrawer>
+    </FormModal>
   );
 }

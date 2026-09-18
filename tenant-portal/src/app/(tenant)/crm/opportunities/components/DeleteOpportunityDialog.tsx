@@ -2,10 +2,13 @@
 
 import { ConfirmActionModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import type { OpportunityListItem } from "../hooks/useOpportunitiesList";
+export interface OpportunityDeleteItem {
+  id: string;
+  title: string;
+}
 
 interface DeleteOpportunityDialogProps {
-  item: OpportunityListItem | null;
+  item: OpportunityDeleteItem | null;
   onClose: () => void;
   onConfirm: () => void;
   isDeleting: boolean;

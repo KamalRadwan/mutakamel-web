@@ -6,15 +6,20 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
+  DEFAULT_OPPORTUNITY_SEARCH,
   EMPTY_OPPORTUNITY_SEARCH,
   buildOpportunitiesListQuery,
   buildOpportunitySearchRequest,
   type OpportunitySearchState,
   type OpportunitySortBy,
 } from "../opportunity-search-contract";
+import {
+  parseOpportunityReadFields,
+  type OpportunityReadFields,
+} from "../opportunity-read-model";
 import type { OpportunityStatus, StageFlag } from "./pipeline-types";
 
-export interface OpportunityListItem {
+export interface OpportunityListItem extends OpportunityReadFields {
   id: string;
   branchId: string;
   customerProfileId: string;
@@ -100,6 +105,7 @@ function parseItem(value: unknown, expectedBranchId: string): OpportunityListIte
     throw new Error("Invalid opportunities response.");
   }
   return {
+    ...parseOpportunityReadFields(item),
     id: requiredUuidV7(item, "id"),
     branchId,
     customerProfileId: requiredUuidV7(item, "customerProfileId"),
@@ -156,13 +162,12 @@ function isAbortError(error: unknown): boolean {
 
 // The table view's data source — the generic, page-numbered GET
 // /opportunities list, and the POST /opportunities/search route that answers
-// the same envelope from a filter tree. Unlike the board/card projections,
-// both return the raw OpportunityEntity: no customer or owner display name.
-// See Q14 in docs/build/OPEN-QUESTIONS.md.
+// the same rich read-model envelope from a filter tree.
 export function useOpportunitiesList(
   branchId: string | null,
   pipelineId: string | null,
   stageId: string | null,
+  actorUserId?: string,
 ) {
   const [items, setItems] = useState<OpportunityListItem[]>([]);
   const [pageInfo, setPageInfo] = useState<OpportunitiesListPageInfo>({ page: 1, limit: 25, total: 0 });
@@ -175,15 +180,24 @@ export function useOpportunitiesList(
   // in advanced mode it is a draft the user is still building, and only the
   // card's Search button promotes it. `opportunity-search-contract` owns every
   // wire name either mode may produce.
-  const [search, setSearch] = useState<OpportunitySearchState>(EMPTY_OPPORTUNITY_SEARCH);
+  const initialSearch = isUUIDv7(actorUserId)
+    ? DEFAULT_OPPORTUNITY_SEARCH
+    : EMPTY_OPPORTUNITY_SEARCH;
+  const [search, setSearch] = useState<OpportunitySearchState>(() => initialSearch);
   // The question ON THE WIRE. Split from the draft because a filter tree is
   // built one control at a time and every intermediate state is a different
   // query — usually an expensive one nobody asked for.
   const [appliedSearch, setAppliedSearch] =
-    useState<OpportunitySearchState>(EMPTY_OPPORTUNITY_SEARCH);
+    useState<OpportunitySearchState>(() => initialSearch);
   // Mirrors `appliedSearch` for the two callbacks below, which decide whether a
   // change reaches the wire before the render that would have shown it to them.
-  const appliedSearchRef = useRef<OpportunitySearchState>(EMPTY_OPPORTUNITY_SEARCH);
+  const appliedSearchRef = useRef<OpportunitySearchState>(initialSearch);
+  const appliedAdvancedSearchRef = useRef<OpportunitySearchState>({
+    ...EMPTY_OPPORTUNITY_SEARCH,
+    mode: "advanced",
+  });
+  const searchTouchedRef = useRef(false);
+  const actorDefaultAppliedRef = useRef(isUUIDv7(actorUserId));
   const requestEpochRef = useRef(0);
   const pageRef = useRef(1);
   // 0 for every fetch key that changes once per gesture — a branch, a pipeline,
@@ -191,6 +205,24 @@ export function useOpportunitiesList(
   // microtask exactly as they always have. 250 only while the basic text box is
   // being typed into, which is the one control that changes per keystroke.
   const fetchDelayRef = useRef(0);
+
+  useEffect(() => {
+    if (
+      actorDefaultAppliedRef.current ||
+      searchTouchedRef.current ||
+      !isUUIDv7(actorUserId)
+    ) {
+      return;
+    }
+    actorDefaultAppliedRef.current = true;
+    queueMicrotask(() => {
+      const next = DEFAULT_OPPORTUNITY_SEARCH;
+      fetchDelayRef.current = 0;
+      appliedSearchRef.current = next;
+      setSearch(next);
+      setAppliedSearch(next);
+    });
+  }, [actorUserId]);
 
   // The search route carries no pipeline or stage key at all: its scope is the
   // body's branch plus whatever the user put in the tree. Dropping both here
@@ -246,6 +278,7 @@ export function useOpportunitiesList(
                   pipelineId: scopedPipelineId,
                   stageId: scopedStageId,
                   search: appliedSearch,
+                  actorUserId,
                 }).toString()}`,
                 { signal, cache: "no-store", maxResponseBytes: 1024 * 1024 },
               );
@@ -262,7 +295,7 @@ export function useOpportunitiesList(
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }
     },
-    [appliedSearch, branchId, scopedPipelineId, sort, scopedStageId],
+    [actorUserId, appliedSearch, branchId, scopedPipelineId, sort, scopedStageId],
   );
 
   // Every change to the fetch key — branch, pipeline, stage, sort or the
@@ -317,9 +350,17 @@ export function useOpportunitiesList(
    * unfiltered one.
    */
   const changeSearch = useCallback((next: OpportunitySearchState) => {
+    searchTouchedRef.current = true;
     setSearch(next);
     const current = appliedSearchRef.current;
-    if (next.mode === "advanced" && current.mode === "advanced") return;
+    if (next.mode === "advanced") {
+      if (current.mode === "advanced") return;
+      const submittedAdvanced = appliedAdvancedSearchRef.current;
+      fetchDelayRef.current = 0;
+      appliedSearchRef.current = submittedAdvanced;
+      setAppliedSearch(submittedAdvanced);
+      return;
+    }
     // Only a typed term earns the delay. A mode switch is one gesture and
     // should answer at once.
     fetchDelayRef.current =
@@ -334,14 +375,16 @@ export function useOpportunitiesList(
 
   /** Advanced mode's Search button: promote the draft, and run it. */
   const submitSearch = useCallback(() => {
+    if (search.mode !== "advanced") return;
     fetchDelayRef.current = 0;
+    appliedAdvancedSearchRef.current = search;
     appliedSearchRef.current = search;
     setAppliedSearch(search);
   }, [search]);
 
   // MASTER-PLAN 13.6: one line, and this list reconciles with the server on
   // an ALL-scoped resync, a realtime reconnect, and a return from offline.
-  const reload = useCallback(() => void fetchList(pageRef.current), [fetchList]);
+  const reload = useCallback(() => fetchList(pageRef.current), [fetchList]);
   useRealtimeResync(reload);
 
   return {

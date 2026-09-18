@@ -10,7 +10,11 @@ export function ConversionOutcome({ convert }: { convert: LeadConvertState }) {
   const { result, ambiguous, appliedUnreadable } = convert;
   if (result) return <section role="status" className="flex flex-col gap-2 rounded-sm border border-border bg-success-subtle p-2">
     <h3 className="text-sm font-semibold">{t.crmLeadConvert.successTitle}</h3>
-    <p className="text-xs">{t.crmLeadConvert.successDescription}</p>
+    <p className="text-xs">
+      {result.leadDeleted
+        ? t.crmLeadConvert.successDescriptionDeleted
+        : t.crmLeadConvert.successDescriptionKept}
+    </p>
     <div className="flex flex-wrap gap-2">
       <Button size="sm" asChild><Link href={"/crm/customer-profiles/" + result.customerProfileId}>{t.crmLeadConvert.viewCustomer}</Link></Button>
       {result.opportunityId && <Button size="sm" asChild><Link href={"/crm/opportunities/" + result.opportunityId}>{t.crmLeadConvert.viewOpportunity}</Link></Button>}

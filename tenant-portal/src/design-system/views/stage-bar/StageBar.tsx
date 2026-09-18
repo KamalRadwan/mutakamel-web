@@ -36,8 +36,8 @@ export interface StageBarStep {
  */
 export interface StageBarProps {
   steps: StageBarStep[];
-  /** The chosen stage, or `undefined` for "every stage". */
-  value?: string;
+  /** Chosen stages; filters may highlight multiple values from a search input. */
+  value?: string | readonly string[];
   /** Omit on a bar that only SHOWS a stage; the steps are then not pressable. */
   onChange?: (next: string | undefined) => void;
   /** Accessible name for the group. */
@@ -109,6 +109,7 @@ export function StageBar({
   // filter; without it the bar is one record's own stage, either movable or a
   // picture.
   const isFilter = allLabel !== undefined;
+  const selected = typeof value === "string" ? [value] : value ?? [];
   const readOnly = onChange === undefined;
   const entries: StageBarStep[] = isFilter
     ? [{ id: "", label: allLabel, count: allCount }, ...steps]
@@ -122,7 +123,7 @@ export function StageBar({
     >
       {entries.map((entry, index) => {
         const isAll = entry.id === "";
-        const active = isAll ? value === undefined : value === entry.id;
+        const active = isAll ? selected.length === 0 : selected.includes(entry.id);
         const shape =
           index === 0 ? CHEVRON_FIRST : index === entries.length - 1 ? CHEVRON_LAST : CHEVRON_MIDDLE;
 
@@ -152,7 +153,7 @@ export function StageBar({
                 if (!active) onChange?.(entry.id);
                 return;
               }
-              onChange?.(active && !isAll ? undefined : entry.id || undefined);
+              onChange?.(active && !isAll && selected.length === 1 ? undefined : entry.id || undefined);
             }}
             className={cn(
               "min-w-0 shrink-0 justify-center gap-1.5 rounded-none border-0 font-normal",

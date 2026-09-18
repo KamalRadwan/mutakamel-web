@@ -103,14 +103,14 @@ describe("buildOpportunitiesListQuery — the query string the table already sen
 });
 
 describe("buildOpportunitiesListQuery — the free-text term", () => {
-  it("sends the term as `search`, which is the only key it may use", () => {
+  it("sends the term with its semantic opportunity field", () => {
     const state = opportunitySearchWithBasicText(EMPTY_OPPORTUNITY_SEARCH, "renewal");
-    expect(queryFor(state)).toBe(`${UNFILTERED}&search=renewal`);
+    expect(queryFor(state)).toBe(`${UNFILTERED}&search=renewal&searchField=opportunity`);
   });
 
   it("trims, because a value of spaces is not a search", () => {
     const state = opportunitySearchWithBasicText(EMPTY_OPPORTUNITY_SEARCH, "  renewal  ");
-    expect(queryFor(state)).toBe(`${UNFILTERED}&search=renewal`);
+    expect(queryFor(state)).toBe(`${UNFILTERED}&search=renewal&searchField=opportunity`);
   });
 
   it("sends no key at all for a blank term", () => {
@@ -142,7 +142,7 @@ describe("buildOpportunitiesListQuery — the free-text term", () => {
 });
 
 describe("buildOpportunitiesListQuery — the accepted key surface", () => {
-  it("never produces a key outside the documented eight", () => {
+  it("never produces a key outside the documented surface", () => {
     const searches: OpportunitySearchState[] = [
       EMPTY_OPPORTUNITY_SEARCH,
       opportunitySearchWithBasicText(EMPTY_OPPORTUNITY_SEARCH, "renewal"),
@@ -160,7 +160,7 @@ describe("buildOpportunitiesListQuery — the accepted key surface", () => {
         expect(OPPORTUNITY_LIST_QUERY_KEYS).toContain(key);
       }
     }
-    expect(OPPORTUNITY_LIST_QUERY_KEYS).toHaveLength(8);
+    expect(OPPORTUNITY_LIST_QUERY_KEYS).toHaveLength(13);
   });
 });
 
@@ -577,9 +577,9 @@ describe("buildOpportunitySearchRequest — the whitelist boundary", () => {
     ).toThrow("Unknown opportunity filter field: customerDisplayName");
   });
 
-  // Fact 3 in the contract's header: these are projections the board and card
-  // routes join in, not columns of `OpportunityEntity`. Neither the tree nor
-  // the free-text box can reach them, and the table renders raw ids instead.
+  // Party-backed display values are rich read-model projections, not advanced
+  // filter-tree columns. Semantic basic search reaches the supported party
+  // fields through `searchField` instead.
   it("offers no party-backed display column", () => {
     const offered = OPPORTUNITY_ADVANCED_FIELDS.map((field) => field.field);
     for (const column of [

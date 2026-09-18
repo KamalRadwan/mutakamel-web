@@ -51,6 +51,8 @@ export interface DataTableLabels {
   };
 }
 
+export type DataTableDensity = "default" | "compact";
+
 export interface ColumnDef<T> {
   id: string;
   header: string;

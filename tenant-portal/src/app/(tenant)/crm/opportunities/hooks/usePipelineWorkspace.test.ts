@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCurrencyAmount } from "./pipeline-types";
+import { formatCurrencyAmount, formatOpportunityAmountSummary } from "./pipeline-types";
 import {
   buildStageMoveRequest,
   opportunityCapabilityAllowsOwner,
@@ -99,6 +99,9 @@ describe("Pipeline API contracts", () => {
     expect(formatCurrencyAmount("9007199254740991.25", "EGP")).toBe(
       "EGP 9,007,199,254,740,991.25",
     );
+    expect(
+      formatOpportunityAmountSummary({ USD: "12.50", EGP: "18014398509481982.50" }),
+    ).toBe("EGP 18,014,398,509,481,982.50 · USD 12.50");
   });
 
   it("uses the branch owner boundary for update affordances", () => {

@@ -6,6 +6,13 @@ Last source verification: **2026-09-07**
 
 Contact detail/write contract re-verified: **2026-09-07** (scoped update below).
 
+Basic search GET/POST, semantic text scopes, Tag, owner filtering and pagination
+re-verified: **2026-09-16**.
+
+Board/Card/Table projections and Card bulk document counts verified: **2026-09-16**.
+
+Related quotation/sales-order count scope re-verified: **2026-09-14**.
+
 Owning app: **crm-app**
 
 Canonical prefix: `/api/tenant/crm/v1/leads`
@@ -31,6 +38,21 @@ the list or detail capabilities requests. A failed list retains its error and
 correlation reference; retries are explicit, and selecting another branch
 starts one new load.
 
+The related-record counts in a Lead detail page send **both company and branch
+headers on all three Trade reads** (quotations, sales orders, invoices), using
+the Lead's own branch. Quotation and sales-order Gateway rows omit
+`organizationScopeMode`; this is legacy owning-app validation, not an explicit
+`NONE` policy. `QuotationsController.list` and `SalesOrdersController.list`
+require `TradeScopeTarget.BRANCH`. Sending them without the selectors fails
+`TRADE.CONTEXT.MISSING_COMPANY`. `partyId` remains the document query filter;
+it does not supply organization context.
+
+When the verified branch/company mapping is unavailable, Trade count requests
+wait and render an unknown count, while CRM opportunity counts can still load.
+When the mapping arrives or changes, requests use the new scope and late
+responses from the previous request are discarded. CRM opportunity search
+continues to send its `branchId` in the body, without Trade selector headers.
+
 Source inspected:
 `crm-app/src/crm/leads/leads.controller.ts`,
 `crm-app/src/crm/leads/dto/lead.dto.ts`,
@@ -43,6 +65,9 @@ Source inspected:
 | --- | --- | --- | --- | --- |
 | POST | `/leads` | `crm.leads.post` | WRITE_SENSITIVE | `crm.leads.create` (scoped) |
 | GET | `/leads` | `crm.leads.get` | AUTHENTICATED | `crm.leads.read` (scoped) |
+| POST | `/leads/search` | `crm.leads.search.post` | READ_HEAVY | `crm.leads.read` (scoped) |
+| POST | `/leads/board` | `crm.leads.board.post` | READ_HEAVY | `crm.leads.read` (scoped) |
+| POST | `/leads/board/stages/:stageId` | `crm.leads.board.stages.by.stage.id.post` | READ_HEAVY | `crm.leads.read` (scoped) |
 | GET | `/leads/capabilities` | `crm.leads.capabilities.get` | AUTHENTICATED | **none** — branch membership only |
 | GET | `/leads/company-options` | `crm.leads.company.options.get` | AUTHENTICATED | `crm.leads.create` (scoped) |
 | GET | `/leads/company-options/:companyPartyId/contacts` | — | AUTHENTICATED | `crm.leads.create` (scoped) |
@@ -55,7 +80,7 @@ Source inspected:
 | POST | `/leads/:id/convert` | `crm.leads.by.id.convert.post` | WRITE_SENSITIVE | `crm.leads.convert` (scoped) |
 | DELETE | `/leads/:id` | `crm.leads.by.id.delete` | WRITE_SENSITIVE | `crm.leads.delete` (scoped) |
 
-Branch guards: `@RequireBranchAccess('body')` on create,
+Branch guards: `@RequireBranchAccess('body')` on create, search and both Board reads,
 `@RequireBranchAccess('query')` on the list and both option routes,
 `@RequireRecordBranchAccess('LEAD')` on every `:id` route.
 
@@ -78,11 +103,31 @@ Query (`LeadsQueryDto extends BranchListQueryDto extends PaginationQueryDto`):
 | `acquisitionSourceId` | UUIDv7 | no | |
 | `ownerUserId` | UUIDv7 | no | **narrows only — never grants access** |
 
-Response: `200`, paginated `{ items, meta }` — **raw CRM shape, not a Core
-envelope.**
+Response: `200`, top-level pagination fields (`items`, `total`, `page`,
+`limit`, `totalPages`, `hasNext`, `hasPrev`) — **raw CRM shape, not a Core
+envelope.** Card/Table rows include `leadProfileType`, the lead Party's primary
+`address`, and `primaryContact` with `partyId`, `displayName`, `jobTitle`,
+`email`, `phones[]` and `isPrimary`. `acquisitionSourceIconUrl` is the
+authenticated, cache-versioned public route for the source avatar, or `null`.
+The Party address means an individual gets the person's country while a
+corporate Lead gets the company's country.
 
 Scoped read narrows results by the actor's own/team/all scope on top of the
 branch filter. An empty page is not proof that no leads exist.
+
+## POST /leads/board · /leads/board/stages/:stageId
+
+Board uses a separate lightweight projection. The initial route returns every
+active stage in `sortOrder`, each with its own page of exactly 50 cards, total
+and `hasNext`. The stage route returns the requested next page only, so the
+column's More button does not reload another stage. Both routes accept the same
+basic/advanced filter body as `/leads/search`; the server adds each lane's
+stage constraint after scoped access.
+
+Board cards include identity/type, stage, owner, rating, colour, next activity,
+primary-contact name and tags. They omit address, primary-contact details,
+email and phone aggregates. Card and Table remain global paginated list/search
+reads and become stage-filtered only when the user selects a stage.
 
 ## GET /leads/capabilities
 
@@ -177,10 +222,10 @@ Both of those are terminal and require confirmation before the request — see
 
 ## POST /leads/:id/convert
 
-Verified 2026-09-07 against all conversion DTO classes in
+Verified 2026-09-18 against all conversion DTO classes in
 `crm-app/src/crm/leads/dto/lead.dto.ts`, the complete `LeadsService.convert`
 transaction and its validation/helpers, `PartyDirectoryAdapter`, scoped owner
-assignment, and Gateway `crm.route-contracts.ts`. Backend files remain read-only.
+assignment, and Gateway `crm.route-contracts.ts`.
 
 Promotes the lead's existing Party to a customer profile. Qualification is
 required only when tenant settings enable `requireQualifiedStageForConversion`;
@@ -191,13 +236,17 @@ Body: `ConvertLeadDto`. Actual service success **201**:
 ```json
 {
   "lead": { "id": "…", "status": "CONVERTED", "convertedCustomerProfileId": "…", "convertedOpportunityId": "…" },
+  "leadId": "…",
+  "leadDeleted": false,
   "customerProfileId": "…",
   "opportunityId": "…"
 }
 ```
 
-The lead above is abbreviated; the real response carries the complete Lead
-detail read model. `opportunityId` is **omitted** when no opportunity is
+The lead above is abbreviated; when retained, the real response carries the
+complete Lead detail read model. With `keepLead: false`, the response carries
+`lead: null`, the original `leadId`, and `leadDeleted: true`. `opportunityId`
+is **omitted** when no opportunity is
 created; otherwise it matches `lead.convertedOpportunityId`.
 `customerProfileId` matches `lead.convertedCustomerProfileId`.
 These are **flat UUIDv7 IDs**, not the outdated Swagger
@@ -213,6 +262,7 @@ status before displaying the receipt links.
 | `displayName`, `companyName` | Optional non-empty strings, max 180; omission retains the existing name/fallback |
 | `primaryContact` | Optional nested **new person**, not an existing-contact update |
 | `createOpportunity` | Optional strict boolean |
+| `keepLead` | Optional strict boolean; omission preserves the previous behavior (`true`). The portal asks and sends the choice explicitly |
 | `opportunity` | Required when the switch is true; forbidden when it is false/omitted |
 
 `LeadConversionContactPersonDto`:
@@ -283,6 +333,13 @@ Gateway contract: `WRITE_SENSITIVE`, idempotent, operation
 `x-idempotency-key` and one immutable request body per submitted attempt.
 No automatic conversion is triggered on open, field change or review.
 
+With `keepLead: false`, conversion creates the customer profile and optional
+opportunity first, then soft-deletes only the CRM Lead and its lead-owned
+contact/tag/custom-field mappings in the same transaction. The shared Party,
+customer profile, Party contact relationships and opportunity remain. A later
+`DELETE /leads/:id` of a retained converted lead likewise deletes only the
+Lead aggregate; it never cascades into the converted customer or Party.
+
 Errors include 403 scoped access/owner denial, 404 missing lead, 409
 `LEAD_ALREADY_CONVERTED` / `PARTY_TYPE_IMMUTABLE`, and 422 conversion,
 contact-name, pipeline-stage, nested-opportunity or required-custom-field
@@ -296,6 +353,8 @@ permits refresh, never another write. See the
 
 Update returns `200` with the updated lead (`404`, `409`, `422`).
 Delete is a **soft delete**, returns **`204` with no body** (`404`, `409`).
+Deleting a converted lead does not delete its Party, customer profile, contact
+relationships, or converted opportunity.
 
 ### Contacts on the One Lead screen
 
@@ -416,6 +475,12 @@ Lead GET/PATCH DTO or add another main-column attachments section.
   and every page. Unlike Core activities, an empty CRM list has `totalPages=0`.
   Both all-pages readers validate pagination, reject duplicate IDs and never
   present a partial result as the full list; aborts cannot commit stale data.
+  Attachment byte counts accept canonical positive integer strings on persisted
+  reads as well as numeric upload receipts: `CrmAttachmentEntity.sizeBytes` is
+  a PostgreSQL `bigint` without a transformer. The client converts only exact
+  integer byte counts within the **25 MiB** cap to its numeric display model.
+  Unreadable attachment responses retain their HTTP status and correlation ID;
+  only failures without an HTTP response use the offline message.
 - Add attachment uses existing `POST /api/tenant/crm/v1/attachments/upload`,
   one file per multipart request, the existing MIME allowlist and **25 MiB**
   cap. Preserve source-owner create/delete capabilities and read-only access
@@ -426,6 +491,8 @@ Lead GET/PATCH DTO or add another main-column attachments section.
   handled by the browser with session cookies, not the JSON transport. No
   token, file bytes or invented public storage URL is put in the page.
 
+Attachment read handling reverified **2026-09-14** against the CRM attachment
+entity, notes/attachments controller/service and Gateway route contracts.
 Verified against Core activities controller/service, CRM notes/attachments
 controller/service and Gateway route contracts. The visual contract is
 [Views → Leads](../design/views.md#leads), with the reusable template described
@@ -438,35 +505,101 @@ in [ActivityList](../design/patterns.md#activitylist).
   `relatedPartyIds` query. It uses IDs already in the detail response; no
   per-contact fetch or client-side merging of separately paginated logs.
   See [the related history contract](core-directory.md#related-party-history).
+- History user references (including salesperson and activity assignee) resolve
+  names through the shared authorized user reader. Both before and after names
+  open the reusable contact modal. Branch and acquisition-source references
+  resolve to authorized names; existing stage labels remain catalogue-backed.
+  The current user response has name/email only, so the card shows initials
+  and an unavailable phone rather than guessing a Party relationship. See
+  [the shared user projection](core-identity.md#shared-user-contact-projection)
+  and [the reusable template](../design/patterns.md#personprofilelink).
 - Pass the committed `lead` object as `EntityHistoryCard.refreshToken`, not only
   `lead.updatedAt`: Directory/contact saves can leave the Lead timestamp intact.
   New saves reset History to page one and abort stale page loads. Refresh/reopen
   the detail page to see edits made elsewhere; this is not a realtime push feed.
+- **History presentation, verified 2026-09-14:** successful Lead creation shows
+  only the localized “Lead created” message beneath the actor and timestamp.
+  Related Core history takes its action from the first child event, so grouped
+  creation is also recognized from the initial `leadProfileType`, `branchId`
+  and `stageId` changes belonging to this Lead's subject id. Later contact
+  additions, ordinary updates, failures and their reasons retain their details.
+  This changes presentation only; stored audit evidence and pagination remain.
+- Lead `rating` transitions render three read-only stars on each side: the
+  recorded count in gold and the remainder in silver, including three silver
+  stars for zero. Before/after labels are accessible in Arabic and English.
+  Missing or invalid recorded values keep their text marker rather than being
+  shown as zero. Other entity types retain their existing value rendering.
 
 - Board axis is the **tenant lead-stage catalogue**, ordered by `sortOrder` —
   fetch from `/lead-stages`. Never hardcode stage names or assume a count.
+- Board data comes from `POST /leads/board`, 50 records per stage. More calls
+  `/leads/board/stages/:stageId` for that stage only. Card/Table use the richer
+  list/search response and normal global pagination.
+- Card View has no row selection: it renders neither per-card checkboxes nor a
+  Select All toolbar. Table selection remains available.
+- Lead cards show an explicit Individual/Company badge and matching icon. The
+  rich Card View adds the correct Party country and flag, company/person contact
+  lines, call/WhatsApp/Telegram actions, and the source catalogue avatar. The
+  `PQ`/`SO`/`IN`, the salesperson full name, rating and activity controls form
+  one bottom-anchored block so cards in the same row keep those controls aligned.
+  Corporate cards show the primary contact's name, position, email and phones
+  with a compact Primary badge when `isPrimary` is true; the type badges use
+  the same compact treatment.
+- Quotation, sales-order and invoice counters use three permission-scoped bulk
+  Trade reads for the whole page and render as `PQ`, `SO` and `IN`. Missing
+  permission hides that counter; a failed permitted read remains unknown (`—`)
+  and is never presented as zero.
 - Stage move is `POST /:id/stage`, never a generic `PATCH`.
 - Move optimistically; roll back on failure.
 - Every action control is gated by `capabilities`, not by permission strings.
 - Status renders through `StatusBadge`; never display the raw wire value.
 - `ownerUserId` is a filter, not an authorization mechanism.
-- The list screen's search is **one field, one value** — a field picker beside
-  a value control whose type follows the field, built in
-  `crm/leads/lead-search-contract.ts`. That module is the only place a query
-  key is named, and it sends **at most one** filter key: `forbidNonWhitelisted`
-  makes an unknown key a `400`, and a blank value would send `status=`, which
-  `@IsEnum` also rejects. There is no advanced/operator mode — see
-  [OPEN-QUESTIONS Q131](../build/OPEN-QUESTIONS.md).
-- `ownerUserId` is offered by no control: nothing lists assignable users by
-  name, so the only possible input is a raw UUID — see
-  [OPEN-QUESTIONS Q132](../build/OPEN-QUESTIONS.md).
+- Basic search uses removable field/value tokens inside one input. Typing
+  suggests Lead, Customer, Email and Phone/Mobile semantic text scopes plus
+  structured fields; enum and catalogue fields then offer valid values. The
+  default **My Leads** token resolves `ownerUserId` from `/auth/me.id`, so the
+  initial read includes only leads assigned to the actor. Removing it removes
+  that filter while retaining server authorization and branch scope. Changing
+  branch restores My Leads and clears unfinished search text/field selection.
+- `crm/leads/lead-basic-search-contract.ts` compiles different fields as AND
+  and repeated structured values as OR (`in`). A single value per field uses
+  GET; repeated values and Tag use the existing read-only `POST /leads/search`
+  with `filterTree` and/or `tagIds`. Both paths filter before server
+  count/pagination. Empty values are omitted, enum values and catalogue UUIDv7
+  ids are validated, and My Leads cannot issue a read without the current actor
+  id.
+- Semantic Party search sends one `search` term with `searchField` equal to
+  `lead`, `customer`, `email` or `phone`. Adding another semantic text token
+  replaces the previous one while retaining structured tokens.
+  See [the study](../build/LEADS-BASIC-SEARCH-STUDY.md) and
+  [OPEN-QUESTIONS Q137](../build/OPEN-QUESTIONS.md#q137--multiple-party-text-search-terms-are-not-supported-by-the-leads-search-contract).
+- Basic is the default when the single compact `Advanced` toggle is unpressed;
+  pressing it opens Advanced and pressing it again returns to Basic. Each row visibly reads
+  `AND/OR | Key | Operator | Value`; changing AND to OR splits the filter tree
+  at that row, and changing OR back to AND merges it into the previous group.
+  A new row starts with a blank Key and reveals its remaining controls only
+  after the field is selected. Editing retains a draft; only the explicit
+  Search action applies it. Re-entering Advanced reapplies its last submitted
+  query without promoting later draft edits.
+- The Advanced field catalogue mirrors every repository-filterable Lead column
+  except `branchId`, which already scopes the request. This includes `rating`
+  and nullable `cardColor`. Operator choices follow a per-field UX policy
+  rather than exposing the database grammar wholesale: the two-value Lead Type
+  is always equality and therefore hides its operator; references and broader
+  enums keep equality, inequality and list membership; rating and timestamps
+  expose useful comparisons and ranges; text keeps exact, case-sensitive and
+  case-insensitive matching. Null checks appear only on nullable columns.
+  Advanced starts directly with these condition rows and sends no separate
+  free-text `search` value. Lead, Customer, Email and Phone/Mobile semantic text
+  scopes remain in Basic search.
 
 ## Portal status
 
 | Capability | Status |
 | --- | --- |
 | List, branch-scoped, paginated | live |
-| Basic search — one field, one value | live |
+| Basic search — field suggestions, multiple tokens, default My Leads | live |
+| Advanced search — typed AND/OR filter-tree builder with explicit submit | live |
 | Create | live |
 | Tags during create | live — multi-select catalogue ids in the single atomic, idempotent create request |
 | Delete | live |

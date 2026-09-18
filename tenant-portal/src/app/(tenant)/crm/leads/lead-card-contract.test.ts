@@ -19,6 +19,7 @@ describe("lead card contract", () => {
   it("titles a corporate lead by its company and names the contact underneath", () => {
     expect(
       leadCardHeading({
+        leadProfileType: "CORPORATE",
         leadName: "Acme Trading",
         company: "Acme Trading",
         primaryContactName: "Dina Ali",
@@ -29,6 +30,7 @@ describe("lead card contract", () => {
   it("gives an individual lead one line, because its party has no contact", () => {
     expect(
       leadCardHeading({
+        leadProfileType: "INDIVIDUAL",
         leadName: "Kamal Radwan",
         company: "Kamal Radwan",
         primaryContactName: "",
@@ -39,6 +41,7 @@ describe("lead card contract", () => {
   it("falls back to the lead name when a corporate lead has no company string", () => {
     expect(
       leadCardHeading({
+        leadProfileType: "CORPORATE",
         leadName: "Acme Trading",
         company: "",
         primaryContactName: "Dina Ali",

@@ -46,6 +46,8 @@ describe("creating a lead", () => {
     expect(handleCreate).toContain("outcome.kind === \"success\"");
     expect(handleCreate).toContain("outcome.kind === \"failed\"");
     expect(handleCreate).toContain("setIsCreateOpen(false)");
+    expect(handleCreate).toContain("changeSearch(DEFAULT_LEAD_SEARCH)");
+    expect(handleCreate).toContain("fetchLeads(undefined, 1, DEFAULT_LEAD_SEARCH)");
   });
 
   it("keeps tags inside the one idempotent create write", () => {

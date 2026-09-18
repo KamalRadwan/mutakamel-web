@@ -17,9 +17,11 @@ import { isUUIDv7 } from "@/lib/uuid";
 //   COMPANY_REQUIRED         company present, branch absent
 //   BRANCH_REQUIRED          both present
 //
-// Any header that IS sent must be a UUIDv7. The Gateway strips both headers
-// before forwarding, so the upstream app never sees them — they are a Gateway
-// contract, not an app parameter.
+// Any header that IS sent must be a UUIDv7. For explicit scope modes the
+// Gateway replaces raw selectors with its validated company/branch values
+// before forwarding. Legacy routes with no mode retain owning-app validation
+// and forward these selectors; absence of a mode is NOT the explicit NONE
+// policy (RouteContextMiddleware + UpstreamClientService.headers).
 //
 // This is separate from CRM's `branchId` QUERY parameter, which the CRM app
 // validates itself on routes that carry no `organizationScopeMode` at all

@@ -25,6 +25,10 @@ export interface BoardColumnLabels {
   expandColumn: string;
   // Paired with BoardView's `onAddToColumn`: supply both or neither.
   addToColumn?: string;
+  // Paired with BoardView's per-column paging props. The function names the
+  // visible progress so "Load more" is not detached from its result set.
+  loadMore?: (loaded: number, total: number) => string;
+  loadingMore?: string;
 }
 
 export interface BoardColumnDef {

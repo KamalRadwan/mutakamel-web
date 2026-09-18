@@ -2134,6 +2134,12 @@ satisfied as built and should say so.
 
 ## Q131 — the filter engine is complete and reachable from nowhere, so an advanced search cannot be built
 
+**2026-09-14 re-verification:** the Leads search endpoint now exists in Gateway,
+controller, DTO, service and repository. The existing Advanced card uses it,
+and Basic now reuses it for multiple structured values. The original discovery
+below is historical for Leads; see the current [study](LEADS-BASIC-SEARCH-STUDY.md).
+
+
 Found 2026-09-04, designing the two-mode search on `/crm/leads`.
 
 `shared-libs/packages/database` ships a finished query engine: `SearchManyDto`
@@ -2197,6 +2203,11 @@ key on a leaf inside a `filterTree` is accepted by the validator and then
 ignored by the compiler, so a tree written that way silently ANDs.
 
 ## Q132 — the CRM owner filter has no source of owner names, so it cannot be offered
+
+**2026-09-14 scoped resolution:** Leads Basic search now offers My Leads using
+`/auth/me.id`, with no user directory lookup. This resolves the current-user
+filter only; choosing another owner by name still requires a supported source.
+
 
 Found 2026-09-05, building the basic search on `/crm/leads`; the same gap
 stopped the owner field on `/crm/customer-profiles` the same day.
@@ -2369,3 +2380,50 @@ called-route verification still fails201/200 on the same held assignment DELETE.
 No Branch endpoint was added and no backend or checker was edited.
 
 **Settle with:** actual Gateway/controller/closed DTO and service evidence from the owning Access and Commercial tracks, followed by frontend contract/UI integration and authenticated tests. This is active parallel coordination, not a request for the user to design an API. Do not bypass authority, assume prices or seed imaginary configuration. Mobile/Partner readiness is outside the user's current task scope.
+
+
+## Q137 — multiple Party text search terms are not supported by the Leads search contract
+
+Found **2026-09-14**, studying Odoo-style Basic lead search.
+
+Both `LeadsQueryDto` and `LeadSearchDto` accept one `search` string (maximum 200
+characters) plus an optional `searchField` of `lead`, `customer`, `email` or
+`phone`. The service forwards that semantic scope to the Party join predicate
+separately from `filterTree`. Party display names, phones and email addresses
+are not raw Lead filter-tree fields. Repeating these text criteria as tree
+leaves would fail or change their meaning.
+
+**Implemented in the current v1 contract:** multiple structured values use `in`
+for one field, with AND between fields. Tag alternatives use `tagIds`. One
+semantic text token is allowed; a new Lead, Customer, Email or Phone/Mobile
+selection replaces it. Advanced remains available as a separate explicit-submit
+filter-tree UI. See
+[the Basic search study](LEADS-BASIC-SEARCH-STUDY.md).
+
+**Settle with:** a future backend-owned extension supporting multiple Party
+text predicates with explicit AND/OR semantics before count and pagination.
+No client-side page filtering is permitted.
+
+## Q138 — tenant user contact cards have no phone or photo contract
+
+Found **2026-09-14**, implementing reusable person contact cards from Audit.
+
+Gateway `core.tenant.users.get` forwards the authenticated user-detail GET to
+`TenantUsersController.findOne`, guarded by `users.user.read` and
+`TenantUsersService.assertCanReadUser`. `TenantUserView` / `toUserView` return
+`firstName`, `lastName`, and `email`, but no phone, image, or `partyId`.
+Although the underlying TenantUser entity has a Party relationship, clients
+cannot discover that link through the verified user response. The separate
+`users/me/profile` route provides display preferences only.
+
+**Implemented:** validated name/email projection, scoped deduplicated reads,
+clickable old/new names in shared history, and an API-free contact-card
+template supporting photo/full name/phone/email. User-backed cards display
+initials and an unavailable phone; permission denial is explicit. No private
+user fields, guessed Party matches, backend edits, or invented routes.
+
+**Settle with:** a backend-owned, authorized contact projection exposing the
+user's phone and authenticated image URL, or a verified scoped Party link.
+Confirm whether audit readers should have a narrower contact-read capability
+when they lack `users.user.read`; the frontend currently respects that guard.
+See [the projection contract](../api/core-identity.md#shared-user-contact-projection).

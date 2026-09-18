@@ -1,22 +1,28 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   Button,
+  ConfirmActionModal,
   DegradedBanner,
   DetailHeader,
   DetailSection,
   ErrorState,
   NotFoundState,
+  PageActions,
   Skeleton,
+  StageBar,
   StatusBadge,
 } from "@/design-system";
 import { useAccessMode } from "@/hooks/useAccessMode";
+import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
+import { formatTemplate } from "@/lib/format/template";
 import { CrmScopeGate } from "../../../shared/components/CrmScopeGate";
+import { UserProfileLink } from "@/components/people/UserProfileLink";
 import { CustomFieldsCard } from "../../../shared/components/CustomFieldsCard";
-import { RecordAttachmentsSection } from "../../../shared/components/RecordAttachmentsSection";
 import { RecordNotesSection } from "../../../shared/components/RecordNotesSection";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import { useCrmRecordCapabilities } from "../../../shared/hooks/useCrmRecordCapabilities";
@@ -24,20 +30,20 @@ import { useOpportunityCapabilities } from "../../hooks/useOpportunityCapabiliti
 import { opportunityCapabilityAllowsOwner } from "../../hooks/usePipelineWorkspace";
 import { useOpportunityDetail } from "../hooks/useOpportunityDetail";
 import { useOpportunityEdit } from "../hooks/useOpportunityEdit";
+import { useOpportunityStageMove } from "../hooks/useOpportunityStageMove";
 import { usePipelineTransfer } from "../hooks/usePipelineTransfer";
 import { OpportunityEditDrawer } from "./OpportunityEditDrawer";
 import { OpportunityFacts } from "./OpportunityFacts";
-import { OpportunityStageTimeline } from "./OpportunityStageTimeline";
+import { OpportunityDetailSidePanel } from "./OpportunityDetailSidePanel";
+import { OpportunityRelatedNav } from "./OpportunityRelatedNav";
 import { PipelineTransferDialog } from "./PipelineTransferDialog";
+import { TerminalMoveDialog } from "../../components/TerminalMoveDialog";
 
-/**
- * `/crm/opportunities/[id]` — MASTER-PLAN 8.10.
- *
- * Same two-column shape as the lead and customer screens. The stage history
- * lives in the main column because it is what a rep reads to answer "where is
- * this deal and who moved it", and the rail keeps ownership, money and record
- * metadata.
- */
+const STAGE_BAR_TONE: Record<string, "positive" | "negative" | undefined> = {
+  WON: "positive",
+  LOST: "negative",
+};
+
 export function OpportunityDetailWorkspace({
   opportunityId,
 }: {
@@ -52,17 +58,34 @@ export function OpportunityDetailWorkspace({
   );
   const attached = useCrmRecordCapabilities(item?.branchId ?? null);
   const { canMutate } = useAccessMode();
+  const ownerPeople = useUserProfiles(
+    item?.ownerUserId ? [item.ownerUserId] : [],
+    Boolean(item?.ownerUserId),
+    item ?? undefined,
+  );
 
-  // The trailing argument on each is the D2 reconciliation: when a write
-  // applies and its body cannot be read, the record is re-read from the server
-  // rather than patched from a response nothing could parse.
-  const edit = useOpportunityEdit(item, detail.setItem, detail.reload);
+  const edit = useOpportunityEdit(item, detail.reload);
   const transfer = usePipelineTransfer(
     item,
     detail.pipelines,
-    detail.setItem,
     detail.reload,
   );
+
+  const pipeline =
+    detail.pipelines.find(({ id }) => id === item?.pipelineId) ?? null;
+  const canUpdate =
+    canMutate &&
+    item !== null &&
+    opportunityCapabilityAllowsOwner(capabilities.update, item.ownerUserId);
+
+  const stageMove = useOpportunityStageMove(
+    item,
+    pipeline?.stages ?? [],
+    canUpdate,
+    detail.reload,
+  );
+
+  const [pendingStageId, setPendingStageId] = useState<string | null>(null);
 
   if (detail.isLoading) {
     return (
@@ -100,48 +123,130 @@ export function OpportunityDetailWorkspace({
     );
   }
 
-  const pipeline =
-    detail.pipelines.find(({ id }) => id === item.pipelineId) ?? null;
-  const stage =
+  const currentStage =
     pipeline?.stages.find(({ id }) => id === item.stageId) ?? null;
-  const canUpdate =
-    canMutate &&
-    opportunityCapabilityAllowsOwner(capabilities.update, item.ownerUserId);
+  const pendingStage =
+    pipeline?.stages.find(({ id }) => id === pendingStageId) ?? null;
+  const pendingTerminalStage =
+    pendingStage?.flag === "WON" || pendingStage?.flag === "LOST"
+      ? pendingStage
+      : null;
+  const loadedOwner = item.ownerUserId
+    ? ownerPeople.profiles.get(item.ownerUserId)
+    : undefined;
+  const ownerResult =
+    loadedOwner?.status === "loading" && item.ownerUserId && item.ownerDisplayName
+      ? {
+          status: "ready" as const,
+          profile: {
+            id: item.ownerUserId,
+            fullName: item.ownerDisplayName,
+            email: "",
+            phone: null,
+            imageUrl: null,
+          },
+        }
+      : loadedOwner;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-2">
+      <PageActions slot="related">
+        <OpportunityRelatedNav item={item} />
+      </PageActions>
+
+      {canUpdate && (
+        <PageActions slot="actions">
+          <div className="flex items-center gap-1.5">
+            <Button size="sm" variant="outline" onClick={edit.openDrawer}>
+              {t.crmLeadDetail.edit}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={transfer.openDialog}
+              disabled={detail.pipelines.length < 2}
+            >
+              {t.crmOpportunityDetail.transferAction}
+            </Button>
+          </div>
+        </PageActions>
+      )}
+
       <DetailHeader
+        className="sr-only"
         title={item.title}
         subtitle={[
           localizedName(pipeline, lang),
-          localizedName(stage, lang),
+          localizedName(currentStage, lang),
         ]
           .filter((part) => part.length > 0)
           .join(" · ")}
         status={<StatusBadge value={item.status} kind="OpportunityStatus" />}
         backLabel={t.crmOpportunityDetail.backToOpportunities}
         backHref="/crm/opportunities"
-        secondaryActions={
-          canUpdate ? (
-            <>
-              <Button size="sm" variant="outline" onClick={edit.openDrawer}>
-                {t.crmLeadDetail.edit}
-              </Button>
-              <Button size="sm"
-                variant="outline"
-                onClick={transfer.openDialog}
-                disabled={detail.pipelines.length < 2}
-              >
-                {t.crmOpportunityDetail.transferAction}
-              </Button>
-            </>
-          ) : undefined
-        }
       />
 
-      {detail.degraded.history && (
-        <DegradedBanner message={t.crmOpportunityDetail.historyUnavailable} />
+      {pipeline && pipeline.stages.length > 0 && (
+        <StageBar
+          label={t.crmOpportunities.stage}
+          steps={pipeline.stages.map((entry) => ({
+            id: entry.id,
+            label: localizedName(entry, lang),
+            tone: STAGE_BAR_TONE[entry.flag],
+          }))}
+          value={item.stageId}
+          onChange={canUpdate ? (next) => next && setPendingStageId(next) : undefined}
+          disabled={stageMove.isMoving}
+        />
       )}
+
+      <ConfirmActionModal
+        open={pendingStage !== null && pendingTerminalStage === null}
+        onOpenChange={(next) => {
+          if (!next) setPendingStageId(null);
+        }}
+        title={t.crmLeadDetail.moveStageTitle}
+        description={formatTemplate(t.crmLeadDetail.moveStageDescription, {
+          from: currentStage ? localizedName(currentStage, lang) : "—",
+          to: pendingStage ? localizedName(pendingStage, lang) : "",
+        })}
+        confirmLabel={t.filters.yes}
+        cancelLabel={t.common.cancel}
+        loading={stageMove.isMoving}
+        onConfirm={async () => {
+          const target = pendingStageId;
+          setPendingStageId(null);
+          if (target) await stageMove.move(target);
+        }}
+      />
+
+      <TerminalMoveDialog
+        key={pendingTerminalStage ? `${item.id}:${pendingTerminalStage.id}` : "closed"}
+        isOpen={pendingTerminalStage !== null}
+        onClose={() => {
+          setPendingStageId(null);
+          stageMove.clearError();
+        }}
+        opportunity={pendingTerminalStage ? item : null}
+        targetFlag={pendingTerminalStage?.flag ?? "WON"}
+        onConfirm={async (reason) => {
+          if (!pendingTerminalStage) return false;
+          const moved = await stageMove.move(pendingTerminalStage.id, reason);
+          if (moved) setPendingStageId(null);
+          return moved;
+        }}
+        isSubmitting={stageMove.isMoving}
+        error={pendingTerminalStage ? stageMove.error : null}
+      />
+
+      {stageMove.error && !pendingTerminalStage && (
+        <ErrorState
+          title={stageMove.error}
+          onRetry={stageMove.clearError}
+          retryLabel={t.common.dismiss}
+        />
+      )}
+
       {detail.degraded.pipelines && (
         <DegradedBanner message={t.crmOpportunityDetail.pipelinesUnavailable} />
       )}
@@ -152,44 +257,43 @@ export function OpportunityDetailWorkspace({
         <DegradedBanner message={t.crmOpportunityDetail.attachedUnavailable} />
       )}
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
-        <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
+      <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="order-2 flex min-w-0 flex-col gap-2 lg:order-1">
           <OpportunityFacts item={item} />
-          <OpportunityStageTimeline entries={detail.history} />
-          <RecordNotesSection
-            branchId={item.branchId}
-            sourceType="OPPORTUNITY"
-            sourceId={item.id}
-            sourceOwnerUserId={item.ownerUserId}
-            createCapability={attached.capabilities.notesCreate}
-            deleteCapability={attached.capabilities.notesDelete}
-            readOnly={!canMutate}
-          />
-          <RecordAttachmentsSection
-            branchId={item.branchId}
-            sourceType="OPPORTUNITY"
-            sourceId={item.id}
-            sourceOwnerUserId={item.ownerUserId}
-            createCapability={attached.capabilities.attachmentsCreate}
-            deleteCapability={attached.capabilities.attachmentsDelete}
-            readOnly={!canMutate}
-          />
-        </div>
-
-        <div className="order-1 flex flex-col gap-3 lg:order-2">
           <DetailSection
-            title={t.crmOpportunityDetail.pipelineTitle}
-            columns={1}
+            title={t.crmLeadDetail.ownershipTitle}
+            columns={2}
             emptyValueLabel={t.detail.notRecorded}
             fields={[
               {
-                label: t.crmOpportunities.pipeline,
-                value: localizedName(pipeline, lang) || null,
+                label: t.crmOpportunities.owner,
+                value: item.ownerUserId ? (
+                  <UserProfileLink
+                    result={ownerResult}
+                    onRetry={ownerPeople.retry}
+                  />
+                ) : null,
               },
               {
-                label: t.crmOpportunities.stage,
-                value: localizedName(stage, lang) || null,
+                label: t.crmOpportunities.customer,
+                value: (
+                  <Link
+                    href={`/crm/customer-profiles/${item.customerProfileId}`}
+                    className="text-foreground hover:underline"
+                  >
+                    {item.customerDisplayName ?? t.crmOpportunities.viewCustomer}
+                  </Link>
+                ),
               },
+              {
+                label: t.crmLeads.contact,
+                value: item.primaryContact
+                  ? [item.primaryContact.displayName, item.primaryContact.jobTitle]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : null,
+              },
+              { label: t.crmLeads.source, value: item.leadSourceName },
               {
                 label: t.crmLeadDetail.stageFlag,
                 value: item.stageFlag ? (
@@ -199,38 +303,38 @@ export function OpportunityDetailWorkspace({
                   />
                 ) : null,
               },
-              {
-                label: t.common.status,
-                value: (
-                  <StatusBadge value={item.status} kind="OpportunityStatus" />
-                ),
-              },
             ]}
           />
-          <DetailSection
-            title={t.crmLeadDetail.ownershipTitle}
-            columns={1}
-            emptyValueLabel={t.detail.notRecorded}
-            fields={[
-              { label: t.crmOpportunities.owner, value: item.ownerUserId },
-              {
-                label: t.crmOpportunities.customer,
-                value: (
-                  <Link
-                    href={`/crm/customer-profiles/${item.customerProfileId}`}
-                    className="text-foreground hover:underline"
-                  >
-                    {t.crmOpportunities.viewCustomer}
-                  </Link>
-                ),
-              },
-              { label: t.crmCustomerProfiles.branch, value: item.branchId },
-            ]}
+          <RecordNotesSection
+            branchId={item.branchId}
+            sourceType="OPPORTUNITY"
+            sourceId={item.id}
+            sourceOwnerUserId={item.ownerUserId}
+            createCapability={attached.capabilities.notesCreate}
+            deleteCapability={attached.capabilities.notesDelete}
+            readOnly={!canMutate}
           />
           <CustomFieldsCard
+            density="compact"
             branchId={item.branchId}
             ownerType="OPPORTUNITY"
             ownerId={item.id}
+          />
+        </div>
+
+        <div className="order-1 flex min-w-0 flex-col gap-2 lg:order-2">
+          <OpportunityDetailSidePanel
+            item={item}
+            attached={attached}
+            readOnly={!canMutate}
+            stageLabels={Object.fromEntries(
+              detail.pipelines.flatMap((entry) =>
+                entry.stages.map((stage) => [stage.id, localizedName(stage, lang)]),
+              ),
+            )}
+            pipelineLabels={Object.fromEntries(
+              detail.pipelines.map((entry) => [entry.id, localizedName(entry, lang)]),
+            )}
           />
         </div>
       </div>

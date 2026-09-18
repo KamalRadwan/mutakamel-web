@@ -1,15 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Eye, UserRound } from "lucide-react";
-import { Badge, Button, StatusBadge, type ColumnDef } from "@/design-system";
+import {
+  Activity,
+  Building2,
+  Trash2,
+  UserRound,
+} from "lucide-react";
+import {
+  Badge,
+  Button,
+  StatusBadge,
+  cn,
+  focusRing,
+  iconSize,
+  type ColumnDef,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizedValue } from "@/lib/format/localized";
+import { formatTemplate } from "@/lib/format/template";
+import {
+  countryIsoFromName,
+  getCountryOptions,
+} from "@/lib/geo/country-data";
+import { AcquisitionSourceIcon } from "../../shared/components/AcquisitionSourceIcon";
+import {
+  CRM_ACTIVITY_MARK,
+  crmActivityState,
+} from "../../shared/crm-activity-tone";
 import type { CustomerProfileItem } from "../hooks/useCustomerProfiles";
+import { CustomerPhoneActionsRow } from "./CustomerPhoneActionsRow";
 
-// The table's column set. Headers arrive translated — DataTable never touches
-// the dictionary. See docs/design/patterns.md#datatable.
-export function useCustomerProfileColumns(): ColumnDef<CustomerProfileItem>[] {
-  const { t } = useI18n();
+export interface CustomerProfileColumnOptions {
+  canDelete?: (item: CustomerProfileItem) => boolean;
+  onDelete?: (item: CustomerProfileItem) => void;
+  onOpenActivities?: (item: CustomerProfileItem) => void;
+}
+
+const COMPACT_BADGE =
+  "shrink-0 px-1 py-0 text-xs font-medium leading-none normal-case tracking-normal";
+
+export function useCustomerProfileColumns(
+  options?: CustomerProfileColumnOptions,
+): ColumnDef<CustomerProfileItem>[] {
+  const { t, lang } = useI18n();
+  const card = t.crmLeads.card;
+  const countryFlags = new Map(
+    getCountryOptions(lang).map(({ isoCode, flag }) => [isoCode, flag]),
+  );
 
   return [
     {
@@ -17,60 +55,230 @@ export function useCustomerProfileColumns(): ColumnDef<CustomerProfileItem>[] {
       sortable: true,
       sortField: "displayName",
       header: t.crmCustomerProfiles.name,
+      width: "15rem",
       cell: (item) => {
-        const ProfileIcon = item.profileType === "CORPORATE" ? Building2 : UserRound;
+        const ProfileIcon =
+          item.profileType === "CORPORATE" ? Building2 : UserRound;
         return (
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-sm bg-muted">
-              <ProfileIcon className="size-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+          <Link
+            href={"/crm/customer-profiles/" + encodeURIComponent(item.id)}
+            className={cn(
+              "flex min-w-48 items-center gap-1.5 rounded-xs text-foreground hover:underline",
+              focusRing,
+            )}
+          >
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-brand-500/10 text-brand-600 dark:text-brand-400">
+              <ProfileIcon className="size-3.5" aria-hidden="true" />
             </span>
-            <div>
-              <p className="font-medium text-foreground">{item.displayName}</p>
-              {item.companyName && item.companyName !== item.displayName && (
-                <p className="text-2xs text-muted-foreground">{item.companyName}</p>
-              )}
-            </div>
-          </div>
+            <span className="min-w-0 flex-1 truncate font-medium">
+              {item.displayName}
+            </span>
+            <Badge tone="neutral" className={COMPACT_BADGE}>
+              {t.crmCustomerProfiles.profileTypes[item.profileType] ??
+                item.profileType}
+            </Badge>
+          </Link>
         );
       },
     },
     {
-      id: "type",
-      header: t.crmCustomerProfiles.type,
-      cell: (item) => (
-        <Badge tone="neutral">{t.crmCustomerProfiles.profileTypes[item.profileType] ?? item.profileType}</Badge>
-      ),
-    },
-    {
       id: "contact",
       header: t.crmCustomerProfiles.contact,
-      cell: (item) => (
-        <div dir="ltr">
-          <p>{item.email ?? t.crmCustomerProfiles.unavailable}</p>
-          {item.phone && <p className="text-2xs text-muted-foreground">{item.phone}</p>}
-        </div>
-      ),
+      width: "15rem",
+      cell: (item) => {
+        const contact =
+          item.profileType === "CORPORATE" ? item.primaryContact : null;
+        const name =
+          contact?.displayName || item.email || t.crmCustomerProfiles.unavailable;
+        const detail = contact?.jobTitle || contact?.email || "";
+        const title = detail ? name + " · " + detail : name;
+        return (
+          <Link
+            href={"/crm/customer-profiles/" + encodeURIComponent(item.id)}
+            className={cn(
+              "flex min-w-48 items-center gap-1.5 whitespace-nowrap rounded-xs hover:underline",
+              focusRing,
+            )}
+            title={title}
+          >
+            <span className="max-w-36 truncate">{name}</span>
+            {detail && (
+              <span className="max-w-28 truncate text-muted-foreground">
+                {detail}
+              </span>
+            )}
+            {contact?.isPrimary && (
+              <Badge tone="brand" className={COMPACT_BADGE}>
+                {card.primary}
+              </Badge>
+            )}
+          </Link>
+        );
+      },
+    },
+    {
+      id: "phone",
+      header: t.crmLeads.phone,
+      width: "13rem",
+      cell: (item) => {
+        const phone =
+          item.profileType === "CORPORATE"
+            ? item.primaryContact?.phones[0] || item.phone
+            : item.phone;
+        return (
+          <span className="flex min-w-48 items-center gap-1 whitespace-nowrap">
+            <Link
+              href={"/crm/customer-profiles/" + encodeURIComponent(item.id)}
+              dir="ltr"
+              className={cn(
+                "min-w-0 flex-1 truncate rounded-xs text-start hover:underline",
+                focusRing,
+              )}
+            >
+              {phone || t.crmCustomerProfiles.unavailable}
+            </Link>
+            {phone && (
+              <CustomerPhoneActionsRow
+                phone={phone}
+                country={item.country}
+                actionsOnly
+              />
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      id: "country",
+      header: t.crmLeads.create.country,
+      width: "8rem",
+      cell: (item) => {
+        const stored = item.country.trim();
+        const iso = /^[A-Z]{2}$/u.test(stored.toUpperCase())
+          ? stored.toUpperCase()
+          : countryIsoFromName(stored);
+        const flag = iso ? (countryFlags.get(iso) ?? "") : "";
+        return (
+          <span className="flex min-w-24 items-center gap-1.5 whitespace-nowrap">
+            {flag && (
+              <span aria-hidden="true" className="text-sm leading-none">
+                {flag}
+              </span>
+            )}
+            <span className="max-w-28 truncate">
+              {stored || t.crmCustomerProfiles.unavailable}
+            </span>
+          </span>
+        );
+      },
     },
     {
       id: "status",
       header: t.common.status,
-      cell: (item) => <StatusBadge value={item.status} kind="CustomerStatus" />,
+      width: "9rem",
+      cell: (item) => (
+        <StatusBadge value={item.status} kind="CustomerStatus" />
+      ),
+    },
+    {
+      id: "source",
+      header: t.crmCustomerProfiles.source,
+      width: "10rem",
+      cell: (item) => {
+        const source = localizedValue(
+          item.acquisitionSourceNameAr,
+          item.acquisitionSourceNameEn,
+          lang,
+        );
+        return (
+          <span className="flex min-w-28 items-center gap-1.5 whitespace-nowrap text-xs">
+            <AcquisitionSourceIcon source={{ iconUrl: item.sourceIconUrl }} />
+            <span className="max-w-32 truncate">
+              {source || t.crmCustomerProfiles.unavailable}
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      id: "salesperson",
+      header: t.crmLeads.salesperson,
+      width: "10rem",
+      cell: (item) => {
+        const name = item.owner
+          ? [item.owner.firstName, item.owner.lastName]
+              .filter(Boolean)
+              .join(" ")
+          : "";
+        return (
+          <span className="block max-w-36 truncate">
+            {name || t.crmCustomerProfiles.unavailable}
+          </span>
+        );
+      },
+    },
+    {
+      id: "activity",
+      header: t.crmLeads.followUp,
+      width: "10rem",
+      cell: (item) => {
+        const state = crmActivityState(item.nextActivity);
+        const stateLabel = card.activityStates[state];
+        return options?.onOpenActivities ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="min-w-0 gap-1 px-1"
+            aria-label={formatTemplate(card.activityOpen, {
+              state: stateLabel,
+            })}
+            title={formatTemplate(card.activityOpen, { state: stateLabel })}
+            onClick={(event) => {
+              event.stopPropagation();
+              options.onOpenActivities?.(item);
+            }}
+          >
+            <Activity
+              strokeWidth={2.5}
+              className={cn(
+                iconSize({ size: "sm" }),
+                CRM_ACTIVITY_MARK[state],
+              )}
+              aria-hidden="true"
+            />
+            <span className="max-w-24 truncate text-muted-foreground">
+              {stateLabel}
+            </span>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">{stateLabel}</span>
+        );
+      },
     },
     {
       id: "actions",
       header: t.common.actions,
       align: "end",
       sticky: "end",
-      cell: (item) => (
-        <Button variant="ghost" size="sm" asChild>
-          <Link
-            href={`/crm/customer-profiles/${encodeURIComponent(item.id)}`}
-            aria-label={`${t.common.actions}: ${item.displayName}`}
+      width: "3.5rem",
+      cell: (item) =>
+        options?.canDelete?.(item) && options.onDelete ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="w-7 px-0"
+            onClick={(event) => {
+              event.stopPropagation();
+              options.onDelete?.(item);
+            }}
+            aria-label={t.common.delete + ": " + item.displayName}
           >
-            <Eye className="size-4" aria-hidden="true" />
-          </Link>
-        </Button>
-      ),
+            <Trash2
+              className="size-3.5 text-destructive"
+              aria-hidden="true"
+            />
+          </Button>
+        ) : null,
     },
   ];
 }

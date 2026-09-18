@@ -4,26 +4,22 @@ import {
   EMPTY_LEAD_SEARCH,
   LEAD_ADVANCED_FIELDS,
   LEAD_FILTERABLE_FIELDS,
-  LEAD_LIST_QUERY_KEYS,
-  LEAD_SEARCH_FIELDS,
   buildLeadSearchRequest,
-  buildLeadsListQuery,
   leadAdvancedField,
   leadSearchCleared,
-  leadSearchField,
-  leadSearchValueOf,
+  leadSearchValuesOf,
   leadSearchWithField,
   leadSearchWithGroups,
   leadSearchWithMode,
-  leadSearchWithRow,
-  leadSearchWithText,
   type LeadAdvancedFieldId,
-  type LeadSearchFieldId,
   type LeadSearchGroup,
   type LeadSearchState,
 } from "./lead-search-contract";
+import { buildLeadsListQuery, type LeadSearchFieldId } from "./lead-basic-search-contract";
 import {
+  crmGroupsWithConnector,
   crmOperatorsFor,
+  crmOperatorsForField,
   type CrmFilterLeaf,
   type CrmFilterOperator,
   type CrmFilterTreeNode,
@@ -32,7 +28,6 @@ import {
 
 const BRANCH_ID = "01900100-0000-7000-8000-000000000099";
 const STAGE_ID = "01900100-0000-7000-8000-000000000010";
-const SOURCE_ID = "01900100-0000-7000-8000-0000000000a1";
 
 const LIST_WINDOW = {
   branchId: BRANCH_ID,
@@ -44,7 +39,7 @@ const LIST_WINDOW = {
 
 /** Basic mode's one condition. */
 function basic(field: LeadSearchFieldId, value: string): LeadSearchState {
-  return { ...EMPTY_LEAD_SEARCH, mode: "basic", basic: { field, value } };
+  return { ...EMPTY_LEAD_SEARCH, mode: "basic", basic: { myLeads: false, filters: [{ field, value }] } };
 }
 
 /** One condition of the card, with `between`'s upper bound left blank. */
@@ -63,7 +58,7 @@ function advanced(...groups: LeadSearchGroup[]): LeadSearchState {
 }
 
 function queryFor(search: LeadSearchState): string {
-  return buildLeadsListQuery({ ...LIST_WINDOW, search }).toString();
+  return buildLeadsListQuery({ ...LIST_WINDOW, basic: search.basic }).toString();
 }
 
 function bodyFor(search: LeadSearchState) {
@@ -80,117 +75,6 @@ function leaves(node: CrmFilterTreeNode | undefined): CrmFilterLeaf[] {
 const UNFILTERED =
   `branchId=${BRANCH_ID}&page=1&limit=50&sortBy=createdAt&sortDir=DESC`;
 
-/* ------------------------------ basic mode ------------------------------ */
-
-describe("buildLeadsListQuery — the default text field", () => {
-  it("sends free text as `search`, which is the only key it may use", () => {
-    expect(queryFor(basic("text", "acme"))).toBe(`${UNFILTERED}&search=acme`);
-  });
-
-  it("trims, because a value of spaces is not a search", () => {
-    expect(queryFor(basic("text", "  acme  "))).toBe(`${UNFILTERED}&search=acme`);
-  });
-
-  it("clamps at the wire's 200 characters instead of earning a 400", () => {
-    const query = buildLeadsListQuery({
-      ...LIST_WINDOW,
-      search: basic("text", "a".repeat(250)),
-    });
-    expect(query.get("search")).toHaveLength(200);
-  });
-});
-
-describe("buildLeadsListQuery — the enum and catalogue fields", () => {
-  const cases: ReadonlyArray<[LeadSearchFieldId, string, string]> = [
-    ["status", "OPEN", "status=OPEN"],
-    ["stageFlag", "QUALIFYING", "stageFlag=QUALIFYING"],
-    ["leadType", "CORPORATE", "leadProfileType=CORPORATE"],
-    ["stage", STAGE_ID, `stageId=${STAGE_ID}`],
-    ["source", SOURCE_ID, `acquisitionSourceId=${SOURCE_ID}`],
-  ];
-
-  it.each(cases)("routes %s through its own wire key", (field, value, expected) => {
-    expect(queryFor(basic(field, value))).toBe(`${UNFILTERED}&${expected}`);
-  });
-
-  it("offers only wire values the DTO's enums accept", () => {
-    expect(leadSearchField("status").values).toEqual([
-      "OPEN",
-      "CONVERTED",
-      "DISQUALIFIED",
-      "ON_HOLD",
-    ]);
-    expect(leadSearchField("stageFlag").values).toEqual([
-      "NEW",
-      "CONTACTED",
-      "QUALIFYING",
-      "QUALIFIED",
-      "DISQUALIFIED",
-      "CONVERTED",
-      "NURTURING",
-      "ON_HOLD",
-    ]);
-    expect(leadSearchField("leadType").values).toEqual([
-      "INDIVIDUAL",
-      "CORPORATE",
-    ]);
-  });
-});
-
-describe("buildLeadsListQuery — a blank value is not a filter", () => {
-  // `status=` is an empty string to @IsEnum, which is a 400 — not "any
-  // status". Every field must omit its key rather than send it empty.
-  it.each(LEAD_SEARCH_FIELDS.map((field) => field.id))(
-    "sends no filter key at all for a blank %s",
-    (field) => {
-      expect(queryFor(basic(field, ""))).toBe(UNFILTERED);
-      expect(queryFor(basic(field, "   "))).toBe(UNFILTERED);
-    },
-  );
-
-  it("sends nothing for the empty state the screen starts and resets to", () => {
-    expect(queryFor(EMPTY_LEAD_SEARCH)).toBe(UNFILTERED);
-  });
-
-  // The card's groups belong to the OTHER endpoint. A basic request must not
-  // pick anything up from them, however much a mode switch left behind.
-  it("ignores the advanced groups entirely", () => {
-    const state: LeadSearchState = {
-      ...advanced({ conditions: [leaf("status", "eq", "OPEN")] }),
-      mode: "basic",
-      text: "acme",
-    };
-    expect(queryFor(state)).toBe(UNFILTERED);
-  });
-});
-
-describe("buildLeadsListQuery — the accepted key surface", () => {
-  it("never produces a key outside the documented twelve", () => {
-    const searches: LeadSearchState[] = [
-      EMPTY_LEAD_SEARCH,
-      ...LEAD_SEARCH_FIELDS.map((field) =>
-        basic(field.id, field.kind === "text" ? "acme" : STAGE_ID),
-      ),
-    ];
-
-    for (const search of searches) {
-      for (const key of buildLeadsListQuery({ ...LIST_WINDOW, search }).keys()) {
-        expect(LEAD_LIST_QUERY_KEYS).toContain(key);
-      }
-    }
-    expect(LEAD_LIST_QUERY_KEYS).toHaveLength(12);
-  });
-
-  it("rejects a field id that is not in the catalogue", () => {
-    expect(() => leadSearchField("owner" as LeadSearchFieldId)).toThrow(
-      "Unknown lead search field: owner",
-    );
-    expect(() => queryFor(basic("owner" as LeadSearchFieldId, "x"))).toThrow(
-      "Unknown lead search field: owner",
-    );
-  });
-});
-
 /* ---------------------------- state transitions --------------------------- */
 
 describe("lead search modes", () => {
@@ -202,35 +86,26 @@ describe("lead search modes", () => {
   // The two modes speak different wires. Neither half is translated into the
   // other, and that is visible in a way a silent partial translation is not.
   it("keeps both halves intact and swaps only the mode", () => {
-    const state = leadSearchWithText(
-      advanced({ conditions: [leaf("status", "eq", "OPEN")] }),
-      "acme",
-    );
+    const state = advanced({ conditions: [leaf("status", "eq", "OPEN")] });
     const next = leadSearchWithMode(state, "basic");
     expect(next.mode).toBe("basic");
     expect(next.groups).toBe(state.groups);
-    expect(next.text).toBe("acme");
   });
 
-  it("clears the value when the basic field changes, since it means nothing there", () => {
-    expect(leadSearchWithRow(basic("status", "OPEN"), { field: "stage" }).basic).toEqual({
-      field: "stage",
-      value: "",
-    });
-  });
+
 });
 
 describe("lead search by field — what the stage bar writes", () => {
   it("reads back the value filtering on a field, and blank when none does", () => {
     const state = basic("stage", STAGE_ID);
-    expect(leadSearchValueOf(state, "stage")).toBe(STAGE_ID);
-    expect(leadSearchValueOf(state, "source")).toBe("");
+    expect(leadSearchValuesOf(state, "stage")).toEqual([STAGE_ID]);
+    expect(leadSearchValuesOf(state, "source")).toEqual([]);
   });
 
-  it("replaces the single condition", () => {
+  it("preserves other filters when a stage is selected", () => {
     expect(leadSearchWithField(basic("status", "OPEN"), "stage", STAGE_ID).basic).toEqual({
-      field: "stage",
-      value: STAGE_ID,
+      myLeads: false,
+      filters: [{ field: "status", value: "OPEN" }, { field: "stage", value: STAGE_ID }],
     });
   });
 
@@ -238,20 +113,25 @@ describe("lead search by field — what the stage bar writes", () => {
     const next = leadSearchWithField(basic("stage", STAGE_ID), "stage", "");
     expect(queryFor(next)).toBe(UNFILTERED);
   });
+
+  it.each([STAGE_ID, ""])("selects basic stage search without submitting or losing an advanced draft (%s)", (stageId) => {
+    const draft = advanced({ conditions: [leaf("status", "eq", "OPEN")] });
+    const next = leadSearchWithField(draft, "stage", stageId);
+    expect(next.mode).toBe("basic");
+    expect(next.groups).toBe(draft.groups);
+    expect(queryFor(next)).toBe(stageId ? `${UNFILTERED}&stageId=${stageId}` : UNFILTERED);
+    expect(leadSearchWithMode(next, "advanced").groups).toBe(draft.groups);
+  });
 });
 
 describe("advanced reset", () => {
-  it("clears the text and the groups without leaving advanced mode", () => {
-    const state = leadSearchWithText(
-      advanced(
-        { conditions: [leaf("status", "eq", "OPEN")] },
-        { conditions: [leaf("stageFlag", "eq", "NEW")] },
-      ),
-      "acme",
+  it("clears the groups without leaving advanced mode", () => {
+    const state = advanced(
+      { conditions: [leaf("status", "eq", "OPEN")] },
+      { conditions: [leaf("stageFlag", "eq", "NEW")] },
     );
     const next = leadSearchCleared(state);
     expect(next.mode).toBe("advanced");
-    expect(next.text).toBe("");
     expect(next.groups).toEqual(EMPTY_LEAD_SEARCH.groups);
     expect(bodyFor(next).filterTree).toBeUndefined();
   });
@@ -269,15 +149,10 @@ describe("buildLeadSearchRequest — the shape of the body", () => {
     });
   });
 
-  it("omits `filterTree` and `search` rather than sending them empty", () => {
+  it("omits `filterTree` and the removed free-text search key", () => {
     const body = bodyFor(advanced({ conditions: [leaf("status", "eq", "  ")] }));
     expect("filterTree" in body).toBe(false);
     expect("search" in body).toBe(false);
-  });
-
-  it("carries the free text, clamped at the wire's 200 characters", () => {
-    const state = leadSearchWithText(EMPTY_LEAD_SEARCH, `  ${"a".repeat(250)}  `);
-    expect(bodyFor(state).search).toHaveLength(200);
   });
 });
 
@@ -421,6 +296,79 @@ describe("buildLeadSearchRequest — a blank condition is dropped", () => {
       bodyFor(advanced({ conditions: [leaf("status", "in", "OPEN, ON_HOLD")] })).filterTree,
     ).toEqual({ field: "status", operator: "in", value: ["OPEN", "ON_HOLD"] });
   });
+
+  it.each(["likeAny", "ilikeAny", "startsWithAny", "endsWithAny"] as const)(
+    "sends a non-empty string array for %s",
+    (operator) => {
+      expect(
+        bodyFor(advanced({ conditions: [leaf("description", operator, "Acme, Mona")] }))
+          .filterTree,
+      ).toEqual({ field: "description", operator, value: ["Acme", "Mona"] });
+      expect(
+        bodyFor(advanced({ conditions: [leaf("description", operator, " , ")] }))
+          .filterTree,
+      ).toBeUndefined();
+    },
+  );
+
+  it("converts a numeric list while preserving date list strings", () => {
+    expect(
+      bodyFor(advanced({ conditions: [leaf("rating", "in", "1, 3")] })).filterTree,
+    ).toEqual({ field: "rating", operator: "in", value: [1, 3] });
+    expect(
+      bodyFor(advanced({ conditions: [leaf("createdAt", "in", "2026-01-01, 2026-02-01")] }))
+        .filterTree,
+    ).toEqual({
+      field: "createdAt",
+      operator: "in",
+      value: ["2026-01-01", "2026-02-01"],
+    });
+  });
+});
+
+describe("advanced operator compatibility", () => {
+  it("offers every meaningful SearchMany operator for each scalar kind", () => {
+    expect(crmOperatorsFor("uuid", false)).toEqual(["eq", "neq", "in", "nin"]);
+    expect(crmOperatorsFor("enum", false)).toEqual(["eq", "neq", "in", "nin"]);
+    expect(crmOperatorsFor("number", false)).toEqual([
+      "eq", "neq", "gt", "gte", "lt", "lte", "between", "in", "nin",
+    ]);
+    expect(crmOperatorsFor("date", false)).toEqual([
+      "eq", "neq", "gt", "gte", "lt", "lte", "between", "in", "nin",
+    ]);
+    expect(crmOperatorsFor("text", false)).toEqual([
+      "eq", "neq", "like", "ilike", "startsWith", "endsWith", "in", "nin",
+      "likeAny", "ilikeAny", "startsWithAny", "endsWithAny",
+    ]);
+  });
+
+  it("uses a field-specific policy instead of exposing the whole database grammar", () => {
+    expect(crmOperatorsForField(leadAdvancedField("leadType"))).toEqual(["eq"]);
+    expect(crmOperatorsForField(leadAdvancedField("status"))).toEqual([
+      "eq", "neq", "in", "nin",
+    ]);
+    expect(crmOperatorsForField(leadAdvancedField("description"))).toEqual([
+      "ilike", "like", "startsWith", "endsWith", "eq", "neq", "isNull", "isNotNull",
+    ]);
+    expect(crmOperatorsForField(leadAdvancedField("createdAt"))).toEqual([
+      "gt", "gte", "lt", "lte", "between",
+    ]);
+  });
+
+  it("always compiles Lead Type with its implicit equality operator", () => {
+    expect(
+      bodyFor(advanced({ conditions: [leaf("leadType", "neq", "INDIVIDUAL")] }))
+        .filterTree,
+    ).toEqual({ field: "leadProfileType", operator: "eq", value: "INDIVIDUAL" });
+  });
+
+  it("omits array-only or duplicate aliases and appends null checks only when nullable", () => {
+    const nullableText = crmOperatorsFor("text", true);
+    expect(nullableText).toEqual([
+      ...crmOperatorsFor("text", false), "isNull", "isNotNull",
+    ]);
+    expect(nullableText).not.toEqual(expect.arrayContaining(["any", "eqAny", "neqAny"]));
+  });
 });
 
 describe("buildLeadSearchRequest — `isNull` carries no value", () => {
@@ -444,7 +392,7 @@ describe("buildLeadSearchRequest — `isNull` carries no value", () => {
   // Asking whether a NOT NULL column is empty is a question with one answer.
   it("offers the null operators on nullable columns only", () => {
     for (const field of LEAD_ADVANCED_FIELDS) {
-      const operators = crmOperatorsFor(field.kind, field.nullable ?? false);
+      const operators = crmOperatorsForField(field);
       expect(operators.includes("isNull")).toBe(field.nullable === true);
       expect(operators.includes("isNotNull")).toBe(field.nullable === true);
     }
@@ -463,6 +411,8 @@ describe("buildLeadSearchRequest — the whitelist boundary", () => {
       "stageId",
       "stageFlag",
       "status",
+      "rating",
+      "cardColor",
       "ownerUserId",
       "createdByUserId",
       "description",
@@ -478,7 +428,7 @@ describe("buildLeadSearchRequest — the whitelist boundary", () => {
 
   it("cannot produce a leaf outside the whitelist, on any field or operator", () => {
     for (const field of LEAD_ADVANCED_FIELDS) {
-      for (const operator of crmOperatorsFor(field.kind, field.nullable ?? false)) {
+      for (const operator of crmOperatorsForField(field)) {
         const state = advanced({
           conditions: [leaf(field.id, operator, "2026-01-01", "2026-02-01")],
         });
@@ -536,11 +486,17 @@ describe("buildLeadSearchRequest — the whitelist boundary", () => {
 });
 
 describe("advanced group edits", () => {
-  it("starts on one group holding one blank condition on the default field", () => {
+  it("starts on one group with its Key deliberately unselected", () => {
     expect(EMPTY_LEAD_SEARCH.groups).toEqual([
       {
         conditions: [
-          { field: DEFAULT_LEAD_ADVANCED_FIELD.id, operator: "eq", value: "", valueTo: "" },
+          {
+            field: DEFAULT_LEAD_ADVANCED_FIELD.id,
+            fieldSelected: false,
+            operator: "eq",
+            value: "",
+            valueTo: "",
+          },
         ],
       },
     ]);
@@ -549,5 +505,39 @@ describe("advanced group edits", () => {
   it("replaces the groups wholesale, which is all the card ever does", () => {
     const groups: LeadSearchGroup[] = [{ conditions: [leaf("status", "eq", "OPEN")] }];
     expect(leadSearchWithGroups(EMPTY_LEAD_SEARCH, groups).groups).toBe(groups);
+  });
+
+  it("turns an AND row into an OR group and compiles a real OR payload", () => {
+    const groups: LeadSearchGroup[] = [{
+      conditions: [
+        leaf("status", "eq", "OPEN"),
+        leaf("leadType", "eq", "CORPORATE"),
+      ],
+    }];
+    const next = crmGroupsWithConnector(groups, 0, 1, "OR");
+
+    expect(bodyFor(advanced(...next)).filterTree).toEqual({
+      op: "OR",
+      children: [
+        { field: "status", operator: "eq", value: "OPEN" },
+        { field: "leadProfileType", operator: "eq", value: "CORPORATE" },
+      ],
+    });
+  });
+
+  it("turns an OR row back into AND without losing either condition", () => {
+    const groups: LeadSearchGroup[] = [
+      { conditions: [leaf("status", "eq", "OPEN")] },
+      { conditions: [leaf("leadType", "eq", "CORPORATE")] },
+    ];
+    const next = crmGroupsWithConnector(groups, 1, 0, "AND");
+
+    expect(bodyFor(advanced(...next)).filterTree).toEqual({
+      op: "AND",
+      children: [
+        { field: "status", operator: "eq", value: "OPEN" },
+        { field: "leadProfileType", operator: "eq", value: "CORPORATE" },
+      ],
+    });
   });
 });

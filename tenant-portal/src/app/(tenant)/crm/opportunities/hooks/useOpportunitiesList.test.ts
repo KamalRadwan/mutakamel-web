@@ -20,11 +20,29 @@ vi.mock("@/design-system", () => ({ useRealtimeResync: () => undefined }));
 
 const branchId = "01900100-0000-7000-8000-000000000099";
 const PIPELINE = "01900100-0000-7000-8000-000000000100";
+const ACTOR = "01900100-0000-7000-8000-000000000120";
 
 const item = {
   id: "01900100-0000-7000-8000-000000000110",
   branchId,
   customerProfileId: "01900100-0000-7000-8000-000000000112",
+  customerProfileType: "CORPORATE",
+  customerDisplayName: "Acme Trading",
+  customerCompanyName: "Acme Trading LLC",
+  customerPhone: "+201000000000",
+  customerEmail: "sales@acme.example",
+  customerCountry: "Egypt",
+  customerCity: "Cairo",
+  primaryContact: {
+    partyId: "01900100-0000-7000-8000-000000000113",
+    displayName: "Mona Ibrahim",
+    jobTitle: "Procurement Director",
+    isPrimary: true,
+    email: "mona@acme.example",
+    phones: ["+201111111111"],
+  },
+  leadSourceName: "Website",
+  leadSourceIconUrl: null,
   pipelineId: PIPELINE,
   stageId: "01900100-0000-7000-8000-000000000101",
   stageFlag: "QUALIFICATION",
@@ -32,6 +50,12 @@ const item = {
   title: "Annual renewal",
   importance: 2,
   ownerUserId: "01900100-0000-7000-8000-000000000120",
+  ownerDisplayName: "Sara Sales",
+  ownerAvatarUrl: null,
+  openActivityCount: 2,
+  nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
+  activityState: "FUTURE",
+  tags: [{ id: "01900100-0000-7000-8000-000000000121", name: "VIP", color: null }],
   expectedCloseDate: "2026-09-01",
   createdAt: "2026-08-25T10:00:00.000Z",
 };
@@ -120,6 +144,21 @@ describe("Opportunities list — the two endpoints", () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it("applies My Opportunities when the authenticated actor arrives after mount", async () => {
+    get.mockResolvedValue(EMPTY_PAGE);
+    const { rerender } = renderHook(
+      ({ actorUserId }: { actorUserId?: string }) =>
+        useOpportunitiesList(branchId, PIPELINE, null, actorUserId),
+      { initialProps: { actorUserId: undefined as string | undefined } },
+    );
+    await settle();
+
+    rerender({ actorUserId: ACTOR });
+    await settle();
+
+    expect(get.mock.calls.at(-1)?.[0]).toContain(`ownerUserId=${ACTOR}`);
+  });
+
   // Arriving in advanced applies once, so basic's term stops answering the
   // moment its box leaves the screen — a table still narrowed by a filter
   // nobody can see is worse than an unfiltered one.
@@ -178,6 +217,40 @@ describe("Opportunities list — the two endpoints", () => {
     expect(get).not.toHaveBeenCalled();
     // The draft still moved — it is the card's own state.
     expect(result.current.search.groups[0]?.conditions[0]?.value).toBe("IN_PROGRESS");
+  });
+
+  it("does not apply an unsubmitted advanced draft after a mode round-trip", async () => {
+    get.mockResolvedValue(EMPTY_PAGE);
+    post.mockResolvedValue(EMPTY_PAGE);
+    const { result } = renderHook(() => useOpportunitiesList(branchId, PIPELINE, null));
+    await settle();
+
+    act(() => {
+      result.current.changeSearch(opportunitySearchWithMode(result.current.search, "advanced"));
+    });
+    await settle();
+    act(() => {
+      result.current.changeSearch(
+        opportunitySearchWithGroups(result.current.search, [
+          { conditions: [{ field: "status", operator: "eq", value: "WON", valueTo: "" }] },
+        ]),
+      );
+    });
+    await settle();
+    act(() => {
+      result.current.changeSearch(opportunitySearchWithMode(result.current.search, "basic"));
+    });
+    await settle();
+
+    post.mockClear();
+    act(() => {
+      result.current.changeSearch(opportunitySearchWithMode(result.current.search, "advanced"));
+    });
+    await settle();
+
+    expect(result.current.search.groups[0]?.conditions[0]?.value).toBe("WON");
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0]?.[1]).not.toHaveProperty("filterTree");
   });
 
   it("sends the compiled tree only once Search is pressed", async () => {
@@ -285,7 +358,7 @@ describe("Opportunities list — the two endpoints", () => {
 
     expect(get).toHaveBeenCalledTimes(1);
     expect(get).toHaveBeenCalledWith(
-      `/api/tenant/crm/v1/opportunities?branchId=${branchId}&page=1&limit=25&sortBy=createdAt&sortDir=DESC&pipelineId=${PIPELINE}&search=renewal`,
+      `/api/tenant/crm/v1/opportunities?branchId=${branchId}&page=1&limit=25&sortBy=createdAt&sortDir=DESC&pipelineId=${PIPELINE}&search=renewal&searchField=opportunity`,
       expect.anything(),
     );
   });

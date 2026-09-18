@@ -62,7 +62,11 @@ export function useLeadViewLabels(): WorkspaceViewLabels {
  * counts as the pipeline's would be worse than presenting nothing, so the
  * bar's own label says "loaded".
  */
-export function useLeadBoardColumns(stages: LeadStage[], items: LeadItem[]): BoardColumnDef[] {
+export function useLeadBoardColumns(
+  stages: LeadStage[],
+  items: LeadItem[],
+  totals?: ReadonlyMap<string, number>,
+): BoardColumnDef[] {
   const { t, lang } = useI18n();
 
   return stages.map((stage) => {
@@ -72,7 +76,7 @@ export function useLeadBoardColumns(stages: LeadStage[], items: LeadItem[]): Boa
     return {
       id: stage.id,
       label: localizedName(stage, lang),
-      count: inStage.length,
+      count: totals?.get(stage.id) ?? inStage.length,
       outcomeRole:
         role === "positive" || role === "negative" || role === "caution" ? role : undefined,
       segments: leadActivitySegments(inStage, t.crmLeads.card.activityStates),

@@ -1,4 +1,4 @@
-import { axiosClient } from "@/lib/api/axiosClient";
+import { axiosClient, TenantApiClientError } from "@/lib/api/axiosClient";
 import {
   buildCrmAttachmentsListPath, parseCrmAttachmentsPageResponse,
   type CrmAttachment, type CrmAttachmentSourceType,
@@ -18,18 +18,29 @@ export async function readAllCrmAttachments(source: {
       { signal, cache: "no-store", maxResponseBytes: 1024 * 1024 },
     );
     signal?.throwIfAborted();
-    const result = parseCrmAttachmentsPageResponse(response.data, source);
-    if (result.page !== page || result.limit !== PAGE_SIZE || result.total < 0 ||
-      result.totalPages !== Math.ceil(result.total / PAGE_SIZE) ||
-      page > Math.max(1, result.totalPages) || result.hasNext !== (page < result.totalPages) ||
-      result.hasPrev !== (page > 1) || (result.hasNext && result.items.length === 0)) {
-      throw new Error("Invalid attachment pagination.");
+    try {
+      const result = parseCrmAttachmentsPageResponse(response.data, source);
+      if (result.page !== page || result.limit !== PAGE_SIZE || result.total < 0 ||
+        result.totalPages !== Math.ceil(result.total / PAGE_SIZE) ||
+        page > Math.max(1, result.totalPages) || result.hasNext !== (page < result.totalPages) ||
+        result.hasPrev !== (page > 1) || (result.hasNext && result.items.length === 0)) {
+        throw new Error("Invalid attachment pagination.");
+      }
+      for (const attachment of result.items) {
+        if (ids.has(attachment.id)) throw new Error("Attachment pagination changed during read.");
+        ids.add(attachment.id);
+        attachments.push(attachment);
+      }
+      if (!result.hasNext) return attachments;
+    } catch (caught) {
+      // The server answered; preserve that evidence instead of reporting offline.
+      throw new TenantApiClientError(
+        caught instanceof Error ? caught.message : "Invalid CRM attachments response.",
+        {
+          ...response,
+          data: { correlationId: response.headers.get("x-correlation-id") ?? undefined },
+        },
+      );
     }
-    for (const attachment of result.items) {
-      if (ids.has(attachment.id)) throw new Error("Attachment pagination changed during read.");
-      ids.add(attachment.id);
-      attachments.push(attachment);
-    }
-    if (!result.hasNext) return attachments;
   }
 }

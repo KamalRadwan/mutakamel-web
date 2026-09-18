@@ -1,23 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleCheck, CircleX, History } from "lucide-react";
 import {
   DetailSection,
   ErrorState,
   Timeline,
-  type TimelineEvent,
 } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDateTimeNumeric } from "@/lib/format/date";
-import { formatTemplate } from "@/lib/format/template";
 import {
   AUDIT_HISTORY_PAGE_SIZE,
   AUDIT_READ_PERMISSION,
   fetchEntityHistory,
   type EntityAuditEvent,
 } from "@/lib/audit/entity-history-contract";
+
+import { toTimelineEvent } from "./EntityHistoryEvent";
+import { useUserProfiles } from "@/hooks/useUserProfiles";
+import { useAuditReferenceLabels } from "@/hooks/useAuditReferenceLabels";
+import { auditUserIds } from "@/lib/audit/history-references";
 
 export interface EntityHistoryCardProps {
   /** The ledger's own name for this kind of record — `lead`, `invoice`. */
@@ -56,6 +57,8 @@ export function EntityHistoryCard({ entityType, entityId, relatedPartyIds, refre
   const canRead = user?.permissions.includes(AUDIT_READ_PERMISSION) ?? false;
 
   const [events, setEvents] = useState<EntityAuditEvent[]>([]);
+  const people = useUserProfiles(auditUserIds(events), canRead && !!entityId, refreshToken);
+  const resolvedLabels = useAuditReferenceLabels(events, valueLabels, canRead && !!entityId, refreshToken);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,7 +157,7 @@ export function EntityHistoryCard({ entityType, entityId, relatedPartyIds, refre
           density={density}
           label={copy.historyTitle}
           events={events.map((event) =>
-            toTimelineEvent(event, lang, copy, t.statusValues, valueLabels),
+            toTimelineEvent(event, lang, copy, t.statusValues, resolvedLabels, { entityType, entityId }, people),
           )}
           isLoading={isLoading}
           emptyTitle={copy.historyEmptyTitle}
@@ -166,117 +169,4 @@ export function EntityHistoryCard({ entityType, entityId, relatedPartyIds, refre
       )}
     </DetailSection>
   );
-}
-
-type AuditCopy = ReturnType<typeof useI18n>["t"]["audit"];
-
-/** A field key as a label — `stageId` and `stage_id` both read "Stage id". */
-function fieldName(field: string, copy: AuditCopy): string {
-  const known = (copy.fields as Record<string, string | undefined>)[field];
-  if (known) return known;
-  const words = field
-    .replace(/[._]+/gu, " ")
-    .replace(/([a-z0-9])([A-Z])/gu, "$1 $2")
-    .trim()
-    .toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
-/**
- * One side of a change, as text.
- *
- * `null` and `undefined` are not the same thing to a reader — one is "it was
- * cleared", the other "it was not set" — but on a diff both mean "there was no
- * value", so both read as the empty marker. An object prints as JSON rather
- * than as `[object Object]`, bounded, because a nested value is still evidence.
- */
-function changeValue(
-  value: unknown,
-  field: string,
-  copy: AuditCopy,
-  statusValues: Record<string, string | undefined>,
-  valueLabels: EntityHistoryCardProps['valueLabels'],
-): string {
-  if (value === null || value === undefined || value === "") return copy.valueEmpty;
-  if (value === "[NOT_RECORDED]") return copy.valueNotRecorded;
-  if (Array.isArray(value)) return value.length
-    ? value.map((item) => changeValue(item, field, copy, statusValues, valueLabels)).join(", ") : copy.valueEmpty;
-  if (typeof value === "string") {
-    if (valueLabels?.[field]) return valueLabels[field][value] || copy.valueUnavailable;
-    if (field === "activityEvent") return copy.actions[value] || copy.valueUnavailable;
-    const statusGroup =
-      ({ stageFlag: "LeadStageFlag", status: "LeadStatus", activityStatus: "ActivityStatus",
-        activityType: "ActivityType", activityPriority: "ActivityPriority", activityDirection: "ActivityDirection" } as Record<string, string>)[field];
-    return (statusGroup && statusValues[`${statusGroup}.${value}`]) || value;
-  }
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  try {
-    return JSON.stringify(value).slice(0, 120);
-  } catch {
-    return copy.valueUnreadable;
-  }
-}
-
-function toTimelineEvent(
-  event: EntityAuditEvent,
-  lang: "ar" | "en",
-  copy: AuditCopy,
-  statusValues: Record<string, string | undefined>,
-  valueLabels: EntityHistoryCardProps['valueLabels'],
-): TimelineEvent {
-  return {
-    id: event.id,
-    // The actor is the useful headline on a compact per-record history. The
-    // action is already expressed by the changed field beneath it, so printing
-    // both adds a line without adding information.
-    title: event.actorLabel || copy.actorUnknown,
-    // All digits, day first, in both languages — a log is read by comparing
-    // rows, and a month name is a different width in each.
-    timestamp: formatDateTimeNumeric(event.occurredAt, lang),
-    tone:
-      event.outcome === "FAILURE" ? "negative" : event.outcome === "SUCCESS" ? "positive" : undefined,
-    icon: event.outcome === "FAILURE" ? CircleX : event.outcome === "SUCCESS" ? CircleCheck : History,
-    description: (
-      <span className="flex flex-col gap-1">
-        {event.changes.length > 0 ? (
-          <span className="flex flex-col gap-1.5">
-            {event.changes.map((change, index) => (
-              <span
-                key={`${change.subjectId ?? ""}:${change.field}:${index}`}
-                className="flex flex-wrap items-baseline gap-x-1 text-xs"
-              >
-                <span className="font-medium text-foreground">
-                  {change.subjectLabel ? <><bdi>{change.subjectLabel}</bdi> · </> : null}
-                  {fieldName(change.field, copy)}:
-                </span>
-                {/* Keep the transition chronological even on the Arabic page;
-                    each value still resolves its own text direction. */}
-                <span className="flex flex-wrap items-baseline gap-1" dir="ltr">
-                  <span
-                    className="break-words text-danger-600 line-through dark:text-danger-300"
-                    dir="auto"
-                  >
-                    {changeValue(change.before, change.field, copy, statusValues, valueLabels)}
-                  </span>
-                  <span className="text-muted-foreground">
-                    &gt;
-                  </span>
-                  <span className="break-words text-foreground" dir="auto">
-                    {changeValue(change.after, change.field, copy, statusValues, valueLabels)}
-                  </span>
-                </span>
-              </span>
-            ))}
-          </span>
-        ) : <span className="text-muted-foreground">{copy.detailsNotRecorded}</span>}
-        {/* The reason is the half that matters when something failed, so it is
-            rendered rather than dropped. */}
-        {event.reason ? (
-          <span className="text-foreground">
-            {formatTemplate(copy.reasonLine, { reason: event.reason })}
-          </span>
-        ) : null}
-      </span>
-    ),
-  };
 }

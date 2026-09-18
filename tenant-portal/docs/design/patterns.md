@@ -19,6 +19,7 @@ only when no pattern fits.
 | --- | --- | --- |
 | `DataTable` | `data-table/` | The table view; server pagination and sorting |
 | `FilterBar` | `filter-bar/` | URL-backed filters above a workspace |
+| `FilterSearchInput` | `filter-search/` | One search control with removable filter chips and field/value suggestions |
 | `PageHeader` | `page-header/` | Title, description, the one primary action |
 | `FormDrawer` | `form-drawer/` | Create/edit in a `Sheet`, with a dirty guard |
 | `ConfirmActionModal` | `confirm-action/` | Destructive confirmation |
@@ -40,6 +41,7 @@ only when no pattern fits.
 | `DetailHeader` | `detail-header/` | The detail-screen header. **Composes `PageHeader`** |
 | `DetailSection` | `detail-section/` | A labelled field group for read-mostly detail bodies |
 | `Timeline` | `timeline/` | Audit history, stage history, delivery attempts, approval ladders |
+| `PersonProfileLink` | `person-profile/` | A name opens a reusable contact card: photo, full name, phone, email |
 | `AttachmentList` | `attachment-list/` | Stored attachments plus the upload affordance |
 | `ActivityList` | `activity-list/` | Reusable activity cards with permission-gated row actions |
 | `EditDrawer` | `edit-drawer/` | The **edit** counterpart to `FormDrawer`, which is create-only |
@@ -48,6 +50,30 @@ only when no pattern fits.
 | `OfflineBanner` · `useConnectivity` | `offline-banner/` | The connection strip, mounted once in `AppShell` |
 | `useRealtimeResync` | `realtime-resync/` | The one line a list adds to reconcile with the server |
 | `LineChart` · `BarChart` · `AreaChart` · `DonutChart` · `Sparkline` | `chart/` | The chart wrappers and the palette law |
+
+## FilterSearchInput
+
+Verified **2026-09-16**. The Basic Leads search uses this API-free pattern from
+`@/design-system`. It combines the search icon, removable filter chips, editable
+value and trailing disclosure button inside one border. A filter chip can carry
+a filter icon. A selected field chip uses a primary field segment followed by a
+neutral value segment; typed suggestions emphasize the field name and value.
+Expandable fields carry a direction-aware chevron and let the caller supply
+their catalogue choices. Translated copy and filter semantics belong to the
+feature hook, including the current-agent **My Leads** default.
+
+Suggestions are portalled outside the scrolling action bar. The input exposes
+combobox/listbox semantics and supports arrows, Enter, Escape and composition
+input. Backspace in an empty input focuses the last chip before deletion. Chips
+scroll horizontally, the current draft remains editable, and the disclosure
+footer offers an explicit clear action. Semantic colors and logical properties
+support both themes and reading directions.
+
+The Leads contract supports multiple structured values, Tag catalogue values,
+and one replaceable semantic text value scoped to Lead, Customer, Email or
+Phone/Mobile. Its separate Advanced mode remains available as an explicit-submit
+AND/OR filter-tree builder; see the
+[Basic search study](../build/LEADS-BASIC-SEARCH-STUDY.md).
 
 ## DataTable
 
@@ -70,6 +96,7 @@ interface DataTableProps<T> {
   selection?: SelectionState;
   emptyState?: React.ReactNode;
   rowReorder?: RowReorderState<T>;    // opt-in row drag + earlier/later
+  density?: "default" | "compact";    // per-screen spacing override
 }
 
 interface ColumnDef<T> {
@@ -86,7 +113,7 @@ interface ColumnDef<T> {
 
 Owns, so no screen re-implements them:
 
-- **36px** rows, `text-xs`, weight **400**
+- **44px** default rows, `text-xs`, weight **400**
 - Sticky header, `bg-card`, bottom `border-border`
 - Zebra rows via `--row-zebra`
 - **Server** pagination and sorting — never client-side over a page of results
@@ -102,6 +129,9 @@ Owns, so no screen re-implements them:
   sticky layers overlap this grid; without the margin the focus ring ends up
   behind one of them with no visual indication at all
 - `DataTableSkeleton` matching real column widths while loading
+- `density="compact"` keeps the same semantics and type size while reducing the
+  header to 32px, the row minimum to 36px and cell padding. It is opt-in so one
+  dense operational table does not silently resize every table in the portal.
 - Empty, error and forbidden states rendered in-body
 - Horizontal overflow inside its own container — **the page never scrolls
   sideways**
@@ -390,11 +420,45 @@ Stage category: New > Contacted
   `dark:text-danger-300` in dark mode; the new value uses the normal foreground.
   These are the existing accessible theme ramps, not a raw red value.
 - Do not render the audit correlation/reference identifier in this card.
+- User references display the resolved name as a `PersonProfileLink`; both old
+  and new names open the corresponding person's card. Resolve through
+  `useUserProfiles` once per unique ID, not independently in every diff value.
+- Branch/company/department/team and acquisition source IDs resolve through
+  their authorized detail routes. Supplied `valueLabels` (including the Lead
+  stage catalogue) take precedence. Unresolved UUID values render the localized
+  unavailable marker, never the raw UUID.
 - Keep the comparison itself left-to-right inside an RTL page so old always
   precedes new; each value still resolves its own text direction.
 - Read the server's redacted `diff`. For legacy `LEAD_STAGE_CHANGED` rows whose
   diff is absent, only the known stage/status fields in metadata may be used as
   a compatibility fallback. Do not reconstruct arbitrary before/after objects.
+
+## PersonProfileLink
+
+Implemented and source-verified **2026-09-14**.
+
+`PersonProfileLink` from `@/design-system` is the API-free template for a
+clickable name and its contact modal. Pass `person` with `fullName`, optional
+`imageUrl`, `phone`, and `email`, plus translated `labels`. The caller supplies
+authorized, validated data. Missing/failed images use initials; absent contact
+fields have an explicit unavailable label. `loading`, `placeholder`, `notice`,
+and `onRetry` cover async reads without introducing a second modal design.
+`previous` strikes through the trigger for an audit's before-value. Radix owns
+focus trapping, Escape dismissal, and focus restoration to that trigger.
+
+For tenant users, compose `useUserProfiles(ids, enabled, refreshToken)` in the
+screen hook with `UserProfileLink` from `components/people/`. The hook returns
+`profiles: Map<userId, UserProfileResult>` and `retry`. Pass
+`result={profiles.get(userId)}` and `onRetry={retry}` to the link. It supplies
+dictionary labels and a `PermissionGate` for forbidden detail reads. The cache
+is in memory, bounded by the mounted consumer, deduplicated across pages, and
+invalidated by authentication scope or the caller's committed-save token.
+
+The current tenant-user API supplies **name and email only**. Its internal
+Party ID is not in the response; do not infer a Party by name/email to fill the
+phone/photo. The modal uses the honest missing-data presentation until a
+verified contract exposes those fields. See
+[the contact projection boundary](../api/core-identity.md#shared-user-contact-projection).
 
 ## ActivityList
 

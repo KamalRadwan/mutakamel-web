@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from `throw new *Exception` sites)
 
-Last source verification: **2026-09-09**
+Last source verification: **2026-09-18**
 
-Codes: **321** across **36** areas
+Codes: **322** across **36** areas
 
 ## Scope
 
@@ -32,7 +32,7 @@ Add an area to `SCOPES` in the generator when a new screen ships.
 
 ## Leads
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 17 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 18 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -52,6 +52,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 17 codes
 | `LEAD_EXISTING_COMPANY_FIELDS_FORBIDDEN` | 422 |
 | `LEAD_EXISTING_COMPANY_INVALID` | 422 |
 | `LEAD_EXISTING_COMPANY_OUTSIDE_BRANCH` | 403 |
+| `LEAD_STAGE_NOT_FOUND` | 404 |
 | `PARTY_DUPLICATE_CONTACT_METHOD` | 422 |
 
 ## Customer profiles
@@ -126,10 +127,10 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/lead-stages` · 6 codes
 | Error code | HTTP |
 | --- | --- |
 | `LEAD_STAGE_CATEGORY_INVALID` | 422 |
-| `LEAD_STAGE_DEFAULT_CONVERTED` | 422 |
 | `LEAD_STAGE_DEFAULT_DEACTIVATE` | 422 |
 | `LEAD_STAGE_DEFAULT_DELETE` | 422 |
 | `LEAD_STAGE_DEFAULT_INACTIVE` | 422 |
+| `LEAD_STAGE_DEFAULT_TERMINAL` | 422 |
 | `LEAD_STAGE_REORDER_INVALID` | 422 |
 
 ## Acquisition sources

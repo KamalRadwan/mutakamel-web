@@ -64,6 +64,17 @@ describe("StageBar", () => {
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
 
+  it("highlights multiple search stages and narrows to a clicked stage", () => {
+    const onChange = renderBar({ value: ["new", "qualifying"] });
+    expect(screen.getByRole("button", { name: /New/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Qualifying/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /All/ })).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(screen.getByRole("button", { name: /New/ }));
+    expect(onChange).toHaveBeenLastCalledWith("new");
+    fireEvent.click(screen.getByRole("button", { name: /All/ }));
+    expect(onChange).toHaveBeenLastCalledWith(undefined);
+  });
+
   // The second job: one record's own stage, where pressing a step MOVES it.
   // `allLabel` is what separates the two — a bar without an "every stage" step
   // is never a toggle group. See the table on StageBarProps.

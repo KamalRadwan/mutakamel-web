@@ -141,8 +141,13 @@ describe("the global nav", () => {
       name: en.nav.mainNavigation,
     });
 
-    // CRM's three sections; `crmAnalytics` filtered away with its permissions.
-    expect(within(nav).getByText(en.nav.navMenuRecords)).toBeInTheDocument();
+    // CRM promotes its three record screens; `crmAnalytics` is filtered away.
+    expect(within(nav).queryByText(en.nav.navMenuRecords)).toBeNull();
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      en.nav.leads,
+      en.nav.customerProfiles,
+      en.nav.opportunities,
+    ]);
     expect(within(nav).getByText(en.nav.navMenuSetup)).toBeInTheDocument();
     expect(within(nav).queryByText(en.nav.navMenuDashboards)).toBeNull();
 

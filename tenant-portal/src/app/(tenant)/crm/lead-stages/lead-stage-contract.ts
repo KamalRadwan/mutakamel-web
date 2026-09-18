@@ -11,9 +11,20 @@ const LEAD_STAGE_FLAGS = [
   "ON_HOLD",
 ] as const;
 
+export const PROTECTED_LEAD_STAGE_FLAGS = [
+  "NEW",
+  "DISQUALIFIED",
+  "CONVERTED",
+] as const satisfies readonly (typeof LEAD_STAGE_FLAGS)[number][];
+
 export const CREATABLE_LEAD_STAGE_FLAGS = LEAD_STAGE_FLAGS.filter(
-  (flag) => flag !== "NEW",
-);
+  (flag) => !PROTECTED_LEAD_STAGE_FLAGS.includes(
+    flag as (typeof PROTECTED_LEAD_STAGE_FLAGS)[number],
+  ),
+) as Exclude<
+  (typeof LEAD_STAGE_FLAGS)[number],
+  (typeof PROTECTED_LEAD_STAGE_FLAGS)[number]
+>[];
 
 // CRM rejects OPEN for lead stages; it is reserved for opportunity stages.
 export const LEAD_STAGE_CATEGORIES = [
@@ -39,7 +50,10 @@ export interface LeadStageItem {
 export interface CreateLeadStageFormData {
   nameAr: string;
   nameEn: string;
-  flag: Exclude<LeadStageFlag, "NEW">;
+  flag: Exclude<
+    LeadStageFlag,
+    (typeof PROTECTED_LEAD_STAGE_FLAGS)[number]
+  >;
   category: LeadStageCategory;
   isDefault: boolean;
 }
@@ -72,13 +86,23 @@ export function toUpdateLeadStageForm(
 }
 
 /**
- * The stage flagged `NEW` is protected: `assertNewStageMutation` answers 422
- * `LEAD_STAGE_PROTECTED` for a rename, a flag change or a deactivation, and no
- * other stage may be changed *into* `NEW`. Verified in
+ * The three lifecycle anchors are server-owned. They cannot be edited or
+ * deleted, and a tenant stage cannot be changed into one of their flags.
+ * Verified in
  * crm-app/src/crm/lead-stages/lead-stages.service.ts.
  */
 export function isProtectedLeadStage(stage: LeadStageItem): boolean {
-  return stage.flag === "NEW";
+  return PROTECTED_LEAD_STAGE_FLAGS.includes(
+    stage.flag as (typeof PROTECTED_LEAD_STAGE_FLAGS)[number],
+  );
+}
+
+export function canBeDefaultLeadStage(stage: LeadStageItem): boolean {
+  return (
+    stage.isActive &&
+    stage.flag !== "DISQUALIFIED" &&
+    stage.flag !== "CONVERTED"
+  );
 }
 
 /** Only fields that actually changed are sent — an unchanged key is noise. */
@@ -95,17 +119,23 @@ export function buildUpdateLeadStageRequest(
     nameEn.length > 80 ||
     !member(LEAD_STAGE_FLAGS, form.flag) ||
     !member(LEAD_STAGE_CATEGORIES, form.category) ||
-    // The service refuses both directions of the NEW protection before it
-    // looks at anything else.
-    (form.flag === "NEW" && stage.flag !== "NEW") ||
-    (stage.flag === "NEW" &&
+    // Reserved lifecycle flags belong only to the canonical stages.
+    (PROTECTED_LEAD_STAGE_FLAGS.includes(
+      form.flag as (typeof PROTECTED_LEAD_STAGE_FLAGS)[number],
+    ) &&
+      form.flag !== stage.flag) ||
+    // A protected stage is entirely read-only. Its default designation, when
+    // eligible, moves through the dedicated set-default endpoint.
+    (isProtectedLeadStage(stage) &&
       (nameAr !== stage.nameAr ||
         nameEn !== stage.nameEn ||
-        form.flag !== "NEW" ||
-        !form.isActive)) ||
-    // A default stage may neither be deactivated nor become CONVERTED.
+        form.flag !== stage.flag ||
+        form.category !== stage.category ||
+        form.isActive !== stage.isActive)) ||
+    // A default stage may not be deactivated.
     (stage.isDefault && !form.isActive) ||
-    (stage.isDefault && form.flag === "CONVERTED")
+    (stage.isDefault &&
+      (form.flag === "DISQUALIFIED" || form.flag === "CONVERTED"))
   ) {
     throw new Error("Invalid lead stage form.");
   }
@@ -212,8 +242,7 @@ export function buildCreateLeadStageRequest(form: CreateLeadStageFormData) {
     nameAr.length > 80 ||
     nameEn.length > 80 ||
     !member(CREATABLE_LEAD_STAGE_FLAGS, form.flag) ||
-    !member(LEAD_STAGE_CATEGORIES, form.category) ||
-    (form.flag === "CONVERTED" && form.isDefault)
+    !member(LEAD_STAGE_CATEGORIES, form.category)
   ) {
     throw new Error("Invalid lead stage form.");
   }
@@ -235,7 +264,8 @@ export function buildCreateLeadStageRequest(form: CreateLeadStageFormData) {
  * crm-app/src/crm/lead-stages/lead-stages.service.ts, which answers 422
  * `LEAD_STAGE_REORDER_INVALID`: the payload must carry **every non-deleted
  * stage exactly once** — so it is built from the unfiltered catalogue, never
- * from a searched subset — and the `NEW` stage must stay first at rank 1.
+ * from a searched subset — `NEW` stays first while `DISQUALIFIED` and
+ * `CONVERTED` stay penultimate and last.
  * Checking both here means an order the server would reject never costs a round
  * trip, and never leaves the table showing an order that was never written.
  */
@@ -254,8 +284,19 @@ export function buildLeadStageReorderRequest(
     throw new Error("Invalid lead stage order.");
   }
 
-  const entryStage = stages.filter(({ flag }) => flag === "NEW");
-  if (entryStage.length !== 1 || orderedIds[0] !== entryStage[0]!.id) {
+  const entryStages = stages.filter(({ flag }) => flag === "NEW");
+  const disqualifiedStages = stages.filter(
+    ({ flag }) => flag === "DISQUALIFIED",
+  );
+  const convertedStages = stages.filter(({ flag }) => flag === "CONVERTED");
+  if (
+    entryStages.length !== 1 ||
+    disqualifiedStages.length !== 1 ||
+    convertedStages.length !== 1 ||
+    orderedIds[0] !== entryStages[0]!.id ||
+    orderedIds.at(-2) !== disqualifiedStages[0]!.id ||
+    orderedIds.at(-1) !== convertedStages[0]!.id
+  ) {
     throw new Error("Invalid lead stage order.");
   }
   return { orderedIds: [...orderedIds] };
@@ -267,4 +308,13 @@ export function entryLeadStageId(
 ): string | null {
   const entryStages = stages.filter(({ flag }) => flag === "NEW");
   return entryStages.length === 1 ? entryStages[0]!.id : null;
+}
+
+/** IDs whose rank is fixed by the server-owned lifecycle order. */
+export function protectedLeadStageIds(
+  stages: readonly LeadStageItem[],
+): ReadonlySet<string> {
+  return new Set(
+    stages.filter(isProtectedLeadStage).map(({ id }) => id),
+  );
 }

@@ -107,6 +107,8 @@ export interface NavSection {
   id: string;
   /** The app whose nav this section belongs to. Exactly one. */
   app: NavAppId;
+  /** Render every item as a first-level link in the desktop global nav. */
+  globalNavDisplay?: "menu" | "items";
   /**
    * The descriptive heading. `null` where the section never carried one.
    *
@@ -175,6 +177,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     id: "crm",
     app: "crm",
+    globalNavDisplay: "items",
     labelKey: "crm",
     menuLabelKey: "navMenuRecords",
     items: [

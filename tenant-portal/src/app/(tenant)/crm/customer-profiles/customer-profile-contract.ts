@@ -7,12 +7,8 @@
 //   POST   /api/tenant/crm/v1/customer-profiles/:id/contacts 201 -> { id }
 //   DELETE /api/tenant/crm/v1/customer-profiles/:id          204, no body
 //
-// `GET /:id` returns `CustomerProfileReadModel` = `CustomerProfileEntity` &
-// `PartyBackedIdentity`, so the identity columns come off the Party behind the
-// profile. **It carries no contacts list** — `selectPartySummary` joins the
-// acquisition source and the party summary, and nothing joins
-// `party_relationships`. That is why this screen can add a contact and cannot
-// list the existing ones.
+// `GET /:id` returns the Party-backed identity plus the primary address and
+// corporate contacts required by the detail workspace.
 //
 // Two pairs of legacy aliases exist on the write DTOs and only one of each is
 // sent: `CustomerProfilesService` resolves `taxNumber ?? taxCardNumber` and
@@ -39,6 +35,26 @@ export const CUSTOMER_STATUSES = [
  */
 export const BLACKLISTED_STATUS: CustomerProfileStatus = "BLACKLISTED";
 
+export interface CustomerProfileAddress {
+  country: string | null;
+  city: string | null;
+  area: string | null;
+  street: string | null;
+}
+
+export interface CustomerProfileContact {
+  partyId: string;
+  relationshipId: string | null;
+  displayName: string;
+  firstName: string | null;
+  lastName: string | null;
+  honorificTitle: string | null;
+  jobTitle: string | null;
+  isPrimary: boolean;
+  email: string | null;
+  phones: string[];
+}
+
 export interface CustomerProfileDetail {
   id: string;
   branchId: string;
@@ -53,6 +69,8 @@ export interface CustomerProfileDetail {
   email: string | null;
   primaryMobile: string | null;
   phones: string[];
+  address: CustomerProfileAddress | null;
+  contacts: CustomerProfileContact[];
   taxNumber: string | null;
   commercialRegistrationNumber: string | null;
   legalName: string | null;
@@ -78,6 +96,51 @@ function record(value: unknown): Record<string, unknown> | null {
 
 function nullableText(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function parseAddress(value: unknown): CustomerProfileAddress | null {
+  if (value === undefined || value === null) return null;
+  const address = record(value);
+  if (!address) invalid();
+  return {
+    country: nullableText(address.country),
+    city: nullableText(address.city),
+    area: nullableText(address.area),
+    street: nullableText(address.street),
+  };
+}
+
+function parseContacts(value: unknown): CustomerProfileContact[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) invalid();
+  return value.map((entry) => {
+    const contact = record(entry);
+    if (
+      !contact ||
+      !isUUIDv7(contact.partyId) ||
+      typeof contact.displayName !== "string" ||
+      contact.displayName.length === 0 ||
+      typeof contact.isPrimary !== "boolean" ||
+      !Array.isArray(contact.phones) ||
+      !contact.phones.every((phone) => typeof phone === "string")
+    ) {
+      invalid();
+    }
+    return {
+      partyId: contact.partyId,
+      relationshipId: isUUIDv7(contact.relationshipId)
+        ? contact.relationshipId
+        : null,
+      displayName: contact.displayName,
+      firstName: nullableText(contact.firstName),
+      lastName: nullableText(contact.lastName),
+      honorificTitle: nullableText(contact.honorificTitle),
+      jobTitle: nullableText(contact.jobTitle),
+      isPrimary: contact.isPrimary,
+      email: nullableText(contact.email),
+      phones: contact.phones,
+    };
+  });
 }
 
 function isMember<const T extends readonly string[]>(
@@ -128,6 +191,8 @@ export function parseCustomerProfileDetailResponse(
           (phone): phone is string => typeof phone === "string",
         )
       : [],
+    address: parseAddress(profile.address),
+    contacts: parseContacts(profile.contacts),
     // The registration identifiers live on the Party, not the profile row —
     // `partySummaryFromRaw` selects them from `parties`.
     taxNumber: party ? nullableText(party.taxNumber) : null,

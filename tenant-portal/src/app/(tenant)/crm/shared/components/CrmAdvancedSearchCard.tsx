@@ -29,17 +29,21 @@ import {
   crmGroupsWithCondition,
   crmGroupsWithConditionAdded,
   crmGroupsWithConditionRemoved,
+  crmGroupsWithConnector,
   crmGroupsWithGroupAdded,
   crmGroupsWithGroupRemoved,
   crmOperatorTakesManyValues,
   crmOperatorTakesNoValue,
   crmOperatorTakesTwoValues,
-  crmOperatorsFor,
+  crmOperatorsForField,
   type CrmFilterOperator,
   type CrmSearchCondition,
+  type CrmSearchConnector,
   type CrmSearchFieldDef,
   type CrmSearchGroup,
 } from "../search/filter-tree";
+
+const UNSELECTED_FIELD_VALUE = "__crm_unselected_field__";
 
 /** One option of a catalogue-backed field, already localized by the caller. */
 export interface CrmSearchCatalogueOption {
@@ -61,9 +65,9 @@ export interface CrmAdvancedSearchCardProps<Id extends string> {
   enumLabel: (field: Id, wireValue: string) => string;
   /** The options of a `catalogue` field, or an empty list while it is degraded. */
   catalogueOptions: (field: Id) => readonly CrmSearchCatalogueOption[];
-  /** Free text over the columns the tree cannot reach. */
-  text: string;
-  onTextChange: (next: string) => void;
+  /** Omit both to start directly with the condition rows. */
+  text?: string;
+  onTextChange?: (next: string) => void;
   /**
    * What the free-text box actually matches on THIS screen, when it is not
    * what the shared copy says. Free text is a per-repository `searchableFields`
@@ -76,13 +80,15 @@ export interface CrmAdvancedSearchCardProps<Id extends string> {
   onGroupsChange: (next: readonly CrmSearchGroup<Id>[]) => void;
   /** Runs the query. Nothing else in this card touches the network. */
   onSubmit: () => void;
-  /** Clears every condition and the free text with them. */
+  /** Clears the caller's advanced-search draft. */
   onReset: () => void;
   disabled?: boolean;
+  /** New rows begin with an explicit field choice instead of assuming field 1. */
+  requireFieldSelection?: boolean;
 }
 
 /**
- * The advanced-search card: free text, OR-separated groups of AND-ed
+ * The advanced-search card: optional free text, OR-separated groups of AND-ed
  * conditions, and one button that runs them.
  *
  * Four decisions are load-bearing:
@@ -92,10 +98,10 @@ export interface CrmAdvancedSearchCardProps<Id extends string> {
  *     a debounce would fire a request for each of them, and the half-built
  *     ones are usually the expensive ones. The basic bar keeps its debounce
  *     because a single text box has no half-built state worth skipping.
- *  2. **OR starts a new SECTION.** The wire grammar allows a boolean operator
- *     per adjacent pair, but a flat list of rows joined by mixed AND/OR reads
- *     by precedence a user cannot see. A group is a boundary they can point
- *     at, and it maps exactly onto `{op:"OR",children:[{op:"AND",…},…]}`.
+ *  2. **Every row after the first names AND or OR.** Choosing OR splits a
+ *     visible section at that row; choosing AND merges it back. The section
+ *     boundary maps exactly onto `{op:"OR",children:[{op:"AND",…},…]}` while
+ *     keeping precedence visible to the user.
  *  3. **A field may be repeated.** `POST /search` has a node per leaf, not a
  *     query-string slot per key, so `stageFlag = NEW OR stageFlag = CONTACTED`
  *     is expressible and the picker withholds nothing.
@@ -115,6 +121,7 @@ export function CrmAdvancedSearchCard<Id extends string>({
   onSubmit,
   onReset,
   disabled,
+  requireFieldSelection = false,
 }: CrmAdvancedSearchCardProps<Id>) {
   const { t } = useI18n();
   // Open on arrival: the card exists to be filled in. It closes itself on
@@ -122,6 +129,7 @@ export function CrmAdvancedSearchCard<Id extends string>({
   const [isOpen, setIsOpen] = useState(true);
 
   const copy = t.crmAdvancedSearch;
+  const hasTextSearch = text !== undefined && onTextChange !== undefined;
   // Never empty: every caller passes its whole whitelist, and a module with no
   // filterable field would not mount this card at all.
   const first = fields[0]!;
@@ -141,7 +149,8 @@ export function CrmAdvancedSearchCard<Id extends string>({
       total +
       group.conditions.filter(
         (condition) =>
-          crmOperatorTakesNoValue(condition.operator) || condition.value.trim().length > 0,
+          condition.fieldSelected !== false &&
+          (crmOperatorTakesNoValue(condition.operator) || condition.value.trim().length > 0),
       ).length,
     0,
   );
@@ -194,23 +203,20 @@ export function CrmAdvancedSearchCard<Id extends string>({
             }}
           >
             <CardContent className="flex flex-col gap-3 pt-0">
-              <div className="flex flex-col gap-1">
-                <Input
-                  size="sm"
-                  value={text}
-                  disabled={disabled}
-                  maxLength={200}
-                  placeholder={copy.textPlaceholder}
-                  aria-label={copy.textLabel}
-                  onChange={(event) => onTextChange(event.target.value)}
-                />
-                {/* Said here rather than in a tooltip, because this box is
-                    exactly where a user goes looking for a "name" condition
-                    and will not find one in the picker below: display name,
-                    phone and email come from a party join the filter compiler
-                    cannot resolve to a column. */}
-                <p className="text-2xs text-muted-foreground">{textHint ?? copy.textHint}</p>
-              </div>
+              {hasTextSearch && (
+                <div className="flex flex-col gap-1">
+                  <Input
+                    size="sm"
+                    value={text}
+                    disabled={disabled}
+                    maxLength={200}
+                    placeholder={copy.textPlaceholder}
+                    aria-label={copy.textLabel}
+                    onChange={(event) => onTextChange(event.target.value)}
+                  />
+                  <p className="text-2xs text-muted-foreground">{textHint ?? copy.textHint}</p>
+                </div>
+              )}
 
               {groups.map((group, groupIndex) => (
                 // Keyed by POSITION. Every row is fully controlled by props, so
@@ -219,19 +225,6 @@ export function CrmAdvancedSearchCard<Id extends string>({
                 // from being destroyed in the same commit that closes its menu,
                 // which drops focus to the body.
                 <div key={groupIndex} className="flex flex-col gap-2">
-                  {groupIndex > 0 && (
-                    // The OR boundary, drawn as a rule with a word on it: this
-                    // is the one join in the card a reader must not have to
-                    // infer, since everything inside a section is AND.
-                    <div className="flex items-center gap-2 py-1">
-                      <span className="h-px flex-1 bg-border" aria-hidden="true" />
-                      <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-2xs uppercase text-muted-foreground">
-                        {copy.or}
-                      </span>
-                      <span className="h-px flex-1 bg-border" aria-hidden="true" />
-                    </div>
-                  )}
-
                   <div
                     role="group"
                     aria-label={formatTemplate(copy.groupLabel, { number: groupIndex + 1 })}
@@ -239,24 +232,35 @@ export function CrmAdvancedSearchCard<Id extends string>({
                   >
                     {group.conditions.map((condition, conditionIndex) => (
                       <div key={conditionIndex} className="flex flex-wrap items-center gap-2">
-                        <span
-                          aria-hidden={conditionIndex === 0 || undefined}
-                          className={cn(
-                            "shrink-0 rounded-full border border-border bg-muted px-2 py-0.5 text-2xs uppercase text-muted-foreground",
-                            conditionIndex === 0 && "invisible",
-                          )}
-                        >
-                          {copy.and}
-                        </span>
-
                         <ConditionRow
                           condition={condition}
-                          definition={resolve(condition.field)}
+                          definition={
+                            condition.fieldSelected === false
+                              ? undefined
+                              : resolve(condition.field)
+                          }
+                          connector={
+                            groupIndex === 0 && conditionIndex === 0
+                              ? undefined
+                              : conditionIndex === 0
+                                ? "OR"
+                                : "AND"
+                          }
                           fields={fields}
                           fieldLabels={fieldLabels}
                           enumLabel={enumLabel}
                           catalogueOptions={catalogueOptions}
                           disabled={disabled}
+                          onConnectorChange={(next) =>
+                            onGroupsChange(
+                              crmGroupsWithConnector(
+                                groups,
+                                groupIndex,
+                                conditionIndex,
+                                next,
+                              ),
+                            )
+                          }
                           onPatch={(patch) =>
                             onGroupsChange(
                               crmGroupsWithCondition(
@@ -276,7 +280,10 @@ export function CrmAdvancedSearchCard<Id extends string>({
                           size="sm"
                           disabled={disabled}
                           aria-label={formatTemplate(copy.removeCondition, {
-                            field: fieldLabels[condition.field],
+                            field:
+                              condition.fieldSelected === false
+                                ? copy.field
+                                : fieldLabels[condition.field],
                           })}
                           onClick={() =>
                             onGroupsChange(
@@ -285,6 +292,7 @@ export function CrmAdvancedSearchCard<Id extends string>({
                                 groupIndex,
                                 conditionIndex,
                                 first,
+                                !requireFieldSelection,
                               ),
                             )
                           }
@@ -303,7 +311,12 @@ export function CrmAdvancedSearchCard<Id extends string>({
                         disabled={disabled}
                         onClick={() =>
                           onGroupsChange(
-                            crmGroupsWithConditionAdded(groups, groupIndex, first),
+                            crmGroupsWithConditionAdded(
+                              groups,
+                              groupIndex,
+                              first,
+                              !requireFieldSelection,
+                            ),
                           )
                         }
                       >
@@ -318,7 +331,14 @@ export function CrmAdvancedSearchCard<Id extends string>({
                           size="sm"
                           disabled={disabled}
                           onClick={() =>
-                            onGroupsChange(crmGroupsWithGroupRemoved(groups, groupIndex, first))
+                            onGroupsChange(
+                              crmGroupsWithGroupRemoved(
+                                groups,
+                                groupIndex,
+                                first,
+                                !requireFieldSelection,
+                              ),
+                            )
                           }
                         >
                           {formatTemplate(copy.removeGroup, { number: groupIndex + 1 })}
@@ -335,7 +355,11 @@ export function CrmAdvancedSearchCard<Id extends string>({
                   variant="outline"
                   size="sm"
                   disabled={disabled}
-                  onClick={() => onGroupsChange(crmGroupsWithGroupAdded(groups, first))}
+                  onClick={() =>
+                    onGroupsChange(
+                      crmGroupsWithGroupAdded(groups, first, !requireFieldSelection),
+                    )
+                  }
                 >
                   <Plus className={iconSize({ size: "md" })} aria-hidden="true" />
                   {copy.addGroup}
@@ -361,12 +385,14 @@ export function CrmAdvancedSearchCard<Id extends string>({
 
 interface ConditionRowProps<Id extends string> {
   condition: CrmSearchCondition<Id>;
-  definition: CrmSearchFieldDef<Id>;
+  definition?: CrmSearchFieldDef<Id>;
+  connector?: CrmSearchConnector;
   fields: readonly CrmSearchFieldDef<Id>[];
   fieldLabels: Record<Id, string>;
   enumLabel: (field: Id, wireValue: string) => string;
   catalogueOptions: (field: Id) => readonly CrmSearchCatalogueOption[];
   disabled?: boolean;
+  onConnectorChange: (connector: CrmSearchConnector) => void;
   onPatch: (patch: Partial<CrmSearchCondition<Id>>) => void;
 }
 
@@ -381,33 +407,62 @@ interface ConditionRowProps<Id extends string> {
 function ConditionRow<Id extends string>({
   condition,
   definition,
+  connector,
   fields,
   fieldLabels,
   enumLabel,
   catalogueOptions,
   disabled,
+  onConnectorChange,
   onPatch,
 }: ConditionRowProps<Id>) {
   const { t, lang } = useI18n();
   const copy = t.crmAdvancedSearch;
-  const operators = crmOperatorsFor(definition.kind, definition.nullable ?? false);
+  const operators = definition ? crmOperatorsForField(definition) : [];
   const operatorLabels: Record<CrmFilterOperator, string> = copy.operators;
-
-  // Names the row as well as the control, so several conditions do not present
-  // a screen reader with identically labelled value boxes.
-  const valueLabel = `${copy.value}: ${fieldLabels[definition.id]}`;
+  const effectiveOperator =
+    definition && operators.includes(condition.operator)
+      ? condition.operator
+      : operators[0];
 
   return (
     <>
+      {connector ? (
+        <Select
+          value={connector}
+          disabled={disabled}
+          onValueChange={(next) => onConnectorChange(next as CrmSearchConnector)}
+        >
+          <SelectTrigger size="sm" className="w-24" aria-label={copy.connector}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="AND">{copy.and}</SelectItem>
+            <SelectItem value="OR">{copy.or}</SelectItem>
+          </SelectContent>
+        </Select>
+      ) : (
+        <span className="w-24 shrink-0 text-center text-2xs uppercase text-muted-foreground">
+          {copy.where}
+        </span>
+      )}
+
       <Select
-        value={condition.field}
+        value={condition.fieldSelected === false ? UNSELECTED_FIELD_VALUE : condition.field}
         disabled={disabled}
-        onValueChange={(next) => onPatch({ field: next as Id })}
+        onValueChange={(next) => {
+          if (next !== UNSELECTED_FIELD_VALUE) {
+            onPatch({ field: next as Id, fieldSelected: true });
+          }
+        }}
       >
         <SelectTrigger size="sm" className="w-52" aria-label={copy.field}>
-          <SelectValue />
+          <SelectValue placeholder={copy.selectField} />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value={UNSELECTED_FIELD_VALUE} disabled>
+            {copy.selectField}
+          </SelectItem>
           {/* Every field, every time: repeating one is legal on this wire. */}
           {fields.map((candidate) => (
             <SelectItem key={candidate.id} value={candidate.id}>
@@ -417,33 +472,39 @@ function ConditionRow<Id extends string>({
         </SelectContent>
       </Select>
 
-      <Select
-        value={condition.operator}
-        disabled={disabled}
-        onValueChange={(next) => onPatch({ operator: next as CrmFilterOperator })}
-      >
-        <SelectTrigger size="sm" className="w-44" aria-label={copy.operator}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {operators.map((operator) => (
-            <SelectItem key={operator} value={operator}>
-              {operatorLabels[operator]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {definition && effectiveOperator && (
+        <>
+          {operators.length > 1 && (
+            <Select
+              value={effectiveOperator}
+              disabled={disabled}
+              onValueChange={(next) => onPatch({ operator: next as CrmFilterOperator })}
+            >
+              <SelectTrigger size="sm" className="w-44" aria-label={copy.operator}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {operators.map((operator) => (
+                  <SelectItem key={operator} value={operator}>
+                    {operatorLabels[operator]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-      <ValueControl
-        condition={condition}
-        definition={definition}
-        label={valueLabel}
-        enumLabel={enumLabel}
-        catalogueOptions={catalogueOptions}
-        disabled={disabled}
-        language={lang}
-        onPatch={onPatch}
-      />
+          <ValueControl
+            condition={{ ...condition, operator: effectiveOperator }}
+            definition={definition}
+            label={`${copy.value}: ${fieldLabels[definition.id]}`}
+            enumLabel={enumLabel}
+            catalogueOptions={catalogueOptions}
+            disabled={disabled}
+            language={lang}
+            onPatch={onPatch}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -489,13 +550,15 @@ function ValueControl<Id extends string>({
           }))
         : options.map((option) => ({ value: option.id, label: option.label }));
 
-    // A raw uuid column has no catalogue to pick from, so the list is typed.
-    if (definition.kind === "uuid") {
+    // Scalar lists without a catalogue are typed as comma-separated values.
+    // The compiler converts number parts while preserving text, dates and ids.
+    if (definition.kind !== "enum" && definition.kind !== "catalogue") {
       return (
         <Input
           size="sm"
-          className="w-60"
-          dir="ltr"
+          className={cn("w-60", definition.kind === "uuid" && "font-mono")}
+          dir={definition.kind === "uuid" || definition.kind === "date" ? "ltr" : undefined}
+          inputMode={definition.kind === "number" ? "decimal" : undefined}
           value={condition.value}
           disabled={disabled}
           placeholder={copy.listPlaceholder}
