@@ -72,9 +72,11 @@ footer offers an explicit clear action. Semantic colors and logical properties
 support both themes and reading directions.
 
 The Leads contract supports multiple structured values, Tag catalogue values,
-and one replaceable semantic text value scoped to Lead, Customer, Email or
-Phone/Mobile. Its separate Advanced mode remains available as an explicit-submit
-AND/OR filter-tree builder; see the
+and one replaceable semantic text value scoped to Lead, Email or Phone/Mobile.
+The API-compatible Customer scope is intentionally omitted from the Leads
+picker; Customer Profiles use Customer as their name scope. Its separate
+Advanced mode remains available as an explicit-submit AND/OR filter-tree
+builder; see the
 [Basic search study](../build/LEADS-BASIC-SEARCH-STUDY.md).
 
 ## DataTable

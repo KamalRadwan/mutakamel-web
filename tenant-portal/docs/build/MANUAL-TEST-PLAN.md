@@ -133,7 +133,7 @@ session, or accepting the invite from the email. See
 | E5 | `/crm/customer-profiles` | Three views; status changes reflect the real lifecycle |
 | E6 | Open a customer detail | Contacts, custom fields, and the capability-gated action cluster |
 | E7 | Open a **deleted** customer by URL | A not-found surface with a back action and **no retry button** |
-| E8 | On `/crm/customer-profiles`, run C18–C22 again | The same basic search, over this screen's four fields: free text, Status, Customer type, Source. **One** filter key per request, never two, never empty, and a change returns to page 1 |
+| E8 | On `/crm/customer-profiles`, run C18–C22 again | Basic offers Customer, Email, Phone/Mobile, Status, Customer type and Source, with no Lead choice. My Customers is present by default; multiple structured tokens are applied before pagination and a change returns to page 1 |
 | E9 | Pick **Source**, and compare a row with the create modal's picker | The same icon-and-name row. The catalogue is fetched **once** for the screen — the bar reuses the modal's, so no second `/acquisition-sources` request appears |
 | E10 | `/crm/pipelines`, type in the search box | One box, no field picker. It narrows by **Arabic name, English name and code**, with no network request at all — `GET /pipelines` takes no query parameters, so the filter can only be client-side |
 

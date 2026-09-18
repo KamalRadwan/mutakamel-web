@@ -6,7 +6,7 @@ import { localizedName } from "@/lib/format/localized";
 import type { FilterSearchOption, FilterSearchToken } from "@/design-system";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import {
-  LEAD_SEARCH_FIELDS,
+  LEAD_BASIC_SEARCH_VISIBLE_FIELDS,
   EMPTY_LEAD_BASIC_SEARCH,
   MAX_LEAD_SEARCH_TAGS,
   addLeadBasicFilter,
@@ -96,7 +96,7 @@ export function useLeadBasicSearch({ state, stages, onChange }: LeadBasicSearchP
   }
 
   const selectedTagCount = state.basic.filters.filter((filter) => filter.field === "tag").length;
-  const availableFields = LEAD_SEARCH_FIELDS.filter((entry) =>
+  const availableFields = LEAD_BASIC_SEARCH_VISIBLE_FIELDS.filter((entry) =>
     (entry.id !== "tag" || (tags.canRead && selectedTagCount < MAX_LEAD_SEARCH_TAGS)),
   );
   let options: FilterSearchOption[];
@@ -140,7 +140,7 @@ export function useLeadBasicSearch({ state, stages, onChange }: LeadBasicSearchP
       resetDraft();
       return;
     }
-    const selected = LEAD_SEARCH_FIELDS.find((entry) => entry.id === id);
+    const selected = LEAD_BASIC_SEARCH_VISIBLE_FIELDS.find((entry) => entry.id === id);
     if (!selected) return;
     if (selected.kind === "text" && term) {
       change(addLeadBasicFilter(state.basic, { field: selected.id, value: term }));

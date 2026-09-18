@@ -555,7 +555,7 @@ in [ActivityList](../design/patterns.md#activitylist).
 - Status renders through `StatusBadge`; never display the raw wire value.
 - `ownerUserId` is a filter, not an authorization mechanism.
 - Basic search uses removable field/value tokens inside one input. Typing
-  suggests Lead, Customer, Email and Phone/Mobile semantic text scopes plus
+  suggests Lead, Email and Phone/Mobile semantic text scopes plus
   structured fields; enum and catalogue fields then offer valid values. The
   default **My Leads** token resolves `ownerUserId` from `/auth/me.id`, so the
   initial read includes only leads assigned to the actor. Removing it removes
@@ -569,8 +569,10 @@ in [ActivityList](../design/patterns.md#activitylist).
   ids are validated, and My Leads cannot issue a read without the current actor
   id.
 - Semantic Party search sends one `search` term with `searchField` equal to
-  `lead`, `customer`, `email` or `phone`. Adding another semantic text token
-  replaces the previous one while retaining structured tokens.
+  `lead`, `email` or `phone`. Adding another semantic text token replaces the
+  previous one while retaining structured tokens. The API still accepts the
+  `customer` scope for compatibility, but the Leads UI does not offer the
+  overlapping choice; customer-profile search keeps its single Customer scope.
   See [the study](../build/LEADS-BASIC-SEARCH-STUDY.md) and
   [OPEN-QUESTIONS Q137](../build/OPEN-QUESTIONS.md#q137--multiple-party-text-search-terms-are-not-supported-by-the-leads-search-contract).
 - Basic is the default when the single compact `Advanced` toggle is unpressed;
@@ -590,8 +592,8 @@ in [ActivityList](../design/patterns.md#activitylist).
   expose useful comparisons and ranges; text keeps exact, case-sensitive and
   case-insensitive matching. Null checks appear only on nullable columns.
   Advanced starts directly with these condition rows and sends no separate
-  free-text `search` value. Lead, Customer, Email and Phone/Mobile semantic text
-  scopes remain in Basic search.
+  free-text `search` value. Lead, Email and Phone/Mobile semantic text scopes
+  remain in Basic search.
 
 ## Portal status
 

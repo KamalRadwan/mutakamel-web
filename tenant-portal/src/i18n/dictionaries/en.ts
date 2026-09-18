@@ -681,7 +681,7 @@ export const en: Dictionary = {
       searchPrefix: "Search",
       searchConnector: "for:",
       toggle: "Show or hide search options",
-      replaceTextHint: "Replaces the current lead, customer, email or phone filter.",
+      replaceTextHint: "Replaces the current lead, email or phone filter.",
       chooseValue: "Choose a value",
       typeValue: "Type a name, phone number or email",
       suggestions: "Search fields and values",

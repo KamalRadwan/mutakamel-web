@@ -29,9 +29,12 @@ filter over the currently loaded page.
   Advanced editor or inventing new query parameters.
 - Party identity and contact values are projections rather than filterable Lead
   columns. Both endpoints accept one `search` plus a `searchField` of `lead`,
-  `customer`, `email` or `phone`. Basic therefore exposes four field-specific
-  suggestions but keeps one replaceable semantic text token. Splitting requests
-  and merging pages in the browser would make pagination incorrect.
+  `customer`, `email` or `phone`. Basic exposes Lead, Email and Phone/Mobile and
+  keeps one replaceable semantic text token. The API-compatible `customer`
+  scope remains supported internally, but is omitted from the Leads picker to
+  avoid a second name-oriented choice. Customer Profiles expose Customer as
+  their corresponding name scope. Splitting requests and merging pages in the
+  browser would make pagination incorrect.
 - Tag is backed by the existing catalogue and read-only search route. Selected
   tags travel as `tagIds`, whose server semantics are ANY/OR.
 

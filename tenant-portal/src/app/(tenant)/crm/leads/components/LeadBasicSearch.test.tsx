@@ -109,7 +109,7 @@ describe("Basic lead search interaction", () => {
     const phoneOption = await screen.findByRole("option", { name: "Search Phone/Mobile for: 01050049899" });
     expect(phoneOption.querySelector("bdi")).toHaveTextContent("01050049899");
     expect(screen.getByRole("option", { name: "Search Lead for: 01050049899" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Search Customer for: 01050049899" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Search Customer for: 01050049899" })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Search Email for: 01050049899" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Search Stage for: 01050049899" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Search Source for: 01050049899" })).toBeInTheDocument();
@@ -224,7 +224,7 @@ describe("Basic lead search interaction", () => {
     fireEvent.keyDown(input(), { key: "Enter", isComposing: true });
     expect(controls.change).not.toHaveBeenCalled();
     fireEvent.keyDown(input(), { key: "ArrowDown" });
-    expect(screen.getByRole("option", { selected: true })).toHaveTextContent("Search Customer for: Mona");
+    expect(screen.getByRole("option", { selected: true })).toHaveTextContent("Search Tag for: Mona");
     fireEvent.keyDown(input(), { key: "ArrowUp" });
     fireEvent.keyDown(input(), { key: "Enter" });
     expect(lastState().basic.filters).toEqual([{ field: "lead", value: "Mona" }]);

@@ -35,6 +35,10 @@ export const LEAD_SEARCH_FIELDS: readonly LeadSearchFieldDef[] = [
   { id: "source", key: "acquisitionSourceId", kind: "source" },
 ];
 
+export const LEAD_BASIC_SEARCH_VISIBLE_FIELDS = LEAD_SEARCH_FIELDS.filter(
+  (field) => field.id !== "customer",
+);
+
 export interface LeadBasicFilter { field: LeadSearchFieldId; value: string }
 export interface LeadBasicSearch { myLeads: boolean; filters: readonly LeadBasicFilter[] }
 export const EMPTY_LEAD_BASIC_SEARCH: LeadBasicSearch = { myLeads: false, filters: [] };

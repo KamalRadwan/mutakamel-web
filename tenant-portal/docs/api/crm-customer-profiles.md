@@ -116,13 +116,13 @@ Returns **`204`** with no body.
   Leads and opportunities default to `board`.
 - Core owns the underlying party directory; CRM owns the profile. Do not try
   to join them client-side.
-- The list screen's search is **one field, one value** — a field picker beside
-  a value control whose type follows the field, built in
-  `crm/customer-profiles/customer-profile-search-contract.ts`. That module is
-  the only place a query key is named, and it sends **at most one** filter key:
-  `forbidNonWhitelisted` makes an unknown key a `400`, and a blank value would
-  send `status=`, which `@IsEnum` also rejects. There is no advanced/operator
-  mode — see [OPEN-QUESTIONS Q131](../build/OPEN-QUESTIONS.md).
+- The list screen's Basic search uses removable tokens in one input. Its
+  semantic choices are Customer, Email and Phone/Mobile; there is no Lead
+  choice on this screen. Status, Customer type and Source are structured
+  choices, and **My Customers** is selected by default. Repeating a structured
+  field uses the read-only search endpoint so alternatives are evaluated before
+  pagination. Advanced search remains a separate explicit-submit filter-tree
+  editor.
 - `search` matches the **party's identity**: display name, first name, last
   name, organization name and its contact methods (`partySearchPredicate()`).
   The profile's own `description` is in the repository's `searchableFields` but
@@ -139,7 +139,7 @@ Returns **`204`** with no body.
 | Capability | Status |
 | --- | --- |
 | List, branch-scoped, paginated | live |
-| Basic search — one field, one value | live — free text, status, customer type, source |
+| Basic search — token input | live — Customer, Email, Phone/Mobile, status, customer type, source |
 | Detail route | live — full action cluster and custom-fields rail |
 | Board view | live — `CustomerStatusEnum` axis, no catalogue fetch |
 | Card view | live |

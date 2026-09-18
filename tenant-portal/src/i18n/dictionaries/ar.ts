@@ -692,7 +692,7 @@ export const ar = {
       searchPrefix: "ابحث في",
       searchConnector: "عن:",
       toggle: "إظهار أو إخفاء خيارات البحث",
-      replaceTextHint: "يستبدل فلتر العميل المحتمل أو العميل أو البريد أو الهاتف الحالي.",
+      replaceTextHint: "يستبدل فلتر العميل المحتمل أو البريد أو الهاتف الحالي.",
       chooseValue: "اختر قيمة",
       typeValue: "اكتب اسمًا أو هاتفًا أو بريدًا إلكترونيًا",
       suggestions: "حقول وقيم البحث",
