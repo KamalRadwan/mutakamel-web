@@ -7,6 +7,7 @@ export function LeadBasicSearch(props: LeadBasicSearchProps) {
   const model = useLeadBasicSearch(props);
   return (
     <FilterSearchInput
+      className="h-8 w-128"
       query={model.query}
       tokens={model.tokens}
       options={model.options}

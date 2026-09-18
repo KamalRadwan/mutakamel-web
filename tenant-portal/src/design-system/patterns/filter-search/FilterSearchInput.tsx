@@ -22,6 +22,7 @@ export interface FilterSearchOption {
   search?: { prefix: string; field: string; connector: string; value: string };
 }
 export interface FilterSearchInputProps {
+  className?: string;
   query: string;
   tokens: readonly FilterSearchToken[];
   options: readonly FilterSearchOption[];
@@ -58,6 +59,7 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
             "flex h-9 w-144 min-w-64 max-w-full items-center gap-1 rounded-md border border-input bg-card ps-2 text-foreground",
             "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
             props.disabled && "opacity-50",
+            props.className,
           )}
         >
           <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />

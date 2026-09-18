@@ -46,6 +46,16 @@ export function LeadSearchBar({
   return (
     <>
       <PageActions slot="search">
+        {value.mode === "basic" && (
+          <LeadBasicSearch
+            key={resetKey}
+            state={value}
+            stages={stages}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        )}
+
         <Button
           variant={value.mode === "advanced" ? "secondary" : "outline"}
           size="xs"
@@ -61,16 +71,6 @@ export function LeadSearchBar({
           <SlidersHorizontal className={iconSize({ size: "sm" })} aria-hidden="true" />
           {t.crmLeads.searchMode.advanced}
         </Button>
-
-        {value.mode === "basic" && (
-          <LeadBasicSearch
-            key={resetKey}
-            state={value}
-            stages={stages}
-            disabled={disabled}
-            onChange={onChange}
-          />
-        )}
       </PageActions>
 
       {value.mode === "advanced" && (
