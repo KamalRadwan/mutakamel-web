@@ -57,7 +57,8 @@ Verified **2026-09-18**. The Basic Leads, Opportunities and Customer Profiles se
 `@/design-system`. Its compact action-bar form is 28px high and 384px wide before
 responsive shrinking. It combines the search icon, removable filter chips, editable
 value and trailing disclosure button inside one border. A filter chip can carry
-a filter icon. A selected field chip uses a primary field segment followed by a
+a filter icon. Chips are 20px high with compact horizontal padding; their remove
+control keeps the shared 24px/44px pointer target outside that visual box. A selected field chip uses a primary field segment followed by a
 neutral value segment; typed suggestions emphasize the field name and value.
 Expandable fields carry a direction-aware chevron and let the caller supply
 their catalogue choices. Translated copy and filter semantics belong to the

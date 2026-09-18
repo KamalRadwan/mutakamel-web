@@ -6,6 +6,7 @@ import { Input } from "../../primitives/Input";
 import { Popover, PopoverAnchor, PopoverContent } from "../../primitives/Popover";
 import { cn } from "../../lib/cn";
 import { mirrorInRtl } from "../../lib/icons";
+import { hitTarget } from "../../lib/variants";
 import { useFilterSearchInput } from "./hooks/useFilterSearchInput";
 
 export interface FilterSearchToken {
@@ -64,18 +65,18 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
           {props.tokens.length > 0 && (
             <div ref={tokensRef} className="flex max-w-3/5 shrink items-center gap-0.5 overflow-x-auto">
               {props.tokens.map((token) => (
-                <span key={token.id} className="inline-flex shrink-0 items-center overflow-hidden rounded-sm bg-secondary text-xs">
+                <span key={token.id} className="inline-flex shrink-0 items-center overflow-hidden rounded-xs bg-secondary text-xs">
                   {token.kind === "filter" && <span className="flex size-5 items-center justify-center bg-primary text-primary-foreground">
                     <Filter className="size-3" aria-hidden="true" />
                   </span>}
                   <span className={cn(
-                    "px-1 font-medium",
+                    "px-0.5 font-medium",
                     token.kind === "field" && "inline-flex self-stretch items-center bg-primary text-primary-foreground",
                   )}>{token.label}</span>
-                  {token.value && <span className="max-w-32 truncate border-s border-border px-1" title={token.value}>{token.value}</span>}
+                  {token.value && <span className="max-w-32 truncate border-s border-border px-0.5" title={token.value}>{token.value}</span>}
                   <Button
                     data-filter-remove=""
-                    variant="ghost" size="sm" className="size-6 shrink-0 rounded-none p-0"
+                    variant="ghost" size="sm" className={cn("size-5 shrink-0 rounded-none p-0", hitTarget)}
                     disabled={props.disabled}
                     aria-label={props.removeLabel([token.label, token.value].filter(Boolean).join(": "))}
                     onClick={() => removeToken(token.id)}
