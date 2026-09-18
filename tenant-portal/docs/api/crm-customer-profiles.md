@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-09-18**
 
 Owning app: **crm-app**
 
@@ -12,16 +12,17 @@ Portal status: **built** — list in three views, detail, create, update, status
 change, delete and add-contact. Not exercised against a live session: CRM is
 blocked twice over, by P4 and by Q17.
 
-`GET /:id` returns `CustomerProfileReadModel`, which joins the acquisition
-source and a Party summary and **no contact relationships** — a profile can
-gain a contact and cannot list the ones it has (Q41). The registration
-identifiers (`taxNumber`, `commercialRegistrationNumber`) live on the joined
-Party, not on the profile row.
+`GET /:id` returns `CustomerProfileReadModel`, including the acquisition
+source, Party summary, primary address and the customer's contact
+relationships. The registration identifiers (`taxNumber`,
+`commercialRegistrationNumber`) live on the joined Party, not on the profile
+row.
 
 Source inspected:
 `crm-app/src/crm/customer-profiles/customer-profiles.controller.ts`,
 `dto/customer-profile.dto.ts`,
-`crm-app/src/crm/common/dto/crm-list-query.dto.ts`.
+`crm-app/src/crm/common/dto/crm-list-query.dto.ts`,
+`crm-app/src/common/party-read-model.ts`.
 
 ## Routes
 
@@ -29,7 +30,13 @@ Source inspected:
 | --- | --- | --- | --- |
 | POST | `/api/tenant/crm/v1/customer-profiles` | `crm.customer_profiles.create` (scoped) | body |
 | GET | `/api/tenant/crm/v1/customer-profiles` | `crm.customer_profiles.read` (scoped) | query |
+| POST | `/api/tenant/crm/v1/customer-profiles/search` | `crm.customer_profiles.read` (scoped) | body |
+| POST | `/api/tenant/crm/v1/customer-profiles/board` | `crm.customer_profiles.read` (scoped) | body |
+| POST | `/api/tenant/crm/v1/customer-profiles/board/statuses/:status` | `crm.customer_profiles.read` (scoped) | body |
 | GET | `/api/tenant/crm/v1/customer-profiles/capabilities` | **none** — branch membership | query |
+| GET | `/api/tenant/crm/v1/customer-profiles/:id/tags` | `crm.customer_profiles.read` (scoped) | record |
+| POST | `/api/tenant/crm/v1/customer-profiles/:id/tags` | `crm.customer_profiles.update` (scoped) | record |
+| DELETE | `/api/tenant/crm/v1/customer-profiles/:id/tags/:tagId` | `crm.customer_profiles.update` (scoped) | record |
 | GET | `/api/tenant/crm/v1/customer-profiles/:id` | `crm.customer_profiles.read` (scoped) | record |
 | PATCH | `/api/tenant/crm/v1/customer-profiles/:id` | `crm.customer_profiles.update` (scoped) | record |
 | POST | `/api/tenant/crm/v1/customer-profiles/:id/contacts` | `crm.customer_profiles.update` (scoped) | record |
@@ -43,12 +50,18 @@ Source inspected:
 | --- | --- | --- |
 | `branchId` | UUIDv7 | **yes** |
 | `page`, `limit`, `sortBy`, `sortDir` | pagination | no — `sortDir` is `ASC`/`DESC`, see [README.md#sort-parameters-differ-per-endpoint](README.md#sort-parameters-differ-per-endpoint) |
+| `search`, `searchField` | text plus `customer` \| `email` \| `phone` | no |
 | `profileType` | `CrmProfileTypeEnum` | no — `INDIVIDUAL` \| `CORPORATE` |
 | `status` | `CustomerStatusEnum` | no — 4 values |
 | `acquisitionSourceId` | UUIDv7 | no |
 | `ownerUserId` | UUIDv7 | no — **narrows only** |
 
-Response `200`, paginated `{ items, meta }` — raw CRM shape.
+Response `200` is the flat CRM page
+`{ items, total, page, limit, totalPages, hasNext, hasPrev }`. Card/Table rows
+are enriched with the customer Party image and contact methods, company
+website, primary address, primary corporate contact, owner name/avatar,
+acquisition source, next activity and tags. Board rows intentionally use a
+smaller projection.
 
 ## POST /customer-profiles/:id/contacts
 
@@ -112,10 +125,12 @@ Returns **`204`** with no body.
   order: `PROSPECT`, `ACTIVE_CUSTOMER`, `INACTIVE`, `BLACKLISTED`.
   Unlike leads and opportunities this needs **no catalogue fetch**, and the
   column set never varies by tenant.
-- Default view is `table` — a customer list is a directory, not a funnel.
-  Leads and opportunities default to `board`.
+- Default view is `board`; Card and Table use the richer list/search projection.
 - Core owns the underlying party directory; CRM owns the profile. Do not try
   to join them client-side.
+- Card and Table consume the rich list/search projection. Preserve the Party
+  photo/logo, owner avatar, city/country, website, tags and corporate primary
+  contact instead of reducing the row to profile ids.
 - The list screen's Basic search uses removable tokens in one input. Its
   semantic choices are Customer, Email and Phone/Mobile; there is no Lead
   choice on this screen. Status, Customer type and Source are structured
@@ -130,9 +145,8 @@ Returns **`204`** with no body.
 - `sortBy` accepts `displayName` and `createdAt` and nothing else. `safeSortBy`
   **throws** on an unlisted value rather than falling back to the default it is
   handed, so an unrecognised sort is a `400`, not a default sort.
-- `ownerUserId` is offered by no control: nothing lists assignable users by
-  name, so the only possible input is a raw UUID — see
-  [OPEN-QUESTIONS Q132](../build/OPEN-QUESTIONS.md).
+- Basic search applies the authenticated user's `ownerUserId` through the
+  default **My Customers** chip. The screen does not expose a raw UUID field.
 
 ## Portal status
 
@@ -147,4 +161,4 @@ Returns **`204`** with no body.
 | Capabilities-driven actions | live — edit, status, delete and add-contact |
 | Create / update / delete | live — `POST`, `PATCH /:id`, `DELETE /:id` |
 | Add contact | live — `POST /:id/contacts`; **this route declares `organizationScopeMode: NONE`, so it must send NO scope headers** |
-| Contacts list | **no route exists** — the read model joins no relationships, see OPEN-QUESTIONS.md Q41 |
+| Contacts list | live inside `GET /:id` through the detail projection's `contacts[]` |

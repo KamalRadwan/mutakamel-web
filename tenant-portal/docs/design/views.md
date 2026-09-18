@@ -967,10 +967,10 @@ the other ends it — and the two sit one menu row apart.
 | Board axis | `CustomerStatusEnum`, fixed order |
 | Move | `PATCH /api/tenant/crm/v1/customer-profiles/:id` — `{ status }` |
 | Capabilities | `GET /api/tenant/crm/v1/customer-profiles/capabilities?branchId=` |
-| Default view | `table` |
-| Card fields | Display name · profile-type icon · owner · acquisition source · `StatusBadge(status)` · contact count |
-| Table columns | Name · Type · Status · Owner · Source · Branch · Created · Actions |
-| Sortable | `createdAt`, `updatedAt`, `name` |
+| Default view | `board` |
+| Card fields | Party photo/logo · display name · type/status · tags · city/country · phones/actions · email/website · corporate primary contact · source · owner avatar/name · activity |
+| Table columns | Customer/type/tags · Contact name/position/email · Phone/actions · Location · Status · Source · Salesperson · Activity · Actions |
+| Sortable | `displayName`, `createdAt` |
 | Filters | `profileType`, `status`, `acquisitionSourceId`, `ownerUserId` |
 | Terminal stages | `BLACKLISTED` — confirm before moving |
 
@@ -988,10 +988,10 @@ the other ends it — and the two sit one menu row apart.
 | Capabilities | `GET /api/tenant/crm/v1/opportunities/capabilities?branchId=` |
 | Default view | `board` |
 | Extra control | **Pipeline selector, required.** `pipelineId` in the URL |
-| Card fields | Title · customer display name · customer type · phone · city/country · lead source · owner name + avatar · `importance` (stars) · `openActivityCount` |
-| Table columns | Title · Customer (link to the customer-profile detail page — see below) · Stage · Status · Owner (raw id — see below) · Expected close · Actions |
-| Sortable (table only) | `createdAt`, `expectedCloseDate` |
-| Filters | `pipelineId`, `stageId`, `status`, `customerProfileId`, `ownerUserId`, `expectedCloseFrom`, `expectedCloseTo` |
+| Card fields | Title/status · customer + primary contact · phone actions · city/country · source · tags · amount/currency · probability · expected close · owner avatar/name · `importance` stars · activity · `PQ`/`SO`/`IN` |
+| Table columns | Opportunity/status · Customer · Contact · Phone/actions · Country · Deal value/probability · Stage · Source · Owner · Expected close · Importance/activity · Actions |
+| Sortable (table only) | `title`, `amount`, `expectedCloseDate` |
+| Filters | semantic text, tags, `pipelineId`, `stageId`, `stageFlag`, `status`, `customerProfileId`, `ownerUserId`, `expectedCloseFrom`, `expectedCloseTo` |
 | Terminal stages | Flags `WON` and `LOST` |
 
 **Opportunities is the one screen where the three views hit three different
@@ -1006,23 +1006,16 @@ Consequences you must design for:
   paginate independently — that is the whole point of the board endpoint.
 - **Cursors are filter-bound.** Resend the same filters with the cursor or the
   page is rejected.
-- **There is no per-card amount.** Money arrives as
-  `stage.summary.amountsByCurrency` — a per-stage, per-currency array of
-  decimal strings. Render each currency separately in the column header; never
-  add across currencies, and never put an amount on a card.
+- Card and list rows retain each opportunity's exact decimal `amount`, currency,
+  probability and expected close date. The board also returns
+  `stage.summary.amountsByCurrency` for authoritative per-stage totals. Render
+  each currency separately and never add across currencies in the browser.
 - Each column also carries `activitySummary` with `overdueCount` — surface it,
   it is the most actionable number on the board.
 - `ownerAvatarUrl` is a safe, cache-busted server path. Render as given.
-- **The table's `Customer`/`Owner` columns cannot show a name.** `GET
-  /opportunities` returns the raw `OpportunityEntity` — `customerProfileId`
-  and `ownerUserId` only, verified against `opportunities.service.ts`'s
-  `findAll` return type. The card endpoint has display names because it is a
-  different, purpose-built projection; the table's generic list does not, and
-  there is no separate user/party-directory lookup to resolve `ownerUserId`
-  elsewhere in the app. Settled: `Customer` renders as a link to
-  `/crm/customer-profiles/:id` (a real, working affordance) instead of a
-  fabricated name; `Owner` renders the raw id. Do not build a fake name for
-  either — see [anti-patterns.md](anti-patterns.md#13-fake-data-and-fake-success).
+- `GET /opportunities` enriches every list row with customer/contact identity,
+  source, owner name/avatar, activity and tags. Table view renders those values
+  directly and keeps the customer link on the real customer-profile id.
 
 ## Accessibility
 

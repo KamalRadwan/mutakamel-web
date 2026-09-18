@@ -15,6 +15,17 @@ const BRANCH_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b4";
 const OTHER_BRANCH_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b5";
 const PARTY_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b6";
 const CONTACT_PARTY_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b9";
+const OWNER_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41b7";
+const TAG_ID = "0191e9a8-7f51-7b32-8d72-19f9217a41ba";
+const IMAGE_URL =
+  "/api/tenant/core/v1/directory/parties/" + PARTY_ID + "/image?v=1789371508713";
+
+function profileTags(count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `0191e9a8-7f51-7b32-8d72-${index.toString(16).padStart(12, "0")}`,
+    name: `Tag ${index + 1}`,
+  }));
+}
 
 const profile = {
   id: PROFILE_ID,
@@ -52,11 +63,15 @@ describe("CRM customer-profile contract", () => {
       profileType: "CORPORATE",
       status: "ACTIVE_CUSTOMER",
       companyName: "Acme Retail LLC",
+      imageUrl: null,
       phone: "+201001112223",
       phones: ["+201001112223"],
       email: "info@acme.test",
+      companyWebsite: null,
       country: "",
+      city: "",
       primaryContact: null,
+      tags: [],
       ownerUserId: null,
       owner: null,
       nextActivity: null,
@@ -69,8 +84,21 @@ describe("CRM customer-profile contract", () => {
   it("retains a corporate primary contact and all rich fields after a local row update", () => {
     const parsed = parseCustomerProfileResponse({
       ...profile,
-      address: { country: "Egypt" },
+      party: { imageUrl: IMAGE_URL },
+      address: { country: "Egypt", city: "Cairo" },
+      companyWebsite: "https://acme.test/about",
       phones: ["+201001112223", "+201009998887"],
+      tags: [{ id: TAG_ID, name: "Healthcare" }],
+      ownerUserId: OWNER_ID,
+      owner: {
+        userId: OWNER_ID,
+        firstName: "Kamal",
+        lastName: "Radwan",
+        avatarUrl:
+          "/api/tenant/core/v1/directory/parties/" +
+          CONTACT_PARTY_ID +
+          "/image?v=1789371508714",
+      },
       primaryContact: {
         partyId: CONTACT_PARTY_ID,
         displayName: "Mona Saleh",
@@ -95,16 +123,50 @@ describe("CRM customer-profile contract", () => {
       "+201009998887",
     ]);
     expect(afterStatusUpdate.country).toBe("Egypt");
+    expect(afterStatusUpdate.city).toBe("Cairo");
+    expect(afterStatusUpdate.imageUrl).toBe(IMAGE_URL);
+    expect(afterStatusUpdate.companyWebsite).toBe("https://acme.test/about");
+    expect(afterStatusUpdate.tags).toEqual([
+      { id: TAG_ID, name: "Healthcare" },
+    ]);
+    expect(afterStatusUpdate.owner?.avatarUrl).toContain("/image?v=");
+  });
+
+  it("accepts more than one attach batch of tags up to the 500-tag catalogue limit", () => {
+    expect(
+      parseCustomerProfileResponse({ ...profile, tags: profileTags(51) }).tags,
+    ).toHaveLength(51);
+    expect(
+      parseCustomerProfileResponse({ ...profile, tags: profileTags(500) }).tags,
+    ).toHaveLength(500);
+    expect(() =>
+      parseCustomerProfileResponse({ ...profile, tags: profileTags(501) }),
+    ).toThrow("Invalid CRM customer-profiles response.");
+  });
+
+  it("rejects untrusted party images and non-http company websites", () => {
+    expect(() =>
+      parseCustomerProfileResponse({
+        ...profile,
+        party: { imageUrl: "https://example.test/customer.png" },
+      }),
+    ).toThrow("Invalid CRM customer-profiles response.");
+    expect(() =>
+      parseCustomerProfileResponse({
+        ...profile,
+        companyWebsite: "javascript:alert(1)",
+      }),
+    ).toThrow("Invalid CRM customer-profiles response.");
   });
 
   it("parses the joined ownerUserId and acquisitionSource when present — docs/design/views.md's card-fields", () => {
     const withOwnerAndSource = {
       ...profile,
-      ownerUserId: "0191e9a8-7f51-7b32-8d72-19f9217a41b7",
+      ownerUserId: OWNER_ID,
       acquisitionSource: { id: "0191e9a8-7f51-7b32-8d72-19f9217a41b8", nameAr: "الإحالات", nameEn: "Referrals" },
     };
     const parsed = parseCustomerProfileResponse(withOwnerAndSource);
-    expect(parsed.ownerUserId).toBe("0191e9a8-7f51-7b32-8d72-19f9217a41b7");
+    expect(parsed.ownerUserId).toBe(OWNER_ID);
     expect(parsed.acquisitionSourceNameAr).toBe("الإحالات");
     expect(parsed.acquisitionSourceNameEn).toBe("Referrals");
   });

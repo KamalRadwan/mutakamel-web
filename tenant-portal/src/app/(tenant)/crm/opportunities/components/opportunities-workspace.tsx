@@ -250,8 +250,8 @@ export function OpportunitiesWorkspace() {
 
   const selectedPipeline = pipelines.find(({ id }) => id === selectedPipelineId) ?? null;
   const stageById = useMemo(
-    () => new Map((selectedPipeline?.stages ?? []).map((stage) => [stage.id, stage])),
-    [selectedPipeline],
+    () => new Map(pipelines.flatMap((pipeline) => pipeline.stages.map((stage) => [stage.id, stage]))),
+    [pipelines],
   );
 
   const [importances, setImportances] = useState<Record<string, number>>({});
@@ -260,7 +260,8 @@ export function OpportunitiesWorkspace() {
     stageById,
     canUpdate: (item) =>
       opportunityCapabilityAllowsOwner(capabilities?.update ?? null, item.ownerUserId),
-    canDelete: () => Boolean(capabilities?.delete),
+    canDelete: (item) =>
+      opportunityCapabilityAllowsOwner(capabilities?.delete ?? null, item.ownerUserId),
     onDelete: (item) => {
       clearError();
       setSelectedForDelete(item);

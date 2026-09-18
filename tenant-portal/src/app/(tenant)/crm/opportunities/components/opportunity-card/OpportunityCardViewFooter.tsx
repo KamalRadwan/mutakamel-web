@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { Building2, Calendar, UserRound } from "lucide-react";
-import { cn, iconSize } from "@/design-system";
-import { formatDate } from "@/lib/format/date";
+import { DateTime, cn, iconSize } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { OpportunityActivityState } from "../../hooks/pipeline-types";
 import {
@@ -64,7 +63,13 @@ export function OpportunityCardViewFooter({
         <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Calendar className={cn(iconSize({ size: "sm" }), "shrink-0")} aria-hidden="true" />
           <span className="truncate">
-            {labels.expectedClose}: {formatDate(expectedCloseDate, lang)}
+            {labels.expectedClose}:{" "}
+            <DateTime
+              value={`${expectedCloseDate.slice(0, 10)}T00:00:00.000Z`}
+              precision="date"
+              language={lang}
+              timeZone="UTC"
+            />
           </span>
         </div>
       )}

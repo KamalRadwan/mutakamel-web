@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, UserRound } from "lucide-react";
+import { Activity } from "lucide-react";
 import { Button, cn, iconSize } from "@/design-system";
 import {
   CRM_ACTIVITY_MARK,
@@ -10,6 +10,7 @@ import type {
   CustomerProfileNextActivity,
   CustomerProfileOwner,
 } from "../../hooks/useCustomerProfiles";
+import { CustomerOwnerAvatar } from "./CustomerProfileAvatar";
 
 export interface CustomerProfileCardFooterLabels {
   activity: string;
@@ -57,12 +58,12 @@ export function CustomerProfileCardFooter({
         />
       </Button>
 
-      {ownerName && (
+      {owner && ownerName && (
         <span
           title={labels.owner}
           className="flex min-w-0 items-center gap-1 text-2xs text-muted-foreground"
         >
-          <UserRound className="size-3 shrink-0" aria-hidden="true" />
+          <CustomerOwnerAvatar owner={owner} className="size-4" />
           <span className="truncate">{ownerName}</span>
         </span>
       )}

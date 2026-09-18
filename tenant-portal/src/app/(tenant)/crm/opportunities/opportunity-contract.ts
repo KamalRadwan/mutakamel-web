@@ -73,6 +73,14 @@ export interface OpportunityDetail extends OpportunityReadFields {
   updatedAt: string;
 }
 
+export interface OpportunityCommercialFields {
+  /** Exact decimal string. It must never pass through `Number()`. */
+  amount: string | null;
+  currencyCode: string | null;
+  expectedCloseDate: string | null;
+  probabilityPercent: number | null;
+}
+
 export interface OpportunityStageSnapshot {
   pipelineNameAr: string | null;
   pipelineNameEn: string | null;
@@ -131,6 +139,18 @@ function boundedInteger(value: unknown, min: number, max: number): number | null
   return parsed;
 }
 
+/** Shared outbound parser for the commercial fields returned by every rich opportunity view. */
+export function parseOpportunityCommercialFields(
+  item: Record<string, unknown>,
+): OpportunityCommercialFields {
+  return {
+    amount: nullableDecimal(item.amount),
+    currencyCode: nullableText(item.currencyCode),
+    expectedCloseDate: nullableText(item.expectedCloseDate),
+    probabilityPercent: boundedInteger(item.probabilityPercent, 0, 100),
+  };
+}
+
 export function parseOpportunityDetailResponse(
   payload: unknown,
 ): OpportunityDetail {
@@ -155,6 +175,7 @@ export function parseOpportunityDetailResponse(
 
   return {
     ...parseOpportunityReadFields(item),
+    ...parseOpportunityCommercialFields(item),
     id: item.id,
     branchId: item.branchId,
     customerProfileId: item.customerProfileId,
@@ -167,11 +188,7 @@ export function parseOpportunityDetailResponse(
     status: item.status,
     title: item.title,
     importance,
-    amount: nullableDecimal(item.amount),
-    currencyCode: nullableText(item.currencyCode),
     description: nullableText(item.description),
-    expectedCloseDate: nullableText(item.expectedCloseDate),
-    probabilityPercent: boundedInteger(item.probabilityPercent, 0, 100),
     ownerUserId: nullableUuid(item.ownerUserId),
     wonAt: nullableText(item.wonAt),
     lostAt: nullableText(item.lostAt),

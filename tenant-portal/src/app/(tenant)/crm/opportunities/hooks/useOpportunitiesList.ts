@@ -14,23 +14,27 @@ import {
   type OpportunitySortBy,
 } from "../opportunity-search-contract";
 import {
+  parseOpportunityCommercialFields,
+  type OpportunityCommercialFields,
+} from "../opportunity-contract";
+import {
   parseOpportunityReadFields,
   type OpportunityReadFields,
 } from "../opportunity-read-model";
 import type { OpportunityStatus, StageFlag } from "./pipeline-types";
 
-export interface OpportunityListItem extends OpportunityReadFields {
+export interface OpportunityListItem extends OpportunityReadFields, OpportunityCommercialFields {
   id: string;
   branchId: string;
   customerProfileId: string;
+  customerPartyId: string;
   pipelineId: string;
   stageId: string;
-  stageFlag: StageFlag;
+  stageFlag: StageFlag | null;
   status: OpportunityStatus;
   title: string;
   importance: number;
   ownerUserId: string | null;
-  expectedCloseDate: string | null;
   createdAt: string;
 }
 
@@ -84,15 +88,16 @@ function nullableUuidV7(value: unknown): string | null {
   return value;
 }
 
-function nullableString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
 function enumValue<T extends string>(value: unknown, options: readonly T[]): T {
   if (typeof value !== "string" || !options.includes(value as T)) {
     throw new Error("Invalid opportunities response.");
   }
   return value as T;
+}
+
+function nullableEnumValue<T extends string>(value: unknown, options: readonly T[]): T | null {
+  if (value === null || value === undefined) return null;
+  return enumValue(value, options);
 }
 
 function parseItem(value: unknown, expectedBranchId: string): OpportunityListItem {
@@ -106,17 +111,18 @@ function parseItem(value: unknown, expectedBranchId: string): OpportunityListIte
   }
   return {
     ...parseOpportunityReadFields(item),
+    ...parseOpportunityCommercialFields(item),
     id: requiredUuidV7(item, "id"),
     branchId,
     customerProfileId: requiredUuidV7(item, "customerProfileId"),
+    customerPartyId: requiredUuidV7(item, "customerPartyId"),
     pipelineId: requiredUuidV7(item, "pipelineId"),
     stageId: requiredUuidV7(item, "stageId"),
-    stageFlag: enumValue(item.stageFlag, STAGE_FLAGS),
+    stageFlag: nullableEnumValue(item.stageFlag, STAGE_FLAGS),
     status: enumValue(item.status, OPPORTUNITY_STATUSES),
     title: requiredString(item, "title"),
     importance: importance as number,
     ownerUserId: nullableUuidV7(item.ownerUserId),
-    expectedCloseDate: nullableString(item.expectedCloseDate),
     createdAt: requiredString(item, "createdAt"),
   };
 }

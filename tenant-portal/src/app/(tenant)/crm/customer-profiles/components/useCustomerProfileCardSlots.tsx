@@ -24,6 +24,7 @@ export interface CustomerProfileCardSlotsOptions {
 
 export interface CustomerProfileCardSlots {
   renderCard: (item: CustomerProfileItem) => ReactNode;
+  renderCardViewCard: (item: CustomerProfileItem) => ReactNode;
   renderActions: (item: CustomerProfileItem) => ReactNode;
   renderFooter: (item: CustomerProfileItem) => ReactNode;
   renderCardViewFooter: (item: CustomerProfileItem) => ReactNode;
@@ -60,6 +61,9 @@ export function useCustomerProfileCardSlots({
 
   return {
     renderCard: (item) => <CustomerProfileCard item={item} />,
+    renderCardViewCard: (item) => (
+      <CustomerProfileCard item={item} variant="card" />
+    ),
 
     renderActions: (item) => (
       <CustomerProfileCardMenu
@@ -109,6 +113,10 @@ export function useCustomerProfileCardSlots({
             emailAction: formatTemplate(card.emailAction, {
               value: item.email ?? "",
             }),
+            websiteAction:
+              t.crmCustomerProfiles.create.companyWebsite +
+              ": " +
+              (item.companyWebsite ?? ""),
             contactEmailAction: formatTemplate(card.emailAction, {
               value: item.primaryContact?.email ?? "",
             }),
@@ -120,7 +128,9 @@ export function useCustomerProfileCardSlots({
               item.profileType === "CORPORATE"
                 ? card.companyCountry
                 : card.individualCountry,
-              { name: item.country },
+              {
+                name: [item.country, item.city].filter(Boolean).join(" · "),
+              },
             ),
             primary: card.primary,
             position: formatTemplate(card.position, {

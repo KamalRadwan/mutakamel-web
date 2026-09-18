@@ -37,6 +37,8 @@ export interface OpportunityReadFields {
   tags: OpportunityTagSummary[];
 }
 
+const MAX_OPPORTUNITY_TAGS = 500;
+
 function invalid(): never {
   throw new Error("Invalid opportunity response.");
 }
@@ -79,7 +81,7 @@ function primaryContact(value: unknown): OpportunityPrimaryContact | null {
 
 function tags(value: unknown): OpportunityTagSummary[] {
   if (value === null || value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 50) invalid();
+  if (!Array.isArray(value) || value.length > MAX_OPPORTUNITY_TAGS) invalid();
   const parsed = value.map((entry) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) invalid();
     const tag = entry as Record<string, unknown>;

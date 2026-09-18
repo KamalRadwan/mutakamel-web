@@ -92,8 +92,9 @@ Basic search for all three workspaces uses the shared token control and applies 
 ### Customer tokens
 
 - Default: `My Customers` (`ownerUserId = authenticated user`).
-- Text choices: Customer, Company, Email, Phone/Mobile.
-- Catalogue/enum choices: Tag, Status, Customer type, Source.
+- Text choices: Customer, Email, Phone/Mobile. Customer searches both person and
+  organization names.
+- Catalogue/enum choices: Status, Customer type, Source.
 - Repeated structured fields become `IN` filters through the search endpoint.
 - Only one semantic text token is active because the wire carries one `search` plus one `searchField`.
 
@@ -128,8 +129,13 @@ The Stage/Status bar and Basic tokens are one state:
 ### Card
 
 - Compact density and no selection checkbox or Select All.
-- Customer cards distinguish individual/company, show direct contact actions, country, primary corporate contact, source, salesperson and activity state.
-- Opportunity cards show title, customer type/name, phone actions, country/city, source, owner/avatar, importance and open activity state/count.
+- Customer cards distinguish individual/company and show photo/logo, status,
+  tags, phones/actions, country/city, email/website, primary corporate contact,
+  source, salesperson avatar/name and activity state.
+- Opportunity cards show title/status, customer and primary contact, phone
+  actions, country/city, source, tags, exact amount/currency, probability,
+  expected close, owner/avatar, importance, open activity state/count and the
+  permission-visible `PQ`/`SO`/`IN` counts.
 - Footer content stays bottom-aligned across cards of unequal body content.
 - Any rank/importance update merges only the fields confirmed by that mutation and preserves rich list fields.
 
@@ -142,6 +148,10 @@ Customer Profiles deliberately have no rating or card-colour control. The entity
 - IDs are never used as the visible owner/customer label when the API can return the public name.
 - Phone actions are independent controls and do not activate the row.
 - Rating/importance and activity controls are interactive and capability-gated.
+- Customer rows preserve bounded tags, both primary-contact position and email,
+  country/city and the customer/owner images returned by the API.
+- Opportunity rows preserve bounded tags, full primary-contact context,
+  country/city and exact amount/currency/probability values.
 
 ## Detail-page parity
 

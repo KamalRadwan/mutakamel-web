@@ -20,10 +20,13 @@ const mockCustomer: CustomerProfileItem = {
   profileType: "CORPORATE",
   status: "ACTIVE_CUSTOMER",
   companyName: "Al-Amal Healthcare Co.",
+  imageUrl: null,
   phone: "+966112345678",
   phones: ["+966112345678"],
   email: "info@alamal.med.sa",
+  companyWebsite: "https://alamal.med.sa",
   country: "Saudi Arabia",
+  city: "Riyadh",
   primaryContact: {
     partyId: "0192f3a0-0000-7000-8000-000000000004",
     displayName: "Mona Saleh",
@@ -32,11 +35,15 @@ const mockCustomer: CustomerProfileItem = {
     phones: ["+966501234567"],
     isPrimary: true,
   },
+  tags: [
+    { id: "0192f3a0-0000-7000-8000-000000000020", name: "Healthcare" },
+  ],
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
   owner: {
     userId: "0192f3a0-0000-7000-8000-000000000010",
     firstName: "Kamal",
     lastName: "Radwan",
+    avatarUrl: null,
   },
   nextActivity: null,
   acquisitionSourceNameAr: "موقع الكتروني",
@@ -75,6 +82,7 @@ describe("useCustomerProfileColumns", () => {
 
     expect(screen.getByText("Mona Saleh")).toBeInTheDocument();
     expect(screen.getByText("Procurement Manager")).toBeInTheDocument();
+    expect(screen.getByText("mona@alamal.med.sa")).toBeInTheDocument();
     expect(screen.getByText("Primary")).toBeInTheDocument();
     expect(screen.getByText("+966501234567")).toBeInTheDocument();
     expect(
@@ -95,6 +103,28 @@ describe("useCustomerProfileColumns", () => {
 
     expect(screen.getByText("Mona Saleh")).toBeInTheDocument();
     expect(screen.getByText("+966501234567")).toBeInTheDocument();
+  });
+
+  it("shows customer tags, city, and salesperson in their compact cells", () => {
+    const { result } = renderHook(() => useCustomerProfileColumns());
+    const name = result.current.find((column) => column.id === "name")!;
+    const country = result.current.find((column) => column.id === "country")!;
+    const salesperson = result.current.find(
+      (column) => column.id === "salesperson",
+    )!;
+
+    render(
+      <div>
+        {name.cell(mockCustomer)}
+        {country.cell(mockCustomer)}
+        {salesperson.cell(mockCustomer)}
+      </div>,
+    );
+
+    expect(screen.getByText("Healthcare")).toBeInTheDocument();
+    expect(screen.getByText("Saudi Arabia")).toBeInTheDocument();
+    expect(screen.getByText("Riyadh")).toBeInTheDocument();
+    expect(screen.getByText("Kamal Radwan")).toBeInTheDocument();
   });
 
   it("opens activities from the activity column", () => {

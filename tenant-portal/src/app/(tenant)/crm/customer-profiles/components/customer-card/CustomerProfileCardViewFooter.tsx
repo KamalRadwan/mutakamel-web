@@ -2,6 +2,7 @@
 
 import {
   BriefcaseBusiness,
+  Globe2,
   Mail,
   MapPin,
   UserRound,
@@ -16,10 +17,12 @@ import {
   CustomerProfileCardFooter,
   type CustomerProfileCardFooterLabels,
 } from "./CustomerProfileCardFooter";
+import { CustomerOwnerAvatar } from "./CustomerProfileAvatar";
 
 export interface CustomerProfileCardViewFooterLabels
   extends CustomerProfileCardFooterLabels {
   emailAction: string;
+  websiteAction: string;
   contactEmailAction: string;
   source: string;
   salesperson: string;
@@ -43,6 +46,7 @@ export function CustomerProfileCardViewFooter({
 }: CustomerProfileCardViewFooterProps) {
   const { lang } = useI18n();
   const storedCountry = item.country.trim();
+  const storedCity = item.city.trim();
   const countryIso = /^[A-Z]{2}$/u.test(storedCountry.toUpperCase())
     ? storedCountry.toUpperCase()
     : countryIsoFromName(storedCountry);
@@ -57,7 +61,7 @@ export function CustomerProfileCardViewFooter({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 border-t border-border pt-1.5">
-      {storedCountry && (
+      {(storedCountry || storedCity) && (
         <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <MapPin
             className={cn(iconSize({ size: "sm" }), "shrink-0")}
@@ -98,6 +102,26 @@ export function CustomerProfileCardViewFooter({
           />
           <span className="truncate" dir="ltr">
             {item.email}
+          </span>
+        </a>
+      )}
+
+      {item.companyWebsite && (
+        <a
+          href={item.companyWebsite}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={labels.websiteAction}
+          title={labels.websiteAction}
+          onClick={(event) => event.stopPropagation()}
+          className="flex min-w-0 items-center gap-1.5 rounded-xs text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Globe2
+            className={cn(iconSize({ size: "sm" }), "shrink-0")}
+            aria-hidden="true"
+          />
+          <span className="truncate" dir="ltr">
+            {new URL(item.companyWebsite).hostname}
           </span>
         </a>
       )}
@@ -168,15 +192,9 @@ export function CustomerProfileCardViewFooter({
       )}
 
       <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-1.5">
-        {ownerName && (
+        {item.owner && ownerName && (
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
-            <UserRound
-              className={cn(
-                iconSize({ size: "sm" }),
-                "shrink-0 text-muted-foreground",
-              )}
-              aria-hidden="true"
-            />
+            <CustomerOwnerAvatar owner={item.owner} className="size-5" />
             <span className="truncate font-medium">{labels.salesperson}</span>
           </div>
         )}

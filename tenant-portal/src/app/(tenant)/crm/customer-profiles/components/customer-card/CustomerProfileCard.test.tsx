@@ -28,16 +28,28 @@ const mockCustomer: CustomerProfileItem = {
   profileType: "CORPORATE",
   status: "ACTIVE_CUSTOMER",
   companyName: "Al-Amal Healthcare Services",
+  imageUrl:
+    "/api/tenant/core/v1/directory/parties/0192f3a0-0000-7000-8000-000000000003/image?v=1789371508713",
   phone: "+966112345678",
   phones: ["+966112345678"],
   email: "info@alamal.com",
+  companyWebsite: "https://alamal.com",
   country: "Saudi Arabia",
+  city: "Riyadh",
   primaryContact: null,
+  tags: [
+    { id: "0192f3a0-0000-7000-8000-000000000020", name: "Healthcare" },
+    { id: "0192f3a0-0000-7000-8000-000000000021", name: "Priority" },
+    { id: "0192f3a0-0000-7000-8000-000000000022", name: "Enterprise" },
+    { id: "0192f3a0-0000-7000-8000-000000000023", name: "Renewal" },
+  ],
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
   owner: {
     userId: "0192f3a0-0000-7000-8000-000000000010",
     firstName: "Kamal",
     lastName: "Radwan",
+    avatarUrl:
+      "/api/tenant/core/v1/directory/parties/0192f3a0-0000-7000-8000-000000000011/image?v=1789371508714",
   },
   nextActivity: null,
   acquisitionSourceNameAr: "موقع الكتروني",
@@ -64,6 +76,17 @@ describe("CustomerProfileCard", () => {
     expect(screen.getByText("Corporate")).toBeInTheDocument();
     expect(screen.getByText("Al-Amal Healthcare Services")).toBeInTheDocument();
     expect(screen.getByText("Website")).toBeInTheDocument();
+  });
+
+  it("shows status and bounded tags in Card View without repeating the source", () => {
+    render(<CustomerProfileCard item={mockCustomer} variant="card" />);
+
+    expect(screen.getByText("Active customer")).toBeInTheDocument();
+    expect(screen.getByText("Healthcare")).toBeInTheDocument();
+    expect(screen.getByText("Priority")).toBeInTheDocument();
+    expect(screen.getByText("Enterprise")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.queryByText("Website")).not.toBeInTheDocument();
   });
 });
 

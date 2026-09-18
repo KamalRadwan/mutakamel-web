@@ -23,10 +23,13 @@ const mockCustomer: CustomerProfileItem = {
   profileType: "CORPORATE",
   status: "ACTIVE_CUSTOMER",
   companyName: "Al-Amal Healthcare Co.",
+  imageUrl: null,
   phone: "+966112345678",
   phones: ["+966112345678"],
   email: "info@alamal.med.sa",
+  companyWebsite: "https://alamal.med.sa/about",
   country: "Saudi Arabia",
+  city: "Riyadh",
   primaryContact: {
     partyId: "0192f3a0-0000-7000-8000-000000000004",
     displayName: "Mona Saleh",
@@ -35,11 +38,13 @@ const mockCustomer: CustomerProfileItem = {
     phones: ["+966501234567"],
     isPrimary: true,
   },
+  tags: [],
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
   owner: {
     userId: "0192f3a0-0000-7000-8000-000000000010",
     firstName: "Kamal",
     lastName: "Radwan",
+    avatarUrl: null,
   },
   nextActivity: null,
   acquisitionSourceNameAr: "موقع الكتروني",
@@ -51,10 +56,11 @@ const labels: CustomerProfileCardViewFooterLabels = {
   activity: "Activities — None planned",
   owner: "Owner: Kamal Radwan",
   emailAction: "Email company",
+  websiteAction: "Website: https://alamal.med.sa/about",
   contactEmailAction: "Email primary contact",
   source: "Source: Website",
   salesperson: "Salesperson: Kamal Radwan",
-  country: "Company country: Saudi Arabia",
+  country: "Company country: Saudi Arabia · Riyadh",
   primary: "Primary",
   position: "Position: Procurement Manager",
 };
@@ -70,12 +76,18 @@ describe("CustomerProfileCardViewFooter", () => {
       />,
     );
 
-    expect(screen.getByText("Company country: Saudi Arabia")).toBeInTheDocument();
+    expect(
+      screen.getByText("Company country: Saudi Arabia · Riyadh"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Mona Saleh")).toBeInTheDocument();
     expect(screen.getByText("Primary")).toBeInTheDocument();
     expect(screen.getByText("Position: Procurement Manager")).toBeInTheDocument();
     expect(screen.getByText(labels.source)).toBeInTheDocument();
     expect(screen.getByText("Salesperson: Kamal Radwan")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: labels.websiteAction })).toHaveAttribute(
+      "href",
+      "https://alamal.med.sa/about",
+    );
     expect(screen.getAllByTitle(en.crmLeadDetail.callAction)).toHaveLength(2);
     expect(screen.getAllByTitle(en.crmLeadDetail.whatsappAction)).toHaveLength(2);
     expect(screen.getAllByTitle(en.crmLeadDetail.telegramAction)).toHaveLength(2);

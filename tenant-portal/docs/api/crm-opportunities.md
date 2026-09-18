@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-09-18**
 
 Owning app: **crm-app**
 
@@ -26,7 +26,11 @@ Source inspected:
 | --- | --- | --- | --- |
 | POST | `/api/tenant/crm/v1/opportunities` | `crm.opportunities.create` (scoped) | body |
 | GET | `/api/tenant/crm/v1/opportunities` | `crm.opportunities.read` (scoped) | query |
+| POST | `/api/tenant/crm/v1/opportunities/search` | `crm.opportunities.read` (scoped) | body |
 | GET | `/api/tenant/crm/v1/opportunities/capabilities` | **none** — branch membership | query |
+| GET | `/api/tenant/crm/v1/opportunities/:id/tags` | `crm.opportunities.read` (scoped) | record |
+| POST | `/api/tenant/crm/v1/opportunities/:id/tags` | `crm.opportunities.update` (scoped) | record |
+| DELETE | `/api/tenant/crm/v1/opportunities/:id/tags/:tagId` | `crm.opportunities.update` (scoped) | record |
 | GET | `/api/tenant/crm/v1/opportunities/:id` | `crm.opportunities.read` (scoped) | record |
 | PATCH | `/api/tenant/crm/v1/opportunities/:id` | `crm.opportunities.update` (scoped) | record |
 | POST | `/api/tenant/crm/v1/opportunities/:id/stage` | `crm.opportunities.update` (scoped) | record |
@@ -148,6 +152,11 @@ independently limited page plus its own cursor, so columns paginate separately.
     "id": "0192…",
     "title": "Renew annual subscription",
     "stageId": "0192…",
+    "status": "IN_PROGRESS",
+    "amount": "250000.00",
+    "currencyCode": "EGP",
+    "probabilityPercent": 65,
+    "expectedCloseDate": "2026-10-31",
     "customerProfileType": "CORPORATE",
     "customerDisplayName": "Acme Trading",
     "customerCompanyName": "Acme Trading LLC",
@@ -170,9 +179,11 @@ independently limited page plus its own cursor, so columns paginate separately.
   It echoes back as `selectedStageId`; a stage id outside the pipeline is a
   **404**. Send no key rather than an empty one: `@IsOptional()` skips only
   null/undefined, so `stageId=` reaches `@IsUUID('7')` and is a 400.
-- **There is no per-item `amount`.** Money lives in the stage `summary` on the
-  board endpoint. Do not put an amount on an opportunity card — the field does
-  not exist in this projection.
+- Card items are the enriched opportunity read model. They retain the exact
+  per-opportunity `amount`, `currencyCode`, `probabilityPercent`,
+  `expectedCloseDate` and `status` alongside the customer/contact projection.
+  The board's stage `summary` remains the authoritative aggregate; never add
+  card amounts in the browser.
 - `ownerAvatarUrl` is a **safe, cache-busted server path**. Render it as given;
   never construct an avatar URL by hand.
 - `importance` is an integer, rendered as stars.
@@ -195,9 +206,11 @@ Do not try to unify them — `DataTable` uses `page`/`limit` against
 | --- | --- | --- |
 | `branchId` | UUIDv7 | **yes** |
 | `page`, `limit`, `sortBy`, `sortDir` | pagination | no — `sortDir` is `ASC`/`DESC`, see [README.md#sort-parameters-differ-per-endpoint](README.md#sort-parameters-differ-per-endpoint) |
+| `search`, `searchField` | text plus `opportunity` \| `customer` \| `email` \| `phone` | no |
 | `pipelineId` | UUIDv7 | no |
 | `stageId` | UUIDv7 | no |
 | `status` | `OpportunityStatusEnum` | no |
+| `stageFlag` | `OpportunityStageFlagEnum` | no |
 | `customerProfileId` | UUIDv7 | no |
 | `ownerUserId` | UUIDv7 | no — **narrows only** |
 | `expectedCloseFrom` | ISO date string | no |
@@ -206,7 +219,11 @@ Do not try to unify them — `DataTable` uses `page`/`limit` against
 `expectedCloseFrom`/`To` are `@IsDateString()` — send ISO strings, not
 `Date` objects.
 
-Response `200`, paginated `{ items, meta }` — raw CRM shape.
+Response `200` is the flat CRM page
+`{ items, total, page, limit, totalPages, hasNext, hasPrev }`. Each item is the
+same enriched read row used by Card view, including customer/contact, source,
+owner, activity, tags and the commercial fields. Table view must preserve the
+exact decimal `amount` string.
 
 ## POST /opportunities/:id/stage — move stage
 
@@ -274,10 +291,10 @@ they do not exist.
 | List, branch-scoped, paginated | live — table view |
 | Board view + stage move | live |
 | Card view | live |
-| Capabilities-driven actions | live — update (drag/importance) and delete; see [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md#q14--opportunities-table-has-no-customerowner-display-names--resolved-2026-08-28) for the table's Customer/Owner column gap |
+| Capabilities-driven actions | live — owner-scoped update (drag/importance) and delete; enriched rows provide customer/contact and owner display data |
 | Delete | live — `DELETE /:id`, capability-gated |
 | Create | live — `POST /opportunities` against an existing customer, plus the lead-conversion route |
 | Update | live — `PATCH /:id`, changed keys only; no pipeline or stage, which the DTO does not carry |
 | Pipeline transfer | live — `PUT /:id/pipeline`, confirmed, terminal target stages filtered out |
 | Stage history | live — `GET /:id/stage-history` on `Timeline`, in the server order |
-| Detail route | live — `/crm/opportunities/[id]`; **the proxy does not admit the path yet, see OPEN-QUESTIONS.md Q40** |
+| Detail route | live — `/crm/opportunities/[id]`; the Gateway admits the CRM detail path |

@@ -405,7 +405,7 @@ export default function CustomerProfilesPage() {
             <CardView
               items={items}
               itemKey={(item) => item.id}
-              renderCard={cardSlots.renderCard}
+              renderCard={cardSlots.renderCardViewCard}
               renderActions={cardSlots.renderActions}
               renderFooter={cardSlots.renderCardViewFooter}
               cardClassName={cardSlots.cardClassName}

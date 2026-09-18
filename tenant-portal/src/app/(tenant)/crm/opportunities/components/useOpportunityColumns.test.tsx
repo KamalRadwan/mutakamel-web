@@ -31,6 +31,7 @@ const mockOpportunity: OpportunityListItem = {
   id: "0192f3a0-0000-7000-8000-000000000001",
   branchId: "0192f3a0-0000-7000-8000-000000000002",
   customerProfileId: "0192f3a0-0000-7000-8000-000000000003",
+  customerPartyId: "0192f3a0-0000-7000-8000-000000000012",
   customerProfileType: "CORPORATE",
   customerDisplayName: "Acme Trading",
   customerCompanyName: "Acme Trading LLC",
@@ -54,13 +55,22 @@ const mockOpportunity: OpportunityListItem = {
   status: "IN_PROGRESS",
   title: "Enterprise Deal 2026",
   importance: 2,
+  amount: "9007199254740991.25",
+  currencyCode: "EGP",
+  probabilityPercent: 65,
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
   ownerDisplayName: "Kamal Radwan",
   ownerAvatarUrl: null,
   openActivityCount: 1,
   nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
   activityState: "FUTURE",
-  tags: [],
+  tags: [
+    {
+      id: "0192f3a0-0000-7000-8000-000000000013",
+      name: "VIP",
+      color: null,
+    },
+  ],
   expectedCloseDate: "2026-11-30T00:00:00Z",
   createdAt: "2026-09-01T00:00:00Z",
 };
@@ -82,11 +92,54 @@ describe("useOpportunityColumns", () => {
     expect(ids).toContain("phone");
     expect(ids).toContain("country");
     expect(ids).toContain("stage");
+    expect(ids).toContain("deal");
     expect(ids).toContain("source");
     expect(ids).toContain("owner");
     expect(ids).toContain("expectedClose");
     expect(ids).toContain("followUp");
     expect(ids).toContain("actions");
+  });
+
+  it("renders the exact deal amount with its probability", () => {
+    const { result } = renderHook(() =>
+      useOpportunityColumns({
+        stageById: new Map([[mockStage.id, mockStage]]),
+        onDelete: vi.fn(),
+      }),
+    );
+    const dealColumn = result.current.find((column) => column.id === "deal");
+
+    render(<div>{dealColumn!.cell(mockOpportunity)}</div>);
+
+    expect(screen.getByText(/9,007,199,254,740,991\.25/)).toBeInTheDocument();
+    expect(screen.getByText("65%")).toBeInTheDocument();
+  });
+
+  it("keeps customer tags, contact details and city visible", () => {
+    const { result } = renderHook(() =>
+      useOpportunityColumns({
+        stageById: new Map([[mockStage.id, mockStage]]),
+        onDelete: vi.fn(),
+      }),
+    );
+    const columns = new Map(result.current.map((column) => [column.id, column]));
+
+    render(
+      <div>
+        {columns.get("customer")!.cell(mockOpportunity)}
+        {columns.get("contact")!.cell(mockOpportunity)}
+        {columns.get("country")!.cell(mockOpportunity)}
+      </div>,
+    );
+
+    expect(screen.getByText("VIP")).toBeInTheDocument();
+    expect(screen.getByText("Nora Saleh")).toBeInTheDocument();
+    expect(screen.getByText(/Procurement Director.*nora@acme\.example/)).toBeInTheDocument();
+    expect(screen.getByText("Cairo")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Acme Trading LLC/ })).toHaveAttribute(
+      "href",
+      `/crm/customer-profiles/${mockOpportunity.customerProfileId}`,
+    );
   });
 
   it("renders followUp with CrmRating and activity button", () => {

@@ -1,12 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Activity,
-  Building2,
-  Trash2,
-  UserRound,
-} from "lucide-react";
+import { Activity, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
@@ -30,6 +25,11 @@ import {
 } from "../../shared/crm-activity-tone";
 import type { CustomerProfileItem } from "../hooks/useCustomerProfiles";
 import { CustomerPhoneActionsRow } from "./CustomerPhoneActionsRow";
+import {
+  CustomerOwnerAvatar,
+  CustomerProfileAvatar,
+} from "./customer-card/CustomerProfileAvatar";
+import { CustomerProfileTagList } from "./customer-card/CustomerProfileTagList";
 
 export interface CustomerProfileColumnOptions {
   canDelete?: (item: CustomerProfileItem) => boolean;
@@ -56,30 +56,35 @@ export function useCustomerProfileColumns(
       sortField: "displayName",
       header: t.crmCustomerProfiles.name,
       width: "15rem",
-      cell: (item) => {
-        const ProfileIcon =
-          item.profileType === "CORPORATE" ? Building2 : UserRound;
-        return (
+      cell: (item) => (
           <Link
             href={"/crm/customer-profiles/" + encodeURIComponent(item.id)}
             className={cn(
-              "flex min-w-48 items-center gap-1.5 rounded-xs text-foreground hover:underline",
+              "flex min-w-48 items-start gap-1.5 rounded-xs text-foreground hover:underline",
               focusRing,
             )}
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-brand-500/10 text-brand-600 dark:text-brand-400">
-              <ProfileIcon className="size-3.5" aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1 truncate font-medium">
-              {item.displayName}
+            <CustomerProfileAvatar
+              imageUrl={item.imageUrl}
+              displayName={item.displayName}
+              profileType={item.profileType}
+              className="size-7"
+            />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate font-medium">{item.displayName}</span>
+              <CustomerProfileTagList
+                tags={item.tags}
+                moreLabel={card.moreTags}
+                maxVisible={1}
+                compact
+              />
             </span>
             <Badge tone="neutral" className={COMPACT_BADGE}>
               {t.crmCustomerProfiles.profileTypes[item.profileType] ??
                 item.profileType}
             </Badge>
           </Link>
-        );
-      },
+        ),
     },
     {
       id: "contact",
@@ -90,27 +95,36 @@ export function useCustomerProfileColumns(
           item.profileType === "CORPORATE" ? item.primaryContact : null;
         const name =
           contact?.displayName || item.email || t.crmCustomerProfiles.unavailable;
-        const detail = contact?.jobTitle || contact?.email || "";
-        const title = detail ? name + " · " + detail : name;
+        const jobTitle = contact?.jobTitle ?? "";
+        const email = contact?.email ?? "";
+        const title = [name, jobTitle, email].filter(Boolean).join(" · ");
         return (
           <Link
             href={"/crm/customer-profiles/" + encodeURIComponent(item.id)}
             className={cn(
-              "flex min-w-48 items-center gap-1.5 whitespace-nowrap rounded-xs hover:underline",
+              "flex min-w-48 flex-col items-start gap-0.5 rounded-xs hover:underline",
               focusRing,
             )}
             title={title}
           >
-            <span className="max-w-36 truncate">{name}</span>
-            {detail && (
-              <span className="max-w-28 truncate text-muted-foreground">
-                {detail}
+            <span className="flex min-w-0 max-w-full items-center gap-1">
+              <span className="max-w-36 truncate">{name}</span>
+              {contact?.isPrimary && (
+                <Badge tone="brand" className={COMPACT_BADGE}>
+                  {card.primary}
+                </Badge>
+              )}
+            </span>
+            {(jobTitle || email) && (
+              <span className="flex max-w-44 items-center gap-1 text-2xs text-muted-foreground">
+                {jobTitle && <span className="truncate">{jobTitle}</span>}
+                {jobTitle && email && <span aria-hidden="true">·</span>}
+                {email && (
+                  <span className="truncate" dir="ltr">
+                    {email}
+                  </span>
+                )}
               </span>
-            )}
-            {contact?.isPrimary && (
-              <Badge tone="brand" className={COMPACT_BADGE}>
-                {card.primary}
-              </Badge>
             )}
           </Link>
         );
@@ -154,19 +168,27 @@ export function useCustomerProfileColumns(
       width: "8rem",
       cell: (item) => {
         const stored = item.country.trim();
+        const city = item.city.trim();
         const iso = /^[A-Z]{2}$/u.test(stored.toUpperCase())
           ? stored.toUpperCase()
           : countryIsoFromName(stored);
         const flag = iso ? (countryFlags.get(iso) ?? "") : "";
         return (
-          <span className="flex min-w-24 items-center gap-1.5 whitespace-nowrap">
+          <span className="flex min-w-24 items-start gap-1.5">
             {flag && (
               <span aria-hidden="true" className="text-sm leading-none">
                 {flag}
               </span>
             )}
-            <span className="max-w-28 truncate">
-              {stored || t.crmCustomerProfiles.unavailable}
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="max-w-28 truncate whitespace-nowrap">
+                {stored || city || t.crmCustomerProfiles.unavailable}
+              </span>
+              {stored && city && (
+                <span className="max-w-28 truncate whitespace-nowrap text-2xs text-muted-foreground">
+                  {city}
+                </span>
+              )}
             </span>
           </span>
         );
@@ -211,8 +233,13 @@ export function useCustomerProfileColumns(
               .join(" ")
           : "";
         return (
-          <span className="block max-w-36 truncate">
-            {name || t.crmCustomerProfiles.unavailable}
+          <span className="flex min-w-0 items-center gap-1.5">
+            {item.owner && (
+              <CustomerOwnerAvatar owner={item.owner} className="size-5" />
+            )}
+            <span className="block max-w-32 truncate">
+              {name || t.crmCustomerProfiles.unavailable}
+            </span>
           </span>
         );
       },

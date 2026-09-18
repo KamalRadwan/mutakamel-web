@@ -10,18 +10,43 @@ import {
   type OpportunityBasicSearch,
 } from "../opportunity-basic-search-contract";
 import {
+  parseOpportunityCommercialFields,
+  type OpportunityCommercialFields,
+} from "../opportunity-contract";
+import {
   parseOpportunityReadFields,
   type OpportunityReadFields,
 } from "../opportunity-read-model";
+import type { OpportunityStatus, StageFlag } from "./pipeline-types";
 
-export interface OpportunityCardItem extends OpportunityReadFields {
+export interface OpportunityCardItem extends OpportunityReadFields, OpportunityCommercialFields {
   id: string;
   title: string;
   stageId: string;
-  customerPartyId: string | null;
+  stageFlag: StageFlag | null;
+  status: OpportunityStatus;
+  customerPartyId: string;
   ownerUserId: string | null;
   importance: number;
 }
+
+const OPPORTUNITY_STATUSES: readonly OpportunityStatus[] = [
+  "IN_PROGRESS",
+  "ON_HOLD",
+  "WON",
+  "LOST",
+];
+const STAGE_FLAGS: readonly StageFlag[] = [
+  "NEW",
+  "DISCOVERY",
+  "QUALIFICATION",
+  "PROPOSAL",
+  "NEGOTIATION",
+  "CONTRACTING",
+  "ON_HOLD",
+  "WON",
+  "LOST",
+];
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -51,26 +76,46 @@ function requiredInteger(value: Record<string, unknown>, key: string, minimum = 
   return candidate as number;
 }
 
+function opportunityStatus(value: unknown): OpportunityStatus {
+  if (
+    typeof value !== "string" ||
+    !OPPORTUNITY_STATUSES.includes(value as OpportunityStatus)
+  ) {
+    throw new Error("Invalid opportunity cards response.");
+  }
+  return value as OpportunityStatus;
+}
+
+function stageFlag(value: unknown): StageFlag | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string" || !STAGE_FLAGS.includes(value as StageFlag)) {
+    throw new Error("Invalid opportunity cards response.");
+  }
+  return value as StageFlag;
+}
+
 function parseCard(value: unknown): OpportunityCardItem {
   const item = record(value);
   if (!item) throw new Error("Invalid opportunity cards response.");
   const importance = requiredInteger(item, "importance");
   if (importance > 3) throw new Error("Invalid opportunity cards response.");
   let readFields: OpportunityReadFields;
+  let commercialFields: OpportunityCommercialFields;
   try {
     readFields = parseOpportunityReadFields(item);
+    commercialFields = parseOpportunityCommercialFields(item);
   } catch {
     throw new Error("Invalid opportunity cards response.");
   }
   return {
     ...readFields,
+    ...commercialFields,
     id: requiredUuidV7(item, "id"),
     title: requiredString(item, "title"),
     stageId: requiredUuidV7(item, "stageId"),
-    customerPartyId:
-      item.customerPartyId === null || item.customerPartyId === undefined
-        ? null
-        : requiredUuidV7(item, "customerPartyId"),
+    stageFlag: stageFlag(item.stageFlag),
+    status: opportunityStatus(item.status),
+    customerPartyId: requiredUuidV7(item, "customerPartyId"),
     ownerUserId:
       item.ownerUserId === null || item.ownerUserId === undefined
         ? null

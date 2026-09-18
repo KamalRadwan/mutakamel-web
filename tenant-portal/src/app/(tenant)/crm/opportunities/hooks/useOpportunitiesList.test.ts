@@ -26,6 +26,7 @@ const item = {
   id: "01900100-0000-7000-8000-000000000110",
   branchId,
   customerProfileId: "01900100-0000-7000-8000-000000000112",
+  customerPartyId: "01900100-0000-7000-8000-000000000114",
   customerProfileType: "CORPORATE",
   customerDisplayName: "Acme Trading",
   customerCompanyName: "Acme Trading LLC",
@@ -49,6 +50,9 @@ const item = {
   status: "IN_PROGRESS",
   title: "Annual renewal",
   importance: 2,
+  amount: "87500.50",
+  currencyCode: "EGP",
+  probabilityPercent: 40,
   ownerUserId: "01900100-0000-7000-8000-000000000120",
   ownerDisplayName: "Sara Sales",
   ownerAvatarUrl: null,
@@ -131,6 +135,43 @@ describe("Opportunities list API contract", () => {
     expect(() =>
       parseOpportunitiesListResponse({ success: true, data: { items: [item] } }, branchId),
     ).toThrow("Invalid opportunities response.");
+  });
+
+  it("preserves commercial fields and accepts the backend's nullable stage flag", () => {
+    const parsed = parseOpportunitiesListResponse(
+      {
+        items: [{ ...item, stageFlag: null }],
+        page: 1,
+        limit: 25,
+        total: 1,
+      },
+      branchId,
+    );
+
+    expect(parsed.items[0]).toMatchObject({
+      customerPartyId: item.customerPartyId,
+      stageFlag: null,
+      amount: "87500.50",
+      currencyCode: "EGP",
+      probabilityPercent: 40,
+      expectedCloseDate: "2026-09-01",
+    });
+  });
+
+  it("rejects malformed amount and probability values", () => {
+    const response = (next: unknown) => ({
+      items: [next],
+      page: 1,
+      limit: 25,
+      total: 1,
+    });
+
+    expect(() =>
+      parseOpportunitiesListResponse(response({ ...item, amount: 87500.5 }), branchId),
+    ).toThrow("Invalid opportunity response.");
+    expect(() =>
+      parseOpportunitiesListResponse(response({ ...item, probabilityPercent: -1 }), branchId),
+    ).toThrow("Invalid opportunity response.");
   });
 });
 

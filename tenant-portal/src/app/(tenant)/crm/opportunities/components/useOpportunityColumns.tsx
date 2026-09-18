@@ -8,6 +8,8 @@ import {
   AvatarImage,
   Badge,
   Button,
+  DateTime,
+  Money,
   StatusBadge,
   cn,
   focusRing,
@@ -17,8 +19,8 @@ import {
   type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatDate } from "@/lib/format/date";
 import { localizedName } from "@/lib/format/localized";
+import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import { countryIsoFromName, getCountryOptions } from "@/lib/geo/country-data";
 import { AcquisitionSourceIcon } from "../../shared/components/AcquisitionSourceIcon";
@@ -64,6 +66,8 @@ export function useOpportunityColumns({
   const oppCopy = t.crmOpportunities;
   const opportunityHref = (item: OpportunityListItem) =>
     `/crm/opportunities/${encodeURIComponent(item.id)}`;
+  const customerHref = (item: OpportunityListItem) =>
+    `/crm/customer-profiles/${encodeURIComponent(item.customerProfileId)}`;
   const countryFlags = new Map(
     getCountryOptions(lang).map(({ isoCode, flag }) => [isoCode, flag]),
   );
@@ -98,17 +102,37 @@ export function useOpportunityColumns({
           oppCopy.notProvided;
         return (
           <Link
-            href={opportunityHref(item)}
+            href={customerHref(item)}
             className={cn(
-              "flex min-w-48 items-center gap-1.5 rounded-xs hover:underline",
+              "flex min-w-48 flex-col items-start gap-0.5 rounded-xs hover:underline",
               focusRing,
             )}
           >
-            <span className="min-w-0 flex-1 truncate">{name}</span>
-            {item.customerProfileType && (
-              <Badge tone="neutral" className={COMPACT_BADGE}>
-                {item.customerProfileType === "CORPORATE" ? card.company : card.individual}
-              </Badge>
+            <span className="flex min-w-0 max-w-full items-center gap-1">
+              <span className="min-w-0 flex-1 truncate">{name}</span>
+              {item.customerProfileType && (
+                <Badge tone="neutral" className={COMPACT_BADGE}>
+                  {item.customerProfileType === "CORPORATE" ? card.company : card.individual}
+                </Badge>
+              )}
+            </span>
+            {item.tags.length > 0 && (
+              <span className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden">
+                {item.tags.slice(0, 2).map((tag) => (
+                  <span
+                    key={tag.id}
+                    title={tag.name}
+                    className="max-w-20 truncate rounded-full border border-border/70 bg-muted/60 px-1.5 py-0.5 text-2xs font-medium leading-none text-muted-foreground"
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+                {item.tags.length > 2 && (
+                  <span className="shrink-0 text-2xs text-muted-foreground">
+                    {formatTemplate(card.moreTags, { count: item.tags.length - 2 })}
+                  </span>
+                )}
+              </span>
             )}
           </Link>
         );
@@ -121,20 +145,26 @@ export function useOpportunityColumns({
       cell: (item) => {
         const contact = item.customerProfileType === "CORPORATE" ? item.primaryContact : null;
         const name = contact?.displayName ?? item.customerEmail ?? oppCopy.notProvided;
-        const detail = contact?.jobTitle ?? contact?.email ?? "";
+        const detail = [contact?.jobTitle, contact?.email].filter(Boolean).join(" · ");
         return (
           <Link
             href={opportunityHref(item)}
             className={cn(
-              "flex min-w-48 items-center gap-1.5 whitespace-nowrap rounded-xs hover:underline",
+              "flex min-w-48 flex-col items-start gap-0.5 rounded-xs hover:underline",
               focusRing,
             )}
             title={detail ? `${name} · ${detail}` : name}
           >
-            <span className="max-w-36 truncate">{name}</span>
-            {detail && <span className="max-w-28 truncate text-muted-foreground">{detail}</span>}
-            {contact?.isPrimary && (
-              <Badge tone="brand" className={COMPACT_BADGE}>{card.primary}</Badge>
+            <span className="flex min-w-0 max-w-full items-center gap-1">
+              <span className="max-w-36 truncate">{name}</span>
+              {contact?.isPrimary && (
+                <Badge tone="brand" className={COMPACT_BADGE}>{card.primary}</Badge>
+              )}
+            </span>
+            {detail && (
+              <span className="max-w-44 truncate text-2xs text-muted-foreground" dir="ltr">
+                {detail}
+              </span>
             )}
           </Link>
         );
@@ -171,14 +201,24 @@ export function useOpportunityColumns({
       width: "8rem",
       cell: (item) => {
         const stored = item.customerCountry?.trim() ?? "";
+        const city = item.customerCity?.trim() ?? "";
         const iso = /^[A-Z]{2}$/u.test(stored.toUpperCase())
           ? stored.toUpperCase()
           : countryIsoFromName(stored);
         const flag = iso ? countryFlags.get(iso) ?? "" : "";
         return (
-          <span className="flex min-w-24 items-center gap-1.5 whitespace-nowrap">
+          <span className="flex min-w-24 items-start gap-1.5">
             {flag && <span aria-hidden="true" className="text-sm leading-none">{flag}</span>}
-            <span className="max-w-28 truncate">{stored || oppCopy.notProvided}</span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="max-w-28 truncate whitespace-nowrap">
+                {stored || city || oppCopy.notProvided}
+              </span>
+              {stored && city && (
+                <span className="max-w-28 truncate whitespace-nowrap text-2xs text-muted-foreground">
+                  {city}
+                </span>
+              )}
+            </span>
           </span>
         );
       },
@@ -196,6 +236,37 @@ export function useOpportunityColumns({
           </Badge>
         );
       },
+    },
+    {
+      id: "deal",
+      header: t.crmOpportunityDetail.create.sections.deal,
+      sortable: true,
+      sortField: "amount",
+      width: "10rem",
+      cell: (item) => (
+        <span className="flex min-w-32 flex-col gap-0.5 whitespace-nowrap">
+          {item.amount ? (
+            <Money
+              value={item.amount}
+              currency={item.currencyCode ?? undefined}
+              language={lang}
+              className="truncate text-xs font-medium text-foreground"
+            />
+          ) : (
+            <span className="text-xs text-muted-foreground">{oppCopy.notProvided}</span>
+          )}
+          {item.probabilityPercent !== null && (
+            <span
+              className="text-2xs text-muted-foreground"
+              title={t.crmOpportunityDetail.probability}
+            >
+              {formatTemplate(t.crmOpportunityDetail.probabilityValue, {
+                percent: formatNumber(item.probabilityPercent, lang),
+              })}
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       id: "source",
@@ -242,7 +313,12 @@ export function useOpportunityColumns({
         item.expectedCloseDate ? (
           <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
             <Calendar className={cn(iconSize({ size: "sm" }), "shrink-0")} aria-hidden="true" />
-            <span>{formatDate(item.expectedCloseDate, lang)}</span>
+            <DateTime
+              value={`${item.expectedCloseDate.slice(0, 10)}T00:00:00.000Z`}
+              precision="date"
+              language={lang}
+              timeZone="UTC"
+            />
           </span>
         ) : (
           <span className="text-xs text-muted-foreground">{oppCopy.notProvided}</span>

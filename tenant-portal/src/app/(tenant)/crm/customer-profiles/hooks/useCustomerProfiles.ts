@@ -53,6 +53,7 @@ export interface CustomerProfileOwner {
   userId: string;
   firstName: string;
   lastName: string;
+  avatarUrl: string | null;
 }
 
 export interface CustomerProfileNextActivity {
@@ -69,6 +70,11 @@ export interface CustomerProfilePrimaryContact {
   isPrimary: boolean;
 }
 
+export interface CustomerProfileTag {
+  id: string;
+  name: string;
+}
+
 export interface CustomerProfileItem {
   id: string;
   branchId: string;
@@ -77,11 +83,15 @@ export interface CustomerProfileItem {
   profileType: CustomerProfileType;
   status: CustomerProfileStatus;
   companyName: string | null;
+  imageUrl: string | null;
   phone: string | null;
   phones: string[];
   email: string | null;
+  companyWebsite: string | null;
   country: string;
+  city: string;
   primaryContact: CustomerProfilePrimaryContact | null;
+  tags: CustomerProfileTag[];
   ownerUserId: string | null;
   owner: CustomerProfileOwner | null;
   nextActivity: CustomerProfileNextActivity | null;
@@ -101,6 +111,7 @@ export interface CustomerProfilesPage {
 }
 
 const LIST_RESPONSE_LIMIT_BYTES = 1_000_000;
+const MAX_CUSTOMER_PROFILE_TAGS = 500;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -163,6 +174,57 @@ function optionalText(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+function partyImageUrl(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (
+    typeof value !== "string" ||
+    !/^\/api\/tenant\/core\/v1\/directory\/parties\/[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/image\?v=\d+$/iu.test(
+      value,
+    )
+  ) {
+    invalidResponse();
+  }
+  return value;
+}
+
+function companyWebsite(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || value.length > 2_048) invalidResponse();
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      invalidResponse();
+    }
+  } catch {
+    invalidResponse();
+  }
+  return value;
+}
+
+function parseTags(value: unknown): CustomerProfileTag[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value) || value.length > MAX_CUSTOMER_PROFILE_TAGS) {
+    invalidResponse();
+  }
+  const parsed = value.map((entry) => {
+    const tag = record(entry);
+    if (
+      !tag ||
+      !isUUIDv7(tag.id) ||
+      typeof tag.name !== "string" ||
+      tag.name.trim().length === 0 ||
+      tag.name.length > 120
+    ) {
+      invalidResponse();
+    }
+    return { id: tag.id, name: tag.name };
+  });
+  if (new Set(parsed.map(({ id }) => id)).size !== parsed.length) {
+    invalidResponse();
+  }
+  return parsed;
+}
+
 function parseOwner(value: unknown): CustomerProfileOwner | null {
   if (value === undefined || value === null) return null;
   const owner = record(value);
@@ -181,6 +243,7 @@ function parseOwner(value: unknown): CustomerProfileOwner | null {
     userId: owner.userId,
     firstName: optionalText(owner.firstName),
     lastName: optionalText(owner.lastName),
+    avatarUrl: partyImageUrl(owner.avatarUrl),
   };
 }
 
@@ -300,6 +363,7 @@ export function parseCustomerProfileResponse(
   const ownerUserId = typeof source.ownerUserId === "string" && isUUIDv7(source.ownerUserId) ? source.ownerUserId : null;
   const acquisitionSource = record(source.acquisitionSource);
   const address = record(source.address);
+  const party = record(source.party);
   const phones = phoneNumbers(source, source.profileType);
 
   return {
@@ -310,14 +374,18 @@ export function parseCustomerProfileResponse(
     profileType: source.profileType,
     status: source.status,
     companyName: nullableText(source, "companyName", 180),
+    imageUrl: partyImageUrl(party?.imageUrl),
     phone: phones[0] ?? primaryMobile ?? companyPhone,
     phones,
     email:
       source.profileType === "CORPORATE"
         ? companyEmail ?? primaryEmail
         : primaryEmail ?? companyEmail,
+    companyWebsite: companyWebsite(source.companyWebsite),
     country: address ? optionalText(address.country) : "",
+    city: address ? optionalText(address.city) : "",
     primaryContact: parsePrimaryContact(source.primaryContact),
+    tags: parseTags(source.tags),
     ownerUserId,
     owner: parseOwner(source.owner),
     nextActivity: parseNextActivity(source.nextActivity),
