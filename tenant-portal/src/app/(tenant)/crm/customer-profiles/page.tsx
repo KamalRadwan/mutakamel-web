@@ -365,6 +365,9 @@ export default function CustomerProfilesPage() {
         {capabilitiesError && (
           <DegradedBanner message={t.crmCustomerProfiles.capabilitiesUnavailable} />
         )}
+        {view === "board" && board.loadMoreError && (
+          <DegradedBanner message={t.crmCustomerProfiles.loadMoreFailed} />
+        )}
 
         {view !== "board" && search.mode === "basic" && (
           <StageBar

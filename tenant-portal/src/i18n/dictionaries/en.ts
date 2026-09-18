@@ -1805,6 +1805,7 @@ export const en: Dictionary = {
     empty: "No matching customer profiles.",
     loadFailed: "Unable to load customer profiles.",
     capabilitiesUnavailable: "Action permissions could not be loaded, so the status-change controls are hidden. The list itself is complete.",
+    loadMoreFailed: "The next page of cards could not be loaded. The cards already shown are correct.",
     confirmBlacklistTitle: "Blacklist this customer?",
     confirmBlacklistMessage: "Blacklisting is terminal in practice — the customer will lose access immediately.",
     confirmBlacklistAction: "Blacklist customer",

@@ -1824,6 +1824,7 @@ export const ar = {
     empty: "لا توجد ملفات عملاء مطابقة.",
     loadFailed: "تعذّر تحميل ملفات العملاء.",
     capabilitiesUnavailable: "تعذّر تحميل صلاحيات الإجراءات، لذلك أُخفيت إجراءات تغيير الحالة. البيانات المعروضة كاملة.",
+    loadMoreFailed: "تعذّر تحميل المزيد من البطاقات. البطاقات المعروضة صحيحة.",
     confirmBlacklistTitle: "حظر هذا العميل؟",
     confirmBlacklistMessage: "الحظر إجراء نهائي عمليًا — سيفقد العميل إمكانية الوصول فورًا.",
     confirmBlacklistAction: "حظر العميل",

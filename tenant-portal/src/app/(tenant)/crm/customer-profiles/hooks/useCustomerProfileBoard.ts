@@ -115,6 +115,8 @@ export function useCustomerProfileBoard({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatuses, setLoadingStatuses] = useState<Set<string>>(new Set());
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [loadMoreError, setLoadMoreError] =
+    useState<NormalizedApiError | null>(null);
   const requestEpochRef = useRef(0);
   const loadMoreRef = useRef<Set<string>>(new Set());
 
@@ -184,11 +186,13 @@ export function useCustomerProfileBoard({
       ) {
         setLanes(EMPTY_LANES);
         setError(null);
+        setLoadMoreError(null);
         setIsLoading(false);
         return false;
       }
       setIsLoading(true);
       setError(null);
+      setLoadMoreError(null);
       try {
         const response = await axiosClient.post<unknown>(
           "/api/tenant/crm/v1/customer-profiles/board",
@@ -243,7 +247,7 @@ export function useCustomerProfileBoard({
       const epoch = requestEpochRef.current;
       loadMoreRef.current.add(status);
       setLoadingStatuses((current) => new Set(current).add(status));
-      setError(null);
+      setLoadMoreError(null);
       try {
         const next = await readStatus(
           status as CustomerProfileStatus,
@@ -267,7 +271,9 @@ export function useCustomerProfileBoard({
         });
       } catch (caught) {
         if (epoch === requestEpochRef.current) {
-          setError(normalizeApiError(caught));
+          // The first page is still authoritative. A failed continuation must
+          // not replace every loaded lane with the board-level error state.
+          setLoadMoreError(normalizeApiError(caught));
         }
       } finally {
         loadMoreRef.current.delete(status);
@@ -325,6 +331,7 @@ export function useCustomerProfileBoard({
     isLoading,
     loadingStatuses,
     error,
+    loadMoreError,
     reload,
     loadMoreStatus,
     applyCardFields,

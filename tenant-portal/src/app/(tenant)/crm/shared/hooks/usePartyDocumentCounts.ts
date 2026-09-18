@@ -20,6 +20,10 @@ const EMPTY_COUNTS: PartyDocumentCounts = {
   salesOrders: null,
   invoices: null,
 };
+// Trade's PartyDocumentCountsDto caps `partyIds` at 100 in
+// trade-app/src/modules/documents/dto/documents.dto.ts. Keep every loaded card
+// represented by splitting the input rather than truncating the view.
+const PARTY_DOCUMENT_COUNT_BATCH_SIZE = 100;
 
 export function usePartyDocumentCounts(
   parties: readonly { partyId: string }[],
@@ -32,9 +36,7 @@ export function usePartyDocumentCounts(
   const { user } = useTenantAuth();
   const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const partyIds = useMemo(
-    () => [
-      ...new Set(parties.map(({ partyId }) => partyId).filter(isUUIDv7)),
-    ].slice(0, 100),
+    () => [...new Set(parties.map(({ partyId }) => partyId).filter(isUUIDv7))],
     [parties],
   );
   const partyKey = partyIds.join(",");
@@ -81,19 +83,36 @@ export function usePartyDocumentCounts(
       ): Promise<Map<string, number> | null> {
         if (!visible[kind]) return null;
         try {
-          const response = await axiosClient.post<unknown>(
-            PARTY_DOCUMENT_COUNT_PATHS[kind],
-            { partyIds },
-            {
-              signal: controller.signal,
-              cache: "no-store",
-              headers: requestHeaders,
-              maxResponseBytes: 64 * 1024,
-              skipAutoIdempotency: true,
-              replayAfterRefresh: true,
-            },
-          );
-          return parsePartyDocumentCountsResponse(response.data, partyIds);
+          const counts = new Map<string, number>();
+          for (
+            let offset = 0;
+            offset < partyIds.length;
+            offset += PARTY_DOCUMENT_COUNT_BATCH_SIZE
+          ) {
+            const batch = partyIds.slice(
+              offset,
+              offset + PARTY_DOCUMENT_COUNT_BATCH_SIZE,
+            );
+            const response = await axiosClient.post<unknown>(
+              PARTY_DOCUMENT_COUNT_PATHS[kind],
+              { partyIds: batch },
+              {
+                signal: controller.signal,
+                cache: "no-store",
+                headers: requestHeaders,
+                maxResponseBytes: 64 * 1024,
+                skipAutoIdempotency: true,
+                replayAfterRefresh: true,
+              },
+            );
+            for (const [partyId, count] of parsePartyDocumentCountsResponse(
+              response.data,
+              batch,
+            )) {
+              counts.set(partyId, count);
+            }
+          }
+          return counts;
         } catch {
           return null;
         }
