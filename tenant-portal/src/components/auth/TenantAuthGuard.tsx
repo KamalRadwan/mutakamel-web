@@ -54,7 +54,12 @@ export function TenantAuthGuard({ children }: { children: React.ReactNode }) {
         authState === "ENDED" ? tenantSessionEndedHref(endedReason) : "/login",
       );
     }
-    if (isAuthenticated && pathname === "/login") router.replace("/");
+    if (
+      isAuthenticated &&
+      (pathname === "/login" || pathname === "/session-expired")
+    ) {
+      router.replace("/");
+    }
   }, [authState, endedReason, isAuthenticated, isLoading, isPublic, pathname, router]);
 
   // `!isPublic` is load-bearing, not a tidy-up. A public page owns interactive

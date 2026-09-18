@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   pathname: "/crm/leads",
   authState: "ENDED" as TenantAuthState,
   endedReason: null as string | null,
+  isAuthenticated: false,
   isLoading: false,
   replace: vi.fn(),
 }));
@@ -28,7 +29,7 @@ vi.mock("@/context/AuthContext", () => ({
   useTenantAuth: () => ({
     authState: state.authState,
     endedReason: state.endedReason,
-    isAuthenticated: false,
+    isAuthenticated: state.isAuthenticated,
     isLoading: state.isLoading,
     retryBootstrap: async () => {},
   }),
@@ -39,6 +40,7 @@ afterEach(() => {
   state.pathname = "/crm/leads";
   state.authState = "ENDED";
   state.endedReason = null;
+  state.isAuthenticated = false;
   state.isLoading = false;
   state.replace.mockReset();
 });
@@ -89,6 +91,15 @@ describe("TenantAuthGuard does not unmount a public page while auth is in flight
 
 // MASTER-PLAN 13.7, closing the first half of OPEN-QUESTIONS.md Q18.
 describe("TenantAuthGuard session-ending reason", () => {
+  it("redirects away from a stale session-expired screen after recovery", async () => {
+    state.pathname = "/session-expired";
+    state.authState = "AUTHENTICATED";
+    state.isAuthenticated = true;
+    renderGuard();
+
+    await waitFor(() => expect(state.replace).toHaveBeenCalledWith("/"));
+  });
+
   it.each([
     "AUTH_SESSION_ENDED",
     "AUTH_SESSION_IDLE_EXPIRED",
