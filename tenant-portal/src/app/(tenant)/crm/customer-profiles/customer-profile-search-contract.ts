@@ -33,6 +33,8 @@ export const CUSTOMER_PROFILE_FILTERABLE_FIELDS: readonly string[] = [
   "acquisitionSourceId",
   "profileType",
   "status",
+  "rating",
+  "cardColor",
   "ownerUserId",
   "sourceLeadId",
   "description",
@@ -45,6 +47,8 @@ export type CustomerProfileAdvancedFieldId =
   | "source"
   | "profileType"
   | "status"
+  | "rating"
+  | "cardColor"
   | "owner"
   | "sourceLead"
   | "description"
@@ -73,6 +77,32 @@ export const CUSTOMER_PROFILE_ADVANCED_FIELDS: readonly CrmSearchFieldDef<Custom
     kind: "enum",
     operators: ["eq", "neq", "in", "nin"],
     values: ["PROSPECT", "ACTIVE_CUSTOMER", "INACTIVE", "BLACKLISTED"],
+  },
+  {
+    id: "rating",
+    field: "rating",
+    kind: "number",
+    operators: ["eq", "neq", "gt", "gte", "lt", "lte", "between"],
+  },
+  {
+    id: "cardColor",
+    field: "cardColor",
+    kind: "enum",
+    nullable: true,
+    operators: ["eq", "neq", "in", "nin"],
+    values: [
+      "RED",
+      "ORANGE",
+      "AMBER",
+      "YELLOW",
+      "GREEN",
+      "TEAL",
+      "BLUE",
+      "INDIGO",
+      "PURPLE",
+      "PINK",
+      "SLATE",
+    ],
   },
   {
     id: "owner",

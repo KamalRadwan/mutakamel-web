@@ -1,12 +1,21 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { MoveToTarget } from "@/design-system";
+import {
+  cardColorBorder,
+  type CardColor,
+  type MoveToTarget,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedValue } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import { crmActivityState } from "../../shared/crm-activity-tone";
 import type { CustomerProfileItem } from "../hooks/useCustomerProfiles";
+import type { CustomerProfileCardPatch } from "../customer-profile-card-contract";
+import type {
+  PartyDocumentCounts,
+  PartyDocumentCountVisibility,
+} from "../../shared/party-document-counts-contract";
 import { CustomerProfileCard } from "./customer-card/CustomerProfileCard";
 import { CustomerProfileCardFooter } from "./customer-card/CustomerProfileCardFooter";
 import { CustomerProfileCardMenu } from "./customer-card/CustomerProfileCardMenu";
@@ -18,8 +27,14 @@ export interface CustomerProfileCardSlotsOptions {
   onOpen: (item: CustomerProfileItem) => void;
   onDelete?: (item: CustomerProfileItem) => void;
   onOpenActivities: (item: CustomerProfileItem) => void;
+  onCardChange: (
+    item: CustomerProfileItem,
+    patch: CustomerProfileCardPatch,
+  ) => void;
   moveTargets?: (item: CustomerProfileItem) => readonly MoveToTarget[];
   onMove?: (item: CustomerProfileItem, status: string) => void;
+  documentCountsByParty?: ReadonlyMap<string, PartyDocumentCounts>;
+  documentCountVisibility?: PartyDocumentCountVisibility;
 }
 
 export interface CustomerProfileCardSlots {
@@ -28,7 +43,7 @@ export interface CustomerProfileCardSlots {
   renderActions: (item: CustomerProfileItem) => ReactNode;
   renderFooter: (item: CustomerProfileItem) => ReactNode;
   renderCardViewFooter: (item: CustomerProfileItem) => ReactNode;
-  cardClassName: () => undefined;
+  cardClassName: (item: CustomerProfileItem) => string | undefined;
 }
 
 export function useCustomerProfileCardSlots({
@@ -37,8 +52,11 @@ export function useCustomerProfileCardSlots({
   onOpen,
   onDelete,
   onOpenActivities,
+  onCardChange,
   moveTargets,
   onMove,
+  documentCountsByParty,
+  documentCountVisibility,
 }: CustomerProfileCardSlotsOptions): CustomerProfileCardSlots {
   const { t, lang } = useI18n();
   const card = t.crmLeads.card;
@@ -67,6 +85,7 @@ export function useCustomerProfileCardSlots({
 
     renderActions: (item) => (
       <CustomerProfileCardMenu
+        cardColor={item.cardColor}
         onOpen={() => onOpen(item)}
         onDelete={canDelete(item) && onDelete ? () => onDelete(item) : undefined}
         moveTargets={canUpdate(item) ? moveTargets?.(item) : undefined}
@@ -75,11 +94,21 @@ export function useCustomerProfileCardSlots({
             ? (status: string) => onMove(item, status)
             : undefined
         }
+        onColorChange={
+          canUpdate(item)
+            ? (cardColor: CardColor | null) =>
+                onCardChange(item, { cardColor })
+            : undefined
+        }
         labels={{
           trigger: formatTemplate(card.more, { name: item.displayName }),
           open: card.open,
           delete: t.common.delete,
           moveTo: t.views.moveTo,
+          cardColor: card.cardColor,
+          colorNone: card.colorNone,
+          colorNames: card.colors,
+          selected: card.colorSelected,
         }}
       />
     ),
@@ -89,9 +118,15 @@ export function useCustomerProfileCardSlots({
         nextActivity={item.nextActivity}
         onOpenActivities={() => onOpenActivities(item)}
         owner={item.owner}
+        rating={item.rating}
+        onRatingChange={(rating) => onCardChange(item, { rating })}
+        isRatingDisabled={!canUpdate(item)}
         labels={{
           activity: activityLabel(item),
           owner: ownerLabel(item),
+          group: card.rating,
+          setStars: card.rateStars,
+          clear: card.clearRating,
         }}
       />
     ),
@@ -106,10 +141,17 @@ export function useCustomerProfileCardSlots({
         <CustomerProfileCardViewFooter
           item={item}
           sourceName={sourceName}
+          counts={documentCountsByParty?.get(item.partyId)}
+          countVisibility={documentCountVisibility}
+          onRatingChange={(rating) => onCardChange(item, { rating })}
+          isRatingDisabled={!canUpdate(item)}
           onOpenActivities={() => onOpenActivities(item)}
           labels={{
             activity: activityLabel(item),
             owner: ownerLabel(item),
+            group: card.rating,
+            setStars: card.rateStars,
+            clear: card.clearRating,
             emailAction: formatTemplate(card.emailAction, {
               value: item.email ?? "",
             }),
@@ -136,11 +178,23 @@ export function useCustomerProfileCardSlots({
             position: formatTemplate(card.position, {
               name: item.primaryContact?.jobTitle ?? "",
             }),
+            quotations: formatTemplate(card.quotations, {
+              count:
+                documentCountsByParty?.get(item.partyId)?.quotations ?? "—",
+            }),
+            salesOrders: formatTemplate(card.salesOrders, {
+              count:
+                documentCountsByParty?.get(item.partyId)?.salesOrders ?? "—",
+            }),
+            invoices: formatTemplate(card.invoices, {
+              count:
+                documentCountsByParty?.get(item.partyId)?.invoices ?? "—",
+            }),
           }}
         />
       );
     },
 
-    cardClassName: () => undefined,
+    cardClassName: (item) => cardColorBorder(item.cardColor) || undefined,
   };
 }

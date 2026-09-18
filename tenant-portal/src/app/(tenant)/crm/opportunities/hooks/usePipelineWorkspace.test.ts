@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatCurrencyAmount, formatOpportunityAmountSummary } from "./pipeline-types";
 import {
   buildStageMoveRequest,
@@ -7,6 +7,7 @@ import {
   parseOpportunityCapabilitiesResponse,
   parseOpportunityStagePageResponse,
   parsePipelinesResponse,
+  reconcileOpportunityBoardAfterConfirmedCardPatch,
 } from "./usePipelineWorkspace";
 
 const pipelineId = "01900100-0000-7000-8000-000000000100";
@@ -45,11 +46,33 @@ const opportunity = {
   status: "IN_PROGRESS",
   title: "Annual renewal",
   importance: 2,
+  cardColor: "TEAL",
   amount: "9007199254740991.25",
   currencyCode: "EGP",
   probabilityPercent: 20,
   activityState: "TODAY",
+  openActivityCount: 1,
+  nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
+  customerProfileType: "CORPORATE",
   customerDisplayName: "Acme Trading",
+  customerCompanyName: "Acme Trading LLC",
+  customerPhone: "+201000000000",
+  customerEmail: "sales@acme.example",
+  customerCountry: "Egypt",
+  customerCity: "Cairo",
+  primaryContact: {
+    partyId: "01900100-0000-7000-8000-000000000114",
+    displayName: "Mona Ibrahim",
+    jobTitle: "Procurement Director",
+    isPrimary: true,
+    email: "mona@acme.example",
+    phones: ["+201111111111"],
+  },
+  leadSourceName: "Website",
+  leadSourceIconUrl: null,
+  ownerDisplayName: "Kamal Radwan",
+  ownerAvatarUrl: null,
+  tags: [{ id: "01900100-0000-7000-8000-000000000115", name: "VIP" }],
   createdAt: "2026-08-25T10:00:00.000Z",
   updatedAt: "2026-08-25T10:00:00.000Z",
 };
@@ -91,7 +114,12 @@ describe("Pipeline API contracts", () => {
 
     expect(board.stages[0].items[0]).toMatchObject({
       amount: "9007199254740991.25",
+      cardColor: "TEAL",
+      customerProfileType: "CORPORATE",
       customerDisplayName: "Acme Trading",
+      primaryContact: { displayName: "Mona Ibrahim" },
+      ownerDisplayName: "Kamal Radwan",
+      tags: [{ name: "VIP" }],
     });
     expect(board.stages[0].summary.amountsByCurrency).toEqual({
       EGP: "18014398509481982.50",
@@ -259,5 +287,25 @@ describe("Pipeline API contracts", () => {
     expect(buildStageMoveRequest(stageId, "QUALIFICATION")).toEqual({
       stageId,
     });
+  });
+
+  it("reloads an enabled board after importance changes but not colour-only changes", async () => {
+    const reloadBoard = vi.fn().mockResolvedValue(true);
+
+    await reconcileOpportunityBoardAfterConfirmedCardPatch(
+      { importance: 3 },
+      true,
+      pipelineId,
+      reloadBoard,
+    );
+    await reconcileOpportunityBoardAfterConfirmedCardPatch(
+      { cardColor: "BLUE" },
+      true,
+      pipelineId,
+      reloadBoard,
+    );
+
+    expect(reloadBoard).toHaveBeenCalledTimes(1);
+    expect(reloadBoard).toHaveBeenCalledWith(pipelineId);
   });
 });

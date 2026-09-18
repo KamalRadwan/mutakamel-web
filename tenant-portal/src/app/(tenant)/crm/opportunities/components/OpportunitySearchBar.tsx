@@ -73,6 +73,7 @@ export function OpportunitySearchBar({
     title: copy.advancedSearch.fields.title,
     description: copy.advancedSearch.fields.description,
     importance: copy.advancedSearch.fields.importance,
+    cardColor: t.crmLeads.card.cardColor,
     amount: copy.advancedSearch.fields.amount,
     currencyCode: copy.advancedSearch.fields.currencyCode,
     probabilityPercent: copy.advancedSearch.fields.probabilityPercent,
@@ -89,10 +90,14 @@ export function OpportunitySearchBar({
   // which needs the widening the narrow-union call sites get for free; an
   // unmapped key falls back to the wire value, as StatusBadge does.
   const statusLabels: Record<string, string | undefined> = t.statusValues;
+  const cardColorLabels: Record<string, string | undefined> = t.crmLeads.card.colors;
 
   function enumLabel(field: OpportunityAdvancedFieldId, wireValue: string): string {
     if (field === "status") {
       return statusLabels[`OpportunityStatus.${wireValue}`] ?? wireValue;
+    }
+    if (field === "cardColor") {
+      return cardColorLabels[wireValue] ?? wireValue;
     }
     return statusLabels[`OpportunityStageFlag.${wireValue}`] ?? wireValue;
   }

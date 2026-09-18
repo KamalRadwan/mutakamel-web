@@ -1,4 +1,6 @@
 import { isUUIDv7 } from "@/lib/uuid";
+import type { CardColor } from "@/design-system";
+import { parseOpportunityCardColor } from "./opportunity-card-contract";
 
 export type OpportunityCustomerProfileType = "INDIVIDUAL" | "CORPORATE";
 export type OpportunityActivityState = "NO_OPEN" | "OVERDUE" | "TODAY" | "FUTURE";
@@ -15,10 +17,10 @@ export interface OpportunityPrimaryContact {
 export interface OpportunityTagSummary {
   id: string;
   name: string;
-  color: string | null;
 }
 
 export interface OpportunityReadFields {
+  cardColor: CardColor | null;
   customerProfileType: OpportunityCustomerProfileType | null;
   customerDisplayName: string | null;
   customerCompanyName: string | null;
@@ -86,7 +88,7 @@ function tags(value: unknown): OpportunityTagSummary[] {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) invalid();
     const tag = entry as Record<string, unknown>;
     if (!isUUIDv7(tag.id) || typeof tag.name !== "string" || tag.name.length === 0) invalid();
-    return { id: tag.id, name: tag.name, color: nullableString(tag.color) };
+    return { id: tag.id, name: tag.name };
   });
   if (new Set(parsed.map(({ id }) => id)).size !== parsed.length) invalid();
   return parsed;
@@ -109,6 +111,7 @@ export function parseOpportunityReadFields(
   const nextOpenActivityAt = nullableString(item.nextOpenActivityAt);
   if (nextOpenActivityAt && Number.isNaN(new Date(nextOpenActivityAt).getTime())) invalid();
   return {
+    cardColor: parseOpportunityCardColor(item.cardColor),
     customerProfileType: profileType(item.customerProfileType),
     customerDisplayName: nullableString(item.customerDisplayName),
     customerCompanyName: nullableString(item.customerCompanyName),

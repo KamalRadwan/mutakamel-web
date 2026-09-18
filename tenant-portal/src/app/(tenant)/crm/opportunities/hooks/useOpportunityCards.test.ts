@@ -39,6 +39,7 @@ const card = {
   ownerDisplayName: "Sara Sales",
   ownerAvatarUrl: "/api/tenant/core/v1/directory/parties/01900100-0000-7000-8000-000000000120/image?v=1",
   importance: 3,
+  cardColor: "TEAL",
   amount: "150000.00",
   currencyCode: "EGP",
   expectedCloseDate: "2026-10-31",
@@ -46,7 +47,7 @@ const card = {
   openActivityCount: 2,
   nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
   activityState: "FUTURE",
-  tags: [{ id: "01900100-0000-7000-8000-000000000123", name: "VIP", color: null }],
+  tags: [{ id: "01900100-0000-7000-8000-000000000123", name: "VIP" }],
 };
 
 describe("Opportunity cards API contract", () => {

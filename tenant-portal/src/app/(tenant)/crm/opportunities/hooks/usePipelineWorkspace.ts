@@ -22,6 +22,13 @@ import {
   EMPTY_OPPORTUNITY_BASIC_SEARCH,
   type OpportunityBasicSearch,
 } from "../opportunity-basic-search-contract";
+import {
+  buildOpportunityCardPatchBody,
+  parseOpportunityCardPatchResponse,
+  type OpportunityCardPatch,
+  type OpportunityCardState,
+} from "../opportunity-card-contract";
+import { parseOpportunityReadFields } from "../opportunity-read-model";
 import type {
   OpportunityActionCapability,
   OpportunityActivityState,
@@ -256,7 +263,14 @@ function parseOpportunity(
     ACTIVITY_STATES,
     "opportunity board",
   );
+  let readFields;
+  try {
+    readFields = parseOpportunityReadFields(item);
+  } catch {
+    throw new Error("Invalid opportunity board response.");
+  }
   return {
+    ...readFields,
     id: requiredUuidV7(item, "id", "opportunity board"),
     branchId: requiredUuidV7(item, "branchId", "opportunity board"),
     customerProfileId: requiredUuidV7(
@@ -285,9 +299,7 @@ function parseOpportunity(
     wonAt: nullableString(item.wonAt),
     lostAt: nullableString(item.lostAt),
     lostReason: nullableString(item.lostReason),
-    nextOpenActivityAt: nullableString(item.nextOpenActivityAt),
     activityState,
-    customerDisplayName: optionalString(item.customerDisplayName),
     contactDisplayName: optionalString(item.contactDisplayName),
   };
 }
@@ -496,10 +508,30 @@ export function opportunityCapabilityAllowsOwner(
   );
 }
 
-export interface OpportunityImportanceCandidate {
+export interface OpportunityCardCandidate extends OpportunityCardState {
   id: string;
-  importance: number;
   ownerUserId?: string | null;
+}
+
+/**
+ * Board rows are ordered by importance before their cursor is cut. A confirmed
+ * importance write therefore needs a fresh server page; colour-only writes do
+ * not affect ordering and can stay as the local field merge.
+ */
+export async function reconcileOpportunityBoardAfterConfirmedCardPatch(
+  patch: OpportunityCardPatch,
+  boardEnabled: boolean,
+  selectedPipelineId: string | null,
+  reloadBoard: (pipelineId: string) => Promise<boolean>,
+): Promise<void> {
+  if (
+    patch.importance === undefined ||
+    !boardEnabled ||
+    !selectedPipelineId
+  ) {
+    return;
+  }
+  await reloadBoard(selectedPipelineId);
 }
 
 export function buildStageMoveRequest(
@@ -1034,68 +1066,158 @@ export function usePipelineWorkspace(boardEnabled = true) {
     if (!isMutating) setTerminalMove(null);
   }, [isMutating]);
 
-  const updateImportance = useCallback(
+  const updateCard = useCallback(
     async (
       cardId: string,
-      newImportance: number,
-      candidate?: OpportunityImportanceCandidate,
+      requestedPatch: OpportunityCardPatch,
+      candidate?: OpportunityCardCandidate,
     ): Promise<boolean> => {
-      if (
-        mutationInFlightRef.current ||
-        loadMoreInFlightRef.current ||
-        !Number.isInteger(newImportance) ||
-        newImportance < 0 ||
-        newImportance > 3
-      ) {
-        return false;
-      }
-      const opportunity = board?.stages
+      if (mutationInFlightRef.current || loadMoreInFlightRef.current) return false;
+      const opportunity = candidate ?? board?.stages
         .flatMap(({ items }) => items)
-        .find(({ id }) => id === cardId) ?? candidate;
+        .find(({ id }) => id === cardId);
       if (
         !opportunity ||
         !opportunityCapabilityAllowsOwner(
           capabilities?.update ?? null,
           opportunity.ownerUserId,
-        ) ||
-        opportunity.importance === newImportance
+        )
       ) {
         return false;
       }
+
+      const patch: OpportunityCardPatch = {
+        ...(requestedPatch.importance !== undefined &&
+        requestedPatch.importance !== opportunity.importance
+          ? { importance: requestedPatch.importance }
+          : {}),
+        ...(requestedPatch.cardColor !== undefined &&
+        requestedPatch.cardColor !== opportunity.cardColor
+          ? { cardColor: requestedPatch.cardColor }
+          : {}),
+      };
+      let body: Record<string, unknown>;
+      try {
+        body = buildOpportunityCardPatchBody(patch);
+      } catch {
+        return false;
+      }
+      if (Object.keys(body).length === 0) return false;
+
+      const previous: OpportunityCardState = {
+        importance: opportunity.importance,
+        cardColor: opportunity.cardColor,
+      };
+      const applyCardFields = (fields: OpportunityCardPatch) =>
+        setBoard((current) =>
+          current
+            ? {
+                ...current,
+                stages: current.stages.map((lane) => ({
+                  ...lane,
+                  items: lane.items.map((item) =>
+                    item.id === cardId
+                      ? {
+                          ...item,
+                          ...(fields.importance !== undefined
+                            ? { importance: fields.importance as OpportunityImportance }
+                            : {}),
+                          ...(fields.cardColor !== undefined
+                            ? { cardColor: fields.cardColor }
+                            : {}),
+                        }
+                      : item,
+                  ),
+                })),
+              }
+            : current,
+        );
+
       mutationInFlightRef.current = true;
       setIsMutating(true);
       setError(null);
+      applyCardFields(patch);
       try {
-        await axiosClient.patch(
-          `/api/tenant/crm/v1/opportunities/${encodeURIComponent(cardId)}`,
-          { importance: newImportance },
-          {
-            nonReplayable: true,
-            skipAutoIdempotency: true,
-            cache: "no-store",
-            maxResponseBytes: 512 * 1024,
-          },
-        );
-        if (boardEnabled && selectedPipelineId) {
-          await fetchBoardData(selectedPipelineId);
+        let response: AxiosResponse<unknown>;
+        try {
+          response = await axiosClient.patch<unknown>(
+            `/api/tenant/crm/v1/opportunities/${encodeURIComponent(cardId)}`,
+            body,
+            {
+              nonReplayable: true,
+              skipAutoIdempotency: true,
+              cache: "no-store",
+              maxResponseBytes: 512 * 1024,
+            },
+          );
+        } catch (caught) {
+          applyCardFields({
+            ...(patch.importance !== undefined ? { importance: previous.importance } : {}),
+            ...(patch.cardColor !== undefined ? { cardColor: previous.cardColor } : {}),
+          });
+          if (isAmbiguousMutationError(caught)) {
+            if (boardEnabled && selectedPipelineId) {
+              await fetchBoardData(selectedPipelineId);
+            }
+            setError(t.crmOpportunities.cardUpdateAmbiguous);
+            // Card and Table callers use `true` as the signal to reconcile
+            // their independent data source. The request may have applied.
+            return true;
+          }
+          setError(errorMessage(caught, t.crmOpportunities.cardUpdateFailed));
+          return false;
         }
-        return true;
-      } catch (caught) {
-        const message = errorMessage(
-          caught,
-          "Unable to update opportunity importance.",
-        );
-        if (boardEnabled && selectedPipelineId && isAmbiguousMutationError(caught)) {
-          await fetchBoardData(selectedPipelineId);
+
+        try {
+          const confirmed = parseOpportunityCardPatchResponse(
+            response.data,
+            cardId,
+            previous,
+            patch,
+          );
+          applyCardFields({
+            ...(patch.importance !== undefined ? { importance: confirmed.importance } : {}),
+            ...(patch.cardColor !== undefined ? { cardColor: confirmed.cardColor } : {}),
+          });
+          await reconcileOpportunityBoardAfterConfirmedCardPatch(
+            patch,
+            boardEnabled,
+            selectedPipelineId,
+            fetchBoardData,
+          );
+          return true;
+        } catch {
+          if (boardEnabled && selectedPipelineId) {
+            await fetchBoardData(selectedPipelineId);
+          }
+          setError(t.crmOpportunities.cardUpdateAmbiguous);
+          // A 2xx write applied. Card and Table callers reconcile their own
+          // source even though this client could not verify the receipt.
+          return true;
         }
-        setError(message);
-        return false;
       } finally {
         mutationInFlightRef.current = false;
         setIsMutating(false);
       }
     },
-    [board, boardEnabled, capabilities?.update, fetchBoardData, selectedPipelineId],
+    [
+      board,
+      boardEnabled,
+      capabilities?.update,
+      fetchBoardData,
+      selectedPipelineId,
+      t.crmOpportunities.cardUpdateAmbiguous,
+      t.crmOpportunities.cardUpdateFailed,
+    ],
+  );
+
+  const updateImportance = useCallback(
+    (
+      cardId: string,
+      newImportance: number,
+      candidate?: OpportunityCardCandidate,
+    ) => updateCard(cardId, { importance: newImportance }, candidate),
+    [updateCard],
   );
 
   return {
@@ -1141,6 +1263,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
     terminalMove,
     confirmTerminalMove,
     cancelTerminalMove,
+    updateCard,
     updateImportance,
   };
 }

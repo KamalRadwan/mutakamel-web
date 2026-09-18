@@ -1,9 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { MoveToTarget } from "@/design-system";
+import {
+  cardColorBorder,
+  type CardColor,
+  type MoveToTarget,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
+import type { OpportunityCardPatch } from "../opportunity-card-contract";
 import type { OpportunityCardRecord } from "../hooks/pipeline-types";
 import { OpportunityCard } from "./opportunity-card/OpportunityCard";
 import { OpportunityCardFooter } from "./opportunity-card/OpportunityCardFooter";
@@ -15,7 +20,11 @@ export interface OpportunityCardSlotsOptions {
   canDelete: (item: OpportunityCardRecord) => boolean;
   onOpen: (item: OpportunityCardRecord) => void;
   onDelete: (item: OpportunityCardRecord) => void;
-  onImportanceChange: (opportunityId: string, importance: number) => void;
+  onCardChange: (
+    opportunityId: string,
+    patch: OpportunityCardPatch,
+    item: OpportunityCardRecord,
+  ) => void;
   onOpenActivities: (item: OpportunityCardRecord) => void;
   moveTargets?: (item: OpportunityCardRecord) => readonly MoveToTarget[];
   onMove?: (item: OpportunityCardRecord, stageId: string) => void;
@@ -26,6 +35,7 @@ export interface OpportunityCardSlots {
   renderActions: (item: OpportunityCardRecord) => ReactNode;
   renderFooter: (item: OpportunityCardRecord) => ReactNode;
   renderCardViewFooter: (item: OpportunityCardRecord) => ReactNode;
+  cardClassName: (item: OpportunityCardRecord) => string | undefined;
 }
 
 export function useOpportunityCardSlots({
@@ -33,7 +43,7 @@ export function useOpportunityCardSlots({
   canDelete,
   onOpen,
   onDelete,
-  onImportanceChange,
+  onCardChange,
   onOpenActivities,
   moveTargets,
   onMove,
@@ -45,33 +55,47 @@ export function useOpportunityCardSlots({
   return {
     renderCard: (item) => <OpportunityCard item={item} />,
 
-    renderActions: (item) => (
-      <OpportunityCardMenu
-        onOpen={() => onOpen(item)}
-        onDelete={canDelete(item) ? () => onDelete(item) : undefined}
-        moveTargets={moveTargets?.(item)}
-        onMove={onMove ? (stageId: string) => onMove(item, stageId) : undefined}
-        labels={{
-          trigger: formatTemplate(card.more, { name: item.title }),
-          open: card.open,
-          delete: t.common.delete,
-          moveTo: t.views.moveTo,
-          cardColor: card.cardColor,
-          colorNone: card.colorNone,
-          colorNames: card.colors,
-          selected: card.colorSelected,
-        }}
-      />
-    ),
+    renderActions: (item) => {
+      const canEdit = canUpdate(item);
+      return (
+        <OpportunityCardMenu
+          cardColor={item.cardColor}
+          onOpen={() => onOpen(item)}
+          onDelete={canDelete(item) ? () => onDelete(item) : undefined}
+          onColorChange={
+            canEdit
+              ? (next: CardColor | null) =>
+                  onCardChange(item.id, { cardColor: next }, item)
+              : undefined
+          }
+          moveTargets={canEdit ? moveTargets?.(item) : undefined}
+          onMove={canEdit && onMove ? (stageId: string) => onMove(item, stageId) : undefined}
+          labels={{
+            trigger: formatTemplate(card.more, { name: item.title }),
+            open: card.open,
+            delete: t.common.delete,
+            moveTo: t.views.moveTo,
+            cardColor: card.cardColor,
+            colorNone: card.colorNone,
+            colorNames: card.colors,
+            selected: card.colorSelected,
+          }}
+        />
+      );
+    },
 
     renderFooter: (item) => (
       <OpportunityCardFooter
         importance={item.importance}
-        onImportanceChange={(next) => onImportanceChange(item.id, next)}
+        onImportanceChange={(next) =>
+          onCardChange(item.id, { importance: next }, item)
+        }
         isImportanceDisabled={!canUpdate(item)}
         activityState={item.activityState}
+        openActivityCount={item.openActivityCount}
         onOpenActivities={() => onOpenActivities(item)}
-        ownerUserId={item.ownerUserId}
+        ownerDisplayName={item.ownerDisplayName}
+        ownerAvatarUrl={item.ownerAvatarUrl}
         labels={{
           activity: formatTemplate(card.activityOpen, {
             state:
@@ -83,8 +107,8 @@ export function useOpportunityCardSlots({
                     ? oppCopy.upcoming
                     : card.activityStates.NONE,
           }),
-          owner: item.ownerUserId
-            ? formatTemplate(card.owner, { name: item.ownerUserId })
+          owner: item.ownerDisplayName
+            ? formatTemplate(card.owner, { name: item.ownerDisplayName })
             : "",
           group: oppCopy.importance,
           setStars: oppCopy.setImportance,
@@ -99,11 +123,15 @@ export function useOpportunityCardSlots({
         customerDisplayName={item.customerDisplayName}
         expectedCloseDate={item.expectedCloseDate}
         importance={item.importance}
-        onImportanceChange={(next) => onImportanceChange(item.id, next)}
+        onImportanceChange={(next) =>
+          onCardChange(item.id, { importance: next }, item)
+        }
         isImportanceDisabled={!canUpdate(item)}
         activityState={item.activityState}
+        openActivityCount={item.openActivityCount}
         onOpenActivities={() => onOpenActivities(item)}
-        ownerUserId={item.ownerUserId}
+        ownerDisplayName={item.ownerDisplayName}
+        ownerAvatarUrl={item.ownerAvatarUrl}
         labels={{
           activity: formatTemplate(card.activityOpen, {
             state:
@@ -115,19 +143,21 @@ export function useOpportunityCardSlots({
                     ? oppCopy.upcoming
                     : card.activityStates.NONE,
           }),
-          owner: item.ownerUserId
-            ? formatTemplate(card.owner, { name: item.ownerUserId })
+          owner: item.ownerDisplayName
+            ? formatTemplate(card.owner, { name: item.ownerDisplayName })
             : "",
           group: oppCopy.importance,
           setStars: oppCopy.setImportance,
           clear: oppCopy.clearImportance,
           customer: item.customerDisplayName ?? "",
           expectedClose: oppCopy.expectedClose,
-          salesperson: item.ownerUserId
-            ? formatTemplate(card.owner, { name: item.ownerUserId })
+          salesperson: item.ownerDisplayName
+            ? formatTemplate(card.owner, { name: item.ownerDisplayName })
             : "",
         }}
       />
     ),
+
+    cardClassName: (item) => cardColorBorder(item.cardColor) || undefined,
   };
 }

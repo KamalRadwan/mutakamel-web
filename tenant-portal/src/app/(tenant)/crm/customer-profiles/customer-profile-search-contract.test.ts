@@ -222,6 +222,38 @@ describe("customer profile Advanced search", () => {
     });
   });
 
+  it("compiles rating and card-colour filters with their typed operators", () => {
+    const state = customerProfileSearchWithMode(
+      customerProfileSearchWithGroups(EMPTY_CUSTOMER_PROFILE_SEARCH, [
+        {
+          conditions: [
+            {
+              field: "rating",
+              operator: "gte",
+              value: "2",
+              valueTo: "",
+            },
+            {
+              field: "cardColor",
+              operator: "eq",
+              value: "TEAL",
+              valueTo: "",
+            },
+          ],
+        },
+      ]),
+      "advanced",
+    );
+
+    expect(buildCustomerProfileSearchRequest(state, WINDOW).filterTree).toEqual({
+      op: "AND",
+      children: [
+        { field: "rating", operator: "gte", value: 2 },
+        { field: "cardColor", operator: "eq", value: "TEAL" },
+      ],
+    });
+  });
+
   it("offers only repository-whitelisted Advanced fields", () => {
     expect(CUSTOMER_PROFILE_FILTERABLE_FIELDS).toEqual([
       "id",
@@ -229,6 +261,8 @@ describe("customer profile Advanced search", () => {
       "acquisitionSourceId",
       "profileType",
       "status",
+      "rating",
+      "cardColor",
       "ownerUserId",
       "sourceLeadId",
       "description",

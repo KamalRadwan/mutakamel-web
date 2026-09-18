@@ -106,10 +106,12 @@ export function OpportunitiesWorkspace() {
     fetchPipelines,
     setBasicSearch: setBoardBasicSearch,
     canUpdateOpportunity,
+    canDeleteOpportunity,
     moveCard,
     terminalMove,
     confirmTerminalMove,
     cancelTerminalMove,
+    updateCard,
     updateImportance,
     loadMoreStage,
   } = usePipelineWorkspace(view === "board");
@@ -335,14 +337,14 @@ export function OpportunitiesWorkspace() {
   const [activityOpportunity, setActivityOpportunity] = useState<{ id: string; name: string } | null>(null);
   const cardSlots = useOpportunityCardSlots({
     canUpdate: canUpdateOpportunity,
-    canDelete: () => Boolean(capabilities?.delete),
+    canDelete: canDeleteOpportunity,
     onOpen: (item) => openOpportunity(item.id),
     onDelete: (item) => {
       clearError();
       setSelectedForDelete({ id: item.id, title: item.title });
     },
-    onImportanceChange: (opportunityId, importance) => {
-      void updateImportance(opportunityId, importance);
+    onCardChange: (opportunityId, patch, item) => {
+      void updateCard(opportunityId, patch, item);
     },
     onOpenActivities: (item) => setActivityOpportunity({ id: item.id, name: item.title }),
     moveTargets: (item) => moveTargets.filter((target) => target.id !== item.stageId),
@@ -362,8 +364,8 @@ export function OpportunitiesWorkspace() {
       clearError();
       setSelectedForDelete({ id: item.id, title: item.title });
     },
-    onImportanceChange: (item, importance) => {
-      void updateImportance(item.id, importance, item).then((updated) => {
+    onCardChange: (item, patch) => {
+      void updateCard(item.id, patch, item).then((updated) => {
         if (updated) void cards.reload();
       });
     },
@@ -487,6 +489,7 @@ export function OpportunitiesWorkspace() {
             renderCard={cardSlots.renderCard}
             renderActions={cardSlots.renderActions}
             renderFooter={cardSlots.renderFooter}
+            cardClassName={cardSlots.cardClassName}
             canDrag={(item) =>
               !isMutating && canUpdateOpportunity(item) && item.stageFlag !== "WON" && item.stageFlag !== "LOST"
             }
@@ -527,6 +530,7 @@ export function OpportunitiesWorkspace() {
               renderCard={cardViewSlots.renderCard}
               renderActions={cardViewSlots.renderActions}
               renderFooter={cardViewSlots.renderFooter}
+              cardClassName={cardViewSlots.cardClassName}
               density="compact"
               onActivate={(item) => openOpportunity(item.id)}
               isLoading={cards.isLoading}

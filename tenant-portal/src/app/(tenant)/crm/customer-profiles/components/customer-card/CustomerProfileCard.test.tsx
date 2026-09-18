@@ -36,6 +36,7 @@ const mockCustomer: CustomerProfileItem = {
   companyWebsite: "https://alamal.com",
   country: "Saudi Arabia",
   city: "Riyadh",
+  primaryContactName: "Mona Saleh",
   primaryContact: null,
   tags: [
     { id: "0192f3a0-0000-7000-8000-000000000020", name: "Healthcare" },
@@ -55,11 +56,16 @@ const mockCustomer: CustomerProfileItem = {
   acquisitionSourceNameAr: "موقع الكتروني",
   acquisitionSourceNameEn: "Website",
   sourceIconUrl: null,
+  rating: 2,
+  cardColor: "TEAL",
 };
 
 const footerLabels: CustomerProfileCardFooterLabels = {
   activity: "Activities — None planned",
   owner: "Owner: Kamal Radwan",
+  group: "Rating",
+  setStars: "Rate {count} of {max}",
+  clear: "Clear rating",
 };
 
 const menuLabels: CustomerProfileCardMenuLabels = {
@@ -67,6 +73,10 @@ const menuLabels: CustomerProfileCardMenuLabels = {
   open: "Open",
   delete: "Delete",
   moveTo: "Move to…",
+  cardColor: "Card colour",
+  colorNone: "No colour",
+  colorNames: en.crmLeads.card.colors,
+  selected: "Selected",
 };
 
 describe("CustomerProfileCard", () => {
@@ -75,6 +85,7 @@ describe("CustomerProfileCard", () => {
     expect(screen.getByText("Al-Amal Hospital")).toBeInTheDocument();
     expect(screen.getByText("Corporate")).toBeInTheDocument();
     expect(screen.getByText("Al-Amal Healthcare Services")).toBeInTheDocument();
+    expect(screen.getByText("Mona Saleh")).toBeInTheDocument();
     expect(screen.getByText("Website")).toBeInTheDocument();
   });
 
@@ -91,32 +102,59 @@ describe("CustomerProfileCard", () => {
 });
 
 describe("CustomerProfileCardFooter", () => {
-  it("opens activities and shows the salesperson name without fake rating controls", () => {
+  it("changes rating, opens activities, and shows the salesperson", () => {
     const onOpenActivities = vi.fn();
+    const onRatingChange = vi.fn();
     render(
       <CustomerProfileCardFooter
         nextActivity={null}
         onOpenActivities={onOpenActivities}
         owner={mockCustomer.owner}
+        rating={mockCustomer.rating}
+        onRatingChange={onRatingChange}
         labels={footerLabels}
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "Rate 3 of 3" }));
+    expect(onRatingChange).toHaveBeenCalledWith(3);
     fireEvent.click(screen.getByRole("button", { name: footerLabels.activity }));
     expect(onOpenActivities).toHaveBeenCalledOnce();
     expect(screen.getByText("Kamal Radwan")).toBeInTheDocument();
-    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
   });
 });
 
 describe("CustomerProfileCardMenu", () => {
   it("opens the customer from the menu", () => {
     const onOpen = vi.fn();
-    render(<CustomerProfileCardMenu onOpen={onOpen} labels={menuLabels} />);
+    render(
+      <CustomerProfileCardMenu
+        cardColor={mockCustomer.cardColor}
+        onOpen={onOpen}
+        labels={menuLabels}
+      />,
+    );
 
     const trigger = screen.getByRole("button", { name: menuLabels.trigger });
     fireEvent.keyDown(trigger, { key: "Enter" });
     fireEvent.click(screen.getByText("Open"));
     expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it("changes the card filing colour", () => {
+    const onColorChange = vi.fn();
+    render(
+      <CustomerProfileCardMenu
+        cardColor={mockCustomer.cardColor}
+        onOpen={vi.fn()}
+        onColorChange={onColorChange}
+        labels={menuLabels}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: menuLabels.trigger });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Blue" }));
+    expect(onColorChange).toHaveBeenCalledWith("BLUE");
   });
 });

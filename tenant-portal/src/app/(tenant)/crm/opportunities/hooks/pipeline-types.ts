@@ -1,3 +1,5 @@
+import type { OpportunityReadFields } from "../opportunity-read-model";
+
 export type OpportunityStatus = "IN_PROGRESS" | "ON_HOLD" | "WON" | "LOST";
 export type OpportunityImportance = 0 | 1 | 2 | 3;
 export type OpportunityActivityState = "NO_OPEN" | "OVERDUE" | "TODAY" | "FUTURE";
@@ -33,12 +35,9 @@ interface OpportunityRecord {
   wonAt?: string | null;
   lostAt?: string | null;
   lostReason?: string | null;
-  nextOpenActivityAt?: string | null;
-  activityState: OpportunityActivityState;
 }
 
-export interface OpportunityCardRecord extends OpportunityRecord {
-  customerDisplayName?: string;
+export interface OpportunityCardRecord extends OpportunityRecord, OpportunityReadFields {
   contactDisplayName?: string;
 }
 

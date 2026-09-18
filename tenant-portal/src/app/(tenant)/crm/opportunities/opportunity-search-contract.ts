@@ -124,6 +124,7 @@ export const OPPORTUNITY_FILTERABLE_FIELDS: readonly string[] = [
   "title",
   "description",
   "importance",
+  "cardColor",
   "amount",
   "currencyCode",
   "probabilityPercent",
@@ -149,6 +150,7 @@ export type OpportunityAdvancedFieldId =
   | "title"
   | "description"
   | "importance"
+  | "cardColor"
   | "amount"
   | "currencyCode"
   | "probabilityPercent"
@@ -224,6 +226,26 @@ export const OPPORTUNITY_ADVANCED_FIELDS: readonly CrmSearchFieldDef<Opportunity
     // read back is not worth a scrolling box.
     { id: "description", field: "description", kind: "text", nullable: true, maxLength: 2000 },
     { id: "importance", field: "importance", kind: "number" },
+    {
+      id: "cardColor",
+      field: "cardColor",
+      kind: "enum",
+      nullable: true,
+      operators: ["eq", "neq", "in", "nin"],
+      values: [
+        "RED",
+        "ORANGE",
+        "AMBER",
+        "YELLOW",
+        "GREEN",
+        "TEAL",
+        "BLUE",
+        "INDIGO",
+        "PURPLE",
+        "PINK",
+        "SLATE",
+      ],
+    },
     { id: "amount", field: "amount", kind: "number", nullable: true },
     {
       id: "currencyCode",

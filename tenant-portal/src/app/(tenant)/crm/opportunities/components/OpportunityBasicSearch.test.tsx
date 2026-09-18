@@ -156,6 +156,37 @@ describe("Opportunity Basic search interaction", () => {
     expect(controls.advanced.mock.lastCall?.[0]).not.toHaveProperty("onTextChange");
   });
 
+  it("offers card colour only in Advanced with localized field and value labels", () => {
+    render(<Harness />);
+    fireEvent.click(
+      screen.getByRole("button", { name: en.crmOpportunities.searchMode.advanced }),
+    );
+
+    const props = controls.advanced.mock.lastCall?.[0] as {
+      fields: readonly {
+        id: string;
+        field: string;
+        kind: string;
+        nullable?: boolean;
+        operators?: readonly string[];
+        values?: readonly string[];
+      }[];
+      fieldLabels: Record<string, string>;
+      enumLabel: (field: "cardColor", wireValue: string) => string;
+    };
+    const cardColor = props.fields.find((field) => field.id === "cardColor");
+
+    expect(cardColor).toMatchObject({
+      field: "cardColor",
+      kind: "enum",
+      nullable: true,
+      operators: ["eq", "neq", "in", "nin"],
+      values: expect.arrayContaining(["RED", "TEAL", "PINK", "SLATE"]),
+    });
+    expect(props.fieldLabels.cardColor).toBe(en.crmLeads.card.cardColor);
+    expect(props.enumLabel("cardColor", "TEAL")).toBe(en.crmLeads.card.colors.TEAL);
+  });
+
   it("hides Advanced outside Table view", () => {
     render(<Harness advancedEnabled={false} />);
     expect(

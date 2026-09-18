@@ -8,9 +8,10 @@ Owning app: **crm-app**
 
 Canonical prefix: `/api/tenant/crm/v1/customer-profiles`
 
-Portal status: **built** — list in three views, detail, create, update, status
-change, delete and add-contact. Not exercised against a live session: CRM is
-blocked twice over, by P4 and by Q17.
+Portal status: **built** — independently paginated board, rich card and table
+views, detail, create, update, status change, rating and card colour, delete
+and add-contact. Not exercised against a live session: CRM is blocked twice
+over, by P4 and by Q17.
 
 `GET /:id` returns `CustomerProfileReadModel`, including the acquisition
 source, Party summary, primary address and the customer's contact
@@ -60,8 +61,26 @@ Response `200` is the flat CRM page
 `{ items, total, page, limit, totalPages, hasNext, hasPrev }`. Card/Table rows
 are enriched with the customer Party image and contact methods, company
 website, primary address, primary corporate contact, owner name/avatar,
-acquisition source, next activity and tags. Board rows intentionally use a
-smaller projection.
+acquisition source, next activity, tags, `rating` and `cardColor`. Board rows
+intentionally use a smaller projection.
+
+Advanced search uses `POST /customer-profiles/search`. Its filter tree accepts
+`rating` and `cardColor` alongside the existing identity, status, type, source
+and owner fields. Those fields are Advanced-search conditions; Basic search
+keeps its token input and default **My Customers** scope.
+
+## POST /customer-profiles/board — board
+
+The first request returns every fixed `CustomerStatusEnum` lane with its own
+first page. Each lane is limited to **50** rows and has independent continuation
+metadata. `POST /customer-profiles/board/statuses/:status` loads the next page
+for one lane without reloading the others.
+
+Board items include the compact identity, `primaryContactName`, source, tags,
+public owner name/avatar, activity summary, `rating` and `cardColor`. The
+primary contact is deliberately a scalar display name here. Address, contact
+phones/email and the full primary-contact object belong to the richer
+Card/Table list projection and the detail read model.
 
 ## POST /customer-profiles/:id/contacts
 
@@ -76,6 +95,19 @@ exposed on 2026-08-27 as `crm.customer.profiles.contacts.post`.
 Also the board view's drag target. Moving a card between columns sends
 `{ status }` — there is no dedicated stage endpoint here, because customer
 status is a fixed enum rather than a tenant catalogue.
+
+The same endpoint persists card presentation controls:
+
+```json
+{ "rating": 2, "cardColor": "BLUE" }
+```
+
+- `rating` is an integer from `0` through `3` and is rendered as three stars.
+- `cardColor` accepts the shared CRM palette or `null`; `null` removes the
+  colour and an omitted key leaves it unchanged.
+- Rating changes are business changes and remain auditable. Card colour is a
+  presentation preference and colour-only changes are not written to the
+  business audit timeline.
 
 `BLACKLISTED` is terminal in practice and should confirm before sending.
 
@@ -128,9 +160,16 @@ Returns **`204`** with no body.
 - Default view is `board`; Card and Table use the richer list/search projection.
 - Core owns the underlying party directory; CRM owns the profile. Do not try
   to join them client-side.
-- Card and Table consume the rich list/search projection. Preserve the Party
-  photo/logo, owner avatar, city/country, website, tags and corporate primary
-  contact instead of reducing the row to profile ids.
+- Card and Table consume the rich list/search projection. Preserve the owner
+  avatar, city/country, website, tags and corporate primary contact instead of
+  reducing the row to profile ids. The projection also carries the Party
+  photo/logo for surfaces that render it; the compact Customer cards use the
+  individual/company type icon. Card view loads quotation, sales-order and
+  invoice counts through shared bulk count requests and renders them as `PQ`,
+  `SO` and `IN`.
+- Rating and card colour are persisted server-side and shared by Board, Card
+  and Table. Optimistic updates must change only those keys, preserve the rich
+  row already on screen and reconcile after an ambiguous response.
 - The list screen's Basic search uses removable tokens in one input. Its
   semantic choices are Customer, Email and Phone/Mobile; there is no Lead
   choice on this screen. Status, Customer type and Source are structured
@@ -154,10 +193,11 @@ Returns **`204`** with no body.
 | --- | --- |
 | List, branch-scoped, paginated | live |
 | Basic search — token input | live — Customer, Email, Phone/Mobile, status, customer type, source |
+| Advanced search | live — includes rating and card colour |
 | Detail route | live — full action cluster and custom-fields rail |
-| Board view | live — `CustomerStatusEnum` axis, no catalogue fetch |
-| Card view | live |
-| Table view | live |
+| Board view | live — `CustomerStatusEnum` axis, 50 rows per independently paginated status, compact read model |
+| Card view | live — rich party/contact/source data, PQ/SO/IN, rating and card colour |
+| Table view | live — rich read model with interactive rating and activity controls |
 | Capabilities-driven actions | live — edit, status, delete and add-contact |
 | Create / update / delete | live — `POST`, `PATCH /:id`, `DELETE /:id` |
 | Add contact | live — `POST /:id/contacts`; **this route declares `organizationScopeMode: NONE`, so it must send NO scope headers** |

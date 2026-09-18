@@ -30,6 +30,7 @@ const mockCustomer: CustomerProfileItem = {
   companyWebsite: "https://alamal.med.sa/about",
   country: "Saudi Arabia",
   city: "Riyadh",
+  primaryContactName: "Mona Saleh",
   primaryContact: {
     partyId: "0192f3a0-0000-7000-8000-000000000004",
     displayName: "Mona Saleh",
@@ -50,6 +51,8 @@ const mockCustomer: CustomerProfileItem = {
   acquisitionSourceNameAr: "موقع الكتروني",
   acquisitionSourceNameEn: "Website",
   sourceIconUrl: null,
+  rating: 2,
+  cardColor: "TEAL",
 };
 
 const labels: CustomerProfileCardViewFooterLabels = {
@@ -63,6 +66,12 @@ const labels: CustomerProfileCardViewFooterLabels = {
   country: "Company country: Saudi Arabia · Riyadh",
   primary: "Primary",
   position: "Position: Procurement Manager",
+  group: "Rating",
+  setStars: "Rate {count} of {max}",
+  clear: "Clear rating",
+  quotations: "Quotations: 2",
+  salesOrders: "Sales orders: 1",
+  invoices: "Invoices: 4",
 };
 
 describe("CustomerProfileCardViewFooter", () => {
@@ -71,6 +80,9 @@ describe("CustomerProfileCardViewFooter", () => {
       <CustomerProfileCardViewFooter
         item={mockCustomer}
         sourceName="Website"
+        counts={{ quotations: 2, salesOrders: 1, invoices: 4 }}
+        countVisibility={{ quotations: true, salesOrders: true, invoices: true }}
+        onRatingChange={vi.fn()}
         onOpenActivities={vi.fn()}
         labels={labels}
       />,
@@ -84,6 +96,9 @@ describe("CustomerProfileCardViewFooter", () => {
     expect(screen.getByText("Position: Procurement Manager")).toBeInTheDocument();
     expect(screen.getByText(labels.source)).toBeInTheDocument();
     expect(screen.getByText("Salesperson: Kamal Radwan")).toBeInTheDocument();
+    expect(screen.getByText("PQ: 2")).toBeInTheDocument();
+    expect(screen.getByText("SO: 1")).toBeInTheDocument();
+    expect(screen.getByText("IN: 4")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: labels.websiteAction })).toHaveAttribute(
       "href",
       "https://alamal.med.sa/about",
@@ -99,6 +114,7 @@ describe("CustomerProfileCardViewFooter", () => {
       <CustomerProfileCardViewFooter
         item={mockCustomer}
         sourceName="Website"
+        onRatingChange={vi.fn()}
         onOpenActivities={onOpenActivities}
         labels={labels}
       />,

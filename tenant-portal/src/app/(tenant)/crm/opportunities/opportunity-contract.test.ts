@@ -47,6 +47,7 @@ const opportunity = {
   status: "IN_PROGRESS",
   title: "Initial ERP rollout",
   importance: 3,
+  cardColor: "TEAL",
   amount: "150000.00",
   currencyCode: "USD",
   description: null,

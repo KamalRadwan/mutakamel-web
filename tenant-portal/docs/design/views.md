@@ -962,16 +962,19 @@ the other ends it — and the two sit one menu row apart.
 
 | | |
 | --- | --- |
-| Hook | `useCustomerProfiles()` |
-| List | `GET /api/tenant/crm/v1/customer-profiles` |
+| Hooks | `useCustomerProfiles()` for Card/Table · `useCustomerProfileBoard()` for Board |
+| **Board data** | `POST /api/tenant/crm/v1/customer-profiles/board` — first 50 per status |
+| **Board continuation** | `POST /api/tenant/crm/v1/customer-profiles/board/statuses/:status` |
+| **Card/Table data** | `GET /api/tenant/crm/v1/customer-profiles` or read-only `POST …/search` |
 | Board axis | `CustomerStatusEnum`, fixed order |
 | Move | `PATCH /api/tenant/crm/v1/customer-profiles/:id` — `{ status }` |
 | Capabilities | `GET /api/tenant/crm/v1/customer-profiles/capabilities?branchId=` |
 | Default view | `board` |
-| Card fields | Party photo/logo · display name · type/status · tags · city/country · phones/actions · email/website · corporate primary contact · source · owner avatar/name · activity |
-| Table columns | Customer/type/tags · Contact name/position/email · Phone/actions · Location · Status · Source · Salesperson · Activity · Actions |
+| Board fields | Display name/type · corporate primary-contact name · tags/source · owner avatar/name · rating/activity · card colour |
+| Card fields | Type icon · display name · type/status · tags · city/country + flag · phones/actions · email/website · corporate primary contact · source · `PQ`/`SO`/`IN` · owner avatar/name · rating/activity · card colour |
+| Table columns | Customer/type/tags · Contact name/position/email · Phone/actions · Location · Status/rating · Source · Salesperson · Activity · Actions |
 | Sortable | `displayName`, `createdAt` |
-| Filters | `profileType`, `status`, `acquisitionSourceId`, `ownerUserId` |
+| Filters | Basic identity tokens plus Advanced `profileType`, `status`, `rating`, `cardColor`, `acquisitionSourceId`, `ownerUserId`, tags and dates |
 | Terminal stages | `BLACKLISTED` — confirm before moving |
 
 ### Opportunities (Pipeline)
@@ -990,8 +993,8 @@ the other ends it — and the two sit one menu row apart.
 | Extra control | **Pipeline selector, required.** `pipelineId` in the URL |
 | Card fields | Title/status · customer + primary contact · phone actions · city/country · source · tags · amount/currency · probability · expected close · owner avatar/name · `importance` stars · activity · `PQ`/`SO`/`IN` |
 | Table columns | Opportunity/status · Customer · Contact · Phone/actions · Country · Deal value/probability · Stage · Source · Owner · Expected close · Importance/activity · Actions |
-| Sortable (table only) | `title`, `amount`, `expectedCloseDate` |
-| Filters | semantic text, tags, `pipelineId`, `stageId`, `stageFlag`, `status`, `customerProfileId`, `ownerUserId`, `expectedCloseFrom`, `expectedCloseTo` |
+| Sortable (table only) | `title`, `amount`, `probabilityPercent`, `expectedCloseDate`, `createdAt` |
+| Filters | semantic text, tags, `pipelineId`, `stageId`, `stageFlag`, `status`, `customerProfileId`, `ownerUserId`, `importance`, `cardColor`, `expectedCloseFrom`, `expectedCloseTo` |
 | Terminal stages | Flags `WON` and `LOST` |
 
 **Opportunities is the one screen where the three views hit three different

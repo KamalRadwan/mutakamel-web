@@ -111,11 +111,15 @@ function CustomerProfileAdvancedSearch({
   const statusLabels: Record<string, string | undefined> = t.statusValues;
   const profileTypeLabels: Record<string, string | undefined> =
     t.crmCustomerProfiles.profileTypes;
+  const cardColorLabels: Record<string, string | undefined> =
+    t.crmLeads.card.colors;
   const fieldLabels: Record<CustomerProfileAdvancedFieldId, string> = {
     id: labels.id,
     source: labels.source,
     profileType: labels.profileType,
     status: labels.status,
+    rating: t.crmLeads.card.rating,
+    cardColor: t.crmLeads.card.cardColor,
     owner: labels.owner,
     sourceLead: labels.sourceLead,
     description: labels.description,
@@ -129,6 +133,9 @@ function CustomerProfileAdvancedSearch({
   ): string {
     if (field === "profileType") {
       return profileTypeLabels[wireValue] ?? wireValue;
+    }
+    if (field === "cardColor") {
+      return cardColorLabels[wireValue] ?? wireValue;
     }
     return statusLabels[`CustomerStatus.${wireValue}`] ?? wireValue;
   }

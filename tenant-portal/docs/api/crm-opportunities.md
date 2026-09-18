@@ -9,9 +9,9 @@ Owning app: **crm-app**
 Canonical prefix: `/api/tenant/crm/v1/opportunities`, `/pipelines`,
 `/opportunity-stages`
 
-Portal status: **built** — board, card and table views, plus delete. See the
-full breakdown below. Not exercised against a live session: CRM is blocked
-twice over, by P4 and by Q17.
+Portal status: **built** — board, rich card and table views, persistent
+importance and card colour, plus delete. See the full breakdown below. Not
+exercised against a live session: CRM is blocked twice over, by P4 and by Q17.
 
 Source inspected:
 `crm-app/src/crm/opportunities/opportunities.controller.ts`,
@@ -120,7 +120,26 @@ independently limited page plus its own cursor, so columns paginate separately.
   "pipeline": { "id": "0192…", "stages": [] },
   "stages": [{
     "stage": { "id": "0192…", "rank": 1, "nameEn": "New" },
-    "items": [],
+    "items": [{
+      "id": "0192…",
+      "title": "Renew annual subscription",
+      "customerProfileType": "CORPORATE",
+      "customerDisplayName": "Acme Trading",
+      "customerCompanyName": "Acme Trading LLC",
+      "contactDisplayName": "Mona Hassan",
+      "importance": 3,
+      "cardColor": "BLUE",
+      "amount": "250000.00",
+      "currencyCode": "EGP",
+      "probabilityPercent": 65,
+      "expectedCloseDate": "2026-10-31",
+      "ownerDisplayName": "Sara Sales",
+      "ownerAvatarUrl": "/api/tenant/core/v1/directory/parties/0192…/image?v=1784023200000",
+      "openActivityCount": 2,
+      "nextOpenActivityAt": "2026-09-19T08:00:00.000Z",
+      "activityState": "TODAY",
+      "tags": [{ "id": "0192…", "name": "Renewal" }]
+    }],
     "summary": {
       "totalCount": 143,
       "amountsByCurrency": [{ "currencyCode": "EGP", "amount": "250000.00" }]
@@ -140,6 +159,11 @@ independently limited page plus its own cursor, so columns paginate separately.
 - `activitySummary` gives the column an at-a-glance follow-up state
   (`overdueCount` is the one worth surfacing).
 - Stage order is `stage.rank`, not a client sort.
+- Board items use the compact read model needed by the lane card. They include
+  customer/company/contact display names, deal values, tags, public owner,
+  activity state, `importance` and `cardColor`. They deliberately omit phone,
+  email, address, the full primary-contact object and acquisition-source
+  details; those belong to Card/Table and detail responses.
 
 ### Card response
 
@@ -161,13 +185,26 @@ independently limited page plus its own cursor, so columns paginate separately.
     "customerDisplayName": "Acme Trading",
     "customerCompanyName": "Acme Trading LLC",
     "customerPhone": "+201000000000",
+    "customerEmail": "sales@acme.example",
     "customerCountry": "Egypt",
     "customerCity": "Cairo",
+    "primaryContact": {
+      "displayName": "Mona Hassan",
+      "jobTitle": "Procurement Manager",
+      "phones": ["+201011111111"],
+      "email": "mona@acme.example",
+      "isPrimary": true
+    },
     "leadSourceName": "Website",
+    "leadSourceIconUrl": "/api/tenant/crm/v1/acquisition-sources/0192…/icon?v=1784023200000",
     "ownerDisplayName": "Sara Sales",
     "ownerAvatarUrl": "/api/tenant/core/v1/directory/parties/0192…/image?v=1784023200000",
     "importance": 3,
-    "openActivityCount": 2
+    "cardColor": "BLUE",
+    "openActivityCount": 2,
+    "nextOpenActivityAt": "2026-09-19T08:00:00.000Z",
+    "activityState": "TODAY",
+    "tags": [{ "id": "0192…", "name": "Renewal" }]
   }],
   "pageInfo": { "limit": 50, "hasMore": true, "nextCursor": "opaque-cursor" }
 }
@@ -187,6 +224,8 @@ independently limited page plus its own cursor, so columns paginate separately.
 - `ownerAvatarUrl` is a **safe, cache-busted server path**. Render it as given;
   never construct an avatar URL by hand.
 - `importance` is an integer, rendered as stars.
+- `cardColor` is the persisted CRM card colour and uses the same palette as
+  Lead and Customer cards.
 - `openActivityCount` counts planned activities without exposing the activity
   records themselves.
 - Cursors are **opaque and filter-bound**. The same filters sent for the
@@ -222,8 +261,28 @@ Do not try to unify them — `DataTable` uses `page`/`limit` against
 Response `200` is the flat CRM page
 `{ items, total, page, limit, totalPages, hasNext, hasPrev }`. Each item is the
 same enriched read row used by Card view, including customer/contact, source,
-owner, activity, tags and the commercial fields. Table view must preserve the
-exact decimal `amount` string.
+owner, activity, tags, `importance`, `cardColor` and the commercial fields.
+Table view must preserve the exact decimal `amount` string.
+
+Advanced search uses `POST /opportunities/search`; its filter tree supports
+`importance` and `cardColor` alongside pipeline, stage, status, customer,
+owner, source and commercial conditions. Basic search remains the token input
+and keeps its default **My Opportunities** scope.
+
+## PATCH /opportunities/:id — rank and card colour
+
+The ordinary opportunity update route persists the two card controls:
+
+```json
+{ "importance": 2, "cardColor": "BLUE" }
+```
+
+- `importance` is the opportunity rank, an integer from `0` through `3` and is
+  rendered as three stars. No duplicate `rating` field is introduced.
+- `cardColor` accepts the shared CRM palette or `null`; `null` clears it and an
+  omitted key leaves it unchanged.
+- Optimistic clients update only the changed presentation/rank keys and keep
+  the remaining rich Board/Card/Table row intact.
 
 ## POST /opportunities/:id/stage — move stage
 
@@ -281,6 +340,9 @@ they do not exist.
 - Stage names are tenant-configured. Never hardcode them, never assume a count.
 - Stage move is `POST /:id/stage`; pipeline transfer is `PUT /:id/pipeline`.
   They are not interchangeable.
+- Importance and card colour persist across Board, Card and Table. Move,
+  colour, rank and delete actions must each use their own row-level capability
+  check.
 - Nine `OpportunityStageFlagEnum` values is why stage is never encoded by hue —
   see [../design/tokens.md](../design/tokens.md#status-mapping).
 
@@ -289,8 +351,9 @@ they do not exist.
 | Capability | Status |
 | --- | --- |
 | List, branch-scoped, paginated | live — table view |
-| Board view + stage move | live |
-| Card view | live |
+| Board view + stage move | live — 50 rows per independently paginated stage, compact opportunity read model |
+| Card view | live — rich customer/contact/source data, commercial fields, PQ/SO/IN, importance and card colour |
+| Advanced search | live — includes importance and card colour |
 | Capabilities-driven actions | live — owner-scoped update (drag/importance) and delete; enriched rows provide customer/contact and owner display data |
 | Delete | live — `DELETE /:id`, capability-gated |
 | Create | live — `POST /opportunities` against an existing customer, plus the lead-conversion route |

@@ -10,6 +10,7 @@ import {
   CUSTOMER_PROFILE_BOARD_LANE_LIMIT,
 } from "../customer-profile-board-contract";
 import type { CustomerProfileSearchState } from "../customer-profile-search-contract";
+import type { CustomerProfileCardPatch } from "../customer-profile-card-contract";
 import {
   parseCustomerProfilesPageResponse,
   type CustomerProfileItem,
@@ -298,6 +299,25 @@ export function useCustomerProfileBoard({
     [lanes],
   );
 
+  const applyCardFields = useCallback(
+    (profileId: string, patch: CustomerProfileCardPatch) => {
+      setLanes((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([status, lane]) => [
+            status,
+            {
+              ...lane,
+              items: lane.items.map((item) =>
+                item.id === profileId ? { ...item, ...patch } : item,
+              ),
+            },
+          ]),
+        ),
+      );
+    },
+    [],
+  );
+
   return {
     items,
     totals,
@@ -307,5 +327,6 @@ export function useCustomerProfileBoard({
     error,
     reload,
     loadMoreStatus,
+    applyCardFields,
   };
 }

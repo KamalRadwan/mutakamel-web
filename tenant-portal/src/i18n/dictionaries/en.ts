@@ -1041,6 +1041,8 @@ export const en: Dictionary = {
     importanceValue: "{level} of 3",
     setImportance: "Set importance to {level} of 3",
     clearImportance: "Clear importance",
+    cardUpdateFailed: "Unable to save the card change.",
+    cardUpdateAmbiguous: "The result of the card change is uncertain. The view was reloaded; check the card before trying again.",
     title: "Title",
     customer: "Customer",
     stage: "Stage",
@@ -1807,6 +1809,10 @@ export const en: Dictionary = {
     confirmBlacklistMessage: "Blacklisting is terminal in practice — the customer will lose access immediately.",
     confirmBlacklistAction: "Blacklist customer",
     moveFailed: "The status change could not be saved. The card was restored.",
+    cardNotPermitted: "You do not have permission to change this customer.",
+    cardUpdateFailed: "Unable to save the customer card change.",
+    cardUpdateAmbiguous:
+      "The card change could not be verified. The customer list is being reloaded.",
     profileTypes: {
       INDIVIDUAL: "Individual",
       CORPORATE: "Corporate",

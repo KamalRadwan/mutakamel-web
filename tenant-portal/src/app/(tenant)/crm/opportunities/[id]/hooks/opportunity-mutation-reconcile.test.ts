@@ -29,6 +29,7 @@ const item = {
   status: "IN_PROGRESS",
   title: "Renewal",
   importance: 2,
+  cardColor: null,
   amount: "1000.00",
   currencyCode: "EGP",
   description: null,

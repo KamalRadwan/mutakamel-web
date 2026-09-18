@@ -1057,6 +1057,8 @@ export const ar = {
     importanceValue: "{level} من 3",
     setImportance: "ضبط الأهمية على {level} من 3",
     clearImportance: "إزالة الأهمية",
+    cardUpdateFailed: "تعذّر حفظ تغيير البطاقة.",
+    cardUpdateAmbiguous: "نتيجة حفظ تغيير البطاقة غير مؤكدة. أُعيد تحميل العرض؛ راجع البطاقة قبل المحاولة مجددًا.",
     title: "العنوان",
     customer: "العميل",
     stage: "المرحلة",
@@ -1826,6 +1828,10 @@ export const ar = {
     confirmBlacklistMessage: "الحظر إجراء نهائي عمليًا — سيفقد العميل إمكانية الوصول فورًا.",
     confirmBlacklistAction: "حظر العميل",
     moveFailed: "تعذر حفظ تغيير الحالة. تمت استعادة البطاقة.",
+    cardNotPermitted: "ليست لديك صلاحية تعديل هذا العميل.",
+    cardUpdateFailed: "تعذّر حفظ تغيير بطاقة العميل.",
+    cardUpdateAmbiguous:
+      "تعذّر التحقق من تغيير البطاقة. جارٍ إعادة تحميل قائمة العملاء.",
     profileTypes: {
       INDIVIDUAL: "فرد",
       CORPORATE: "شركة",

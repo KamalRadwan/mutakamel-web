@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
-import { useRealtimeResync } from "@/design-system";
+import { useRealtimeResync, type CardColor } from "@/design-system";
 import {
   resolveDefaultTenantBranchId,
   useTenantBranchSelection,
@@ -23,6 +23,11 @@ import {
   buildCustomerProfileBasicSearchRequest,
   customerProfileBasicSearchNeedsPost,
 } from "../customer-profile-basic-search-contract";
+import {
+  parseCustomerProfileCardColor,
+  parseCustomerProfileRating,
+  type CustomerProfileCardPatch,
+} from "../customer-profile-card-contract";
 
 export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
 /**
@@ -90,6 +95,8 @@ export interface CustomerProfileItem {
   companyWebsite: string | null;
   country: string;
   city: string;
+  /** Lean Board projection; rich Card/Table responses also include `primaryContact`. */
+  primaryContactName: string | null;
   primaryContact: CustomerProfilePrimaryContact | null;
   tags: CustomerProfileTag[];
   ownerUserId: string | null;
@@ -98,6 +105,8 @@ export interface CustomerProfileItem {
   acquisitionSourceNameAr: string | null;
   acquisitionSourceNameEn: string | null;
   sourceIconUrl: string | null;
+  rating: number;
+  cardColor: CardColor | null;
 }
 
 export interface CustomerProfilesPage {
@@ -365,6 +374,11 @@ export function parseCustomerProfileResponse(
   const address = record(source.address);
   const party = record(source.party);
   const phones = phoneNumbers(source, source.profileType);
+  const primaryContact = parsePrimaryContact(source.primaryContact);
+  const primaryContactName =
+    nullableText(source, "primaryContactName", 180) ??
+    primaryContact?.displayName ??
+    null;
 
   return {
     id: requiredUuidV7(source, "id"),
@@ -384,7 +398,8 @@ export function parseCustomerProfileResponse(
     companyWebsite: companyWebsite(source.companyWebsite),
     country: address ? optionalText(address.country) : "",
     city: address ? optionalText(address.city) : "",
-    primaryContact: parsePrimaryContact(source.primaryContact),
+    primaryContactName,
+    primaryContact,
     tags: parseTags(source.tags),
     ownerUserId,
     owner: parseOwner(source.owner),
@@ -392,6 +407,8 @@ export function parseCustomerProfileResponse(
     acquisitionSourceNameAr: acquisitionSource ? nullableText(acquisitionSource, "nameAr", 120) : null,
     acquisitionSourceNameEn: acquisitionSource ? nullableText(acquisitionSource, "nameEn", 120) : null,
     sourceIconUrl: sourceIconUrl(source.acquisitionSourceIconUrl),
+    rating: parseCustomerProfileRating(source.rating),
+    cardColor: parseCustomerProfileCardColor(source.cardColor),
   };
 }
 
@@ -716,6 +733,22 @@ export function useCustomerProfiles() {
   }, []);
   useRealtimeResync(reload);
 
+  const applyCardFields = useCallback(
+    (profileId: string, patch: CustomerProfileCardPatch) => {
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) =>
+                item.id === profileId ? { ...item, ...patch } : item,
+              ),
+            }
+          : current,
+      );
+    },
+    [],
+  );
+
   const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
     const field = CUSTOMER_PROFILE_SORT_FIELDS.find((allowed) => allowed === next.id);
     if (!field) return;
@@ -752,6 +785,7 @@ export function useCustomerProfiles() {
     previousPage,
     nextPage,
     reload,
+    applyCardFields,
     activeView,
     setActiveView,
     dataRevision,

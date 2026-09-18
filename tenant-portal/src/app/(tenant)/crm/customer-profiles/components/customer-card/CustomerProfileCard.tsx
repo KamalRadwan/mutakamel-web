@@ -1,11 +1,11 @@
 "use client";
 
-import { Badge, StatusBadge } from "@/design-system";
+import { Building2, UserRound } from "lucide-react";
+import { Badge, StatusBadge, cn, iconSize } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedValue } from "@/lib/format/localized";
 import type { CustomerProfileItem } from "../../hooks/useCustomerProfiles";
 import { AcquisitionSourceIcon } from "../../../shared/components/AcquisitionSourceIcon";
-import { CustomerProfileAvatar } from "./CustomerProfileAvatar";
 import { CustomerProfileTagList } from "./CustomerProfileTagList";
 
 export interface CustomerProfileCardProps {
@@ -30,16 +30,23 @@ export function CustomerProfileCard({
     item.companyName !== item.displayName
       ? item.companyName
       : null;
+  const contactName =
+    item.profileType === "CORPORATE"
+      ? item.primaryContact?.displayName ?? item.primaryContactName
+      : null;
+  const TypeIcon =
+    item.profileType === "CORPORATE" ? Building2 : UserRound;
 
   return (
-    <div className="flex min-w-0 items-start gap-2">
-      <CustomerProfileAvatar
-        imageUrl={item.imageUrl}
-        displayName={item.displayName}
-        profileType={item.profileType}
-      />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-1">
         <div className="flex min-w-0 items-center gap-1.5">
+          <TypeIcon
+            className={cn(
+              iconSize({ size: "sm" }),
+              "shrink-0 text-muted-foreground",
+            )}
+            aria-hidden="true"
+          />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {item.displayName}
           </span>
@@ -51,6 +58,16 @@ export function CustomerProfileCard({
               item.profileType}
           </Badge>
         </div>
+
+        {contactName && (
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <UserRound
+              className={cn(iconSize({ size: "sm" }), "shrink-0")}
+              aria-hidden="true"
+            />
+            <span className="truncate">{contactName}</span>
+          </span>
+        )}
 
         {(companyName || isCardView) && (
           <div className="flex min-w-0 items-center gap-1.5">
@@ -69,7 +86,7 @@ export function CustomerProfileCard({
           </div>
         )}
 
-        {isCardView && (
+        {(isCardView || item.tags.length > 0) && (
           <CustomerProfileTagList
             tags={item.tags}
             moreLabel={t.crmLeads.card.moreTags}
@@ -82,7 +99,6 @@ export function CustomerProfileCard({
             <span className="truncate">{sourceName}</span>
           </div>
         )}
-      </div>
     </div>
   );
 }

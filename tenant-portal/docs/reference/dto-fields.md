@@ -8,7 +8,7 @@ Status: **verified** (parsed from controller DTO source)
 
 Last source verification: **2026-09-18**
 
-Classes: **46** · Fields: **312**
+Classes: **46** · Fields: **315**
 
 ## How to read this
 
@@ -247,6 +247,8 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles/dto/custome
 | --- | --- | --- | --- |
 | `displayName` | string | no | non-empty, max 180 |
 | `status` | enum CustomerStatusEnum | no | — |
+| `rating` | integer | no | >= CRM_LEAD_RATING_MIN, <= CRM_LEAD_RATING_MAX |
+| `cardColor` | enum CrmLeadCardColorEnum | no | — |
 | `ownerUserId` | UUIDv7 | no | — |
 | `acquisitionSourceId` | UUIDv7 | no | — |
 | `companyName` | string | no | non-empty, max 180 |
@@ -293,6 +295,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities/dto/opportunity
 | --- | --- | --- | --- |
 | `title` | string | no | non-empty, max 180 |
 | `importance` | integer | no | >= 0, <= 3 |
+| `cardColor` | enum CrmLeadCardColorEnum | no | — |
 | `amount` | number | no | >= 0 |
 | `description` | string | no | max 2000 |
 | `currencyCode` | string | no | length 3–3, transformed |

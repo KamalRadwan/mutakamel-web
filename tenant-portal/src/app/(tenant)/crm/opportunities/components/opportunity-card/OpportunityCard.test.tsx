@@ -3,9 +3,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CARD_COLORS, type CardColor } from "@/design-system";
+import { en } from "@/i18n/dictionaries/en";
 import { OpportunityCard } from "./OpportunityCard";
 import { OpportunityCardFooter, type OpportunityCardFooterLabels } from "./OpportunityCardFooter";
 import { OpportunityCardMenu, type OpportunityCardMenuLabels } from "./OpportunityCardMenu";
+
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
+}));
 
 afterEach(cleanup);
 
@@ -22,17 +27,39 @@ const mockOpportunity = {
   cardColor: "TEAL" as const,
   amount: "50000",
   currencyCode: "SAR",
+  customerProfileType: "CORPORATE" as const,
   customerDisplayName: "Global Tech LLC",
+  customerCompanyName: "Global Tech LLC",
+  customerPhone: null,
+  customerEmail: null,
+  customerCountry: null,
+  customerCity: null,
+  primaryContact: {
+    partyId: "0192f3a0-0000-7000-8000-000000000011",
+    displayName: "Mona Ali",
+    jobTitle: "Buyer",
+    isPrimary: true,
+    email: null,
+    phones: [],
+  },
+  leadSourceName: null,
+  leadSourceIconUrl: null,
   probabilityPercent: 75,
+  expectedCloseDate: "2026-10-31",
   activityState: "OVERDUE" as const,
+  openActivityCount: 2,
+  nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
+  ownerDisplayName: "Kamal Radwan",
+  ownerAvatarUrl: null,
+  tags: [{ id: "0192f3a0-0000-7000-8000-000000000012", name: "VIP" }],
   createdAt: "2026-09-01T00:00:00Z",
   updatedAt: "2026-09-01T00:00:00Z",
 };
 
 const footerLabels: OpportunityCardFooterLabels = {
   activity: "Activities — Overdue",
-  owner: "Owner: 0192f3a0-0000-7000-8000-000000000010",
+  owner: "Owner: Kamal Radwan",
   group: "Importance",
   setStars: "Rate {count} of {max}",
   clear: "Clear importance",
@@ -54,7 +81,7 @@ describe("OpportunityCard", () => {
     render(<OpportunityCard item={mockOpportunity} />);
     expect(screen.getByText("Enterprise Deal 2026")).toBeInTheDocument();
     expect(screen.getByText("Global Tech LLC")).toBeInTheDocument();
-    expect(screen.getByText("SAR 50,000")).toBeInTheDocument();
+    expect(screen.getByText(/50,000\.00/)).toBeInTheDocument();
     expect(screen.getByText(/75/)).toBeInTheDocument();
   });
 });
@@ -69,8 +96,9 @@ describe("OpportunityCardFooter", () => {
         importance={2}
         onImportanceChange={onImportanceChange}
         activityState="OVERDUE"
+        openActivityCount={2}
         onOpenActivities={onOpenActivities}
-        ownerUserId="0192f3a0-0000-7000-8000-000000000010"
+        ownerDisplayName="Kamal Radwan"
         labels={footerLabels}
       />,
     );
@@ -79,7 +107,8 @@ describe("OpportunityCardFooter", () => {
     expect(activityBtn).toBeInTheDocument();
     fireEvent.click(activityBtn);
     expect(onOpenActivities).toHaveBeenCalledOnce();
-    expect(screen.getByText("01")).toBeInTheDocument();
+    expect(screen.getByText("Kamal Radwan")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 });
 
@@ -100,5 +129,24 @@ describe("OpportunityCardMenu", () => {
     const openItem = screen.getByText("Open");
     fireEvent.click(openItem);
     expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it("sends the selected filing colour through the shared picker", () => {
+    const onColorChange = vi.fn();
+    render(
+      <OpportunityCardMenu
+        cardColor="TEAL"
+        onOpen={vi.fn()}
+        onColorChange={onColorChange}
+        labels={menuLabels}
+      />,
+    );
+
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: menuLabels.trigger }),
+      { key: "Enter" },
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "PINK" }));
+    expect(onColorChange).toHaveBeenCalledWith("PINK");
   });
 });

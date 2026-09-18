@@ -342,6 +342,43 @@ describe("buildOpportunitySearchRequest — the same field, twice", () => {
   });
 });
 
+describe("buildOpportunitySearchRequest — card colour", () => {
+  it("offers the backend colour vocabulary with only supported comparison operators", () => {
+    const field = opportunityAdvancedField("cardColor");
+
+    expect(field).toMatchObject({
+      field: "cardColor",
+      kind: "enum",
+      nullable: true,
+      operators: ["eq", "neq", "in", "nin"],
+      values: [
+        "RED",
+        "ORANGE",
+        "AMBER",
+        "YELLOW",
+        "GREEN",
+        "TEAL",
+        "BLUE",
+        "INDIGO",
+        "PURPLE",
+        "PINK",
+        "SLATE",
+      ],
+    });
+  });
+
+  it("compiles a multi-colour condition without changing the basic query contract", () => {
+    const state = advanced({ conditions: [leaf("cardColor", "in", "TEAL, PINK")] });
+
+    expect(bodyFor(state).filterTree).toEqual({
+      field: "cardColor",
+      operator: "in",
+      value: ["TEAL", "PINK"],
+    });
+    expect(queryFor({ ...state, mode: "basic" })).toBe(UNFILTERED);
+  });
+});
+
 describe("buildOpportunitySearchRequest — a number is a JSON number", () => {
   // `requireNumberOrDate` accepts a numeric STRING as a date, so `amount >
   // "500"` would pass validation and then compare a numeric column against the
@@ -485,6 +522,7 @@ describe("buildOpportunitySearchRequest — `isNull` carries no value", () => {
     expect([...nullable].sort()).toEqual(
       [
         "amount",
+        "cardColor",
         "contactPartyId",
         "currencyCode",
         "description",
@@ -521,6 +559,7 @@ describe("buildOpportunitySearchRequest — the whitelist boundary", () => {
       "title",
       "description",
       "importance",
+      "cardColor",
       "amount",
       "currencyCode",
       "probabilityPercent",

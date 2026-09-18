@@ -14,9 +14,10 @@ vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api/axiosClient")>();
   return { ...actual, axiosClient: { ...actual.axiosClient, get, post } };
 });
-// `useRealtimeResync` is the list hook's only design-system import, and it only
-// attaches window listeners. Stubbing it keeps this test off the barrel.
-vi.mock("@/design-system", () => ({ useRealtimeResync: () => undefined }));
+vi.mock("@/design-system", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/design-system")>();
+  return { ...actual, useRealtimeResync: () => undefined };
+});
 
 const branchId = "01900100-0000-7000-8000-000000000099";
 const PIPELINE = "01900100-0000-7000-8000-000000000100";
@@ -50,6 +51,7 @@ const item = {
   status: "IN_PROGRESS",
   title: "Annual renewal",
   importance: 2,
+  cardColor: "TEAL",
   amount: "87500.50",
   currencyCode: "EGP",
   probabilityPercent: 40,
@@ -59,7 +61,7 @@ const item = {
   openActivityCount: 2,
   nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
   activityState: "FUTURE",
-  tags: [{ id: "01900100-0000-7000-8000-000000000121", name: "VIP", color: null }],
+  tags: [{ id: "01900100-0000-7000-8000-000000000121", name: "VIP" }],
   expectedCloseDate: "2026-09-01",
   createdAt: "2026-08-25T10:00:00.000Z",
 };

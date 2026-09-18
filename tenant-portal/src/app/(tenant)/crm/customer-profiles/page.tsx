@@ -40,6 +40,9 @@ import { useCrmCreateCustomFields } from "../shared/hooks/useCrmCreateCustomFiel
 import { useCrmFieldMessages } from "../shared/hooks/useCrmFieldMessages";
 import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
 import { useCustomerProfileCardSlots } from "./components/useCustomerProfileCardSlots";
+import { useUpdateCustomerProfileCard } from "./hooks/useUpdateCustomerProfileCard";
+import { usePartyDocumentCounts } from "../shared/hooks/usePartyDocumentCounts";
+import type { CustomerProfileCardPatch } from "./customer-profile-card-contract";
 import { crmCapabilityAllowsOwner } from "../shared/crm-capabilities";
 import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
 import { crmActivitySegments } from "../shared/crm-activity-tone";
@@ -80,6 +83,7 @@ export default function CustomerProfilesPage() {
     activeView,
     setActiveView,
     dataRevision,
+    applyCardFields: applyListCardFields,
   } = useCustomerProfiles();
 
   const { capabilities, error: capabilitiesError } =
@@ -89,6 +93,11 @@ export default function CustomerProfilesPage() {
     (item: CustomerProfileItem) =>
       crmCapabilityAllowsOwner(capabilities.update, item.ownerUserId),
     [capabilities.update],
+  );
+  const canDeleteProfile = useCallback(
+    (item: CustomerProfileItem) =>
+      crmCapabilityAllowsOwner(capabilities.delete, item.ownerUserId),
+    [capabilities.delete],
   );
 
   const router = useRouter();
@@ -125,10 +134,32 @@ export default function CustomerProfilesPage() {
     sort,
     revision: dataRevision,
   });
+  const applyBoardCardFields = board.applyCardFields;
   const { displayItems, handleCardMove } = useCustomerProfileBoardMove(
     board.items,
     reload,
     canUpdateProfile,
+  );
+  const applyCardFields = useCallback(
+    (profileId: string, patch: CustomerProfileCardPatch) => {
+      applyListCardFields(profileId, patch);
+      applyBoardCardFields(profileId, patch);
+    },
+    [applyBoardCardFields, applyListCardFields],
+  );
+  // `reload` increments `dataRevision`, which refreshes the independently
+  // sourced Board as well as the Card/Table list without issuing two requests.
+  const reconcileCards = useCallback(() => reload(), [reload]);
+  const { updateCard } = useUpdateCustomerProfileCard({
+    branchId,
+    canUpdate: canUpdateProfile,
+    applyCardFields,
+    reconcile: reconcileCards,
+  });
+  const documentCounts = usePartyDocumentCounts(
+    items,
+    branchId,
+    view === "card",
   );
 
   const [pendingTerminalMove, setPendingTerminalMove] = useState<{
@@ -163,7 +194,7 @@ export default function CustomerProfilesPage() {
 
   const cardSlots = useCustomerProfileCardSlots({
     canUpdate: canUpdateProfile,
-    canDelete: (item) => Boolean(capabilities.delete) && canUpdateProfile(item),
+    canDelete: canDeleteProfile,
     onOpen: (item) => openProfile(item),
     onDelete: (item) => {
       clearDeleteError();
@@ -172,6 +203,9 @@ export default function CustomerProfilesPage() {
     onOpenActivities: (item) => {
       setActivityCustomer({ id: item.id, name: item.displayName });
     },
+    onCardChange: (item, patch) => void updateCard(item, patch),
+    documentCountsByParty: documentCounts.countsByParty,
+    documentCountVisibility: documentCounts.visible,
     moveTargets:
       view === "board"
         ? (item) => moveTargets.filter((target) => target.id !== item.status)
@@ -234,7 +268,8 @@ export default function CustomerProfilesPage() {
     reload,
   );
   const tableColumns = useCustomerProfileColumns({
-    canDelete: (item) => Boolean(capabilities.delete) && canUpdateProfile(item),
+    canUpdate: canUpdateProfile,
+    canDelete: canDeleteProfile,
     onDelete: (item) => {
       clearDeleteError();
       setSelectedForDelete({ id: item.id, name: item.displayName });
@@ -242,6 +277,8 @@ export default function CustomerProfilesPage() {
     onOpenActivities: (item) => {
       setActivityCustomer({ id: item.id, name: item.displayName });
     },
+    onRatingChange: (item, rating) =>
+      void updateCard(item, { rating }),
   });
 
   const preconditionState = precondition ? <EmptyState title={precondition} /> : undefined;

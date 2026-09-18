@@ -15,7 +15,7 @@ afterEach(cleanup);
 
 const labels: OpportunityCardViewFooterLabels = {
   activity: "Activities — Overdue",
-  owner: "Owner: 0192f3a0-0000-7000-8000-000000000010",
+  owner: "Owner: Alice",
   group: "Importance",
   setStars: "Rate {count} of {max}",
   clear: "Clear importance",
@@ -37,8 +37,9 @@ describe("OpportunityCardViewFooter", () => {
         importance={2}
         onImportanceChange={onImportanceChange}
         activityState="OVERDUE"
+        openActivityCount={2}
         onOpenActivities={onOpenActivities}
-        ownerUserId="0192f3a0-0000-7000-8000-000000000010"
+        ownerDisplayName="Alice"
         labels={labels}
       />,
     );

@@ -30,10 +30,13 @@ import {
   CustomerProfileAvatar,
 } from "./customer-card/CustomerProfileAvatar";
 import { CustomerProfileTagList } from "./customer-card/CustomerProfileTagList";
+import { CrmRating } from "../../shared/components/CrmRating";
 
 export interface CustomerProfileColumnOptions {
+  canUpdate?: (item: CustomerProfileItem) => boolean;
   canDelete?: (item: CustomerProfileItem) => boolean;
   onDelete?: (item: CustomerProfileItem) => void;
+  onRatingChange?: (item: CustomerProfileItem, rating: number) => void;
   onOpenActivities?: (item: CustomerProfileItem) => void;
 }
 
@@ -200,6 +203,25 @@ export function useCustomerProfileColumns(
       width: "9rem",
       cell: (item) => (
         <StatusBadge value={item.status} kind="CustomerStatus" />
+      ),
+    },
+    {
+      id: "rating",
+      header: card.rating,
+      width: "6rem",
+      cell: (item) => (
+        <CrmRating
+          value={item.rating}
+          onChange={(rating) => options?.onRatingChange?.(item, rating)}
+          disabled={
+            !options?.onRatingChange || !options.canUpdate?.(item)
+          }
+          labels={{
+            group: card.rating,
+            setStars: card.rateStars,
+            clear: card.clearRating,
+          }}
+        />
       ),
     },
     {

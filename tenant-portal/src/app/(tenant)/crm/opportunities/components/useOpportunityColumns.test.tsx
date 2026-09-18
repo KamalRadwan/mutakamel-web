@@ -55,6 +55,7 @@ const mockOpportunity: OpportunityListItem = {
   status: "IN_PROGRESS",
   title: "Enterprise Deal 2026",
   importance: 2,
+  cardColor: null,
   amount: "9007199254740991.25",
   currencyCode: "EGP",
   probabilityPercent: 65,
@@ -68,7 +69,6 @@ const mockOpportunity: OpportunityListItem = {
     {
       id: "0192f3a0-0000-7000-8000-000000000013",
       name: "VIP",
-      color: null,
     },
   ],
   expectedCloseDate: "2026-11-30T00:00:00Z",

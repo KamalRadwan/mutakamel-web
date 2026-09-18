@@ -2,9 +2,12 @@
 
 import {
   BriefcaseBusiness,
+  FileText,
   Globe2,
   Mail,
   MapPin,
+  ReceiptText,
+  ShoppingCart,
   UserRound,
 } from "lucide-react";
 import { Badge, cn, iconSize } from "@/design-system";
@@ -18,6 +21,10 @@ import {
   type CustomerProfileCardFooterLabels,
 } from "./CustomerProfileCardFooter";
 import { CustomerOwnerAvatar } from "./CustomerProfileAvatar";
+import type {
+  PartyDocumentCounts,
+  PartyDocumentCountVisibility,
+} from "../../../shared/party-document-counts-contract";
 
 export interface CustomerProfileCardViewFooterLabels
   extends CustomerProfileCardFooterLabels {
@@ -29,11 +36,18 @@ export interface CustomerProfileCardViewFooterLabels
   country: string;
   primary: string;
   position: string;
+  quotations: string;
+  salesOrders: string;
+  invoices: string;
 }
 
 export interface CustomerProfileCardViewFooterProps {
   item: CustomerProfileItem;
   sourceName?: string | null;
+  counts?: PartyDocumentCounts;
+  countVisibility?: PartyDocumentCountVisibility;
+  onRatingChange: (next: number) => void;
+  isRatingDisabled?: boolean;
   onOpenActivities: () => void;
   labels: CustomerProfileCardViewFooterLabels;
 }
@@ -41,6 +55,10 @@ export interface CustomerProfileCardViewFooterProps {
 export function CustomerProfileCardViewFooter({
   item,
   sourceName,
+  counts,
+  countVisibility,
+  onRatingChange,
+  isRatingDisabled,
   onOpenActivities,
   labels,
 }: CustomerProfileCardViewFooterProps) {
@@ -58,6 +76,29 @@ export function CustomerProfileCardViewFooter({
   const ownerName = item.owner
     ? [item.owner.firstName, item.owner.lastName].filter(Boolean).join(" ")
     : "";
+  const countRows = [
+    {
+      key: "quotations" as const,
+      icon: FileText,
+      abbreviation: "PQ",
+      label: labels.quotations,
+    },
+    {
+      key: "salesOrders" as const,
+      icon: ShoppingCart,
+      abbreviation: "SO",
+      label: labels.salesOrders,
+    },
+    {
+      key: "invoices" as const,
+      icon: ReceiptText,
+      abbreviation: "IN",
+      label: labels.invoices,
+    },
+  ];
+  const hasVisibleCounts = countVisibility
+    ? countRows.some(({ key }) => countVisibility[key])
+    : false;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 border-t border-border pt-1.5">
@@ -192,6 +233,29 @@ export function CustomerProfileCardViewFooter({
       )}
 
       <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-1.5">
+        {counts && countVisibility && hasVisibleCounts && (
+          <div className="grid grid-cols-3 gap-1">
+            {countRows.map(
+              ({ key, icon: CountIcon, abbreviation, label }) =>
+                countVisibility[key] && (
+                  <div
+                    key={key}
+                    className="flex min-w-0 items-center gap-1 rounded-xs bg-muted/60 px-1.5 py-1 text-xs text-muted-foreground"
+                    title={label}
+                  >
+                    <CountIcon
+                      className={cn(iconSize({ size: "sm" }), "shrink-0")}
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">
+                      {abbreviation}: {counts[key] ?? "—"}
+                    </span>
+                  </div>
+                ),
+            )}
+          </div>
+        )}
+
         {item.owner && ownerName && (
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
             <CustomerOwnerAvatar owner={item.owner} className="size-5" />
@@ -203,6 +267,9 @@ export function CustomerProfileCardViewFooter({
           nextActivity={item.nextActivity}
           onOpenActivities={onOpenActivities}
           owner={null}
+          rating={item.rating}
+          onRatingChange={onRatingChange}
+          isRatingDisabled={isRatingDisabled}
           labels={labels}
         />
       </div>

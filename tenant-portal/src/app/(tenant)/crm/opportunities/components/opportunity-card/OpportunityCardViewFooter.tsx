@@ -24,8 +24,10 @@ export interface OpportunityCardViewFooterProps {
   onImportanceChange: (next: number) => void;
   isImportanceDisabled?: boolean;
   activityState: OpportunityActivityState;
+  openActivityCount?: number;
   onOpenActivities: () => void;
-  ownerUserId?: string | null;
+  ownerDisplayName?: string | null;
+  ownerAvatarUrl?: string | null;
   labels: OpportunityCardViewFooterLabels;
 }
 
@@ -38,8 +40,10 @@ export function OpportunityCardViewFooter({
   onImportanceChange,
   isImportanceDisabled,
   activityState,
+  openActivityCount = 0,
   onOpenActivities,
-  ownerUserId,
+  ownerDisplayName,
+  ownerAvatarUrl,
   labels,
 }: OpportunityCardViewFooterProps) {
   const { lang } = useI18n();
@@ -75,7 +79,7 @@ export function OpportunityCardViewFooter({
       )}
 
       <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-1.5">
-        {ownerUserId && (
+        {ownerDisplayName && (
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-foreground">
             <UserRound
               className={cn(iconSize({ size: "sm" }), "shrink-0 text-muted-foreground")}
@@ -90,8 +94,10 @@ export function OpportunityCardViewFooter({
           onImportanceChange={onImportanceChange}
           isImportanceDisabled={isImportanceDisabled}
           activityState={activityState}
+          openActivityCount={openActivityCount}
           onOpenActivities={onOpenActivities}
-          ownerUserId={ownerUserId}
+          ownerDisplayName={ownerDisplayName}
+          ownerAvatarUrl={ownerAvatarUrl}
           labels={labels}
         />
       </div>

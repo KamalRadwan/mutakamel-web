@@ -70,6 +70,7 @@ describe("CRM customer-profile contract", () => {
       companyWebsite: null,
       country: "",
       city: "",
+      primaryContactName: null,
       primaryContact: null,
       tags: [],
       ownerUserId: null,
@@ -78,6 +79,8 @@ describe("CRM customer-profile contract", () => {
       acquisitionSourceNameAr: null,
       acquisitionSourceNameEn: null,
       sourceIconUrl: null,
+      rating: 0,
+      cardColor: null,
     });
   });
 
@@ -107,6 +110,8 @@ describe("CRM customer-profile contract", () => {
         phones: ["+201055500000"],
         isPrimary: true,
       },
+      rating: 2,
+      cardColor: "TEAL",
     });
 
     const afterStatusUpdate = { ...parsed, status: "INACTIVE" as const };
@@ -118,6 +123,7 @@ describe("CRM customer-profile contract", () => {
       phones: ["+201055500000"],
       isPrimary: true,
     });
+    expect(afterStatusUpdate.primaryContactName).toBe("Mona Saleh");
     expect(afterStatusUpdate.phones).toEqual([
       "+201001112223",
       "+201009998887",
@@ -130,6 +136,18 @@ describe("CRM customer-profile contract", () => {
       { id: TAG_ID, name: "Healthcare" },
     ]);
     expect(afterStatusUpdate.owner?.avatarUrl).toContain("/image?v=");
+    expect(afterStatusUpdate.rating).toBe(2);
+    expect(afterStatusUpdate.cardColor).toBe("TEAL");
+  });
+
+  it("accepts the lean Board primary-contact name without rich contact fields", () => {
+    const parsed = parseCustomerProfileResponse({
+      ...profile,
+      primaryContactName: "Mona Saleh",
+    });
+
+    expect(parsed.primaryContactName).toBe("Mona Saleh");
+    expect(parsed.primaryContact).toBeNull();
   });
 
   it("accepts more than one attach batch of tags up to the 500-tag catalogue limit", () => {
@@ -156,6 +174,15 @@ describe("CRM customer-profile contract", () => {
         ...profile,
         companyWebsite: "javascript:alert(1)",
       }),
+    ).toThrow("Invalid CRM customer-profiles response.");
+  });
+
+  it("rejects invalid customer card fields", () => {
+    expect(() =>
+      parseCustomerProfileResponse({ ...profile, rating: 4 }),
+    ).toThrow("Invalid CRM customer-profiles response.");
+    expect(() =>
+      parseCustomerProfileResponse({ ...profile, cardColor: "MAUVE" }),
     ).toThrow("Invalid CRM customer-profiles response.");
   });
 

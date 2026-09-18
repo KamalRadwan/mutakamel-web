@@ -38,6 +38,7 @@ const item: OpportunityCardItem = {
   ownerDisplayName: "Kamal Radwan",
   ownerAvatarUrl: null,
   importance: 2,
+  cardColor: "TEAL",
   amount: "9007199254740991.25",
   currencyCode: "EGP",
   probabilityPercent: 65,
@@ -74,11 +75,11 @@ describe("OpportunityCardTile", () => {
         item={{
           ...item,
           tags: [
-            { id: "0192f3a0-0000-7000-8000-000000000011", name: "VIP", color: null },
-            { id: "0192f3a0-0000-7000-8000-000000000012", name: "Renewal", color: null },
-            { id: "0192f3a0-0000-7000-8000-000000000013", name: "Enterprise", color: null },
-            { id: "0192f3a0-0000-7000-8000-000000000014", name: "Hidden one", color: null },
-            { id: "0192f3a0-0000-7000-8000-000000000015", name: "Hidden two", color: null },
+            { id: "0192f3a0-0000-7000-8000-000000000011", name: "VIP" },
+            { id: "0192f3a0-0000-7000-8000-000000000012", name: "Renewal" },
+            { id: "0192f3a0-0000-7000-8000-000000000013", name: "Enterprise" },
+            { id: "0192f3a0-0000-7000-8000-000000000014", name: "Hidden one" },
+            { id: "0192f3a0-0000-7000-8000-000000000015", name: "Hidden two" },
           ],
         }}
       />,

@@ -27,6 +27,7 @@ const mockCustomer: CustomerProfileItem = {
   companyWebsite: "https://alamal.med.sa",
   country: "Saudi Arabia",
   city: "Riyadh",
+  primaryContactName: "Mona Saleh",
   primaryContact: {
     partyId: "0192f3a0-0000-7000-8000-000000000004",
     displayName: "Mona Saleh",
@@ -49,6 +50,8 @@ const mockCustomer: CustomerProfileItem = {
   acquisitionSourceNameAr: "موقع الكتروني",
   acquisitionSourceNameEn: "Website",
   sourceIconUrl: null,
+  rating: 2,
+  cardColor: "TEAL",
 };
 
 describe("useCustomerProfileColumns", () => {
@@ -60,6 +63,7 @@ describe("useCustomerProfileColumns", () => {
       "phone",
       "country",
       "status",
+      "rating",
       "source",
       "salesperson",
       "activity",
@@ -137,5 +141,20 @@ describe("useCustomerProfileColumns", () => {
     render(<div>{activity.cell(mockCustomer)}</div>);
     fireEvent.click(screen.getByRole("button", { name: /Activities/i }));
     expect(onOpenActivities).toHaveBeenCalledWith(mockCustomer);
+  });
+
+  it("changes rating from the table when the profile is editable", () => {
+    const onRatingChange = vi.fn();
+    const { result } = renderHook(() =>
+      useCustomerProfileColumns({
+        canUpdate: () => true,
+        onRatingChange,
+      }),
+    );
+    const rating = result.current.find((column) => column.id === "rating")!;
+
+    render(<div>{rating.cell(mockCustomer)}</div>);
+    fireEvent.click(screen.getByRole("button", { name: "Rate 3 of 3" }));
+    expect(onRatingChange).toHaveBeenCalledWith(mockCustomer, 3);
   });
 });

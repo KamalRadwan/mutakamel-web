@@ -1,6 +1,6 @@
 # CRM views parity study
 
-Last verified: 2026-09-17
+Last verified: 2026-09-18
 
 This study defines how the Leads workspace becomes the interaction and data-contract reference for Customer Profiles and Opportunities. The goal is behavioral parity, while keeping each record type's own lifecycle and fields.
 
@@ -26,6 +26,8 @@ The implementation now follows the split above:
 - Opportunity Board continues to use the pipeline Board and per-stage continuation routes. Card View now reads `/pipelines/:pipelineId/cards`, while Table reads the rich opportunity list/search projection.
 - Customer and Opportunity Basic search use the shared token input, accept several chips, and start with `My Customers` or `My Opportunities`. Advanced search remains an explicit-submit tree with no duplicate text box.
 - Customer and Opportunity Card/Table views use compact layouts, direct contact actions, public labels and avatars, source and activity context, and bottom-aligned operational footers.
+- Customer rating and card colour are persisted by CRM and available in Board, Card, Table and Advanced Search. Opportunity keeps its existing persisted `importance` as the rank and now persists the same card-colour palette.
+- Customer and Opportunity Board cards use Lead-style colour borders, editable three-star rank controls, activity actions and public salesperson identity. Opportunity cards retain amount, currency, probability and expected-close data.
 - One Customer and One Opportunity now use the Lead detail composition: lifecycle bar, compact information cards, related-document navigation, and the History/Activities/Attachments side rail.
 
 Lead rating writes were also hardened while applying the same projection rule. A rating/card-colour PATCH now merges only its confirmed fields into the latest rich row. The detail/PATCH projection includes `primaryContact`, and legacy corporate leads fall back to their organization primary relationship only when no lead-scoped contact mapping exists. Changing a rank can therefore no longer erase the company contact or phone from Table View.
@@ -123,6 +125,8 @@ The Stage/Status bar and Basic tokens are one state:
 - Opportunity columns use the selected pipeline's stage rank.
 - Initial lane size is 50.
 - Each column shows the server total and its own Load more state.
+- Board projections carry only what their compact cards render. Rich phone,
+  email, address and document-count fields remain in Card/Table projections.
 - Moves remain capability-gated, optimistic and reversible on a definite failure.
 - Blacklisted, Won and Lost moves confirm before the write.
 
@@ -139,7 +143,10 @@ The Stage/Status bar and Basic tokens are one state:
 - Footer content stays bottom-aligned across cards of unequal body content.
 - Any rank/importance update merges only the fields confirmed by that mutation and preserves rich list fields.
 
-Customer Profiles deliberately have no rating or card-colour control. The entity has no such domain fields; the previous browser-local stars and colour disappeared on refresh and therefore represented no saved business state. Customer status and planned activity provide the real operational signals. Leads keep rating/colour, and Opportunities keep their persisted importance.
+Customer Profiles persist a bounded `rating` from zero to three and an optional
+card colour. Opportunities keep `importance` as their bounded rank and persist
+the same optional colour. Colour-only changes are presentation preferences and
+do not create business-history noise; rank changes remain business changes.
 
 ### Table
 
