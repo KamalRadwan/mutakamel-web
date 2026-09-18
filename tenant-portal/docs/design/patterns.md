@@ -53,8 +53,9 @@ only when no pattern fits.
 
 ## FilterSearchInput
 
-Verified **2026-09-16**. The Basic Leads search uses this API-free pattern from
-`@/design-system`. It combines the search icon, removable filter chips, editable
+Verified **2026-09-18**. The Basic Leads, Opportunities and Customer Profiles searches use this API-free pattern from
+`@/design-system`. Its compact action-bar form is 28px high and 384px wide before
+responsive shrinking. It combines the search icon, removable filter chips, editable
 value and trailing disclosure button inside one border. A filter chip can carry
 a filter icon. A selected field chip uses a primary field segment followed by a
 neutral value segment; typed suggestions emphasize the field name and value.

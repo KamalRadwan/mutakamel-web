@@ -142,6 +142,16 @@ export function OpportunitySearchBar({
   return (
     <>
       <PageActions slot="search">
+        {value.mode === "basic" && (
+          <OpportunityBasicSearch
+            key={resetKey}
+            state={value}
+            pipelines={pipelines}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        )}
+
         {advancedEnabled && (
           <Button
             variant={value.mode === "advanced" ? "secondary" : "outline"}
@@ -162,16 +172,6 @@ export function OpportunitySearchBar({
             <SlidersHorizontal className={iconSize({ size: "sm" })} aria-hidden="true" />
             {copy.searchMode.advanced}
           </Button>
-        )}
-
-        {value.mode === "basic" && (
-          <OpportunityBasicSearch
-            key={resetKey}
-            state={value}
-            pipelines={pipelines}
-            disabled={disabled}
-            onChange={onChange}
-          />
         )}
       </PageActions>
 

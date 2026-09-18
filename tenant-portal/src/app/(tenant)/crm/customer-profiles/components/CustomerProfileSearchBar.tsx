@@ -45,6 +45,17 @@ export function CustomerProfileSearchBar({
   return (
     <>
       <PageActions slot="search">
+        {value.mode === "basic" && (
+          <CustomerProfileBasicSearch
+            key={resetKey}
+            state={value}
+            sources={sources}
+            sourcesDegraded={sourcesDegraded}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        )}
+
         <Button
           variant={value.mode === "advanced" ? "secondary" : "outline"}
           size="xs"
@@ -67,17 +78,6 @@ export function CustomerProfileSearchBar({
           />
           {t.crmCustomerProfiles.searchMode.advanced}
         </Button>
-
-        {value.mode === "basic" && (
-          <CustomerProfileBasicSearch
-            key={resetKey}
-            state={value}
-            sources={sources}
-            sourcesDegraded={sourcesDegraded}
-            disabled={disabled}
-            onChange={onChange}
-          />
-        )}
       </PageActions>
 
       {value.mode === "advanced" && (

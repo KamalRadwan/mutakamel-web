@@ -22,7 +22,6 @@ export interface FilterSearchOption {
   search?: { prefix: string; field: string; connector: string; value: string };
 }
 export interface FilterSearchInputProps {
-  className?: string;
   query: string;
   tokens: readonly FilterSearchToken[];
   options: readonly FilterSearchOption[];
@@ -56,28 +55,27 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
         <div
           ref={rootRef}
           className={cn(
-            "flex h-9 w-144 min-w-64 max-w-full items-center gap-1 rounded-md border border-input bg-card ps-2 text-foreground",
+            "flex h-7 w-96 min-w-64 max-w-full items-center gap-0.5 rounded-md border border-input bg-card ps-1.5 text-foreground",
             "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
             props.disabled && "opacity-50",
-            props.className,
           )}
         >
-          <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Search className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
           {props.tokens.length > 0 && (
-            <div ref={tokensRef} className="flex max-w-3/5 shrink items-center gap-1 overflow-x-auto">
+            <div ref={tokensRef} className="flex max-w-3/5 shrink items-center gap-0.5 overflow-x-auto">
               {props.tokens.map((token) => (
                 <span key={token.id} className="inline-flex shrink-0 items-center overflow-hidden rounded-sm bg-secondary text-xs">
-                  {token.kind === "filter" && <span className="flex size-6 items-center justify-center bg-primary text-primary-foreground">
-                    <Filter className="size-3.5" aria-hidden="true" />
+                  {token.kind === "filter" && <span className="flex size-5 items-center justify-center bg-primary text-primary-foreground">
+                    <Filter className="size-3" aria-hidden="true" />
                   </span>}
                   <span className={cn(
-                    "px-1.5 font-medium",
+                    "px-1 font-medium",
                     token.kind === "field" && "inline-flex self-stretch items-center bg-primary text-primary-foreground",
                   )}>{token.label}</span>
-                  {token.value && <span className="max-w-40 truncate border-s border-border px-1.5" title={token.value}>{token.value}</span>}
+                  {token.value && <span className="max-w-32 truncate border-s border-border px-1" title={token.value}>{token.value}</span>}
                   <Button
                     data-filter-remove=""
-                    variant="ghost" size="xs" className="size-6 shrink-0 rounded-none p-0"
+                    variant="ghost" size="sm" className="size-6 shrink-0 rounded-none p-0"
                     disabled={props.disabled}
                     aria-label={props.removeLabel([token.label, token.value].filter(Boolean).join(": "))}
                     onClick={() => removeToken(token.id)}
@@ -88,7 +86,7 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
             </div>
           )}
           {props.prompt && (
-            <Button variant="ghost" size="xs" className="max-w-32 shrink-0 gap-1 px-1"
+            <Button variant="ghost" size="sm" className="h-6 max-w-28 shrink-0 gap-0.5 px-1"
               disabled={props.disabled} aria-label={props.backLabel} onClick={clearPrompt}>
               <ChevronLeft className={cn("size-3 shrink-0", mirrorInRtl)} aria-hidden="true" />
               <span className="truncate">{props.prompt}</span>
@@ -100,15 +98,15 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
             aria-activedescendant={open && activeIndex >= 0 ? optionId(activeIndex) : undefined}
             aria-label={props.label} placeholder={props.placeholder}
             value={props.query} disabled={props.disabled} autoComplete="off" maxLength={200}
-            className="h-7 min-w-20 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+            className="h-6 min-w-16 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
             onChange={onQueryChange}
             onFocus={onFocus} onKeyDown={onKeyDown}
           />
-          <Button variant="ghost" size="sm" className="h-full w-8 shrink-0 rounded-none border-s border-border p-0"
+          <Button variant="ghost" size="sm" className="h-full w-7 shrink-0 rounded-none border-s border-border p-0"
             disabled={props.disabled} aria-label={props.toggleLabel} aria-expanded={open}
             aria-controls={open ? listId : undefined} aria-haspopup="listbox"
             onMouseDown={preventFocus} onClick={toggleSuggestions}>
-            <ChevronDown className="size-3.5" aria-hidden="true" />
+            <ChevronDown className="size-3" aria-hidden="true" />
           </Button>
         </div>
       </PopoverAnchor>
@@ -122,8 +120,8 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
           {props.options.map((option, index) => (
             <Button key={option.id} id={optionId(index)} role="option" aria-selected={index === activeIndex}
               aria-label={option.label} aria-describedby={option.description ? `${optionId(index)}-hint` : undefined}
-              tabIndex={-1} variant="ghost" className={cn(
-                "h-auto min-h-8 w-full flex-col items-start gap-0.5 whitespace-normal px-2 py-1 text-start font-normal",
+              tabIndex={-1} variant="ghost" size="sm" className={cn(
+                "h-auto min-h-7 w-full flex-col items-start gap-0.5 whitespace-normal px-1.5 py-0.5 text-start font-normal",
                 index === activeIndex && "bg-accent text-accent-foreground",
               )}
               onMouseDown={preventFocus} onClick={() => select(option.id)}>
@@ -139,11 +137,11 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
               {option.description && <span id={`${optionId(index)}-hint`} className="ps-4.5 text-xs text-muted-foreground">{option.description}</span>}
             </Button>
           ))}
-          {!props.options.length && <p role="status" className="p-2 text-sm text-muted-foreground">{props.emptyLabel}</p>}
+          {!props.options.length && <p role="status" className="p-1.5 text-xs text-muted-foreground">{props.emptyLabel}</p>}
         </div>
         {(props.tokens.length > 0 || props.query || props.prompt) && (
           <div className="mt-1 border-t border-border pt-1">
-            <Button variant="ghost" size="sm" className="w-full justify-start text-start font-normal" disabled={props.disabled} onClick={clear}>
+            <Button variant="ghost" size="sm" className="h-6 w-full justify-start text-start font-normal" disabled={props.disabled} onClick={clear}>
               {props.clearLabel}
             </Button>
           </div>
