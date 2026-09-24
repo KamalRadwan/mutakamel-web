@@ -204,7 +204,7 @@ before anything else is sent.
 
 The **Tags** screen at `/crm/tags` (Setup nav, gated on `crm.tags.read`;
 create/edit/delete need `crm.tags.manage`) lists the catalogue with each chip,
-creates and edits a tag's name and colour in one `FormDrawer` with the design
+creates and edits a tag's name and colour in one centred `FormModal size="card"` with the design
 system's `TagColorPicker` — `PATCH` carries only the changed keys, colours as a
 pair — and deletes through `ConfirmActionModal`.
 

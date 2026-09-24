@@ -21,7 +21,7 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import { crmTagColor, type CrmTagCatalogueItem } from "../shared/tag-contract";
-import { CrmTagFormDrawer } from "./components/CrmTagFormDrawer";
+import { CrmTagFormModal } from "./components/CrmTagFormModal";
 import { DeleteCrmTagConfirmModal } from "./components/DeleteCrmTagConfirmModal";
 import { useCrmTags } from "./hooks/useCrmTags";
 
@@ -168,7 +168,7 @@ export default function CrmTagsPage() {
         />
 
         {tags.formTarget && (
-          <CrmTagFormDrawer
+          <CrmTagFormModal
             key={tags.formTarget.mode === "edit" ? `edit-${tags.formTarget.tag.id}` : "create"}
             target={tags.formTarget}
             existingTags={tags.allItems}
