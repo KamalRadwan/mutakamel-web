@@ -243,7 +243,9 @@ namespace per dialog, `create-closed` and `` `activity-${id ?? "closed"}` ``,
 which changes nothing about **when** each key changes. Four CRM pages carry a
 comment about this because it was found four times by hand; the fifth,
 `crm/leads`, shipped the warning anyway. That is the argument for a gate rather
-than a convention.
+than a convention. (`LeadActivityDialog` itself is gone since 2026-09-24: the
+shared `ActivityModal` keys its own surface per request, so its call sites carry
+no `key` at all. The shape recurs with every keyed dialog stack.)
 
 **It proves collisions instead of guessing at them.** The guard parses the TSX
 and works out, for each `key`, the set of constant strings it can actually

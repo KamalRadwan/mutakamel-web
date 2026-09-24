@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LeadDetail } from "../../lead-contract";
-import { runCrmWrite } from "../../../shared/crm-write";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { useLeadDetailsEdit } from "./useLeadDetailsEdit";
 import { en } from "@/i18n/dictionaries/en";
 
@@ -10,7 +10,7 @@ const ACTOR = "01900100-0000-7000-8000-000000000001";
 const OWNER = "01900100-0000-7000-8000-000000000002";
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: { id: "01900100-0000-7000-8000-000000000001" } }) }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
-vi.mock("../../../shared/crm-write", () => ({ createCrmWriteAttempt: vi.fn(() => ({})), runCrmWrite: vi.fn() }));
+vi.mock("@/lib/api/idempotent-write", () => ({ createWriteAttempt: vi.fn(() => ({})), runIdempotentWrite: vi.fn() }));
 const lead = { id: "01900100-0000-7000-8000-000000000003", ownerUserId: OWNER, status: "OPEN", description: "Old note", interestSummary: "Summary", expectedNeed: "Need", acquisitionSourceId: null } as LeadDetail;
 
 function setup(subject = lead, editable = true) {
@@ -24,23 +24,23 @@ describe("useLeadDetailsEdit", () => {
   beforeEach(() => vi.clearAllMocks());
   it("never assigns on mount and preserves an existing owner", () => {
     const { result } = setup();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     expect(result.current.form?.ownerUserId).toBe(OWNER);
     expect(result.current.editable).toBe(true);
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
   it("suggests current user for an unassigned edit without writing until save", () => {
     const { result } = setup({ ...lead, ownerUserId: null });
     expect(result.current.form?.ownerUserId).toBe(ACTOR);
     act(() => result.current.cancel());
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
   it("saves a changed textarea without sending contact/company/creator fields", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValue({ kind: "success", value: { ...lead, description: "Next" }, replayed: false });
+    vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "success", value: { ...lead, description: "Next" }, replayed: false });
     const { result, onSaved, rerender } = setup();
     act(() => result.current.change("description", "Next"));
     await act(() => result.current.save());
-    expect(runCrmWrite).toHaveBeenCalledWith(expect.objectContaining({ method: "patch", path: `/api/tenant/crm/v1/leads/${lead.id}`, body: { description: "Next" } }));
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ method: "patch", path: `/api/tenant/crm/v1/leads/${lead.id}`, body: { description: "Next" } }));
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ description: "Next" }));
     rerender({ subject: { ...lead, description: "Next" }, editable: true });
     expect(result.current.form?.description).toBe("Next");
@@ -50,7 +50,7 @@ describe("useLeadDetailsEdit", () => {
   it("no-op saves and cancel do not send requests", async () => {
     const { result } = setup();
     await act(() => result.current.save());
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     expect(result.current.form?.description).toBe("Old note");
     act(() => result.current.change("description", "Unsaved"));
     expect(result.current.isDirty).toBe(true);
@@ -58,10 +58,10 @@ describe("useLeadDetailsEdit", () => {
     expect(result.current.form?.description).toBe("Old note");
     expect(result.current.editable).toBe(true);
     expect(result.current.isDirty).toBe(false);
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
   it("retains draft on a definite failure", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValue({ kind: "failed", error: { status: 422, message: "Failed" } });
+    vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "failed", error: { status: 422, message: "Failed" } });
     const { result, onSaved } = setup();
     act(() => result.current.change("expectedNeed", "New need"));
     await act(() => result.current.save());
@@ -69,7 +69,7 @@ describe("useLeadDetailsEdit", () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
   it("blocks replay after an ambiguous write until a fresh lead arrives", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValue({ kind: "ambiguous", error: { status: 0, message: "Unknown" } });
+    vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "ambiguous", error: { status: 0, message: "Unknown" } });
     const { result, onSaved, onReconcile, rerender } = setup();
     act(() => result.current.change("description", "New"));
     await act(() => result.current.save());
@@ -78,7 +78,7 @@ describe("useLeadDetailsEdit", () => {
     expect(onSaved).not.toHaveBeenCalled();
     act(() => result.current.change("description", "Retry"));
     await act(() => result.current.save());
-    expect(runCrmWrite).toHaveBeenCalledOnce();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
     rerender({ subject: { ...lead, description: "Verified" }, editable: true });
     expect(result.current.form?.description).toBe("Verified");
     expect(result.current.editable).toBe(true);
@@ -92,7 +92,7 @@ describe("useLeadDetailsEdit", () => {
     act(() => converted.result.current.change("description", "Denied"));
     await act(() => converted.result.current.save());
     expect(converted.result.current.form).toBeNull();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
 
   it("merges batched changes without losing another field", () => {
@@ -123,9 +123,9 @@ describe("useLeadDetailsEdit", () => {
     rerender({ subject: { ...lead, description: "Fresh note" }, editable: true });
     act(() => result.current.change("expectedNeed", "New need"));
     expect(result.current.form).toMatchObject({ description: "Fresh note", expectedNeed: "New need" });
-    vi.mocked(runCrmWrite).mockResolvedValue({ kind: "failed", error: { status: 422 } });
+    vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "failed", error: { status: 422 } });
     await act(() => result.current.save());
-    expect(runCrmWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { expectedNeed: "New need" } }));
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { expectedNeed: "New need" } }));
   });
 
   it("does not suggest an actor outside the allowed owner boundary", () => {
@@ -136,7 +136,7 @@ describe("useLeadDetailsEdit", () => {
 
   it("requires a post-result refresh if another card refreshes the lead while saving", async () => {
     let release!: () => void;
-    vi.mocked(runCrmWrite).mockImplementation(async () => {
+    vi.mocked(runIdempotentWrite).mockImplementation(async () => {
       await new Promise<void>((resolve) => { release = resolve; });
       return { kind: "ambiguous", error: { status: 0 } };
     });
@@ -148,7 +148,7 @@ describe("useLeadDetailsEdit", () => {
     await act(async () => { release(); });
     expect(result.current.form).toBeNull();
     await act(() => result.current.save());
-    expect(runCrmWrite).toHaveBeenCalledOnce();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
     rerender({ subject: { ...lead, description: "Verified note" }, editable: true });
     expect(result.current.form?.description).toBe("Verified note");
   });

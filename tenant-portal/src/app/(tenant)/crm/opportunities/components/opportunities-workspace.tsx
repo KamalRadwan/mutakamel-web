@@ -25,6 +25,9 @@ import {
   type SortState,
   type WorkspaceViewLabels,
 } from "@/design-system";
+import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
+import { ActivityModal } from "@/components/activities/ActivityModal";
+import type { ActivityTargetSelection } from "@/components/activities/activity-contract";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
@@ -42,7 +45,6 @@ import { useOpportunityCards } from "../hooks/useOpportunityCards";
 import { useOpportunityDocumentCounts } from "../hooks/useOpportunityDocumentCounts";
 import { useCreateOpportunity } from "../hooks/useCreateOpportunity";
 import { opportunityActivitySegments } from "../../shared/crm-activity-tone";
-import { CrmActivityDialog } from "../../shared/components/CrmActivityDialog";
 import { useOpportunityCardSlots } from "./useOpportunityCardSlots";
 import { useOpportunityCardViewSlots } from "./useOpportunityCardViewSlots";
 import {
@@ -279,9 +281,7 @@ export function OpportunitiesWorkspace() {
         });
       });
     },
-    onOpenActivities: (item) => {
-      setActivityOpportunity({ id: item.id, name: item.title });
-    },
+    onOpenActivities: (item) => openActivities(item),
     importances,
   });
 
@@ -334,7 +334,10 @@ export function OpportunitiesWorkspace() {
     label: localizedName(stage, lang),
   }));
 
-  const [activityOpportunity, setActivityOpportunity] = useState<{ id: string; name: string } | null>(null);
+  const [activityOpportunity, setActivityOpportunity] = useState<ActivityTargetSelection | null>(null);
+  function openActivities(item: { id: string; title: string }) {
+    setActivityOpportunity({ app: "CRM", type: "OPPORTUNITY", id: item.id, label: item.title });
+  }
   const cardSlots = useOpportunityCardSlots({
     canUpdate: canUpdateOpportunity,
     canDelete: canDeleteOpportunity,
@@ -346,7 +349,7 @@ export function OpportunitiesWorkspace() {
     onCardChange: (opportunityId, patch, item) => {
       void updateCard(opportunityId, patch, item);
     },
-    onOpenActivities: (item) => setActivityOpportunity({ id: item.id, name: item.title }),
+    onOpenActivities: (item) => openActivities(item),
     moveTargets: (item) => moveTargets.filter((target) => target.id !== item.stageId),
     onMove: (item, targetStageId) => {
       moveCard(item.id, item.stageId, targetStageId);
@@ -369,8 +372,7 @@ export function OpportunitiesWorkspace() {
         if (updated) void cards.reload();
       });
     },
-    onOpenActivities: (item) =>
-      setActivityOpportunity({ id: item.id, name: item.title }),
+    onOpenActivities: (item) => openActivities(item),
     documentCountsByParty: documentCounts.countsByParty,
     documentCountVisibility: documentCounts.visible,
   });
@@ -449,6 +451,7 @@ export function OpportunitiesWorkspace() {
           available={["board", "card", "table"]}
           labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
         />
+        <ActivitiesWorkspaceLink type="OPPORTUNITY" />
       </PageActions>
 
       {capabilitiesUnavailable && <DegradedBanner message={t.crmOpportunities.capabilitiesUnavailable} />}
@@ -602,19 +605,12 @@ export function OpportunitiesWorkspace() {
         error={deleteError}
       />
 
-      <CrmActivityDialog
-        key={`activity-${activityOpportunity?.id ?? "closed"}`}
-        target={
-          activityOpportunity
-            ? {
-                id: activityOpportunity.id,
-                name: activityOpportunity.name,
-                targetType: "OPPORTUNITY",
-              }
-            : null
-        }
+      <ActivityModal
+        scope="CRM"
+        branchId={branchId}
+        request={activityOpportunity ? { kind: "create", target: activityOpportunity, agenda: true } : null}
         onClose={() => setActivityOpportunity(null)}
-        onCreated={() => {
+        onChanged={() => {
           if (view === "board") void fetchPipelines();
           if (view === "card") void cards.reload();
           if (view === "table") void list.reload();

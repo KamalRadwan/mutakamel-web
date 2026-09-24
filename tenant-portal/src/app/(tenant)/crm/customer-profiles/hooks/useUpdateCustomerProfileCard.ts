@@ -5,7 +5,7 @@ import { useToast } from "@/design-system";
 import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
 import { normalizeApiError } from "@/lib/api/errors";
 import { useI18n } from "@/i18n/I18nContext";
-import { isAmbiguousWriteFailure } from "../../shared/crm-write";
+import { isAmbiguousWriteFailure } from "@/lib/api/idempotent-write";
 import {
   buildCustomerProfileCardPatchBody,
   parseCustomerProfileCardPatchResponse,

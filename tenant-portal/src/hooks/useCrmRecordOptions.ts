@@ -6,10 +6,10 @@ import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 
 /**
- * One searchable picker over the four CRM records that can own a task, a
- * calendar event, an activity or a custom-field value.
+ * One searchable picker over the three CRM records that can own a custom-field
+ * value or be the source of an outbound email.
  *
- * It lives in `src/hooks/` because three screens in different route folders
+ * It lives in `src/hooks/` because two screens in different route folders
  * need the same list and
  * docs/architecture/file-architecture.md#dependency-direction forbids one CRM
  * screen importing another's hook. This is the layer that page documents for
@@ -27,21 +27,6 @@ export const CRM_RECORD_SOURCE_TYPES = [
 ] as const;
 export type CrmRecordSourceType = (typeof CRM_RECORD_SOURCE_TYPES)[number];
 
-/** Tasks and calendar events additionally accept an activity as their source. */
-export const CRM_WORK_SOURCE_TYPES = [
-  ...CRM_RECORD_SOURCE_TYPES,
-  "ACTIVITY",
-] as const;
-export type CrmWorkSourceType = (typeof CRM_WORK_SOURCE_TYPES)[number];
-
-/** A reminder targets a task or a calendar event, not a CRM record. */
-type CrmReminderTargetType = "TASK" | "CALENDAR_EVENT";
-
-/** Every list this picker can read. */
-export type CrmPickerResource =
-  | CrmWorkSourceType
-  | CrmReminderTargetType;
-
 export interface CrmRecordOption {
   value: string;
   label: string;
@@ -49,32 +34,25 @@ export interface CrmRecordOption {
 
 // Every one of these is a BranchListQueryDto list: branchId is required and a
 // missing one is a 422, never an empty list (S2).
-const SOURCE_PATHS: Record<CrmPickerResource, string> = {
+const SOURCE_PATHS: Record<CrmRecordSourceType, string> = {
   LEAD: "/api/tenant/crm/v1/leads",
   CUSTOMER_PROFILE: "/api/tenant/crm/v1/customer-profiles",
   OPPORTUNITY: "/api/tenant/crm/v1/opportunities",
-  ACTIVITY: "/api/tenant/crm/v1/activities",
-  TASK: "/api/tenant/crm/v1/tasks",
-  CALENDAR_EVENT: "/api/tenant/crm/v1/calendar/events",
 };
 
 // The display field differs per resource: leads and customer profiles are
-// party-backed and carry `displayName`, an opportunity, a task and an event
-// carry `title`, an activity carries `subject`. Verified against each
-// service's own projection.
-const LABEL_KEYS: Record<CrmPickerResource, string> = {
+// party-backed and carry `displayName`, an opportunity carries `title`.
+// Verified against each service's own projection.
+const LABEL_KEYS: Record<CrmRecordSourceType, string> = {
   LEAD: "displayName",
   CUSTOMER_PROFILE: "displayName",
   OPPORTUNITY: "title",
-  ACTIVITY: "subject",
-  TASK: "title",
-  CALENDAR_EVENT: "title",
 };
 
 const OPTIONS_LIMIT = 25;
 
 export function useCrmRecordOptions(
-  sourceType: CrmPickerResource | null,
+  sourceType: CrmRecordSourceType | null,
   branchId: string | null,
 ) {
   const [options, setOptions] = useState<CrmRecordOption[]>([]);

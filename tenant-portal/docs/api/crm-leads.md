@@ -13,6 +13,9 @@ Board/Card/Table projections and Card bulk document counts verified: **2026-09-1
 
 Related quotation/sales-order count scope re-verified: **2026-09-14**.
 
+Activity panel and card activity modal moved to Core's activity hub:
+**2026-09-24** ([frontend notes](#one-lead-side-panel-contract-2026-09-07)).
+
 Owning app: **crm-app**
 
 Canonical prefix: `/api/tenant/crm/v1/leads`
@@ -469,16 +472,23 @@ History is the default of three icon tabs; Activities and Attachments load on
 first selection and keep their state when hidden. These tabs do not change the
 Lead GET/PATCH DTO or add another main-column attachments section.
 
-- Open activities use `GET /api/tenant/core/v1/activities` with
-  `targetApp=CRM`, `targetType=LEAD`, `targetId=<lead.id>`, `status=PLANNED`,
-  `sortBy=dueAt`, `sortDir=ASC`, `limit=25` and every page until `hasNext=false`.
-  Core returns `{items,total,page,limit,totalPages,hasNext}` inside `data`
-  (no `hasPrev`, so no pagination `meta` here). Read remains gated by
-  `activities.read`; row writes retain separate `activities.update`,
-  `activities.complete`, `activities.cancel` permissions, `If-Match` versions
-  and one UUIDv7 idempotency key per attempt. Do not use CRM's DONE activity
-  log endpoint for this planned-work list. The modal and rail share the reader
-  and `ActivityList` presentation. Their writes re-read the open list.
+- The Activities tab is the shared `RecordActivitiesPanel`. It lists the lead's
+  **open** activities with `GET /api/tenant/core/v1/activities` —
+  `targetApp=CRM`, `targetType=LEAD`, `targetId=<lead.id>`,
+  `statuses=PLANNED,IN_PROGRESS`, `sortBy=dueAt`, `sortDir=ASC`, `limit=25` —
+  and every page until `hasNext=false`; a failed page fails the read rather than
+  showing a partial list. Core returns `{items,total,page,limit,totalPages,hasNext}`
+  inside `data` (no `hasPrev`, so no pagination `meta` here). Read is gated by
+  `activities.read`; complete and cancel per row, and create, view and edit
+  through the shared activity modal, each carry their own Core permission, an
+  `If-Match` version and one UUIDv7 idempotency key per attempt — the contract
+  is [Core activities](core-directory.md#activities--12-routes). Every write
+  re-reads the open list. "View all activities" opens `/crm/activities`
+  filtered to this lead, on its table and across every branch. CRM's own activity log routes are not read anywhere.
+- A card's or a table row's activity mark opens the same modal on the lead,
+  creating with the lead's open activities listed above the form; any write
+  reloads the list, board or table it came from so the next-activity mark
+  follows.
 - Attachments use the raw CRM `GET /api/tenant/crm/v1/attachments` response,
   scoped by `branchId`, `sourceType=LEAD`, `sourceId=<lead.id>`, `limit=50`
   and every page. Unlike Core activities, an empty CRM list has `totalPages=0`.
@@ -502,10 +512,10 @@ Lead GET/PATCH DTO or add another main-column attachments section.
 
 Attachment read handling reverified **2026-09-14** against the CRM attachment
 entity, notes/attachments controller/service and Gateway route contracts.
-Verified against Core activities controller/service, CRM notes/attachments
-controller/service and Gateway route contracts. The visual contract is
-[Views → Leads](../design/views.md#leads), with the reusable template described
-in [ActivityList](../design/patterns.md#activitylist).
+The activity panel and modal re-verified **2026-09-24** against the Core
+activities controller, DTOs and service. The visual contract is
+[Views → Leads](../design/views.md#leads), with the shared panel and modal
+described in [the activity template](../design/patterns.md#the-activity-template).
 
 ### Existing lead integration
 

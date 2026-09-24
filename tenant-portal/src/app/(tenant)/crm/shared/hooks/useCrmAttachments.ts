@@ -15,12 +15,12 @@ import {
   type CrmAttachmentUploadFailure,
 } from "../attachments-contract";
 import {
-  createCrmWriteAttempt,
+  createWriteAttempt,
   expectNoContent,
-  runCrmWrite,
-  type CrmAppliedUnreadable,
-  type CrmWriteAttempt,
-} from "../crm-write";
+  runIdempotentWrite,
+  type AppliedUnreadable,
+  type WriteAttempt,
+} from "@/lib/api/idempotent-write";
 
 export interface CrmAttachmentsSource {
   branchId: string | null;
@@ -30,7 +30,7 @@ export interface CrmAttachmentsSource {
 
 export interface CrmAttachmentsAmbiguity {
   operation: "upload" | "delete";
-  attempt: CrmWriteAttempt;
+  attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
 }
@@ -44,7 +44,7 @@ type SendWrite = () => Promise<
 
 type SettleWrite = (
   operation: CrmAttachmentsAmbiguity["operation"],
-  attempt: CrmWriteAttempt,
+  attempt: WriteAttempt,
   send: SendWrite,
 ) => Promise<boolean>;
 
@@ -83,7 +83,7 @@ export function useCrmAttachments({
   // `writeError` and `uploadFailure` because both of those invite the user to
   // do it again, which is the one thing this outcome forbids.
   const [appliedUnreadable, setAppliedUnreadable] =
-    useState<CrmAppliedUnreadable | null>(null);
+    useState<AppliedUnreadable | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const requestEpochRef = useRef(0);
 
@@ -180,7 +180,7 @@ export function useCrmAttachments({
       if (!isUUIDv7(branchId) || !isUUIDv7(sourceId) || isUploading) {
         return false;
       }
-      const attempt = createCrmWriteAttempt();
+      const attempt = createWriteAttempt();
       const body = buildCrmAttachmentUploadBody({
         file,
         branchId,
@@ -194,7 +194,7 @@ export function useCrmAttachments({
           "upload",
           attempt,
           async () =>
-            await runCrmWrite({
+            await runIdempotentWrite({
               attempt,
               method: "post",
               path: `${CRM_ATTACHMENTS_PATH}/upload`,
@@ -213,14 +213,14 @@ export function useCrmAttachments({
   const remove = useCallback(
     async (attachmentId: string): Promise<boolean> => {
       if (pendingId !== null) return false;
-      const attempt = createCrmWriteAttempt();
+      const attempt = createWriteAttempt();
       setPendingId(attachmentId);
       try {
         return await settle(
           "delete",
           attempt,
           async () =>
-            await runCrmWrite({
+            await runIdempotentWrite({
               attempt,
               method: "delete",
               path: crmAttachmentPath(attachmentId),

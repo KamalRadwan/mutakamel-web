@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
-import { createCrmWriteAttempt, runCrmWrite } from "../../../shared/crm-write";
+import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { leadPath, parseLeadDetailResponse, type LeadDetail } from "../../lead-contract";
 import type { UpdateLeadRequest } from "../../lead-write-contract";
 
@@ -49,8 +49,8 @@ export function useLeadCompanyEdit(
       inFlight.current = true;
       setSavingKey(key);
       setError(null);
-      const outcome = await runCrmWrite({
-        attempt: createCrmWriteAttempt(),
+      const outcome = await runIdempotentWrite({
+        attempt: createWriteAttempt(),
         method: "patch",
         path: leadPath(lead.id),
         body: request,

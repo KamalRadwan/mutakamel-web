@@ -1,24 +1,28 @@
 "use client";
 
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
-import { Columns3, LayoutGrid, Rows3 } from "lucide-react";
+import { CalendarDays, Columns3, LayoutGrid, Rows3, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { focusRing } from "../lib/variants";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../primitives/Tooltip";
+import type { WorkspaceView } from "./types";
 
-export type WorkspaceView = "board" | "card" | "table";
-
-const VIEW_ICONS: Record<WorkspaceView, typeof Columns3> = {
+const VIEW_ICONS: Record<WorkspaceView, LucideIcon> = {
   board: Columns3,
   card: LayoutGrid,
   table: Rows3,
+  calendar: CalendarDays,
 };
 
-export interface ViewSwitcherProps {
-  value: WorkspaceView;
-  onChange: (view: WorkspaceView) => void;
-  available: WorkspaceView[];
-  labels: Record<WorkspaceView, string>;
+// Generic over the screen's own view set, so a record workspace passes
+// board/card/table and Activities calendar/board/table, and `labels` has to
+// name exactly the views on offer.
+export interface ViewSwitcherProps<V extends WorkspaceView> {
+  value: V;
+  onChange: (view: V) => void;
+  // In the order the switcher draws them.
+  available: readonly V[];
+  labels: Record<V, string>;
 }
 
 // A segmented radiogroup, not three independent buttons — Radix RadioGroup
@@ -26,15 +30,20 @@ export interface ViewSwitcherProps {
 // option is bg-secondary, never a colored fill (that was the hue-coded
 // switcher this replaces — three hues for one control; see D10 in
 // docs/build/DEFECTS.md).
-export function ViewSwitcher({ value, onChange, available, labels }: ViewSwitcherProps) {
+export function ViewSwitcher<V extends WorkspaceView>({ value, onChange, available, labels }: ViewSwitcherProps<V>) {
   return (
     <RadioGroupPrimitive.Root
       value={value}
-      onValueChange={(next) => onChange(next as WorkspaceView)}
+      // Radix reports a plain string. Matching it against the views on offer
+      // keeps the callback typed to the screen's own set without a cast.
+      onValueChange={(next) => {
+        const view = available.find((candidate) => candidate === next);
+        if (view) onChange(view);
+      }}
       className="inline-flex items-center gap-0.5 rounded-sm border border-border bg-card p-0.5"
     >
       {available.map((view) => {
-        const Icon = VIEW_ICONS[view];
+        const Icon: LucideIcon = VIEW_ICONS[view];
         return (
           <Tooltip key={view}>
             <TooltipTrigger asChild>

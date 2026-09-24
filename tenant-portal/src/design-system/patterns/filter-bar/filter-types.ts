@@ -1,4 +1,5 @@
-import type { DateRangePresetLabels } from "../../primitives/DateRangePicker";
+import type { Day } from "date-fns";
+import type { DateRangePresetId, DateRangePresetLabels } from "../../primitives/DateRangePicker";
 
 export interface FilterOption {
   value: string;
@@ -54,6 +55,10 @@ export interface MultiSelectFilterDef extends FilterDefBase {
 export interface DateRangeFilterDef extends FilterDefBase {
   kind: "dateRange";
   presetLabels: DateRangePresetLabels;
+  /** The presets offered, in order — see `DateRangePicker`. Omitted: the six backward ones. */
+  presets?: readonly DateRangePresetId[];
+  /** First day of the week the `thisWeek` preset resolves against. */
+  weekStartsOn?: Day;
   clearLabel?: string;
 }
 

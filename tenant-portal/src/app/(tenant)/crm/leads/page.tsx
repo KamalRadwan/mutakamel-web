@@ -16,15 +16,14 @@ import {
   useWorkspaceState,
   StageBar,
 } from "@/design-system";
+import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
+import { ActivityModal } from "@/components/activities/ActivityModal";
+import type { ActivityTargetSelection } from "@/components/activities/activity-contract";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import { CreateLeadsModal } from "./components/CreateLeadsModal";
 import { DeleteLeadsConfirmModal } from "./components/DeleteLeadsConfirmModal";
-import {
-  LeadActivityDialog,
-  type LeadActivityTarget,
-} from "./components/lead-activity/LeadActivityDialog";
 import {
   LEAD_STAGE_BAR_TONE,
   useLeadBoardColumns,
@@ -86,7 +85,11 @@ export default function LeadsPage() {
   } = useLeads();
 
   // Keep identity only: booking an activity reloads the lead's current data.
-  const [activityLead, setActivityLead] = useState<LeadActivityTarget | null>(null);
+  const [activityLead, setActivityLead] = useState<ActivityTargetSelection | null>(null);
+  const openActivities = useCallback(
+    (lead: LeadItem) => setActivityLead({ app: "CRM", type: "LEAD", id: lead.id, label: lead.leadName }),
+    [],
+  );
 
   // A column's add action seeds the editable stage; the header leaves it unset.
   const [createStageId, setCreateStageId] = useState<string | null>(null);
@@ -136,7 +139,7 @@ export default function LeadsPage() {
     canDelete: canDeleteLead,
     onDelete: setSelectedForDelete,
     onRatingChange: (lead, rating) => void updateLeadCard(lead.id, { rating }, lead),
-    onOpenActivities: (lead) => setActivityLead({ id: lead.id, name: lead.leadName }),
+    onOpenActivities: openActivities,
   });
   const cardSlots = useLeadCardSlots({
     canUpdate: canUpdateLead,
@@ -144,7 +147,7 @@ export default function LeadsPage() {
     onOpen: openLead,
     onDelete: setSelectedForDelete,
     onCardChange: (leadId, patch, lead) => void updateLeadCard(leadId, patch, lead),
-    onOpenActivities: (lead) => setActivityLead({ id: lead.id, name: lead.leadName }),
+    onOpenActivities: openActivities,
     documentCountsByParty: documentCounts.countsByParty,
     documentCountVisibility: documentCounts.visible,
     // The detail page's stage control provides the alternative to board dragging.
@@ -211,6 +214,7 @@ export default function LeadsPage() {
             available={["board", "card", "table"]}
             labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
           />
+          <ActivitiesWorkspaceLink type="LEAD" />
         </PageActions>
 
         {degraded.stages && <DegradedBanner message={t.crmLeads.stagesUnavailable} />}
@@ -324,11 +328,12 @@ export default function LeadsPage() {
         />
 
         {/* A different lead opens a clean form; activity changes reload server data. */}
-        <LeadActivityDialog
-          key={`activity-${activityLead?.id ?? "closed"}`}
-          lead={activityLead}
+        <ActivityModal
+          scope="CRM"
+          branchId={branchId}
+          request={activityLead ? { kind: "create", target: activityLead, agenda: true } : null}
           onClose={() => setActivityLead(null)}
-          onCreated={() => void refreshData()}
+          onChanged={() => void refreshData()}
         />
 
         <DeleteLeadsConfirmModal

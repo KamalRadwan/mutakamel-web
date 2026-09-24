@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import { I18nProvider } from "@/i18n/I18nContext";
-import { runCrmWrite } from "../../../shared/crm-write";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import type { LeadDetail } from "../../lead-contract";
 import { LeadContactsCard } from "./LeadContactsCard";
 
@@ -12,9 +12,9 @@ vi.mock("@/i18n/I18nContext", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/i18n/I18nContext")>()),
   useI18n: () => ({ t: en, lang: "en", dir: "ltr" }),
 }));
-vi.mock("../../../shared/crm-write", () => ({
-  runCrmWrite: vi.fn(),
-  createCrmWriteAttempt: () => ({ idempotencyKey: "01900100-0000-7000-8000-000000000001" }),
+vi.mock("@/lib/api/idempotent-write", () => ({
+  runIdempotentWrite: vi.fn(),
+  createWriteAttempt: () => ({ idempotencyKey: "01900100-0000-7000-8000-000000000001" }),
 }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: { permissions: [] } }) }));
 
@@ -118,7 +118,7 @@ describe("LeadContactsCard", () => {
     fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getAllByRole("button", { name: /^Edit contact:/ })).toHaveLength(2);
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
 
   it("opens supported individual fields together and restores persisted values on cancel", () => {
@@ -137,7 +137,7 @@ describe("LeadContactsCard", () => {
     fireEvent.click(screen.getByRole("button", { name: en.common.discardConfirm }));
     expect(screen.getByText("Mona Hassan")).toBeTruthy();
     expect(screen.queryByText("Mena")).toBeNull();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -148,6 +148,6 @@ describe("LeadContactsCard", () => {
     renderCard(lead, canEdit);
     expect(screen.queryAllByRole("button", { name: /^Edit contact:/ })).toHaveLength(0);
     if (lead.contacts.length === 0) expect(screen.getByText(en.crmLeadDetail.contactsEmpty)).toBeTruthy();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
 });

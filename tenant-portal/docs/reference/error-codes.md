@@ -4,11 +4,11 @@
 > Regenerate with `pnpm docs:errors`.
 > Generator: `scripts/docs/generate-error-reference.mjs`
 
-Status: **verified** (parsed from `throw new *Exception` sites)
+Status: **verified** (parsed from `throw new *Exception` sites and exception factories)
 
-Last source verification: **2026-09-18**
+Last source verification: **2026-09-24**
 
-Codes: **322** across **36** areas
+Codes: **325** across **35** areas
 
 ## Scope
 
@@ -169,17 +169,6 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/custom-fields` · 14 codes
 | `CUSTOM_FIELD_REFERENCE_REQUIRED` | 422 |
 | `CUSTOM_FIELD_VALUE_INVALID` | 422 |
 | `CUSTOM_FIELD_VALUE_REQUIRED` | 422 |
-
-## CRM activities
-
-Source: `../backend/mutakamel-apps/crm-app/src/crm/activities` · 4 codes
-
-| Error code | HTTP |
-| --- | --- |
-| `CRM_EVENT_TIME_INVALID` | 422 |
-| `CRM_REMINDER_TIME_INVALID` | 422 |
-| `CRM_SOURCE_BRANCH_MISMATCH` | 422 |
-| `CRM_SOURCE_INVALID` | 422 |
 
 ## CRM notes & attachments
 
@@ -528,14 +517,21 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/template-platform` · 1 c
 
 ## Core activities
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/activities` · 4 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/activities` · 11 codes
 
 | Error code | HTTP |
 | --- | --- |
 | `ACCESS_POLICY_UNAVAILABLE` | 503 |
+| `ACTIVITY_ACCESS_DENIED` | 403 |
 | `ACTIVITY_IDEMPOTENCY_IN_FLIGHT` | 409 |
 | `ACTIVITY_IDEMPOTENCY_KEY_INVALID` | 422 |
 | `ACTIVITY_IDEMPOTENCY_MISMATCH` | 422 |
+| `ACTIVITY_INVALID` | 422 |
+| `ACTIVITY_NOT_FOUND` | 404 |
+| `ACTIVITY_TARGET_RESOLVER_UNAVAILABLE` | 503 |
+| `ACTIVITY_TERMINAL` | 409 |
+| `ACTIVITY_VERSION_CONFLICT` | 409 |
+| `ACTIVITY_VERSION_REQUIRED` | 428 |
 
 ## Trade documents
 

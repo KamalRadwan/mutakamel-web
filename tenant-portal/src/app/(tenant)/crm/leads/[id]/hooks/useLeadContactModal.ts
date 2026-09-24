@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { readCoreData, readCrmBody, writeCoreData } from "@/lib/api/envelope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { generateUUIDv7 } from "@/lib/uuid";
-import { createCrmWriteAttempt, isAmbiguousWriteFailure, runCrmWrite } from "../../../shared/crm-write";
+import { createWriteAttempt, isAmbiguousWriteFailure, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { leadPath, parseLeadDetailResponse, type LeadContact, type LeadDetail } from "../../lead-contract";
 import { CONTACT_DIRECTORY_PERMISSIONS, CONTACT_MODAL_LIMITS, ContactWriteResponseError, buildContactCoreWrites, buildSelectedContactLeadRequest, contactModalForm, contactPersonPath, parseContactPerson, validateContactModal, validateContactWriteResponse, type ContactModalField, type ContactModalForm, type ContactPerson } from "../contact-modal-contract";
 
@@ -119,7 +119,7 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
         stage = "preflight";
         crmBody = buildSelectedContactLeadRequest(await readLead(), form, baseline);
         stage = "write";
-        const outcome = await runCrmWrite({ attempt: createCrmWriteAttempt(), method: "patch", path: leadPath(lead.id), body: crmBody, parse: parseLeadDetailResponse });
+        const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body: crmBody, parse: parseLeadDetailResponse });
         if (outcome.kind !== "success") {
           const uncertain = outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable";
           setError(outcome.error); setFailure(uncertain ? "uncertain" : completed ? "partial" : "failed");

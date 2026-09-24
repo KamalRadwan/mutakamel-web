@@ -16,12 +16,12 @@ import {
   type CrmNoteSourceType,
 } from "../notes-contract";
 import {
-  createCrmWriteAttempt,
+  createWriteAttempt,
   expectNoContent,
-  runCrmWrite,
-  type CrmAppliedUnreadable,
-  type CrmWriteAttempt,
-} from "../crm-write";
+  runIdempotentWrite,
+  type AppliedUnreadable,
+  type WriteAttempt,
+} from "@/lib/api/idempotent-write";
 
 const NOTES_PAGE_SIZE = 25;
 const NOTES_RESPONSE_LIMIT_BYTES = 1024 * 1024;
@@ -34,7 +34,7 @@ export interface CrmNotesSource {
 
 export interface CrmNotesAmbiguity {
   operation: "create" | "update" | "delete";
-  attempt: CrmWriteAttempt;
+  attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
 }
@@ -52,7 +52,7 @@ type SendWrite = () => Promise<
 
 type SettleWrite = (
   operation: CrmNotesAmbiguity["operation"],
-  attempt: CrmWriteAttempt,
+  attempt: WriteAttempt,
   send: SendWrite,
 ) => Promise<boolean>;
 
@@ -76,7 +76,7 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   // `writeError`, which invites the user to type the note again — and on a
   // non-idempotent POST that is a second note.
   const [appliedUnreadable, setAppliedUnreadable] =
-    useState<CrmAppliedUnreadable | null>(null);
+    useState<AppliedUnreadable | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const requestEpochRef = useRef(0);
 
@@ -149,7 +149,7 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   const settle: SettleWrite = useCallback(
     async function settleWrite(
       operation: CrmNotesAmbiguity["operation"],
-      attempt: CrmWriteAttempt,
+      attempt: WriteAttempt,
       send: SendWrite,
     ): Promise<boolean> {
       const outcome = await send();
@@ -195,7 +195,7 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   const create = useCallback(
     async (body: string): Promise<boolean> => {
       if (!isUUIDv7(branchId) || !isUUIDv7(sourceId) || isSaving) return false;
-      const attempt = createCrmWriteAttempt();
+      const attempt = createWriteAttempt();
       const payload = buildCreateCrmNoteRequest({
         branchId,
         sourceType,
@@ -208,7 +208,7 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
           "create",
           attempt,
           async () =>
-            await runCrmWrite({
+            await runIdempotentWrite({
               attempt,
               method: "post",
               path: CRM_NOTES_PATH,
@@ -227,7 +227,7 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   const update = useCallback(
     async (noteId: string, body: string): Promise<boolean> => {
       if (pendingId !== null) return false;
-      const attempt = createCrmWriteAttempt();
+      const attempt = createWriteAttempt();
       const payload = buildUpdateCrmNoteRequest(body);
       setPendingId(noteId);
       try {
@@ -235,7 +235,7 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
           "update",
           attempt,
           async () =>
-            await runCrmWrite({
+            await runIdempotentWrite({
               attempt,
               method: "patch",
               path: crmNotePath(noteId),
@@ -254,14 +254,14 @@ export function useCrmNotes({ branchId, sourceType, sourceId }: CrmNotesSource) 
   const remove = useCallback(
     async (noteId: string): Promise<boolean> => {
       if (pendingId !== null) return false;
-      const attempt = createCrmWriteAttempt();
+      const attempt = createWriteAttempt();
       setPendingId(noteId);
       try {
         return await settle(
           "delete",
           attempt,
           async () =>
-            await runCrmWrite({
+            await runIdempotentWrite({
               attempt,
               method: "delete",
               path: crmNotePath(noteId),

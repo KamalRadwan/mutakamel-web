@@ -7,11 +7,11 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-09-18**
+Last source verification: **2026-09-24**
 
-Generated at: **2026-09-18T09:27:07.633Z**
+Generated at: **2026-09-24T17:25:53.707Z**
 
-Backend revision: `40c06870bc0c+dirty`
+Backend revision: `9bfe05e84b41+dirty`
 
 Owning app: **trade-app**
 

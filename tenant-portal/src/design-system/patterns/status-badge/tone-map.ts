@@ -10,13 +10,11 @@ export type StatusKind =
   | "OpportunityStageFlag"
   | "CustomerStatus"
   | "StageCategory"
-  | "CrmTaskStatus"
-  | "CrmActivityStatus"
-  | "CrmReminderStatus"
   | "TenantStatus"
   | "UserStatus"
   | "SubscriptionStatus"
-  | "AccessMode";
+  | "AccessMode"
+  | "ActivityStatus";
 
 const TONE_MAP: Record<StatusKind, Record<string, StatusRole>> = {
   LeadStatus: {
@@ -64,21 +62,6 @@ const TONE_MAP: Record<StatusKind, Record<string, StatusRole>> = {
     OPEN: "pending",
     IN_PROGRESS: "pending",
   },
-  CrmTaskStatus: {
-    DONE: "positive",
-    CANCELLED: "negative",
-    OPEN: "pending",
-    IN_PROGRESS: "pending",
-  },
-  CrmActivityStatus: {
-    DONE: "positive",
-    OPEN: "pending",
-  },
-  CrmReminderStatus: {
-    SENT: "positive",
-    CANCELLED: "negative",
-    PENDING: "caution",
-  },
   // The four Core lifecycles below are transcribed from
   // ../backend/mutakamel-apps/core-app/packages/common/src/enums/ —
   // tenant-status.enum.ts, user-status.enum.ts, subscription-status.enum.ts
@@ -113,6 +96,18 @@ const TONE_MAP: Record<StatusKind, Record<string, StatusRole>> = {
     BLOCKED: "negative",
     DUNNING: "caution",
     READ_ONLY: "caution",
+  },
+  // Core's activity hub — ActivityStatusEnum in
+  // ../backend/mutakamel-apps/core-app/packages/common/src/enums/activity.enum.ts.
+  // Both open statuses are ink + motion: an activity that has started differs
+  // from one that is scheduled by its label, not by a hue, and neither is an
+  // outcome yet. Overdue is not a status — it is derived from the due time,
+  // and the screens that show it carry it themselves.
+  ActivityStatus: {
+    DONE: "positive",
+    CANCELLED: "negative",
+    PLANNED: "pending",
+    IN_PROGRESS: "pending",
   },
 };
 

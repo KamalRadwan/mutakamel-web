@@ -3,11 +3,11 @@
 import { useCallback, useMemo, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import {
-  createCrmWriteAttempt,
-  runCrmWrite,
-  type CrmAppliedUnreadable,
-  type CrmWriteAttempt,
-} from "../../../shared/crm-write";
+  createWriteAttempt,
+  runIdempotentWrite,
+  type AppliedUnreadable,
+  type WriteAttempt,
+} from "@/lib/api/idempotent-write";
 import type { OpportunityPipeline } from "../../hooks/pipeline-types";
 import {
   opportunityPipelinePath,
@@ -28,7 +28,7 @@ import { buildTransferPipelineRequest } from "../../opportunity-write-contract";
 const TERMINAL_STAGE_FLAGS = ["WON", "LOST"];
 
 export interface PipelineTransferAmbiguity {
-  attempt: CrmWriteAttempt;
+  attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
 }
@@ -66,7 +66,7 @@ export function usePipelineTransfer(
   // because `error` invites a second Save and that is exactly what a
   // non-idempotent route cannot take.
   const [appliedUnreadable, setAppliedUnreadable] =
-    useState<CrmAppliedUnreadable | null>(null);
+    useState<AppliedUnreadable | null>(null);
 
   /** The opportunity's current pipeline is never a transfer target. */
   const targetPipelines = useMemo(
@@ -97,14 +97,14 @@ export function usePipelineTransfer(
 
   const submit = useCallback(async () => {
     if (!item || pipelineId.length === 0 || isSubmitting) return;
-    const attempt = createCrmWriteAttempt();
+    const attempt = createWriteAttempt();
     const body = buildTransferPipelineRequest({ pipelineId, stageId, reason });
 
     const send = async (): Promise<void> => {
       setIsSubmitting(true);
       setError(null);
       try {
-        const outcome = await runCrmWrite({
+        const outcome = await runIdempotentWrite({
           attempt,
           method: "put",
           path: opportunityPipelinePath(item.id),

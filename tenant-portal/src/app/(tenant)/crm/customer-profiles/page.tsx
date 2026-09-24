@@ -22,6 +22,9 @@ import {
   type MoveToTarget,
   type WorkspaceViewLabels,
 } from "@/design-system";
+import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
+import { ActivityModal } from "@/components/activities/ActivityModal";
+import type { ActivityTargetSelection } from "@/components/activities/activity-contract";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
@@ -46,7 +49,6 @@ import type { CustomerProfileCardPatch } from "./customer-profile-card-contract"
 import { crmCapabilityAllowsOwner } from "../shared/crm-capabilities";
 import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
 import { crmActivitySegments } from "../shared/crm-activity-tone";
-import { CrmActivityDialog } from "../shared/components/CrmActivityDialog";
 import {
   CUSTOMER_PROFILE_BOARD_STATUSES,
   useCustomerProfileBoard,
@@ -167,10 +169,7 @@ export default function CustomerProfilesPage() {
     resolve: (confirmed: boolean) => void;
   } | null>(null);
 
-  const [activityCustomer, setActivityCustomer] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
+  const [activityCustomer, setActivityCustomer] = useState<ActivityTargetSelection | null>(null);
   const [selectedForDelete, setSelectedForDelete] = useState<{
     id: string;
     name: string;
@@ -200,9 +199,7 @@ export default function CustomerProfilesPage() {
       clearDeleteError();
       setSelectedForDelete({ id: item.id, name: item.displayName });
     },
-    onOpenActivities: (item) => {
-      setActivityCustomer({ id: item.id, name: item.displayName });
-    },
+    onOpenActivities: (item) => openActivities(item),
     onCardChange: (item, patch) => void updateCard(item, patch),
     documentCountsByParty: documentCounts.countsByParty,
     documentCountVisibility: documentCounts.visible,
@@ -274,9 +271,7 @@ export default function CustomerProfilesPage() {
       clearDeleteError();
       setSelectedForDelete({ id: item.id, name: item.displayName });
     },
-    onOpenActivities: (item) => {
-      setActivityCustomer({ id: item.id, name: item.displayName });
-    },
+    onOpenActivities: (item) => openActivities(item),
     onRatingChange: (item, rating) =>
       void updateCard(item, { rating }),
   });
@@ -307,6 +302,10 @@ export default function CustomerProfilesPage() {
 
   function openProfile(item: CustomerProfileItem) {
     router.push(`/crm/customer-profiles/${encodeURIComponent(item.id)}`);
+  }
+
+  function openActivities(item: CustomerProfileItem) {
+    setActivityCustomer({ app: "CRM", type: "CUSTOMER_PROFILE", id: item.id, label: item.displayName });
   }
 
   return (
@@ -360,6 +359,7 @@ export default function CustomerProfilesPage() {
             available={["board", "card", "table"]}
             labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
           />
+          <ActivitiesWorkspaceLink type="CUSTOMER_PROFILE" />
         </PageActions>
 
         {capabilitiesError && (
@@ -537,19 +537,12 @@ export default function CustomerProfilesPage() {
           }}
         />
 
-        <CrmActivityDialog
-          key={`activity-${activityCustomer?.id ?? "closed"}`}
-          target={
-            activityCustomer
-              ? {
-                  id: activityCustomer.id,
-                  name: activityCustomer.name,
-                  targetType: "CUSTOMER_PROFILE",
-                }
-              : null
-          }
+        <ActivityModal
+          scope="CRM"
+          branchId={branchId}
+          request={activityCustomer ? { kind: "create", target: activityCustomer, agenda: true } : null}
           onClose={() => setActivityCustomer(null)}
-          onCreated={reload}
+          onChanged={() => reload()}
         />
       </div>
     </PermissionGate>

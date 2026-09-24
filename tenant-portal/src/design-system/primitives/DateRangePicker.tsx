@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import {
+  addDays,
   endOfDay,
   endOfMonth,
   endOfQuarter,
+  endOfWeek,
   startOfDay,
   startOfMonth,
   startOfQuarter,
+  startOfWeek,
   subDays,
+  type Day,
 } from "date-fns";
 import { CalendarRange, X } from "lucide-react";
 import { useLanguage, type Language } from "@/i18n/useLanguage";
@@ -27,18 +31,26 @@ export interface DateRangeValue {
   to?: Date;
 }
 
-/** The six presets this product needs. Labels arrive translated from the caller. */
-export interface DateRangePresetLabels {
-  today: string;
-  last7Days: string;
-  last30Days: string;
-  last90Days: string;
-  thisMonth: string;
-  thisQuarter: string;
-}
+/** Every preset the picker can resolve. A caller offers a subset through `presets`. */
+export type DateRangePresetId =
+  | "today"
+  | "thisWeek"
+  | "next7Days"
+  | "next30Days"
+  | "last7Days"
+  | "last30Days"
+  | "last90Days"
+  | "thisMonth"
+  | "thisQuarter";
 
-export type DateRangePresetId = keyof DateRangePresetLabels;
+/** Translated by the caller, one label per preset it offers. */
+export type DateRangePresetLabels = Partial<Record<DateRangePresetId, string>>;
 
+/**
+ * What a picker offers when its caller names no `presets`: the six
+ * backward-looking ranges every filter screen was built with, so adding the
+ * forward ones changed nothing on those screens.
+ */
 export const DATE_RANGE_PRESET_IDS: readonly DateRangePresetId[] = [
   "today",
   "last7Days",
@@ -53,13 +65,21 @@ export const DATE_RANGE_PRESET_IDS: readonly DateRangePresetId[] = [
  * read from the clock so the result is deterministic in tests and in CI.
  *
  * Ranges are inclusive and snap to day boundaries — a "last 7 days" filter that
- * starts mid-afternoon silently drops a day of results.
+ * starts mid-afternoon silently drops a day of results. The forward ranges
+ * count today in, as the backward ones do: "next 7 days" is today and the six
+ * after it. `weekStartsOn` (0 = Sunday … 6 = Saturday) places "this week".
  */
-export function resolveDateRangePreset(id: DateRangePresetId, now: Date): DateRangeValue {
+export function resolveDateRangePreset(id: DateRangePresetId, now: Date, weekStartsOn: Day = 0): DateRangeValue {
   const today = startOfDay(now);
   switch (id) {
     case "today":
       return { from: today, to: endOfDay(now) };
+    case "thisWeek":
+      return { from: startOfWeek(today, { weekStartsOn }), to: endOfWeek(today, { weekStartsOn }) };
+    case "next7Days":
+      return { from: today, to: endOfDay(addDays(today, 6)) };
+    case "next30Days":
+      return { from: today, to: endOfDay(addDays(today, 29)) };
     case "last7Days":
       return { from: subDays(today, 6), to: endOfDay(now) };
     case "last30Days":
@@ -78,6 +98,14 @@ export interface DateRangePickerProps extends ControlSizeProps {
   onValueChange: (next: DateRangeValue | undefined) => void;
   placeholder: string;
   presetLabels: DateRangePresetLabels;
+  /** The presets offered, in this order. Defaults to `DATE_RANGE_PRESET_IDS`. */
+  presets?: readonly DateRangePresetId[];
+  /**
+   * First day of the week (0 = Sunday … 6 = Saturday), for the `thisWeek`
+   * preset and the grid alike, so the two cannot disagree. Omitted, "this
+   * week" starts on Sunday and the grid follows the locale.
+   */
+  weekStartsOn?: Day;
   clearLabel?: string;
   startMonth?: Date;
   endMonth?: Date;
@@ -97,6 +125,8 @@ export function DateRangePicker({
   onValueChange,
   placeholder,
   presetLabels,
+  presets = DATE_RANGE_PRESET_IDS,
+  weekStartsOn,
   clearLabel,
   startMonth,
   endMonth,
@@ -127,8 +157,15 @@ export function DateRangePicker({
         .join(" – ")
     : placeholder;
 
+  // A preset the caller left unlabelled is not offered: a shortcut missing
+  // from the list costs less than a button with no name.
+  const offeredPresets = presets.flatMap((presetId) => {
+    const presetLabel = presetLabels[presetId];
+    return presetLabel ? [{ id: presetId, label: presetLabel }] : [];
+  });
+
   function applyPreset(id: DateRangePresetId) {
-    onValueChange(resolveDateRangePreset(id, now ?? new Date()));
+    onValueChange(resolveDateRangePreset(id, now ?? new Date(), weekStartsOn));
     setOpen(false);
   }
 
@@ -163,15 +200,15 @@ export function DateRangePicker({
 
         <PopoverContent align="start" className="flex w-auto flex-col gap-2 p-0 sm:flex-row">
           <div className="flex flex-row flex-wrap gap-1 p-2 sm:w-40 sm:flex-col sm:flex-nowrap">
-            {DATE_RANGE_PRESET_IDS.map((presetId) => (
+            {offeredPresets.map((preset) => (
               <Button
-                key={presetId}
+                key={preset.id}
                 variant="ghost"
                 size="sm"
-                onClick={() => applyPreset(presetId)}
+                onClick={() => applyPreset(preset.id)}
                 className="cursor-pointer justify-start font-normal"
               >
-                {presetLabels[presetId]}
+                {preset.label}
               </Button>
             ))}
           </div>
@@ -182,6 +219,7 @@ export function DateRangePicker({
             numberOfMonths={1}
             selected={value?.from ? { from: value.from, to: value.to } : undefined}
             defaultMonth={value?.from}
+            weekStartsOn={weekStartsOn}
             startMonth={startMonth}
             endMonth={endMonth}
             autoFocus

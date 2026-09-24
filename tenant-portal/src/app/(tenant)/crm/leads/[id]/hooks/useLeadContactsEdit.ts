@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
-import { createCrmWriteAttempt, runCrmWrite } from "../../../shared/crm-write";
+import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { leadPath, parseLeadDetailResponse, type LeadDetail } from "../../lead-contract";
 import {
   buildLeadContactsRequest,
@@ -69,7 +69,7 @@ export function useLeadContactsEdit(
     setSaving(true);
     setError(null);
     try {
-      const outcome = await runCrmWrite({ attempt: createCrmWriteAttempt(), method: "patch", path: leadPath(lead.id), body, parse: parseLeadDetailResponse });
+      const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body, parse: parseLeadDetailResponse });
       if (outcome.kind === "success") {
         onSaved(outcome.value);
         setForm(null);

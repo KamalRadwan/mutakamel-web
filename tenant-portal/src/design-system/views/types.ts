@@ -2,6 +2,16 @@ import type { ReactNode } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import type { DataTableLabels, PageInfo, SelectionState, SortState } from "../patterns/data-table/types";
 
+// Every presentation a workspace can offer. Each screen offers its own set:
+// the record workspaces (Leads, Customer Profiles, Opportunities) board, card
+// and table; Activities, the one time-based workspace, calendar, board and
+// table. See docs/design/views.md#view-state.
+export type WorkspaceView = "board" | "card" | "table" | "calendar";
+
+// The record workspaces' set — what the view hooks assume when a screen names
+// none, which is how every screen that predates the calendar still calls them.
+export type RecordWorkspaceView = Exclude<WorkspaceView, "calendar">;
+
 // The label set every view needs. It is DataTable's set, not a parallel copy:
 // the table was the only view that already owned pagination, sorting and
 // selection, so its vocabulary is the shared one and the other two views

@@ -6,7 +6,7 @@
 // `POST /leads` it needs no `x-idempotency-key`: replaying it writes the same
 // value a second time and lands on the same state. What it does NOT get to
 // skip is the outcome classification — a rating whose result is unknown is
-// neither kept nor discarded silently. See ../shared/crm-write.ts.
+// neither kept nor discarded silently. See lib/api/idempotent-write.ts.
 //
 // Split out of lead-contract.ts because these four fields are read by the LIST
 // parser (useLeads.parseLead), not the detail one, and the two contracts have

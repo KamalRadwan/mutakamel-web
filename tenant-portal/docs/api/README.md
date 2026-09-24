@@ -339,17 +339,21 @@ They are all semantically documented. The 26 are these, and they have not moved:
 
 | Owning controller | Routes | Portal screens |
 | --- | ---: | --- |
-| `crm/activities/activities.controller.ts` | 11 — activities, tasks, calendar events, reminders | `/crm/activities`, `/crm/tasks`, `/crm/calendar`, `/crm/reminders` |
+| `crm/activities/activities.controller.ts` | 11 — activities, tasks, calendar events, reminders | **none since 2026-09-24** — `/crm/tasks`, `/crm/calendar` and `/crm/reminders` were removed and `/crm/activities` now reads [Core's activity hub](core-directory.md#activities--12-routes) |
 | `crm/notes-attachments/notes-attachments.controller.ts` | 9 — notes, attachments, upload, download | The notes and attachments panels on every CRM detail screen |
 | `crm/outbound-emails/outbound-emails.controller.ts` | 6 — options, preview, create, list, detail, retry | `/crm/outbound-emails` |
 
 **This paragraph used to say these families had "no portal screen", and that is
 the part that was wrong.** It was true on 2026-08-28 and stopped being true when
-Phase 8B built them. Every one of the 26 now has a screen calling it with no
+Phase 8B built them. Every one of the 26 had a screen calling it with no
 hand-written contract page behind it — which is the same condition that produced
 [D23](../build/DEFECTS.md#d23--editing-a-widgets-name-can-destroy-its-query-spec--fixed-2026-08-31):
 a screen reconstructing a request body from what its form happened to model,
-with nothing written down to contradict it.
+with nothing written down to contradict it. **Since 2026-09-24 the 11 activity
+routes have no caller in the portal** — every activity surface reads Core's
+activity hub instead — so the live risk is the notes, attachment and
+outbound-email families. The crm-app activity backend stays for its dashboards
+until its own retirement.
 
 The 1 Core entry is `GET /public/tenant-host/status`, which is public and
 transport-level; `core-reference.md` covers it and no semantic page is owed.
@@ -374,7 +378,9 @@ It is recorded **here** rather than in the document that owns it because that
 document is one of the three above and does not exist yet. Whoever writes
 `crm-activities.md` should move this into it. Leaving a decision in a coverage
 note is how decisions get re-litigated, so this is a placement to fix, not a
-place to add more.
+place to add more. Since 2026-09-24 no portal screen creates CRM reminders — the
+Core activity hub has no reminder field, because nothing would deliver one — so
+the decision now waits on the crm-app activity backend's retirement.
 
 ## Two different questions, two different words
 

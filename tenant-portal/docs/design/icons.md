@@ -133,7 +133,8 @@ and every route would pay for glyphs it does not render.
 | --- | --- | --- |
 | Back to list | `ArrowLeft` | Mirrors |
 | Breadcrumb separator | `ChevronRight` | Mirrors |
-| Previous / next page | `ChevronLeft` / `ChevronRight` | Mirrors |
+| Previous / next page, previous / next period | `ChevronLeft` / `ChevronRight` | Mirrors — earlier is to the right under RTL |
+| Calendar view | `CalendarDays` | The view switcher's calendar; see [views.md](views.md#the-switcher) |
 | Disclosure (accordion, tree) | `ChevronDown` | Rotates, never mirrors |
 | Open in a new place | `ExternalLink` | |
 | Overflow menu | `MoreHorizontal` | Never `MoreVertical` — pick one |
@@ -200,6 +201,32 @@ opposite of scheduled. It is a stroke glyph, so at the `sm` step it carries a
 heavier `strokeWidth={2.5}` — at 14px a hairline polyline is not a mark. The
 weight is lucide's own prop, not `stroke-[2.5]`, which is ambiguous between a
 stroke colour and a stroke width.
+
+### Activity types
+
+Added **2026-09-24**. The glyph of each Core activity type is the one Core's
+own catalogue declares — the `icon` of `GET /api/tenant/core/v1/activity-types`,
+set in `ActivitiesService` (`src/tenant/activities/activities.service.ts`) — so
+a type looks the same wherever it is drawn, and a new type arrives with its
+glyph named.
+
+| Type | Icon | Catalogue `icon` |
+| --- | --- | --- |
+| `TODO` | `SquareCheck` | `check-square` — lucide's earlier name for the same glyph |
+| `CALL` | `Phone` | `phone` |
+| `MEETING` | `Users` | `users` |
+| `EMAIL` | `Mail` | `mail` |
+| `VISIT` | `MapPin` | `map-pin` |
+| `FOLLOW_UP` | `Clock` | `clock` |
+| `OTHER` | `Circle` | `circle` |
+
+A type is a **category**, so its glyph is always ink and always beside its
+label — never a hue ([tokens.md](tokens.md#non-outcome-values--never-a-hue)).
+`Users`, `MapPin` and `Clock` are the glyphs the Objects table already gives a
+team, a location and a time, which is the same concept each time rather than a
+second meaning. `Phone` is the activity **type**; the green call mark in
+[contact channel marks](#contact-channel-marks) is the **action** of dialling a
+number, and the two do not substitute for each other.
 
 ## Checklist
 

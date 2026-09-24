@@ -6,7 +6,7 @@ import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { Button } from "@/design-system";
-import { runCrmWrite } from "../../../shared/crm-write";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { parseLeadConversionResponse } from "../lead-conversion-contract";
 import { CONVERSION_IDS as ids, conversionLead, conversionReceipt } from "../__fixtures__/lead-conversion";
 import { useLeadConvert } from "../hooks/useLeadConvert";
@@ -20,7 +20,7 @@ vi.mock("@/i18n/I18nContext", async (original) => ({
 }));
 vi.mock("../hooks/useLeadConversionOptions", () => ({ useLeadConversionOptions: () => ({ pipelines: [], ownerOptions: [], loading: false, pipelinesFailed: false, usersFailed: false, canReadUsers: true }) }));
 vi.mock("../../../shared/hooks/useCrmCreateCustomFields", () => ({ useCrmCreateCustomFields: () => ({ definitions: [], requiredFieldKeys: [], degraded: false, loading: false }) }));
-vi.mock("../../../shared/crm-write", async (original) => ({ ...await original<typeof import("../../../shared/crm-write")>(), runCrmWrite: vi.fn() }));
+vi.mock("@/lib/api/idempotent-write", async (original) => ({ ...await original<typeof import("@/lib/api/idempotent-write")>(), runIdempotentWrite: vi.fn() }));
 
 function Harness() {
   const state = useLeadConvert(conversionLead, vi.fn(), true, null);
@@ -61,20 +61,20 @@ describe("LeadConvertModal", () => {
     fireEvent.click(modal.getByRole("button", { name: en.crmLeadConvert.addMethod }));
     expect(modal.getByRole("textbox", { name: /^Value/ })).toHaveAttribute("maxlength", "255");
     expect(modal.getByLabelText(en.crmLeadConvert.methodLabel)).toHaveAttribute("maxlength", "80");
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
   it("reviews read-only before confirmation, then keeps the actual response links without another submit", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValue({ kind: "success", replayed: false, value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false, true) });
+    vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "success", replayed: false, value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false, true) });
     const modal = open();
     await act(async () => fireEvent.click(modal.getByRole("button", { name: en.crmLeadConvert.reviewTitle })));
     expect(modal.getByLabelText(en.crmLeads.name)).toBeDisabled();
     expect(modal.getByRole("button", { name: en.crmLeadConvert.backToForm })).toBeInTheDocument();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     await act(async () => fireEvent.click(modal.getByRole("button", { name: en.crmLeadConvert.confirm })));
     expect(modal.getByRole("link", { name: en.crmLeadConvert.viewCustomer })).toHaveAttribute("href", `/crm/customer-profiles/${ids.customer}`);
     expect(modal.queryByRole("link", { name: en.crmLeadConvert.viewOpportunity })).toBeNull();
     expect(modal.queryByRole("button", { name: en.crmLeadConvert.confirm })).toBeNull();
-    expect(runCrmWrite).toHaveBeenCalledOnce();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
   });
   it("asks explicitly whether the converted lead is kept or removed", async () => {
     const modal = open();
@@ -84,7 +84,7 @@ describe("LeadConvertModal", () => {
     expect(modal.getByText(en.crmLeadConvert.deleteLeadHint)).toBeInTheDocument();
   });
   it("confirms that removing the lead preserves the converted customer", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValue({
+    vi.mocked(runIdempotentWrite).mockResolvedValue({
       kind: "success",
       replayed: false,
       value: parseLeadConversionResponse(
@@ -116,6 +116,6 @@ describe("LeadConvertModal", () => {
     const guard = within(screen.getByRole("alertdialog"));
     fireEvent.click(guard.getByRole("button", { name: en.common.discardConfirm }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
 });

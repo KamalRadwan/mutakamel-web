@@ -11,6 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "../../primitives/DropdownMenu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../primitives/Tooltip";
 
 export interface MoveToTarget {
   id: string;
@@ -40,11 +41,17 @@ export function MoveToMenu({ targets, onMove, label }: MoveToMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="xs" aria-label={label}>
-          <CornerUpRight className={cn(iconSize({ size: "sm" }), mirrorInRtl)} aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
+      {/* Icon-only, so the name is both spoken (aria-label) and shown (tooltip). */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="xs" aria-label={label}>
+              <CornerUpRight className={cn(iconSize({ size: "sm" }), mirrorInRtl)} aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>{label}</DropdownMenuLabel>
         {targets.map((target) => (

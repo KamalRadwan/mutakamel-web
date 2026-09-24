@@ -21,8 +21,8 @@ vi.mock("@/components/audit/EntityHistoryCard", () => ({
     return <p>History content</p>;
   },
 }));
-vi.mock("../../../shared/components/CrmActivitiesPanel", () => ({
-  CrmActivitiesPanel: (props: unknown) => {
+vi.mock("@/components/activities/RecordActivitiesPanel", () => ({
+  RecordActivitiesPanel: (props: unknown) => {
     mocks.activities(props);
     return <p>Activities content</p>;
   },

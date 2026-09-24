@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 //
 // Read from source because the alternative is standing up the whole hook —
 // auth context, branch selection, i18n — to observe one header. The invariant
-// is small and structural: this write goes through `runCrmWrite`, which is the
+// is small and structural: this write goes through `runIdempotentWrite`, which is the
 // only thing in CRM that pairs a key with an attempt and replays it rather than
 // minting a second one.
 const source = readFileSync(resolve(__dirname, "./useLeads.ts"), "utf8");
@@ -28,8 +28,8 @@ describe("creating a lead", () => {
   const handleCreate = block("const handleCreate = async");
 
   it("sends the write through the attempt-keyed CRM writer", () => {
-    expect(handleCreate).toContain("createCrmWriteAttempt()");
-    expect(handleCreate).toContain("runCrmWrite(");
+    expect(handleCreate).toContain("createWriteAttempt()");
+    expect(handleCreate).toContain("runIdempotentWrite(");
   });
 
   it("never tells the transport to skip the key on this route", () => {

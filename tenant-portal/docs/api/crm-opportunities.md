@@ -227,8 +227,15 @@ independently limited page plus its own cursor, so columns paginate separately.
 - `importance` is an integer, rendered as stars.
 - `cardColor` is the persisted CRM card colour and uses the same palette as
   Lead and Customer cards.
-- `openActivityCount` counts planned activities without exposing the activity
-  records themselves.
+- `openActivityCount` counts **open** Core activities — `PLANNED` or
+  `IN_PROGRESS` (crm-app `OPEN_CORE_ACTIVITY_STATUSES_SQL`, 2026-09-24) —
+  without exposing the activity records themselves. `activityState` and the
+  column's `activitySummary` use the same definition of open.
+- The card's activity mark, and the table's activity cell, open the shared
+  Core activity modal on the opportunity (create, with its open activities
+  listed above the form); any write reloads the active view. The detail page's
+  Activities tab is the shared record panel. Contract:
+  [Core activities](core-directory.md#activities--12-routes).
 - Cursors are **opaque and filter-bound**. The same filters sent for the
   initial request must be resent with the cursor, or the page is rejected.
 

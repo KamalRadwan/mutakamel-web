@@ -50,7 +50,7 @@ describe("Tenant Portal production route surface", () => {
     expect(isSupportedCrmPath("/crm/outbound-emails/email-id")).toBe(true);
     // Still one segment deep, and still nothing that has no [id] route.
     expect(isSupportedCrmPath("/crm/leads/lead-id/notes")).toBe(false);
-    expect(isSupportedCrmPath("/crm/tasks/task-id")).toBe(false);
+    expect(isSupportedCrmPath("/crm/activities/activity-id")).toBe(false);
     expect(isSupportedCrmPath("/crm/opportunities-stage-history")).toBe(false);
   });
 
@@ -145,13 +145,15 @@ describe("Tenant Portal production route surface", () => {
         "crm.settings.read",
       ]),
     ).toBe(TENANT_ROUTES.crmStaticCatalogue);
-    // Was null until 2026-08-31, when Phase 8B's activities, tasks, calendar,
-    // reminders and outbound-email screens were linked. An actor who can read
-    // activities now has somewhere to land instead of being told they have no
-    // CRM access at all.
-    expect(getFirstPermittedCrmRoute(["crm.activities.read.all"])).toBe(
-      TENANT_ROUTES.crmActivities,
-    );
+    // The Activities workspace reads Core's activity hub, so Core's exact
+    // `activities.read` admits it — together with a read on some CRM record
+    // type, without which Core would show it no CRM activity at all. An actor
+    // who can read activities on leads has somewhere to land even without the
+    // lead-stage catalogue the Leads screen needs.
+    expect(
+      getFirstPermittedCrmRoute(["activities.read", "crm.leads.read.own"]),
+    ).toBe(TENANT_ROUTES.crmActivities);
+    expect(getFirstPermittedCrmRoute(["activities.read"])).toBeNull();
     // Ordering here decides where a user LANDS, so it is behaviour. The first
     // attempt put these seven ahead of leads, which would have dropped a
     // pipeline manager onto a configuration screen instead of their records.

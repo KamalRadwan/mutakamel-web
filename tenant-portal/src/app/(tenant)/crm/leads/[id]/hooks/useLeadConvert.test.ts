@@ -3,7 +3,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
-import { runCrmWrite, type CrmWriteOutcome } from "../../../shared/crm-write";
+import { runIdempotentWrite, type WriteOutcome } from "@/lib/api/idempotent-write";
 import type { CrmActionCapability } from "../../../shared/crm-capabilities";
 import { parseLeadConversionResponse, type LeadConversionResult } from "../lead-conversion-contract";
 import { CONVERSION_IDS as ids, conversionLead, conversionReceipt } from "../__fixtures__/lead-conversion";
@@ -14,11 +14,11 @@ import { useLeadConvert } from "./useLeadConvert";
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
 vi.mock("./useLeadConversionOptions", () => ({ useLeadConversionOptions: vi.fn() }));
 vi.mock("../../../shared/hooks/useCrmCreateCustomFields", () => ({ useCrmCreateCustomFields: vi.fn() }));
-vi.mock("../../../shared/crm-write", async (original) => ({ ...await original<typeof import("../../../shared/crm-write")>(), runCrmWrite: vi.fn() }));
+vi.mock("@/lib/api/idempotent-write", async (original) => ({ ...await original<typeof import("@/lib/api/idempotent-write")>(), runIdempotentWrite: vi.fn() }));
 
 const all: CrmActionCapability = { scope: "all", ownerUserIds: null };
 const defaults = { canConvert: true, capability: all as CrmActionCapability | null, lead: conversionLead };
-const success = (): CrmWriteOutcome<LeadConversionResult> => ({ kind: "success", replayed: false,
+const success = (): WriteOutcome<LeadConversionResult> => ({ kind: "success", replayed: false,
   value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false, true) });
 
 function setup(overrides: Partial<typeof defaults> = {}) {
@@ -41,25 +41,25 @@ afterEach(cleanup);
 
 describe("useLeadConvert", () => {
   it("reviews before posting and ignores a same-render double submission", async () => {
-    let finish!: (value: CrmWriteOutcome<LeadConversionResult>) => void;
-    vi.mocked(runCrmWrite).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    let finish!: (value: WriteOutcome<LeadConversionResult>) => void;
+    vi.mocked(runIdempotentWrite).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     const { result, reload } = setup();
     await act(async () => result.current.submit());
     expect(result.current.reviewing).toBe(true);
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     let pending!: Promise<void>;
     act(() => { pending = result.current.submit(); void result.current.submit(); result.current.closeModal(); });
-    expect(runCrmWrite).toHaveBeenCalledOnce();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
     expect(result.current.open).toBe(true);
     expect(result.current.locked).toBe(true);
     await act(async () => { finish(success()); await pending; });
     expect(reload).toHaveBeenCalledOnce();
     expect(result.current.result?.customerProfileId).toBe(ids.customer);
-    expect(runCrmWrite).toHaveBeenCalledWith(expect.objectContaining({ method: "post", path: `/api/tenant/crm/v1/leads/${ids.lead}/convert`,
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ method: "post", path: `/api/tenant/crm/v1/leads/${ids.lead}/convert`,
       body: { profileType: "CORPORATE", displayName: "Acme", companyName: "Acme Trading", keepLead: true, createOpportunity: false } }));
   });
   it("sends the explicit remove choice and keeps the receipt visible without reloading a deleted lead", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValue({
+    vi.mocked(runIdempotentWrite).mockResolvedValue({
       kind: "success",
       replayed: false,
       value: parseLeadConversionResponse(
@@ -75,32 +75,32 @@ describe("useLeadConvert", () => {
     await act(async () => result.current.submit());
     await act(async () => result.current.submit());
 
-    expect(runCrmWrite).toHaveBeenCalledWith(
+    expect(runIdempotentWrite).toHaveBeenCalledWith(
       expect.objectContaining({ body: expect.objectContaining({ keepLead: false }) }),
     );
     expect(result.current.result).toMatchObject({ lead: null, leadDeleted: true });
     expect(reload).not.toHaveBeenCalled();
   });
   it("freezes an ambiguous attempt across close/reopen and retries the identical body/key", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValueOnce({ kind: "ambiguous", error: { status: 0 } }).mockResolvedValueOnce(success());
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "ambiguous", error: { status: 0 } }).mockResolvedValueOnce(success());
     const { result } = setup();
     await act(async () => result.current.submit());
     await act(async () => result.current.submit());
-    const intent = vi.mocked(runCrmWrite).mock.calls[0][0];
+    const intent = vi.mocked(runIdempotentWrite).mock.calls[0][0];
     act(() => { result.current.setField("displayName", "Unsafe changed intent"); result.current.closeModal(); });
     act(() => result.current.openModal());
     expect(result.current.form?.displayName).toBe("Acme");
     expect(result.current.hasReceipt).toBe(true);
     await act(async () => result.current.submit());
-    expect(runCrmWrite).toHaveBeenCalledOnce();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
     await act(async () => result.current.retry());
-    const replay = vi.mocked(runCrmWrite).mock.calls[1][0];
+    const replay = vi.mocked(runIdempotentWrite).mock.calls[1][0];
     expect(replay.attempt).toBe(intent.attempt);
     expect(replay.body).toBe(intent.body);
     expect(replay.path).toBe(intent.path);
   });
   it("keeps successful or unreadable receipts and prevents any second write", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValueOnce({ kind: "applied_unreadable", error: { status: 201 } });
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "applied_unreadable", error: { status: 201 } });
     const { result, reload } = setup();
     await act(async () => result.current.submit());
     await act(async () => result.current.submit());
@@ -109,18 +109,18 @@ describe("useLeadConvert", () => {
     await act(async () => result.current.retry());
     expect(result.current.appliedUnreadable).toEqual({ status: 201 });
     expect(result.current.isDirty).toBe(false);
-    expect(runCrmWrite).toHaveBeenCalledOnce();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
     expect(reload).toHaveBeenCalledOnce();
   });
   it("allows a changed intent only after a definite rejection", async () => {
-    vi.mocked(runCrmWrite).mockResolvedValueOnce({ kind: "failed", error: { status: 422 } }).mockResolvedValueOnce(success());
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "failed", error: { status: 422 } }).mockResolvedValueOnce(success());
     const { result } = setup();
     await act(async () => result.current.submit());
     await act(async () => result.current.submit());
     act(() => result.current.setField("displayName", "Corrected name"));
     await act(async () => result.current.submit());
     await act(async () => result.current.submit());
-    const [first, second] = vi.mocked(runCrmWrite).mock.calls.map(([options]) => options);
+    const [first, second] = vi.mocked(runIdempotentWrite).mock.calls.map(([options]) => options);
     expect(second.attempt.idempotencyKey).not.toBe(first.attempt.idempotencyKey);
     expect(second.body).toMatchObject({ displayName: "Corrected name" });
   });
@@ -129,7 +129,7 @@ describe("useLeadConvert", () => {
     await act(async () => result.current.submit());
     rerender({ ...defaults, canConvert: false });
     await act(async () => result.current.submit());
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
   it("keeps the party type immutable and requires independent opportunity permission", async () => {
     const { result } = setup({ capability: null });
@@ -161,6 +161,6 @@ describe("useLeadConvert", () => {
     await act(async () => result.current.submit());
     expect(result.current.errors.createOpportunity).toBe(en.crmLeadConvert.referencesLoading);
     expect(result.current.errors["customFields.seats"]).toBe(en.crmShared.fieldRequired);
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
 });

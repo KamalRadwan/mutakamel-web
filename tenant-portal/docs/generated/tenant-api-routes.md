@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-09-18T09:27:07.633Z**
+Generated at: **2026-09-24T17:25:53.707Z**
 
-Frontend revision: `145dcfeb94fa+dirty`
+Frontend revision: `7c5e0545503e+dirty`
 
-Backend revision: `40c06870bc0c+dirty`
+Backend revision: `9bfe05e84b41+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,11 +17,11 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 224 |
+| core | 228 |
 | crm | 164 |
 | trade | 234 |
 | webphone | 20 |
-| **Total** | **642** |
+| **Total** | **646** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -42,7 +42,11 @@ Machine-readable source:
 | core | PATCH | `/api/tenant/core/v1/activities/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.activities.update` |
 | core | POST | `/api/tenant/core/v1/activities/:id/cancel` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.activities.cancel` |
 | core | POST | `/api/tenant/core/v1/activities/:id/complete` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.activities.complete` |
+| core | POST | `/api/tenant/core/v1/activities/:id/status` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.activities.status` |
 | core | GET | `/api/tenant/core/v1/activities/assignees` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.assignees` |
+| core | GET | `/api/tenant/core/v1/activities/calendar` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.calendar` |
+| core | GET | `/api/tenant/core/v1/activities/summary` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.summary` |
+| core | GET | `/api/tenant/core/v1/activities/targets` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.targets` |
 | core | GET | `/api/tenant/core/v1/activity-types` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.types` |
 | core | GET | `/api/tenant/core/v1/audit` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.list` |
 | core | GET | `/api/tenant/core/v1/audit/entities/:entityType/:entityId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.entity-history` |

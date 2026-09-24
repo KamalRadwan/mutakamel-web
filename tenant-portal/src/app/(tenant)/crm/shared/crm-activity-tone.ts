@@ -2,9 +2,9 @@ import type { BoardColumnSegment } from "@/design-system";
 
 export type CrmActivityState = "OVERDUE" | "TODAY" | "FUTURE" | "NONE";
 
-export const CRM_ACTIVITY_STATES = ["OVERDUE", "TODAY", "FUTURE", "NONE"] as const;
+const CRM_ACTIVITY_STATES = ["OVERDUE", "TODAY", "FUTURE", "NONE"] as const;
 
-export const CRM_ACTIVITY_TONE: Record<CrmActivityState, BoardColumnSegment["tone"]> = {
+const CRM_ACTIVITY_TONE: Record<CrmActivityState, BoardColumnSegment["tone"]> = {
   OVERDUE: "negative",
   TODAY: "caution",
   FUTURE: "positive",

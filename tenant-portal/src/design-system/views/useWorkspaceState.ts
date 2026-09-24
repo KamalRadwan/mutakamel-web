@@ -1,13 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { replaceSearchParams } from "./replace-search-params";
 import type { SelectionState, SortDirection, SortState } from "../patterns/data-table/types";
-import type { WorkspaceView } from "./ViewSwitcher";
-import { useWorkspaceView } from "./useWorkspaceView";
+import type { RecordWorkspaceView, WorkspaceView } from "./types";
+import { RECORD_WORKSPACE_VIEWS, useWorkspaceView } from "./useWorkspaceView";
 
-interface WorkspaceStateOptions {
-  defaultView: WorkspaceView;
+interface WorkspaceStateOptions<V extends WorkspaceView> {
+  // The screen's own view set, in switcher order. The record workspaces omit
+  // it and get board/card/table; Activities passes calendar/board/table.
+  views?: readonly V[];
+  defaultView: NoInfer<V>;
   defaultSort?: SortState;
   // The data hook's own setters. The URL is authoritative, so these fire
   // whenever it disagrees with what this hook last delivered — that is what
@@ -17,9 +21,9 @@ interface WorkspaceStateOptions {
   onSortChange?: (sort: SortState) => void;
 }
 
-export interface WorkspaceState {
-  view: WorkspaceView;
-  setView: (view: WorkspaceView) => void;
+export interface WorkspaceState<V extends WorkspaceView = RecordWorkspaceView> {
+  view: V;
+  setView: (view: V) => void;
   page: number;
   setPage: (page: number) => void;
   sort: SortState | undefined;
@@ -43,12 +47,26 @@ function parseDirection(value: string | null): SortDirection | null {
 // the same screen state. Selection deliberately does NOT: it is a set of ids
 // with no bound, and a URL is the wrong place for it. Living in this hook is
 // enough for it to survive a view switch, which is what it has to survive.
-export function useWorkspaceState(screenId: string, options: WorkspaceStateOptions): WorkspaceState {
-  const { defaultView, defaultSort, onPageChange, onSortChange } = options;
-  const router = useRouter();
-  const pathname = usePathname();
+export function useWorkspaceState(
+  screenId: string,
+  options: WorkspaceStateOptions<RecordWorkspaceView>,
+): WorkspaceState;
+export function useWorkspaceState<V extends WorkspaceView>(
+  screenId: string,
+  options: WorkspaceStateOptions<V> & { views: readonly V[] },
+): WorkspaceState<V>;
+export function useWorkspaceState<V extends WorkspaceView>(
+  screenId: string,
+  options: WorkspaceStateOptions<V>,
+): WorkspaceState<V> {
+  const { views, defaultView, defaultSort, onPageChange, onSortChange } = options;
   const searchParams = useSearchParams();
-  const [view, setView] = useWorkspaceView(screenId, defaultView);
+  // Only the first signature may omit the set, and it fixes V to the record views.
+  const [view, setView] = useWorkspaceView<V>(
+    screenId,
+    defaultView,
+    views ?? (RECORD_WORKSPACE_VIEWS as readonly V[]),
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const urlPage = Number.parseInt(searchParams.get("page") ?? "", 10);
@@ -61,25 +79,13 @@ export function useWorkspaceState(screenId: string, options: WorkspaceStateOptio
     [defaultSort, sortDirection, sortId],
   );
 
-  const writeParams = useCallback(
-    (updates: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParams.toString());
-      for (const [key, value] of Object.entries(updates)) {
-        if (value === null) params.delete(key);
-        else params.set(key, value);
-      }
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
-
-  const setPage = useCallback((next: number) => writeParams({ page: String(next) }), [writeParams]);
+  const setPage = useCallback((next: number) => replaceSearchParams({ page: String(next) }), []);
 
   // A new sort is a new result set, so it starts at page 1. Changing VIEW
   // never touches either — that is the whole point.
   const setSort = useCallback(
-    (next: SortState) => writeParams({ sort: next.id, dir: next.direction, page: "1" }),
-    [writeParams],
+    (next: SortState) => replaceSearchParams({ sort: next.id, dir: next.direction, page: "1" }),
+    [],
   );
 
   const deliveredPage = useRef(1);

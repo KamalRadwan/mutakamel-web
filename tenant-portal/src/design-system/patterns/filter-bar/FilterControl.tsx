@@ -81,6 +81,8 @@ export function FilterControl({ filter, value, onValueChange, className }: Filte
           className={cn("w-56", className)}
           placeholder={filter.label}
           presetLabels={filter.presetLabels}
+          presets={filter.presets}
+          weekStartsOn={filter.weekStartsOn}
           clearLabel={filter.clearLabel}
           value={
             value?.kind === "dateRange"
@@ -143,8 +145,11 @@ export function FilterControl({ filter, value, onValueChange, className }: Filte
             checked={checked}
             onCheckedChange={(next) => commit(next ? { kind: "boolean", value: true } : undefined)}
           />
+          {/* The switch already says on or off, so its label keeps naming the
+              filter: swapping it for `trueLabel` turned "Assigned to me" into a
+              bare "Yes". `trueLabel`/`falseLabel` belong to the chip text. */}
           <Label htmlFor={id} className="cursor-pointer text-xs font-normal whitespace-nowrap">
-            {checked ? filter.trueLabel : filter.label}
+            {filter.label}
           </Label>
         </div>
       );

@@ -31,7 +31,6 @@ const SCOPES = [
   { area: "Acquisition sources", dir: "crm-app/src/crm/acquisition-sources" },
   { area: "Custom fields", dir: "crm-app/src/crm/custom-fields" },
   { area: "CRM settings", dir: "crm-app/src/crm/settings" },
-  { area: "CRM activities", dir: "crm-app/src/crm/activities" },
   { area: "CRM notes & attachments", dir: "crm-app/src/crm/notes-attachments" },
   { area: "CRM outbound email", dir: "crm-app/src/crm/outbound-emails" },
   { area: "CRM dashboards", dir: "crm-app/src/crm/dashboards" },
@@ -115,33 +114,65 @@ function walk(dir) {
 const byArea = [];
 let total = 0;
 
-for (const { area, dir } of SCOPES) {
-  const files = walk(resolve(backendRoot, dir));
-  const codes = new Map(); // code -> Set(status)
+// The argument span of the call whose opening parenthesis ends at `start`,
+// found by balancing parentheses.
+function argumentsFrom(text, start) {
+  let depth = 1;
+  let i = start;
+  while (i < text.length && depth > 0) {
+    if (text[i] === "(") depth += 1;
+    else if (text[i] === ")") depth -= 1;
+    i += 1;
+  }
+  return text.slice(start, i - 1);
+}
 
-  for (const file of files) {
-    const text = readFileSync(file, "utf8");
-    // throw new XException( ... 'CODE' ... ) — scan the call's argument span.
-    const re = /throw new ([A-Za-z]+Exception)\(/gu;
-    let m;
-    while ((m = re.exec(text)) !== null) {
-      const status = EXCEPTION_STATUS[m[1]];
+// `HttpException` names no status; it travels as a trailing numeric argument.
+function statusOf(exception, args) {
+  if (exception !== "HttpException") return EXCEPTION_STATUS[exception];
+  const trailing = args.match(/,\s*(\d{3})\s*$/u);
+  return trailing ? Number(trailing[1]) : undefined;
+}
+
+function literalCodes(args) {
+  return [...args.matchAll(/['"]([A-Z][A-Z0-9_]{4,})['"]/gu)]
+    .map((match) => match[1])
+    .filter((code) => !NOT_AN_ERROR.has(code));
+}
+
+for (const { area, dir } of SCOPES) {
+  const texts = walk(resolve(backendRoot, dir)).map((file) => readFileSync(file, "utf8"));
+  const codes = new Map(); // code -> Set(status)
+  const add = (code, status) => {
+    if (!codes.has(code)) codes.set(code, new Set());
+    codes.get(code).add(status);
+  };
+  // Factories that take the code as a parameter — `(code, message) =>
+  // new ConflictException({ code, message })` — raise whatever their call
+  // sites pass, so those are read instead of the definition.
+  const forwarding = new Map(); // factory name -> status
+
+  for (const text of texts) {
+    for (const m of text.matchAll(/throw new ([A-Za-z]+Exception)\(/gu)) {
+      const args = argumentsFrom(text, m.index + m[0].length);
+      const status = statusOf(m[1], args);
+      if (status) literalCodes(args).forEach((code) => add(code, status));
+    }
+    // `const notFound = () => new NotFoundException({ code: ... })` is thrown
+    // as `throw notFound()`, which the pattern above cannot see.
+    for (const m of text.matchAll(/const ([A-Za-z0-9_$]+) = \([^)]*\) => new ([A-Za-z]+Exception)\(/gu)) {
+      const args = argumentsFrom(text, m.index + m[0].length);
+      const status = statusOf(m[2], args);
       if (!status) continue;
-      // Balance parens from the opening to capture the whole argument list.
-      let depth = 1;
-      let i = re.lastIndex;
-      while (i < text.length && depth > 0) {
-        if (text[i] === "(") depth += 1;
-        else if (text[i] === ")") depth -= 1;
-        i += 1;
-      }
-      const args = text.slice(re.lastIndex, i - 1);
-      for (const c of args.matchAll(/['"]([A-Z][A-Z0-9_]{4,})['"]/gu)) {
-        const code = c[1];
-        if (NOT_AN_ERROR.has(code)) continue;
-        if (!codes.has(code)) codes.set(code, new Set());
-        codes.get(code).add(status);
-      }
+      const found = literalCodes(args);
+      found.forEach((code) => add(code, status));
+      if (found.length === 0 && /\bcode\b/u.test(args)) forwarding.set(m[1], status);
+    }
+  }
+  for (const [factory, status] of forwarding) {
+    const call = new RegExp(`\\b${factory}\\(\\s*['"]([A-Z][A-Z0-9_]{4,})['"]`, "gu");
+    for (const text of texts) {
+      for (const m of text.matchAll(call)) add(m[1], status);
     }
   }
 
@@ -165,7 +196,7 @@ const page = `# Error Code Reference
 > Regenerate with \`pnpm docs:errors\`.
 > Generator: \`scripts/docs/generate-error-reference.mjs\`
 
-Status: **verified** (parsed from \`throw new *Exception\` sites)
+Status: **verified** (parsed from \`throw new *Exception\` sites and exception factories)
 
 Last source verification: **${new Date().toISOString().slice(0, 10)}**
 

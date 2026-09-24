@@ -4,11 +4,11 @@ import { useCallback, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import type { CrmProfileType } from "../../leads/lead-contract";
 import {
-  createCrmWriteAttempt,
-  runCrmWrite,
-  type CrmAppliedUnreadable,
-  type CrmWriteAttempt,
-} from "../../shared/crm-write";
+  createWriteAttempt,
+  runIdempotentWrite,
+  type AppliedUnreadable,
+  type WriteAttempt,
+} from "@/lib/api/idempotent-write";
 import { useCrmCreateForm } from "../../shared/hooks/useCrmCreateForm";
 import { parseCustomerProfileDetailResponse } from "../customer-profile-contract";
 import {
@@ -26,7 +26,7 @@ import {
 import { CUSTOMER_PROFILES_PATH } from "./useCustomerProfiles";
 
 export interface CreateCustomerProfileAmbiguity {
-  attempt: CrmWriteAttempt;
+  attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
 }
@@ -78,7 +78,7 @@ export function useCreateCustomerProfile(
   // D2. `POST /customer-profiles` is not idempotent across attempts, so a 2xx
   // whose body this client cannot read is the most dangerous thing to report as
   // a plain failure: the profile exists, and a second Save makes two.
-  const [appliedUnreadable, setAppliedUnreadable] = useState<CrmAppliedUnreadable | null>(
+  const [appliedUnreadable, setAppliedUnreadable] = useState<AppliedUnreadable | null>(
     null,
   );
 
@@ -258,14 +258,14 @@ export function useCreateCustomerProfile(
     // user no way to ask what is wrong, so the press is what reveals it.
     revealAll();
     if (!branchId || isSubmitting || Object.keys(allErrors).length > 0) return;
-    const attempt = createCrmWriteAttempt();
+    const attempt = createWriteAttempt();
     const body = buildCreateCustomerProfileFullRequest(form, branchId);
 
     const send = async (): Promise<void> => {
       setIsSubmitting(true);
       setError(null);
       try {
-        const outcome = await runCrmWrite({
+        const outcome = await runIdempotentWrite({
           attempt,
           method: "post",
           path: CUSTOMER_PROFILES_PATH,

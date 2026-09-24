@@ -5,7 +5,7 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { formatTemplate } from "@/lib/format/template";
-import { createCrmWriteAttempt, runCrmWrite } from "../../../shared/crm-write";
+import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { leadPath, parseLeadDetailResponse, type LeadDetail } from "../../lead-contract";
 import { LEAD_CREATE_LIMITS } from "../../lead-create-contract";
 import { buildLeadDetailsRequest, toLeadDetailsForm, type LeadDetailsForm } from "../lead-details-edit-contract";
@@ -57,7 +57,7 @@ export function useLeadDetailsEdit(lead: LeadDetail, canEdit: boolean, onSaved: 
     setSaving(true);
     setError(null);
     try {
-      const outcome = await runCrmWrite({ attempt: createCrmWriteAttempt(), method: "patch", path: leadPath(lead.id), body, parse: parseLeadDetailResponse });
+      const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body, parse: parseLeadDetailResponse });
       if (outcome.kind === "success") {
         onSaved(outcome.value);
         setDraft(null);

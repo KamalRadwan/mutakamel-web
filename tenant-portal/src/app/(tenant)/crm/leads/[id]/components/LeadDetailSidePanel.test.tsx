@@ -14,7 +14,7 @@ vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({
 vi.mock("@/components/audit/EntityHistoryCard", () => ({ EntityHistoryCard: (props: unknown) => {
   mocks.history(props); return <p>History content</p>;
 } }));
-vi.mock("./LeadActivitiesPanel", () => ({ LeadActivitiesPanel: (props: unknown) => {
+vi.mock("@/components/activities/RecordActivitiesPanel", () => ({ RecordActivitiesPanel: (props: unknown) => {
   mocks.activities(props); return <p>Activities content</p>;
 } }));
 vi.mock("../../../shared/components/RecordAttachmentsSection", () => ({ RecordAttachmentsSection: (props: unknown) => {
@@ -79,7 +79,7 @@ describe("Lead detail side panel", () => {
     mocks.arabic = true;
     const { container } = render(<LeadDetailSidePanel lead={lead} capabilities={capabilities} readOnly />);
     expect(screen.getByRole("tab", { name: ar.audit.historyTitle })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: ar.crmLeads.activities.title })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: ar.activities.title })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: ar.attachments.title })).toBeInTheDocument();
     expect(container.firstElementChild).toHaveAttribute("dir", "rtl");
   });

@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-09-18**
+Last source verification: **2026-09-24**
 
-Generated at: **2026-09-18T09:27:07.633Z**
+Generated at: **2026-09-24T17:25:53.707Z**
 
-Backend revision: `40c06870bc0c+dirty`
+Backend revision: `9bfe05e84b41+dirty`
 
 Owning app: **core-app**
 
-Routes: **224**
+Routes: **228**
 
 ## What this page is
 
@@ -49,7 +49,11 @@ browser code.
 | PATCH | `/api/tenant/core/v1/activities/:id` | `core.tenant.activities.update` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/activities/:id/cancel` | `core.tenant.activities.cancel` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/core/v1/activities/:id/complete` | `core.tenant.activities.complete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/core/v1/activities/:id/status` | `core.tenant.activities.status` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/activities/assignees` | `core.tenant.activities.assignees` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/activities/calendar` | `core.tenant.activities.calendar` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/activities/summary` | `core.tenant.activities.summary` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/core/v1/activities/targets` | `core.tenant.activities.targets` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/activity-types` | `core.tenant.activities.types` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/audit` | `core.tenant.audit.list` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/core/v1/audit/entities/:entityType/:entityId` | `core.tenant.audit.entity-history` | AUTHENTICATED | yes | TENANT_PORTAL |

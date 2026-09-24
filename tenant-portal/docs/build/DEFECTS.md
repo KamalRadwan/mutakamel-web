@@ -205,6 +205,8 @@ meaning.
 
 **Narrowed, not closed — deliberately deferred.** Phases 8A and 8B wired the `capabilities` endpoints for every screen they own, and 8A found the real cause: the three CRM capabilities routes are `BRANCH_REQUIRED`, and only the `branchId` *query parameter* was being sent, so the Gateway answered `400 GW.REQUEST.INVALID` and every control degraded silently to "unavailable". That is fixed. What remains is a backend gap, not a portal one: **`activities.update` is exposed by no capabilities endpoint at all**, so update and cancel still fall back to a scoped permission string — recorded as Q53.
 
+**Closed 2026-09-24.** The remaining half went with the screens it concerned: the CRM task, calendar and reminder screens are gone, and every activity surface now acts on Core's activity hub. Core's authority is decided per activity from data the row carries — `activities.<action>.all`, or the base key when the actor is the assignee or the creator — so the portal's admission can mirror it exactly, with no owner boundary left to guess ([permissions.md](../reference/permissions.md#activities-are-the-one-core-family-with-a-scope)). Q53 is superseded with it.
+
 `useLeads.ts` derives `canCreate` / `canUpdateLead` / `canDeleteLead` from
 `/auth/me` permission strings. CRM exposes per-branch `capabilities`
 endpoints that already account for branch **and owner** scope.
@@ -585,10 +587,22 @@ dictionary keys. Deferred deliberately — three Trade agents are appending to
 middle of theirs is how the `en.ts`/`ar.ts` divergence already broke typecheck
 repo-wide once today.
 
+**The activity four closed 2026-09-24.** `/crm/tasks`, `/crm/calendar` and
+`/crm/reminders` no longer exist — deleted with their route constants,
+`CRM_EXACT_PATHS` and `CRM_ENTRY_ROUTES` rows, so the proxy now sends them to
+`/unavailable` — and `/crm/activities` is the Activities workspace over Core's
+activity hub, the first row of the CRM Records nav (`nav.crmActivities`,
+admitted by Core `activities.read`). Landing order is unchanged: an actor whose
+only grant is `activities.read` lands there.
+
+**Still open for three:** `/crm/pipelines`, `/crm/opportunity-stages` and
+`/crm/outbound-emails` still have no nav row. The first two are reached from the
+Getting started checklist; outbound email is reachable by URL alone.
+
 Permissions to use, read off each screen's route rather than guessed:
 `crm.pipelines.read` for pipelines; **`crm.pipelines.manage` for
 opportunity-stages** — all five of its routes require `.manage`, including
-both GETs; `crm.activities.read` (scoped) for the other five.
+both GETs; `crm.activities.read` (scoped) for outbound emails.
 
 This is the same failure shape as [Q40](OPEN-QUESTIONS.md): a screen is
 complete, tested and green while nothing can reach it, because admission and
@@ -778,3 +792,30 @@ commit as the defect.
 Files: `src/app/(tenant)/crm/leads/hooks/useLeads.ts`,
 `src/app/(tenant)/crm/leads/page.tsx`,
 `src/app/(tenant)/crm/leads/components/CreateLeadsModal.tsx`
+
+## D26 — A view, page or sort switch could drop the screen's own URL keys · **fixed 2026-09-24**
+
+Written: **2026-09-24**
+
+**Severity: a filter the user just set could silently vanish from the address
+bar, and with it from the screen and from every link copied afterwards.**
+
+`useWorkspaceView.setView` and `useWorkspaceState`'s page and sort writes
+built the next URL from the render's `useSearchParams` snapshot and committed
+it with `router.replace`. The router commits only when its transition renders,
+so any other write landing in between — a screen writing its own keys through
+`history.replaceState`, as the Activities workspace does for its filters and
+calendar position — was overwritten by a URL built from the older query.
+
+Fixed by one writer for every workspace key: `replaceSearchParams`
+(`src/design-system/views/replace-search-params.ts`) reads
+`window.location.search` at the moment of the write and commits through
+`history.replaceState`, which Next keeps `useSearchParams` in step with. The
+view, page, sort and the Activities workspace's own keys all go through it, so
+each write builds on the last; a query change no longer costs a server round
+trip either. [views.md](../design/views.md#view-state).
+
+Files: `src/design-system/views/useWorkspaceView.ts`,
+`src/design-system/views/useWorkspaceState.ts`,
+`src/design-system/views/replace-search-params.ts`,
+`src/components/activities/workspace/activity-workspace-url.ts`

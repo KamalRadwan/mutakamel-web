@@ -3,7 +3,7 @@
 Status: **verified**
 
 Last source verification: **2026-08-31** (Trade section; CRM 2026-08-27, Core
-2026-08-28)
+2026-08-28, Core activities 2026-09-24)
 
 Source: `../backend/mutakamel-apps/crm-app/node_modules/@mutakamel/crm-app-common/dist/constants/permissions.d.ts`
 (package `0.0.1`), plus `@RequirePermissions` decorators on the owning
@@ -101,6 +101,8 @@ Two rules that are easy to get wrong:
 | `/crm/custom-fields` | `crm.custom_fields.read` |
 | `/crm/settings` | `crm.settings.read` |
 | `/crm/static-data-catalogue` | `crm.settings.read` |
+| `/crm/activities` | Core `activities.read`, exact — the workspace reads Core's activity hub, not a CRM route — **and** one of `crm.leads.read`, `crm.customer_profiles.read`, `crm.opportunities.read` (scoped): Core shows an activity only to an actor who may read its record, so without a CRM record read the workspace could never hold anything |
+| `/core/activities` | `activities.read`, exact |
 | `/core/authentication` | authenticated only |
 
 ## Capabilities outrank permission strings
@@ -158,11 +160,12 @@ controllers are the only source.
 
 Core uses a `group.resource.action` shape (three segments) where CRM uses
 `crm.resource.action`. Core permissions have **no `own`/`team`/`all` scope
-suffixes — do not apply CRM's scope-matching logic to them.**
+suffixes — do not apply CRM's scope-matching logic to them** — with one
+exception, below.
 
 | Group | Permissions |
 | --- | --- |
-| `activities` | `activities.assign` · `activities.cancel` · `activities.complete` · `activities.create` · `activities.read` · `activities.update` |
+| `activities` | `activities.assign` · `activities.cancel` · `activities.complete` · `activities.create` · `activities.read` · `activities.update` — plus the branch-wide `activities.read.all` · `activities.update.all` · `activities.complete.all` · `activities.cancel.all` |
 | `audit` | `audit.read` |
 | `branding` | `branding.manage` · `branding.read` |
 | `currencies` | `currencies.currency.manage` · `currencies.currency.read` |
@@ -182,10 +185,35 @@ admin-master routes that happen to live under `core-app/src/tenant/billing/`
 (`admin-tenant-billing.controller.ts`). A tenant user will never hold these.
 Never gate a tenant screen on one.
 
+### Activities are the one Core family with a scope
+
+`read`, `update`, `complete` and `cancel` each have an `.all` variant in the
+catalogue (`core-app/src/common/i18n/permission-catalog-i18n.ts`); `create` and
+`assign` have none. The `.all` keys guard **no route** — every activity route
+declares the base key in `@RequirePermissions`, matched exactly, which is why
+the grep below never finds them. `ActivityAuthorizerService` reads them per
+activity:
+
+- the base key acts on activities the actor is **assigned to or created**;
+- the `.all` key acts on **every activity in an authorised branch**;
+- the tenant owner may do anything.
+
+So route admission for `/core/activities` is the exact `activities.read`, and
+for `/crm/activities` that plus a read on some CRM record type. The portal's
+per-activity admission — which lifecycle actions a row, a card or the modal
+offers — is the exact `activities.<action>` (the route's guard), plus either
+`activities.<action>.all` or being the assignee or the creator: `.all` alone is
+refused at the guard, so it offers nothing. `activities.create` and the
+assignee picker's `activities.assign` are likewise matched exactly. It is
+advisory: Core decides, and the table of who may do what is in
+[core-directory.md](../api/core-directory.md#who-may-act-on-which-activity).
+
 ### What the portal uses today
 
-Only `notifications.notification.read` — for the topbar dropdown. Everything
-else in this table belongs to a screen that is not built.
+`notifications.notification.read` for the topbar dropdown, each built Core
+screen's read key for route admission (`CORE_ENTRY_ROUTES` in
+`lib/navigation/tenant-routes.ts`), and the activity keys above for the
+activity workspaces, the activity modal and the record panels.
 
 `/core/authentication` requires **no permission**; the session routes are
 self-scoped, so any authenticated user manages their own sessions.

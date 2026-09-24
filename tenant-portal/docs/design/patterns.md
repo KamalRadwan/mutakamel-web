@@ -43,7 +43,7 @@ only when no pattern fits.
 | `Timeline` | `timeline/` | Audit history, stage history, delivery attempts, approval ladders |
 | `PersonProfileLink` | `person-profile/` | A name opens a reusable contact card: photo, full name, phone, email |
 | `AttachmentList` | `attachment-list/` | Stored attachments plus the upload affordance |
-| `ActivityList` | `activity-list/` | Reusable activity cards with permission-gated row actions |
+| `ActivityList` | `activity-list/` | Reusable activity cards: a row can open its activity, and each row's actions are gated per row |
 | `EditDrawer` | `edit-drawer/` | The **edit** counterpart to `FormDrawer`, which is create-only |
 | `DeletionBlockerDialog` | `deletion-blocker/` | A 409 with reasons — the list of blocking children |
 | `AtomicReplacementConfirm` | `atomic-replacement/` | The pre-write diff for a full-replacement `PUT` |
@@ -253,13 +253,23 @@ interface FilterBarProps {
 | --- | --- | --- |
 | `select` | `Select` | `{ value: string }` |
 | `multiSelect` | `MultiSelect` | `{ values: string[] }` |
-| `dateRange` | `DateRangePicker` with the six presets | `{ from?: string; to?: string }` — **ISO strings** |
+| `dateRange` | `DateRangePicker` with the def's `presets` — by default the six backward ones | `{ from?: string; to?: string }` — **ISO strings** |
 | `numericRange` | two `Input type=number` | `{ min?: string; max?: string }` — **decimal strings** |
 | `boolean` | `Switch` | `{ value: true }` |
 
 **Every leaf is a string.** Filter state lives in the query string, a decimal
 bound must not be `Number()`d, and an ISO date has to survive a pasted link
 exactly as written. `dateRange` converts to `Date` only at the picker boundary.
+
+A `dateRange` def may name its own `presets` — which ones, in which order —
+from `DateRangePresetId`: the six backward-looking ranges (`today`,
+`last7Days`, `last30Days`, `last90Days`, `thisMonth`, `thisQuarter`) plus the
+forward ones a schedule needs (`thisWeek`, `next7Days`, `next30Days`), with a
+`weekStartsOn` that places "this week". `presetLabels` is keyed by the offered
+ids only. Omitting `presets` keeps the six backward ones, so every screen built
+before the forward presets existed renders exactly as it did; the Activities
+workspace offers `today`, `thisWeek`, `next7Days`, `next30Days`, `thisMonth`,
+`last7Days`, `last30Days`.
 
 A `boolean` filter that is switched off **clears** rather than storing `false`:
 `?archived=false` and "no archived filter" are the same query, and storing one
@@ -467,21 +477,194 @@ verified contract exposes those fields. See
 ## ActivityList
 
 `density="compact"` uses 6px card padding, 4px list gaps, and the shared
-`text-xs` subject size. Both lead activity surfaces can select it without
-forking row markup or altering action permissions. Default is standard.
+`text-xs` subject size. Default is standard.
 
 `ActivityList<T>` is the API-free card template for open work. Import it from
-`@/design-system`; never import a Lead feature component into another app.
-Pass rows with `id`, `subject`, `dueAt`, plus `describe(row)` for localized
-type/priority/date/action labels and priority tone. The template renders wrapped
-subjects, a labelled priority badge, type/date and one overflow menu. Loading,
-error and empty states live in the same template.
+`@/design-system`. Pass rows with `id`, `subject`, `dueAt`, plus
+`describe(row)` for localized type/priority/date/action labels and priority
+tone. The template renders wrapped subjects, a labelled priority badge,
+type/date and one overflow menu. Loading, error and empty states live in the
+same template.
 
-The caller supplies `canEdit`, `canComplete`, `canDiscard`, `pendingId`,
-`editingId` and row callbacks. Permissions, queries, confirmation, modal state,
-optimistic version and idempotency stay outside the template. Discard means
-cancel, never delete. `LeadActivityList` supplies CRM's labels and formatting;
-both `LeadActivityDialog` and `LeadActivitiesPanel` reuse it.
+Two opt-in additions, both backward compatible (updated 2026-09-24):
+
+- **`onOpen(row)`** makes each row's subject and schedule one activation
+  surface — a `Button` named by the subject (`aria-labelledby`) and described
+  by the schedule (`aria-describedby`), so a screen reader hears the activity
+  first rather than one run-on string. It is a Tab stop and answers Enter and
+  Space. The priority badge and the overflow menu stay outside it, so no
+  control is ever nested inside another. Without `onOpen` the row is text.
+- **Per-row admission.** `canEditItem(row)`, `canCompleteItem(row)` and
+  `canDiscardItem(row)` answer "may the actor do this to THIS activity" — the
+  assignee-or-creator rule a list-wide switch cannot express — and take
+  precedence over `canEdit` / `canComplete` / `canDiscard`. A menu entry exists
+  only when both its handler (`onEdit`, `onComplete`, `onDiscard`) and its
+  permission do, and a row with no entry has no menu at all.
+
+Permissions, queries, confirmation, modal state, optimistic version and
+idempotency stay outside the template. `pendingId` disables every row's menu
+while a write is in flight; opening a row stays available, because it writes
+nothing. Discard means cancel, never delete. The activity template's agenda
+and `RecordActivitiesPanel` (below) are its callers.
+
+## The activity template
+
+Added **2026-09-24**. `src/components/activities/` is the ONE activity module
+of the portal — wire contract, parsers, form model, commands and the modal —
+used by the Activities workspace (CRM and Core), the Leads, Customers and
+Opportunities screens, every record side panel, and later Trade. It lives in
+`src/components/` because three apps share it: it may import
+`@/design-system`, `@/lib/*`, `@/i18n/*`, `@/context/*` and `@/hooks/*`, never
+`@/app/*`. Every string is in the `activities` dictionary namespace.
+
+### ActivityModal — create, view and edit
+
+One `FormModal size="card"` whose props change with the screen, so moving
+between view and edit never remounts the dialog:
+
+```ts
+type ActivityModalRequest =
+  | { kind: "create"; target?: ActivityTargetSelection; agenda?: boolean; defaults?: { type?: ActivityType; start?: Date } }
+  | { kind: "view"; activity: Activity }   // snapshot at once, refreshed from GET activities/:id
+  | { kind: "edit"; activity: Activity };  // straight into edit — a row's "Edit"
+
+interface ActivityModalProps {
+  request: ActivityModalRequest | null;    // null = closed
+  scope: "CRM" | "ALL";                    // which record types the picker offers
+  branchId?: string | null;                // narrows the record picker; null = every branch
+  onClose: () => void;
+  // After any write that changed, or may have changed, an activity: Core's copy,
+  // or null when it could not be read — an answer lost, an unknown outcome let go.
+  onChanged: (activity: Activity | null) => void;
+}
+```
+
+| Screen | Title / description | Body | Footer |
+| --- | --- | --- | --- |
+| Create | "New activity" / "For {record}" when the record is fixed | the record's open activities when `agenda` and a fixed record, then the form | "Save activity" (primary) · "Save and add another" · Cancel |
+| View | the subject / type · record, with the status badge | `ActivityDetails` | "Mark as done" (primary) · Cancel activity · Start or Move back to scheduled · Edit · Close |
+| Edit | "Edit activity" / "For {record}", with the status badge | the form, without the status control or the record picker | "Save changes" (primary) · Cancel |
+
+- **The type drives the form.** Seven icon + label tiles pick it. TODO,
+  FOLLOW_UP and OTHER are *due* at one moment; CALL, MEETING and VISIT *start*
+  and may end (30, 60 and 60 minutes by default); MEETING and VISIT take a
+  location, CALL and MEETING a meeting link, CALL and EMAIL a direction. A
+  field the type hides is never sent on create. On edit, changing the type
+  clears what the new type does not carry; a value the type never showed — one
+  another client wrote — is left alone, since the user was never shown it, and
+  a hidden end moves with the start so Core never refuses a window the form
+  cannot show. Start and end are a `DatePicker` plus a time input in
+  the viewer's own zone, turned into instants with local `Date` constructors —
+  never by slicing an ISO string. Moving the start carries the end with it.
+- **A new activity** starts at the next half hour (or the calendar slot that
+  was clicked), Scheduled, priority Normal. The status control exists on create
+  only, and only when there is a choice: In progress needs `activities.update`,
+  Completed — logging a past activity, with an optional outcome — needs
+  `activities.complete`. After creation a status changes only through the
+  lifecycle actions.
+- **"Save and add another"** submits the real form, so the first invalid field
+  still takes focus; it keeps the type, record, assignee and status, clears
+  the rest and stays open.
+- **The record picker** — a create with no fixed record — is a record-type
+  `Select` limited by `scope`, then a `Combobox` over `GET activities/targets`:
+  only records the actor could book on right now, narrowed by `branchId`,
+  searched 300 ms after typing stops, every search aborting the one before.
+  **The assignee** is a `Combobox` over `GET activities/assignees` once a record
+  is chosen, for an actor holding `activities.assign`; otherwise the default
+  reads back — "Me" on create, the current assignee on edit.
+- **Validation mirrors Core** — required title and record, lengths, an end
+  after the start and at most 14 days later, an http(s) link, a scheduled start
+  in the future, a completed start no more than 5 minutes ahead — and speaks
+  per field on blur. Core stays authoritative. Lengths count characters as
+  Core's `@MaxLength` and `varchar` do (`activityTextLength`), not UTF-16 units,
+  in the form and in the response parsers alike: an emoji is one character, so
+  a title Core stored at its limit still parses and still saves. An edit sends
+  only what changed; a cleared optional is `null`.
+- **An edit saves against the copy it shows.** The form remembers the copy it
+  was filled from — the base of its diff and the version its save sends in
+  `If-Match`. When `GET activities/:id` answers with a newer copy before the
+  user has typed, the form refills from it; once they have typed it keeps its
+  base, so a save over someone else's change answers `409` and their edits are
+  rebased onto the newer copy in front of them — never written over it
+  silently.
+- **Admission is absent, not disabled — for actions.** Create needs
+  `activities.create` itself. An action on an activity needs
+  `activities.<action>` itself — the route's guard matches the base key
+  exactly, so `.all` alone opens nothing — plus either `activities.<action>.all`
+  or being its assignee or creator, and an open status; Start and Move back use
+  `update`. Filing a new activity as In progress or Completed accepts either
+  scope, because the service checks it for the activity's own creator. Choosing
+  an assignee reads `GET activities/assignees`, whose guard wants
+  `activities.assign` itself. The tenant owner may do everything, a read-only
+  access mode (`useAccessMode().canMutate`) nothing. All of it is advisory.
+- **A form that cannot be saved is locked and says why.** Opened without the
+  right — a create without `activities.create`, an edit of an activity that has
+  since finished or that the actor may not edit, or any form under a read-only
+  access mode — the form stays readable, every control is disabled, and a
+  `DegradedBanner` above it gives the reason ("You do not have permission to add
+  activities.", "This activity is already completed or cancelled.", the
+  read-only notice). An activity that is gone says so through the error slot.
+- **Getting back.** Close on a view opened from the agenda returns to the
+  create form, draft intact. Cancel, X or Esc in edit returns to view when edit
+  was opened from view, else closes — the dirty guard asks first either way. A
+  successful edit returns to view with the saved activity.
+- **Results.** A success raises a toast and calls `onChanged`. A refusal is
+  translated by its code (`activities.errors`) into the footer's error slot,
+  falling back to `formatApiErrorMessage`; a 403 adds nothing, because the
+  transport has already toasted it. `409 ACTIVITY_VERSION_CONFLICT` and
+  `ACTIVITY_TERMINAL` re-read the activity (`GET activities/:id`), show the
+  message and keep the user's edits, rebased so the next save sends only their
+  changes against the new version. An unknown outcome replaces the body with
+  `AmbiguousOutcomePanel` — operation, idempotency key, reference — whose Retry
+  replays the same key and whose Dismiss re-reads, the host's lists included
+  (`onChanged(null)`), as does closing the modal on it. A dismissed create keeps
+  its key: saving the same body again replays it, so if the first one landed
+  Core answers with it instead of creating the activity twice. A write that
+  applied but whose reply cannot be read never offers Save again, and calls
+  `onChanged(null)` so the screens behind read it for themselves.
+- **The view** shows the type, priority and direction, when (date and time
+  range, marked Overdue or Due today while open), the related record (a portal
+  link for leads, customers and opportunities — the server's `route` is never
+  followed), the assignee, location, a "Join meeting" link (http(s) only,
+  `target="_blank" rel="noopener noreferrer"`), notes, the outcome or the
+  cancellation reason, and when it was created, updated, completed or
+  cancelled.
+
+### ActivityOutcomeDialog
+
+Ends an activity through `ReasonDialog`. **Complete**: "Complete this
+activity", an optional Outcome (≤ 2000), confirm "Mark as done". **Cancel**:
+destructive, "Cancel this activity", an optional Reason (≤ 2000), confirm
+"Cancel activity". Nothing is deleted — a cancelled activity stays on its
+record.
+
+It is presentational — `{ open, mode, onClose, onConfirm(text), loading?,
+error? }` — and its host runs the write through `useActivityCommands`, usually
+via `useActivityOutcome`. `useActivityCommands` holds one write at a time: while
+a write is in flight or its outcome is unknown, `busy` is true, the unresolved
+write's activity is `pendingActivityId`, and no other write starts — every host
+disables its menus and drags on `busy`, and the hook refuses a press that lands
+before that render — so a later write can never take an unresolved one's place
+and lose its key. A refusal stays inside the dialog so the typed note
+survives it; every other answer closes it, and an unknown outcome is shown by
+the host in-body with its key. Mount it beside the host's own dialog, never
+inside it.
+
+### RecordActivitiesPanel
+
+The activity section of a record's detail side panel:
+`{ target: ActivityTargetSelection; readOnly: boolean; onChanged?: () => void }`.
+A compact `DetailSection` titled "Activities", with "New activity" when the
+actor holds `activities.create` and the page is not read-only; the record's
+open activities — every page, soonest first — as an `ActivityList` whose rows
+open the activity and whose menus offer Edit, Mark as done and Cancel activity
+per row; and "View all activities", the Activities workspace filtered to the
+record (`/crm/activities?targetApp=CRM&targetType=LEAD&targetId=…`; a record of
+another app opens Core's workspace). It hosts its own `ActivityModal` and
+`ActivityOutcomeDialog`, reloads after every write — including one whose
+answer was lost, and a dismissed unknown outcome — and on a realtime resync,
+and renders `PermissionGate` rather than an empty list when activities cannot
+be read. "View all activities" opens the workspace on its table.
 
 ## AttachmentList
 

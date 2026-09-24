@@ -2,7 +2,8 @@
 
 Status: **Specification**
 
-Written: **2026-08-27** · Contract section rewritten: **2026-08-31** (Phase 2)
+Written: **2026-08-27** · Contract section rewritten: **2026-08-31** (Phase 2) ·
+Calendar view added: **2026-09-24**
 
 Implementation: `src/design-system/views/`
 
@@ -13,6 +14,14 @@ views: `board`, `card`, `table`.** Same data, same filters, same permissions,
 same empty and error states — three presentations of one workspace.
 
 A screen implements all three or none. There is no "table only for now".
+
+**The rule is about those three record workspaces.** Activities is the one
+**time-based** workspace, and it renders `calendar`, `board` and `table`: a
+calendar because an activity is a thing with a time, a board because its status
+moves, and a table because it is the list a keyboard and a screen reader can walk
+end to end. It has no card view — a grid of activity cards says nothing a
+calendar day does not. See [Calendar view](#calendar-view) and
+[Activities](#activities--the-time-based-workspace).
 
 ## Naming — "Kanban" is dead
 
@@ -165,7 +174,12 @@ re-implements one.
   the URL.
 - **Search.** One search input; debounced 300ms; `q` in the URL.
 - **Branch scope.** One `TenantBranchSelect`. Every CRM read is branch-scoped —
-  `branchId` is a **required** query parameter on all three list endpoints.
+  `branchId` is a **required** query parameter on all three list endpoints, so
+  `useTenantBranchSelection` falls back to the actor's primary branch. A screen
+  whose reads narrow by branch only when asked passes
+  `useTenantBranchSelection(user, { optional: true })` and
+  `<TenantBranchSelect allowAll />`: it opens on "All accessible branches"
+  (`null`, no `branchId`), offered first in the list.
 - **Permissions.** Action visibility comes from the screen's `capabilities`
   endpoint, not from guessing at `/auth/me` strings. See
   [api/crm-leads.md](../api/crm-leads.md#get-leadscapabilities).
@@ -176,13 +190,32 @@ re-implements one.
 ## View state
 
 ```ts
-export type WorkspaceView = "board" | "card" | "table";
+export type WorkspaceView = "board" | "card" | "table" | "calendar";
+export type RecordWorkspaceView = Exclude<WorkspaceView, "calendar">;
 ```
 
+- **Each screen offers its own set.** `ViewSwitcher`, `useWorkspaceView` and
+  `useWorkspaceState` are generic over it. A record workspace names no set and
+  gets `RECORD_WORKSPACE_VIEWS` — board, card, table — which is why every call
+  site that predates the calendar compiles unchanged. Activities passes
+  `views: ["calendar", "board", "table"]`, and `view`, `setView` and the
+  switcher's `labels` are then typed to exactly that set: a label missing for
+  an offered view does not compile, and neither does a `defaultView` outside it.
+  A `?view=` or stored value the screen does not offer falls back like any
+  unknown value.
 - **URL is the source of truth**: `?view=board`, plus `?page=`, `?sort=` and
   `?dir=`. Deep links and refresh must land on the same view *and the same
   place in it*. `useWorkspaceState` owns all four; a view switch never resets
   any of them.
+- **Every write goes through `replaceSearchParams`** (`views/replace-search-params.ts`):
+  built from `window.location.search` at the moment of the write and committed
+  with `window.history.replaceState`, never `router.replace` from a
+  `useSearchParams` snapshot. The router commits a URL only when its transition
+  renders, so two writes in one event — or a screen's own filter write and a
+  view switch — would each start from the same old query and the later one
+  would drop the earlier. Next keeps `useSearchParams` in step with
+  `replaceState`, and a query change costs no server round trip. A screen that
+  keeps its own keys in the URL writes them through the same function.
 - **Selection deliberately stays out of the URL.** It is an unbounded set of
   ids. It lives in `useWorkspaceState`, above the view switch, which is what
   it has to survive.
@@ -191,6 +224,7 @@ export type WorkspaceView = "board" | "card" | "table";
   restore from storage, else fall back to the screen default.
 - **Defaults**: Leads → `board`. Opportunities → `board`. Customer
   Profiles → `table` (a customer list is a directory, not a funnel).
+  Activities → `calendar`.
 - Storage reads and writes go through `safeStorage` and must survive a throwing
   or absent `localStorage`.
 
@@ -228,6 +262,9 @@ the same bar's `actions` region, with the rest of the screen's controls.
 </PageActions>
 ```
 
+`available` is the screen's own set, in the order drawn — Activities passes
+`["calendar","board","table"]` — and `labels` must name exactly those views.
+
 See [shell.md](shell.md#it-holds-the-screens-controls).
 
 | View | Icon | `t.views.*` |
@@ -235,6 +272,7 @@ See [shell.md](shell.md#it-holds-the-screens-controls).
 | `board` | `Columns3` | `t.views.board` |
 | `card` | `LayoutGrid` | `t.views.card` |
 | `table` | `Rows3` | `t.views.table` |
+| `calendar` | `CalendarDays` | `t.views.calendar` |
 
 Rules:
 
@@ -247,6 +285,25 @@ Rules:
   one control, and one of the clearest examples of the problem this system
   removes.
 - Arrow keys move between options; the group is one tab stop.
+
+### A link after the switcher — `WorkspaceLink`
+
+Leads, Customers and Opportunities each put one more icon **after** the
+switcher, in the same `view` slot: `ActivitiesWorkspaceLink`
+(`src/components/activities/`), which draws the design-system `WorkspaceLink`.
+It opens the Activities workspace narrowed to that list's record type —
+`/crm/activities?targetApp=CRM&targetType=LEAD` (`CUSTOMER_PROFILE`,
+`OPPORTUNITY`), shown there as the removable "Related to: Leads" chip.
+
+- It wears the switcher's frame (bordered `bg-card`, 28px target) so the two
+  read as one cluster, but it is a **link, never a radio**: a radio promises
+  another drawing of the same records, and this leaves for other records.
+- Icon `ListChecks` — the Activities glyph the nav uses (one glyph per concept).
+  `aria-label` and `Tooltip` carry "Lead activities" / "أنشطة العملاء المحتملين"
+  and their customer and opportunity counterparts (`t.activities.workspaceLinks`).
+- Admitted by the same rule as the nav's Activities item
+  (`canAccessCrmRoute(…, TENANT_ROUTES.crmActivities)`), so it is absent rather
+  than a link to a refusal.
 
 ## Board view
 
@@ -624,6 +681,192 @@ Also owned by `DataTable`, and added in Phase 2:
 - Numeric and currency columns are `tabular-nums` and align to the inline end.
 - Every column header is translated; no raw field names reach the UI.
 
+## Calendar view
+
+```
+src/design-system/views/calendar/
+  CalendarView.tsx       the public component: toolbar, states, the grid for the mode
+  CalendarMonthGrid.tsx  six fixed weeks
+  CalendarTimeGrid.tsx   week and day: hour rows, items placed by time
+  CalendarToolbar.tsx    previous / today / next, the range title, Month · Week · Day
+  CalendarItem.tsx       the activation surface around the caller's content
+  calendar-range.ts      calendarRange, calendarWeekStart — public
+  calendar-layout.ts     overlap lanes, wall-clock minutes
+  calendar-format.ts     every date string the calendar draws, through Intl
+  useCalendarFocus.ts    the grid's single roving tab stop
+  useScrollToHour.ts · useNow.ts
+```
+
+It keeps the workspace rules — it never fetches, never reads the dictionary
+(every string arrives in `labels`), never knows which entity it renders, never
+owns a mutation — but **not** `WorkspaceViewProps`. A calendar's range is its
+paging and time is its order, so it takes no `page`, `sort` or `selection`, and
+it takes the range's anchor and mode instead:
+
+```ts
+interface CalendarViewProps<T> {
+  mode: CalendarMode;                        // "month" | "week" | "day"
+  onModeChange: (mode: CalendarMode) => void;
+  anchor: Date;                              // any instant inside the period on show
+  onAnchorChange: (anchor: Date) => void;
+  weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  items: T[];
+  itemKey: (item: T) => string;
+  itemStart: (item: T) => Date;
+  itemEnd: (item: T) => Date | null;         // null = a point in time
+  renderItem: (item: T, layout: "month" | "timed") => ReactNode;  // content only
+  itemLabel: (item: T) => string;            // the surface's accessible name
+  itemClassName?: (item: T) => string | undefined;                // tone, semantic tokens only
+  onItemActivate?: (item: T) => void;
+  onSlotActivate?: (start: Date) => void;    // omitted = no create affordance
+  isLoading: boolean;
+  error?: NormalizedApiError | null;
+  onRetry?: () => void;
+  emptyState?: ReactNode;
+  toolbarEnd?: ReactNode;                    // e.g. a truncation notice
+  labels: CalendarViewLabels;                // incl. moreItems(count), modeLabel, slotLabel?(start)
+  className?: string;
+}
+```
+
+**The range is a function, and the screen fetches exactly it.**
+`calendarRange(mode, anchor, weekStartsOn)` returns `[start, end)` as the local
+starts of their days: 42 days for a month, 7 for a week, 1 for a day. The month is always
+six whole weeks, so the grid keeps one height from February to August — and the
+days it draws from the neighbouring months are inside the range, so their items
+are fetched rather than silently missing.
+
+**A day starts where the calendar says, not 24 hours after the last.** Every
+day boundary — the range's end, the grid's days, a column's end — comes from
+`calendarDayStart(day, offset)`, which builds the date from its parts. Stepping
+with date-fns `addDays` keeps the time of day, and where daylight saving starts
+at midnight — Cairo's last Friday of April, whose day begins at 01:00 — every
+later day would begin at 01:00 too, handing each night's first hour to the day
+before. The Activities workspace's summary day and due-date range use the same
+function.
+
+**The week starts where the reader's locale says.** `calendarWeekStart(language)`
+reads CLDR's week data from `Intl.Locale` (`getWeekInfo()`, or the older
+`weekInfo` accessor) for `INTL_LOCALE[language]`: Saturday for `ar-EG`, Sunday
+for `en-US`, with those two as the fallback where a browser exposes no week
+data. Not date-fns — its `ar-EG` locale says Sunday. Pass the same value to a
+`dateRange` filter's `weekStartsOn`, or "This week" and the calendar disagree.
+
+**Every date is `Intl` with `INTL_LOCALE`**, Arabic names with Western digits:
+"September 2026", "Sep 20 – 26, 2026" (`formatRange`, which writes both months
+out when a week crosses one), "Thursday, September 24, 2026".
+
+### Month
+
+Six weeks of seven days under a weekday header. Days outside the anchor's
+month take `bg-muted/40`; today is marked by **weight and a hairline ring,
+never a hue** — the date picker's rule, because a date is an identity, not an
+outcome — and carries `aria-current="date"`.
+
+- A day shows **up to three** items, then **"+N more"**, which opens that day.
+  A fixed count keeps every week the same height; the rows are at least
+  `8.5rem`, and a pane too short for six of them scrolls inside the grid.
+- The **date number is a button** that opens the day. The first of each month
+  adds the month's short name beside it, as a caption and not as the button's
+  text: the button's name is the whole date, and "Oct 1" is not contained in
+  "October 1" (WCAG 2.5.3, label in name).
+- An item spanning several days shows on each of them; a point in time belongs
+  to the day it falls on, and an item ending at midnight does not spill over.
+- **A click in a day's empty space** proposes that day at 09:00. It is pointer
+  only on purpose: its keyboard route is the date button, which opens the day
+  and its half-hour targets.
+
+### Week and day
+
+48px an hour under a **sticky day header**, beside a **sticky hour gutter**. The
+grid opens at the current hour when today is on screen and at 07:00 otherwise —
+once, on mount, instantly; after that the scroll position is the user's, and it
+survives a switch between week and day.
+
+- Items are placed by start and end, **clamped to the day**; a two-day visit
+  draws on both. Positions are **wall-clock** minutes, not elapsed ones, which
+  differ by an hour on a daylight-saving day while the hour labels do not.
+- **Nothing is drawn shorter than half an hour** — 24px, the WCAG 2.2 target
+  floor. A point in time is drawn that tall, and one late in the day is pinned
+  inside it rather than run off the bottom.
+- **Overlapping items share the width as lanes**, first come first served. A
+  run of transitively overlapping items is one cluster; lanes are shared
+  within a cluster and never across two, so an early clash does not narrow
+  the rest of the day, and a block widens into lanes nothing it overlaps uses.
+  Offsets are `insetInlineStart`, so the lanes mirror with the page.
+- A **neutral "now" line** (`bg-foreground`, never a hue) crosses today.
+- With the create pair supplied, every half-hour is a target — a `Button`
+  named by `labels.slotLabel(start)`. **Supply `onSlotActivate` and
+  `slotLabel` together or neither**: a target nobody can name is not offered,
+  so without the label there is no create affordance at all.
+- In a week, each day's heading is a button that opens the day. Seven columns
+  take at least 7 × 112px; narrower than that the grid scrolls sideways rather
+  than squeezing an activity under a readable width.
+
+### Items
+
+`renderItem` draws the content; the **view owns the surface** around it — a
+`Button`, so focus, Enter and Space come from the primitive. `itemLabel` is
+that surface's accessible name and it must say **when and in what state** in
+words: the grid conveys the time by position, and a position is not a name.
+`itemClassName` paints the surface in semantic tokens only — never geometry,
+because a block's size is its duration — and a type never takes a hue
+([tokens.md](tokens.md#activity-due-state--derived-not-an-enum)). Without
+`onItemActivate` an item is not focusable and keeps its name as screen-reader
+text.
+
+### Keyboard and semantics
+
+- **One tab stop for the whole grid.** A week offers 336 half-hour targets; as
+  tab stops they would bury everything after the calendar. `useCalendarFocus`
+  keeps one roving stop and moves it with the arrows.
+- **Up / Down** move through a day, top to bottom — in the time grid by time,
+  heading first; in the month they run on into the week above or below.
+  **Left / Right** move to the neighbouring day at the same time of day, and
+  **follow the screen**: under RTL the next day is to the left. **Home / End**
+  jump to the first or last day of the row. Enter and Space are the buttons'
+  own. A stop that disappears — reloaded away, another period — hands the tab
+  stop back to today, or the anchor's day.
+- `role="grid"` → `row` → `columnheader` / `gridcell`, labelled by the range
+  title. **Days are named on their date buttons (month) and their column
+  headers (week, day), not on the cells**: a label on a cell replaces its
+  contents for a reader walking the table, which would hide the activities in
+  it.
+- Items and slots scroll clear of the sticky header and gutter
+  (`scroll-mt-12` / `scroll-ms-14`), so a focused control is never behind the
+  chrome that stays put (WCAG 2.2 focus-not-obscured).
+- The range title is a polite live region: stepping through periods is
+  announced as the new period.
+
+### States
+
+The toolbar stays in every state, so the reader can always move to another
+period. Every state below it owns the full height of the pane.
+
+| State | Rendering |
+| --- | --- |
+| Loading | A skeleton shaped like the grid — 42 cells, 7 columns or 1 |
+| Error | `ErrorState` with retry, in the grid's frame |
+| Empty | The grid, **with a notice over it** (`role="status"`) — `emptyState`, or `EmptyState` with `labels.emptyTitle` |
+
+The empty notice floats over the grid instead of replacing it: an empty week is
+still a week to plan into, and a grid that stays put does not jump as the user
+pages between empty and busy periods. Only the notice takes the pointer. Keep
+an `emptyState` compact — one line and at most one action.
+
+### What it does not do
+
+- **No motion** beyond the budget: no month slide, an instant scroll, and a
+  "now" line that moves once a minute without animating.
+- **No server-rendered "today".** The clock is read through
+  `useSyncExternalStore` (`useNow`), and the server snapshot is empty: the
+  server's time zone is not the reader's, and a "today" drawn there could fail
+  hydration. The client marks today on its first pass.
+- **Opening a day is two callbacks.** "+N more", a date and a week heading call
+  `onAnchorChange` and then `onModeChange` in the same event. A screen that
+  keeps both in the URL must build each write from the current query, not
+  from one read at render, or the second write drops the first.
+
 ## Per-screen configuration
 
 The only per-screen code. Everything above is shared.
@@ -682,7 +925,7 @@ Activities are **Core's** resource. `POST /api/tenant/crm/v1/activities` files
 `DONE` rows — a log of what happened — so planned work goes to Core's route,
 which is `idempotent: true` in the Gateway contract and therefore refuses a
 write without a UUIDv7 `x-idempotency-key`. One key per Save press, reused
-across the transport's retries of that press — `crm/shared/crm-write.ts`,
+across the transport's retries of that press — `lib/api/idempotent-write.ts`,
 rule 1. A fresh key per retry books the activity twice. A successful create re-reads
 both halves: the dialog's list, and the board, whose `nextActivity` bucket the
 server owns.
@@ -849,13 +1092,17 @@ newest first." sentence. Timeline entries and empty/error feedback remain unchan
 Returning to History remounts its reader; committed lead changes still pass the
 whole `lead` object as the refresh token and preserve related Party IDs.
 
-Activities shows **all open (`PLANNED`) activities**, soonest due first, using
-the same compact cards as the lead card-view activity modal. Both consume the
-reusable design-system [`ActivityList`](patterns.md#activitylist) through
-`LeadActivityList`; do not copy its markup into another screen. Each card has
-subject, priority, type, due date and the existing permission-gated row menu:
-Edit opens the existing modal prefilled with that row, Mark as done completes
-it, and Discard confirms cancellation. Successful writes reload the open list.
+Activities is the shared `RecordActivitiesPanel`
+([the activity template](patterns.md#the-activity-template)), the same panel the
+customer-profile and opportunity side panels render. It lists the record's
+**open activities** (`PLANNED` and `IN_PROGRESS`), soonest due first, through the
+design-system [`ActivityList`](patterns.md#activitylist); do not copy its markup
+into another screen. **New activity** opens `ActivityModal` with the record
+fixed; a row opens that activity; each row's menu offers Edit, Mark as done and
+Cancel only where the actor may perform them on that activity. **View all
+activities** opens the Activities workspace's table filtered to this record,
+across every branch. Successful writes reload the open list, and so does a
+write whose answer was lost or whose unknown outcome the user dismissed.
 
 Attachments contains the record's full attachment list, with **Add attachment**
 above it and a named download icon for every file. It uses
@@ -1024,6 +1271,157 @@ Consequences you must design for:
   source, owner name/avatar, activity and tags. Table view renders those values
   directly and keeps the customer link on the real customer-profile id.
 
+### Activities — the time-based workspace
+
+Added **2026-09-24**. One `<ActivitiesWorkspace scope />`
+(`src/components/activities/workspace/`) serves both routes, over Core's
+activity hub. It hosts the page's one template `ActivityModal` and one
+`ActivityOutcomeDialog`; hooks hold the state and the reads
+(`workspace/hooks/`), components hold the markup.
+
+| | |
+| --- | --- |
+| Routes | `/crm/activities` (scope `CRM`: every read carries `targetApp=CRM`, and the record picker offers CRM record types only) · `/core/activities` (scope `ALL`) |
+| Views | `calendar` · `board` · `table` — no card view |
+| Default view | `calendar`, persisted per scope — `useWorkspaceState("activities-<scope>", { views })` |
+| Branch | `TenantBranchSelect allowAll` over `useTenantBranchSelection(user, { optional: true })`: **optional** here, and the workspace opens on "All accessible branches" — no `branchId`, every branch the viewer can see — so a record's "View all" finds it whichever branch it sits in. A chosen branch narrows every read and the modal's record picker |
+| KPI strip | `GET /api/tenant/core/v1/activities/summary` — see [the KPI strip](#activities-the-kpi-strip) |
+| Calendar data | `GET /api/tenant/core/v1/activities/calendar?from=&to=` for `calendarRange(mode, anchor, weekStartsOn)`; at most 500 items, and a `truncated` answer puts a notice in `toolbarEnd` |
+| Board axis | `ActivityStatusEnum`, fixed: `PLANNED` · `IN_PROGRESS` · `DONE` · `CANCELLED` — each lane pages `GET /activities?statuses=<status>` |
+| Move | `PLANNED` ↔ `IN_PROGRESS`: `POST /activities/:id/status`, optimistic with rollback. Into `DONE` / `CANCELLED`: through `confirmMove` to the complete / cancel dialog. A finished activity never drags |
+| Table data | `GET /api/tenant/core/v1/activities`, 25 a page, sorted by `dueAt` on the server |
+| Filters | search, type, status, priority, assigned to me, overdue only, due date — the due-date range is hidden in the calendar, whose navigation owns the range |
+| Due-date presets | `today`, `thisWeek`, `next7Days`, `next30Days`, `thisMonth`, `last7Days`, `last30Days`, with `weekStartsOn: calendarWeekStart(language)` — see [primitives.md](primitives.md#daterangepicker-presets) |
+| Calendar chip | Type icon ([icons.md](icons.md#activity-types)) · time · subject · related record; toned by due state, never by type |
+
+The status filter narrows the board's columns as well as its cards: a status
+nobody asked for is not drawn as an empty lane.
+
+#### Activities: the URL
+
+Every key below belongs to the workspace; `view`, `page`, `sort` and `dir`
+stay `useWorkspaceState`'s. A filter or search change also drops `page` — a new
+result set starts on page 1 — and touches nothing else.
+
+| Key | Holds | Notes |
+| --- | --- | --- |
+| `q` | the search | trimmed and capped at 200 characters on the wire |
+| `types` · `statuses` · `priorities` | comma lists | read in enum order; an unknown value is dropped, not an error |
+| `mine` · `overdue` | `true` | a switched-off filter is removed, never stored as `false`; `mine` sends the viewer as `assigneeUserId` |
+| `from` · `to` | local days, `yyyy-MM-dd`, inclusive | sent as `dueFrom` = where `from` begins locally and `dueTo` = where the day **after** `to` begins (`dueTo` is exclusive). A reversed pair is ignored. Not applied in the calendar |
+| `targetApp` · `targetType` · `targetId` | the deep link a record screen hands over | one removable chip: "Related to: Leads" for a record type, "Related record: Lead" for one record. The type must be in `ACTIVITY_TARGET_TYPES` for the page's scope (CRM types only on `/crm/activities`); anything else is ignored, and an id that is not a record id narrows to the type alone. Removing the chip drops all three |
+| `cal` | `week` · `day` | absent is `month` |
+| `date` | the calendar's anchor day, `yyyy-MM-dd` | absent is today, so paging back to today leaves a link that still means "today" tomorrow |
+
+**Writes go through `replaceSearchParams`**, the same live-query writer as the
+view, the page and the sort ([View state](#view-state)): the calendar's two
+same-event callbacks ("+N more" calls `onAnchorChange` and then `onModeChange`)
+each build on the other instead of the second dropping the first.
+
+Two helpers build links into the workspace: `activitiesWorkspaceHref(target)`
+(`activity-presentation.ts`) for one record — the detail panels' "View all",
+which opens on `view=table`, because a record's activities span its whole
+history and a month of calendar shows only part of it — and
+`activitiesWorkspaceTypeHref(scope, { app, type })`
+(`workspace/activity-workspace-url.ts`) for every record of one type, which
+leaves the view to the viewer's own last choice.
+
+#### Activities: the KPI strip
+
+`GET /activities/summary` for the viewer's own day — `dayStart` is where today
+begins locally and `dayEnd` where tomorrow does, which Core cannot know — under the same
+filters as the view on screen **minus `statuses` and `overdue`**: either would
+zero the other three counts. Open is `PLANNED` or `IN_PROGRESS`.
+
+| Card | Counts | `StatCard` tone |
+| --- | --- | --- |
+| Overdue | open, and its end — or its due time, when it has no end — has passed | `danger` |
+| Due today | open, not overdue, due before `dayEnd` | `warn` |
+| Upcoming | open, not overdue, due at or after `dayEnd` | `neutral` |
+| Completed today | `DONE`, completed between `dayStart` and `dayEnd` | `brand` |
+
+An ellipsis holds each value until Core answers. A failed summary shows `—` in
+every card and a `DegradedBanner`; it never holds up the views.
+
+#### Activities: the three views
+
+**Calendar.** Month by default. It reads exactly `calendarRange(mode, anchor,
+weekStartsOn)` with `weekStartsOn = calendarWeekStart(language)`, the value the
+due-date presets use too, so "This week" and the week view agree. An item opens
+the modal on its view screen; an empty slot opens it on create with that start
+— offered only with the create grant, and otherwise not at all. The chip's
+surface takes a coloured leading edge for overdue (`destructive-vivid`), due
+today (`warning-vivid`) and completed (`success-vivid`); a cancelled item is
+muted and struck through; one in progress carries the pending dot. The item's
+accessible name spells all of it: subject · type · when · status · due state ·
+related record.
+
+**Board.** Lanes `PLANNED` · `IN_PROGRESS` · `DONE` · `CANCELLED`, narrowed by
+the status filter. Each lane is its own `GET /activities?statuses=<status>&page=n&limit=25`,
+`sortDir=ASC` for the open lanes (soonest first) and `DESC` for the finished ones
+(most recent first); the first page of every lane is read together, so the board
+is whole or an error, and "Load more (loaded of total)" pages one lane. A card
+moved into or out of a lane shifts Core's pages under the loaded ones, so that
+lane is marked `shifted` and its next "Load more" reads it again up to the next
+page — pages 1…n+1 — instead of asking for page n+1 alone, which would skip the
+card that slid back across the page boundary. The count is the lane's total. `DONE` carries the positive outcome border and
+`CANCELLED` the negative one; the open lanes carry a due-state bar from
+`summary.byStatus` — overdue, due today, upcoming as negative, caution,
+positive — which counts the whole lane rather than the cards loaded, so its
+label says "this column's open activities". Under "Overdue only" it keeps the
+overdue slice alone.
+
+| From → to | Needs | What happens |
+| --- | --- | --- |
+| `PLANNED` ↔ `IN_PROGRESS` | `activities.update` | The card moves at once and `POST /activities/:id/status` runs; Core's copy replaces the card and the KPIs are read again. A refusal moves it back and toasts |
+| open → `DONE` | `activities.complete` | `confirmMove` opens the complete dialog. Nothing moves until Core has completed it; then the lanes and the KPIs are read again |
+| open → `CANCELLED` | `activities.cancel` | The same, through the cancel dialog, whose reason is optional |
+| `DONE` / `CANCELLED` → anything | — | Never: a finished activity neither drags nor offers "Move to…" |
+
+Each grant is the base permission on an activity the viewer is assigned to or
+created, or the base permission **and** its `.all` scope on any: the route's
+guard matches the base key exactly, so `.all` alone opens nothing. `canMoveTo` gates "Move to…", and
+`confirmMove` checks a drag against the same rule, because the board does not.
+A card shows the type glyph and subject (struck through when cancelled), the
+related record, when with its due state in words, the assignee ("Me", the
+name, or the identifier), and a caution badge for `HIGH` / `URGENT` only.
+
+**Table.** `TableView`, compact, 25 a page. **When** (`dueAt`) is the one
+sortable column, sorted on the server. Columns: Activity (glyph + subject),
+Related to (a link for leads, customers and opportunities, a label otherwise or
+once the record is gone), Assigned to, When (+ due state), Status
+(`StatusBadge kind="ActivityStatus"`), Priority (a caution badge for `HIGH` /
+`URGENT`, plain words otherwise), and the actions menu. A row opens the modal;
+the link and the menu inside it stop the row's own activation. A page left past
+the end — its last rows completed or filtered away — moves to the last page
+there is.
+
+**The actions menu**, on every card and row: View, Edit, Start or Move back to
+scheduled, Mark as done, Cancel activity — each present only when the viewer may
+take it on that activity, and every menu waits while a write is in flight **or
+its outcome is unknown**.
+
+#### Activities: writes and states
+
+- Every successful write toasts and reads the KPIs and the view on screen again,
+  **keeping what is on screen until the new answer lands** — a board does not
+  blank out each time a card is completed. A refusal is a toast (a 403 is the
+  transport's own); an unknown outcome stays in the body as an
+  `AmbiguousOutcomePanel` until it is retried with the same key or dismissed —
+  [patterns.md](patterns.md#where-a-result-belongs). Until then no other write
+  starts on the board or in the menus (drags and menus are disabled), so a
+  later write can never take its place and lose its key; reads — filters,
+  views, the branch — go on.
+- `useRealtimeResync` reads the KPIs and the view again on a resync signal.
+- Only the view on screen reads. A 403 on its read replaces the workspace with
+  `PermissionGate`'s denied state; a failure is `ErrorState` with a retry; each
+  view loads behind its own skeleton; every state owns the pane's height.
+- Empty is two answers: filters on → "No activity matches these filters" with
+  **Clear filters**; nothing at all → "No activities yet" with **New activity**
+  where the viewer may create. The calendar floats a compact notice over its
+  grid instead, and says "Nothing scheduled in this period" when the period is
+  empty but the summary counts activities elsewhere.
+
 ## Accessibility
 
 Required for all three views, not optional polish:
@@ -1039,6 +1437,10 @@ Required for all three views, not optional polish:
 - Cards are focusable and open on `Enter`.
 - View changes announce via `aria-live="polite"` — "Board view, 42 leads".
 - Every icon-only control has an `aria-label` from the dictionary.
+- The calendar grid is one tab stop; the arrows move by day and by time, and
+  follow the screen under RTL. Its range title is a polite live region.
+- Every calendar item's accessible name carries its time and state in words —
+  the grid shows the time only by position.
 
 ## Definition of done
 

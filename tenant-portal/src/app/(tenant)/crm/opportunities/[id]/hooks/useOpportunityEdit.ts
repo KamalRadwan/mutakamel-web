@@ -3,11 +3,11 @@
 import { useCallback, useMemo, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import {
-  createCrmWriteAttempt,
-  runCrmWrite,
-  type CrmAppliedUnreadable,
-  type CrmWriteAttempt,
-} from "../../../shared/crm-write";
+  createWriteAttempt,
+  runIdempotentWrite,
+  type AppliedUnreadable,
+  type WriteAttempt,
+} from "@/lib/api/idempotent-write";
 import {
   opportunityPath,
   parseOpportunityDetailResponse,
@@ -21,7 +21,7 @@ import {
 } from "../../opportunity-write-contract";
 
 export interface OpportunityEditAmbiguity {
-  attempt: CrmWriteAttempt;
+  attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
 }
@@ -60,7 +60,7 @@ export function useOpportunityEdit(
   // D2: the write applied and its receipt could not be read. Its own state,
   // because `error` invites a second Save.
   const [appliedUnreadable, setAppliedUnreadable] =
-    useState<CrmAppliedUnreadable | null>(null);
+    useState<AppliedUnreadable | null>(null);
 
   const isDirty = useMemo(() => {
     if (!form || !baseline) return false;
@@ -122,13 +122,13 @@ export function useOpportunityEdit(
       closeDrawer();
       return;
     }
-    const attempt = createCrmWriteAttempt();
+    const attempt = createWriteAttempt();
 
     const send = async (): Promise<void> => {
       setIsSubmitting(true);
       setError(null);
       try {
-        const outcome = await runCrmWrite({
+        const outcome = await runIdempotentWrite({
           attempt,
           method: "patch",
           path: opportunityPath(item.id),

@@ -2,7 +2,8 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-27** (CRM; the Core activity hub
+**2026-09-24**)
 
 Source: `../backend/mutakamel-apps/crm-app/node_modules/@mutakamel/crm-app-common/dist/enums/crm.enums.d.ts`
 (package version `0.0.1` — the **installed artifact**, which is what the
@@ -184,6 +185,12 @@ Coarse grouping applied to a stage definition.
 
 `TASK` · `CALENDAR_EVENT`
 
+**No portal screen renders the four enums above since 2026-09-24** — nor
+`CrmActivityTypeEnum`, `CrmActivityDirectionEnum` or `CrmReminderChannelEnum`.
+The CRM activity log, task, calendar and reminder screens were replaced by the
+[Core activity hub](#core-activity-hub), whose own enums are listed below.
+crm-app still declares and emits these values.
+
 ### `CrmPriorityEnum`
 
 The one deliberate exception to "categories take no hue" — priority genuinely
@@ -240,7 +247,47 @@ a list whose server will not honour it.
 
 ## Core and Trade enums
 
-Not yet extracted. Core's tenant enums live in
+### Core activity hub
+
+Source: `../backend/mutakamel-apps/core-app/node_modules/@mutakamel/core-app-common/dist/enums/activity.enum.d.ts`
+(package version `0.0.3`), verified **2026-09-24**. Every value is labelled
+under `t.activities.*`; statuses also under `t.statusValues["ActivityStatus.*"]`.
+
+`ActivityStatusEnum` — `PLANNED` and `IN_PROGRESS` are open (`OPEN_ACTIVITY_STATUSES`),
+`DONE` and `CANCELLED` are terminal:
+
+| Value | Role |
+| --- | --- |
+| `PLANNED` | ink + motion |
+| `IN_PROGRESS` | ink + motion |
+| `DONE` | positive |
+| `CANCELLED` | negative |
+
+`ActivityPriorityEnum` — an attention signal, like `CrmPriorityEnum`:
+
+| Value | Role |
+| --- | --- |
+| `URGENT` | caution |
+| `HIGH` | caution |
+| `NORMAL` | ink |
+| `LOW` | ink |
+
+Categories — ink, never a hue:
+
+| Enum | Values |
+| --- | --- |
+| Activity type (`ACTIVITY_TYPES`, validated with `@IsIn`) | `TODO` · `CALL` · `MEETING` · `EMAIL` · `VISIT` · `FOLLOW_UP` · `OTHER` |
+| `ActivityDirectionEnum` | `INBOUND` · `OUTBOUND` · `INTERNAL` |
+| `ActivityTargetAppEnum` | `CRM` · `CORE` · `TRADE` |
+| Target type per app (`ACTIVITY_TARGET_TYPES`) | `CRM`: `LEAD` · `CUSTOMER_PROFILE` · `OPPORTUNITY` — `CORE`: `PARTY` — `TRADE`: `QUOTATION` · `SALES_ORDER` |
+| `ActivityTargetRoleEnum` | `PRIMARY` · `CONTEXT` |
+
+Overdue, due today and upcoming are **derived** from the due time, never sent —
+see [tokens.md](../design/tokens.md#activity-due-state--derived-not-an-enum).
+
+### Everything else
+
+Not yet extracted. Core's other tenant enums live in
 `core-app/node_modules/@mutakamel/core-app-contracts/dist/`; Trade's in the
 equivalent `trade-app` package.
 

@@ -4,14 +4,14 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import type { LeadDetail } from "../../lead-contract";
-import { runCrmWrite } from "../../../shared/crm-write";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { useLeadCompanyEdit } from "./useLeadCompanyEdit";
 import { useLeadCompanyModal } from "./useLeadCompanyModal";
 
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
-vi.mock("../../../shared/crm-write", () => ({
-  runCrmWrite: vi.fn(),
-  createCrmWriteAttempt: () => ({ idempotencyKey: "01900100-0000-7000-8000-000000000001" }),
+vi.mock("@/lib/api/idempotent-write", () => ({
+  runIdempotentWrite: vi.fn(),
+  createWriteAttempt: () => ({ idempotencyKey: "01900100-0000-7000-8000-000000000001" }),
 }));
 
 const lead = {
@@ -37,7 +37,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("useLeadCompanyModal", () => {
   it.each(["ambiguous", "applied_unreadable"] as const)("blocks retries after %s and reopens from refreshed data", async (kind) => {
     const { result, rerender, onReconcile, onSaved } = setup();
-    vi.mocked(runCrmWrite).mockResolvedValueOnce({ kind, error: { status: 0 } });
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind, error: { status: 0 } });
     act(() => result.current.modal.open());
     act(() => result.current.modal.setField("companyName", "Draft"));
     await act(async () => result.current.modal.save());
@@ -45,7 +45,7 @@ describe("useLeadCompanyModal", () => {
     expect(onSaved).not.toHaveBeenCalled();
     expect(result.current.edit.reconciliationRequired).toBe(true);
     await act(async () => result.current.modal.save());
-    expect(runCrmWrite).toHaveBeenCalledOnce();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
     rerender({ currentLead: { ...lead, companyName: "Confirmed server name" } });
     act(() => result.current.modal.close());
     act(() => result.current.modal.open());
@@ -59,18 +59,18 @@ describe("useLeadCompanyModal", () => {
     act(() => result.current.modal.open());
     act(() => result.current.modal.setAddressField("country", ""));
     await act(async () => result.current.modal.save());
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     expect(result.current.modal.errors.address).toBe(en.crmLeadDetail.companyAddressClearUnavailable);
     expect(result.current.modal.form?.address.country).toBe("");
   });
 
   it("keeps its opening baseline when unrelated refreshed data arrives", async () => {
     const { result, rerender } = setup();
-    vi.mocked(runCrmWrite).mockResolvedValueOnce({ kind: "success", value: lead, replayed: false });
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: lead, replayed: false });
     act(() => result.current.modal.open());
     act(() => result.current.modal.setField("companyName", "Updated name"));
     rerender({ currentLead: { ...lead, taxNumber: "Changed elsewhere" } });
     await act(async () => result.current.modal.save());
-    expect(runCrmWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { companyName: "Updated name" } }));
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { companyName: "Updated name" } }));
   });
 });

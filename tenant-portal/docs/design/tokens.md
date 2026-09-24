@@ -261,14 +261,6 @@ never the only signal.
 | `StageCategoryEnum` | `POSITIVE` | positive |
 | `StageCategoryEnum` | `NEGATIVE` | negative |
 | `StageCategoryEnum` | `OPEN`, `IN_PROGRESS` | ink + motion |
-| `CrmTaskStatusEnum` | `DONE` | positive |
-| `CrmTaskStatusEnum` | `CANCELLED` | negative |
-| `CrmTaskStatusEnum` | `OPEN`, `IN_PROGRESS` | ink + motion |
-| `CrmActivityStatusEnum` | `DONE` | positive |
-| `CrmActivityStatusEnum` | `OPEN` | ink + motion |
-| `CrmReminderStatusEnum` | `SENT` | positive |
-| `CrmReminderStatusEnum` | `CANCELLED` | negative |
-| `CrmReminderStatusEnum` | `PENDING` | caution |
 | `TenantStatusEnum` | `ACTIVE` | positive |
 | `TenantStatusEnum` | `PROVISIONING_FAILED`, `DELETED` | negative |
 | `TenantStatusEnum` | `SUSPENDED` | caution |
@@ -284,6 +276,9 @@ never the only signal.
 | `AccessModeEnum` | `FULL` | positive |
 | `AccessModeEnum` | `BLOCKED` | negative |
 | `AccessModeEnum` | `DUNNING`, `READ_ONLY` | caution |
+| `ActivityStatusEnum` | `DONE` | positive |
+| `ActivityStatusEnum` | `CANCELLED` | negative |
+| `ActivityStatusEnum` | `PLANNED`, `IN_PROGRESS` | ink + motion |
 
 The four Core lifecycles above were transcribed on **2026-08-30** from
 `../backend/mutakamel-apps/core-app/packages/common/src/enums/` —
@@ -300,6 +295,34 @@ and `access-mode.enum.ts`. Two findings worth carrying forward:
   `READ_ONLY`, and `TRIAL` is full access while its period is current — hence
   ink + motion rather than caution.
 
+`ActivityStatusEnum` is Core's activity hub
+(`packages/common/src/enums/activity.enum.ts`), mapped **2026-09-24** as
+`StatusBadge kind="ActivityStatus"`, labels from
+`t.statusValues["ActivityStatus.*"]`. `IN_PROGRESS` arrives with the Activities
+workspace, between `PLANNED` and `DONE`. **Both open values are ink + motion**:
+an activity that has started differs from one that is scheduled by its label,
+not by a hue, and neither is an outcome yet. Overdue is not a status — see
+[below](#activity-due-state--derived-not-an-enum).
+
+### Activity due state — derived, not an enum
+
+An open activity is also coloured by **when it is due**, measured against now
+with the same buckets `GET /activities/summary` counts. It is computed, never
+sent as a field, so it has no row in the table above:
+
+| State | When | Role |
+| --- | --- | --- |
+| Overdue | open, and its end (or its due time, when it has no end) has passed | negative |
+| Due today | open, not overdue, due before the end of the reader's day | caution |
+| Upcoming | open, due after today | ink — no hue |
+| Completed | `DONE` | positive |
+| Cancelled | `CANCELLED` | negative, and struck through |
+
+The words always travel with the colour — "Overdue", "Due today" — in the
+item's accessible name and in its text, so the hue is reinforcement. A calendar
+chip or a board card takes its tone from this table and **never from its
+type**.
+
 ### Non-outcome values → never a hue
 
 These are **categories**, not states. They take `ink` and are distinguished by
@@ -311,11 +334,14 @@ their label and, where useful, an icon:
 `CrmCustomFieldTypeEnum` (all 11) ·
 `CrmCustomFieldOwnerTypeEnum` (all 5) ·
 `CrmReminderChannelEnum` (all 3) ·
-`PipelineAccessModeEnum` (both).
+`PipelineAccessModeEnum` (both) ·
+Core's activity type (all 7, `ACTIVITY_TYPES` — a type is told apart by its
+[glyph](icons.md#activity-types) and its label) ·
+Core's `ActivityDirectionEnum` (all 3).
 
-`CrmPriorityEnum` is the one deliberate exception: `URGENT` and `HIGH` take
-`caution`, `MEDIUM` and `LOW` take `ink`. Priority genuinely is an
-attention signal.
+`CrmPriorityEnum` and Core's `ActivityPriorityEnum` are the deliberate
+exceptions: `URGENT` and `HIGH` take `caution`; `MEDIUM` / `NORMAL` and `LOW`
+take `ink`. Priority genuinely is an attention signal.
 
 ### "In progress" is ink plus motion
 

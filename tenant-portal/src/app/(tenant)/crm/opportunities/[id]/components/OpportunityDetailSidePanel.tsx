@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { History, ListTodo, Paperclip } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger, iconSize } from "@/design-system";
+import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
 import { EntityHistoryCard } from "@/components/audit/EntityHistoryCard";
 import { useI18n } from "@/i18n/I18nContext";
 import { RecordAttachmentsSection } from "../../../shared/components/RecordAttachmentsSection";
-import { CrmActivitiesPanel } from "../../../shared/components/CrmActivitiesPanel";
 import type { OpportunityDetail } from "../../opportunity-contract";
 import type { useCrmRecordCapabilities } from "../../../shared/hooks/useCrmRecordCapabilities";
 
@@ -40,7 +40,7 @@ export function OpportunityDetailSidePanel({
 
   const tabs = [
     { value: "history", label: t.audit.historyTitle, Icon: History },
-    { value: "activities", label: t.crmLeads.activities.title, Icon: ListTodo },
+    { value: "activities", label: t.activities.title, Icon: ListTodo },
     { value: "attachments", label: t.attachments.title, Icon: Paperclip },
   ];
   const relatedPartyIds = [item.customerPartyId, item.contactPartyId].filter(
@@ -84,8 +84,8 @@ export function OpportunityDetailSidePanel({
           hidden={activeTab !== "activities"}
           className="mt-2"
         >
-          <CrmActivitiesPanel
-            target={{ id: item.id, name: item.title, targetType: "OPPORTUNITY" }}
+          <RecordActivitiesPanel
+            target={{ app: "CRM", type: "OPPORTUNITY", id: item.id, label: item.title }}
             readOnly={readOnly}
           />
         </TabsContent>

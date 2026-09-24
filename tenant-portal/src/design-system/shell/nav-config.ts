@@ -182,6 +182,15 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: "crm",
     menuLabelKey: "navMenuRecords",
     items: [
+      // Core's activity hub filtered to CRM records — the Core item's glyph,
+      // one glyph per concept. Admitted by Core `activities.read`, not a CRM grant.
+      {
+        id: "crmActivities",
+        labelKey: "crmActivities",
+        href: TENANT_ROUTES.crmActivities,
+        icon: ListChecks,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmActivities),
+      },
       {
         id: "leads",
         labelKey: "leads",

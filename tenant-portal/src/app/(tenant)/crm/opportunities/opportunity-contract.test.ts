@@ -8,7 +8,7 @@ import {
 } from "./opportunity-contract";
 import { ar } from "@/i18n/dictionaries/ar";
 import { en } from "@/i18n/dictionaries/en";
-import { WRITE_APPLIED_UNREADABLE } from "../shared/crm-write";
+import { WRITE_APPLIED_UNREADABLE } from "@/lib/api/idempotent-write";
 import { MONEY_MAX_AMOUNT, MONEY_OUT_OF_RANGE } from "../shared/money";
 import {
   OPPORTUNITY_AMOUNT_NOT_CLEARABLE,

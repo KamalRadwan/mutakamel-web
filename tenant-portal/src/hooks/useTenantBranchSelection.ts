@@ -32,14 +32,20 @@ export function resolveDefaultTenantBranchId(
 
 export function useTenantBranchSelection(
   source: TenantBranchSource | null | undefined,
+  /**
+   * A required branch falls back to the actor's primary one. An optional one
+   * starts at `null` — every branch the actor can see — and `selectBranch(null)`
+   * returns to it, for reads the server only narrows when asked.
+   */
+  { optional = false }: { optional?: boolean } = {},
 ) {
   const branchIds = useMemo(
     () => [...new Set(source?.accessibleBranches.filter(isUUIDv7) ?? [])],
     [source],
   );
   const defaultBranchId = useMemo(
-    () => resolveDefaultTenantBranchId(source),
-    [source],
+    () => (optional ? null : resolveDefaultTenantBranchId(source)),
+    [optional, source],
   );
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const branchId =
@@ -48,9 +54,11 @@ export function useTenantBranchSelection(
       : defaultBranchId;
 
   const selectBranch = useCallback(
-    (nextBranchId: string) => {
+    (nextBranchId: string | null) => {
       setSelectedBranchId(
-        branchIds.includes(nextBranchId) ? nextBranchId : null,
+        nextBranchId !== null && branchIds.includes(nextBranchId)
+          ? nextBranchId
+          : null,
       );
     },
     [branchIds],

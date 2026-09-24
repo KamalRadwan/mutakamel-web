@@ -3,11 +3,11 @@
 import { useCallback, useMemo, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import {
-  createCrmWriteAttempt,
-  runCrmWrite,
-  type CrmAppliedUnreadable,
-  type CrmWriteAttempt,
-} from "../../shared/crm-write";
+  createWriteAttempt,
+  runIdempotentWrite,
+  type AppliedUnreadable,
+  type WriteAttempt,
+} from "@/lib/api/idempotent-write";
 import {
   OPPORTUNITIES_PATH,
   parseOpportunityDetailResponse,
@@ -30,7 +30,7 @@ import type { OpportunityPipeline } from "./pipeline-types";
 const TERMINAL_STAGE_FLAGS = ["WON", "LOST"];
 
 export interface CreateOpportunityAmbiguity {
-  attempt: CrmWriteAttempt;
+  attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
 }
@@ -64,7 +64,7 @@ export function useCreateOpportunity(
   // because `error` invites a second Save and that is exactly what a
   // non-idempotent route cannot take.
   const [appliedUnreadable, setAppliedUnreadable] =
-    useState<CrmAppliedUnreadable | null>(null);
+    useState<AppliedUnreadable | null>(null);
   const [ambiguity, setAmbiguity] = useState<CreateOpportunityAmbiguity | null>(
     null,
   );
@@ -152,13 +152,13 @@ export function useCreateOpportunity(
       });
       return;
     }
-    const attempt = createCrmWriteAttempt();
+    const attempt = createWriteAttempt();
 
     const send = async (): Promise<void> => {
       setIsSubmitting(true);
       setError(null);
       try {
-        const outcome = await runCrmWrite({
+        const outcome = await runIdempotentWrite({
           attempt,
           method: "post",
           path: OPPORTUNITIES_PATH,

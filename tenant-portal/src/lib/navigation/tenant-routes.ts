@@ -56,9 +56,6 @@ export const TENANT_ROUTES = {
   crmPipelines: "/crm/pipelines",
   crmOpportunityStages: "/crm/opportunity-stages",
   crmActivities: "/crm/activities",
-  crmTasks: "/crm/tasks",
-  crmCalendar: "/crm/calendar",
-  crmReminders: "/crm/reminders",
   crmOutboundEmails: "/crm/outbound-emails",
   crmSettings: "/crm/settings",
   // Phase 9 — CRM dashboards and widgets, docs/api/crm-dashboards.md.
@@ -118,9 +115,6 @@ const CRM_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.crmPipelines,
   TENANT_ROUTES.crmOpportunityStages,
   TENANT_ROUTES.crmActivities,
-  TENANT_ROUTES.crmTasks,
-  TENANT_ROUTES.crmCalendar,
-  TENANT_ROUTES.crmReminders,
   TENANT_ROUTES.crmOutboundEmails,
   TENANT_ROUTES.crmSettings,
   TENANT_ROUTES.crmDashboards,
@@ -194,20 +188,21 @@ const CRM_ENTRY_ROUTES = [
     requirements: [{ permission: "crm.pipelines.manage", acceptsScopedPermission: false }],
   },
   {
+    // The CRM Activities workspace reads Core's activity hub, not a CRM route:
+    // its list, summary and calendar reads declare
+    // @RequirePermissions('activities.read'), matched exactly —
+    // `activities.read.all` widens what they return, it does not open them.
+    // It lists activities on CRM records only, and Core shows one only to an
+    // actor who may read its record, so without a read on some CRM record type
+    // the workspace could never hold anything: no entry, and no landing here.
     href: TENANT_ROUTES.crmActivities,
-    requirements: [{ permission: "crm.activities.read", acceptsScopedPermission: true }],
-  },
-  {
-    href: TENANT_ROUTES.crmTasks,
-    requirements: [{ permission: "crm.activities.read", acceptsScopedPermission: true }],
-  },
-  {
-    href: TENANT_ROUTES.crmCalendar,
-    requirements: [{ permission: "crm.activities.read", acceptsScopedPermission: true }],
-  },
-  {
-    href: TENANT_ROUTES.crmReminders,
-    requirements: [{ permission: "crm.activities.read", acceptsScopedPermission: true }],
+    requirements: [
+      { permission: "activities.read", acceptsScopedPermission: false },
+      {
+        anyOf: ["crm.leads.read", "crm.customer_profiles.read", "crm.opportunities.read"],
+        acceptsScopedPermission: true,
+      },
+    ],
   },
   {
     href: TENANT_ROUTES.crmOutboundEmails,
@@ -262,6 +257,32 @@ const CRM_ENTRY_ROUTES = [
 
 const CRM_READ_SCOPES = ["own", "team", "all"] as const;
 
+type CrmRouteRequirement = (typeof CRM_ENTRY_ROUTES)[number]["requirements"][number];
+
+function holdsCrmPermission(
+  permissions: readonly string[],
+  required: string,
+  acceptsScopedPermission: boolean,
+): boolean {
+  return permissions.some(
+    (permission) =>
+      permission === required ||
+      (acceptsScopedPermission &&
+        CRM_READ_SCOPES.some((scope) => permission === `${required}.${scope}`)),
+  );
+}
+
+function meetsCrmRequirement(
+  permissions: readonly string[],
+  requirement: CrmRouteRequirement,
+): boolean {
+  const alternatives: readonly string[] =
+    "anyOf" in requirement ? requirement.anyOf : [requirement.permission];
+  return alternatives.some((required) =>
+    holdsCrmPermission(permissions, required, requirement.acceptsScopedPermission),
+  );
+}
+
 export function canAccessCrmRoute(
   permissions: readonly string[],
   href: (typeof CRM_ENTRY_ROUTES)[number]["href"],
@@ -269,15 +290,8 @@ export function canAccessCrmRoute(
   const route = CRM_ENTRY_ROUTES.find((candidate) => candidate.href === href);
   if (!route) return false;
 
-  return route.requirements.every((requirement) =>
-    permissions.some(
-      (permission) =>
-        permission === requirement.permission ||
-        (requirement.acceptsScopedPermission &&
-          CRM_READ_SCOPES.some(
-            (scope) => permission === `${requirement.permission}.${scope}`,
-          )),
-    ),
+  return route.requirements.every((requirement: CrmRouteRequirement) =>
+    meetsCrmRequirement(permissions, requirement),
   );
 }
 

@@ -200,6 +200,7 @@ Returns **`204`** with no body.
 | Board view | live — `CustomerStatusEnum` axis, 50 rows per independently paginated status, compact read model |
 | Card view | live — rich party/contact/source data, PQ/SO/IN, rating and card colour |
 | Table view | live — rich read model with interactive rating and activity controls |
+| Activities | live 2026-09-24 — the card, board and table activity marks open the shared Core activity modal on the customer (create, with its open activities listed above the form) and reload the view after any write; the detail page's Activities tab is the shared record panel. "Next activity" counts open (`PLANNED` or `IN_PROGRESS`) Core activities. Contract: [Core activities](core-directory.md#activities--12-routes) |
 | Capabilities-driven actions | live — edit, status, delete and add-contact |
 | Create / update / delete | live — `POST`, `PATCH /:id`, `DELETE /:id` |
 | Add contact | live — `POST /:id/contacts`; **this route declares `organizationScopeMode: NONE`, so it must send NO scope headers** |

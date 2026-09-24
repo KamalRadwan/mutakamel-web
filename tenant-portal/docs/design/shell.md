@@ -122,17 +122,22 @@ narrowed is [anti-patterns.md § 8](anti-patterns.md).
 
 ### Sections are menus, with promoted record links
 
-The three apps carry **30, 11 and 30 items**. A horizontal bar holds about six
-labels beside the brand zone, the app switcher and the account cluster, so the
-only structure that fits is one trigger per section — the grouping the sidebar
-already had, rotated ninety degrees.
+The three apps carry **33, 13 and 30 items** (counted 2026-09-24). A horizontal
+bar holds about six labels beside the brand zone, the app switcher and the
+account cluster, so the only structure that fits is one trigger per section —
+the grouping the sidebar already had, rotated ninety degrees.
 
-CRM promotes **Leads**, **Customers** and **Opportunities** from its Records
-section into three first-level links at the start of the section row. These are
-the app's primary destinations and the resulting five desktop entries still fit
-the bar. The Records trigger is therefore absent from the desktop GlobalNav;
-the responsive sheet and PageActionBar retain the Records grouping and location
-context.
+CRM promotes **Activities**, **Leads**, **Customers** and **Opportunities** from
+its Records section into four first-level links at the start of the section
+row. These are the app's primary destinations; with the Dashboards and Setup
+triggers they make six desktop entries, the same count as Trade's six triggers,
+which is the row the `xl` breakpoint below was sized for. The Records trigger is
+therefore absent from the desktop GlobalNav; the responsive sheet and
+PageActionBar retain the Records grouping and location context.
+
+**Activities** leads the row (2026-09-24): it is Core's activity hub filtered to
+CRM records, admitted by Core `activities.read` rather than a CRM grant, and it
+carries the Core Activities item's glyph, `ListChecks` — one glyph per concept.
 
 `NavSection.menuLabelKey` is the short label the trigger renders, and it is a
 **separate, required field** from `labelKey`. The two answer different

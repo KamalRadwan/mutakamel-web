@@ -8,10 +8,10 @@ import {
   TabsTrigger,
   iconSize,
 } from "@/design-system";
+import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
 import { EntityHistoryCard } from "@/components/audit/EntityHistoryCard";
 import { useI18n } from "@/i18n/I18nContext";
 import { RecordAttachmentsSection } from "../../../shared/components/RecordAttachmentsSection";
-import { CrmActivitiesPanel } from "../../../shared/components/CrmActivitiesPanel";
 import type { CustomerProfileDetail } from "../../customer-profile-contract";
 import type { useCrmRecordCapabilities } from "../../../shared/hooks/useCrmRecordCapabilities";
 import { useCustomerProfileSidePanel } from "../hooks/useCustomerProfileSidePanel";
@@ -32,7 +32,7 @@ export function CustomerProfileDetailSidePanel({
 
   const tabs = [
     { value: "history", label: t.audit.historyTitle, Icon: History },
-    { value: "activities", label: t.crmLeads.activities.title, Icon: ListTodo },
+    { value: "activities", label: t.activities.title, Icon: ListTodo },
     { value: "attachments", label: t.attachments.title, Icon: Paperclip },
   ];
 
@@ -77,11 +77,12 @@ export function CustomerProfileDetailSidePanel({
           hidden={panel.active !== "activities"}
           className="mt-2"
         >
-          <CrmActivitiesPanel
+          <RecordActivitiesPanel
             target={{
+              app: "CRM",
+              type: "CUSTOMER_PROFILE",
               id: profile.id,
-              name: profile.displayName,
-              targetType: "CUSTOMER_PROFILE",
+              label: profile.displayName,
             }}
             readOnly={readOnly}
           />

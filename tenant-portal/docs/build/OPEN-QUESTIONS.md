@@ -1093,6 +1093,12 @@ otherwise scoped out of. `core-settings-nav.test.ts` pins the new predicate.
 
 ## Q50 — the CRM task list cannot show three fields the task write accepts
 
+**Superseded 2026-09-24 by the Core activity hub.** The portal no longer has a
+task, calendar or reminder screen; tasks, calls, meetings and visits are Core
+activities, and `GET /api/tenant/core/v1/activities/:id` returns every field a
+create or update accepts ([core-directory.md](../api/core-directory.md#the-activity-view)).
+The crm-app gap below is real but has no portal consumer.
+
 `CreateTaskDto` and `UpdateTaskDto` both accept `description`,
 `assigneeUserId` and `priority`
 (`crm-app/src/crm/activities/dto/activity.dto.ts`).
@@ -1122,6 +1128,10 @@ saw would silently erase one. `/crm/calendar` does the same for its three.
 
 ## Q51 — a calendar event's `attendees` has no declared item shape
 
+**Superseded 2026-09-24 by the Core activity hub.** `/crm/calendar` is gone,
+and a Core activity has no attendees at all — deliberately: attendees need their
+own model and visibility rules, recorded as future scope rather than faked.
+
 `CreateCalendarEventDto.attendees` is `@IsArray() @ArrayMaxSize(100)
 attendees?: unknown[]`, and `CrmCalendarEventEntity.attendees` is `unknown[]`.
 Nothing in crm-app states what one entry contains — not a DTO, not the entity,
@@ -1135,6 +1145,12 @@ eventually reads it.
 **Settle with:** crm-app — give `attendees` an item DTO, or drop the field.
 
 ## Q52 — four CRM records have a list route and no detail route
+
+**Superseded 2026-09-24 by the Core activity hub.** The four drawers are gone
+with their screens. A Core activity has `GET /activities/:id`, and the portal
+shows one in the shared activity modal, refreshed from that route — a modal over
+the workspace rather than a routed page, so `/crm/activities/:id` stays
+unadmitted.
 
 MASTER-PLAN 8.27 asks for detail pages for `/crm/activities`, `/crm/tasks`,
 `/crm/calendar` and `/crm/reminders`. `ActivitiesController` exposes **no
@@ -1156,6 +1172,14 @@ that silently fails past page one.
 the four list queries.
 
 ## Q53 — `activities.update` has no capabilities signal
+
+**Superseded 2026-09-24 by the Core activity hub.** No portal screen writes a
+CRM task, event or reminder any more, and `src/hooks/useCrmActivityCapabilities.ts`
+is deleted. Core's activity authority needs no capabilities endpoint: it is
+decided per activity from its assignee and creator, both on the row, against
+`activities.<action>` or `activities.<action>.all` — which the portal mirrors
+exactly ([permissions.md](../reference/permissions.md#activities-are-the-one-core-family-with-a-scope)).
+D11 is closed with it.
 
 S6 and defect D11 require **action** admission to come from the CRM
 capabilities endpoints rather than from `/auth/me` permission strings.
@@ -1252,8 +1276,9 @@ owned.
 Fixed by replacing the single hardcoded pattern with a `CRM_DETAIL_PATHS`
 regex that mirrors `CORE_DETAIL_PATHS` — the Core side had already hit this
 and solved it. Tests pin all six, plus two negatives: a second segment
-(`/crm/leads/:id/notes`) and a segment with no `[id]` route (`/crm/tasks/:id`),
-so the pattern cannot silently widen.
+(`/crm/leads/:id/notes`) and a segment with no `[id]` route
+(`/crm/activities/:id` — `/crm/tasks/:id` until that screen was removed on
+2026-09-24), so the pattern cannot silently widen.
 
 **The lesson is the shape of the bug, not the fix.** A screen can be complete,
 tested and green while being unreachable, because admission lives in a

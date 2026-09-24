@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { generateUUIDv7 } from "@/lib/uuid";
-import { createCrmWriteAttempt, runCrmWrite, type CrmWriteAttempt } from "../../../shared/crm-write";
+import { createWriteAttempt, runIdempotentWrite, type WriteAttempt } from "@/lib/api/idempotent-write";
 import { crmCapabilityAllowsOwner, type CrmActionCapability } from "../../../shared/crm-capabilities";
 import { useCrmCreateCustomFields } from "../../../shared/hooks/useCrmCreateCustomFields";
 import { leadConvertPath, type LeadDetail } from "../../lead-contract";
@@ -12,7 +12,7 @@ import { buildConvertLeadRequest, initialLeadConversion, parseLeadConversionResp
 import { validateLeadConversion } from "../lead-conversion-validation";
 import { useLeadConversionOptions } from "./useLeadConversionOptions";
 
-type PendingConversion = { attempt: CrmWriteAttempt; body: ConvertLeadRequest; leadId: string };
+type PendingConversion = { attempt: WriteAttempt; body: ConvertLeadRequest; leadId: string };
 
 /** One immutable body/key per attempt; only a definite refusal permits editing a new intent. */
 export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void, canConvert: boolean, opportunityCapability: CrmActionCapability | null) {
@@ -83,11 +83,11 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void,
     if (ambiguous && !replay) return;
     if (!ambiguous && !validate()) { setReviewing(false); return; }
     if (!replay && !reviewing) { setReviewing(true); return; }
-    const intent = pending ?? { attempt: createCrmWriteAttempt(), body: buildConvertLeadRequest(form), leadId: lead.id };
+    const intent = pending ?? { attempt: createWriteAttempt(), body: buildConvertLeadRequest(form), leadId: lead.id };
     if (intent.leadId !== lead.id) return;
     setPending(intent); inFlight.current = true; setIsSubmitting(true); setError(null);
     try {
-      const outcome = await runCrmWrite({
+      const outcome = await runIdempotentWrite({
         attempt: intent.attempt, method: "post", path: leadConvertPath(intent.leadId), body: intent.body,
         parse: (payload) => parseLeadConversionResponse(
           payload,

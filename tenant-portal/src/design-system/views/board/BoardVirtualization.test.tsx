@@ -22,6 +22,7 @@
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TooltipProvider } from "../../primitives/Tooltip";
 import { BoardView, type BoardViewLabels } from "./BoardView";
 import { ESTIMATED_ROW_PX, OVERSCAN_ROWS, UNMEASURED_VIEWPORT_PX, VIRTUALIZE_ABOVE } from "./useColumnWindow";
 import type { BoardColumnDef } from "./types";
@@ -67,17 +68,21 @@ function leads(count: number): Lead[] {
 
 function renderBoard(count: number) {
   const onCardMove = vi.fn();
+  // The app mounts one TooltipProvider at the root (app/layout.tsx); the
+  // cards' icon-only "Move to" trigger carries a tooltip, so the board needs it here too.
   render(
-    <BoardView<Lead>
-      columns={columns}
-      columnOf={(item) => item.stageId}
-      items={leads(count)}
-      itemKey={(item) => item.id}
-      renderCard={(item) => <span>{item.name}</span>}
-      onCardMove={onCardMove}
-      isLoading={false}
-      labels={labels}
-    />,
+    <TooltipProvider>
+      <BoardView<Lead>
+        columns={columns}
+        columnOf={(item) => item.stageId}
+        items={leads(count)}
+        itemKey={(item) => item.id}
+        renderCard={(item) => <span>{item.name}</span>}
+        onCardMove={onCardMove}
+        isLoading={false}
+        labels={labels}
+      />
+    </TooltipProvider>,
   );
   return { onCardMove };
 }

@@ -3,13 +3,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "../primitives/Tooltip";
-import { ViewSwitcher } from "./ViewSwitcher";
+import type { RecordWorkspaceView } from "./types";
+import { ViewSwitcher, type ViewSwitcherProps } from "./ViewSwitcher";
 
 afterEach(cleanup);
 
 const labels = { board: "Board", card: "Card", table: "Table" };
 
-function renderSwitcher(props: React.ComponentProps<typeof ViewSwitcher>) {
+function renderSwitcher(props: ViewSwitcherProps<RecordWorkspaceView>) {
   return render(
     <TooltipProvider>
       <ViewSwitcher {...props} />

@@ -33,8 +33,13 @@ DialogOverlay.displayName = "DialogOverlay";
 // one constant rather than repeated per step so the five sizes cannot drift
 // apart, and so `full` can opt out of centring wholesale instead of having to
 // unset six utilities the base string would otherwise have imposed.
+//
+// `start-1/2` is logical and `translate-x` is not: under RTL the start edge is
+// the right one, so the pull back to centre has to flip sign as well — without
+// `rtl:translate-x-1/2` every centred dialog sat one full width left of centre
+// in Arabic. Same mechanism as the Switch thumb.
 const CENTERED_CARD =
-  "start-1/2 top-1/2 grid w-full -translate-x-1/2 -translate-y-1/2 gap-3 rounded-lg p-3 sm:p-3.5";
+  "start-1/2 top-1/2 grid w-full -translate-x-1/2 rtl:translate-x-1/2 -translate-y-1/2 gap-3 rounded-lg p-3 sm:p-3.5";
 
 const dialogContentVariants = cva(
   "fixed z-(--z-overlay) border border-border bg-popover text-popover-foreground shadow-overlay",

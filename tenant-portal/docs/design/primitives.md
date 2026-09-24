@@ -307,7 +307,7 @@ with the rest of Phase 1's primitives.
 | Primitive | Built on | Notes |
 | --- | --- | --- |
 | `Calendar` | `react-day-picker` | No vendored stylesheet — see [DECISIONS D15](../build/DECISIONS.md#d15--third-party-components-take-no-stylesheet--assumed) |
-| `DatePicker` · `DateRangePicker` | `Calendar` | `Intl` with an explicit locale; Arabic uses Western digits |
+| `DatePicker` · `DateRangePicker` | `Calendar` | `Intl` with an explicit locale; Arabic uses Western digits. Range presets — see below |
 | `Combobox` | `Popover` + `Input` | Type-ahead over a large remote list, debounced — see below |
 | `MultiSelect` | `Popover` + `Badge` | Chips in the trigger; overflow is a **button**, never a static count. An option carrying `tagColor` renders as a `TagChip` in the trigger and the list |
 | **`TagChip`** · `TagChipOverflow` | plain `<span>` | See below |
@@ -320,6 +320,41 @@ with the rest of Phase 1's primitives.
 | **`FileUpload`** | plain `<label>` + `<input type=file>` | See below |
 | **`CommandPalette`** | `cmdk` + `Dialog` | See below |
 | **`RichTextEditor`** | `contenteditable` | See below |
+
+### DateRangePicker presets
+
+Updated **2026-09-24**: the picker can look forward as well as back.
+
+```ts
+presets?: readonly DateRangePresetId[]   // which shortcuts, in this order
+presetLabels: DateRangePresetLabels      // Partial<Record<DateRangePresetId, string>>
+weekStartsOn?: 0 | 1 | 2 | 3 | 4 | 5 | 6 // "This week", and the grid's first column
+```
+
+| Preset | Range (inclusive, snapped to day boundaries) |
+| --- | --- |
+| `today` | today |
+| `thisWeek` | the week holding today, from `weekStartsOn` (default Sunday) |
+| `next7Days` · `next30Days` | today and the 6 · 29 days after it |
+| `last7Days` · `last30Days` · `last90Days` | today and the 6 · 29 · 89 days before it |
+| `thisMonth` · `thisQuarter` | the calendar month · quarter holding today |
+
+- **Omit `presets` and nothing changes**: the picker offers
+  `DATE_RANGE_PRESET_IDS`, the six backward ranges every filter screen was
+  built with, in the order it always did.
+- **A preset the caller has not labelled is not offered.** The labels are a
+  partial map because a screen names only the presets it offers; a shortcut
+  missing from the list costs less than a button with no name.
+- **`weekStartsOn` sets the grid too**, so "This week" and the calendar under it
+  cannot disagree. Omitted, "This week" starts on Sunday and the grid follows
+  the locale. A screen with a calendar passes `calendarWeekStart(language)` —
+  CLDR's week, which for Arabic is Saturday
+  ([views.md](views.md#calendar-view)).
+- `resolveDateRangePreset(id, now, weekStartsOn = 0)` stays the pure resolver,
+  given its "now" so it is deterministic in tests.
+- FilterBar's `dateRange` filter takes the same optional `presets` and
+  `weekStartsOn` and hands them through. The Activities workspace offers
+  `today, thisWeek, next7Days, next30Days, thisMonth, last7Days, last30Days`.
 
 ### TagChip
 

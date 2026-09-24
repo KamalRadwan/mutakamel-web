@@ -3,12 +3,12 @@
 import { useCallback, useMemo, useState } from "react";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import {
-  createCrmWriteAttempt,
+  createWriteAttempt,
   expectNoContent,
-  runCrmWrite,
-  type CrmAppliedUnreadable,
-  type CrmWriteAttempt,
-} from "../../../shared/crm-write";
+  runIdempotentWrite,
+  type AppliedUnreadable,
+  type WriteAttempt,
+} from "@/lib/api/idempotent-write";
 import {
   parseAddContactResponse,
   parseCustomerProfileDetailResponse,
@@ -33,7 +33,7 @@ export type CustomerProfileOperation =
 
 export interface CustomerProfileAmbiguity {
   operation: CustomerProfileOperation;
-  attempt: CrmWriteAttempt;
+  attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
 }
@@ -76,7 +76,7 @@ export function useCustomerProfileActions(
   // D2: the write applied and its receipt could not be read. Its own state,
   // because `error` invites a second Save and that is what must not happen.
   const [appliedUnreadable, setAppliedUnreadable] =
-    useState<CrmAppliedUnreadable | null>(null);
+    useState<AppliedUnreadable | null>(null);
 
   const isDirty = useMemo(() => {
     if (!form || !baseline) return false;
@@ -90,7 +90,7 @@ export function useCustomerProfileActions(
   const run = useCallback(
     async function runWrite<T>(
       operation: CustomerProfileOperation,
-      attempt: CrmWriteAttempt,
+      attempt: WriteAttempt,
       send: () => Promise<
         | { kind: "success"; value: T }
         | { kind: "failed"; error: NormalizedApiError }
@@ -154,12 +154,12 @@ export function useCustomerProfileActions(
       setForm(null);
       return;
     }
-    const attempt = createCrmWriteAttempt();
+    const attempt = createWriteAttempt();
     const saved = await run(
       "edit",
       attempt,
       () =>
-        runCrmWrite({
+        runIdempotentWrite({
           attempt,
           method: "patch",
           path: customerProfilePath(profile.id),
@@ -188,12 +188,12 @@ export function useCustomerProfileActions(
     async (status?: CustomerProfileStatus) => {
       const nextStatus = status ?? pendingStatus;
       if (!profile || !nextStatus) return;
-      const attempt = createCrmWriteAttempt();
+      const attempt = createWriteAttempt();
       const saved = await run(
         "status",
         attempt,
         () =>
-          runCrmWrite({
+          runIdempotentWrite({
             attempt,
             method: "patch",
             path: customerProfilePath(profile.id),
@@ -211,12 +211,12 @@ export function useCustomerProfileActions(
 
   const submitContact = useCallback(async () => {
     if (!profile || !contactForm) return;
-    const attempt = createCrmWriteAttempt();
+    const attempt = createWriteAttempt();
     const added = await run(
       "contact",
       attempt,
       () =>
-        runCrmWrite({
+        runIdempotentWrite({
           attempt,
           method: "post",
           path: `${customerProfilePath(profile.id)}/contacts`,
@@ -244,12 +244,12 @@ export function useCustomerProfileActions(
 
   const submitDelete = useCallback(async () => {
     if (!profile) return;
-    const attempt = createCrmWriteAttempt();
+    const attempt = createWriteAttempt();
     const deleted = await run(
       "delete",
       attempt,
       () =>
-        runCrmWrite({
+        runIdempotentWrite({
           attempt,
           method: "delete",
           path: customerProfilePath(profile.id),

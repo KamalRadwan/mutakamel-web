@@ -21,10 +21,10 @@ import {
   type LeadStageFlag,
 } from "../../lead-stages/lead-stage-contract";
 import {
-  createCrmWriteAttempt,
+  createWriteAttempt,
   isAmbiguousWriteFailure,
-  runCrmWrite,
-} from "../../shared/crm-write";
+  runIdempotentWrite,
+} from "@/lib/api/idempotent-write";
 import {
   buildLeadCardPatchBody,
   parseLeadCardColor,
@@ -806,12 +806,12 @@ export function useLeads() {
     // `POST /crm/leads` is `idempotencyMode: WRITE_SENSITIVE` with
     // `idempotent: true` in the Gateway contract, so it answers 400
     // GW.IDEM.MISSING without an `x-idempotency-key`. The key is minted per
-    // SAVE PRESS rather than left to the transport: `runCrmWrite` reuses one
+    // SAVE PRESS rather than left to the transport: `runIdempotentWrite` reuses one
     // key across every retry of the same attempt, which is what stops a retry
     // from filing a second lead — and it reads `Idempotency-Replayed` as the
-    // success it is rather than as a conflict. crm-write.ts, rules 1 and 2.
-    const attempt = createCrmWriteAttempt();
-    const outcome = await runCrmWrite({
+    // success it is rather than as a conflict. lib/api/idempotent-write.ts, rules 1 and 2.
+    const attempt = createWriteAttempt();
+    const outcome = await runIdempotentWrite({
       attempt,
       method: "post",
       path: "/api/tenant/crm/v1/leads",
@@ -916,7 +916,7 @@ export function useLeads() {
    * server-confirmed card fields or puts the old row back, and none of them
    * leaves the new value sitting on a card the server never accepted.
    *
-   * Three outcomes, the same three crm-write.ts names:
+   * Three outcomes, the same three lib/api/idempotent-write.ts names:
    *   - a definite answer, parsed  -> adopt the confirmed card fields
    *   - a definite rejection (<500) -> revert, and say why
    *   - anything else               -> the write MAY have applied, so revert
@@ -992,7 +992,7 @@ export function useLeads() {
       }
 
       // Past this line the write APPLIED, so parsing is outside the block
-      // above on purpose — crm-write.ts's `applied_unreadable`. A body this
+      // above on purpose — lib/api/idempotent-write.ts's `applied_unreadable`. A body this
       // client cannot read is a contract failure of a write that already
       // happened, and reverting would put a stale value back onto a card the
       // server has already changed. Reload instead, and say the result is

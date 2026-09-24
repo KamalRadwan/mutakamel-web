@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import { TenantApiClientError } from "@/lib/api/axiosClient";
 import { readCoreData, readCrmBody, writeCoreData } from "@/lib/api/envelope";
-import { runCrmWrite } from "../../../shared/crm-write";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import type { LeadContact, LeadDetail } from "../../lead-contract";
 import { CONTACT_DIRECTORY_PERMISSIONS } from "../contact-modal-contract";
 import { useLeadContactModal } from "./useLeadContactModal";
@@ -14,7 +14,7 @@ const auth = vi.hoisted(() => ({ permissions: [] as string[] }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: auth }) }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
 vi.mock("@/lib/api/envelope", () => ({ readCoreData: vi.fn(), readCrmBody: vi.fn(), writeCoreData: vi.fn() }));
-vi.mock("../../../shared/crm-write", async (original) => ({ ...(await original<typeof import("../../../shared/crm-write")>()), runCrmWrite: vi.fn() }));
+vi.mock("@/lib/api/idempotent-write", async (original) => ({ ...(await original<typeof import("@/lib/api/idempotent-write")>()), runIdempotentWrite: vi.fn() }));
 vi.mock("../../lead-contract", async (original) => ({ ...(await original<typeof import("../../lead-contract")>()), parseLeadDetailResponse: (payload: unknown) => payload }));
 
 const partyId = "01900100-0000-7000-8000-000000000011";
@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.mocked(readCoreData).mockResolvedValue(person);
   vi.mocked(readCrmBody).mockResolvedValue(lead);
   vi.mocked(writeCoreData).mockResolvedValue(person);
-  vi.mocked(runCrmWrite).mockResolvedValue({ kind: "success", value: lead, replayed: false });
+  vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "success", value: lead, replayed: false });
 });
 afterEach(cleanup);
 
@@ -51,7 +51,7 @@ describe("useLeadContactModal", () => {
     act(() => result.current.setField("displayName", "Dena Ali"));
     act(() => result.current.close());
     expect(writeCoreData).not.toHaveBeenCalled();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
   it("without Directory permissions edits only job title without reading Party", async () => {
     auth.permissions = [];
@@ -64,7 +64,7 @@ describe("useLeadContactModal", () => {
     act(() => result.current.setField("jobTitle", "Director"));
     await act(async () => result.current.save());
     expect(writeCoreData).not.toHaveBeenCalled();
-    expect(runCrmWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { contacts: [{ contactPartyId: partyId, jobTitle: "Director", isPrimary: true }] } }));
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { contacts: [{ contactPartyId: partyId, jobTitle: "Director", isPrimary: true }] } }));
   });
   it("preserves the draft after a definite rejection before any write succeeds", async () => {
     const { result } = setup();
@@ -127,7 +127,7 @@ describe("useLeadContactModal", () => {
     vi.mocked(readCrmBody).mockResolvedValueOnce(fresh);
     await act(async () => result.current.save());
     expect(writeCoreData).toHaveBeenCalledWith("patch", `/api/tenant/core/v1/directory/parties/${partyId}`, { displayName: "Dena Ali" }, expect.any(Object));
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     expect(onSaved).toHaveBeenCalledWith(fresh);
     expect(result.current.open).toBe(false);
   });
@@ -140,7 +140,7 @@ describe("useLeadContactModal", () => {
     const other = { ...contact, partyId: "01900100-0000-7000-8000-000000000099", jobTitle: "Fresh finance title", isPrimary: false };
     vi.mocked(readCrmBody).mockResolvedValueOnce({ ...lead, contacts: [contact, other] });
     await act(async () => result.current.save());
-    expect(runCrmWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { contacts: [
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { contacts: [
       { contactPartyId: partyId, jobTitle: "Director", isPrimary: true },
       { contactPartyId: other.partyId, jobTitle: "Fresh finance title", isPrimary: false },
     ] } }));
@@ -155,7 +155,7 @@ describe("useLeadContactModal", () => {
     act(() => result.current.setField("jobTitle", "Director"));
     await act(async () => result.current.save());
     expect(writeCoreData).not.toHaveBeenCalled();
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     await act(async () => result.current.reload());
     expect(result.current.mustReload).toBe(false);
     expect(result.current.canEditIdentity).toBe(true);
@@ -169,7 +169,7 @@ describe("useLeadContactModal", () => {
     vi.mocked(readCrmBody).mockResolvedValueOnce({ ...lead, contacts: [] });
     await act(async () => result.current.save());
     expect(result.current.mustReload).toBe(true);
-    expect(runCrmWrite).not.toHaveBeenCalled();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
     expect(onReconcile).toHaveBeenCalledOnce();
   });
 

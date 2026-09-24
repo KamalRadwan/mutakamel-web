@@ -10,6 +10,9 @@ permissions, preserving contact-method IDs. The contact-method service also
 checks party write scope. See [the integration contract](crm-leads.md#contacts-on-the-one-lead-screen)
 for the split Core/CRM save and partial-outcome handling.
 
+Activity hub re-verified: **2026-09-24** — the twelve activity routes below,
+their bodies, filters, lifecycle and error codes.
+
 Owning app: **core-app**
 
 Canonical prefixes: `/api/tenant/core/v1/directory`, `.../activities`,
@@ -22,10 +25,13 @@ Source inspected:
 `core-app/src/tenant/directory/dto/*.dto.ts`,
 `core-app/src/tenant/activities/activities.controller.ts`,
 `core-app/src/tenant/activities/dto/activity.dto.ts`,
+`core-app/src/tenant/activities/dto/activity-response.dto.ts`,
+`core-app/src/tenant/activities/activity.rules.ts`,
+`core-app/src/tenant/activities/activity.errors.ts`,
 `core-app/src/tenant/audit/tenant-audit.controller.ts`,
 `core-app/src/tenant/audit/audit-query.dto.ts`.
 
-**31 routes.** Directory 21 · Activities 7 · Activity types 1 · Audit 2.
+**35 routes.** Directory 21 · Activities 11 · Activity types 1 · Audit 2.
 
 Everything under [core-identity.md § What applies to every route](core-identity.md#what-applies-to-every-route-on-this-page)
 applies here too.
@@ -115,40 +121,230 @@ a **configured** outcome — surface which setting caused it, not just "duplicat
 
 ---
 
-## Activities — 8 routes
+## Activities — 12 routes
+
+Core's **activity hub**: one record per call, meeting, visit or task, booked
+against a CRM, Core or Trade record. Every portal surface that shows activities
+reads it — the Activities workspaces at `/core/activities` (every app) and
+`/crm/activities` (CRM records only), the shared activity modal and the
+activity panel on each CRM record's detail page.
 
 | Method | Canonical path | Permission | Headers |
 | --- | --- | --- | --- |
+| POST | `/api/tenant/core/v1/activities` | `activities.create` — plus `activities.update` for `status: IN_PROGRESS`, `activities.complete` for `status: DONE` | `x-idempotency-key` |
 | GET | `/api/tenant/core/v1/activities` | `activities.read` | — |
-| POST | `/api/tenant/core/v1/activities` | `activities.create` | `x-idempotency-key` |
+| GET | `/api/tenant/core/v1/activities/summary` | `activities.read` | — |
+| GET | `/api/tenant/core/v1/activities/calendar` | `activities.read` | — |
+| GET | `/api/tenant/core/v1/activities/targets` | `activities.create` | — |
+| GET | `/api/tenant/core/v1/activities/assignees` | `activities.assign` | — |
 | GET | `/api/tenant/core/v1/activities/:id` | `activities.read` | returns `ETag` |
 | PATCH | `/api/tenant/core/v1/activities/:id` | `activities.update` | `If-Match` + `x-idempotency-key` |
+| POST | `/api/tenant/core/v1/activities/:id/status` | `activities.update` | `If-Match` + `x-idempotency-key` |
 | POST | `/api/tenant/core/v1/activities/:id/complete` | `activities.complete` | `If-Match` + `x-idempotency-key` |
 | POST | `/api/tenant/core/v1/activities/:id/cancel` | `activities.cancel` | `If-Match` + `x-idempotency-key` |
-| GET | `/api/tenant/core/v1/activities/assignees` | `activities.assign` | — |
 | GET | `/api/tenant/core/v1/activity-types` | `activities.read` | — |
 
-Activities are **cross-app**: an activity targets a CRM or Trade record, and the
-service authorises against that target as well as against the activity itself.
-A user who may read activities can still be refused a specific one because they
-cannot see its target.
+Every response is the Core envelope (`{ success, data }`) with
+`Cache-Control: no-store, private`. A single-activity response also carries
+`ETag: "<version>"`, and a replayed idempotent write `Idempotency-Replayed: true`.
+
+Activities are **cross-app**: an activity targets a CRM, Core or Trade record,
+and the service authorises against that target as well as against the activity
+itself. A user who may read activities can still be refused a specific one
+because they cannot see its target.
+
+### Who may act on which activity
+
+The route permission opens the route; the service then decides per activity.
+The base key acts on activities the actor is **assigned to or created**; the
+`.all` key acts **branch-wide** in an authorised branch; the tenant owner may do
+anything.
+
+| Action | Own | Branch-wide |
+| --- | --- | --- |
+| read | `activities.read` | `activities.read.all` |
+| update, start, move back to scheduled | `activities.update` | `activities.update.all` |
+| complete | `activities.complete` | `activities.complete.all` |
+| cancel | `activities.cancel` | `activities.cancel.all` |
+| create | `activities.create` in the target's branch | — |
+| assign to someone else | `activities.assign` | — |
+
+`@RequirePermissions` is an exact match, so every route still needs its **base**
+key — `activities.read.all` alone opens nothing. The portal's admission mirrors
+this table per activity and is advisory; see
+[permissions.md](../reference/permissions.md#core-tenant-permissions).
+
+### Statuses and transitions
+
+`PLANNED` and `IN_PROGRESS` are **open**; `DONE` and `CANCELLED` are terminal
+and never change again.
+
+| From → to | Command |
+| --- | --- |
+| (new) → `PLANNED` | `POST /activities` — the default `status` |
+| (new) → `IN_PROGRESS` | `POST /activities` with `status: "IN_PROGRESS"` |
+| (new) → `DONE` | `POST /activities` with `status: "DONE"` — logs a past activity |
+| `PLANNED` ↔ `IN_PROGRESS` | `POST /activities/:id/status` with `{ "status": "PLANNED" \| "IN_PROGRESS" }` |
+| open → `DONE` | `POST /activities/:id/complete` with an optional `outcome` (≤2000) |
+| open → `CANCELLED` | `POST /activities/:id/cancel` with an optional `reason` (≤2000) |
+| open, fields | `PATCH /activities/:id` |
+
+A create with a status other than `PLANNED` is stored as a planned activity plus
+its transition in one transaction, so the `CREATED` event always carries
+`PLANNED`. `POST /:id/status` with the current status is a **no-op**: the
+current view comes back with no save, no event and no version bump. Any write on
+a terminal activity is **409 `ACTIVITY_TERMINAL`**. `status`, `complete` and
+`cancel` return **200**, not 201 — they are `@HttpCode(200)`;
+`POST /activities` returns **201**.
+
+### The activity view
+
+Create, get, update, every lifecycle command, and each item of the list and the
+calendar return the same shape:
+
+```jsonc
+{
+  "id": "uuid", "type": "MEETING", "subject": "Product demo", "description": null,
+  "direction": null, "priority": "HIGH", "status": "IN_PROGRESS",
+  "dueAt": "ISO", "endsAt": "ISO | null", "location": "string | null", "meetingUrl": "string | null",
+  "completedAt": null, "cancelledAt": null, "outcome": null,
+  "assigneeUserId": "uuid", "assigneeName": "string | null",
+  "createdByUserId": "uuid", "createdByName": "string | null",
+  "branchId": "uuid", "companyId": "uuid", "version": 3,
+  "createdAt": "ISO", "updatedAt": "ISO",
+  "targets": [{ "id": "uuid", "role": "PRIMARY | CONTEXT", "targetApp": "CRM", "targetType": "LEAD",
+                "targetId": "uuid", "label": "string", "route": "string",
+                "targetVersion": "string | null", "unavailableAt": "ISO | null" }]
+}
+```
+
+`outcome` holds the completion note or the cancellation reason. A target's
+`route` addresses another application's UI and is never followed — the portal
+links only to detail routes it built itself.
+
+### Create and update bodies
+
+| Field | Create | Update | Rule |
+| --- | --- | --- | --- |
+| `target` `{ app, type, id }` | required | — fixed | `type` must be one of the app's target types |
+| `type` | required | optional | `TODO` `CALL` `MEETING` `EMAIL` `VISIT` `FOLLOW_UP` `OTHER` |
+| `subject` | required | optional | trimmed, non-blank, ≤180 |
+| `description` | optional | optional, `null` clears | ≤4000; blank is stored as `null` |
+| `direction` | optional | optional, `null` clears | `INBOUND` `OUTBOUND` `INTERNAL` |
+| `priority` | optional, `NORMAL` | optional | `LOW` `NORMAL` `HIGH` `URGENT` |
+| `dueAt` | required | optional | ISO instant |
+| `endsAt` | optional | optional, `null` clears | after `dueAt`, at most 14 days after it |
+| `location` | optional | optional, `null` clears | ≤180; blank is stored as `null` |
+| `meetingUrl` | optional | optional, `null` clears | ≤2048, a full `http://` or `https://` link |
+| `assigneeUserId` | optional, the actor | optional | someone else needs `activities.assign` |
+| `status` | optional, `PLANNED` | — | `PLANNED` `IN_PROGRESS` `DONE` |
+| `outcome` | optional | — | ≤2000, only with `status: "DONE"` |
+
+Each rule below fails as **422 `ACTIVITY_INVALID`** with a plain message:
+
+- `status: PLANNED` needs a future `dueAt`; `DONE` needs a `dueAt` no later than
+  five minutes from now; `IN_PROGRESS` has no due constraint.
+- An update needs at least one field and applies only to an open activity. The
+  window is checked as it will be stored — a new `endsAt` against the stored
+  `dueAt`, and the reverse — and a changed `dueAt` must lie ahead only while the
+  activity is `PLANNED`.
+
+Both bodies are whitelisted with `forbidNonWhitelisted`: an unknown key is a 400.
+Status changes are never a `PATCH` field.
+
+### List — `GET /activities`
+
+`page`, `limit` (≤100), `sortBy` (`dueAt` only), `sortDir`, `search` (≤200,
+matched against the subject), plus:
+
+| Filter | Shape |
+| --- | --- |
+| `branchId`, `assigneeUserId` | UUIDv7 |
+| `targetApp`, `targetType`, `targetId` | one record's activities; `targetType` and `targetId` need `targetApp`, `targetId` needs `targetType` |
+| `statuses`, `types`, `priorities` | comma-separated and unique, e.g. `statuses=PLANNED,IN_PROGRESS` |
+| `dueFrom`, `dueTo` | ISO instants, `dueFrom` before `dueTo`; keeps `dueFrom ≤ dueAt < dueTo` |
+| `overdue` | `true` or `false` — open, and its end (or its due time, without an end) has passed |
+
+The page is `data: { items, total, page, limit, totalPages, hasNext }` — **no
+`hasPrev`** and no `meta`; derive the previous-page state from `page`.
+
+### Summary — `GET /activities/summary`
+
+The list's filters except `statuses`, `overdue`, pagination and sort, plus the
+**required** `dayStart` and `dayEnd`: the viewer's local day as ISO instants,
+`dayEnd` after `dayStart`, at most 48 hours apart.
+
+```json
+{ "overdue": 4, "today": 6, "upcoming": 18, "completedToday": 3,
+  "byStatus": [
+    { "status": "PLANNED", "total": 20, "overdue": 3, "today": 5, "upcoming": 12 },
+    { "status": "IN_PROGRESS", "total": 8, "overdue": 1, "today": 1, "upcoming": 6 },
+    { "status": "DONE", "total": 31, "overdue": 0, "today": 0, "upcoming": 0 },
+    { "status": "CANCELLED", "total": 1, "overdue": 0, "today": 0, "upcoming": 0 } ] }
+```
+
+All four statuses, in enum order, zero-filled. An open activity is **overdue**
+when its end (or due time) has passed, **today** when it is not overdue and is
+due before `dayEnd`, and **upcoming** otherwise. `completedToday` counts `DONE`
+activities completed in `[dayStart, dayEnd)`. The top-level three are sums over
+the open statuses, and visibility is exactly the list's.
+
+### Calendar — `GET /activities/calendar`
+
+The list's filters — including `statuses`, `overdue` and `search` — except
+pagination, sort and `dueFrom`/`dueTo`, plus the **required** `from` and `to`:
+`to` after `from`, at most 62 days apart. It returns every activity whose
+`[dueAt, endsAt]` overlaps `[from, to)`, ordered by `dueAt` then `id`, **at most
+500**, as `data: { items, truncated }`. `truncated: true` means more exist:
+narrow the filters, there is no next page.
+
+### Record picker — `GET /activities/targets`
+
+`targetApp` and `targetType` are required (the type must belong to the app),
+with `branchId?` and `search?` (≤100, matched against the label). It returns up
+to **20** `[{ targetApp, targetType, targetId, label, branchId }]`, ordered by
+label — only records the caller could create an activity on right now: write
+entitlement for the app, current read access to the record, and
+`activities.create` in its branch. Authorisation runs **before** the limit, so
+twenty rows are twenty usable rows. An application the tenant may not write
+answers an empty list, not a 403.
+
+### Assignees — `GET /activities/assignees`
+
+`targetApp`, `targetType` and `targetId` are all required, with `search?`
+(≤100). It returns only users eligible for assignment **inside the authorised
+target company**. It is not a general user picker — do not reuse it as one.
 
 ### Concurrency here is looser than email-config — do not copy one to the other
 
 `parseIfMatch` in this controller accepts `W/"n"`, `"n"` **and** bare `n`.
 `email-config` accepts only the strong `"n"` form and answers **428** when the
 header is absent. Two different contracts in the same app; read the controller
-before assuming.
+before assuming. Here a missing or malformed `If-Match` is **428
+`ACTIVITY_VERSION_REQUIRED`**, and a version that moved is **409
+`ACTIVITY_VERSION_CONFLICT`**.
 
-`complete` and `cancel` return **200**, not 201 — they are `@HttpCode(200)`.
-`POST /activities` returns **201**.
+`GET /activity-types` is the canonical catalogue `[{ key, label, icon,
+defaultPriority }]` — the same seven keys `@IsIn` accepts on the bodies.
 
-`GET /activities/assignees` requires `targetApp`, `targetType` and `targetId`,
-and returns only users eligible for assignment **inside the authorised target
-company**. It is not a general user picker — do not reuse it as one.
+### Errors
 
-`GET /activity-types` is the catalogue for the activity form. Use it; do not
-hardcode types.
+| Code | HTTP | Meaning |
+| --- | --- | --- |
+| `ACTIVITY_NOT_FOUND` | 404 | the activity or its target does not exist, or is outside the caller's sight |
+| `ACTIVITY_ACCESS_DENIED` | 403 | the activity is outside the caller's authority |
+| `ACTIVITY_INVALID` | 422 | a body, filter or schedule rule failed — the message names it |
+| `ACTIVITY_VERSION_REQUIRED` | 428 | `If-Match` missing or malformed |
+| `ACTIVITY_VERSION_CONFLICT` | 409 | the activity changed since it was read — reload it |
+| `ACTIVITY_TERMINAL` | 409 | the activity is already `DONE` or `CANCELLED` |
+| `ACTIVITY_TARGET_RESOLVER_UNAVAILABLE` | 503 | the target's application did not answer |
+| `ACTIVITY_IDEMPOTENCY_IN_FLIGHT` | 409 | the same key is still being processed |
+| `ACTIVITY_IDEMPOTENCY_MISMATCH` | 422 | the key was already used for a different body |
+| `ACTIVITY_IDEMPOTENCY_KEY_INVALID` | 422 | `x-idempotency-key` is missing or not a UUIDv7 |
+
+The portal translates each under `t.activities.errors` and falls back to the
+generic message; [error-codes.md](../reference/error-codes.md#core-activities)
+lists the same set, generated from source.
 
 ---
 
@@ -215,7 +411,9 @@ last page.
 | `/core/directory/settings` | 7.9 | built |
 | `/core/audit` | 7.20 | built |
 | Entity history on detail screens | 7.21 | built on party and template detail |
-| `/core/activities` | 7.22 | built |
+| `/core/activities` — the Activities workspace, every app | 7.22 | rebuilt 2026-09-24 on the activity hub |
+| `/crm/activities` — the same workspace, CRM records only | — | built 2026-09-24; admitted by `activities.read` and a read on some CRM record type |
+| Activity modal and record panels on lead, customer and opportunity screens | — | built 2026-09-24 |
 
 ### What the portal does not offer
 

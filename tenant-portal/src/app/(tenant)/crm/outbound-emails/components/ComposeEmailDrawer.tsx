@@ -134,7 +134,7 @@ export function ComposeEmailDrawer({
           <SelectContent>
             {OUTBOUND_EMAIL_SOURCE_TYPES.map((type) => (
               <SelectItem key={type} value={type}>
-                {t.crmTasks.sourceTypeValues[type] ?? type}
+                {t.crmOutboundEmails.sourceTypeValues[type] ?? type}
               </SelectItem>
             ))}
           </SelectContent>
@@ -161,7 +161,7 @@ export function ComposeEmailDrawer({
           placeholder={t.crmOutboundEmails.sourceRecordPlaceholder}
           searchPlaceholder={t.common.search}
           loadingLabel={t.common.loading}
-          emptyLabel={t.crmTasks.recordsEmpty}
+          emptyLabel={t.crmOutboundEmails.recordsEmpty}
           clearLabel={t.common.dismiss}
         />
       </Field>
