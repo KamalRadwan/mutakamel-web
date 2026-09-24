@@ -28,6 +28,7 @@ import {
   parseCustomerProfileRating,
   type CustomerProfileCardPatch,
 } from "../customer-profile-card-contract";
+import { parseCrmTags, type CrmTag } from "../../shared/tag-contract";
 
 export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
 /**
@@ -75,11 +76,6 @@ export interface CustomerProfilePrimaryContact {
   isPrimary: boolean;
 }
 
-export interface CustomerProfileTag {
-  id: string;
-  name: string;
-}
-
 export interface CustomerProfileItem {
   id: string;
   branchId: string;
@@ -98,7 +94,7 @@ export interface CustomerProfileItem {
   /** Lean Board projection; rich Card/Table responses also include `primaryContact`. */
   primaryContactName: string | null;
   primaryContact: CustomerProfilePrimaryContact | null;
-  tags: CustomerProfileTag[];
+  tags: CrmTag[];
   ownerUserId: string | null;
   owner: CustomerProfileOwner | null;
   nextActivity: CustomerProfileNextActivity | null;
@@ -120,7 +116,6 @@ export interface CustomerProfilesPage {
 }
 
 const LIST_RESPONSE_LIMIT_BYTES = 1_000_000;
-const MAX_CUSTOMER_PROFILE_TAGS = 500;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -208,30 +203,6 @@ function companyWebsite(value: unknown): string | null {
     invalidResponse();
   }
   return value;
-}
-
-function parseTags(value: unknown): CustomerProfileTag[] {
-  if (value === undefined || value === null) return [];
-  if (!Array.isArray(value) || value.length > MAX_CUSTOMER_PROFILE_TAGS) {
-    invalidResponse();
-  }
-  const parsed = value.map((entry) => {
-    const tag = record(entry);
-    if (
-      !tag ||
-      !isUUIDv7(tag.id) ||
-      typeof tag.name !== "string" ||
-      tag.name.trim().length === 0 ||
-      tag.name.length > 120
-    ) {
-      invalidResponse();
-    }
-    return { id: tag.id, name: tag.name };
-  });
-  if (new Set(parsed.map(({ id }) => id)).size !== parsed.length) {
-    invalidResponse();
-  }
-  return parsed;
 }
 
 function parseOwner(value: unknown): CustomerProfileOwner | null {
@@ -400,7 +371,7 @@ export function parseCustomerProfileResponse(
     city: address ? optionalText(address.city) : "",
     primaryContactName,
     primaryContact,
-    tags: parseTags(source.tags),
+    tags: parseCrmTags(source.tags, "Invalid CRM customer-profiles response."),
     ownerUserId,
     owner: parseOwner(source.owner),
     nextActivity: parseNextActivity(source.nextActivity),

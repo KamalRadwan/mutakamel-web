@@ -69,6 +69,8 @@ const mockOpportunity: OpportunityListItem = {
     {
       id: "0192f3a0-0000-7000-8000-000000000013",
       name: "VIP",
+      backgroundColor: null,
+      textColor: null,
     },
   ],
   expectedCloseDate: "2026-11-30T00:00:00Z",

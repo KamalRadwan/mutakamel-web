@@ -108,46 +108,6 @@ export function leadActivityState(activity: LeadNextActivity | null): LeadActivi
   return activity === null ? "NONE" : activity.bucket;
 }
 
-export interface LeadTag {
-  id: string;
-  name: string;
-  /**
-   * One of the app's eleven filing colours, or `null`.
-   *
-   * `null` covers two different facts, and neither is a broken payload: a tag
-   * the tenant gave no colour, and a colour from a vocabulary this screen does
-   * not own. CRM's `CreateTagDto` carries a name and nothing else today, so the
-   * field is optional on the wire and usually absent. Unlike `cardColor` — a
-   * CRM enum with a database CHECK behind it, where an unknown value IS a
-   * contract break — an unrecognised tag colour degrades to the neutral badge
-   * instead of taking the whole board down. A colour of the wrong TYPE still
-   * throws, exactly as everything else here does.
-   */
-  color: CardColor | null;
-}
-
-/**
- * The lead's tags, in the order the server sent them.
- *
- * Absent and `null` are both "this lead has no tags" — one is a crm-app that
- * does not project the field yet, the other a lead nobody has tagged — and
- * both give an empty array. Anything else that is not an array of objects
- * carrying an id and a name throws, the way every parser in this file does.
- */
-export function parseLeadTags(value: unknown): LeadTag[] {
-  if (isEmpty(value)) return [];
-  if (!Array.isArray(value)) invalid();
-  return value.map((entry) => {
-    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) invalid();
-    const tag = entry as Record<string, unknown>;
-    if (!isUUIDv7(tag.id)) invalid();
-    if (typeof tag.name !== "string" || tag.name.length === 0) invalid();
-    const color = tag.color;
-    if (!isEmpty(color) && typeof color !== "string") invalid();
-    return { id: tag.id, name: tag.name, color: isCardColor(color) ? color : null };
-  });
-}
-
 /**
  * The owner's initials — "Kamal Radwan" is `KR`.
  *

@@ -4,8 +4,9 @@ import { createElement } from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nContext";
+import { ar } from "@/i18n/dictionaries/ar";
 import { useCreateTagModal } from "./useCreateTagModal";
-import type { LeadTag } from "../lead-card-contract";
+import type { CrmTag } from "../../shared/tag-contract";
 
 const { post } = vi.hoisted(() => ({ post: vi.fn() }));
 
@@ -14,9 +15,9 @@ vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
   return { ...actual, axiosClient: { ...actual.axiosClient, post } };
 });
 
-const EXISTING_TAGS: LeadTag[] = [
-  { id: "01900100-0000-7000-8000-000000000001", name: "VIP", color: null },
-  { id: "01900100-0000-7000-8000-000000000002", name: "Enterprise", color: null },
+const EXISTING_TAGS: CrmTag[] = [
+  { id: "01900100-0000-7000-8000-000000000001", name: "VIP", backgroundColor: null, textColor: null },
+  { id: "01900100-0000-7000-8000-000000000002", name: "Enterprise", backgroundColor: null, textColor: null },
 ];
 
 const wrapper = ({ children }: { children: React.ReactNode }) =>
@@ -132,9 +133,73 @@ describe("useCreateTagModal", () => {
     expect(onSuccess).toHaveBeenCalledWith({
       id: newTagId,
       name: "New Category",
-      color: null,
+      backgroundColor: null,
+      textColor: null,
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("sends the colour pair with the name and keeps it on the created tag", async () => {
+    const newTagId = "01900100-0000-7000-8000-000000000098";
+    post.mockResolvedValueOnce({
+      data: {
+        id: newTagId,
+        name: "Hot",
+        backgroundColor: "#FEE2E2",
+        textColor: "#991B1B",
+        createdAt: "2026-09-24T00:00:00.000Z",
+        updatedAt: "2026-09-24T00:00:00.000Z",
+      },
+    });
+
+    const { result } = renderTagModal({
+      open: true,
+      initialName: "Hot",
+      existingTags: EXISTING_TAGS,
+      onSuccess,
+      onClose,
+    });
+
+    act(() => {
+      result.current.handleColorChange({ backgroundColor: "#FEE2E2", textColor: "#991B1B" });
+    });
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(post).toHaveBeenCalledWith("/api/tenant/crm/v1/tags", {
+      name: "Hot",
+      backgroundColor: "#FEE2E2",
+      textColor: "#991B1B",
+    });
+    expect(onSuccess).toHaveBeenCalledWith({
+      id: newTagId,
+      name: "Hot",
+      backgroundColor: "#FEE2E2",
+      textColor: "#991B1B",
+    });
+  });
+
+  it("maps 422 CRM_TAG_COLOR_INCOMPLETE to the colour message", async () => {
+    post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 422, data: { errorCode: "CRM_TAG_COLOR_INCOMPLETE" } },
+    });
+
+    const { result } = renderTagModal({
+      open: true,
+      initialName: "Half colour",
+      existingTags: [],
+      onSuccess,
+      onClose,
+    });
+
+    await act(async () => {
+      await result.current.handleSubmit();
+    });
+
+    expect(result.current.serverError).toBe(ar.crmTags.errors.colorIncomplete);
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 
   it("handles 409 CRM_TAG_NAME_TAKEN from server", async () => {

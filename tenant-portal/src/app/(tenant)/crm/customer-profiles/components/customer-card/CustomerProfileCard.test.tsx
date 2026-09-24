@@ -39,10 +39,10 @@ const mockCustomer: CustomerProfileItem = {
   primaryContactName: "Mona Saleh",
   primaryContact: null,
   tags: [
-    { id: "0192f3a0-0000-7000-8000-000000000020", name: "Healthcare" },
-    { id: "0192f3a0-0000-7000-8000-000000000021", name: "Priority" },
-    { id: "0192f3a0-0000-7000-8000-000000000022", name: "Enterprise" },
-    { id: "0192f3a0-0000-7000-8000-000000000023", name: "Renewal" },
+    { id: "0192f3a0-0000-7000-8000-000000000020", name: "Healthcare", backgroundColor: null, textColor: null },
+    { id: "0192f3a0-0000-7000-8000-000000000021", name: "Priority", backgroundColor: null, textColor: null },
+    { id: "0192f3a0-0000-7000-8000-000000000022", name: "Enterprise", backgroundColor: null, textColor: null },
+    { id: "0192f3a0-0000-7000-8000-000000000023", name: "Renewal", backgroundColor: null, textColor: null },
   ],
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
   owner: {

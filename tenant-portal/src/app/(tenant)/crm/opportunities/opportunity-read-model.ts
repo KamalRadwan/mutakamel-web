@@ -1,5 +1,6 @@
 import { isUUIDv7 } from "@/lib/uuid";
 import type { CardColor } from "@/design-system";
+import { parseCrmTags, type CrmTag } from "../shared/tag-contract";
 import { parseOpportunityCardColor } from "./opportunity-card-contract";
 
 export type OpportunityCustomerProfileType = "INDIVIDUAL" | "CORPORATE";
@@ -12,11 +13,6 @@ export interface OpportunityPrimaryContact {
   isPrimary: boolean;
   email: string | null;
   phones: string[];
-}
-
-export interface OpportunityTagSummary {
-  id: string;
-  name: string;
 }
 
 export interface OpportunityReadFields {
@@ -36,10 +32,8 @@ export interface OpportunityReadFields {
   openActivityCount: number;
   nextOpenActivityAt: string | null;
   activityState: OpportunityActivityState;
-  tags: OpportunityTagSummary[];
+  tags: CrmTag[];
 }
-
-const MAX_OPPORTUNITY_TAGS = 500;
 
 function invalid(): never {
   throw new Error("Invalid opportunity response.");
@@ -81,18 +75,6 @@ function primaryContact(value: unknown): OpportunityPrimaryContact | null {
   };
 }
 
-function tags(value: unknown): OpportunityTagSummary[] {
-  if (value === null || value === undefined) return [];
-  if (!Array.isArray(value) || value.length > MAX_OPPORTUNITY_TAGS) invalid();
-  const parsed = value.map((entry) => {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) invalid();
-    const tag = entry as Record<string, unknown>;
-    if (!isUUIDv7(tag.id) || typeof tag.name !== "string" || tag.name.length === 0) invalid();
-    return { id: tag.id, name: tag.name };
-  });
-  if (new Set(parsed.map(({ id }) => id)).size !== parsed.length) invalid();
-  return parsed;
-}
 
 function activityState(value: unknown): OpportunityActivityState {
   if (value === null || value === undefined) return "NO_OPEN";
@@ -127,7 +109,7 @@ export function parseOpportunityReadFields(
     openActivityCount: count as number,
     nextOpenActivityAt,
     activityState: activityState(item.activityState),
-    tags: tags(item.tags),
+    tags: parseCrmTags(item.tags, "Invalid opportunity response."),
   };
 }
 

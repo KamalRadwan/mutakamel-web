@@ -47,6 +47,7 @@ import {
   SlidersHorizontal,
   SquareStack,
   Store,
+  Tags,
   TrendingUp,
   Truck,
   Upload,
@@ -259,6 +260,13 @@ export const NAV_SECTIONS: NavSection[] = [
         href: TENANT_ROUTES.crmAcquisitionSources,
         icon: TrendingUp,
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmAcquisitionSources),
+      },
+      {
+        id: "crmTags",
+        labelKey: "crmTags",
+        href: TENANT_ROUTES.crmTags,
+        icon: Tags,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmTags),
       },
       {
         id: "customFields",

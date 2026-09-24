@@ -2,7 +2,8 @@
 
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { parseLeadTagArray, useCreateLeadTags } from "./useCreateLeadTags";
+import { parseCrmTagCatalogue } from "../../shared/tag-contract";
+import { useCreateLeadTags } from "./useCreateLeadTags";
 
 const { auth, get } = vi.hoisted(() => ({ auth: vi.fn(), get: vi.fn() }));
 
@@ -34,26 +35,26 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("parseLeadTagArray", () => {
+describe("parseCrmTagCatalogue", () => {
   it("accepts the raw CRM catalogue and rejects ambiguous ids", () => {
-    expect(parseLeadTagArray([TAG_VIEW])).toEqual([
-      { id: TAG, name: "Priority", color: null },
+    expect(parseCrmTagCatalogue([TAG_VIEW])).toEqual([
+      { ...TAG_VIEW, backgroundColor: null, textColor: null },
     ]);
-    expect(() => parseLeadTagArray([TAG_VIEW, TAG_VIEW])).toThrow();
+    expect(() => parseCrmTagCatalogue([TAG_VIEW, TAG_VIEW])).toThrow();
     expect(() =>
-      parseLeadTagArray([TAG_VIEW, { ...TAG_VIEW, id: TAG.toUpperCase() }]),
+      parseCrmTagCatalogue([TAG_VIEW, { ...TAG_VIEW, id: TAG.toUpperCase() }]),
     ).toThrow();
   });
 
   it("rejects envelopes, oversized catalogues and names beyond the DTO limit", () => {
-    expect(() => parseLeadTagArray({ data: [TAG_VIEW] })).toThrow();
-    expect(() => parseLeadTagArray(Array.from({ length: 501 }, () => TAG_VIEW))).toThrow();
-    expect(() => parseLeadTagArray([{ ...TAG_VIEW, name: "x".repeat(61) }])).toThrow();
+    expect(() => parseCrmTagCatalogue({ data: [TAG_VIEW] })).toThrow();
+    expect(() => parseCrmTagCatalogue(Array.from({ length: 501 }, () => TAG_VIEW))).toThrow();
+    expect(() => parseCrmTagCatalogue([{ ...TAG_VIEW, name: "x".repeat(61) }])).toThrow();
   });
 
   it("measures the name limit by Unicode code point", () => {
-    expect(parseLeadTagArray([{ ...TAG_VIEW, name: "😀".repeat(40) }])).toHaveLength(1);
-    expect(() => parseLeadTagArray([{ ...TAG_VIEW, name: "😀".repeat(61) }])).toThrow();
+    expect(parseCrmTagCatalogue([{ ...TAG_VIEW, name: "😀".repeat(40) }])).toHaveLength(1);
+    expect(() => parseCrmTagCatalogue([{ ...TAG_VIEW, name: "😀".repeat(61) }])).toThrow();
   });
 });
 
@@ -106,7 +107,7 @@ describe("useCreateLeadTags", () => {
     await waitFor(() => expect(result.current.items).toHaveLength(1));
     expect(result.current.canManage).toBe(true);
 
-    const newTag = { id: "01900100-0000-7000-8000-000000000009", name: "Alpha", color: null as null };
+    const newTag = { id: "01900100-0000-7000-8000-000000000009", name: "Alpha", backgroundColor: null, textColor: null };
     act(() => {
       result.current.addTag(newTag);
     });

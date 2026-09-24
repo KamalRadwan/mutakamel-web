@@ -133,7 +133,7 @@ describe("CRM customer-profile contract", () => {
     expect(afterStatusUpdate.imageUrl).toBe(IMAGE_URL);
     expect(afterStatusUpdate.companyWebsite).toBe("https://acme.test/about");
     expect(afterStatusUpdate.tags).toEqual([
-      { id: TAG_ID, name: "Healthcare" },
+      { id: TAG_ID, name: "Healthcare", backgroundColor: null, textColor: null },
     ]);
     expect(afterStatusUpdate.owner?.avatarUrl).toContain("/image?v=");
     expect(afterStatusUpdate.rating).toBe(2);

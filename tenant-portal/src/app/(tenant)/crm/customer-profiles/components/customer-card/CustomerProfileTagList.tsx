@@ -1,9 +1,9 @@
 "use client";
 
 import { Tag } from "lucide-react";
-import { cn, iconSize } from "@/design-system";
+import { TagChip, TagChipOverflow, cn, iconSize } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
-import type { CustomerProfileTag } from "../../hooks/useCustomerProfiles";
+import type { CrmTag } from "../../../shared/tag-contract";
 
 export function CustomerProfileTagList({
   tags,
@@ -11,7 +11,7 @@ export function CustomerProfileTagList({
   maxVisible = 3,
   compact = false,
 }: {
-  tags: CustomerProfileTag[];
+  tags: CrmTag[];
   moreLabel: string;
   maxVisible?: number;
   compact?: boolean;
@@ -19,6 +19,7 @@ export function CustomerProfileTagList({
   if (tags.length === 0) return null;
   const visible = tags.slice(0, maxVisible);
   const hidden = tags.slice(maxVisible);
+  const size = compact ? "xs" : "sm";
 
   return (
     <ul
@@ -34,30 +35,23 @@ export function CustomerProfileTagList({
         <Tag className={iconSize({ size: "sm" })} />
       </li>
       {visible.map((tag) => (
-        <li
-          key={tag.id}
-          title={tag.name}
-          className={cn(
-            "inline-flex min-w-0 max-w-full items-center rounded-full border border-border/70 bg-muted/60 font-medium leading-none text-muted-foreground",
-            compact ? "max-w-20 px-1.5 py-0.5 text-2xs" : "px-2 py-0.5 text-xs",
-          )}
-        >
-          <span className="truncate">{tag.name}</span>
+        <li key={tag.id} className="flex min-w-0 max-w-full">
+          <TagChip
+            label={tag.name}
+            backgroundColor={tag.backgroundColor}
+            textColor={tag.textColor}
+            size={size}
+            className={compact ? "max-w-20" : undefined}
+          />
         </li>
       ))}
       {hidden.length > 0 && (
-        <li
-          className={cn(
-            "inline-flex shrink-0 items-center rounded-full border border-border/70 bg-muted/60 font-medium leading-none text-muted-foreground",
-            compact ? "px-1 py-0.5 text-2xs" : "px-1.5 py-0.5 text-xs",
-          )}
-        >
-          <span aria-hidden="true">
-            {formatTemplate(moreLabel, { count: hidden.length })}
-          </span>
-          <span className="sr-only">
-            {hidden.map((tag) => tag.name).join(", ")}
-          </span>
+        <li className="flex shrink-0">
+          <TagChipOverflow
+            label={formatTemplate(moreLabel, { count: hidden.length })}
+            hiddenNames={hidden.map((tag) => tag.name)}
+            size={size}
+          />
         </li>
       )}
     </ul>

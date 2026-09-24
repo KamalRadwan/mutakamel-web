@@ -1,22 +1,23 @@
 "use client";
 
-import { Field, FormModal, Input } from "@/design-system";
+import { Field, FormModal, Input, TagColorPicker } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import type { LeadTag } from "../../lead-card-contract";
+import type { CrmTag } from "../../../shared/tag-contract";
 import { useCreateTagModal } from "../../hooks/useCreateTagModal";
 
 export interface CreateTagModalProps {
   open: boolean;
   initialName?: string;
-  existingTags: LeadTag[];
-  onSuccess: (newTag: LeadTag) => void;
+  existingTags: CrmTag[];
+  onSuccess: (newTag: CrmTag) => void;
   onClose: () => void;
 }
 
 /**
  * Centered modal card to create a new CRM lead tag in the catalogue.
  * Allowed only for users with the `crm.tags.manage` permission.
- * Strictly sends `{ name }` matching the CRM Lead Tags API v1 CreateTagDto.
+ * Sends `{ name }`, or `{ name, backgroundColor, textColor }` when a colour
+ * was picked — CreateTagDto accepts both colours or neither.
  */
 export function CreateTagModal({
   open,
@@ -78,6 +79,12 @@ export function CreateTagModal({
             autoFocus
           />
         </Field>
+        <TagColorPicker
+          value={modal.color}
+          onChange={modal.handleColorChange}
+          previewLabel={modal.name}
+          disabled={modal.isSubmitting}
+        />
       </div>
     </FormModal>
   );

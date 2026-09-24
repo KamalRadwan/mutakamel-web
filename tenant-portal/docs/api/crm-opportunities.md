@@ -138,7 +138,7 @@ independently limited page plus its own cursor, so columns paginate separately.
       "openActivityCount": 2,
       "nextOpenActivityAt": "2026-09-19T08:00:00.000Z",
       "activityState": "TODAY",
-      "tags": [{ "id": "0192…", "name": "Renewal" }]
+      "tags": [{ "id": "0192…", "name": "Renewal", "backgroundColor": "#DBEAFE", "textColor": "#1E40AF" }]
     }],
     "summary": {
       "totalCount": 143,
@@ -160,7 +160,8 @@ independently limited page plus its own cursor, so columns paginate separately.
   (`overdueCount` is the one worth surfacing).
 - Stage order is `stage.rank`, not a client sort.
 - Board items use the compact read model needed by the lane card. They include
-  customer/company/contact display names, deal values, tags, public owner,
+  customer/company/contact display names, deal values, tags (each
+  `{ id, name, backgroundColor, textColor }`, verified 2026-09-24), public owner,
   activity state, `importance` and `cardColor`. They deliberately omit phone,
   email, address, the full primary-contact object and acquisition-source
   details; those belong to Card/Table and detail responses.
@@ -204,7 +205,7 @@ independently limited page plus its own cursor, so columns paginate separately.
     "openActivityCount": 2,
     "nextOpenActivityAt": "2026-09-19T08:00:00.000Z",
     "activityState": "TODAY",
-    "tags": [{ "id": "0192…", "name": "Renewal" }]
+    "tags": [{ "id": "0192…", "name": "Renewal", "backgroundColor": null, "textColor": null }]
   }],
   "pageInfo": { "limit": 50, "hasMore": true, "nextCursor": "opaque-cursor" }
 }

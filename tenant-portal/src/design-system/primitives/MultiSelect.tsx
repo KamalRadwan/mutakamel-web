@@ -11,11 +11,18 @@ import type { ComboboxOption } from "./Combobox";
 import { FieldControlBoundary, useFieldControlContext } from "./field-control";
 import { Input } from "./Input";
 import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
+import { TagChip } from "./TagChip";
+import type { TagColor } from "./tag-color";
+
+/** An option that is a tag may carry its colour; its chip then draws it. */
+export interface MultiSelectOption extends ComboboxOption {
+  tagColor?: TagColor | null;
+}
 
 export interface MultiSelectProps extends ControlSizeProps {
   values: string[];
   onValuesChange: (next: string[]) => void;
-  options: ComboboxOption[];
+  options: MultiSelectOption[];
   placeholder: string;
   searchPlaceholder?: string;
   emptyLabel: string;
@@ -132,7 +139,7 @@ export function MultiSelect({
     onValuesChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
   }
 
-  function toggleOption(option: ComboboxOption) {
+  function toggleOption(option: MultiSelectOption) {
     if (option.disabled) return;
     toggle(option.value);
   }
@@ -170,7 +177,7 @@ export function MultiSelect({
     }
   }
 
-  function handleOptionKeyDown(event: KeyboardEvent<HTMLLIElement>, option: ComboboxOption) {
+  function handleOptionKeyDown(event: KeyboardEvent<HTMLLIElement>, option: MultiSelectOption) {
     const currentIndex = enabledOptions.findIndex((item) => item.value === option.value);
     if (currentIndex === -1) return;
 
@@ -221,21 +228,40 @@ export function MultiSelect({
     }
   }
 
-  function renderChip(option: Pick<ComboboxOption, "value" | "label">) {
+  function renderChip(option: Pick<MultiSelectOption, "value" | "label" | "tagColor">) {
+    const remove = editable && (
+      <Button
+        variant="ghost"
+        size="xs"
+        aria-label={formatTemplate(removeLabel, { label: option.label })}
+        onClick={() => toggle(option.value)}
+        // On a coloured chip the neutral hover fill would be a grey patch on
+        // the tenant's colour; the icon takes the chip's own text colour.
+        className={cn(
+          "size-4 shrink-0 cursor-pointer rounded-xs p-0!",
+          option.tagColor && "text-current hover:bg-transparent hover:opacity-75",
+        )}
+      >
+        <X className="size-3" aria-hidden="true" />
+      </Button>
+    );
+    if (option.tagColor) {
+      return (
+        <TagChip
+          key={option.value}
+          label={option.label}
+          backgroundColor={option.tagColor.backgroundColor}
+          textColor={option.tagColor.textColor}
+          className="max-w-40 gap-0.5 pe-0.5"
+        >
+          {remove}
+        </TagChip>
+      );
+    }
     return (
       <Badge key={option.value} tone="neutral" className="max-w-40 gap-0.5 pe-0.5">
         <bdi dir="auto" className="truncate">{option.label}</bdi>
-        {editable && (
-          <Button
-            variant="ghost"
-            size="xs"
-            aria-label={formatTemplate(removeLabel, { label: option.label })}
-            onClick={() => toggle(option.value)}
-            className="size-4 shrink-0 cursor-pointer rounded-xs p-0!"
-          >
-            <X className="size-3" aria-hidden="true" />
-          </Button>
-        )}
+        {remove}
       </Badge>
     );
   }
@@ -379,7 +405,15 @@ export function MultiSelect({
                   className={cn("size-3.5 shrink-0", !values.includes(option.value) && "invisible")}
                   aria-hidden="true"
                 />
-                <bdi dir="auto" className="truncate">{option.label}</bdi>
+                {option.tagColor ? (
+                  <TagChip
+                    label={option.label}
+                    backgroundColor={option.tagColor.backgroundColor}
+                    textColor={option.tagColor.textColor}
+                  />
+                ) : (
+                  <bdi dir="auto" className="truncate">{option.label}</bdi>
+                )}
               </li>
             ))}
             {showCreateOption && (

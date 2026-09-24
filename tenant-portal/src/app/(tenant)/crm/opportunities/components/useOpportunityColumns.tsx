@@ -11,6 +11,7 @@ import {
   DateTime,
   Money,
   StatusBadge,
+  TagChip,
   cn,
   focusRing,
   iconSize,
@@ -119,13 +120,14 @@ export function useOpportunityColumns({
             {item.tags.length > 0 && (
               <span className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden">
                 {item.tags.slice(0, 2).map((tag) => (
-                  <span
+                  <TagChip
                     key={tag.id}
-                    title={tag.name}
-                    className="max-w-20 truncate rounded-full border border-border/70 bg-muted/60 px-1.5 py-0.5 text-2xs font-medium leading-none text-muted-foreground"
-                  >
-                    {tag.name}
-                  </span>
+                    label={tag.name}
+                    backgroundColor={tag.backgroundColor}
+                    textColor={tag.textColor}
+                    size="xs"
+                    className="max-w-20"
+                  />
                 ))}
                 {item.tags.length > 2 && (
                   <span className="shrink-0 text-2xs text-muted-foreground">

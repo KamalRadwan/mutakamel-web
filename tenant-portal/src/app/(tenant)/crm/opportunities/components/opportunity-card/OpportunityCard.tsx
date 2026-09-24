@@ -8,7 +8,7 @@ import {
   Tag,
   UserRound,
 } from "lucide-react";
-import { Badge, DateTime, Money, cn, iconSize } from "@/design-system";
+import { Badge, DateTime, Money, TagChip, cn, iconSize } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
@@ -93,9 +93,12 @@ export function OpportunityCard({ item }: { item: OpportunityCardRecord }) {
         <div className="flex min-w-0 flex-wrap items-center gap-1 pt-0.5">
           <Tag className={cn(iconSize({ size: "sm" }), "shrink-0 text-muted-foreground")} aria-hidden="true" />
           {visibleTags.map((tag) => (
-            <Badge key={tag.id} tone="neutral" className={COMPACT_BADGE}>
-              {tag.name}
-            </Badge>
+            <TagChip
+              key={tag.id}
+              label={tag.name}
+              backgroundColor={tag.backgroundColor}
+              textColor={tag.textColor}
+            />
           ))}
           {hiddenTagCount > 0 && (
             <span className="text-2xs text-muted-foreground">

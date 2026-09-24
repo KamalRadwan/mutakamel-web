@@ -148,8 +148,8 @@ describe("the tag picker", () => {
       tagsUnavailable: true,
       tagIds: ["priority"],
       tags: [
-        { id: "priority", name: "Priority", color: null },
-        { id: "new", name: "New choice", color: null },
+        { id: "priority", name: "Priority", backgroundColor: null, textColor: null },
+        { id: "new", name: "New choice", backgroundColor: null, textColor: null },
       ],
       onTagsChange,
     });
@@ -162,13 +162,14 @@ describe("the tag picker", () => {
     const selected = Array.from({ length: 50 }, (_, index) => ({
       id: `tag-${index}`,
       name: `Tag ${index}`,
-      color: null,
+      backgroundColor: null,
+      textColor: null,
     }));
     const onTagsChange = vi.fn();
     renderSection({
       showTags: true,
       tagIds: selected.map(({ id }) => id),
-      tags: [...selected, { id: "extra", name: "Additional", color: null }],
+      tags: [...selected, { id: "extra", name: "Additional", backgroundColor: null, textColor: null }],
       onTagsChange,
     });
 
@@ -188,7 +189,7 @@ describe("the tag picker", () => {
       showTags: true,
       canCreateTag: true,
       onCreateTag,
-      tags: [{ id: "tag-1", name: "Existing", color: null }],
+      tags: [{ id: "tag-1", name: "Existing", backgroundColor: null, textColor: null }],
     });
 
     fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.tags }));
@@ -207,7 +208,7 @@ describe("the tag picker", () => {
       showTags: true,
       canCreateTag: false,
       onCreateTag,
-      tags: [{ id: "tag-1", name: "Existing", color: null }],
+      tags: [{ id: "tag-1", name: "Existing", backgroundColor: null, textColor: null }],
     });
 
     fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.tags }));

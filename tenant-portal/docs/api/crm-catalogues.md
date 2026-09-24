@@ -2,11 +2,11 @@
 
 Status: **verified**
 
-Last source verification: **2026-09-07**
+Last source verification: **2026-09-24**
 
 Owning app: **crm-app**
 
-Portal status: **built** — all five screens are server-backed. Not exercised
+Portal status: **built** — all six screens are server-backed. Not exercised
 against a live session: CRM is blocked twice over, by P4 and by Q17.
 
 Covers the tenant-configured vocabulary the workspaces depend on: lead stages,
@@ -151,11 +151,62 @@ Canonical prefix: `/api/tenant/crm/v1/tags`
 | PATCH | `/api/tenant/crm/v1/tags/:id` | `crm.tags.manage` |
 | DELETE | `/api/tenant/crm/v1/tags/:id` | `crm.tags.manage` |
 
-The list is a raw, name-sorted array of `{ id, name, createdAt, updatedAt }`,
-not a Core envelope and not paginated. A tenant can have at most 500 live tags.
-Names are trimmed, non-empty, at most 60 characters, and unique among live tags
-after case/whitespace normalization. There is no colour field in the current
-catalogue contract.
+Verified **2026-09-24** against `tags/tags.controller.ts`,
+`tags/tags.service.ts` and `tags/dto/tag.dto.ts`.
+
+The list is a raw, name-sorted array, not a Core envelope and not paginated.
+Every catalogue response (`GET /tags`, `GET/POST/PATCH /tags/:id`) is one item
+of this shape:
+
+```json
+{
+  "id": "0192…",
+  "name": "High priority",
+  "backgroundColor": "#FEE2E2",
+  "textColor": "#991B1B",
+  "createdAt": "2026-09-24T09:00:00.000Z",
+  "updatedAt": "2026-09-24T09:00:00.000Z"
+}
+```
+
+A tenant can have at most 500 live tags. Names are trimmed, non-empty, at most
+60 characters, and unique among live tags after case/whitespace normalization.
+
+**Colour.** `backgroundColor` and `textColor` are a pair: both upper-case
+`#RRGGBB`, or both `null` for an uncoloured tag. The server accepts either case
+on input (`^#[0-9A-Fa-f]{6}$`) and stores the upper-case form.
+
+| Request | Body | Rules |
+| --- | --- | --- |
+| `POST /tags` | `{ name, backgroundColor?, textColor? }` | Send both colours or neither |
+| `PATCH /tags/:id` | any of `{ name?, backgroundColor?, textColor? }` | At least one key. Colours travel together; `backgroundColor: null, textColor: null` clears the colour |
+| `DELETE /tags/:id` | — | `204`. Soft-deletes the tag and detaches it from every record in the same transaction |
+
+| Status | Code | When |
+| --- | --- | --- |
+| `409` | `CRM_TAG_NAME_TAKEN` | Another live tag already has the normalized name |
+| `422` | `CRM_TAG_LIMIT_EXCEEDED` | Creating the 501st live tag |
+| `422` | `CRM_TAG_COLOR_INCOMPLETE` | Only one colour sent, or one `null` and the other not |
+| `422` | `CRM_TAG_UPDATE_EMPTY` | `PATCH` with no field |
+| `404` | `CRM_TAG_NOT_FOUND` | The tag does not exist or was deleted |
+
+The same `{ id, name, backgroundColor, textColor }` summary is embedded in the
+lead, customer-profile and opportunity read models, and
+`GET /crm/{leads|customer-profiles|opportunities}/:id/tags` returns the full
+catalogue shape above. The portal reads every one of them through
+`crm/shared/tag-contract.ts`; a missing, half-set or malformed colour pair is
+read as an uncoloured tag rather than failing the record that carries it.
+
+`POST`, `PATCH` and `DELETE /tags*` are `idempotent: false` in the Gateway
+contract, so the portal sends them with `nonReplayable` and no idempotency key.
+A transport failure or `5xx` is an uncertain outcome: the catalogue is re-read
+before anything else is sent.
+
+The **Tags** screen at `/crm/tags` (Setup nav, gated on `crm.tags.read`;
+create/edit/delete need `crm.tags.manage`) lists the catalogue with each chip,
+creates and edits a tag's name and colour in one `FormDrawer` with the design
+system's `TagColorPicker` — `PATCH` carries only the changed keys, colours as a
+pair — and deletes through `ConfirmActionModal`.
 
 The Create Lead modal loads this catalogue and sends the selected ids as
 `CreateLeadDto.tagIds` in its single lead-creation request. Up to 50 unique ids
@@ -283,9 +334,9 @@ installed package declaration wins and this documentation is stale.
 
 ## Frontend notes
 
-- All four mutable catalogues use `FormDrawer` for create and edit, and
+- All five mutable catalogues use `FormDrawer` for create and edit, and
   `ConfirmActionModal` for delete.
-- All five screens render through `DataTable`.
+- All six screens render through `DataTable`.
 - These catalogues are **fetched by the workspaces that depend on them** —
   Leads needs lead stages for its board axis, and both Leads and Customer
   Profiles need acquisition sources for their filters. Cache them per session;
@@ -299,6 +350,7 @@ installed package declaration wins and this documentation is stale.
 | --- | --- |
 | Lead stages | live — list, create, delete, set-default |
 | Acquisition sources | live |
+| Tags | live — list, create, edit name/colour, delete |
 | Custom fields | live |
 | CRM settings | live — safe subset writable |
 | Static data catalogue | live — read-only, contract-tested |

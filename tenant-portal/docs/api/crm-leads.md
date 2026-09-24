@@ -125,7 +125,9 @@ basic/advanced filter body as `/leads/search`; the server adds each lane's
 stage constraint after scoped access.
 
 Board cards include identity/type, stage, owner, rating, colour, next activity,
-primary-contact name and tags. They omit address, primary-contact details,
+primary-contact name and tags. Each tag is `{ id, name, backgroundColor,
+textColor }` — the colour pair is upper-case `#RRGGBB` or both `null`
+(2026-09-24, [catalogues](crm-catalogues.md#tags)). They omit address, primary-contact details,
 email and phone aggregates. Card and Table remain global paginated list/search
 reads and become stage-filtered only when the user selects a stage.
 
@@ -189,7 +191,12 @@ The modal sends all selected ids inside the single `POST /leads` body:
 The lead, its Party changes, custom fields and tag links share the creation
 transaction. An unknown or deleted tag returns `422 CRM_TAG_UNKNOWN` and rolls
 back the complete creation; malformed, duplicate or over-limit ids are rejected
-by DTO validation. The `201` lead response includes the saved `tags` array.
+by DTO validation. The `201` lead response includes the saved `tags` array of
+`{ id, name, backgroundColor, textColor }`.
+
+The picker's **Create tag** modal posts `{ name }` or
+`{ name, backgroundColor, textColor }` to `/tags` (`crm.tags.manage`), and the
+created tag joins the picker with its colour.
 
 Initial tag assignment uses the existing scoped `crm.leads.create` authority;
 it does not require `crm.leads.update` or `crm.tags.manage`. The picker requires
@@ -432,7 +439,9 @@ The one-lead page no longer mounts its standalone notes-ledger card; Notes in
 Details remains `description`. This removes no stored ledger notes and makes
 no notes-ledger create/delete call.
 
-`GET /api/tenant/crm/v1/leads/:id/tags` supplies the read-only tags.
+`GET /api/tenant/crm/v1/leads/:id/tags` supplies the read-only tags — full
+catalogue items, `{ id, name, backgroundColor, textColor, createdAt, updatedAt }`
+(re-verified 2026-09-24, see [catalogues](crm-catalogues.md#tags)).
 Owner/creator names use the authenticated actor when IDs match; otherwise
 `GET /api/tenant/core/v1/users/:id` requires `users.user.read`. The owner picker
 uses the same permission-gated `/users` list filtered by branch and ACTIVE

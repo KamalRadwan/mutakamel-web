@@ -388,6 +388,41 @@ Four rules keep them from becoming a second palette:
   non-text bar; a swatch declared on `:root` and forgotten in `.dark` fails the
   parse rather than shipping a light colour onto a dark card.
 
+## Tag colours — a pair the tenant owns
+
+Added **2026-09-24**. A tag — in CRM today, in Trade or Accounting when they
+grow tags — may carry a colour, and that colour is **two values chosen
+together**: a background and a text colour, each an upper-case `#RRGGBB`. It
+replaces the earlier rule that a tag's colour was only a leading dot on the one
+neutral chip.
+
+Like a card swatch it is a private filing mark, so no role ramp supplies it —
+but unlike a swatch it is **text on a fill**, and that changes what has to be
+measured:
+
+- **The pair is judged against itself, never against the page.** A chip's
+  text sits on the chip's own background, so its legibility does not depend on
+  the card, the theme or the tenant's brand. The pair is therefore *not*
+  re-tinted for dark mode: a pale chip on a dark card still reads, because its
+  text contrast never involved the card.
+- **Thirty presets, every one at 4.5:1 or better.** `TAG_COLOR_PRESETS` in
+  `src/design-system/primitives/tag-color.ts` — twenty tinted chips (each hue
+  family's 100 fill with its 800 text, plus slate/gray/stone) and ten solid
+  ones. The hex values are written out because the theme flip above collapses
+  the stock families; no utility can supply them. `pnpm design:contrast` parses
+  that file and fails on any pair under 4.5:1 or a count other than 30.
+- **A custom pair is allowed and always flagged.** `TagColorPicker` shows the
+  live ratio and a caution note under 4.5:1. The tenant may know better, so it
+  does not block; it never lets a weak pair pass silently.
+- **Uncoloured is the default and stays theme-aware.** Both values `null`
+  renders the neutral chip (`bg-muted/60`, `text-muted-foreground`,
+  `border-border/70`), which the semantic tokens already carry into dark mode.
+- **Inline style, inside the design system only.** The pair is tenant data, so
+  `TagChip` applies it as `style` — the same exception `chart-common.tsx` takes
+  for a legend swatch — after `toTagColor` has proved both values are
+  `#RRGGBB`. Feature code passes `backgroundColor`/`textColor` props and never
+  writes a colour itself.
+
 ## Elevation and control tokens
 
 > **Superseded.** The control scale that was here specified 28/32/36/40/44px.

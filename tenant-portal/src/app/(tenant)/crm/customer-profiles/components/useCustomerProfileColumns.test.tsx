@@ -37,7 +37,7 @@ const mockCustomer: CustomerProfileItem = {
     isPrimary: true,
   },
   tags: [
-    { id: "0192f3a0-0000-7000-8000-000000000020", name: "Healthcare" },
+    { id: "0192f3a0-0000-7000-8000-000000000020", name: "Healthcare", backgroundColor: null, textColor: null },
   ],
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
   owner: {

@@ -5,7 +5,7 @@ import { readOwnerOptions } from "./readLeadOwnerOptions";
 import { useTenantAuth } from "@/context/AuthContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { readCoreData } from "@/lib/api/envelope";
-import { parseLeadTags, type LeadTag } from "../../lead-card-contract";
+import { parseCrmTags, type CrmTag } from "../../../shared/tag-contract";
 import { leadPath, type LeadDetail } from "../../lead-contract";
 import { parseLeadDetailsUser, type LeadDetailsUser } from "../lead-details-edit-contract";
 
@@ -19,7 +19,7 @@ export function useLeadDetailsReferences(lead: LeadDetail, editing: boolean, all
   const [options, setOptions] = useState<LeadDetailsUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersUnavailable, setUsersUnavailable] = useState(false);
-  const [tags, setTags] = useState<LeadTag[]>([]);
+  const [tags, setTags] = useState<CrmTag[]>([]);
   const [tagsLoading, setTagsLoading] = useState(true);
   const [tagsUnavailable, setTagsUnavailable] = useState(false);
 
@@ -59,7 +59,7 @@ export function useLeadDetailsReferences(lead: LeadDetail, editing: boolean, all
       void axiosClient.get<unknown>(`${leadPath(lead.id)}/tags`, { signal: controller.signal, cache: "no-store", maxResponseBytes: 256 * 1024 }).then((response) => {
         // A missing/null list is a broken GET contract, not an empty tag set.
         if (!Array.isArray(response.data)) throw new Error("Invalid lead tags response.");
-        const next = parseLeadTags(response.data);
+        const next = parseCrmTags(response.data);
         if (!controller.signal.aborted) { setTags(next); setTagsUnavailable(false); }
       }).catch(() => {
         if (!controller.signal.aborted) { setTags([]); setTagsUnavailable(true); }

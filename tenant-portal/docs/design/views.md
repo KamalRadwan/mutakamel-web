@@ -653,12 +653,16 @@ The only per-screen code. Everything above is shared.
 | Filters | `leadProfileType`, `status`, `stageId`, `stageFlag`, `acquisitionSourceId`, `ownerUserId` |
 | Terminal stages | Any stage whose flag is `CONVERTED` or `DISQUALIFIED` |
 
-**Tags** render as chips under the contact name — sentence case on
-`bg-muted`, never the `Badge` primitive, which states a record's *state* and
-says so in uppercase semibold. A tag is a value the tenant chose, so its
-optional colour is a leading dot rather than the chip's own background: the
-name is beside it, so nothing is carried by hue alone, and every chip stays on
-one background pair whose contrast is already known. The row is capped at
+**Tags** render as `TagChip`s under the contact name — sentence case, never
+the `Badge` primitive, which states a record's *state* and says so in
+uppercase semibold. A tag is a value the tenant chose, and **a coloured tag
+draws its own background/text pair** (changed 2026-09-24): the chip's
+background and text are the tag's `backgroundColor`/`textColor`, so the pair's
+contrast is the pair's own — every preset clears 4.5:1 and a weaker custom pair
+is flagged when it is chosen (see [tokens.md](tokens.md#tag-colours--a-pair-the-tenant-owns)). An
+**uncoloured tag stays the neutral theme-aware chip** (`bg-muted/60`,
+`text-muted-foreground`). The name is always the text, so nothing is carried
+by hue alone. The row is capped at
 three plus a `+N` chip that names the rest to a screen reader — a lead may
 carry fifty (`MAX_TAGS_PER_ATTACH`), and a card that grew a line per tag would
 be a different **height** from its neighbours, which is what the windowed

@@ -1,27 +1,25 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import type { TagColor } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { axiosClient } from "@/lib/api/axiosClient";
 import { formatTemplate } from "@/lib/format/template";
-import { isUUIDv7 } from "@/lib/uuid";
-import type { LeadTag } from "../lead-card-contract";
-
-export const TAGS_API_PATH = "/api/tenant/crm/v1/tags";
-export const TAG_NAME_MAX_LENGTH = 60;
-
-export interface TagResponse {
-  id: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import {
+  CRM_TAGS_PATH,
+  CRM_TAG_NAME_MAX_LENGTH,
+  buildCreateCrmTagBody,
+  crmTagErrorMessage,
+  parseCrmTagCatalogueItem,
+  readCrmTagError,
+  type CrmTag,
+} from "../../shared/tag-contract";
 
 export interface UseCreateTagModalOptions {
   open: boolean;
   initialName?: string;
-  existingTags: LeadTag[];
-  onSuccess: (newTag: LeadTag) => void;
+  existingTags: CrmTag[];
+  onSuccess: (newTag: CrmTag) => void;
   onClose: () => void;
 }
 
@@ -35,6 +33,7 @@ export function useCreateTagModal({
   const { t } = useI18n();
   const [prevOpen, setPrevOpen] = useState(open);
   const [name, setName] = useState(initialName.trim());
+  const [color, setColor] = useState<TagColor | null>(null);
   const [touched, setTouched] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -45,6 +44,7 @@ export function useCreateTagModal({
     setPrevOpen(open);
     if (open) {
       setName(initialName.trim());
+      setColor(null);
       setTouched(false);
       setFieldError(null);
       setServerError(null);
@@ -61,9 +61,9 @@ export function useCreateTagModal({
       if (val.length === 0) {
         return t.crmLeads.create.errors.required;
       }
-      if ([...val].length > TAG_NAME_MAX_LENGTH) {
+      if ([...val].length > CRM_TAG_NAME_MAX_LENGTH) {
         return formatTemplate(t.crmLeads.create.errors.maxLength, {
-          max: TAG_NAME_MAX_LENGTH,
+          max: CRM_TAG_NAME_MAX_LENGTH,
         });
       }
       const lower = val.toLowerCase();
@@ -83,6 +83,11 @@ export function useCreateTagModal({
     }
   };
 
+  const handleColorChange = (next: TagColor | null) => {
+    setColor(next);
+    setServerError(null);
+  };
+
   const handleBlur = () => {
     setTouched(true);
     setFieldError(validate(name));
@@ -98,60 +103,59 @@ export function useCreateTagModal({
     setServerError(null);
 
     try {
-      const response = await axiosClient.post<unknown>(TAGS_API_PATH, {
-        name: trimmed,
+      const response = await axiosClient.post<unknown>(
+        CRM_TAGS_PATH,
+        buildCreateCrmTagBody(trimmed, color),
+      );
+      // The created tag carries the colour the server stored, so its chip in
+      // the picker matches the catalogue from the first render.
+      const created = parseCrmTagCatalogueItem(response.data);
+      onSuccess({
+        id: created.id,
+        name: created.name,
+        backgroundColor: created.backgroundColor,
+        textColor: created.textColor,
       });
-
-      const data = response.data as Partial<TagResponse> | undefined;
-      const id = data?.id;
-      const tagName = data?.name;
-      if (!data || typeof data !== "object" || !id || !isUUIDv7(id) || typeof tagName !== "string") {
-        throw new Error("Invalid tag response payload.");
-      }
-
-      const createdTag: LeadTag = {
-        id,
-        name: tagName,
-        color: null,
-      };
-
-      onSuccess(createdTag);
       onClose();
     } catch (error: unknown) {
-      if (error instanceof TenantApiClientError || (typeof error === "object" && error !== null && "response" in error)) {
-        const res = (error as { response?: { status?: number; data?: { errorCode?: string; message?: string } } }).response;
-        const status = res?.status;
-        const code = res?.data?.errorCode;
-        const msg = res?.data?.message;
-
-        if (status === 409 || code === "CRM_TAG_NAME_TAKEN") {
-          setFieldError(t.crmLeads.create.createTagErrorNameTaken);
-        } else if (status === 422 || code === "CRM_TAG_LIMIT_EXCEEDED") {
-          setServerError(t.crmLeads.create.createTagErrorLimitExceeded);
-        } else {
-          setServerError(msg || t.crmLeads.create.createTagErrorGeneric);
-        }
-      } else {
+      const failure = readCrmTagError(error);
+      if (failure === null) {
         setServerError(t.crmLeads.create.createTagErrorGeneric);
+      } else if (
+        failure.code === "CRM_TAG_NAME_TAKEN" ||
+        (failure.code === null && failure.status === 409)
+      ) {
+        setFieldError(t.crmLeads.create.createTagErrorNameTaken);
+      } else {
+        setServerError(
+          crmTagErrorMessage(failure, {
+            ...t.crmTags.errors,
+            limitExceeded: t.crmLeads.create.createTagErrorLimitExceeded,
+            saveFailed: t.crmLeads.create.createTagErrorGeneric,
+          }),
+        );
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isDirty = trimmed.length > 0;
-  const isSubmitDisabled = isSubmitting || trimmed.length === 0 || [...trimmed].length > TAG_NAME_MAX_LENGTH;
+  const isDirty = trimmed.length > 0 || color !== null;
+  const isSubmitDisabled =
+    isSubmitting || trimmed.length === 0 || [...trimmed].length > CRM_TAG_NAME_MAX_LENGTH;
 
   return {
     name,
+    color,
     charCount,
-    maxChars: TAG_NAME_MAX_LENGTH,
+    maxChars: CRM_TAG_NAME_MAX_LENGTH,
     fieldError,
     serverError,
     isSubmitting,
     isDirty,
     isSubmitDisabled,
     handleNameChange,
+    handleColorChange,
     handleBlur,
     handleSubmit,
   };

@@ -31,12 +31,11 @@ import {
   parseLeadNextActivity,
   parseLeadOwner,
   parseLeadRating,
-  parseLeadTags,
   type LeadCardPatch,
   type LeadNextActivity,
   type LeadOwner,
-  type LeadTag,
 } from "../lead-card-contract";
+import { parseCrmTags, type CrmTag } from "../../shared/tag-contract";
 import {
   buildCreateLeadRequest,
   type CreateLeadForm,
@@ -102,7 +101,7 @@ export interface LeadItem {
    */
   primaryContactName: string;
   /** The card's tag chips. Empty for an untagged lead and for a row that omits the field. */
-  tags: LeadTag[];
+  tags: CrmTag[];
 }
 
 export interface LeadActionCapability {
@@ -262,7 +261,7 @@ function parseLead(value: unknown, expectedBranchId: string): LeadItem {
     owner: parseLeadOwner(lead.owner),
     nextActivity: parseLeadNextActivity(lead.nextActivity),
     primaryContactName: optionalString(lead.primaryContactName),
-    tags: parseLeadTags(lead.tags),
+    tags: parseCrmTags(lead.tags, "Invalid leads response."),
   };
 }
 

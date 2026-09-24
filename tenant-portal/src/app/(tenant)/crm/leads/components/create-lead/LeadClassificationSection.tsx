@@ -15,7 +15,7 @@ import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
 import { AcquisitionSourceOption } from "../../../shared/components/AcquisitionSourceIcon";
-import type { LeadTag } from "../../lead-card-contract";
+import { crmTagColor, type CrmTag } from "../../../shared/tag-contract";
 import {
   CRM_PROFILE_TYPES,
   LEAD_CREATE_LIMITS,
@@ -43,7 +43,7 @@ export interface LeadClassificationSectionProps {
   tagIds: string[];
   stages: LeadStage[];
   sources: AcquisitionSource[];
-  tags: LeadTag[];
+  tags: CrmTag[];
   showTags: boolean;
   tagsLoading: boolean;
   tagsUnavailable: boolean;
@@ -257,6 +257,7 @@ export function LeadClassificationSection({
             options={tags.map((tag) => ({
               value: tag.id,
               label: tag.name,
+              tagColor: crmTagColor(tag),
               // At the ceiling, existing selections stay removable while only
               // choices that would make CreateLeadDto invalid are disabled.
               disabled:

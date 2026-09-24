@@ -47,7 +47,7 @@ const card = {
   openActivityCount: 2,
   nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
   activityState: "FUTURE",
-  tags: [{ id: "01900100-0000-7000-8000-000000000123", name: "VIP" }],
+  tags: [{ id: "01900100-0000-7000-8000-000000000123", name: "VIP", backgroundColor: "#DBEAFE", textColor: "#1E40AF" }],
 };
 
 describe("Opportunity cards API contract", () => {

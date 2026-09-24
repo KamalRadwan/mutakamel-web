@@ -847,6 +847,31 @@ here for the create rule alone, not for room, which is exactly the case `card`
 was added for. The edit surface in the same file is an `EditDrawer` and stays
 one.
 
+## TagColorPicker
+
+```ts
+value: { backgroundColor: string; textColor: string } | null
+onChange: (next: TagColor | null) => void
+previewLabel?: string   // usually the tag name as typed
+disabled?: boolean
+```
+
+Controlled. Three parts, top to bottom:
+
+1. **Presets** — a radio group (arrow keys, direction-aware) of "none" plus the
+   thirty `TAG_COLOR_PRESETS`. Each swatch shows `Aa` in its text colour on its
+   background, is named in words (`t.tagColors.names`), and the checked one is
+   marked by a ring, never by hue.
+2. **Custom** — background and text, each a native `<input type="color">` plus
+   a hex `Input`. A half-typed hex stays a draft; it reaches `onChange` only
+   once it parses, paired with the other side's current colour, because the
+   backend takes both or neither.
+3. **Preview** — a `TagChip` in the chosen pair with the computed ratio, and a
+   caution note under 4.5:1. The note does not block saving.
+
+Generic — it knows nothing about CRM. Strings live in the `tagColors`
+namespace. First consumers: the CRM Create Tag modal and `/crm/tags`.
+
 ## StatusBadge
 
 ```tsx

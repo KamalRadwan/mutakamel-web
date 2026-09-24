@@ -19,10 +19,20 @@ describe("CreateTagModal", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The colour picker's radio group measures itself; jsdom has no observer.
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
   });
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   function renderModal(open = true, initialName = "") {
@@ -33,7 +43,7 @@ describe("CreateTagModal", () => {
         createElement(CreateTagModal, {
           open,
           initialName,
-          existingTags: [{ id: "01900100-0000-7000-8000-000000000001", name: "VIP", color: null }],
+          existingTags: [{ id: "01900100-0000-7000-8000-000000000001", name: "VIP", backgroundColor: null, textColor: null }],
           onSuccess,
           onClose,
         }),
@@ -72,7 +82,8 @@ describe("CreateTagModal", () => {
       expect(onSuccess).toHaveBeenCalledWith({
         id: createdId,
         name: "Urgent Lead",
-        color: null,
+        backgroundColor: null,
+        textColor: null,
       });
       expect(onClose).toHaveBeenCalled();
     });

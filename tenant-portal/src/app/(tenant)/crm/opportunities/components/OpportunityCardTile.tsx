@@ -15,6 +15,7 @@ import {
   DateTime,
   Money,
   StatusBadge,
+  TagChip,
   cn,
   iconSize,
 } from "@/design-system";
@@ -188,7 +189,12 @@ export function OpportunityCardTile({
       {item.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {item.tags.slice(0, 3).map((tag) => (
-            <Badge key={tag.id} tone="neutral" className={COMPACT_BADGE}>{tag.name}</Badge>
+            <TagChip
+              key={tag.id}
+              label={tag.name}
+              backgroundColor={tag.backgroundColor}
+              textColor={tag.textColor}
+            />
           ))}
           {item.tags.length > 3 && (
             <span className="text-2xs text-muted-foreground">

@@ -75,11 +75,11 @@ describe("OpportunityCardTile", () => {
         item={{
           ...item,
           tags: [
-            { id: "0192f3a0-0000-7000-8000-000000000011", name: "VIP" },
-            { id: "0192f3a0-0000-7000-8000-000000000012", name: "Renewal" },
-            { id: "0192f3a0-0000-7000-8000-000000000013", name: "Enterprise" },
-            { id: "0192f3a0-0000-7000-8000-000000000014", name: "Hidden one" },
-            { id: "0192f3a0-0000-7000-8000-000000000015", name: "Hidden two" },
+            { id: "0192f3a0-0000-7000-8000-000000000011", name: "VIP", backgroundColor: null, textColor: null },
+            { id: "0192f3a0-0000-7000-8000-000000000012", name: "Renewal", backgroundColor: null, textColor: null },
+            { id: "0192f3a0-0000-7000-8000-000000000013", name: "Enterprise", backgroundColor: null, textColor: null },
+            { id: "0192f3a0-0000-7000-8000-000000000014", name: "Hidden one", backgroundColor: null, textColor: null },
+            { id: "0192f3a0-0000-7000-8000-000000000015", name: "Hidden two", backgroundColor: null, textColor: null },
           ],
         }}
       />,

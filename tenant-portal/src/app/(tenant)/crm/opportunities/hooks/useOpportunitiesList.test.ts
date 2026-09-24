@@ -61,7 +61,7 @@ const item = {
   openActivityCount: 2,
   nextOpenActivityAt: "2026-09-18T09:00:00.000Z",
   activityState: "FUTURE",
-  tags: [{ id: "01900100-0000-7000-8000-000000000121", name: "VIP" }],
+  tags: [{ id: "01900100-0000-7000-8000-000000000121", name: "VIP", backgroundColor: "#DBEAFE", textColor: "#1E40AF" }],
   expectedCloseDate: "2026-09-01",
   createdAt: "2026-08-25T10:00:00.000Z",
 };

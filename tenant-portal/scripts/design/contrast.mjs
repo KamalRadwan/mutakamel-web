@@ -284,6 +284,52 @@ for (const [label, fg, bg, need] of MUST_FAIL) {
   );
 }
 
+/* ---------- Tag colour presets ----------
+   A tag chip draws the tenant's own background/text pair, so the pair is judged
+   against itself, never against the page — it reads the same on a light or a
+   dark card. Parsed from the one file that declares the presets
+   (src/design-system/primitives/tag-color.ts), one `{ key, backgroundColor,
+   textColor }` per line; a count other than 30 fails rather than letting a
+   preset slip past the check. */
+
+const TAG_PRESET_COUNT = 30;
+const TAG_PRESET_LINE =
+  /\{ key: "([A-Za-z]+)", backgroundColor: "#([0-9A-F]{6})", textColor: "#([0-9A-F]{6})" \}/g;
+
+function srgbHexLuminance(hex) {
+  const channel = (offset) => {
+    const value = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+}
+
+function hexContrast(a, b) {
+  const [hi, lo] = [srgbHexLuminance(a), srgbHexLuminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+const tagColorSource = readFileSync(
+  join(here, "..", "..", "src", "design-system", "primitives", "tag-color.ts"),
+  "utf8",
+);
+const tagPresets = [...tagColorSource.matchAll(TAG_PRESET_LINE)];
+process.stdout.write("\nTAG COLOUR PRESETS (text vs its own background, need 4.50)\n");
+if (tagPresets.length !== TAG_PRESET_COUNT) {
+  failures += 1;
+  process.stdout.write(
+    `  FAIL  expected ${TAG_PRESET_COUNT} presets in tag-color.ts, parsed ${tagPresets.length}\n`,
+  );
+}
+for (const [, key, background, text] of tagPresets) {
+  const ratio = hexContrast(background, text);
+  const pass = ratio >= 4.5;
+  if (!pass) failures += 1;
+  process.stdout.write(
+    `  ${pass ? "OK " : "FAIL"} ${ratio.toFixed(2).padStart(6)}  ${key.padEnd(14)} #${background} / #${text}\n`,
+  );
+}
+
 process.stdout.write("\nRESOLVED HEX (for eyeballing / design tools)\n");
 for (const [name, v] of Object.entries(rgb)) {
   if (name === "white") continue;

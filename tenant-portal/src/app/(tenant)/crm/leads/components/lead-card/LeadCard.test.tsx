@@ -120,8 +120,8 @@ describe("LeadCard", () => {
         lead={{
           ...lead,
           tags: [
-            { id: "01900100-0000-7000-8000-0000000000a1", name: "VIP", color: "RED" },
-            { id: "01900100-0000-7000-8000-0000000000a2", name: "Renewal", color: null },
+            { id: "01900100-0000-7000-8000-0000000000a1", name: "VIP", backgroundColor: "#FEE2E2", textColor: "#991B1B" },
+            { id: "01900100-0000-7000-8000-0000000000a2", name: "Renewal", backgroundColor: null, textColor: null },
           ],
         }}
         labels={cardLabels}
@@ -145,7 +145,8 @@ describe("LeadCard", () => {
           tags: Array.from({ length: 5 }, (_, index) => ({
             id: `01900100-0000-7000-8000-00000000000${index}`,
             name: `Tag ${index}`,
-            color: null,
+            backgroundColor: null,
+            textColor: null,
           })),
         }}
         labels={cardLabels}

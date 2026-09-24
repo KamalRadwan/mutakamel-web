@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, UserRound, X } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage, Button, Card, CardContent, CardHeader, DateTime, ErrorState, Field, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea, cn } from "@/design-system";
+import { Avatar, AvatarFallback, AvatarImage, Button, Card, CardContent, CardHeader, DateTime, ErrorState, Field, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, TagChip, Textarea, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedValue } from "@/lib/format/localized";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
@@ -65,7 +65,7 @@ export function LeadIdentityCards({ lead, sources, canEdit, allowedOwnerIds, onS
         </DetailsValue>
         <DetailsValue label={t.crmLeadDetail.tags}>
           {choices.tagsLoading ? <span className="text-xs text-muted-foreground">{t.common.loading}</span> : choices.tagsUnavailable ? <span role="status" className="text-xs text-muted-foreground">{t.crmLeadDetail.tagsUnavailable}</span> : choices.tags.length ? (
-            <ul className="flex min-h-6 flex-wrap items-center gap-1">{choices.tags.map((tag) => <li key={tag.id} className="max-w-full break-words rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{tag.name}</li>)}</ul>
+            <ul className="flex min-h-6 flex-wrap items-center gap-1">{choices.tags.map((tag) => <li key={tag.id} className="flex min-w-0 max-w-full"><TagChip label={tag.name} backgroundColor={tag.backgroundColor} textColor={tag.textColor} /></li>)}</ul>
           ) : <span className="text-xs text-muted-foreground">{t.crmLeadDetail.noTags}</span>}
         </DetailsValue>
         <DetailsValue label={t.crmLeadDetail.salesPerson}>

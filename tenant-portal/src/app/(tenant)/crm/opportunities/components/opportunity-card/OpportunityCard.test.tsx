@@ -52,7 +52,7 @@ const mockOpportunity = {
   ownerUserId: "0192f3a0-0000-7000-8000-000000000010",
   ownerDisplayName: "Kamal Radwan",
   ownerAvatarUrl: null,
-  tags: [{ id: "0192f3a0-0000-7000-8000-000000000012", name: "VIP" }],
+  tags: [{ id: "0192f3a0-0000-7000-8000-000000000012", name: "VIP", backgroundColor: null, textColor: null }],
   createdAt: "2026-09-01T00:00:00Z",
   updatedAt: "2026-09-01T00:00:00Z",
 };

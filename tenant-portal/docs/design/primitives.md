@@ -309,7 +309,8 @@ with the rest of Phase 1's primitives.
 | `Calendar` | `react-day-picker` | No vendored stylesheet — see [DECISIONS D15](../build/DECISIONS.md#d15--third-party-components-take-no-stylesheet--assumed) |
 | `DatePicker` · `DateRangePicker` | `Calendar` | `Intl` with an explicit locale; Arabic uses Western digits |
 | `Combobox` | `Popover` + `Input` | Type-ahead over a large remote list, debounced — see below |
-| `MultiSelect` | `Popover` + `Badge` | Chips in the trigger; overflow is a **button**, never a static count |
+| `MultiSelect` | `Popover` + `Badge` | Chips in the trigger; overflow is a **button**, never a static count. An option carrying `tagColor` renders as a `TagChip` in the trigger and the list |
+| **`TagChip`** · `TagChipOverflow` | plain `<span>` | See below |
 | `Stepper` | plain `<ol>` | A step's position never takes a hue |
 | `Progress` | `@radix-ui/react-progress` | Determinate and indeterminate — see below |
 | `Accordion` · `Collapsible` | Radix | The one permitted height keyframe — [motion.md](motion.md#the-one-height-exception) |
@@ -319,6 +320,24 @@ with the rest of Phase 1's primitives.
 | **`FileUpload`** | plain `<label>` + `<input type=file>` | See below |
 | **`CommandPalette`** | `cmdk` + `Dialog` | See below |
 | **`RichTextEditor`** | `contenteditable` | See below |
+
+### TagChip
+
+```ts
+label: string
+backgroundColor?: string | null   // "#RRGGBB"
+textColor?: string | null         // "#RRGGBB" — used only as a pair
+size?: "sm" | "xs"                // card face · dense table cell
+children?: ReactNode              // trailing content, e.g. a remove control
+```
+
+One tag, in any app. A valid pair paints the chip's own background, text and
+a border mixed from the two; a missing, half-set or malformed pair is the
+neutral chip. The label is `<bdi dir="auto">` and truncates, with the full name
+in `title`. `TagChipOverflow` is the `+N` chip beside it: the visible count is
+`aria-hidden` and the hidden names are announced instead. Never `Badge` —
+a badge states a record's state. Colour rules:
+[tokens.md](tokens.md#tag-colours--a-pair-the-tenant-owns).
 
 ### Combobox
 

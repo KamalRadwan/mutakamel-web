@@ -4,8 +4,8 @@ import {
   leadActivityState,
   leadCardHeading,
   leadOwnerInitials,
-  parseLeadTags,
 } from "./lead-card-contract";
+import { parseCrmTags } from "../shared/tag-contract";
 
 const OWNER_ID = "01900100-0000-7000-8000-000000000020";
 const TAG_ID = "01900100-0000-7000-8000-0000000000a1";
@@ -74,43 +74,44 @@ describe("lead card contract", () => {
     expect(buildLeadCardPatchBody({})).toEqual({});
   });
 
+  // The lead read model embeds the shared CRM tag summary, so its tags are
+  // read through the one parser every CRM screen uses.
   describe("tags", () => {
     // Two different facts, one answer: a crm-app that does not project the
     // field yet, and a lead nobody has tagged. Neither is a broken payload.
     it("reads an absent, null or empty tag list as no tags", () => {
-      expect(parseLeadTags(undefined)).toEqual([]);
-      expect(parseLeadTags(null)).toEqual([]);
-      expect(parseLeadTags([])).toEqual([]);
+      expect(parseCrmTags(undefined)).toEqual([]);
+      expect(parseCrmTags(null)).toEqual([]);
+      expect(parseCrmTags([])).toEqual([]);
     });
 
-    it("keeps the server's order and normalises the optional colour", () => {
+    it("keeps the server's order and canonicalises the colour pair", () => {
       expect(
-        parseLeadTags([
-          { id: TAG_ID, name: "VIP", color: "RED" },
-          { id: OWNER_ID, name: "Renewal" },
+        parseCrmTags([
+          { id: TAG_ID, name: "VIP", backgroundColor: "#fee2e2", textColor: "#991B1B" },
+          { id: OWNER_ID, name: "Renewal", backgroundColor: null, textColor: null },
         ]),
       ).toEqual([
-        { id: TAG_ID, name: "VIP", color: "RED" },
-        { id: OWNER_ID, name: "Renewal", color: null },
+        { id: TAG_ID, name: "VIP", backgroundColor: "#FEE2E2", textColor: "#991B1B" },
+        { id: OWNER_ID, name: "Renewal", backgroundColor: null, textColor: null },
       ]);
     });
 
-    // Unlike `cardColor` — a CRM enum with a database CHECK behind it, where
-    // an unknown value is a contract break — a tag's colour comes from a
-    // vocabulary this screen does not own. It degrades to the neutral chip
-    // rather than taking the whole board down.
-    it("degrades an unrecognised colour instead of failing the list", () => {
-      expect(parseLeadTags([{ id: TAG_ID, name: "VIP", color: "MAUVE" }])).toEqual([
-        { id: TAG_ID, name: "VIP", color: null },
-      ]);
+    // The colour is cosmetic: a missing, half-set or malformed pair degrades
+    // to the neutral chip rather than taking the whole board down.
+    it("degrades a missing, half-set or malformed colour pair to uncoloured", () => {
+      const uncoloured = [{ id: TAG_ID, name: "VIP", backgroundColor: null, textColor: null }];
+      expect(parseCrmTags([{ id: TAG_ID, name: "VIP" }])).toEqual(uncoloured);
+      expect(parseCrmTags([{ id: TAG_ID, name: "VIP", backgroundColor: "#FEE2E2", textColor: null }])).toEqual(uncoloured);
+      expect(parseCrmTags([{ id: TAG_ID, name: "VIP", backgroundColor: "RED", textColor: 7 }])).toEqual(uncoloured);
     });
 
     it("rejects a payload of the wrong shape, as every parser here does", () => {
-      expect(() => parseLeadTags("VIP")).toThrow();
-      expect(() => parseLeadTags([{ id: TAG_ID }])).toThrow();
-      expect(() => parseLeadTags([{ id: TAG_ID, name: "" }])).toThrow();
-      expect(() => parseLeadTags([{ id: "not-a-uuid", name: "VIP" }])).toThrow();
-      expect(() => parseLeadTags([{ id: TAG_ID, name: "VIP", color: 7 }])).toThrow();
+      expect(() => parseCrmTags("VIP")).toThrow();
+      expect(() => parseCrmTags([{ id: TAG_ID }])).toThrow();
+      expect(() => parseCrmTags([{ id: TAG_ID, name: "" }])).toThrow();
+      expect(() => parseCrmTags([{ id: "not-a-uuid", name: "VIP" }])).toThrow();
+      expect(() => parseCrmTags([{ id: TAG_ID, name: "VIP" }, { id: TAG_ID, name: "VIP" }])).toThrow();
     });
   });
 });

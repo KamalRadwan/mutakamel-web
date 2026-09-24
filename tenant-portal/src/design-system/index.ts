@@ -55,6 +55,8 @@ export * from "./primitives/Stepper";
 export * from "./primitives/Switch";
 export * from "./primitives/Table";
 export * from "./primitives/Tabs";
+export * from "./primitives/TagChip";
+export * from "./primitives/tag-color";
 export * from "./primitives/Textarea";
 export * from "./primitives/ToggleGroup";
 export * from "./primitives/Tooltip";
@@ -111,6 +113,7 @@ export * from "./patterns/reason-dialog/ReasonDialog";
 export * from "./patterns/unavailable-state/UnavailableState";
 export * from "./patterns/status-badge/StatusBadge";
 export * from "./patterns/status-badge/tone-map";
+export * from "./patterns/tag-color-picker/TagColorPicker";
 export * from "./patterns/timeline/Timeline";
 
 export * from "./views/card-color";

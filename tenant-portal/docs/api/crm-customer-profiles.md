@@ -62,7 +62,9 @@ Response `200` is the flat CRM page
 are enriched with the customer Party image and contact methods, company
 website, primary address, primary corporate contact, owner name/avatar,
 acquisition source, next activity, tags, `rating` and `cardColor`. Board rows
-intentionally use a smaller projection.
+intentionally use a smaller projection. Each tag is
+`{ id, name, backgroundColor, textColor }` — an upper-case `#RRGGBB` pair or
+both `null` (verified 2026-09-24, [catalogues](crm-catalogues.md#tags)).
 
 Advanced search uses `POST /customer-profiles/search`. Its filter tree accepts
 `rating` and `cardColor` alongside the existing identity, status, type, source

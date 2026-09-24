@@ -50,7 +50,7 @@ const cardFields = {
     lastName: "Radwan",
   },
   nextActivity: { activityAt: "2026-09-05T09:00:00.000Z", bucket: "OVERDUE" },
-  tags: [{ id: "01900100-0000-7000-8000-0000000000a1", name: "VIP", color: "RED" }],
+  tags: [{ id: "01900100-0000-7000-8000-0000000000a1", name: "VIP", backgroundColor: "#FEE2E2", textColor: "#991B1B" }],
 };
 
 describe("Leads API contracts", () => {
@@ -107,7 +107,7 @@ describe("Leads API contracts", () => {
       nextActivity: { activityAt: cardFields.nextActivity.activityAt, bucket: "OVERDUE" },
       // Mocked: crm-app is still adding `tags` to the list read model, so the
       // base `lead` above deliberately omits it and gets the empty default.
-      tags: [{ id: cardFields.tags[0].id, name: "VIP", color: "RED" }],
+      tags: [{ id: cardFields.tags[0].id, name: "VIP", backgroundColor: "#FEE2E2", textColor: "#991B1B" }],
     });
 
     // An explicit null is a column nobody has written, not a broken payload.

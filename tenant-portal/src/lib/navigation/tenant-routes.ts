@@ -51,6 +51,7 @@ export const TENANT_ROUTES = {
   crmStaticCatalogue: "/crm/static-data-catalogue",
   crmLeadStages: "/crm/lead-stages",
   crmAcquisitionSources: "/crm/acquisition-sources",
+  crmTags: "/crm/tags",
   crmCustomFields: "/crm/custom-fields",
   crmPipelines: "/crm/pipelines",
   crmOpportunityStages: "/crm/opportunity-stages",
@@ -112,6 +113,7 @@ const CRM_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.crmStaticCatalogue,
   TENANT_ROUTES.crmLeadStages,
   TENANT_ROUTES.crmAcquisitionSources,
+  TENANT_ROUTES.crmTags,
   TENANT_ROUTES.crmCustomFields,
   TENANT_ROUTES.crmPipelines,
   TENANT_ROUTES.crmOpportunityStages,
@@ -234,6 +236,12 @@ const CRM_ENTRY_ROUTES = [
         acceptsScopedPermission: false,
       },
     ],
+  },
+  {
+    // crm-app tags.controller.ts: both GETs require `crm.tags.read`, unscoped;
+    // the writes additionally require `crm.tags.manage`, checked in-page.
+    href: TENANT_ROUTES.crmTags,
+    requirements: [{ permission: "crm.tags.read", acceptsScopedPermission: false }],
   },
   {
     href: TENANT_ROUTES.crmCustomFields,

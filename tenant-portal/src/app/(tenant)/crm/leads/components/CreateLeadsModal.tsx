@@ -15,7 +15,7 @@ import { useLeadCompanyOptions } from "../hooks/useLeadCompanyOptions";
 import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import type { LeadStage } from "../hooks/useLeads";
 import { isCorporateLead, usesExistingCompany, LEAD_CREATE_LIMITS, type CreateLeadForm } from "../lead-create-contract";
-import type { LeadTag } from "../lead-card-contract";
+import type { CrmTag } from "../../shared/tag-contract";
 import {
   leadCreateSectionErrorCount,
   type LeadCreateSectionId,
@@ -132,7 +132,7 @@ export function CreateLeadsModal({
     setCreateTagModalOpen(true);
   };
 
-  const handleTagCreated = (newTag: LeadTag) => {
+  const handleTagCreated = (newTag: CrmTag) => {
     leadTags.addTag(newTag);
     if (form.tagIds.length < LEAD_CREATE_LIMITS.tags && !form.tagIds.includes(newTag.id)) {
       state.setField("tagIds", [...form.tagIds, newTag.id]);

@@ -135,6 +135,7 @@ the guard is innermost so providers exist before it redirects.
 | `/crm/opportunities` | `(tenant)` | `crm.opportunities.read` + `crm.pipelines.read` |
 | `/crm/lead-stages` | `(tenant)` | `crm.lead_stages.read` |
 | `/crm/acquisition-sources` | `(tenant)` | `crm.acquisition_sources.read` |
+| `/crm/tags` | `(tenant)` | `crm.tags.read` |
 | `/crm/custom-fields` | `(tenant)` | `crm.custom_fields.read` |
 | `/crm/settings` | `(tenant)` | `crm.settings.read` |
 | `/crm/static-data-catalogue` | `(tenant)` | `crm.settings.read` |

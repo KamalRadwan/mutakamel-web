@@ -1,9 +1,9 @@
 "use client";
 
 import { Tag } from "lucide-react";
-import { cardColorFill, cn, iconSize } from "@/design-system";
+import { TagChip, TagChipOverflow, iconSize } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
-import type { LeadTag } from "../../lead-card-contract";
+import type { CrmTag } from "../../../shared/tag-contract";
 
 /**
  * How many tags reach the card face.
@@ -17,7 +17,7 @@ import type { LeadTag } from "../../lead-card-contract";
 const MAX_VISIBLE_LEAD_TAGS = 3;
 
 export interface LeadTagListProps {
-  tags: LeadTag[];
+  tags: CrmTag[];
   /** `{count}` more — the overflow chip's whole text. */
   moreLabel: string;
 }
@@ -25,15 +25,9 @@ export interface LeadTagListProps {
 /**
  * The lead's tags, under the contact name.
  *
- * Chips, not `Badge`: a badge states a record's STATE, and the primitive says
- * so in uppercase semibold. A tag is a value the tenant chose, so it renders
- * in sentence case at the muted step — docs/design/patterns.md, and the
- * compact-label rule that a pill's label stays on one line.
- *
- * The colour is a leading dot rather than the chip's own background. It keeps
- * every chip on the one `bg-muted`/`text-muted-foreground` pair whose contrast
- * is already known, and it keeps the colour decorative — the tag's name is
- * beside it, so nothing here is carried by hue alone.
+ * Every chip is a `TagChip`: a coloured tag draws its own background/text
+ * pair, an uncoloured one is the neutral theme-aware chip. The tag's name is
+ * always the text, so nothing here is carried by hue alone.
  */
 export function LeadTagList({ tags, moreLabel }: LeadTagListProps) {
   if (tags.length === 0) return null;
@@ -47,28 +41,19 @@ export function LeadTagList({ tags, moreLabel }: LeadTagListProps) {
         <Tag className={iconSize({ size: "sm" })} />
       </li>
       {visible.map((tag) => (
-        <li
-          key={tag.id}
-          title={tag.name}
-          className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border/70 bg-muted/60 px-2 py-0.5 text-xs font-medium leading-none text-muted-foreground"
-        >
-          {tag.color && (
-            <span
-              className={cn("size-1.5 shrink-0 rounded-full", cardColorFill(tag.color))}
-              aria-hidden="true"
-            />
-          )}
-          <span className="truncate">{tag.name}</span>
+        <li key={tag.id} className="flex min-w-0 max-w-full">
+          <TagChip label={tag.name} backgroundColor={tag.backgroundColor} textColor={tag.textColor} />
         </li>
       ))}
 
       {/* The names past the third are still announced, and the card opens the
-          lead, where the full set is listed. What must not happen is the card
-          silently claiming three tags when there are nine. */}
+          lead, where the full set is listed. */}
       {hidden.length > 0 && (
-        <li className="inline-flex items-center rounded-full border border-border/70 bg-muted/60 px-1.5 py-0.5 text-xs font-medium leading-none text-muted-foreground">
-          <span aria-hidden="true">{formatTemplate(moreLabel, { count: hidden.length })}</span>
-          <span className="sr-only">{hidden.map((tag) => tag.name).join(", ")}</span>
+        <li className="flex">
+          <TagChipOverflow
+            label={formatTemplate(moreLabel, { count: hidden.length })}
+            hiddenNames={hidden.map((tag) => tag.name)}
+          />
         </li>
       )}
     </ul>
