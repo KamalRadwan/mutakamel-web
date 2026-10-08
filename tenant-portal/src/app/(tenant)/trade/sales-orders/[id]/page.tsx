@@ -25,6 +25,7 @@ import { TradeDocumentSkeleton } from "../../documents/components/TradeDocumentS
 import { TradeDocumentTotals } from "../../documents/components/TradeDocumentTotals";
 import { TradeDraftReferenceDrawer } from "../../documents/components/TradeDraftReferenceDrawer";
 import { TradeGate } from "../../documents/components/TradeGate";
+import { TradeOrderLinesPanel } from "../../documents/components/TradeOrderLinesPanel";
 import { TradePdfPanel } from "../../documents/components/TradePdfPanel";
 import {
   TRADE_REASON_CODE_MAX_LENGTH,
@@ -192,6 +193,15 @@ export default function SalesOrderDetailPage({ params }: { params: Promise<{ id:
                   value: order.sourceQuotationRevisionId,
                 },
               ]}
+            />
+
+            <TradeOrderLinesPanel
+              lines={order.lines}
+              currencyCode={order.currencyCode}
+              secondaryDescriptionLabel={t.tradeDocuments.deliveryDescription}
+              secondaryDescription={(line) => line.deliveryDescriptionSnapshot}
+              emptyTitle={t.tradeDocuments.orderLinesEmpty}
+              errorTitle={t.tradeDocuments.salesOrders.loadFailed}
             />
 
             <TradeDocumentTotals

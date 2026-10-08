@@ -3,7 +3,12 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 /**
- * The four regions of the page action bar, in the order it renders them.
+ * The five regions of the page action bar.
+ *
+ * `primary` is filled only by `PageHeader`. On ordinary screens it follows the
+ * secondary `actions` in the trailing cluster. On a nav item marked as a
+ * primary page it moves to the inline start and replaces the redundant
+ * section / screen location label.
  *
  * `related` sits in the MIDDLE, on its own: it holds links to other records —
  * a lead's opportunities, its quotations — which are navigation rather than
@@ -17,7 +22,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
  * changes how the screen is drawn rather than what it holds; keeping it at a
  * fixed edge means it does not move as a screen gains or loses actions.
  */
-export type PageActionSlot = "related" | "actions" | "search" | "view";
+export type PageActionSlot = "primary" | "related" | "actions" | "search" | "view";
 
 type SlotNodes = Record<PageActionSlot, HTMLElement | null>;
 
@@ -37,7 +42,13 @@ interface PageActionSlotsValue {
   register: (slot: PageActionSlot, node: HTMLElement | null) => void;
 }
 
-const EMPTY_NODES: SlotNodes = { related: null, actions: null, search: null, view: null };
+const EMPTY_NODES: SlotNodes = {
+  primary: null,
+  related: null,
+  actions: null,
+  search: null,
+  view: null,
+};
 
 const PageActionSlotsContext = createContext<PageActionSlotsValue>({
   present: false,
@@ -46,7 +57,7 @@ const PageActionSlotsContext = createContext<PageActionSlotsValue>({
 });
 
 /**
- * Holds the action bar's three mount points for the page below it.
+ * Holds the action bar's five mount points for the page below it.
  *
  * **Why DOM nodes and a portal rather than React nodes in state.** A page's
  * actions are not static markup: the leads screen's "Add lead" needs the

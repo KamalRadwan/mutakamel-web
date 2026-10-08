@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  Badge,
+  Button,
+  cn,
   Field,
-  FormSection,
   MultiSelect,
   Select,
   SelectContent,
@@ -10,14 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system";
+import { Building2, Target, User } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
-import { formatTemplate } from "@/lib/format/template";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
 import { AcquisitionSourceOption } from "../../../shared/components/AcquisitionSourceIcon";
 import { crmTagColor, type CrmTag } from "../../../shared/tag-contract";
 import {
-  CRM_PROFILE_TYPES,
   LEAD_CREATE_LIMITS,
   type CrmProfileType,
 } from "../../lead-create-contract";
@@ -118,173 +119,205 @@ export function LeadClassificationSection({
   const { t, lang } = useI18n();
 
   return (
-    <FormSection
-      id="classification"
-      title={t.crmLeads.create.sections.classification}
-      columns={3}
+    <section
+      data-form-section="classification"
+      className="flex scroll-mt-4 flex-col gap-3"
     >
-      {companyIds.length > 1 && (
-        // Ids, not names: `/auth/me` is the only proven source for which
-        // companies this account may use and it carries no names — the same
-        // call `TenantBranchSelect` and `TradeScopeBar` already make. `dir` on
-        // the trigger is what keeps the UUID readable in an RTL paragraph.
-        <Field label={t.organization.parentCompany}>
-          <Select
-            value={companyId ?? ""}
+      {/* 1. Profile Type Switcher & Required fields indicator */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          role="radiogroup"
+          aria-label={t.crmLeads.create.leadType}
+          className="flex items-center gap-1.5"
+        >
+          <Button
+            type="button"
+            role="radio"
+            aria-checked={leadProfileType === "INDIVIDUAL"}
             disabled={disabled}
-            onValueChange={onCompanyChange}
-          >
-            <SelectTrigger size="sm" dir="ltr" className="font-mono">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {companyIds.map((id) => (
-                <SelectItem key={id} value={id}>
-                  {id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
-
-      {branchIds.length > 1 && (
-        <Field label={t.common.branch} required>
-          <Select
-            value={branchId}
-            disabled={disabled}
-            onValueChange={onBranchChange}
-          >
-            <SelectTrigger size="sm" dir="ltr" className="font-mono">
-              {/* No prompt: the inset label already says Branch. A
-                  placeholder survives only where it says what leaving the
-                  field empty MEANS — the stage default below. */}
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {branchIds.map((id) => (
-                <SelectItem key={id} value={id}>
-                  {id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
-
-      <Field label={t.crmLeads.create.leadType} required>
-        <Select
-          value={leadProfileType}
-          disabled={disabled}
-          onValueChange={(value) => onProfileTypeChange(value as CrmProfileType)}
-        >
-          <SelectTrigger size="sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CRM_PROFILE_TYPES.map((profileType) => (
-              <SelectItem key={profileType} value={profileType}>
-                {t.crmLeads.create.types[profileType]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-
-      <Field label={t.crmLeads.stage}>
-        <Select
-          value={stageId || DEFAULT_STAGE_VALUE}
-          disabled={disabled}
-          onValueChange={(value) => onStageChange(value === DEFAULT_STAGE_VALUE ? "" : value)}
-        >
-          <SelectTrigger size="sm">
-            <SelectValue placeholder={t.crmLeads.defaultStage} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={DEFAULT_STAGE_VALUE}>{t.crmLeads.defaultStage}</SelectItem>
-            {stages
-              .filter((stage) => stage.flag !== "CONVERTED")
-              .map((stage) => (
-                <SelectItem key={stage.id} value={stage.id}>
-                  {localizedName(stage, lang)}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </Field>
-
-      {/* The "no source" option is gone, not disabled: this form requires a
-          source, and an option whose only effect is to fail validation is a
-          trap. Its absence is also why nothing here can return to the empty
-          value once a source has been picked. */}
-      <Field label={t.crmLeads.source} error={errors.acquisitionSourceId} required>
-        <Select
-          value={acquisitionSourceId}
-          disabled={disabled}
-          onValueChange={onSourceChange}
-        >
-          <SelectTrigger size="sm">
-            {/* Not "No source": that is the name of a STATE this form no
-                longer has, and reading it in an empty required box invites
-                the user to leave it alone. */}
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {sources.map((source) => (
-              <SelectItem key={source.id} value={source.id}>
-                <AcquisitionSourceOption source={source} label={localizedName(source, lang)} />
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-
-      {showTags && (
-        <Field
-          label={t.crmLeads.create.tags}
-          error={errors.tagIds}
-          hint={formatTemplate(t.crmLeads.create.tagsLimitHint, {
-            count: tagIds.length,
-            max: LEAD_CREATE_LIMITS.tags,
-          })}
-        >
-          <MultiSelect
+            onClick={() => onProfileTypeChange("INDIVIDUAL")}
             size="sm"
-            values={tagIds}
-            onValuesChange={(next) => {
-              if (next.length <= LEAD_CREATE_LIMITS.tags) onTagsChange(next);
-            }}
-            options={tags.map((tag) => ({
-              value: tag.id,
-              label: tag.name,
-              tagColor: crmTagColor(tag),
-              // At the ceiling, existing selections stay removable while only
-              // choices that would make CreateLeadDto invalid are disabled.
-              disabled:
-                !tagIds.includes(tag.id) &&
-                (tagsUnavailable || tagIds.length >= LEAD_CREATE_LIMITS.tags),
-            }))}
-            placeholder={
-              tagsLoading ? t.common.loading : t.crmLeads.create.tagsPlaceholder
-            }
-            searchPlaceholder={t.crmLeads.create.tagsSearch}
-            emptyLabel={
-              tagsUnavailable
-                ? t.crmLeads.create.tagsUnavailable
-                : t.crmLeads.create.tagsEmpty
-            }
-            clearAllLabel={t.filters.clearAll}
-            moreLabel={t.filters.more}
-            removeLabel={t.filters.remove}
-            overflowLabel={t.crmLeads.create.tagsOverflow}
-            onCreate={canCreateTag ? onCreateTag : undefined}
-            createLabel={t.crmLeads.create.createTagAction}
-            // A degraded catalogue blocks new choices, not chip removal.
-            disabled={disabled || tagsLoading}
-            onBlur={onTagsBlur}
-          />
-        </Field>
-      )}
-    </FormSection>
+            variant={leadProfileType === "INDIVIDUAL" ? "outline" : "ghost"}
+            className={cn(
+              "gap-2 px-3 font-medium",
+              leadProfileType === "INDIVIDUAL"
+                ? "border-primary bg-card text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <User className="size-4 shrink-0" aria-hidden="true" />
+            <span>{t.crmLeads.create.types.INDIVIDUAL}</span>
+          </Button>
+
+          <Button
+            type="button"
+            role="radio"
+            aria-checked={leadProfileType === "CORPORATE"}
+            disabled={disabled}
+            onClick={() => onProfileTypeChange("CORPORATE")}
+            size="sm"
+            variant={leadProfileType === "CORPORATE" ? "outline" : "ghost"}
+            className={cn(
+              "gap-2 px-3 font-medium",
+              leadProfileType === "CORPORATE"
+                ? "border-primary bg-card text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Building2 className="size-4 shrink-0" aria-hidden="true" />
+            <span>{t.crmLeads.create.types.CORPORATE}</span>
+          </Button>
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          <span className="me-1 font-semibold text-destructive">*</span>
+          {t.crmLeads.create.requiredFields}
+        </span>
+      </div>
+
+      {/* 2. Lead classification Card */}
+      <div className="rounded-lg border border-border bg-card p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-foreground">
+            <Target className="size-4 text-muted-foreground" aria-hidden="true" />
+            <h4 tabIndex={-1} className="text-sm font-semibold text-foreground outline-none">
+              {t.crmLeads.create.leadClassificationTitle}
+            </h4>
+          </div>
+          <Badge tone="positive">
+            {t.crmLeads.create.readyBadge}
+          </Badge>
+        </div>
+
+        {(companyIds.length > 1 || branchIds.length > 1) && (
+          <div className="grid grid-cols-1 gap-2 border-b border-border pb-3 md:grid-cols-2">
+            {companyIds.length > 1 && (
+              <Field label={t.organization.parentCompany} showLabel>
+                <Select
+                  value={companyId ?? ""}
+                  disabled={disabled}
+                  onValueChange={onCompanyChange}
+                >
+                  <SelectTrigger size="sm" dir="ltr" className="font-mono">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companyIds.map((id) => (
+                      <SelectItem key={id} value={id}>
+                        {id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+
+            {branchIds.length > 1 && (
+              <Field label={t.common.branch} required showLabel>
+                <Select
+                  value={branchId}
+                  disabled={disabled}
+                  onValueChange={onBranchChange}
+                >
+                  <SelectTrigger size="sm" dir="ltr" className="font-mono">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branchIds.map((id) => (
+                      <SelectItem key={id} value={id}>
+                        {id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-2 pt-3 md:grid-cols-3">
+          <Field label={t.crmLeads.stage} required showLabel>
+            <Select
+              value={stageId || DEFAULT_STAGE_VALUE}
+              disabled={disabled}
+              onValueChange={(value) => onStageChange(value === DEFAULT_STAGE_VALUE ? "" : value)}
+            >
+              <SelectTrigger size="sm">
+                <SelectValue placeholder={t.crmLeads.defaultStage} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DEFAULT_STAGE_VALUE}>{t.crmLeads.defaultStage}</SelectItem>
+                {stages
+                  .filter((stage) => stage.flag !== "CONVERTED")
+                  .map((stage) => (
+                    <SelectItem key={stage.id} value={stage.id}>
+                      {localizedName(stage, lang)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label={t.crmLeads.source} error={errors.acquisitionSourceId} required showLabel>
+            <Select
+              value={acquisitionSourceId}
+              disabled={disabled}
+              onValueChange={onSourceChange}
+            >
+              <SelectTrigger size="sm">
+                <SelectValue placeholder={t.crmLeads.create.selectSourcePlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                {sources.map((source) => (
+                  <SelectItem key={source.id} value={source.id}>
+                    <AcquisitionSourceOption source={source} label={localizedName(source, lang)} />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {showTags && (
+            <Field
+              label={t.crmLeads.create.tags}
+              error={errors.tagIds}
+              showLabel
+            >
+              <MultiSelect
+                size="sm"
+                values={tagIds}
+                onValuesChange={(next) => {
+                  if (next.length <= LEAD_CREATE_LIMITS.tags) onTagsChange(next);
+                }}
+                options={tags.map((tag) => ({
+                  value: tag.id,
+                  label: tag.name,
+                  tagColor: crmTagColor(tag),
+                  disabled:
+                    !tagIds.includes(tag.id) &&
+                    (tagsUnavailable || tagIds.length >= LEAD_CREATE_LIMITS.tags),
+                }))}
+                placeholder={
+                  tagsLoading ? t.common.loading : t.crmLeads.create.tagsPlaceholder
+                }
+                searchPlaceholder={t.crmLeads.create.tagsSearch}
+                emptyLabel={
+                  tagsUnavailable
+                    ? t.crmLeads.create.tagsUnavailable
+                    : t.crmLeads.create.tagsEmpty
+                }
+                clearAllLabel={t.filters.clearAll}
+                moreLabel={t.filters.more}
+                removeLabel={t.filters.remove}
+                overflowLabel={t.crmLeads.create.tagsOverflow}
+                onCreate={canCreateTag ? onCreateTag : undefined}
+                createLabel={t.crmLeads.create.createTagAction}
+                disabled={disabled || tagsLoading}
+                onBlur={onTagsBlur}
+              />
+            </Field>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

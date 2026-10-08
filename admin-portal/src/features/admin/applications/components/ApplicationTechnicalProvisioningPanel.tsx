@@ -62,6 +62,8 @@ export function ApplicationTechnicalProvisioningPanel({
       copy.reasons.databasePermissionManifestRequired,
     DATABASE_PERMISSION_MANIFEST_INVALID:
       copy.reasons.databasePermissionManifestInvalid,
+    DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH:
+      copy.reasons.databasePermissionManifestReleaseMismatch,
   };
   const selectionLabels: Record<ApplicationSelectionBlocker, string> = {
     APPLICATION_LIFECYCLE_NOT_ACTIVE:

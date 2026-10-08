@@ -33,11 +33,34 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(model.provisioning.cancelOperation).toHaveBeenCalledWith(OPERATION_ID);
   });
 
+  it("offers re-provisioning after cancellation has completed", () => {
+    const model = makeModel({ operationStatus: "CANCELLED" });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+    fireEvent.click(screen.getByRole("button", { name: "Re-provision" }));
+    expect(model.provisioning.retryOperation).toHaveBeenCalledWith(OPERATION_ID);
+  });
+
+  it("explains pending cancellation and keeps re-provisioning visible but disabled", () => {
+    render(<TenantProvisioningWorkspaceView model={makeModel({ operationStatus: "CANCEL_REQUESTED" })} />);
+    expect(screen.getByRole("button", { name: "Re-provision" })).toBeDisabled();
+    expect(screen.getByText(/Cancellation is still in progress/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request cancel" })).not.toBeInTheDocument();
+  });
+
+  it("blocks managed repair while cancellation is pending and links to the operation", () => {
+    const model = makeModel({ section: "managed", operationStatus: "CANCEL_REQUESTED" });
+    render(<TenantProvisioningWorkspaceView model={model} />);
+    expect(screen.getByRole("button", { name: "Create repair" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "View current operation" }));
+    expect(model.setSection).toHaveBeenCalledWith("operations");
+    expect(model.provisioning.selectOperation).toHaveBeenCalledWith(OPERATION_ID);
+  });
+
   it("offers retry for a retryable latest operation", () => {
     const model = makeModel({ operationStatus: "FAILED_RETRYABLE" });
     render(<TenantProvisioningWorkspaceView model={model} />);
 
-    const retry = screen.getByRole("button", { name: /^Retry$/u });
+    const retry = screen.getByRole("button", { name: /^Re-provision$/u });
     fireEvent.click(retry);
 
     expect(model.provisioning.retryOperation).toHaveBeenCalledWith(OPERATION_ID);
@@ -52,7 +75,7 @@ describe("TenantProvisioningWorkspaceView", () => {
     render(<TenantProvisioningWorkspaceView model={model} />);
 
     expect(
-      screen.queryByRole("button", { name: /^Retry$/u }),
+      screen.queryByRole("button", { name: /^Re-provision$/u }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByText(
@@ -171,7 +194,7 @@ function makeModel(
     section?: "operations" | "updates" | "state" | "prerequisites" | "managed";
     seedRevision?: number | null;
     prerequisiteCount?: number;
-    operationStatus?: "RUNNING" | "FAILED_RETRYABLE";
+    operationStatus?: "RUNNING" | "FAILED_RETRYABLE" | "CANCEL_REQUESTED" | "CANCELLED";
     selectedGeneration?: number;
     latestGeneration?: number;
     localError?: string;
@@ -225,6 +248,8 @@ function makeModel(
   return {
     lang: options.lang ?? "en",
     dir: options.lang === "ar" ? "rtl" : "ltr",
+    latestOperation: operations.reduce((a, b) => a.generation > b.generation ? a : b),
+    hasOpenOperation: ["REQUESTED", "PLANNING", "QUEUED", "RUNNING", "WAITING_RETRY", "CANCEL_REQUESTED"].includes(options.operationStatus ?? "RUNNING"),
     section: options.section ?? "operations",
     setSection: noop,
     selectedUpdateKeys: [],

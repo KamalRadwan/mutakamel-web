@@ -221,7 +221,7 @@ describe("FormModal card size", () => {
   const sections = [{ id: "company", label: "Company" }];
 
   it("drops the section index, which the full size still renders", () => {
-    const card = renderModal(<Modal size="card" sections={sections} />);
+    const card = renderModal(<Modal size="wide" sections={sections} />);
     expect(
       screen.queryByRole("navigation", { name: "Form sections" }),
     ).not.toBeInTheDocument();
@@ -233,7 +233,7 @@ describe("FormModal card size", () => {
   });
 
   it("still renders the form and its actions at both sizes", () => {
-    for (const size of ["card", "full"] as const) {
+    for (const size of ["card", "wide", "full"] as const) {
       const rendered = renderModal(<Modal size={size} sections={sections} />);
 
       const input = screen.getByLabelText("Company name");
@@ -251,10 +251,30 @@ describe("FormModal card size", () => {
     renderModal(<Modal size="card" />);
 
     const content = screen.getByRole("dialog");
-    expect(content).toHaveClass("flex", "flex-col", "gap-0", "p-0", "max-w-[672px]");
+    expect(content).toHaveClass(
+      "flex",
+      "flex-col",
+      "gap-0",
+      "p-0",
+      "max-w-[672px]",
+      "w-[calc(100%-2rem)]",
+    );
     expect(content).not.toHaveClass("grid");
     expect(content).not.toHaveClass("gap-4");
     expect(content).not.toHaveClass("p-6");
+  });
+
+  it("gives a multi-column card more room without becoming a full surface", () => {
+    renderModal(<Modal size="wide" />);
+
+    const content = screen.getByRole("dialog");
+    expect(content).toHaveClass(
+      "flex",
+      "max-w-[960px]",
+      "max-h-[85dvh]",
+      "w-[calc(100%-2rem)]",
+    );
+    expect(content).not.toHaveClass("inset-5");
   });
 });
 
@@ -276,5 +296,139 @@ describe("FormModal index entries are not submit buttons", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
 
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe("FormModal stepper variant", () => {
+  const steps = [
+    {
+      id: "essential",
+      targetSectionIds: ["company"],
+      label: "Essential details",
+      description: "Classification and preferred contact method",
+    },
+    {
+      id: "address",
+      targetSectionIds: ["address"],
+      label: "Address",
+      description: "Optional location information",
+    },
+    {
+      id: "qualification",
+      targetSectionIds: ["qualification"],
+      label: "Qualification",
+      description: "Interest, need and internal notes",
+    },
+  ];
+
+  it("renders the sidebar header, step numbers, titles and descriptions", () => {
+    renderModal(
+      <Modal
+        sectionVariant="stepper"
+        sidebarHeader={<span>LEAD DETAILS</span>}
+        sections={steps}
+      >
+        <FormSection id="company" title="Company">
+          <Field label="Company name">
+            <Input />
+          </Field>
+        </FormSection>
+        <FormSection id="address" title="Address">
+          <Field label="City">
+            <Input />
+          </Field>
+        </FormSection>
+        <FormSection id="qualification" title="Qualification">
+          <Field label="Notes">
+            <Input />
+          </Field>
+        </FormSection>
+      </Modal>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "Form sections" });
+    expect(within(nav).getByText("LEAD DETAILS")).toBeInTheDocument();
+    expect(within(nav).getByText("Essential details")).toBeInTheDocument();
+    expect(
+      within(nav).getByText("Classification and preferred contact method"),
+    ).toBeInTheDocument();
+    expect(within(nav).getByText("Address")).toBeInTheDocument();
+    expect(within(nav).getByText("Optional location information")).toBeInTheDocument();
+    expect(within(nav).getByText("Qualification")).toBeInTheDocument();
+    expect(within(nav).getByText("Interest, need and internal notes")).toBeInTheDocument();
+
+    expect(within(nav).getByText("1")).toBeInTheDocument();
+    expect(within(nav).getByText("2")).toBeInTheDocument();
+    expect(within(nav).getByText("3")).toBeInTheDocument();
+  });
+
+  it("keeps header and footer outside the compact scroll regions", () => {
+    renderModal(
+      <Modal
+        density="compact"
+        sectionVariant="stepper"
+        sidebarHeader={<span>LEAD DETAILS</span>}
+        sections={steps}
+      >
+        <FormSection id="company" title="Company">
+          <Field label="Company name">
+            <Input />
+          </Field>
+        </FormSection>
+      </Modal>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "Form sections" });
+    expect(nav).toHaveClass("min-h-0", "w-60", "overflow-y-auto", "p-4");
+
+    const section = screen.getByRole("heading", { name: "Company" }).closest("section");
+    const scrollBody = section?.parentElement;
+    expect(scrollBody).toHaveClass(
+      "grid",
+      "min-h-0",
+      "flex-1",
+      "auto-rows-max",
+      "content-start",
+      "overflow-y-auto",
+      "gap-2",
+      "px-3",
+      "py-2",
+    );
+    expect(scrollBody).not.toContainElement(screen.getByRole("heading", { name: "Add lead" }));
+    expect(scrollBody).not.toContainElement(screen.getByRole("button", { name: "Create" }));
+  });
+
+  it("navigates to the target section when a step button is clicked", () => {
+    renderModal(
+      <Modal
+        sectionVariant="stepper"
+        sidebarHeader={<span>LEAD DETAILS</span>}
+        sections={steps}
+      >
+        <FormSection id="company" title="Company">
+          <Field label="Company name">
+            <Input />
+          </Field>
+        </FormSection>
+        <FormSection id="address" title="Address">
+          <Field label="City">
+            <Input />
+          </Field>
+        </FormSection>
+        <FormSection id="qualification" title="Qualification">
+          <Field label="Notes">
+            <Input />
+          </Field>
+        </FormSection>
+      </Modal>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "Form sections" });
+    const addressButton = within(nav).getByRole("button", { name: /Address/ });
+    fireEvent.click(addressButton);
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "Address", level: 3 }),
+    );
   });
 });

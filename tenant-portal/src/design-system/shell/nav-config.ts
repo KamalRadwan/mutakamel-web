@@ -74,6 +74,12 @@ export interface NavItem {
   labelKey: string; // dictionary key under t.nav
   href: string;
   icon: LucideIcon;
+  /**
+   * The exact list route is already a first-level destination, so its primary
+   * action replaces the redundant section / screen label in PageActionBar.
+   * Detail routes below it still keep the location link back to the list.
+   */
+  primaryPage?: boolean;
   // Carried verbatim from lib/navigation/tenant-routes.ts's
   // canAccessCrmRoute — only the output shape changes here, from
   // hook-computed booleans to data the nav iterates. Its tests carry
@@ -196,6 +202,7 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: "leads",
         href: TENANT_ROUTES.crmLeads,
         icon: Users2,
+        primaryPage: true,
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmLeads),
       },
       {
@@ -318,6 +325,7 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: "tradeItems",
         href: TENANT_ROUTES.tradeItems,
         icon: Package,
+        primaryPage: true,
         hasAccess: (permissions) =>
           canAccessTradeFoundationRoute(permissions, TENANT_ROUTES.tradeItems),
       },
@@ -328,6 +336,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Ruler,
         hasAccess: (permissions) =>
           canAccessTradeFoundationRoute(permissions, TENANT_ROUTES.tradeUoms),
+      },
+      {
+        id: "tradeCategories",
+        labelKey: "tradeCategories",
+        href: TENANT_ROUTES.tradeCategories,
+        icon: Network,
+        hasAccess: (permissions) => canAccessTradeFoundationRoute(permissions, TENANT_ROUTES.tradeCategories),
       },
       {
         id: "tradeChannels",

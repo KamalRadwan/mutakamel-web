@@ -127,17 +127,50 @@ describe("buildCreateLeadRequest — corporate", () => {
       }),
       BRANCH_ID,
     );
-    // `ensureCorporateContactsBatch` builds no contact methods for a selected
-    // party — email and phones there are discarded, so they are not sent. Nor
-    // is the name: the directory already holds it, and this form cannot change
-    // it.
+    // Current backend caveat: even when contactPartyId is supplied, the
+    // service still evaluates a contact name. Supply fullName or firstName/lastName.
     expect(request.contacts).toEqual([
       {
         isPrimary: true,
         jobTitle: "Head of Ops",
         contactPartyId: CONTACT_PARTY_ID,
+        firstName: "Dina",
+        lastName: "Ali",
       },
     ]);
+  });
+
+  it("supports fullName on existing corporate contact matching contract example", () => {
+    const request = buildCreateLeadRequest(
+      corporate({
+        existingCompanyPartyId: COMPANY_PARTY_ID,
+        acquisitionSourceId: "01900100-0000-7000-8000-0000000000a1",
+        contacts: [
+          {
+            ...emptyLeadContact("contact-1"),
+            contactPartyId: CONTACT_PARTY_ID,
+            fullName: "Dina Ali",
+            jobTitle: "Procurement Manager",
+            isPrimary: true,
+          },
+        ],
+      }),
+      BRANCH_ID,
+    );
+    expect(request).toEqual({
+      branchId: BRANCH_ID,
+      leadProfileType: "CORPORATE",
+      existingCompanyPartyId: COMPANY_PARTY_ID,
+      acquisitionSourceId: "01900100-0000-7000-8000-0000000000a1",
+      contacts: [
+        {
+          contactPartyId: CONTACT_PARTY_ID,
+          fullName: "Dina Ali",
+          jobTitle: "Procurement Manager",
+          isPrimary: true,
+        },
+      ],
+    });
   });
 });
 

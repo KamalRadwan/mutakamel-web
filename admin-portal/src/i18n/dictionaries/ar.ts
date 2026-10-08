@@ -1694,6 +1694,8 @@ export const ar = {
           "يحتاج التطبيق المتصل بقاعدة البيانات إلى بيانات أذونات نشطة.",
         databasePermissionManifestInvalid:
           "فشل التحقق من بيانات أذونات قاعدة البيانات النشطة.",
+        databasePermissionManifestReleaseMismatch:
+          "بيانات أذونات قاعدة البيانات النشطة مرتبطة بإصدار مكوّن مختلف.",
       },
       selectionTitle: "عوائق اختيار المستأجر الجديد",
       selectionBlockers: {
@@ -2368,6 +2370,10 @@ export const ar = {
     selectOperationTitle: "اختر عملية.",
     generationLabelLower: "الجيل",
     retryButton: "إعادة المحاولة",
+    reprovisionButton: "إعادة التجهيز",
+    cancellationPendingNote: "الإلغاء ما زال قيد التنفيذ. ستتاح إعادة التجهيز بعد تأكيد توقف العملية. يتم تحديث الصفحة تلقائيًا.",
+    openOperationNote: "توجد عملية مفتوحة. يجب انتهاؤها أو اكتمال إلغائها قبل بدء عملية جديدة.",
+    viewCurrentOperationButton: "عرض العملية الحالية",
     requestCancelButton: "طلب الإلغاء",
     historicalOperationNote: (currentGen: number, latestGen: number) =>
       `هذه عملية تاريخية. حلّ الجيل ${latestGen} محل الجيل ${currentGen}؛ إجراءات إعادة المحاولة والإلغاء متاحة لأحدث عملية فقط.`,

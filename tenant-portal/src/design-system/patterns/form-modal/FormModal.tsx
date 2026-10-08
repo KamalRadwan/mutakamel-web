@@ -19,10 +19,17 @@ export interface FormModalSection {
   /** Matches the `id` of the `FormSection` it points at. */
   id: string;
   label: string;
+  /** Subtitle or explanatory text rendered below the label in stepper variant. */
+  description?: string;
   /** A short state word beside the label — a count, "optional". Already translated. */
   hint?: string;
   /** Marks the entry as carrying an unresolved problem, so a collapsed section still says so. */
   invalid?: boolean;
+  /**
+   * For grouped or composite sections: any sub-section IDs that map to this step.
+   * If any of these are the active section in scroll-spy, this step is marked active.
+   */
+  targetSectionIds?: string[];
 }
 
 export interface FormModalLabels {
@@ -44,8 +51,8 @@ export interface FormModalProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
-  /** `full` is the viewport less 20px. `card` is a centred 672px card for a short create form that has no sections. */
-  size?: "full" | "card";
+  /** `full` is the viewport less 20px. `wide` and `card` are centred surfaces without a section index. */
+  size?: "full" | "wide" | "card";
   density?: "standard" | "compact";
   isDirty: boolean;
   isSubmitting: boolean;
@@ -58,6 +65,10 @@ export interface FormModalProps {
   hideSubmit?: boolean;
   /** Index entries, in document order. Omit for a modal with no section index. Rendered only at `size="full"`. */
   sections?: FormModalSection[];
+  /** Section navigation visual style. "default" is a compact list of buttons; "stepper" is a numbered vertical timeline with titles and subtitles. */
+  sectionVariant?: "default" | "stepper";
+  /** Optional title / header element above the section navigation (e.g. "LEAD DETAILS"). */
+  sidebarHeader?: React.ReactNode;
   /** Rendered in the header band, before the close button — a status chip, a scope note. */
   headerAside?: React.ReactNode;
   /** Rendered at the footer's inline start, opposite Cancel and Submit. */
@@ -81,6 +92,8 @@ export function FormModal({
   submitDisabled,
   hideSubmit = false,
   sections,
+  sectionVariant = "default",
+  sidebarHeader,
   headerAside,
   footerLeading,
   labels,
@@ -106,7 +119,9 @@ export function FormModal({
   // The effect below must not re-subscribe on every parent render, and a
   // `sections` array built inline at the call site is a new reference each
   // time. The ids are what it actually depends on.
-  const sectionKey = (sections ?? []).map((section) => section.id).join("|");
+  const sectionKey = (sections ?? [])
+    .map((section) => `${section.id}:${(section.targetSectionIds ?? []).join(",")}`)
+    .join("|");
 
   // Which section the reader is on. A scroll listener rather than an
   // IntersectionObserver: the answer wanted here is "the last heading that has
@@ -145,19 +160,31 @@ export function FormModal({
   }, [body, sectionKey]);
 
   function goToSection(id: string) {
+    const targetSection = sections?.find((s) => s.id === id);
+    const targetId = targetSection?.targetSectionIds?.[0] ?? id;
     const nodes = body?.querySelectorAll<HTMLElement>("[data-form-section]");
     // Matched by reading the attribute rather than by building a selector, so a
     // section id never has to be escaped to be addressable.
-    const node = [...(nodes ?? [])].find((candidate) => candidate.dataset.formSection === id);
+    const node = [...(nodes ?? [])].find(
+      (candidate) =>
+        candidate.dataset.formSection === id ||
+        candidate.dataset.formSection === targetId,
+    );
     if (!node) return;
+    const closedTrigger = node.querySelector<HTMLButtonElement>(
+      'button[data-state="closed"], [data-state="closed"] button',
+    );
+    if (closedTrigger) {
+      closedTrigger.click();
+    }
     // No `behavior: "smooth"` here: the container carries `scroll-smooth`, so
     // the global prefers-reduced-motion reset can turn it off. A JS argument
     // would override that reset and animate anyway.
     node.scrollIntoView?.({ block: "start" });
-    setActiveSection(id);
+    setActiveSection(node.dataset.formSection ?? id);
     // Scrolling moves the eye and leaves the keyboard behind. The heading is
     // the section's own focus target — see FormSection.
-    node.querySelector<HTMLElement>("h3[tabindex]")?.focus();
+    node.querySelector<HTMLElement>("h3[tabindex], h4[tabindex], button[tabindex]")?.focus();
   }
 
   return (
@@ -167,14 +194,19 @@ export function FormModal({
         onOpenChange={(next) => (next ? onOpenChange(true) : shell.requestClose())}
       >
         <DialogContent
-          size={size === "card" ? "2xl" : "full"}
+          size={size === "full" ? "full" : "2xl"}
           // The `2xl` size string is a centred card that carries `grid … gap-4
           // … p-6`; this override makes it the same flex column `full` already
           // is, with no padding of its own, because the header/body/footer
           // bands below own theirs. tailwind-merge resolves `grid`→`flex` and
           // `p-6`→`p-0` — both are last-wins groups.
           className={
-            size === "card" ? "flex max-h-[85dvh] flex-col gap-0 p-0" : undefined
+            size === "full"
+              ? undefined
+              : cn(
+                  "flex max-h-[85dvh] w-[calc(100%-2rem)] flex-col gap-0 p-0",
+                  size === "wide" && "max-w-[960px]",
+                )
           }
           closeLabel={labels.close}
           onEscapeKeyDown={(event) => {
@@ -205,39 +237,129 @@ export function FormModal({
               {size === "full" && sections && sections.length > 0 && (
                 <nav
                   aria-label={labels.sections}
-                  className="hidden w-56 shrink-0 overflow-y-auto border-e border-border bg-muted/40 p-2 lg:block"
+                  className={cn(
+                    "hidden min-h-0 shrink-0 overflow-y-auto border-e border-border lg:block",
+                    sectionVariant === "stepper"
+                      ? "w-60 bg-muted/40 p-4"
+                      : "w-56 bg-muted/40 p-2",
+                  )}
                 >
-                  <ol className="flex flex-col gap-0.5">
-                    {sections.map((section) => (
-                      <li key={section.id}>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-current={activeSection === section.id ? "true" : undefined}
-                          onClick={() => goToSection(section.id)}
-                          className={cn(
-                            "w-full justify-between gap-2 text-start font-normal",
-                            activeSection === section.id && "bg-accent text-foreground",
-                          )}
-                        >
-                          <span className="min-w-0 truncate">{section.label}</span>
-                          {section.invalid ? (
-                            <span className="shrink-0 text-destructive" aria-hidden="true">
-                              !
-                            </span>
-                          ) : (
-                            section.hint && (
-                              <span className="shrink-0 text-xs text-muted-foreground">
-                                {section.hint}
+                  {sidebarHeader && (
+                    <div className={sectionVariant === "stepper" ? "mb-4" : "mb-2 px-2 py-1"}>
+                      {sidebarHeader}
+                    </div>
+                  )}
+
+                  {sectionVariant === "stepper" ? (
+                    <ol className="relative flex flex-col">
+                      {sections.map((section, index) => {
+                        const isCurrent =
+                          (activeSection === null && index === 0) ||
+                          activeSection === section.id ||
+                          Boolean(
+                            section.targetSectionIds &&
+                              activeSection &&
+                              section.targetSectionIds.includes(activeSection),
+                          );
+
+                        return (
+                          <li
+                            key={section.id}
+                            className="relative flex gap-2.5 pb-5 last:pb-0"
+                          >
+                            {/* Vertical connector line */}
+                            {index < sections.length - 1 && (
+                              <div
+                                aria-hidden="true"
+                                className="absolute start-3.5 top-7 -bottom-1 w-px bg-border"
+                              />
+                            )}
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => goToSection(section.id)}
+                              className="group -m-1 h-auto w-full items-start justify-start gap-3 p-1 whitespace-normal text-start"
+                              aria-current={isCurrent ? "step" : undefined}
+                            >
+                              {/* Step circle marker */}
+                              <span
+                                className={cn(
+                                  "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors",
+                                  isCurrent &&
+                                    "border-primary bg-primary text-primary-foreground ring-4 ring-ring/15",
+                                  !isCurrent &&
+                                    !section.invalid &&
+                                    "border-border bg-card text-muted-foreground",
+                                  section.invalid &&
+                                    "border-destructive bg-destructive/10 text-destructive ring-4 ring-destructive/15",
+                                )}
+                              >
+                                {index + 1}
                               </span>
-                            )
-                          )}
-                          {section.invalid && <span className="sr-only">{labels.sectionInvalid}</span>}
-                        </Button>
-                      </li>
-                    ))}
-                  </ol>
+
+                              {/* Title and subtitle */}
+                              <div className="flex min-w-0 flex-col">
+                                <span
+                                  className={cn(
+                                    "text-sm font-semibold leading-tight transition-colors",
+                                    isCurrent && "text-primary",
+                                    !isCurrent &&
+                                      !section.invalid &&
+                                      "text-foreground group-hover:text-primary",
+                                    section.invalid && "text-destructive",
+                                  )}
+                                >
+                                  {section.label}
+                                </span>
+                                {section.description && (
+                                  <span className="mt-1 text-xs leading-snug text-muted-foreground">
+                                    {section.description}
+                                  </span>
+                                )}
+                                {section.invalid && (
+                                  <span className="sr-only">{labels.sectionInvalid}</span>
+                                )}
+                              </div>
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  ) : (
+                    <ol className="flex flex-col gap-0.5">
+                      {sections.map((section) => (
+                        <li key={section.id}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-current={activeSection === section.id ? "true" : undefined}
+                            onClick={() => goToSection(section.id)}
+                            className={cn(
+                              "w-full justify-between gap-2 text-start font-normal",
+                              activeSection === section.id && "bg-accent text-foreground",
+                            )}
+                          >
+                            <span className="min-w-0 truncate">{section.label}</span>
+                            {section.invalid ? (
+                              <span className="shrink-0 text-destructive" aria-hidden="true">
+                                !
+                              </span>
+                            ) : (
+                              section.hint && (
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {section.hint}
+                                </span>
+                              )
+                            )}
+                            {section.invalid && <span className="sr-only">{labels.sectionInvalid}</span>}
+                          </Button>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                 </nav>
               )}
 
@@ -250,7 +372,19 @@ export function FormModal({
               <div
                 ref={setBody}
                 // Contains Radix's absolute native select so focus cannot scroll the entire dialog.
-                className={cn("relative flex min-w-0 flex-1 scroll-smooth flex-col overflow-y-auto", density === "compact" ? "gap-2 px-3 py-2" : "gap-4 px-4 py-3.5 sm:px-5")}
+                className={cn(
+                  // This is a grid, not a constrained column flexbox. A flex
+                  // body lets its section children shrink to fit the viewport;
+                  // sections that also own `overflow-hidden` (for example an
+                  // open Collapsible) then clip their fields before the body
+                  // has any overflow to scroll. Max-content rows preserve each
+                  // section's natural height and make this element the single
+                  // scroll owner while the header and footer stay fixed.
+                  "relative grid min-h-0 min-w-0 flex-1 auto-rows-max content-start overflow-y-auto scroll-smooth",
+                  density === "compact"
+                    ? "gap-2 px-3 py-2"
+                    : "gap-4 px-4 py-3.5 sm:px-5",
+                )}
               >
                 {children}
               </div>

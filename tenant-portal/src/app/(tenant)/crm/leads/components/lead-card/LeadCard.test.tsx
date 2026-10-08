@@ -82,7 +82,7 @@ describe("LeadCard", () => {
     // A corporate lead's own display name IS its company name, so both cases
     // below carry the same `leadName`/`company` pair. What separates them is
     // whether the lead party has a contact person hanging off it.
-    const { rerender } = render(
+    const { container, rerender } = render(
       <LeadCard
         lead={{ ...lead, leadName: "Acme Trading", company: "Acme Trading" }}
         labels={cardLabels}
@@ -107,6 +107,10 @@ describe("LeadCard", () => {
     expect(screen.getAllByText("Kamal Radwan")).toHaveLength(1);
     expect(screen.getByText("Individual")).toBeInTheDocument();
     expect(screen.queryByText("Dina Ali")).toBeNull();
+    expect(container.querySelector("svg")).toBeNull();
+    expect(container.textContent?.indexOf("Kamal Radwan")).toBeLessThan(
+      container.textContent?.indexOf("Individual") ?? 0,
+    );
   });
 
   it("renders nothing at all where a lead has no tags", () => {

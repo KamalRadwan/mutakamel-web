@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Combobox, type ComboboxOption } from "./Combobox";
+import { Button } from "./Button";
 
 afterEach(cleanup);
 beforeEach(() => vi.useRealTimers());
@@ -28,6 +29,24 @@ function renderCombobox(overrides: Partial<React.ComponentProps<typeof Combobox>
 }
 
 describe("Combobox", () => {
+  it.each(["loading", "error"] as const)("drops hidden options from keyboard and ARIA selection during %s", (state) => {
+    const { props, rerender } = renderCombobox();
+    fireEvent.click(screen.getByRole("button", { name: /Select a branch/ }));
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "End" });
+    rerender(<Combobox {...props} loading={state === "loading"} errorContent={state === "error" ? <p>Read failed</p> : undefined} />);
+    expect(screen.getByRole("combobox")).not.toHaveAttribute("aria-activedescendant");
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
+    expect(props.onValueChange).not.toHaveBeenCalled();
+    expect(screen.queryByText("No branches match")).not.toBeInTheDocument();
+  });
+
+  it("keeps retry and page buttons outside the listbox", () => {
+    renderCombobox({ errorContent: <Button>Retry read</Button>, footer: <Button>Next page</Button> });
+    fireEvent.click(screen.getByRole("button", { name: /Select a branch/ }));
+    for (const name of ["Retry read", "Next page"]) expect(screen.getByRole("listbox")).not.toContainElement(screen.getByRole("button", { name }));
+  });
+
   it("shows the caller-supplied label for the current value, not the raw id", () => {
     renderCombobox({ value: "99", selectedLabel: "Aswan branch" });
     expect(screen.getByRole("button", { name: /Aswan branch/ })).toBeInTheDocument();

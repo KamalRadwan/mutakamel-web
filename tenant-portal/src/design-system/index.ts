@@ -115,6 +115,8 @@ export * from "./patterns/status-badge/StatusBadge";
 export * from "./patterns/status-badge/tone-map";
 export * from "./patterns/tag-color-picker/TagColorPicker";
 export * from "./patterns/timeline/Timeline";
+export * from "./patterns/tree/Tree";
+export * from "./patterns/tree/tree-types";
 
 export * from "./views/card-color";
 export * from "./views/replace-search-params";

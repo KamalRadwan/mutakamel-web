@@ -116,6 +116,12 @@ export function jsonObject(value: unknown): Record<string, unknown> {
   return record(value) ?? {};
 }
 
+/** A nullable JSON object that still rejects arrays and primitive values. */
+export function nullableJsonObject(value: unknown): Record<string, unknown> | null {
+  if (value === null || value === undefined) return null;
+  return record(value) ?? tradeInvalidResponse();
+}
+
 /**
  * Every money and quantity field in Trade is a decimal string of at most eight
  * places. `Number(` appears nowhere in trade-app's document services for one of

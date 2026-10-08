@@ -474,7 +474,7 @@ export function useTenantProvisioning(
         if (!shouldRetainProvisioningIntent(normalized)) {
           intentKeys.current.delete(fingerprint);
         }
-        setMutation({ name, intentKey: idempotencyKey, error: normalized });
+        setMutation({ name: null, intentKey: idempotencyKey, error: normalized });
         throw normalized;
       }
     },

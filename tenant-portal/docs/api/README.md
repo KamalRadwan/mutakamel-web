@@ -7,6 +7,9 @@ Last source verification: **2026-08-27**
 Inventory and Application/Addon read additions refreshed **2026-09-08** from
 the generated Gateway source inventory and the separately dated domain pages.
 
+Trade Category source and Item assignment integration were verified **2026-09-27**;
+see [Trade Categories](./trade-categories.md) for its eleven routes and delivery evidence.
+
 Source: `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/`,
 `core-app/src/tenant/`, `crm-app/src/crm/`.
 
@@ -23,20 +26,20 @@ The Gateway is the only browser-facing edge. Upstream paths
 and must never appear in browser code. `worker-app` has **no** tenant browser
 API — its results are read through Core, CRM or Trade projections.
 
-Current inventory: **618 tenant routes** — Core207, CRM160, Trade231, WebPhone20. Full
-table in [../generated/tenant-api-routes.md](../generated/tenant-api-routes.md);
+The current source-derived inventory is in
+[../generated/tenant-api-routes.md](../generated/tenant-api-routes.md);
 machine-readable in the sibling `.json`. Regenerate with `pnpm docs:routes`.
 
 ## Route classes
 
 Every Gateway route declares one. It determines transport policy.
 
-| Class | Count | Meaning |
-| --- | --- | --- |
-| `AUTHENTICATED` | 233 | Standard authenticated read |
-| `WRITE_SENSITIVE` | 347 | Mutation; idempotency and retry policy apply |
-| `READ_HEAVY` | 23 | Larger payload/timeout allowance |
-| `PUBLIC` | 15 | No session required |
+| Class | Meaning |
+| --- | --- |
+| `AUTHENTICATED` | Standard authenticated read |
+| `WRITE_SENSITIVE` | Mutation; idempotency and retry policy apply |
+| `READ_HEAVY` | Larger payload/timeout allowance |
+| `PUBLIC` | No session required |
 
 A route that is `WRITE_SENSITIVE` **and** `idempotent: true` requires an
 `x-idempotency-key` (UUIDv7). `axiosClient` attaches one automatically.

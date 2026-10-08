@@ -33,7 +33,11 @@ import { LeadSearchBar } from "./components/LeadSearchBar";
 import { leadSearchValuesOf, leadSearchWithField } from "./lead-search-contract";
 import { useLeadCardSlots } from "./components/useLeadCardSlots";
 import { useLeadColumns } from "./components/useLeadColumns";
-import { type LeadItem, useLeads } from "./hooks/useLeads";
+import {
+  DEFAULT_LEADS_SORT,
+  type LeadItem,
+  useLeads,
+} from "./hooks/useLeads";
 import { useLeadBoard } from "./hooks/useLeadBoard";
 import { useLeadDocumentCounts } from "./hooks/useLeadDocumentCounts";
 
@@ -112,6 +116,7 @@ export default function LeadsPage() {
   );
   const workspace = useWorkspaceState("leads", {
     defaultView: "board",
+    defaultSort: DEFAULT_LEADS_SORT,
     onPageChange: applyPage,
     onSortChange: applySort,
   });
@@ -255,6 +260,9 @@ export default function LeadsPage() {
               }}
               onActivate={openLead}
               onAddToColumn={canCreate ? openCreateInStage : undefined}
+              canAddToColumn={(columnId) =>
+                stageById.get(columnId)?.flag !== TERMINAL_STAGE_FLAG
+              }
               isLoading={board.isLoading || (isLoading && stages.length === 0)}
               error={board.error ?? loadError}
               onRetry={() => void board.reload()}
@@ -291,6 +299,14 @@ export default function LeadsPage() {
               page={pageInfo}
               onPageChange={workspace.setPage}
               sort={workspace.sort}
+              onSortChange={workspace.setSort}
+              sortOptions={[
+                {
+                  id: "createdAt",
+                  label: t.crmLeads.advancedSearch.fields.createdAt,
+                },
+                { id: "displayName", label: t.crmLeads.name },
+              ]}
               emptyState={branchEmptyState}
               labels={{ ...viewLabels, sortBy: t.views.sortBy }}
             />

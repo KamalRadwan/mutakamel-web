@@ -4,6 +4,7 @@ import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react"
 import { useI18n } from "@/i18n/I18nContext";
 import { cn } from "../lib/cn";
 import { focusRing } from "../lib/variants";
+import { Button } from "../primitives/Button";
 
 export type AppToastType = "success" | "error" | "warning" | "info";
 
@@ -11,6 +12,7 @@ export interface AppToastProps {
   type: AppToastType;
   title: string;
   message?: string;
+  action?: { label: string; onClick: () => void };
   onDismiss: () => void;
 }
 
@@ -30,7 +32,7 @@ const ICON_TONE: Record<AppToastType, string> = {
   info: "text-ink-500 dark:text-ink-400",
 };
 
-export function AppToast({ type, title, message, onDismiss }: AppToastProps) {
+export function AppToast({ type, title, message, action, onDismiss }: AppToastProps) {
   const { t } = useI18n();
   const Icon = ICONS[type];
 
@@ -64,6 +66,7 @@ export function AppToast({ type, title, message, onDismiss }: AppToastProps) {
             <bdi>{message}</bdi>
           </p>
         )}
+        {action ? <Button className="mt-2" variant="outline" size="sm" onClick={() => { action.onClick(); onDismiss(); }}>{action.label}</Button> : null}
       </div>
       <button
         type="button"

@@ -50,6 +50,7 @@ export interface CrmPhoneNumberInputProps {
    * over the visible one.
    */
   label?: string;
+  placeholder?: string;
   disabled?: boolean;
   onChange: (next: string) => void;
   onBlur: () => void;
@@ -73,6 +74,7 @@ export function CrmPhoneNumberInput({
   value,
   maxLength,
   label,
+  placeholder,
   disabled,
   onChange,
   onBlur,
@@ -228,7 +230,7 @@ export function CrmPhoneNumberInput({
         inputMode="tel"
         autoComplete="tel-national"
         aria-label={label ?? t.crmShared.phoneNumber}
-        placeholder={label ?? t.crmShared.phoneNumber}
+        placeholder={placeholder ?? label ?? t.crmShared.phoneNumber}
         dir="ltr"
         value={nationalNumber}
         maxLength={Math.max(1, maxLength - callingCode.length)}

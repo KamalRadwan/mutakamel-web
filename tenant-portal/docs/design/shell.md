@@ -23,7 +23,7 @@ things sent it away:
 3. **A screen's actions and its heading were stacked above its data.** Every
    list screen spent a header row and a toolbar row before the first record.
 
-The replacement is two full-width bars. It costs 42px of height and returns
+The replacement is two full-width bars. It costs 22px of height and returns
 240px of width, and the toolbar rows fold into the second bar rather than
 sitting above the table.
 
@@ -34,8 +34,8 @@ full-width bars have no collapsed state to remember.
 ## AppShell
 
 ```text
-┌ GlobalNav      45px ─ brand 250px │ app ▾ │ section ▾ … ⟵⟶ 🌐 ☀ 🔔 │ 👤 ┐
-├ PageActionBar  45px ─ CRM › Leads          ⟵⟶ [+ Add lead] [search] [▤▦▥] ┤
+┌ GlobalNav      35px ─ brand 250px │ app ▾ │ section ▾ … ⟵⟶ 🌐 ☀ 🔔 │ 👤 ┐
+├ PageActionBar  35px ─ [+ Add lead]             ⟵⟶ [branch] [search] [▤▦▥] ┤
 │ main                                                                      │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
@@ -52,10 +52,10 @@ One height token per bar, and one derived total:
 
 ```css
 :root {
-  --size-topbar:    calc(2.8125rem * var(--ui-scale)); /* 45px — global nav */
-  --size-actionbar: calc(2.8125rem * var(--ui-scale)); /* 45px — action bar */
+  --size-topbar:    calc(2.1875rem * var(--ui-scale)); /* 35px — global nav */
+  --size-actionbar: calc(2.1875rem * var(--ui-scale)); /* 35px — action bar */
   --size-brand:     calc(15.625rem * var(--ui-scale)); /* 250px — brand zone */
-  --size-chrome:    calc(var(--size-topbar) + var(--size-actionbar)); /* 90px */
+  --size-chrome:    calc(var(--size-topbar) + var(--size-actionbar)); /* 70px */
 }
 ```
 
@@ -64,10 +64,10 @@ that needs it: an element positioned against the chrome from **outside** the
 shell's flex column, of which there is exactly one — the suspended-tenant banner
 in `TenantHostStateBoundary`, which used to carry a hand-fitted `top-16`.
 
-**Both bars are the same height on purpose.** They read as one 90px chrome block
-split by a rule, not as a header with a subordinate strip under it. 45px is the
-smallest height that clears a 32px control with a 6.5px optical margin, and 32px
-is what the action bar's primary button and the branch selects beside it are.
+**Both bars are the same height on purpose.** They read as one 70px chrome block
+split by a rule, not as a header with a subordinate strip under it. 35px clears
+the bars' 28px controls with a 3.5px optical margin while preserving more of the
+1366×768 workspace for the page itself.
 
 ### The height chain is load-bearing
 
@@ -86,7 +86,7 @@ control is spacing and nothing else; the 16/24px this inherited from the sidebar
 era read as a gap where a page title used to sit, and on the 1366×768 laptop
 this is built for it spent 48px of vertical budget on nothing.
 
-## GlobalNav — 45px
+## GlobalNav — 35px
 
 | Zone | Width | Contents |
 | --- | --- | --- |
@@ -111,7 +111,7 @@ This bar is the product's one inverted surface: `bg-nav`, which is
 system brand and the tenant's own hue for a branded portal. `PageActionBar`
 below it stays `--card`, which is what keeps a screen's primary button on a
 surface it was measured for; the two bars therefore no longer read as one
-90px block, and read instead as brand chrome above a working bar.
+70px block, and read instead as brand chrome above a working bar.
 
 Nothing in this bar styles itself for that. `.nav-surface` on the `<header>`
 re-points the ordinary semantic names for the subtree, so a control here asks
@@ -132,8 +132,9 @@ its Records section into four first-level links at the start of the section
 row. These are the app's primary destinations; with the Dashboards and Setup
 triggers they make six desktop entries, the same count as Trade's six triggers,
 which is the row the `xl` breakpoint below was sized for. The Records trigger is
-therefore absent from the desktop GlobalNav; the responsive sheet and
-PageActionBar retain the Records grouping and location context.
+therefore absent from the desktop GlobalNav; the responsive sheet retains the
+full grouping, while PageActionBar omits the redundant grouping only on an
+exact route marked `primaryPage` and restores it on descendant detail routes.
 
 **Activities** leads the row (2026-09-24): it is Core's activity hub filtered to
 CRM records, admitted by Core `activities.read` rather than a CRM grant, and it
@@ -164,7 +165,7 @@ every menu closed. The item level is answered by the bar below it.
 The fixed costs are the brand zone, the switcher and the account cluster —
 roughly 570px before a section is drawn. Trade's six triggers need about 600px.
 At 1280px that fits; at 1024px it does not, and the honest options there are a
-clipped row, a horizontal scrollbar inside a 45px bar, or the sheet.
+clipped row, a horizontal scrollbar inside a 35px bar, or the sheet.
 
 Below `xl` the menu trigger opens `NavSheet`: an inline-start `Sheet` listing
 every section with its **descriptive** heading and every item under it. That is
@@ -175,7 +176,7 @@ the screen it opened.
 This is also what the old shell did at the same width, where `lg`–`xl` defaulted
 the sidebar to its icon rail.
 
-## PageActionBar — 45px
+## PageActionBar — 35px
 
 Two jobs, and the first is the one that is easy to miss.
 
@@ -188,6 +189,15 @@ derived from `nav-config.ts` by `usePathname()` (`useNavLocation.ts`).
 
 Without it the shell would have traded a permanent location indicator for none,
 which is the one real thing a horizontal nav costs.
+
+**Primary destinations are the deliberate exception.** A nav item may mark its
+exact route as `primaryPage`. The first-level GlobalNav link already names that
+screen, so repeating `Records › Leads` in the bar adds no navigation value. On
+that exact route the filled primary action occupies the logical inline start
+instead. Prefix-matched detail routes do not inherit the exception: on
+`/crm/leads/<id>` the bar still reads `Records › Leads`, and Leads remains the
+link back to the list. This also holds when the actor cannot create a lead: the
+redundant location stays omitted; the start slot is simply empty.
 
 **The screen half is a link; the section half is not.** A section has no index
 route to point at, but a nav item always has one — and on a detail route the
@@ -207,7 +217,8 @@ one above it.
 
 ### It holds the screen's controls
 
-Four regions, in render order: **`related`** in the middle, then
+Five regions: **`primary`** at logical start on a primary destination (or after
+`actions` on ordinary screens), **`related`** in the middle, then
 **`actions` · `search` · `view`** in a trailing cluster. `view` sits at the
 inline end because it is the only control that changes how the screen is drawn
 rather than what it holds, so a fixed edge keeps it still as a screen gains or
@@ -248,7 +259,7 @@ Most screens never call `PageActions` themselves:
 
 | What moves | Who moves it | Screens |
 | --- | --- | --- |
-| `primaryAction` + `secondaryActions` | `PageHeader` | 78 |
+| `primaryAction` → `primary`; `secondaryActions` → `actions` | `PageHeader` | 78 |
 | Search box + `Filters` popover | `FilterBar` | 47 |
 | The basic search row | The three CRM search bars | 3 |
 | `ViewSwitcher` | The screen, `slot="view"` | 5 |
@@ -266,7 +277,7 @@ outline, and on a detail screen it names the record, which is a different
 sentence from the nav location. `FilterBar`'s chips stay on the page — they wrap
 onto a second line by design and describe applied state rather than asking a
 question. The advanced search cards stay for the same reason: a card that grows
-to several rows of conditions has nowhere to go in a 45px bar. `TradeScopeBar`'s
+to several rows of conditions has nowhere to go in a 35px bar. `TradeScopeBar`'s
 three selects stay, as they already do on the other nine Trade screens.
 
 Two bespoke filter surfaces also stay, and deliberately: `AuditFilterPanel` is a
@@ -277,7 +288,7 @@ are worse than a control sitting directly above the table it filters. They are
 the boundary of what folded into the bar, not an oversight.
 
 **The bar renders on every route**, including one that registers nothing. A bar
-that vanished on some screens would move the page 45px on those routes, and
+that vanished on some screens would move the page 35px on those routes, and
 every navigation between the two kinds would shift content under the pointer.
 
 ### Filters are one shape at every width now

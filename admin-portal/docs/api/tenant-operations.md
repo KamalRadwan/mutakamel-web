@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-11**
+Last source verification: **2026-09-29** (cancellation and re-provision recovery)
 
 Verified against the current Gateway contracts, Core controllers, DTOs,
 operation/read-model services, provisioning command services, database enums,
@@ -653,3 +653,7 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-read-models.service.ts`
 - `../backend/mutakamel-apps/core-app/packages/database/src/enums/tenant-provisioning.enum.ts`
 - `../backend/mutakamel-apps/shared-libs/packages/common/src/interceptors/response-envelope.interceptor.ts`
+
+## Cancellation and re-provision recovery
+
+`CANCEL_REQUESTED` remains an open operation until the Worker commits stop evidence. The Operations tab keeps **Re-provision** visible but disabled during cancellation and continues polling. Once cancelled, that button submits the existing operation-specific retry command. Failed retryable operations offer the same **Re-provision** action through the existing retry endpoint. Managed commands are disabled while an operation is open, with **View current operation** navigation. A raced `TENANT_PROVISIONING_OPERATION_ALREADY_OPEN` response explains how to recover instead of displaying only the raw code. Failed requests clear the busy state while retaining the same idempotency key where the outcome is uncertain.

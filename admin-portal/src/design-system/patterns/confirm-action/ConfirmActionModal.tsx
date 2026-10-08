@@ -109,14 +109,14 @@ export function ConfirmActionModal({
           <X className="size-4" aria-hidden="true" />
         </AlertDialogCancel>
         <div className="mb-4 flex items-center gap-3 border-b border-border pb-3">
-          <div className="rounded-md bg-muted p-2">
+          <div className="shrink-0 rounded-md bg-muted p-2">
             <Icon className={iconClassName ?? `size-5 ${VARIANT_ICON_CLASS[variant]}`} aria-hidden="true" />
           </div>
-          <div>
+          <div className="min-w-0">
             <AlertDialogTitle className="text-sm font-semibold">
               {lang === "ar" ? titleAr : titleEn}
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">
+            <AlertDialogDescription className="whitespace-pre-line break-words text-xs">
               {lang === "ar" ? descriptionAr : descriptionEn}
             </AlertDialogDescription>
           </div>

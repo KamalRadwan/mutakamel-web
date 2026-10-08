@@ -3,9 +3,12 @@
 import { Settings } from "lucide-react";
 import { SubNav, SETTINGS_SUBNAV } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { useAuth } from "@/context/AuthContext";
+import { adminCan } from "@/lib/auth/rbac";
 
 export function SettingsSidebar() {
   const { t } = useI18n();
+  const { user } = useAuth();
 
   return (
     <div className="space-y-3">
@@ -14,7 +17,8 @@ export function SettingsSidebar() {
         {t.settings.pageTitle}
       </h2>
       <SubNav
-        items={SETTINGS_SUBNAV.map((item) => ({ href: item.href, labelKey: item.labelKey }))}
+        items={SETTINGS_SUBNAV.filter((item) => !item.permission || adminCan(user, item.permission))
+          .map((item) => ({ href: item.href, labelKey: item.labelKey }))}
         ariaLabel={t.settings.pageTitle}
       />
     </div>

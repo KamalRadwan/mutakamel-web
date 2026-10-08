@@ -363,8 +363,9 @@ never `Number()`.
 Tuned for many rows on a 1366×768 laptop — but no longer at the cost of
 rendering smaller than its sibling portal.
 
-Every size token multiplies by `--ui-scale`, which ships at **1**. The whole
-shell geometry below is the admin portal's exact chrome.
+Every size token multiplies by `--ui-scale`, which ships at **1**. The control
+and row geometry below matches the admin portal; this portal's two-bar shell
+keeps its own denser height.
 
 ```css
 :root {
@@ -377,16 +378,16 @@ shell geometry below is the admin portal's exact chrome.
   --size-control-xl: calc(2.5rem  * var(--ui-scale));  /* 40px */
 
   --size-row:       calc(2.75rem   * var(--ui-scale)); /* 44px  — admin's px-4/py-3 body cell */
-  --size-topbar:    calc(2.8125rem * var(--ui-scale)); /* 45px  — the global nav */
-  --size-actionbar: calc(2.8125rem * var(--ui-scale)); /* 45px  — the page action bar */
+  --size-topbar:    calc(2.1875rem * var(--ui-scale)); /* 35px  — the global nav */
+  --size-actionbar: calc(2.1875rem * var(--ui-scale)); /* 35px  — the page action bar */
   --size-brand:     calc(15.625rem * var(--ui-scale)); /* 250px — the brand zone */
-  --size-chrome:    calc(var(--size-topbar) + var(--size-actionbar)); /* 90px */
+  --size-chrome:    calc(var(--size-topbar) + var(--size-actionbar)); /* 70px */
 }
 ```
 
 The row is still admin's. The **chrome is not, any more**: admin's 48px topbar,
 240px sidebar and 52px rail were adopted in the token port and replaced on
-2026-09-06 by two 45px bars. `--size-sidebar` and `--size-rail` are gone with
+2026-09-06 by two 35px bars. `--size-sidebar` and `--size-rail` are gone with
 the components that consumed them. See [shell.md](shell.md#appshell).
 
 **The default moved from 0.9 to 1, and that is the headline of the port.** The
@@ -754,7 +755,7 @@ to; the page itself must say so.
 
 # 7 · Page-by-page UI/UX
 
-Shell for every authenticated page: a **45px global nav** over a **45px page
+Shell for every authenticated page: a **35px global nav** over a **35px page
 action bar** over `main`, with a 16px gutter that opens to 24px from `md:`
 upward (`p-4 md:p-6`). Both bars are full width; there is no sidebar.
 

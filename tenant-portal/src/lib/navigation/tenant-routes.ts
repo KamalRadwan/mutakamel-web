@@ -68,6 +68,7 @@ export const TENANT_ROUTES = {
   trade: "/trade",
   // Phase 10 — Trade foundation, docs/api/trade-foundation.md.
   tradeItems: "/trade/items",
+  tradeCategories: "/trade/categories",
   tradeUoms: "/trade/uoms",
   tradeChannels: "/trade/channels",
   tradeCommercialAccounts: "/trade/commercial-accounts",
@@ -528,6 +529,7 @@ export function canAccessTradeAnalytics(): boolean {
 //     full configuration-manage rights does not have.
 const TRADE_FOUNDATION_ROUTES = [
   { href: TENANT_ROUTES.tradeItems, permission: "trade.items.read" },
+  { href: TENANT_ROUTES.tradeCategories, permission: "trade.items.read" },
   { href: TENANT_ROUTES.tradeUoms, permission: "trade.items.read" },
   { href: TENANT_ROUTES.tradeChannels, permission: "trade.items.read" },
   {
@@ -617,7 +619,7 @@ const TRADE_EXACT_PATHS = new Set<string>([
 // one, because a quotation revision, a confirmation attempt and a render job
 // are all read through their parent document's own routes.
 const TRADE_DETAIL_PATHS =
-  /^\/trade\/(?:items|uoms|channels|commercial-accounts|quotations|sales-orders|purchase-orders|purchase-quotations|invoices|contracts|inventory\/(?:nodes|serials|decisions)|price-book-versions|decisions|extensions|import-mappings|imports|control-tower|dashboards|widgets|webhooks|webhooks\/deliveries)\/[^/]+$/u;
+  /^\/trade\/(?:items|categories|uoms|channels|commercial-accounts|quotations|sales-orders|purchase-orders|purchase-quotations|invoices|contracts|inventory\/(?:nodes|serials|decisions)|price-book-versions|decisions|extensions|import-mappings|imports|control-tower|dashboards|widgets|webhooks|webhooks\/deliveries)\/[^/]+$/u;
 
 /**
  * The `/trade/*` allowlist `proxy.ts` redirects against.

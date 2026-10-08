@@ -68,6 +68,11 @@ export interface BoardViewProps<T> extends Omit<WorkspaceViewProps<T>, "sort" | 
   // know what creating means — the screen opens its own modal and decides what
   // the column id seeds in it. Requires `labels.addToColumn`.
   onAddToColumn?: (columnId: string) => void;
+  // Some columns are valid destinations for existing records but invalid
+  // starting states for new ones (for example, a terminal Converted stage).
+  // Returning false removes the action instead of presenting a control that
+  // can only fail after it is pressed.
+  canAddToColumn?: (columnId: string) => boolean;
   columnPage?: (columnId: string) => { hasMore: boolean; isLoadingMore: boolean };
   onLoadMoreColumn?: (columnId: string) => void;
   labels: BoardViewLabels;
@@ -92,6 +97,7 @@ export function BoardView<T>({
   confirmMove,
   onCardMove,
   onAddToColumn,
+  canAddToColumn,
   columnPage,
   onLoadMoreColumn,
   isLoading,
@@ -230,7 +236,11 @@ export function BoardView<T>({
               cards={cardsFor(column.id)}
               isCollapsed={collapsed.isCollapsed(column.id)}
               onToggleCollapse={collapsed.toggle}
-              onAdd={onAddToColumn}
+              onAdd={
+                onAddToColumn && (canAddToColumn?.(column.id) ?? true)
+                  ? onAddToColumn
+                  : undefined
+              }
               hasMore={columnPage?.(column.id).hasMore}
               isLoadingMore={columnPage?.(column.id).isLoadingMore}
               onLoadMore={onLoadMoreColumn}

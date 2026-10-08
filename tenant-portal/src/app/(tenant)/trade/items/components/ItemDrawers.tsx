@@ -14,8 +14,8 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
-  EMPTY_ITEM_FORM,
   ITEM_CODE_MAX_LENGTH,
+  ITEM_LOCALIZED_NAME_MAX_LENGTH,
   ITEM_KINDS,
   ITEM_STATUSES,
   toItemForm,
@@ -24,7 +24,10 @@ import {
   type ItemKind,
   type ItemStatus,
 } from "../item-contract";
-import { LOCALIZED_NAME_MAX_LENGTH } from "../../trade-validation";
+import { ItemExtendedFields } from "./ItemExtendedFields";
+import { ItemRelationsFields } from "./ItemRelationsFields";
+import { CategoryPicker } from "../../categories/components/CategoryPicker";
+import type { ItemCategorySummary } from "../../categories/category-contract";
 
 interface ItemDrawerProps {
   isSubmitting: boolean;
@@ -45,16 +48,18 @@ function useDrawerLabels() {
   };
 }
 
-function ItemFields({
+function EditItemFields({
   values,
   onChange,
   isSubmitting,
-  isEdit,
+  itemId,
+  categorySummary,
 }: {
   values: ItemFormValues;
   onChange: (patch: Partial<ItemFormValues>) => void;
   isSubmitting: boolean;
-  isEdit: boolean;
+  itemId: string;
+  categorySummary: ItemCategorySummary | null;
 }) {
   const { t } = useI18n();
 
@@ -63,8 +68,7 @@ function ItemFields({
       <Field
         label={t.trade.itemCode}
         hint={t.trade.itemCodeHint}
-        readOnly={isEdit}
-        required={!isEdit}
+        readOnly
       >
         <Input size="sm" placeholder={t.trade.itemCode}
           dir="ltr"
@@ -72,19 +76,18 @@ function ItemFields({
           onChange={(event) => onChange({ canonicalCode: event.target.value.toUpperCase() })}
           maxLength={ITEM_CODE_MAX_LENGTH}
           disabled={isSubmitting}
-          readOnly={isEdit}
-          required={!isEdit}
+          readOnly
         />
       </Field>
 
       {/* `UpdateItemDto` has no `itemKind` or `baseUomId`: they are set once. */}
-      <Field label={t.trade.itemKind} readOnly={isEdit} required>
+      <Field label={t.trade.itemKind} readOnly required>
         <Select
           value={values.itemKind}
           onValueChange={(next) => onChange({ itemKind: next as ItemKind })}
-          disabled={isSubmitting || isEdit}
+          disabled
         >
-          <SelectTrigger size="sm" aria-label={t.trade.itemKind} aria-readonly={isEdit}>
+          <SelectTrigger size="sm" aria-label={t.trade.itemKind} aria-readonly>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -101,7 +104,7 @@ function ItemFields({
         <Input size="sm" placeholder={t.trade.nameAr}
           value={values.nameAr}
           onChange={(event) => onChange({ nameAr: event.target.value })}
-          maxLength={LOCALIZED_NAME_MAX_LENGTH}
+          maxLength={ITEM_LOCALIZED_NAME_MAX_LENGTH}
           disabled={isSubmitting}
         />
       </Field>
@@ -111,7 +114,7 @@ function ItemFields({
           dir="ltr"
           value={values.nameEn}
           onChange={(event) => onChange({ nameEn: event.target.value })}
-          maxLength={LOCALIZED_NAME_MAX_LENGTH}
+          maxLength={ITEM_LOCALIZED_NAME_MAX_LENGTH}
           disabled={isSubmitting}
         />
       </Field>
@@ -119,8 +122,7 @@ function ItemFields({
       <Field
         label={t.trade.itemBaseUom}
         hint={t.trade.itemBaseUomHint}
-        readOnly={isEdit}
-        required={!isEdit}
+        readOnly
       >
         <Input size="sm" placeholder={t.trade.itemBaseUom}
           dir="ltr"
@@ -128,20 +130,12 @@ function ItemFields({
           value={values.baseUomId}
           onChange={(event) => onChange({ baseUomId: event.target.value })}
           disabled={isSubmitting}
-          readOnly={isEdit}
-          required={!isEdit}
+          readOnly
         />
       </Field>
 
-      <Field label={t.trade.itemCategory}>
-        <Input size="sm" placeholder={t.trade.itemCategory}
-          dir="ltr"
-          className="font-mono"
-          value={values.categoryId}
-          onChange={(event) => onChange({ categoryId: event.target.value })}
-          disabled={isSubmitting}
-        />
-      </Field>
+      <CategoryPicker value={values.category} currentSummary={categorySummary}
+        onChange={(category) => onChange({ category })} disabled={isSubmitting} />
 
       <Field label={t.trade.itemVariantIdentity} hint={t.trade.itemVariantHint}>
         <Textarea placeholder={t.trade.itemVariantIdentity}
@@ -153,70 +147,38 @@ function ItemFields({
         />
       </Field>
 
-      {isEdit ? (
-        <Field label={t.common.status}>
-          <Select
-            value={values.status}
-            onValueChange={(next) => onChange({ status: next as ItemStatus })}
-            disabled={isSubmitting}
-          >
-            <SelectTrigger size="sm" aria-label={t.common.status}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ITEM_STATUSES.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {t.trade[`itemStatus_${status}`]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      ) : null}
-    </div>
-  );
-}
+      <Field label={t.common.status}>
+        <Select
+          value={values.status}
+          onValueChange={(next) => onChange({ status: next as ItemStatus })}
+          disabled={isSubmitting}
+        >
+          <SelectTrigger size="sm" aria-label={t.common.status}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ITEM_STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>
+                {t.trade[`itemStatus_${status}`]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
 
-export function CreateItemDrawer({
-  isOpen,
-  isSubmitting,
-  error,
-  onClose,
-  onSubmit,
-}: ItemDrawerProps & { isOpen: boolean }) {
-  const { t } = useI18n();
-  const labels = useDrawerLabels();
-  const [values, setValues] = useState<ItemFormValues>(EMPTY_ITEM_FORM);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_ITEM_FORM);
-
-  return (
-    <FormDrawer
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) {
-          setValues(EMPTY_ITEM_FORM);
-          onClose();
-        }
-      }}
-      title={t.trade.itemCreateTitle}
-      description={t.trade.itemCreateDescription}
-      isDirty={isDirty}
-      isSubmitting={isSubmitting}
-      onSubmit={() => {
-        void onSubmit(values).then((saved) => {
-          if (saved) setValues(EMPTY_ITEM_FORM);
-        });
-      }}
-      error={error ?? undefined}
-      labels={labels}
-    >
-      <ItemFields
+      <ItemRelationsFields
         values={values}
-        onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
-        isSubmitting={isSubmitting}
-        isEdit={false}
+        disabled={isSubmitting}
+        excludeItemId={itemId}
+        onChange={onChange}
       />
-    </FormDrawer>
+
+      <ItemExtendedFields
+        values={values}
+        disabled={isSubmitting}
+        onChange={onChange}
+      />
+    </div>
   );
 }
 
@@ -247,11 +209,12 @@ export function EditItemDrawer({
       error={error ?? undefined}
       labels={labels}
     >
-      <ItemFields
+      <EditItemFields
         values={values}
         onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
         isSubmitting={isSubmitting}
-        isEdit
+        itemId={item.id}
+        categorySummary={item.categorySummary}
       />
     </FormDrawer>
   );

@@ -35,6 +35,10 @@ export interface ComboboxProps extends ControlSizeProps {
   searchPlaceholder: string;
   loadingLabel: string;
   emptyLabel: string;
+  /** Read failure replaces the option list; it is never an empty result. */
+  errorContent?: React.ReactNode;
+  /** Buttons for bounded remote pages, outside the ARIA listbox. */
+  footer?: React.ReactNode;
   clearLabel?: string;
   disabled?: boolean;
   readOnly?: boolean;
@@ -70,6 +74,8 @@ export function Combobox({
   searchPlaceholder,
   loadingLabel,
   emptyLabel,
+  errorContent,
+  footer,
   clearLabel,
   disabled,
   readOnly,
@@ -117,7 +123,7 @@ export function Combobox({
     setActiveIndex(0);
   }
 
-  const activeOptionId = options.length > 0 ? `${listId}-option-${activeIndex}` : undefined;
+  const activeOptionId = !loading && !errorContent && options.length > 0 ? `${listId}-option-${activeIndex}` : undefined;
 
   useEffect(() => {
     if (!activeOptionId) return;
@@ -135,7 +141,7 @@ export function Combobox({
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (options.length === 0) return;
+    if (loading || errorContent || options.length === 0) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActiveIndex((current) => (current + 1) % options.length);
@@ -231,12 +237,12 @@ export function Combobox({
                 {loadingLabel}
               </li>
             )}
-            {!loading && options.length === 0 && (
+            {!loading && !errorContent && options.length === 0 && (
               <li className="px-2 py-3 text-sm text-muted-foreground" role="presentation">
                 {emptyLabel}
               </li>
             )}
-            {!loading &&
+            {!loading && !errorContent &&
               options.map((option, index) => (
                 <li
                   key={option.value}
@@ -279,6 +285,8 @@ export function Combobox({
                 </li>
               ))}
           </ul>
+          {errorContent}
+          {footer ? <div className="border-t border-border p-2">{footer}</div> : null}
         </PopoverContent>
       </Popover>
 

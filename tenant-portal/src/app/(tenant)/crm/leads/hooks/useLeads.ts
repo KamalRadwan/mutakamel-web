@@ -451,7 +451,10 @@ function isAmbiguousMutationError(error: unknown): boolean {
 //
 // Never mutated in place: `setSort` assigns a fresh object to `sortRef.current`
 // rather than writing through it, so sharing this one object at init is safe.
-const DEFAULT_LEADS_SORT: { id: "displayName" | "createdAt"; direction: "asc" | "desc" } = {
+export const DEFAULT_LEADS_SORT: {
+  id: "displayName" | "createdAt";
+  direction: "asc" | "desc";
+} = {
   id: "createdAt",
   direction: "desc",
 };

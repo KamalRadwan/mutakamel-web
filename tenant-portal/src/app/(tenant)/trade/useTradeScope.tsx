@@ -34,6 +34,7 @@ import {
 // same shape `TenantBranchSelect` already uses across CRM.
 
 const COMPANY_KEY = "tenant_trade_company";
+const ITEM_MASTER_SCOPE = "__tenant__";
 const BRANCH_KEY = "tenant_trade_branch";
 const CHANNEL_KEY = "tenant_trade_channel";
 const CHANNELS_RESPONSE_LIMIT_BYTES = 200_000;
@@ -46,7 +47,7 @@ export interface TradeScopeValue {
   isLoadingChannels: boolean;
   /** `GET /channels` failed — a 403 here is an ordinary answer, not a bug. */
   channelsError: NormalizedApiError | null;
-  selectCompany: (companyId: string) => void;
+  selectCompany: (companyId: string | null) => void;
   selectBranch: (branchId: string | null) => void;
   selectChannel: (channelId: string | null) => void;
   /** Headers for one route's scope target, or `{}` when the target cannot be met. */
@@ -91,13 +92,15 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
       setCompanyId((current) =>
         current && companyIds.includes(current)
           ? current
-          : (storedId(COMPANY_KEY, companyIds) ?? (companyIds.length === 1 ? companyIds[0] : null)),
+          : safeStorage.getItem(COMPANY_KEY) === ITEM_MASTER_SCOPE
+            ? null
+            : (storedId(COMPANY_KEY, companyIds) ?? (companyIds.length === 1 ? companyIds[0] : null)),
       ),
     );
   }, [companyIds]);
 
   useEffect(() => {
-    if (accessibleBranchIds.length === 0) return;
+    if (accessibleBranchIds.length === 0 || safeStorage.getItem(COMPANY_KEY) === ITEM_MASTER_SCOPE) return;
     queueMicrotask(() =>
       setBranchId((current) =>
         current && accessibleBranchIds.includes(current)
@@ -129,6 +132,7 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
       if (!companyId) {
         setChannels([]);
         setChannelsError(null);
+        setIsLoadingChannels(false);
         return;
       }
       setIsLoadingChannels(true);
@@ -141,7 +145,9 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
         headers: { [COMPANY_SCOPE_HEADER]: companyId },
         maxResponseBytes: CHANNELS_RESPONSE_LIMIT_BYTES,
       })
-        .then((result) => setChannels(parseChannelListResponse(result.data)))
+        .then((result) => {
+          if (!controller.signal.aborted) setChannels(parseChannelListResponse(result.data));
+        })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
           setChannels([]);
@@ -172,12 +178,14 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
     );
   }, [channels]);
 
-  const selectCompany = useCallback((next: string) => {
-    if (!isUUIDv7(next)) return;
-    safeStorage.setItem(COMPANY_KEY, next);
+  const selectCompany = useCallback((next: string | null) => {
+    if (next !== null && !isUUIDv7(next)) return;
+    // An explicit tenant choice must survive the single-company default on reload.
+    safeStorage.setItem(COMPANY_KEY, next ?? ITEM_MASTER_SCOPE);
     setCompanyId(next);
     setBranchId(null);
     setChannelId(null);
+    setChannels([]);
     safeStorage.removeItem(BRANCH_KEY);
     safeStorage.removeItem(CHANNEL_KEY);
   }, []);

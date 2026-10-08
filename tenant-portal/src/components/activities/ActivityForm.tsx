@@ -65,19 +65,8 @@ export function ActivityForm(props: ActivityFormProps) {
   const message = (field: ActivityFormField) => activityValidationMessage(copy, field, errors[field]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <ActivityTypePicker value={values.type} onChange={form.setType} disabled={disabled} />
-
-      <Field label={copy.form.subject} error={message("subject")} required>
-        <Input
-          value={values.subject}
-          onChange={(event) => form.setField("subject", event.target.value)}
-          onBlur={() => form.touch("subject")}
-          placeholder={copy.form.subjectPlaceholder}
-          maxLength={ACTIVITY_SUBJECT_MAX}
-          disabled={disabled}
-        />
-      </Field>
 
       {mode === "create" && !props.targetFixed && (
         <ActivityTargetField
@@ -91,14 +80,30 @@ export function ActivityForm(props: ActivityFormProps) {
         />
       )}
 
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Field label={copy.form.subject} error={message("subject")} required showLabel>
+          <Input
+            size="xs"
+            value={values.subject}
+            onChange={(event) => form.setField("subject", event.target.value)}
+            onBlur={() => form.touch("subject")}
+            placeholder={copy.form.subjectPlaceholder}
+            maxLength={ACTIVITY_SUBJECT_MAX}
+            disabled={disabled}
+          />
+        </Field>
+
+        <ActivityAssigneeField {...props} />
+      </div>
+
       <ActivityScheduleFields form={form} disabled={disabled} />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-flow-col sm:auto-cols-fr">
         {mode === "create" && props.statuses.length > 1 && (
           <Captioned caption={copy.form.status}>
             <Field label={copy.form.status}>
               <Select value={values.status} onValueChange={(status) => form.setStatus(status as ActivityCreateStatus)} disabled={disabled}>
-                <SelectTrigger size="sm">
+                <SelectTrigger size="xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -113,7 +118,7 @@ export function ActivityForm(props: ActivityFormProps) {
         <Captioned caption={copy.form.priority}>
           <Field label={copy.form.priority}>
             <Select value={values.priority} onValueChange={(priority) => form.setField("priority", priority)} disabled={disabled}>
-              <SelectTrigger size="sm">
+              <SelectTrigger size="xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -132,7 +137,7 @@ export function ActivityForm(props: ActivityFormProps) {
                 onValueChange={(direction) => form.setField("direction", direction === NO_DIRECTION ? "" : direction)}
                 disabled={disabled}
               >
-                <SelectTrigger size="sm">
+                <SelectTrigger size="xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -147,15 +152,14 @@ export function ActivityForm(props: ActivityFormProps) {
         )}
       </div>
 
-      <ActivityAssigneeField {...props} />
-
       {(traits.hasLocation || traits.hasMeetingUrl) && (
         <fieldset className="flex min-w-0 flex-col gap-1">
           <legend className="mb-1 text-xs font-medium text-muted-foreground">{copy.form.meetingDetails}</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {traits.hasLocation && (
               <Field label={copy.form.location} error={message("location")}>
                 <Input
+                  size="xs"
                   value={values.location}
                   onChange={(event) => form.setField("location", event.target.value)}
                   onBlur={() => form.touch("location")}
@@ -168,6 +172,7 @@ export function ActivityForm(props: ActivityFormProps) {
             {traits.hasMeetingUrl && (
               <Field label={copy.form.meetingUrl} error={message("meetingUrl")}>
                 <Input
+                  size="xs"
                   type="url"
                   dir="ltr"
                   value={values.meetingUrl}
@@ -185,11 +190,13 @@ export function ActivityForm(props: ActivityFormProps) {
 
       <Field label={copy.form.description} error={message("description")}>
         <Textarea
+          size="xs"
           value={values.description}
           onChange={(event) => form.setField("description", event.target.value)}
           onBlur={() => form.touch("description")}
           placeholder={copy.form.descriptionPlaceholder}
           maxLength={ACTIVITY_DESCRIPTION_MAX}
+          rows={2}
           disabled={disabled}
         />
       </Field>
@@ -197,6 +204,7 @@ export function ActivityForm(props: ActivityFormProps) {
       {mode === "create" && values.status === "DONE" && (
         <Field label={copy.form.outcome} error={message("outcome")}>
           <Textarea
+            size="xs"
             value={values.outcome}
             onChange={(event) => form.setField("outcome", event.target.value)}
             onBlur={() => form.touch("outcome")}
@@ -247,6 +255,7 @@ function ActivityAssigneeField({ form, canAssign, actorId, activity, disabled }:
       <Field label={copy.assignee} hint={canAssign && !target ? copy.assigneeNeedsTarget : undefined} readOnly={!pickable}>
         {pickable ? (
           <Combobox
+            size="xs"
             value={currentId ?? undefined}
             selectedLabel={currentLabel}
             onValueChange={(id) => {
@@ -265,7 +274,7 @@ function ActivityAssigneeField({ form, canAssign, actorId, activity, disabled }:
         ) : (
           // `dir="auto"`: the fallback is a raw id when Core has no name, and a
           // Latin identifier must not be reordered by the Arabic paragraph.
-          <Input value={currentLabel} readOnly dir="auto" />
+          <Input size="xs" value={currentLabel} readOnly dir="auto" />
         )}
       </Field>
     </Captioned>

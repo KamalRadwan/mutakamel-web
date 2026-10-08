@@ -295,6 +295,7 @@ trigger.
 ```ts
 interface PageHeaderProps {
   title: string;
+  headingRef?: React.Ref<HTMLHeadingElement>;
   description?: string;
   primaryAction?: { label: string; onClick: () => void; disabled?: boolean };
   secondaryActions?: React.ReactNode;
@@ -308,12 +309,16 @@ primary actions, one of them is secondary.
 `titleAdornment` and `leading` are slots `DetailHeader` fills; nothing else
 should need them.
 
+Use `headingRef` when a completed action removes its own focus destination.
+The heading then accepts programmatic focus without joining the Tab order;
+Category deletion returns focus here, including deletion of the final root.
+
 **The action cluster renders in the page action bar**, not under the heading.
 The props are unchanged and every screen declares its actions exactly where it
 always did; `PageHeader` portals the resulting DOM into the shell's second bar.
 Doing it here is what moved 78 screens' actions without editing any of them,
-and it keeps the one-filled-action ceiling structural — the bar has no
-`primary` of its own. The `<h1>` stays on the page. See
+and it keeps the one-filled-action ceiling structural — the bar can host the
+button but cannot create a `primary` action of its own. The `<h1>` stays on the page. See
 [shell.md](../design/shell.md#it-holds-the-screens-controls).
 
 ## DetailHeader
@@ -541,7 +546,7 @@ interface ActivityModalProps {
 
 | Screen | Title / description | Body | Footer |
 | --- | --- | --- | --- |
-| Create | "New activity" / "For {record}" when the record is fixed | the record's open activities when `agenda` and a fixed record, then the form | "Save activity" (primary) · "Save and add another" · Cancel |
+| Create | "Activities · {record}" when the record is fixed, otherwise "Activities" | the record's open activities when `agenda` and a fixed record, then the compact form | "Save activity" (primary) · "Save and add another" · Cancel |
 | View | the subject / type · record, with the status badge | `ActivityDetails` | "Mark as done" (primary) · Cancel activity · Start or Move back to scheduled · Edit · Close |
 | Edit | "Edit activity" / "For {record}", with the status badge | the form, without the status control or the record picker | "Save changes" (primary) · Cancel |
 
@@ -930,12 +935,17 @@ behaviour from `useFormShell`, so the real `<form>`, the `noValidate` decision,
 the dirty guard on all four dismissal routes and the focus-the-first-invalid-field
 rule are one implementation, not two that drift.
 
-`size` picks the surface, and the two answer different questions. `full` — the
+`size` picks the surface. `full` — the
 default — is `DialogContent size="full"`, the viewport less 20px on every side.
-`card` is `DialogContent size="2xl"`: a centred 672px card, capped at `85dvh`,
+`card` is `DialogContent size="2xl"`: a centred 672px card, capped at `85dvh`
+and inset 16px from each viewport edge on narrow screens,
 with that size's own `grid`, `gap-4` and `p-6` overridden away so the header,
 body and footer bands own their padding exactly as they do at `full`. Nothing
 else forks — one dirty guard, one error summary, one focus rule, one shell.
+`wide` uses the same centred-card behaviour at a 960px cap for a concise
+multi-column form that needs more horizontal room but still has no section
+index; it is not a substitute for `full` when a long record needs navigable
+sections.
 
 **The bar for `full`**, and both halves are required:
 
@@ -1259,6 +1269,17 @@ toast.errorFromApi(title, error: NormalizedApiError, duration?)
   English there, and that is fixed in the rebuild.
 - Patterns that render an in-body surface must **not** import `useToast`. That
   pairing is a review smell.
+
+## Paged Tree (2026-09-27)
+
+`Tree` takes nested `TreeNode` values with stable IDs, absolute sibling positions,
+levels and totals; controlled expansion/selection; and translated disclosure
+labels. Roving DOM focus is independent of selection. Physical Left/Right keep
+APG meaning in RTL; layout and disclosure icons use logical mirroring. Child
+loading sets the parent's busy state. Pagination is rendered by the consumer
+outside the tree/group roles. Category uses this non-virtual pattern until real
+assistive-technology acceptance permits virtualization. See
+[Trade Categories](../api/trade-categories.md) for cache, reveal and request semantics.
 
 ## Checklist for every pattern
 

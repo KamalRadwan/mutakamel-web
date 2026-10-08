@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import {
+  Combobox,
+  DegradedBanner,
   Field,
   FormDrawer,
   Input,
@@ -15,7 +17,9 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useCatalogUoms } from "../hooks/useCatalogUoms";
+import { useItemReferenceData } from "../hooks/useItemReferenceData";
 import type { CatalogUomPurpose } from "../../uoms/uom-contract";
+import type { ItemTaxOption } from "../item-reference-data-contract";
 import {
   EMPTY_BRANCH_PROFILE_FORM,
   EMPTY_COMPANY_PROFILE_FORM,
@@ -107,8 +111,53 @@ function UomField({
   );
 }
 
+function TaxField({
+  label,
+  value,
+  taxes,
+  loading,
+  disabled,
+  onSearch,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  taxes: ItemTaxOption[];
+  loading: boolean;
+  disabled: boolean;
+  onSearch: (query: string) => void;
+  onChange: (next: string) => void;
+}) {
+  const { t } = useI18n();
+  const selected = taxes.find((tax) => tax.id === value);
+  return (
+    <Field label={label} hint={t.trade.itemTaxStoredById}>
+      <Combobox
+        value={value || undefined}
+        selectedLabel={selected ? `${selected.code} — ${selected.name}` : value || undefined}
+        onValueChange={(next) => onChange(next ?? "")}
+        options={taxes.map((tax) => ({
+          value: tax.id,
+          label: `${tax.code} — ${tax.name}`,
+          description: `${tax.rate}%`,
+        }))}
+        onSearch={onSearch}
+        loading={loading}
+        disabled={disabled}
+        size="sm"
+        placeholder={t.trade.itemTaxPlaceholder}
+        searchPlaceholder={t.trade.itemSearchTaxes}
+        loadingLabel={t.common.loading}
+        emptyLabel={t.trade.itemNoTaxResults}
+        clearLabel={t.trade.itemNoTax}
+      />
+    </Field>
+  );
+}
+
 export function CompanyProfileDrawer({
   open,
+  itemKind,
   profile,
   isSubmitting,
   error,
@@ -116,6 +165,7 @@ export function CompanyProfileDrawer({
   onSubmit,
 }: {
   open: boolean;
+  itemKind: string;
   profile: ItemCompanyProfile | null;
   isSubmitting: boolean;
   error: string | null;
@@ -124,10 +174,16 @@ export function CompanyProfileDrawer({
 }) {
   const { t } = useI18n();
   const labels = useDrawerLabels();
-  const initial = profile ? toCompanyProfileForm(profile) : EMPTY_COMPANY_PROFILE_FORM;
+  const productInventory = itemKind === "PRODUCT";
+  const baseInitial = profile ? toCompanyProfileForm(profile) : EMPTY_COMPANY_PROFILE_FORM;
+  const initial = productInventory
+    ? baseInitial
+    : { ...baseInitial, trackInventory: false, trackingMode: "NONE" as const };
   const [values, setValues] = useState<CompanyProfileFormValues>(initial);
+  const reference = useItemReferenceData(open);
   const change = (patch: Partial<CompanyProfileFormValues>) =>
     setValues((current) => ({ ...current, ...patch }));
+
 
   return (
     <FormDrawer
@@ -150,7 +206,10 @@ export function CompanyProfileDrawer({
         <Field label={t.trade.canSell}>
           <Switch
             checked={values.canSell}
-            onCheckedChange={(checked) => change({ canSell: checked })}
+            onCheckedChange={(checked) => change({
+              canSell: checked,
+              ...(!checked ? { canPos: false } : {}),
+            })}
             disabled={isSubmitting}
           />
         </Field>
@@ -161,18 +220,32 @@ export function CompanyProfileDrawer({
             disabled={isSubmitting}
           />
         </Field>
-        <Field label={t.trade.trackInventory}>
+        <Field label={t.trade.canPos} hint={t.trade.canPosHint}>
           <Switch
-            checked={values.trackInventory}
-            onCheckedChange={(checked) => change({ trackInventory: checked })}
-            disabled={isSubmitting}
+            checked={values.canPos}
+            onCheckedChange={(checked) => change({ canPos: checked })}
+            disabled={isSubmitting || !values.canSell}
           />
         </Field>
-        <Field label={t.trade.trackingMode} required>
+        <Field label={t.trade.trackInventory} hint={!productInventory ? t.trade.itemInventoryProductOnly : undefined}>
+          <Switch
+            checked={values.trackInventory}
+            onCheckedChange={(checked) => change({
+              trackInventory: checked,
+              ...(!checked ? { trackingMode: "NONE" } : {}),
+            })}
+            disabled={isSubmitting || !productInventory}
+          />
+        </Field>
+        <Field
+          label={t.trade.trackingMode}
+          hint={productInventory && !values.trackInventory ? t.trade.itemTrackingRequiresInventory : undefined}
+          required
+        >
           <Select
             value={values.trackingMode}
             onValueChange={(next) => change({ trackingMode: next as ItemTrackingMode })}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !productInventory || !values.trackInventory}
           >
             <SelectTrigger size="sm" aria-label={t.trade.trackingMode}>
               <SelectValue />
@@ -200,6 +273,53 @@ export function CompanyProfileDrawer({
           isSubmitting={isSubmitting}
           onChange={(next) => change({ defaultPurchaseUomId: next })}
         />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t.trade.itemSalesPrice} hint={t.trade.itemNonNegativeDecimal}>
+            <Input
+              size="sm"
+              dir="ltr"
+              inputMode="decimal"
+              value={values.salesPrice}
+              onChange={(event) => change({
+                salesPrice: event.target.value,
+                ...(!values.currencyCode && reference.companyCurrencyCode
+                  ? { currencyCode: reference.companyCurrencyCode }
+                  : {}),
+              })}
+              disabled={isSubmitting}
+            />
+          </Field>
+          <Field label={t.trade.itemCurrencyCode} hint={t.trade.itemCurrencyHint}>
+            <Input
+              size="sm"
+              dir="ltr"
+              value={values.currencyCode}
+              placeholder={reference.companyCurrencyCode ?? undefined}
+              onChange={(event) => change({ currencyCode: event.target.value.toUpperCase() })}
+              maxLength={3}
+              disabled={isSubmitting}
+            />
+          </Field>
+          <TaxField
+            label={t.trade.itemSalesTax}
+            value={values.salesTaxId}
+            taxes={reference.taxes}
+            loading={reference.isLoading}
+            disabled={isSubmitting}
+            onSearch={reference.search}
+            onChange={(salesTaxId) => change({ salesTaxId })}
+          />
+          <TaxField
+            label={t.trade.itemPurchaseTax}
+            value={values.purchaseTaxId}
+            taxes={reference.taxes}
+            loading={reference.isLoading}
+            disabled={isSubmitting}
+            onSearch={reference.search}
+            onChange={(purchaseTaxId) => change({ purchaseTaxId })}
+          />
+        </div>
+        {reference.error ? <DegradedBanner message={t.trade.itemReferenceDataUnavailable} /> : null}
         <Field label={t.trade.taxClassificationKey}>
           <Input size="sm" placeholder={t.trade.taxClassificationKey}
             value={values.taxClassificationKey}

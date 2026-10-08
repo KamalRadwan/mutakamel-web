@@ -2452,3 +2452,23 @@ user's phone and authenticated image URL, or a verified scoped Party link.
 Confirm whether audit readers should have a narrower contact-read capability
 when they lack `users.user.read`; the frontend currently respects that guard.
 See [the projection contract](../api/core-identity.md#shared-user-contact-projection).
+
+## Q139 — Category live acceptance needs an identified test tenant and its current Trade schema
+
+Found **2026-09-27**, verifying the Category workspace in an authenticated
+`mersany.mutakamel.ai:5002` session. The tree request reached Trade and failed
+because `trade_category_tree_state` was absent. A read-only check using the
+tenant's existing Trade binding confirmed both Category tables are absent and
+there are zero Items or non-null Category references. The running tenant's
+migration history is not readable by the Trade runtime role.
+
+Source and a zero row count cannot establish that this tenant is disposable
+or intended for acceptance-test writes. No live tenant data/schema was changed.
+The existing error boundary renders, Add remains unavailable, and source now
+maps the missing Category schema to the existing 503 dependency code, covered
+by a real PostgreSQL regression test.
+
+**Settle with:** the workspace owner identifying the test tenant, then the
+platform completing the matching current Trade schema/package adoption. Run
+the authenticated CRUD, bilingual/theme, keyboard and screen-reader acceptance
+matrix against that environment. See [Category verification](../api/trade-categories.md#tree-navigation-and-verification).

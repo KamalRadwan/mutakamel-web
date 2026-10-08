@@ -90,7 +90,7 @@ export function isLocalizedNames(value: unknown): value is Record<string, string
   return Object.values(names).every((name) => typeof name === "string");
 }
 
-export const LOCALIZED_NAME_MAX_LENGTH = 160;
+const LOCALIZED_NAME_MAX_LENGTH = 160;
 const LOCALIZED_NAMES_MAX_ENTRIES = 20;
 
 /** True when every key is a locale the server's own normalizer would accept. */

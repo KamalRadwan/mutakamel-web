@@ -136,6 +136,16 @@ describe("tags", () => {
 });
 
 describe("when errors are allowed to speak", () => {
+  it("keeps the displayed default honorific in the pristine snapshot", () => {
+    const { result } = renderHook(() =>
+      useCreateLeadForm(messages, [], undefined, "Mr"),
+    );
+
+    expect(result.current.form.honorificTitle).toBe("Mr");
+    expect(result.current.form.contacts[0]?.honorificTitle).toBe("Mr");
+    expect(result.current.isDirty).toBe(false);
+  });
+
   it("stays silent until the field is blurred, then tracks it live", () => {
     const { result } = setup();
     // The first name is empty and therefore invalid from the first render —

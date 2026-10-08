@@ -48,7 +48,7 @@ export function ActivityTargetField({ scope, branchId, value, onChange, onBlur, 
             }}
             disabled={disabled}
           >
-            <SelectTrigger size="sm">
+            <SelectTrigger size="xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -62,6 +62,7 @@ export function ActivityTargetField({ scope, branchId, value, onChange, onBlur, 
         </Field>
         <Field label={copy.form.relatedRecord} error={error} required>
           <Combobox
+            size="xs"
             value={value?.id}
             selectedLabel={value?.label}
             onValueChange={(id) => {

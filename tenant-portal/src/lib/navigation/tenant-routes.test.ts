@@ -372,6 +372,7 @@ describe("Core settings route surface", () => {
     expect(permittedTradeFoundationRoutes([])).toEqual([]);
     expect(permittedTradeFoundationRoutes(["trade.items.read"])).toEqual([
       TENANT_ROUTES.tradeItems,
+      TENANT_ROUTES.tradeCategories,
       TENANT_ROUTES.tradeUoms,
       TENANT_ROUTES.tradeChannels,
     ]);

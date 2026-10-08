@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import {
   Button,
@@ -14,12 +13,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatTemplate } from "@/lib/format/template";
 import { multiplyFixedDecimal } from "../fixed-decimal";
 import { tradeDocumentMessage } from "../trade-document-errors";
-import { itemDisplayName } from "../trade-lookup-contract";
+import { itemDescriptionPreview, itemDisplayName } from "../trade-lookup-contract";
 import type { TradeLineDraftState } from "../hooks/useTradeLineDraft";
 
 export interface TradeLineEditorProps {
@@ -39,15 +40,6 @@ export interface TradeLineEditorProps {
  */
 export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEditorProps) {
   const { t, lang } = useI18n();
-  const [search, setSearch] = useState("");
-
-  const query = search.trim().toLowerCase();
-  const visibleItems = state.items.filter(
-    (item) =>
-      query.length === 0 ||
-      itemDisplayName(item, lang).toLowerCase().includes(query) ||
-      item.canonicalCode.toLowerCase().includes(query),
-  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -60,23 +52,13 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
         />
       ) : null}
 
-      {/* `CatalogListQueryDto` has no search term and `POST /items/search`
-          filters only on exact `canonicalCode`, so this box narrows the page
-          that is loaded and nothing beyond it. Saying so is the difference
-          between a filter and a lie. */}
-      {state.itemTotal > state.items.length ? (
-        <DegradedBanner
-          message={formatTemplate(t.tradeDocuments.lineEditor.partialCatalogue, {
-            loaded: state.items.length,
-            total: state.itemTotal,
-          })}
-        />
-      ) : null}
-
       <ul className="flex flex-col gap-3">
         {state.lines.map((line, index) => {
           const uoms = state.uomsByItem[line.itemId] ?? [];
-          const selected = state.items.find((item) => item.id === line.itemId);
+          const selected = state.itemsById[line.itemId];
+          const description = selected
+            ? itemDescriptionPreview(selected, lang, state.purpose)
+            : null;
           const isInvalid = state.invalidLineIndex === index;
           return (
             <li
@@ -90,12 +72,12 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
                     value={line.itemId || undefined}
                     selectedLabel={selected ? itemDisplayName(selected, lang) : undefined}
                     onValueChange={(next) => state.setItem(index, next ?? "")}
-                    options={visibleItems.map((item) => ({
+                    options={state.items.map((item) => ({
                       value: item.id,
                       label: itemDisplayName(item, lang),
-                      description: item.canonicalCode,
+                      description: [item.canonicalCode, item.barcode].filter(Boolean).join(" · "),
                     }))}
-                    onSearch={setSearch}
+                    onSearch={state.searchItems}
                     loading={state.isLoadingItems}
                     disabled={disabled}
                     placeholder={t.tradeDocuments.lineEditor.selectItem}
@@ -104,6 +86,14 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
                     emptyLabel={t.tradeDocuments.lineEditor.noItems}
                   />
                 </Field>
+                {description ? (
+                  <p className="mt-1.5 text-xs text-muted-foreground" aria-live="polite">
+                    <span className="font-medium text-foreground">
+                      {t.tradeDocuments.lineEditor.descriptionPreview}:
+                    </span>{" "}
+                    {description}
+                  </p>
+                ) : null}
               </div>
 
               <div className="sm:col-span-3">
@@ -163,15 +153,20 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
                     )}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={t.tradeDocuments.lineEditor.removeLine}
-                  disabled={disabled || state.lines.length === 1}
-                  onClick={() => state.removeLine(index)}
-                >
-                  <Trash2 className="size-4 text-destructive" aria-hidden="true" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t.tradeDocuments.lineEditor.removeLine}
+                      disabled={disabled || state.lines.length === 1}
+                      onClick={() => state.removeLine(index)}
+                    >
+                      <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t.tradeDocuments.lineEditor.removeLine}</TooltipContent>
+                </Tooltip>
               </div>
             </li>
           );

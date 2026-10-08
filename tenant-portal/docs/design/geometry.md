@@ -11,7 +11,7 @@ Source of truth once implemented: `src/app/globals.css`,
 > fonts, sizes and per-page UI/UX. Since the admin-portal token port the shipped
 > geometry is **32px controls / 44px rows** at `--ui-scale` **1**. The chrome was
 > admin's exact 48px topbar / 240px sidebar / 52px rail until 2026-09-06 and is
-> now **two 45px full-width bars** — [shell.md](shell.md) is authoritative for
+> now **two 35px full-width bars** — [shell.md](shell.md) is authoritative for
 > it, and every sidebar figure below is kept only as the record of what the
 > swing used to cost. This page keeps the longer reasoning behind the radius
 > scale, elevation model and budgets.

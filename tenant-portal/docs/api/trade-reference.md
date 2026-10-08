@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-09-24**
+Last source verification: **2026-09-27**
 
-Generated at: **2026-09-24T17:25:53.707Z**
+Generated at: **2026-09-27T15:21:05.173Z**
 
-Backend revision: `9bfe05e84b41+dirty`
+Backend revision: `2d4118e2d64d+dirty`
 
 Owning app: **trade-app**
 
-Routes: **234**
+Routes: **248**
 
 ## What this page is
 
@@ -39,7 +39,18 @@ browser code.
 
 | Method | Canonical path | Route key | Class | Idempotent | Portal usage |
 | --- | --- | --- | --- | --- | --- |
+| GET | `/api/tenant/trade/v1/catalog/categories` | `trading.catalog.categories.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/catalog/uoms` | `trading.catalog.uoms.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| GET | `/api/tenant/trade/v1/categories` | `trading.categories.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/categories` | `trading.categories.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/trade/v1/categories/:id` | `trading.categories.by-id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/trade/v1/categories/:id` | `trading.categories.by-id.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/categories/:id/delete` | `trading.categories.by-id.delete.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/categories/:id/move` | `trading.categories.by-id.move.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/categories/:id/reorder` | `trading.categories.by-id.reorder.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/categories/:id/status` | `trading.categories.by-id.status.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/categories/search` | `trading.categories.search.post` | READ_HEAVY | yes | TENANT_PORTAL |
+| GET | `/api/tenant/trade/v1/categories/tree` | `trading.categories.tree.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/channels` | `trading.channels.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/channels` | `trading.channels.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/channels/:id` | `trading.channels.by-id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
@@ -167,6 +178,9 @@ browser code.
 | PATCH | `/api/tenant/trade/v1/items/:id/channel-listings/:channelId` | `trading.items.by-id.channel.listings.by-channel-id.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/trade/v1/items/:id/company-profile` | `trading.items.by-id.company.profile.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/items/:id/company-profile` | `trading.items.by-id.company.profile.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/trade/v1/items/:id/standard-cost` | `trading.items.by-id.standard.cost.get` | AUTHENTICATED | yes | TENANT_PORTAL |
+| PATCH | `/api/tenant/trade/v1/items/:id/standard-cost` | `trading.items.by-id.standard.cost.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/trade/v1/items/reference-data` | `trading.items.reference.data.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/items/search` | `trading.items.search.post` | READ_HEAVY | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/policies` | `trading.policies.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/policies` | `trading.policies.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |

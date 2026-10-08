@@ -7,6 +7,8 @@ import {
   isTradeTimestamp,
   isVersion,
   jsonObject,
+  nullableJsonObject,
+  nullableString,
   optionalUuid,
   parseTradeDocumentHeader,
   record,
@@ -53,12 +55,15 @@ interface SalesOrderLine {
   id: string;
   clientLineId: string;
   uomId: string;
+  descriptionSnapshot: string | null;
+  deliveryDescriptionSnapshot: string | null;
   orderedQuantity: string;
   unitPrice: string;
   lineTotal: string;
   discountTotal: string | null;
   chargeTotal: string | null;
   taxTotal: string | null;
+  taxSnapshot: Record<string, unknown> | null;
   printLineNumber: number | null;
 }
 
@@ -175,6 +180,8 @@ function parseSalesOrderLine(payload: unknown): SalesOrderLine {
     id: line.id,
     clientLineId: line.clientLineId,
     uomId: line.uomId,
+    descriptionSnapshot: nullableString(line.descriptionSnapshot, 500),
+    deliveryDescriptionSnapshot: nullableString(line.deliveryDescriptionSnapshot, 500),
     orderedQuantity: line.orderedQuantity,
     unitPrice: line.unitPrice,
     lineTotal: line.lineTotal,
@@ -183,6 +190,7 @@ function parseSalesOrderLine(payload: unknown): SalesOrderLine {
     discountTotal: optionalDecimal(line.discountTotal),
     chargeTotal: optionalDecimal(line.chargeTotal),
     taxTotal: optionalDecimal(line.taxTotal),
+    taxSnapshot: nullableJsonObject(line.taxSnapshot),
     printLineNumber: typeof line.printLineNumber === "number" ? line.printLineNumber : null,
   };
 }

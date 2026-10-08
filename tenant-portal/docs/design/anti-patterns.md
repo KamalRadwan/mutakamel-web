@@ -114,7 +114,7 @@ stated:
   `scripts/design/contrast.mjs` (white 17.5:1, muted text 6.96:1, the active
   marker 9.7:1), and `brand-ramp.test.ts` sweeps all 360 hues to prove white
   stays legible on it for any tenant.
-- **It stops at 45px.** `PageActionBar` below it stays `bg-card` and the
+- **It stops at 35px.** `PageActionBar` below it stays `bg-card` and the
   workspace stays `--canvas`. The screen's own primary button never lands on
   the chrome — brand-600 measures 2.61:1 against it — because that button lives
   in the bar that did not change.

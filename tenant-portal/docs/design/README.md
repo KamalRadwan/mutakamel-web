@@ -180,7 +180,7 @@ so here is the current line.
 - **The geometry.** 44px row, the control scale unscaled at `--ui-scale: 1`,
   admin's control paddings, and the five-step radius scale. The *chrome* no
   longer matches: admin's 48px topbar and 240px sidebar were adopted and then
-  replaced by two 45px bars, because this portal's shell answers a different
+  replaced by two 35px bars, because this portal's shell answers a different
   question — see [shell.md](shell.md#what-is-replaced).
 - **The semantic roles**, including everything that did not exist here before:
   `--selected`, the `--info-*` / `--success-*` / `--warning-*` families with

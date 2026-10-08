@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-09-24T17:25:53.707Z**
+Generated at: **2026-09-27T16:36:31.257Z**
 
-Frontend revision: `7c5e0545503e+dirty`
+Frontend revision: `c57e1f853ef8+dirty`
 
-Backend revision: `9bfe05e84b41+dirty`
+Backend revision: `2d4118e2d64d+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -19,9 +19,9 @@ canonical Gateway path mappings.
 | --- | ---: |
 | core | 228 |
 | crm | 164 |
-| trade | 234 |
+| trade | 248 |
 | webphone | 20 |
-| **Total** | **646** |
+| **Total** | **660** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -428,7 +428,18 @@ Machine-readable source:
 | crm | DELETE | `/api/tenant/crm/v1/widgets/:id/shares/:shareId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.widgets.shares.delete` |
 | crm | POST | `/api/tenant/crm/v1/widgets/preview` | TENANT_PORTAL | READ_HEAVY | yes | `crm.dashboard.widgets.preview.post` |
 | crm | GET | `/api/tenant/crm/v1/widgets/share-targets` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.widgets.share.targets.get` |
+| trade | GET | `/api/tenant/trade/v1/catalog/categories` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.catalog.categories.get` |
 | trade | GET | `/api/tenant/trade/v1/catalog/uoms` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.catalog.uoms.get` |
+| trade | GET | `/api/tenant/trade/v1/categories` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.categories.get` |
+| trade | POST | `/api/tenant/trade/v1/categories` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.categories.post` |
+| trade | GET | `/api/tenant/trade/v1/categories/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.categories.by-id.get` |
+| trade | PATCH | `/api/tenant/trade/v1/categories/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.categories.by-id.patch` |
+| trade | POST | `/api/tenant/trade/v1/categories/:id/delete` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.categories.by-id.delete.post` |
+| trade | POST | `/api/tenant/trade/v1/categories/:id/move` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.categories.by-id.move.post` |
+| trade | POST | `/api/tenant/trade/v1/categories/:id/reorder` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.categories.by-id.reorder.post` |
+| trade | POST | `/api/tenant/trade/v1/categories/:id/status` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.categories.by-id.status.post` |
+| trade | POST | `/api/tenant/trade/v1/categories/search` | TENANT_PORTAL | READ_HEAVY | yes | `trading.categories.search.post` |
+| trade | GET | `/api/tenant/trade/v1/categories/tree` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.categories.tree.get` |
 | trade | GET | `/api/tenant/trade/v1/channels` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.channels.get` |
 | trade | POST | `/api/tenant/trade/v1/channels` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.channels.post` |
 | trade | GET | `/api/tenant/trade/v1/channels/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.channels.by-id.get` |
@@ -556,6 +567,9 @@ Machine-readable source:
 | trade | PATCH | `/api/tenant/trade/v1/items/:id/channel-listings/:channelId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.channel.listings.by-channel-id.patch` |
 | trade | PATCH | `/api/tenant/trade/v1/items/:id/company-profile` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.company.profile.patch` |
 | trade | POST | `/api/tenant/trade/v1/items/:id/company-profile` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.company.profile.post` |
+| trade | GET | `/api/tenant/trade/v1/items/:id/standard-cost` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.items.by-id.standard.cost.get` |
+| trade | PATCH | `/api/tenant/trade/v1/items/:id/standard-cost` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.standard.cost.patch` |
+| trade | GET | `/api/tenant/trade/v1/items/reference-data` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.items.reference.data.get` |
 | trade | POST | `/api/tenant/trade/v1/items/search` | TENANT_PORTAL | READ_HEAVY | yes | `trading.items.search.post` |
 | trade | GET | `/api/tenant/trade/v1/policies` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.policies.get` |
 | trade | POST | `/api/tenant/trade/v1/policies` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.policies.post` |

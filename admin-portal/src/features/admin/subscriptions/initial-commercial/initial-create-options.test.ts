@@ -11,6 +11,14 @@ describe("Closed initial-create display options", () => {
     expect(readInitialCreateOptions({ quoteRequired: true, applications: [] }).applications).toEqual([]);
     expect(options.applications[0]).not.toHaveProperty("selectionAllowed");
   });
+  it("preserves the fail-closed permission-manifest release mismatch", () => {
+    const options = initialOptionsFixture();
+    options.applications[0].readinessReasons = [
+      "DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH",
+    ];
+
+    expect(readInitialCreateOptions(options)).toEqual(options);
+  });
   it.each(["ready", "canApply", "price", "selectionAllowed", "provisioningIntent"])("rejects uncontracted authority %s at every object level", field => {
     for (const level of ["root", "app", "tier", "addon"] as const) {
       const value = initialOptionsFixture();

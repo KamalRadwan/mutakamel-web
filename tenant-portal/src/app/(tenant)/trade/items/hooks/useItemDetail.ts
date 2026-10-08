@@ -7,7 +7,7 @@ import { isUUIDv7 } from "@/lib/uuid";
 import { tradeGet } from "../../trade-api";
 import { useTradeScopeRequest } from "../../useTradeScope";
 import { record } from "../../trade-validation";
-import { ITEM_NOT_FOUND_CODE, itemPath, parseItemResponse, type Item } from "../item-contract";
+import { ITEM_NOT_FOUND_CODE, itemPath, parseItemDetailResponse, type Item } from "../item-contract";
 import {
   parseBranchProfileResponse,
   parseCompanyProfileResponse,
@@ -28,10 +28,9 @@ export interface ItemDetail {
  *
  * `CatalogService.get` returns the item spread with `companyProfile` and
  * `branchProfile` alongside, both `null` when the context does not reach them.
- * It throws `TRADE.CATALOG.ITEM_NOT_FOUND` at **404** for a missing item and at
- * **404 again** when a company header is sent and the item has no profile in
- * that company — so "not found" here can mean "not in this company", which is
- * why the empty state names the operating context.
+ * It throws `TRADE.CATALOG.ITEM_NOT_FOUND` at **404** only for a missing item.
+ * Under a selected company, an item without a company profile still returns
+ * with `companyProfile: null` so this screen can bootstrap that first profile.
  */
 export function useItemDetail(id: string) {
   const { t, lang } = useI18n();
@@ -62,7 +61,7 @@ export function useItemDetail(id: string) {
           if (controller.signal.aborted) return;
           const payload = record(result.data);
           setDetail({
-            item: parseItemResponse(result.data),
+            item: parseItemDetailResponse(result.data),
             companyProfile: payload?.companyProfile
               ? parseCompanyProfileResponse(payload.companyProfile)
               : null,

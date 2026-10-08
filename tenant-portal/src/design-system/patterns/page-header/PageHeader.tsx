@@ -14,8 +14,17 @@ export interface Breadcrumb {
 
 export interface PageHeaderProps {
   title: string;
+  /** Stable focus destination when a completed action removes its trigger. */
+  headingRef?: React.Ref<HTMLHeadingElement>;
   description?: string;
-  primaryAction?: { label: string; onClick: () => void; disabled?: boolean; loading?: boolean; size?: ButtonProps["size"] };
+  primaryAction?: {
+    label: string;
+    icon?: React.ReactNode;
+    onClick: () => void;
+    disabled?: boolean;
+    loading?: boolean;
+    size?: ButtonProps["size"];
+  };
   secondaryActions?: React.ReactNode;
   breadcrumbs?: Breadcrumb[];
   /** Rendered inline after the title — a `StatusBadge`, and nothing that takes focus. */
@@ -53,6 +62,7 @@ export interface PageHeaderProps {
  */
 export function PageHeader({
   title,
+  headingRef,
   description,
   primaryAction,
   secondaryActions,
@@ -88,26 +98,26 @@ export function PageHeader({
           {leading}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+              <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined}
+                className="text-xl font-semibold text-foreground">{title}</h1>
               {titleAdornment}
             </div>
             {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
           </div>
         </div>
-        {(secondaryActions || primaryAction) && (
-          <PageActions slot="actions">
-            {secondaryActions}
-            {primaryAction && (
-              <Button
-                variant="primary"
-                size={primaryAction.size ?? "sm"}
-                onClick={primaryAction.onClick}
-                disabled={primaryAction.disabled}
-                loading={primaryAction.loading}
-              >
-                {primaryAction.label}
-              </Button>
-            )}
+        {secondaryActions && <PageActions slot="actions">{secondaryActions}</PageActions>}
+        {primaryAction && (
+          <PageActions slot="primary">
+            <Button
+              variant="primary"
+              size={primaryAction.size ?? "sm"}
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.disabled}
+              loading={primaryAction.loading}
+            >
+              {primaryAction.icon}
+              {primaryAction.label}
+            </Button>
           </PageActions>
         )}
       </div>

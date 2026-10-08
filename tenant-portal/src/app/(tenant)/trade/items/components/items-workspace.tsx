@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Pencil, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, Pencil, Plus, RefreshCw } from "lucide-react";
 import {
   Badge,
   BoardView,
   Button,
   CardView,
-  DegradedBanner,
+  EmptyState,
   FilterBar,
   IdentifierText,
   PageHeader,
@@ -34,7 +35,8 @@ import { TradeScopeBar } from "../../TradeScopeBar";
 import { TRADE_PERMISSIONS } from "../../trade-scope";
 import { tradeLocalizedName } from "../../trade-validation";
 import { useItems } from "../hooks/useItems";
-import { CreateItemDrawer, EditItemDrawer } from "./ItemDrawers";
+import { CreateItemModal } from "./CreateItemModal";
+import { EditItemDrawer } from "./ItemDrawers";
 import {
   ITEM_KINDS,
   ITEM_STATUSES,
@@ -47,8 +49,16 @@ import {
 
 export function ItemsWorkspace() {
   const { t, lang } = useI18n();
+  const router = useRouter();
   const items = useItems();
   const [view, setView] = useWorkspaceView("trade-items", "table");
+  const emptyState = (
+    <EmptyState
+      title={items.emptyTitle}
+      description={items.emptyDescription}
+      action={items.emptyAction}
+    />
+  );
 
   const viewLabels: WorkspaceViewLabels = {
     retry: t.common.retry,
@@ -118,6 +128,7 @@ export function ItemsWorkspace() {
             {item.eligibility.canPurchase ? (
               <Badge tone="brand">{t.trade.canPurchase}</Badge>
             ) : null}
+            {item.eligibility.canPos ? <Badge tone="brand">{t.trade.canPos}</Badge> : null}
           </span>
         ) : (
           "—"
@@ -137,11 +148,20 @@ export function ItemsWorkspace() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label={t.trade.itemEditTitle}
-                    disabled={items.isSubmitting}
-                    onClick={() => items.openEdit(item)}
+                    aria-label={
+                      items.editLoadingId === item.id
+                        ? t.trade.itemEditLoading
+                        : t.trade.itemEditTitle
+                    }
+                    disabled={items.isSubmitting || items.editLoadingId !== null}
+                    aria-busy={items.editLoadingId === item.id || undefined}
+                    onClick={() => void items.openEdit(item)}
                   >
-                    <Pencil className="size-4" aria-hidden="true" />
+                    {items.editLoadingId === item.id ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Pencil className="size-4" aria-hidden="true" />
+                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t.trade.itemEditTitle}</TooltipContent>
@@ -169,7 +189,13 @@ export function ItemsWorkspace() {
           title={t.trade.itemsTitle}
           description={t.trade.itemsSubtitle}
           primaryAction={
-            items.canManage ? { label: t.trade.itemCreate, onClick: items.openCreate } : undefined
+            items.canManage
+              ? {
+                  label: t.trade.itemCreate,
+                  icon: <Plus className="size-4" aria-hidden="true" />,
+                  onClick: items.openCreate,
+                }
+              : undefined
           }
           secondaryActions={
             <Button size="sm"
@@ -189,9 +215,9 @@ export function ItemsWorkspace() {
         <SubNav items={TRADE_FOUNDATION_NAV_ITEMS} />
 
         {/* The scope bar stays in the body, as it does on the other nine
-            Trade screens: three selects will not share a 45px row with this
+            Trade screens: three selects will not share a 35px row with this
             screen's actions, its search and its view switcher. */}
-        <TradeScopeBar />
+        <TradeScopeBar allowItemMaster />
 
         <PageActions slot="view">
           <ViewSwitcher
@@ -202,7 +228,7 @@ export function ItemsWorkspace() {
           />
         </PageActions>
 
-        <DegradedBanner message={t.trade.itemSearchNote} />
+        {items.search.trim() && <p className="text-sm text-muted-foreground">{t.trade.itemSearchNote}</p>}
 
         <FilterBar
           filters={[
@@ -252,11 +278,13 @@ export function ItemsWorkspace() {
         <div className="min-h-0 flex-1">
           {view === "board" && (
             <BoardView
-              columns={boardColumns}
+              columns={items.items.length === 0 ? [] : boardColumns}
               columnOf={(item) => item.status}
               items={items.items}
+              emptyState={emptyState}
               itemKey={(item) => item.id}
               renderCard={renderCard}
+              onActivate={(item) => router.push(`${TENANT_ROUTES.tradeItems}/${item.id}`)}
               canDrag={() => items.canManage && items.movingId === null}
               onCardMove={(move) => {
                 if (!isItemStatus(move.toColumnId)) return;
@@ -279,8 +307,10 @@ export function ItemsWorkspace() {
           {view === "card" && (
             <CardView
               items={items.items}
+              emptyState={emptyState}
               itemKey={(item) => item.id}
               renderCard={renderCard}
+              onActivate={(item) => router.push(`${TENANT_ROUTES.tradeItems}/${item.id}`)}
               isLoading={items.isLoading}
               error={items.queryError}
               onRetry={() => void items.reload()}
@@ -293,7 +323,9 @@ export function ItemsWorkspace() {
             <TableView
               columns={columns}
               items={items.items}
+              emptyState={emptyState}
               itemKey={(item) => item.id}
+              onActivate={(item) => router.push(`${TENANT_ROUTES.tradeItems}/${item.id}`)}
               isLoading={items.isLoading}
               error={items.queryError}
               onRetry={() => void items.reload()}
@@ -304,7 +336,7 @@ export function ItemsWorkspace() {
           )}
         </div>
 
-        <CreateItemDrawer
+        <CreateItemModal
           key={items.createOpen ? "create-open" : "create-closed"}
           isOpen={items.createOpen}
           isSubmitting={items.isSubmitting}

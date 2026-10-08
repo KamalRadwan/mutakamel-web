@@ -256,6 +256,8 @@ describe("useTenantProvisioning", () => {
         expect.objectContaining({ errorCode: "PROVISIONING_DEPENDENCY_UNAVAILABLE" }),
       );
     });
+    expect(result.current.mutation.name).toBeNull();
+    expect(result.current.mutation.error?.errorCode).toBe("PROVISIONING_DEPENDENCY_UNAVAILABLE");
     await act(async () => {
       await result.current.retryOperation(OPERATION_ID);
     });

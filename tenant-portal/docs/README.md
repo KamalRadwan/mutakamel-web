@@ -88,9 +88,10 @@ docs/
 | [crm-customer-profiles.md](api/crm-customer-profiles.md) | Profiles, contacts, capabilities |
 | [crm-opportunities.md](api/crm-opportunities.md) | Opportunities, pipelines, stages, board |
 | [crm-catalogues.md](api/crm-catalogues.md) | Lead stages, acquisition sources, custom fields, settings, static data |
-| [core-reference.md](api/core-reference.md) | **Generated** — all 199 Core routes |
-| [crm-reference.md](api/crm-reference.md) | **Generated** — all 143 CRM routes |
-| [trade-reference.md](api/trade-reference.md) | **Generated** — all 231 Trade routes; not yet built |
+| [trade-categories.md](api/trade-categories.md) | Category tree, management commands, Item picker and assignment, recovery and verification |
+| [core-reference.md](api/core-reference.md) | **Generated** — current Core Gateway routes |
+| [crm-reference.md](api/crm-reference.md) | **Generated** — current CRM Gateway routes |
+| [trade-reference.md](api/trade-reference.md) | **Generated** — current Trade Gateway routes |
 
 ### reference/
 

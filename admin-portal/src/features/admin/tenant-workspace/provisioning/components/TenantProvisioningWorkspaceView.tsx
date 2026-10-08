@@ -304,19 +304,17 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
         <div className="space-y-4">
           {(() => {
             const operation = provisioning.selectedOperation.data;
-            const latestOperation = provisioning.operations.data.items.reduce(
-              (latest, candidate) =>
-                candidate.generation > latest.generation ? candidate : latest,
-            );
-            const isLatestOperation = latestOperation.id === operation.id;
+            const latestOperation = model.latestOperation;
+            const isLatestOperation = latestOperation?.id === operation.id;
             const isHistoricalOperation =
-              operation.generation < latestOperation.generation;
+              !!latestOperation && operation.generation < latestOperation.generation;
             const canRetry =
               provisioning.permissions.canRetryOrCancel &&
               isLatestOperation &&
               ["FAILED_RETRYABLE", "MANUAL_RECOVERY_REQUIRED", "CANCELLED"].includes(
                 operation.status,
               );
+            const cancellationPending = isLatestOperation && operation.status === "CANCEL_REQUESTED";
             const canCancel =
               provisioning.permissions.canRetryOrCancel &&
               isLatestOperation &&
@@ -341,15 +339,16 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={operation.status} ar={ar} />
-                      {canRetry && (
+                      {(canRetry || (cancellationPending && provisioning.permissions.canRetryOrCancel)) && (
                         <Button
                           type="button"
                           variant="primary"
                           size="sm"
                           onClick={() => void provisioning.retryOperation(operation.id).catch(() => undefined)}
-                          disabled={provisioning.mutation.name !== null}
+                          disabled={cancellationPending || provisioning.mutation.name !== null}
+                          aria-describedby={cancellationPending ? "provisioning-cancellation-status" : undefined}
                         >
-                          {copy.retryButton}
+                          {copy.reprovisionButton}
                         </Button>
                       )}
                       {canCancel && (
@@ -365,7 +364,12 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                       )}
                     </div>
                   </div>
-                  {isHistoricalOperation && (
+                  {cancellationPending && (
+                    <p id="provisioning-cancellation-status" role="status" className="mt-3 rounded-md bg-muted p-3 text-xs text-muted-foreground">
+                      {copy.cancellationPendingNote}
+                    </p>
+                  )}
+                  {isHistoricalOperation && latestOperation && (
                     <div className="mt-3 flex items-start gap-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
                       <History className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                       <p>
@@ -708,6 +712,15 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
   const { provisioning } = model;
   return (
     <div className="grid gap-4 xl:grid-cols-2">
+      {model.hasOpenOperation && (
+        <div role="status" className="rounded-md bg-muted p-3 text-xs text-muted-foreground xl:col-span-2">
+          <p>{copy.openOperationNote}</p>
+          <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => {
+            if (model.latestOperation) provisioning.selectOperation(model.latestOperation.id);
+            model.setSection("operations");
+          }}>{copy.viewCurrentOperationButton}</Button>
+        </div>
+      )}
       <CommandCard title={copy.addApplicationTitle} description={copy.addApplicationDescription}>
         <div className="grid gap-2 sm:grid-cols-2">
           <Field label={copy.applicationKeyLabel} hideLabel required>
@@ -777,7 +790,7 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
           ))}
           <Button type="button" variant="link" size="sm" onClick={model.addManagedTarget} className="h-auto p-0">+ {copy.addTargetButton}</Button>
         </div>
-        <Button type="button" variant="primary" size="sm" disabled={!provisioning.permissions.canAddApplication || provisioning.mutation.name !== null} onClick={() => void model.submitAddApplication()}>{copy.createAddOperationButton}</Button>
+        <Button type="button" variant="primary" size="sm" disabled={model.hasOpenOperation || !provisioning.permissions.canAddApplication || provisioning.mutation.name !== null} onClick={() => void model.submitAddApplication()}>{copy.createAddOperationButton}</Button>
       </CommandCard>
 
       <div className="space-y-3">
@@ -795,7 +808,7 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
               />
             )}
           </Field>
-          <Button type="button" variant="primary" size="sm" disabled={!provisioning.permissions.canRepair || provisioning.mutation.name !== null} onClick={() => void model.submitRepair()}>{copy.createRepairButton}</Button>
+          <Button type="button" variant="primary" size="sm" disabled={model.hasOpenOperation || !provisioning.permissions.canRepair || provisioning.mutation.name !== null} onClick={() => void model.submitRepair()}>{copy.createRepairButton}</Button>
         </CommandCard>
 
         <CommandCard title={copy.retainedDecommissionTitle} description={copy.retainedDecommissionDescription}>
@@ -816,7 +829,7 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
             <Checkbox id="retention-acknowledged" name="retentionAcknowledged" checked={model.retentionAcknowledged} onCheckedChange={(checked) => model.setRetentionAcknowledged(checked === true)} />
             <span>{copy.retentionAckLabel}</span>
           </label>
-          <Button type="button" variant="destructive" size="sm" disabled={!provisioning.permissions.canDecommission || !model.retentionAcknowledged || provisioning.mutation.name !== null} onClick={() => void model.submitDecommission()}>{copy.createDecommissionButton}</Button>
+          <Button type="button" variant="destructive" size="sm" disabled={model.hasOpenOperation || !provisioning.permissions.canDecommission || !model.retentionAcknowledged || provisioning.mutation.name !== null} onClick={() => void model.submitDecommission()}>{copy.createDecommissionButton}</Button>
         </CommandCard>
       </div>
     </div>
@@ -971,4 +984,4 @@ function shortDigest(value: string): string { return `${value.slice(0, 10)}…${
 function formatDate(value: string, locale: string): string { return new Intl.DateTimeFormat(localeForLanguage(locale === "ar" ? "ar" : "en"), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function operationTypeLabel(type: string, ar: boolean): string { const labels: Record<string, [string, string]> = { INITIAL_PROVISION: ["Initial provision", "التجهيز الأولي"], RETRY: ["Retry", "إعادة محاولة"], UPDATE: ["Update", "تحديث"], ADD_APPLICATION: ["Add Application", "إضافة تطبيق"], REPAIR: ["Repair", "إصلاح"], DECOMMISSION: ["Decommission", "إيقاف"] }; return labels[type]?.[ar ? 1 : 0] ?? type; }
 function operationStatusLabel(status: TenantOperationStatus, ar: boolean): string { if (!ar) return status; const labels: Partial<Record<TenantOperationStatus, string>> = { REQUESTED: "مطلوبة", PLANNING: "تخطيط", QUEUED: "بالطابور", RUNNING: "قيد التنفيذ", WAITING_RETRY: "انتظار إعادة", CANCEL_REQUESTED: "طلب إلغاء", SUCCEEDED: "نجحت", FAILED_RETRYABLE: "فشل قابل للإعادة", MANUAL_RECOVERY_REQUIRED: "تدخل يدوي", CANCELLED: "ملغاة" }; return labels[status] ?? status; }
-function localizeError(code: string, ar: boolean): string { const messages: Record<string, [string, string]> = { TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE: ["Core has not exposed the conflict revision; resolution is disabled safely.", "لم تعرض Core مراجعة التعارض؛ تم تعطيل الحل بأمان."], TENANT_UPDATE_SELECTION_REQUIRED: ["Select at least one update.", "اختر تحديثًا واحدًا على الأقل."], TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED: ["Acknowledge retained-data behavior.", "أكد سلوك الاحتفاظ بالبيانات."], TENANT_PROVISIONING_OPERATION_SUPERSEDED: ["This operation was superseded by a newer generation. Refresh the history and select the latest operation.", "حلّ جيل أحدث محل هذه العملية. حدّث السجل واختر أحدث عملية."], INVALID_PROVISIONING_REASON_CODE: ["Use an uppercase safe reason code.", "استخدم رمز سبب آمنًا بأحرف كبيرة."], "GW.IDEM.IN_FLIGHT": ["The exact command is still in flight; retry keeps the same key.", "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه."] }; return messages[code]?.[ar ? 1 : 0] ?? code; }
+function localizeError(code: string, ar: boolean): string { const messages: Record<string, [string, string]> = { TENANT_PROVISIONING_OPERATION_ALREADY_OPEN: ["An operation is still open. Open Operations and wait for it to finish or complete cancellation before re-provisioning.", "توجد عملية مفتوحة. افتح العمليات وانتظر انتهاءها أو اكتمال إلغائها قبل إعادة التجهيز."], TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE: ["Core has not exposed the conflict revision; resolution is disabled safely.", "لم تعرض Core مراجعة التعارض؛ تم تعطيل الحل بأمان."], TENANT_UPDATE_SELECTION_REQUIRED: ["Select at least one update.", "اختر تحديثًا واحدًا على الأقل."], TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED: ["Acknowledge retained-data behavior.", "أكد سلوك الاحتفاظ بالبيانات."], TENANT_PROVISIONING_OPERATION_SUPERSEDED: ["This operation was superseded by a newer generation. Refresh the history and select the latest operation.", "حلّ جيل أحدث محل هذه العملية. حدّث السجل واختر أحدث عملية."], INVALID_PROVISIONING_REASON_CODE: ["Use an uppercase safe reason code.", "استخدم رمز سبب آمنًا بأحرف كبيرة."], "GW.IDEM.IN_FLIGHT": ["The exact command is still in flight; retry keeps the same key.", "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه."] }; return messages[code]?.[ar ? 1 : 0] ?? code; }

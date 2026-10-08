@@ -69,7 +69,7 @@ function renderBar(overrides: Partial<FilterBarProps> = {}) {
 
 // The filter controls live in the Filters popover at every width now — the
 // inline-from-`lg` row went when the controls moved into the page action bar,
-// which shares a 45px row with the screen's actions and cannot hold a variable
+// which shares a 35px row with the screen's actions and cannot hold a variable
 // number of selects. jsdom resolved `hidden lg:flex` to "rendered" and let
 // these three tests reach the controls without ever opening anything, so
 // opening it here is the assertion catching up with the component, not a

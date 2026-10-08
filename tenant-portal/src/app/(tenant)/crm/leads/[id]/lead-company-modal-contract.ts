@@ -26,9 +26,7 @@ export interface LeadCompanyForm extends Record<LeadCompanyField, string> {
   address: LeadAddressForm;
 }
 
-export interface LeadCompanyUpdateRequest extends UpdateLeadRequest {
-  address?: LeadAddressForm;
-}
+export type LeadCompanyUpdateRequest = UpdateLeadRequest;
 
 export function companyFormFromLead(lead: LeadDetail): LeadCompanyForm {
   return {
@@ -46,6 +44,7 @@ export function companyFormFromLead(lead: LeadDetail): LeadCompanyForm {
       street2: lead.address?.apartment ?? "",
       buildingNo: lead.address?.buildingNo ?? "",
       floor: lead.address?.floor ?? "",
+      apartment: "",
       landmark: lead.address?.landmark ?? "",
       postalCode: lead.address?.postalCode ?? "",
     },
@@ -106,7 +105,11 @@ export function buildCompanyModalRequest(
     && Object.values(address).some(Boolean)) {
     // Lead update upserts the whole LEGAL address; omitted address properties
     // would clear untouched columns in the Directory.
-    request.address = address;
+    const cleanAddress: Partial<LeadAddressForm> = { ...address };
+    if (!cleanAddress.apartment) {
+      delete cleanAddress.apartment;
+    }
+    request.address = cleanAddress as LeadAddressForm;
   }
   return request;
 }

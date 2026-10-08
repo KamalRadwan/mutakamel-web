@@ -182,7 +182,7 @@ nothing, the same standing `--radius-xl` has.
 brand hue (264.05, against brand-600's 264.376) held at the ramp's darkest
 lightness. It is deliberately **not** a ramp step: the brand ramp desaturates as
 it darkens, from C 0.217 at 600 to 0.098 at 950, and the chrome holds 0.162,
-because a 45px band of brand wants the saturation the ramp gives up. Keeping it
+because a 35px band of brand wants the saturation the ramp gives up. Keeping it
 out of the ramp is what stops it being reached for as "brand-1000" on a surface
 where that curve is the rule.
 

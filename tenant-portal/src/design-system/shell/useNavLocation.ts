@@ -20,9 +20,21 @@ export interface NavLocation {
    * already open, which is a no-op and not worth a second code path.
    */
   itemHref: string | null;
+  /**
+   * True only for an exact route whose nav item declares `primaryPage`.
+   * Descendants deliberately return false so detail screens retain the link
+   * back to their owning list.
+   */
+  isPrimaryPage: boolean;
 }
 
-const NONE: NavLocation = { section: null, itemId: null, itemLabelKey: null, itemHref: null };
+const NONE: NavLocation = {
+  section: null,
+  itemId: null,
+  itemLabelKey: null,
+  itemHref: null,
+  isPrimaryPage: false,
+};
 
 /**
  * Which nav entry the current route belongs to.
@@ -56,7 +68,13 @@ export function useNavLocation(sections: NavSection[]): NavLocation {
           (pathname.startsWith(item.href) && pathname.charAt(item.href.length) === "/");
         if (!matches || item.href.length <= bestLength) continue;
         bestLength = item.href.length;
-        best = { section, itemId: item.id, itemLabelKey: item.labelKey, itemHref: item.href };
+        best = {
+          section,
+          itemId: item.id,
+          itemLabelKey: item.labelKey,
+          itemHref: item.href,
+          isPrimaryPage: pathname === item.href && item.primaryPage === true,
+        };
       }
     }
 

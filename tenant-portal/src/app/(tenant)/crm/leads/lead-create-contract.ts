@@ -18,7 +18,7 @@
 //     the array is present the singular is IGNORED. Only the arrays are sent,
 //     so there is no shape in which one silently wins over the other.
 
-import { CRM_PROFILE_TYPES, type CrmProfileType } from "./lead-contract";
+import type { CrmProfileType } from "./lead-contract";
 
 export const LEAD_CREATE_LIMITS = {
   companyName: 180,
@@ -67,6 +67,7 @@ export interface LeadAddressForm {
   street2: string;
   buildingNo: string;
   floor: string;
+  apartment: string;
   landmark: string;
   postalCode: string;
 }
@@ -116,6 +117,7 @@ const EMPTY_LEAD_ADDRESS: LeadAddressForm = {
   street2: "",
   buildingNo: "",
   floor: "",
+  apartment: "",
   landmark: "",
   postalCode: "",
 };
@@ -210,7 +212,7 @@ function optional<T extends string>(
   return trimmed.length > 0 ? ({ [key]: trimmed } as Record<T, string>) : {};
 }
 
-interface CreateLeadAddressRequest {
+export interface CreateLeadAddressRequest {
   country?: string;
   city?: string;
   state?: string;
@@ -218,12 +220,14 @@ interface CreateLeadAddressRequest {
   street2?: string;
   buildingNo?: string;
   floor?: string;
+  apartment?: string;
   landmark?: string;
   postalCode?: string;
 }
 
 interface CreateLeadContactRequest {
   contactPartyId?: string;
+  fullName?: string;
   firstName?: string;
   lastName?: string;
   honorificTitle?: string;
@@ -241,16 +245,21 @@ export interface CreateLeadRequest {
   stageId?: string;
   acquisitionSourceId?: string;
   tagIds?: string[];
+  ownerUserId?: string;
   companyName?: string;
   existingCompanyPartyId?: string;
   legalName?: string;
   taxNumber?: string;
   commercialRegistrationNumber?: string;
+  companyPhone?: string;
   companyPhones?: string[];
+  companyEmail?: string;
+  companyWebsite?: string;
   contacts?: CreateLeadContactRequest[];
   firstName?: string;
   lastName?: string;
   honorificTitle?: string;
+  primaryMobile?: string;
   email?: string;
   phones?: string[];
   address?: CreateLeadAddressRequest;
@@ -277,6 +286,7 @@ function buildAddress(address: LeadAddressForm): CreateLeadAddressRequest | unde
     ...optional("street2", address.street2),
     ...optional("buildingNo", address.buildingNo),
     ...optional("floor", address.floor),
+    ...optional("apartment", address.apartment),
     ...optional("landmark", address.landmark),
     ...optional("postalCode", address.postalCode),
   };
@@ -299,11 +309,28 @@ function buildContact(contact: LeadContactForm, isPrimary: boolean): CreateLeadC
   if (isPrimary) request.isPrimary = true;
   Object.assign(request, optional("jobTitle", contact.jobTitle));
 
+  const fullName = contact.fullName.trim();
+  const firstName = contact.firstName.trim();
+  const lastName = contact.lastName.trim();
+
   if (contact.contactPartyId.length > 0) {
     request.contactPartyId = contact.contactPartyId;
+    // Current backend caveat: even when contactPartyId is supplied, the
+    // service still evaluates a contact name. Supply fullName or firstName/lastName.
+    if (fullName.length > 0) {
+      request.fullName = fullName;
+    } else if (firstName.length > 0) {
+      request.firstName = firstName;
+      if (lastName.length > 0) request.lastName = lastName;
+    } else if (lastName.length > 0) {
+      request.lastName = lastName;
+    }
     return request;
   }
 
+  if (fullName.length > 0) {
+    request.fullName = fullName;
+  }
   Object.assign(
     request,
     optional("firstName", contact.firstName),
@@ -363,7 +390,7 @@ export function buildCreateLeadRequest(
   if (customFields) request.customFields = customFields;
 
   if (corporate) {
-    if (companyName.length > 0) request.companyName = companyName;
+    if (!existingCompany && companyName.length > 0) request.companyName = companyName;
     const primaryIndex = Math.max(
       form.contacts.findIndex((contact) => contact.isPrimary),
       0,
@@ -402,5 +429,4 @@ export function buildCreateLeadRequest(
   return request;
 }
 
-export { CRM_PROFILE_TYPES };
 export type { CrmProfileType };

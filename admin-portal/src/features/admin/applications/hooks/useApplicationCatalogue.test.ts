@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const api = vi.hoisted(() => ({
   replacePriceLadder: vi.fn(),
   replaceTierGrants: vi.fn(),
   deleteTier: vi.fn(),
+  updateTier: vi.fn(),
 }));
 
 vi.mock("../api/applications.api", () => ({ applicationsApi: api }));
@@ -29,6 +31,70 @@ function deferred<T>() {
   const promise = new Promise<T>((next) => { resolve = next; });
   return { promise, resolve };
 }
+
+// Model the workspace's grant/price editors, which copy server data into local
+// drafts in effects. Bound updates so a regression fails without hanging Vitest.
+function renderCatalogueEditor(applicationId: string | null) {
+  const synchronizeDraft = vi.fn();
+  const hook = renderHook(() => {
+    const catalogue = useApplicationCatalogue(applicationId);
+    const [draft, setDraft] = useState({ grants: catalogue.grants, prices: catalogue.prices });
+    useEffect(() => {
+      synchronizeDraft();
+      if (synchronizeDraft.mock.calls.length <= 12) {
+        setDraft({ grants: catalogue.grants, prices: catalogue.prices });
+      }
+    }, [catalogue.grants, catalogue.prices]);
+    return { catalogue, draft };
+  });
+  return { ...hook, synchronizeDraft };
+}
+
+describe("useApplicationCatalogue editor stability", () => {
+  beforeEach(() => {
+    Object.values(api).forEach((mock) => mock.mockReset());
+    sessionStorage.clear();
+    api.listTiers.mockResolvedValue([
+      { id: "tier-a", key: "a", name: "A", rank: 0, color: "#000000", isActive: true },
+    ]);
+    api.listFeatures.mockResolvedValue([]);
+    api.getApplicationAudit.mockResolvedValue({ items: [], page: 1, limit: 20, total: 0, totalPages: 0 });
+    api.getTierGrants.mockResolvedValue([]);
+    api.getPriceLadder.mockResolvedValue([]);
+  });
+
+  it.each(["catalogue", "tier", "no-access"])("does not keep resetting drafts while %s data is unavailable", async (state) => {
+    const pending = deferred<never[]>();
+    if (state === "catalogue") api.listTiers.mockReturnValue(pending.promise);
+    if (state === "tier") api.getTierGrants.mockReturnValue(pending.promise);
+    const { result, synchronizeDraft, unmount } = renderCatalogueEditor(state === "no-access" ? null : "application-1");
+
+    await act(async () => {});
+    expect(result.current.draft).toEqual({ grants: [], prices: [] });
+    expect(synchronizeDraft.mock.calls.length).toBeLessThanOrEqual(2);
+    unmount();
+  });
+
+  it("settles after a tier update when reloading its details fails", async () => {
+    const { result, synchronizeDraft, unmount } = renderCatalogueEditor("application-1");
+    await waitFor(() => expect(result.current.catalogue.loadedTierId).toBe("tier-a"));
+    synchronizeDraft.mockClear();
+    api.updateTier.mockResolvedValue({ id: "tier-a", name: "Updated tier" });
+    api.getTierGrants.mockRejectedValue(new Error("Grants unavailable"));
+
+    await act(async () => {
+      await result.current.catalogue.updateTier("tier-a", { name: "Updated tier" });
+    });
+
+    expect(result.current.catalogue.pendingAction).toBeNull();
+    expect(result.current.catalogue.tierDetailError).toBe("Grants unavailable");
+    expect(result.current.draft).toEqual({ grants: [], prices: [] });
+    expect(synchronizeDraft.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(api.updateTier).toHaveBeenCalledOnce();
+    expect(api.getTierGrants).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+});
 
 describe("useApplicationCatalogue request ownership", () => {
   beforeEach(() => {

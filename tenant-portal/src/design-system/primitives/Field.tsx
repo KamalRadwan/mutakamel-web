@@ -17,6 +17,8 @@ export interface FieldProps {
    * unavailable". Pair it with a `hint` naming where the value IS editable.
    */
   readOnly?: boolean;
+  /** When true, renders the label visibly above the field rather than sr-only. */
+  showLabel?: boolean;
   className?: string;
   /**
    * Exactly one design-system control, at any depth. It claims the label by
@@ -38,6 +40,7 @@ export function Field({
   error,
   required,
   readOnly,
+  showLabel = false,
   className,
   children,
 }: FieldProps) {
@@ -75,9 +78,17 @@ export function Field({
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label htmlFor={controlId} className="sr-only">
+      <Label
+        htmlFor={controlId}
+        className={showLabel ? "text-xs" : "sr-only"}
+      >
         {label}
-        {required && <span aria-hidden="true"> *</span>}
+        {required && (
+          <span aria-hidden="true" className="text-destructive">
+            {" "}
+            *
+          </span>
+        )}
       </Label>
       {/*
         readOnly reaches the control BOTH ways on purpose: the native attribute

@@ -6,7 +6,7 @@
 
 Status: **verified** (parsed from `throw new *Exception` sites and exception factories)
 
-Last source verification: **2026-09-24**
+Last source verification: **2026-09-27**
 
 Codes: **325** across **35** areas
 

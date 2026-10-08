@@ -22,7 +22,7 @@ export interface PageActionBarProps {
  * The second bar: where the current screen puts its own controls.
  *
  * ```text
- * CRM › Leads                     [+ Add lead]  [search…]        [board|card|table]
+ * [+ Add lead]                         [branch] [search…] [board|card|table]
  * ```
  *
  * Two jobs, and the first one is not obvious.
@@ -32,13 +32,17 @@ export interface PageActionBarProps {
  * trigger — so the answer moves here, to the start of the bar: the section, then
  * the screen. Without it the shell would have replaced a permanent location
  * indicator with none, which is the one real thing a horizontal nav costs.
+ * The exception is an exact route explicitly marked as a primary page: its
+ * first-level nav entry already supplies that context, so its primary action
+ * takes this inline-start position instead. Descendant detail routes retain
+ * the location link back to the list.
  *
  * **It holds the screen's controls**, portalled in from the page itself so each
  * keeps the state and handlers it was written with — see `page-action-slots.tsx`
  * for why that is a portal and not shell state.
  *
  * The bar renders on every route, including one that registers nothing. A bar
- * that disappeared on some screens would move the whole page up 45px on those
+ * that disappeared on some screens would move the whole page up 35px on those
  * routes, and every navigation between the two kinds would shift the content
  * under the pointer.
  */
@@ -55,9 +59,22 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
   // until React throws "Maximum update depth exceeded". Found by
   // AppShell.actions.test.tsx, which is the reason that test renders the real
   // bar instead of a stub.
-  const setRelated = useCallback((node: HTMLDivElement | null) => register("related", node), [register]);
-  const setActions = useCallback((node: HTMLDivElement | null) => register("actions", node), [register]);
-  const setSearch = useCallback((node: HTMLDivElement | null) => register("search", node), [register]);
+  const setPrimary = useCallback(
+    (node: HTMLDivElement | null) => register("primary", node),
+    [register],
+  );
+  const setRelated = useCallback(
+    (node: HTMLDivElement | null) => register("related", node),
+    [register],
+  );
+  const setActions = useCallback(
+    (node: HTMLDivElement | null) => register("actions", node),
+    [register],
+  );
+  const setSearch = useCallback(
+    (node: HTMLDivElement | null) => register("search", node),
+    [register],
+  );
   const setView = useCallback((node: HTMLDivElement | null) => register("view", node), [register]);
 
   const sectionLabel = location.section
@@ -79,36 +96,41 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
         "overflow-x-auto bg-card px-3 print:hidden",
       )}
     >
+      {location.isPrimaryPage && (
+        <div ref={setPrimary} className="flex items-center gap-2 empty:hidden" />
+      )}
       {/* Not a <nav>: a second landmark announced as navigation would just add
           noise to the one above it. The SECTION stays plain text because a
           section has no index route to link to; the ITEM is a link, because it
           always has one — and on a detail route that link is the way back to
           the list the record came from, which is the trip a user makes far more
           often than any other from here. */}
-      <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-        <span className="truncate">{sectionLabel}</span>
-        {itemLabel && (
-          <>
-            <ChevronRight
-              className={cn(iconSize({ size: "xs" }), mirrorInRtl)}
-              aria-hidden="true"
-            />
-            {location.itemHref ? (
-              <Link
-                href={location.itemHref}
-                className={cn(
-                  "truncate rounded-xs text-sm font-medium text-foreground hover:underline",
-                  focusRing,
-                )}
-              >
-                {itemLabel}
-              </Link>
-            ) : (
-              <span className="truncate text-sm font-medium text-foreground">{itemLabel}</span>
-            )}
-          </>
-        )}
-      </p>
+      {!location.isPrimaryPage && (
+        <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <span className="truncate">{sectionLabel}</span>
+          {itemLabel && (
+            <>
+              <ChevronRight
+                className={cn(iconSize({ size: "xs" }), mirrorInRtl)}
+                aria-hidden="true"
+              />
+              {location.itemHref ? (
+                <Link
+                  href={location.itemHref}
+                  className={cn(
+                    "truncate rounded-xs text-sm font-medium text-foreground hover:underline",
+                    focusRing,
+                  )}
+                >
+                  {itemLabel}
+                </Link>
+              ) : (
+                <span className="truncate text-sm font-medium text-foreground">{itemLabel}</span>
+              )}
+            </>
+          )}
+        </p>
+      )}
       {/* The middle. Links to OTHER records live here rather than in the
           trailing cluster: they leave this screen, and the controls beside the
           view switcher act on it. `mx-auto` centres the group in whatever room
@@ -120,6 +142,9 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
           empty, which is every list screen. */}
       <div className="ms-auto flex min-w-0 items-center gap-2">
         <div ref={setActions} className="flex items-center gap-2" />
+        {!location.isPrimaryPage && (
+          <div ref={setPrimary} className="flex items-center gap-2 empty:hidden" />
+        )}
         <div ref={setSearch} className="flex min-w-0 items-center gap-2" />
         <div ref={setView} className="flex items-center gap-2" />
       </div>

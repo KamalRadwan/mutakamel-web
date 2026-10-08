@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-28**
+Last source verification: **2026-09-29** (Worker message verification; existing settings registry last verified 2026-08-28)
 
 Verified against the current API Gateway route contracts, Core controller,
 DTOs, registry, services, entities, migrations, SMTP verifier, the private
@@ -11,6 +11,7 @@ settings screens.
 
 This is the implementation contract for:
 
+- `/settings/worker-events` (separate Worker verification-key authority described below)
 - `/settings/platform`
 - `/settings/auth`
 - `/settings/billing`
@@ -686,3 +687,64 @@ rules are documented in the
 [System Settings and Platform SMTP Frontend Contract](../api/system-settings.md).
 
 ---
+
+
+## Worker message verification settings (2026-09-29)
+
+Settings > Worker Messages is implemented at /settings/worker-events. It uses
+Core's Worker event verification-key authority, separate from generic system
+settings and from the Ed25519 release publisher keys under Provisioning.
+
+Canonical browser root: /api/admin/core/v1/provisioning/worker-event-verification-keys.
+All responses use Core's success/data envelope and private, no-store caching.
+
+| Method / suffix | Permission (ALL) | Success | Contract |
+| --- | --- | --- | --- |
+| GET / | admin.provisioning.publisher-keys.read | 200 | Durable history, newest first, bounded to 500 records |
+| GET /configured | admin.provisioning.publisher-keys.read | 200 | Configured ACTIVE and optional PREVIOUS identities |
+| POST /adopt-configured | admin.provisioning.publisher-keys.manage + admin.provisioning.critical | 201 | Register the exact configured identity; UUIDv7 x-idempotency-key required |
+
+Both reads are READ_HEAVY, safe for transport retries. Adoption is WRITE_SENSITIVE,
+idempotent, and never automatically retried by the Gateway transport. The shared
+browser client handles cookie authentication, CSRF, and one coordinated refresh.
+
+Configured identities contain only trustSlot (ACTIVE or PREVIOUS), issuer, keyId,
+algorithm (RS256), and publicKeyFingerprint (64 lowercase SHA-256 hex characters).
+Public/private key bytes never cross this endpoint. Core derives these fields
+using the same validated configuration parser used by message verification.
+Unavailable configuration returns 503 WORKER_EVENT_VERIFICATION_TRUST_UNAVAILABLE.
+
+The button registers the ACTIVE identity automatically without manual input. A
+confirmation previews its issuer, key ID, fingerprint, and slot. The exact request
+contains only trustSlot, expectedIssuer, expectedKeyId, and
+expectedPublicKeyFingerprint. Configuration changes after the read yield 409
+WORKER_EVENT_VERIFICATION_KEY_CONFIG_MISMATCH; the UI refreshes the identity and
+requires fresh confirmation. The page and navigation require read permission;
+the button additionally requires BOTH write permissions. A 403 is an error,
+never an empty registry.
+
+A completed adoption of an already registered, matching ACTIVE identity returns
+the existing record. Ambiguous network/5xx/in-flight outcomes retain the exact
+command ID and request in component memory for an explicit same-command retry.
+The UI asks the operator to keep the page open; command recovery is not persisted
+across reloads or account changes. Reads are cancelled when the owner changes.
+
+Registration updates durable Worker verification trust only. It does not generate
+or rotate keys, alter environment variables, replay dead-letter messages, or
+restart pending tenant operations. No schema change or migration is required.
+
+Source evidence: Core admin-worker-event-verification-keys controller, governance
+service and response DTO; Gateway core-worker-evidence-authority route contracts;
+Admin Portal src/features/admin/worker-event-keys. Targeted API, hook, component,
+HTTP authorization and Gateway contract tests cover this flow.
+
+Runtime verification on 2026-09-29: Core, Gateway, and Admin Portal images were
+rebuilt and deployed locally. Anonymous configured-identity reads returned 401;
+authenticated reads returned 200 with only the five documented safe fields.
+The browser registration flow returned success for the existing ACTIVE key and
+retained revision 1. No key generation, message replay, or tenant retry was run.
+English/light desktop and Arabic/light/dark 390px views were exercised. A long
+fingerprint overflow in the shared confirmation dialog was corrected with
+wrapping and a constrained flex child. Targeted frontend/confirmation, Core HTTP
+and governance, and Gateway route tests, typechecks, scoped lint, documentation
+checks and builds passed. This is not a full assistive-technology audit.

@@ -82,6 +82,11 @@ export function useCreateLeadForm(
   // the seed rather than a blank, because the reason for the seed did not
   // change when the user cleared the form.
   initialStageId?: string,
+  // `CrmContactLine` shows the first catalogue honorific on a blank row. Make
+  // that displayed default part of the pristine snapshot instead of letting
+  // the line write it in an effect after mount, which would make a form the
+  // user never touched look dirty and raise a false discard warning.
+  defaultHonorificTitle = "",
 ) {
   const validate = useCallback(
     (candidate: CreateLeadForm) =>
@@ -89,8 +94,19 @@ export function useCreateLeadForm(
     [messages, requiredCustomFieldKeys],
   );
   const createInitial = useCallback(
-    () => ({ ...emptyCreateLeadForm(nextContactKey()), ...(initialStageId ? { stageId: initialStageId } : {}) }),
-    [initialStageId],
+    () => {
+      const pristine = emptyCreateLeadForm(nextContactKey());
+      return {
+        ...pristine,
+        honorificTitle: defaultHonorificTitle,
+        contacts: pristine.contacts.map((contact) => ({
+          ...contact,
+          honorificTitle: defaultHonorificTitle,
+        })),
+        ...(initialStageId ? { stageId: initialStageId } : {}),
+      };
+    },
+    [defaultHonorificTitle, initialStageId],
   );
   const { form, errors, allErrors, isDirty, setForm, setField, touch, revealAll, reset } =
     useCrmCreateForm({ createInitial, validate, fingerprint });

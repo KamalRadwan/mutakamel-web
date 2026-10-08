@@ -3,7 +3,7 @@
 import { toast as sonnerToast } from "sonner";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
-import { AppToast, type AppToastType } from "./AppToast";
+import { AppToast, type AppToastType, type AppToastProps } from "./AppToast";
 import { describeApiOutcome, formatApiErrorMessage } from "./format-api-error";
 
 const DEFAULT_DURATION = 4000;
@@ -13,9 +13,9 @@ function resolveDuration(duration?: number): number {
   return duration <= 0 ? Infinity : duration;
 }
 
-function show(type: AppToastType, title: string, message: string | undefined, duration: number | undefined) {
+function show(type: AppToastType, title: string, message: string | undefined, duration: number | undefined, action?: AppToastProps["action"]) {
   return sonnerToast.custom(
-    (id) => <AppToast type={type} title={title} message={message} onDismiss={() => sonnerToast.dismiss(id)} />,
+    (id) => <AppToast type={type} title={title} message={message} action={action} onDismiss={() => sonnerToast.dismiss(id)} />,
     { duration: resolveDuration(duration) },
   );
 }
@@ -23,7 +23,7 @@ function show(type: AppToastType, title: string, message: string | undefined, du
 export interface UseToastResult {
   success: (title: string, message?: string, duration?: number) => void;
   error: (title: string, message?: string, duration?: number) => void;
-  warning: (title: string, message?: string, duration?: number) => void;
+  warning: (title: string, message?: string, duration?: number, action?: AppToastProps["action"]) => void;
   info: (title: string, message?: string, duration?: number) => void;
   // Appends errorCode + correlationId to the message so the evidence a user
   // report needs is never lost — docs/design/patterns.md#toast-api.
@@ -42,7 +42,7 @@ export function useToast(): UseToastResult {
   return {
     success: (title, message, duration) => show("success", title, message, duration),
     error: (title, message, duration) => show("error", title, message, duration),
-    warning: (title, message, duration) => show("warning", title, message, duration),
+    warning: (title, message, duration, action) => show("warning", title, message, duration, action),
     info: (title, message, duration) => show("info", title, message, duration),
     errorFromApi: (title, error, duration) =>
       show("error", title, formatApiErrorMessage(error, t), duration),

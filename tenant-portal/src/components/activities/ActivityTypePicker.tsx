@@ -37,9 +37,9 @@ export function ActivityTypePicker({ value, onChange, disabled }: ActivityTypePi
         <ToggleGroupItem
           key={type}
           value={type}
-          className="h-auto min-w-0 flex-col gap-1 px-1 py-2 text-xs whitespace-normal"
+          className="h-auto min-h-11 min-w-0 flex-col gap-0.5 px-1 py-1 text-xs whitespace-normal"
         >
-          <ActivityTypeIcon type={type} size="lg" />
+          <ActivityTypeIcon type={type} size="sm" />
           <span className="max-w-full text-center break-words">{copy.types[type]}</span>
         </ToggleGroupItem>
       ))}

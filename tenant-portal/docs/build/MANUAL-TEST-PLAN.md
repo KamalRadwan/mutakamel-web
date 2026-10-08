@@ -3,10 +3,29 @@
 Written: **2026-08-30** · Status: **Run 1 partially executed** — section A done,
 B–H blocked on a usable login (see [DECISIONS.md#d13](DECISIONS.md))
 
+## Category release acceptance — 2026-09-27
+
+Source and unit verification are recorded in [Trade Categories](../api/trade-categories.md).
+These are pending real authenticated checks, not inferred passes:
+
+- [ ] Arabic RTL and English LTR, both themes, reduced motion, touch, 200% zoom and 400% reflow.
+- [ ] Create roots/children, metadata translations, move, reorder, status with reason, and eligible deletion.
+- [ ] Two-session stale row/tree tokens: retained draft, current-value review, new intent only after review.
+- [ ] Lost write acknowledgement: original key/body recovery; saved receipt plus failed refresh retries GET only.
+- [ ] Reader/steward/company/branch scopes and independent read/write grants; no inferred management authority.
+- [ ] Item create unresolved/none/selected, unchanged edit with failed options, inactive retained assignment, explicit clear.
+- [ ] Tree arrows/Home/End/Enter/typeahead and stable focus in NVDA/Chrome and VoiceOver/Safari; no virtualization enabled.
+- [ ] First/middle/last sibling pages, source moved during reveal, collapsed late response, and the 2000-node cap.
+- [ ] Current installed Gateway/Trade schema and permissions, validated Category FK, and approved retained-data reconciliation.
+
+Browser attempt on 2026-09-27 opened the local Category route on port 5002 but
+remained at session verification. It does not establish authenticated CRUD or
+visual/accessibility acceptance.
+
 > **The token layer moved on 2026-09-01.** The design system was replaced with
 > the admin portal's, and the density default went from compact (`--ui-scale`
 > 0.9) to standard (1). The **steps above the "Recording results" heading have
-> been updated** to the sizes that now ship — two 45px full-width nav bars
+> been updated** to the sizes that now ship — two 35px full-width nav bars
 > (2026-09-06, replacing the 48px topbar / 240px sidebar / 52px rail), 44px
 > rows, 32px buttons, 36px fields, IBM Plex rather than Readex Pro.
 >
@@ -63,7 +82,7 @@ session, or accepting the invite from the email. See
 | B1 | Global nav | Only permitted sections. A section with one permitted screen is a **link**, not a menu. The active section's trigger carries a 2px bottom bar + weight 500, **never a filled pill** |
 | B2 | `Ctrl/Cmd+B` | Collapses to the 52px rail; tooltips appear on the correct side per direction |
 | B3 | Reload while collapsed | Still collapsed, **no flash** — the state is read server-side from a cookie |
-| B4 | The two bars | 45px each at `--ui-scale` 1, 90px together. Brand zone 250px. Content column is the **full viewport width** |
+| B4 | The two bars | 35px each at `--ui-scale` 1, 70px together. Brand zone 250px. Content column is the **full viewport width** |
 | B5 | Below `xl` | The section menus disappear and the menu trigger opens a Sheet from the reading-start edge, listing every section with its full heading |
 | B6 | Notifications | Unread count announced to a screen reader (audit B13) |
 | B7 | `Tab` from the top | A skip link is the first focusable element (audit B6) |

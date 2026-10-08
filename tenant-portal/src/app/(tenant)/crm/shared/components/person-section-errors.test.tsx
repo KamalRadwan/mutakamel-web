@@ -39,7 +39,7 @@ const handlers = {
 
 describe("the person section of the lead modal", () => {
   it("shows the errors the validator files against the two name parts", () => {
-    render(
+    const { container } = render(
       <I18nProvider>
         <LeadPersonSection
           form={{ ...emptyCreateLeadForm("contact-1"), leadProfileType: "INDIVIDUAL" }}
@@ -47,6 +47,10 @@ describe("the person section of the lead modal", () => {
           {...handlers}
         />
       </I18nProvider>,
+    );
+    expect(screen.getByRole("heading", { name: "Contact" })).toBeTruthy();
+    expect(container.querySelector('[data-form-section="person"] .grid')?.className).toContain(
+      "@min-[52rem]:grid-cols-",
     );
     expect(screen.getByText("Required.")).toBeTruthy();
     expect(screen.getByText("At most 80 characters.")).toBeTruthy();

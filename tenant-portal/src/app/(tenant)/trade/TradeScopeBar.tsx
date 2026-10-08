@@ -20,12 +20,13 @@ const CLEAR_VALUE = "__all__";
  * same choice `TenantBranchSelect` already makes across CRM. Channels carry a
  * real name, because `GET /channels` returns one.
  *
+ * Item screens also offer the tenant master, which has no company header.
  * Branch and channel are clearable: most Trade reads are `OPERATING_CONTEXT`
  * or `COMPANY_OR_BRANCH`, where dropping the branch widens the scope to the
  * company rather than failing, and a channel is never required by any route on
  * the foundation pages.
  */
-export function TradeScopeBar() {
+export function TradeScopeBar({ allowItemMaster = false }: { allowItemMaster?: boolean }) {
   const { t } = useI18n();
   const {
     context,
@@ -40,11 +41,20 @@ export function TradeScopeBar() {
 
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.trade.scopeTitle}>
-      <Select value={context.companyId ?? undefined} onValueChange={selectCompany}>
-        <SelectTrigger size="sm" dir="ltr" aria-label={t.trade.scopeCompany} className="w-56 font-mono">
+      <Select
+        value={context.companyId ?? (allowItemMaster ? CLEAR_VALUE : "")}
+        onValueChange={(next) => selectCompany(next === CLEAR_VALUE ? null : next)}
+      >
+        <SelectTrigger
+          size="sm"
+          dir={context.companyId ? "ltr" : undefined}
+          aria-label={t.trade.scopeCompany}
+          className={context.companyId ? "w-56 font-mono" : "w-56"}
+        >
           <SelectValue placeholder={t.trade.scopeSelectCompany} />
         </SelectTrigger>
         <SelectContent>
+          {allowItemMaster && <SelectItem value={CLEAR_VALUE}>{t.trade.scopeItemMaster}</SelectItem>}
           {companyIds.map((id) => (
             <SelectItem key={id} value={id}>
               {id}
@@ -56,7 +66,7 @@ export function TradeScopeBar() {
       <Select
         value={context.branchId ?? CLEAR_VALUE}
         onValueChange={(next) => selectBranch(next === CLEAR_VALUE ? null : next)}
-        disabled={branchIds.length === 0}
+        disabled={!context.companyId || branchIds.length === 0}
       >
         <SelectTrigger size="sm" dir="ltr" aria-label={t.trade.scopeBranch} className="w-56 font-mono">
           <SelectValue placeholder={t.trade.scopeAllBranches} />
@@ -74,7 +84,7 @@ export function TradeScopeBar() {
       <Select
         value={context.channelId ?? CLEAR_VALUE}
         onValueChange={(next) => selectChannel(next === CLEAR_VALUE ? null : next)}
-        disabled={isLoadingChannels || channels.length === 0}
+        disabled={!context.companyId || isLoadingChannels || channels.length === 0}
       >
         <SelectTrigger size="sm" aria-label={t.trade.scopeChannel} className="w-56">
           <SelectValue placeholder={t.trade.scopeNoChannel} />

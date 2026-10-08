@@ -28,6 +28,12 @@ import type {
 
 type ResourceError = string | null;
 const PENDING_CREATE_STORAGE_KEY = "admin.catalogue.pending-create";
+// Editors synchronize local drafts from these arrays. Empty projections must
+// stay stable while requests are pending or fail, or their effects render-loop.
+const EMPTY_TIERS: TierView[] = [];
+const EMPTY_FEATURES: FeatureView[] = [];
+const EMPTY_GRANTS: TierFeatureGrantView[] = [];
+const EMPTY_PRICES: PriceTierView[] = [];
 
 export function useApplicationCatalogue(applicationId: string | null) {
   const toast = useToast();
@@ -451,12 +457,12 @@ export function useApplicationCatalogue(applicationId: string | null) {
 
   const isCurrentApplication = loadedApplicationId === applicationId;
   const isCurrentTier = isCurrentApplication && loadedTierId === selectedTierId;
-  const visiblePrices = isCurrentTier ? prices : [];
+  const visiblePrices = isCurrentTier ? prices : EMPTY_PRICES;
 
   return {
-    tiers: isCurrentApplication ? tiers : [],
-    features: isCurrentApplication ? features : [],
-    grants: isCurrentTier ? grants : [],
+    tiers: isCurrentApplication ? tiers : EMPTY_TIERS,
+    features: isCurrentApplication ? features : EMPTY_FEATURES,
+    grants: isCurrentTier ? grants : EMPTY_GRANTS,
     prices: visiblePrices,
     audit: isCurrentApplication ? audit : null,
     loadedApplicationId,

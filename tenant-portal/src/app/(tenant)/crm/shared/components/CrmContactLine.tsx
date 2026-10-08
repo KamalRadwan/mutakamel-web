@@ -82,6 +82,26 @@ export interface CrmContactLineProps {
   onPhoneAdd?: () => void;
   onPhoneRemove?: (index: number) => void;
   onBlur: (path: string) => void;
+  /** When true, renders visible labels above the controls. */
+  showLabels?: boolean;
+  /** Mark lastName as required (shows red asterisk on label). */
+  lastNameRequired?: boolean;
+  /** Mark phone as required (shows red asterisk on label). */
+  phoneRequired?: boolean;
+  /**
+   * Layout mode:
+   * - "single-row": The default responsive line layout.
+   * - "two-row": Two comfortable rows (Row 1: Title, First Name, Last Name; Row 2: Phone, Email) with more height.
+   */
+  layout?: "single-row" | "two-row";
+  /** Optional overrides for field labels */
+  fieldLabels?: {
+    honorificTitle?: string;
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    email?: string;
+  };
 }
 
 /**
@@ -112,6 +132,11 @@ export function CrmContactLine({
   onPhoneAdd,
   onPhoneRemove,
   onBlur,
+  showLabels = false,
+  lastNameRequired = false,
+  phoneRequired = false,
+  layout = "single-row",
+  fieldLabels,
 }: CrmContactLineProps) {
   const { t, lang } = useI18n();
   const honorifics = getHonorificOptions(lang);
@@ -130,6 +155,203 @@ export function CrmContactLine({
     const [first] = honorifics;
     if (first) queueMicrotask(() => onFieldChange({ honorificTitle: first.label }));
   }, [contact.honorificTitle, directoryOwned, honorifics, onFieldChange]);
+
+  if (layout === "two-row") {
+    return (
+      <div className="@container flex flex-col gap-4">
+        {/* Row 1: Title (honorific), First name, Last name, (Job title if shown) */}
+        <div className="grid grid-cols-1 gap-4 @min-[32rem]:grid-cols-12">
+          {!directoryOwned && (
+            <div className="@min-[32rem]:col-span-3 @min-[48rem]:col-span-2">
+              <Field
+                label={fieldLabels?.honorificTitle ?? t.crmLeads.create.honorificTitle}
+                error={errors[`${path}.honorificTitle`]}
+                showLabel={showLabels}
+              >
+                <Select
+                  value={honorific?.key ?? ""}
+                  disabled={disabled}
+                  onValueChange={(key) =>
+                    onFieldChange({
+                      honorificTitle: honorifics.find((option) => option.key === key)?.label ?? "",
+                    })
+                  }
+                >
+                  <SelectTrigger size="sm">
+                    <SelectValue placeholder={fieldLabels?.honorificTitle ?? t.crmLeads.create.honorificTitle} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {honorifics.map((option) => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+          )}
+
+          <div
+            className={cn(
+              directoryOwned
+                ? "@min-[32rem]:col-span-12"
+                : showJobTitle
+                  ? "@min-[32rem]:col-span-9 @min-[48rem]:col-span-10 grid grid-cols-1 gap-4 @min-[32rem]:grid-cols-3"
+                  : "@min-[32rem]:col-span-9 @min-[48rem]:col-span-10 grid grid-cols-1 gap-4 @min-[32rem]:grid-cols-2",
+            )}
+          >
+            {directoryOwned ? (
+              <Field label={directoryNameLabel} readOnly hint={identityHint} showLabel={showLabels}>
+                <Input size="sm" placeholder={directoryNameLabel} value={contact.fullName} disabled />
+              </Field>
+            ) : (
+              <>
+                <Field
+                  label={fieldLabels?.firstName ?? t.crmLeads.create.firstName}
+                  error={errors[`${path}.firstName`]}
+                  required
+                  hint={identityHint}
+                  showLabel={showLabels}
+                >
+                  <Input
+                    size="sm"
+                    placeholder={fieldLabels?.firstName ?? t.crmLeads.create.firstName}
+                    value={contact.firstName}
+                    maxLength={limits.name}
+                    disabled={disabled}
+                    onChange={(event) => onFieldChange({ firstName: event.target.value })}
+                    onBlur={() => onBlur(`${path}.firstName`)}
+                  />
+                </Field>
+                <Field
+                  label={fieldLabels?.lastName ?? t.crmLeads.create.lastName}
+                  error={errors[`${path}.lastName`]}
+                  required={lastNameRequired}
+                  showLabel={showLabels}
+                >
+                  <Input
+                    size="sm"
+                    placeholder={fieldLabels?.lastName ?? t.crmLeads.create.lastName}
+                    value={contact.lastName}
+                    maxLength={limits.name}
+                    disabled={disabled}
+                    onChange={(event) => onFieldChange({ lastName: event.target.value })}
+                    onBlur={() => onBlur(`${path}.lastName`)}
+                  />
+                </Field>
+              </>
+            )}
+
+            {showJobTitle && (
+              <Field
+                label={t.crmLeads.create.contactJobTitle}
+                error={errors[`${path}.jobTitle`]}
+                showLabel={showLabels}
+              >
+                <CrmJobTitleField
+                  value={contact.jobTitle}
+                  disabled={disabled}
+                  onChange={(next) => onFieldChange({ jobTitle: next })}
+                  onBlur={() => onBlur(`${path}.jobTitle`)}
+                />
+              </Field>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: Phone number, Email address */}
+        <div className="grid grid-cols-1 gap-4 @min-[36rem]:grid-cols-2">
+          {!directoryOwned && (
+            <Field
+              label={fieldLabels?.phone ?? t.crmLeads.phone}
+              error={errors[`${path}.phones.0`]}
+              required={phoneRequired}
+              showLabel={showLabels}
+            >
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1">
+                  <CrmPhoneNumberInput
+                    value={contact.phones[0] ?? ""}
+                    maxLength={CRM_PHONE_MAX_LENGTH}
+                    label={fieldLabels?.phone ?? t.crmLeads.phone}
+                    placeholder={t.crmShared.enterPhoneNumber ?? t.crmShared.phoneNumber}
+                    disabled={disabled}
+                    onChange={(next) => onPhoneChange(0, next)}
+                    onBlur={() => onBlur(`${path}.phones.0`)}
+                  />
+                  {onPhoneAdd && contact.phones.length < CRM_PHONE_LIST_MAX && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={disabled}
+                      aria-label={t.crmShared.addPhone}
+                      data-icon-button
+                      onClick={onPhoneAdd}
+                      className="size-6 shrink-0 rounded-full bg-positive-600 p-0 text-white not-disabled:hover:bg-positive-700"
+                    >
+                      <Plus className="size-3.5" aria-hidden="true" />
+                    </Button>
+                  )}
+                </div>
+
+                {extraPhones.map((phone, offset) => {
+                  const index = offset + 1;
+                  const rowPath = `${path}.phones.${index}`;
+                  return (
+                    <div key={rowPath} className="flex items-center gap-1">
+                      <CrmPhoneNumberInput
+                        value={phone}
+                        maxLength={CRM_PHONE_MAX_LENGTH}
+                        label={formatTemplate(t.crmShared.phoneNumbered, { number: index + 1 })}
+                        placeholder={t.crmShared.enterPhoneNumber ?? t.crmShared.phoneNumber}
+                        disabled={disabled}
+                        onChange={(next) => onPhoneChange(index, next)}
+                        onBlur={() => onBlur(rowPath)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        aria-label={formatTemplate(t.crmShared.removePhone, { number: index + 1 })}
+                        data-icon-button
+                        onClick={() => onPhoneRemove?.(index)}
+                        className="size-6 shrink-0 rounded-full p-0"
+                      >
+                        <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
+
+          {!directoryOwned && (
+            <Field
+              label={fieldLabels?.email ?? t.crmLeads.email}
+              error={errors[`${path}.email`]}
+              showLabel={showLabels}
+            >
+              <Input
+                size="sm"
+                placeholder={fieldLabels?.email ?? t.crmLeads.email}
+                type="email"
+                dir="ltr"
+                value={contact.email}
+                maxLength={limits.email}
+                disabled={disabled}
+                onChange={(event) => onFieldChange({ email: event.target.value })}
+                onBlur={() => onBlur(`${path}.email`)}
+              />
+            </Field>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     // A container, so the line answers to the width IT has rather than to the
@@ -152,11 +374,15 @@ export function CrmContactLine({
           // Written out rather than composed: Tailwind reads these as text.
           showJobTitle
             ? "@min-[64rem]:grid-cols-[4.5rem_minmax(0,11rem)_minmax(0,11rem)_minmax(0,9.5rem)_minmax(16.5rem,1fr)_minmax(0,13rem)]"
-            : "@min-[52rem]:grid-cols-[4.5rem_minmax(0,11.5rem)_minmax(0,11.5rem)_minmax(16.5rem,1fr)_minmax(0,13.5rem)]",
+            : "@min-[52rem]:grid-cols-[minmax(5rem,5.5rem)_minmax(0,1fr)_minmax(0,1fr)_minmax(16rem,1.3fr)_minmax(0,1.2fr)]",
         )}
       >
         {!directoryOwned && (
-          <Field label={t.crmLeads.create.honorificTitle} error={errors[`${path}.honorificTitle`]}>
+          <Field
+            label={fieldLabels?.honorificTitle ?? t.crmLeads.create.honorificTitle}
+            error={errors[`${path}.honorificTitle`]}
+            showLabel={showLabels}
+          >
             <Select
               value={honorific?.key ?? ""}
               disabled={disabled}
@@ -169,7 +395,7 @@ export function CrmContactLine({
               }
             >
               <SelectTrigger size="sm">
-                <SelectValue placeholder={t.crmLeads.create.honorificTitle} />
+                <SelectValue placeholder={fieldLabels?.honorificTitle ?? t.crmLeads.create.honorificTitle} />
               </SelectTrigger>
               <SelectContent>
                 {honorifics.map((option) => (
@@ -186,18 +412,19 @@ export function CrmContactLine({
             directory holds. A new one is typed as two parts, which is what the
             record actually stores — the rendered name is CRM's to compose. */}
         {directoryOwned ? (
-          <Field label={directoryNameLabel} readOnly hint={identityHint}>
+          <Field label={directoryNameLabel} readOnly hint={identityHint} showLabel={showLabels}>
             <Input size="sm" placeholder={directoryNameLabel} value={contact.fullName} disabled />
           </Field>
         ) : (
           <>
             <Field
-              label={t.crmLeads.create.firstName}
+              label={fieldLabels?.firstName ?? t.crmLeads.create.firstName}
               error={errors[`${path}.firstName`]}
               required
               hint={identityHint}
+              showLabel={showLabels}
             >
-              <Input size="sm" placeholder={t.crmLeads.create.firstName}
+              <Input size="sm" placeholder={fieldLabels?.firstName ?? t.crmLeads.create.firstName}
                 value={contact.firstName}
                 maxLength={limits.name}
                 disabled={disabled}
@@ -205,8 +432,13 @@ export function CrmContactLine({
                 onBlur={() => onBlur(`${path}.firstName`)}
               />
             </Field>
-            <Field label={t.crmLeads.create.lastName} error={errors[`${path}.lastName`]}>
-              <Input size="sm" placeholder={t.crmLeads.create.lastName}
+            <Field
+              label={fieldLabels?.lastName ?? t.crmLeads.create.lastName}
+              error={errors[`${path}.lastName`]}
+              required={lastNameRequired}
+              showLabel={showLabels}
+            >
+              <Input size="sm" placeholder={fieldLabels?.lastName ?? t.crmLeads.create.lastName}
                 value={contact.lastName}
                 maxLength={limits.name}
                 disabled={disabled}
@@ -218,24 +450,34 @@ export function CrmContactLine({
         )}
 
         {showJobTitle && (
-        <Field label={t.crmLeads.create.contactJobTitle} error={errors[`${path}.jobTitle`]}>
-          <CrmJobTitleField
-            value={contact.jobTitle}
-            disabled={disabled}
-            onChange={(next) => onFieldChange({ jobTitle: next })}
-            onBlur={() => onBlur(`${path}.jobTitle`)}
-          />
-        </Field>
+          <Field
+            label={t.crmLeads.create.contactJobTitle}
+            error={errors[`${path}.jobTitle`]}
+            showLabel={showLabels}
+          >
+            <CrmJobTitleField
+              value={contact.jobTitle}
+              disabled={disabled}
+              onChange={(next) => onFieldChange({ jobTitle: next })}
+              onBlur={() => onBlur(`${path}.jobTitle`)}
+            />
+          </Field>
         )}
 
         {!directoryOwned && (
-          <Field label={t.crmLeads.phone} error={errors[`${path}.phones.0`]}>
+          <Field
+            label={fieldLabels?.phone ?? t.crmLeads.phone}
+            error={errors[`${path}.phones.0`]}
+            required={phoneRequired}
+            showLabel={showLabels}
+          >
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-1">
                 <CrmPhoneNumberInput
                   value={contact.phones[0] ?? ""}
                   maxLength={CRM_PHONE_MAX_LENGTH}
-                  label={t.crmLeads.phone}
+                  label={fieldLabels?.phone ?? t.crmLeads.phone}
+                  placeholder={t.crmShared.enterPhoneNumber ?? t.crmShared.phoneNumber}
                   disabled={disabled}
                   onChange={(next) => onPhoneChange(0, next)}
                   onBlur={() => onBlur(`${path}.phones.0`)}
@@ -272,6 +514,7 @@ export function CrmContactLine({
                       value={phone}
                       maxLength={CRM_PHONE_MAX_LENGTH}
                       label={formatTemplate(t.crmShared.phoneNumbered, { number: index + 1 })}
+                      placeholder={t.crmShared.enterPhoneNumber ?? t.crmShared.phoneNumber}
                       disabled={disabled}
                       onChange={(next) => onPhoneChange(index, next)}
                       onBlur={() => onBlur(rowPath)}
@@ -296,8 +539,12 @@ export function CrmContactLine({
         )}
 
         {!directoryOwned && (
-          <Field label={t.crmLeads.email} error={errors[`${path}.email`]}>
-            <Input size="sm" placeholder={t.crmLeads.email}
+          <Field
+            label={fieldLabels?.email ?? t.crmLeads.email}
+            error={errors[`${path}.email`]}
+            showLabel={showLabels}
+          >
+            <Input size="sm" placeholder={fieldLabels?.email ?? t.crmLeads.email}
               type="email"
               dir="ltr"
               value={contact.email}

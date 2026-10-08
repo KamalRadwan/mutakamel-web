@@ -234,6 +234,11 @@ export function activityLabel(copy: ActivityCopy, group: ActivityLabelGroup, val
   return wireLabel(copy[group], value, copy.unknownValue, `activities.${group}`);
 }
 
+/** The create heading names its fixed or newly selected record without spending a second header line. */
+export function activityCreateModalTitle(title: string, recordName?: string | null): string {
+  return [title, recordName].filter(Boolean).join(" · ");
+}
+
 /**
  * A failed activity request, as one translated sentence for an in-body slot.
  *

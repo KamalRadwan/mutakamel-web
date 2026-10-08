@@ -1,6 +1,6 @@
 "use client";
 
-import { FormSection } from "@/design-system";
+import { User } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { LEAD_CREATE_LIMITS, type CreateLeadForm } from "../../lead-create-contract";
 import type { LeadCreateErrors } from "../../lead-create-validation";
@@ -53,12 +53,25 @@ export function LeadPersonSection({
   };
 
   return (
-    <FormSection id="person" title={t.crmLeads.create.sections.person} columns={1}>
-      {/* The same line a contact gets, minus the job title: a lead who IS a
-          person has none. One template, so an individual lead and a corporate
-          lead's contact do not look like two different products. */}
+    <section
+      data-form-section="person"
+      aria-labelledby="lead-person-heading"
+      className="scroll-mt-4 rounded-lg border border-border bg-card p-3"
+    >
+      <div className="mb-3 flex items-center gap-2 text-foreground">
+        <User className="size-4 text-muted-foreground" aria-hidden="true" />
+        <h4
+          id="lead-person-heading"
+          tabIndex={-1}
+          className="text-sm font-semibold text-foreground outline-none"
+        >
+          {t.crmLeads.create.personalInformationTitle}
+        </h4>
+      </div>
+
       <CrmContactLine
         path="person"
+        layout="single-row"
         contact={{
           honorificTitle: form.honorificTitle,
           fullName: "",
@@ -77,6 +90,16 @@ export function LeadPersonSection({
         }}
         directoryNameLabel={t.crmLeads.contactName}
         showJobTitle={false}
+        showLabels
+        lastNameRequired
+        phoneRequired
+        fieldLabels={{
+          honorificTitle: t.crmLeads.create.titleField,
+          firstName: t.crmLeads.create.firstName,
+          lastName: t.crmLeads.create.lastName,
+          phone: t.crmLeads.create.phoneNumber,
+          email: t.crmLeads.create.emailAddress,
+        }}
         onFieldChange={(patch) => {
           if (patch.honorificTitle !== undefined) {
             onFieldChange("honorificTitle", patch.honorificTitle);
@@ -90,7 +113,6 @@ export function LeadPersonSection({
         onPhoneRemove={onPhoneRemove}
         onBlur={onBlur}
       />
-
-    </FormSection>
+    </section>
   );
 }

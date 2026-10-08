@@ -6,7 +6,12 @@ import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import type { Activity, ActivityScope, ActivityTargetSelection, ActivityType } from "./activity-contract";
-import { activityErrorMessage, activityLabel, primaryActivityTarget } from "./activity-presentation";
+import {
+  activityCreateModalTitle,
+  activityErrorMessage,
+  activityLabel,
+  primaryActivityTarget,
+} from "./activity-presentation";
 import { ActivityAgenda } from "./ActivityAgenda";
 import { ActivityDetails } from "./ActivityDetails";
 import { ActivityForm } from "./ActivityForm";
@@ -63,13 +68,21 @@ function ActivityModalSurface(props: ActivityModalSurfaceInput) {
   const pending = commands.pendingKind;
   const ambiguous = commands.ambiguous;
   const target = current ? primaryActivityTarget(current) : null;
-  const recordName = screen === "create" ? modal.fixedTarget?.label : target?.label;
+  const recordName = screen === "create"
+    ? modal.fixedTarget?.label ?? modal.createForm.values.target?.label
+    : target?.label;
   const viewing = screen === "view" && current !== null;
 
-  const title = viewing ? current.subject : screen === "edit" ? copy.form.editTitle : copy.form.createTitle;
+  const title = viewing
+    ? current.subject
+    : screen === "edit"
+      ? copy.form.editTitle
+      : activityCreateModalTitle(copy.title, recordName);
   const description = viewing
     ? [activityLabel(copy, "types", current.type), target?.label].filter(Boolean).join(" · ")
-    : recordName ? formatTemplate(copy.form.recordDescription, { name: recordName }) : undefined;
+    : screen === "edit" && recordName
+      ? formatTemplate(copy.form.recordDescription, { name: recordName })
+      : undefined;
   const allowed = screen === "view" ? can.complete : screen === "edit" ? can.update : can.create;
   const detailError = screen !== "create" && modal.detailError ? activityErrorMessage(t, modal.detailError) : null;
   // "gone" needs no notice of its own: the detail read's error already says it.
@@ -98,6 +111,7 @@ function ActivityModalSurface(props: ActivityModalSurfaceInput) {
           if (!next) modal.requestClose();
         }}
         size="card"
+        density="compact"
         title={title}
         description={description}
         headerAside={screen !== "create" && current ? <StatusBadge kind="ActivityStatus" value={current.status} /> : undefined}

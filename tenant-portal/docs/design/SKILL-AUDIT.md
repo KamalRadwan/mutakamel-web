@@ -177,7 +177,7 @@ existing move mutation, satisfies AA.
 **Rule:** `focus-not-obscured` (WCAG 2.2 AA)
 
 We stack four sticky layers: the chrome (44px when this was written, 48px after
-the admin port, and two 45px bars since 2026-09-06), sticky table header, sticky
+the admin port, and two 35px bars since 2026-09-06), sticky table header, sticky
 inline-start first column, sticky inline-end action column. A `Tab` into a row
 action near a viewport edge can land behind one of them, with no visible focus.
 

@@ -132,13 +132,39 @@ describe("the acquisition source", () => {
   });
 });
 
+describe("the stage picker", () => {
+  const newStage = {
+    id: "01900100-0000-7000-8000-0000000000d1",
+    nameAr: "جديد",
+    nameEn: "New",
+    flag: "NEW" as const,
+  };
+
+  it("shows the tenant default when no stage is seeded, without duplicating New", () => {
+    renderSection({ stages: [newStage] });
+
+    const trigger = screen.getByRole("combobox", { name: en.crmLeads.stage });
+    expect(trigger).toHaveTextContent(en.crmLeads.defaultStage);
+    expect(trigger).not.toHaveTextContent(newStage.nameEn);
+
+    fireEvent.click(trigger);
+    expect(screen.getAllByText(newStage.nameEn)).toHaveLength(1);
+  });
+
+  it("keeps an explicitly seeded board-column stage selected", () => {
+    renderSection({ stages: [newStage], stageId: newStage.id });
+    expect(screen.getByRole("combobox", { name: en.crmLeads.stage })).toHaveTextContent(
+      newStage.nameEn,
+    );
+  });
+});
+
 describe("the tag picker", () => {
   it("renders the design-system multi-select when admission allows tag reads", () => {
     renderSection({ showTags: true });
     expect(
       screen.getByRole("button", { name: en.crmLeads.create.tags }),
     ).toBeEnabled();
-    expect(screen.getByText("Up to 50 tags (0 selected).")).toBeVisible();
   });
 
   it("keeps a selected tag removable when the catalogue degrades", () => {

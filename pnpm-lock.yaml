@@ -272,8 +272,8 @@ importers:
         specifier: ^18.0.1
         version: 18.0.1(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@mutakamel/core-app-contracts':
-        specifier: 0.0.23
-        version: 0.0.23(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+        specifier: 0.0.36
+        version: 0.0.36(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@mutakamel/identifiers':
         specifier: workspace:*
         version: link:../packages/identifiers
@@ -888,8 +888,8 @@ packages:
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
     engines: {node: '>=8'}
 
-  '@mutakamel/common@0.1.2':
-    resolution: {integrity: sha512-VqwaCa611S+JYR/GIarWVWATSzp5Qo11KP6xOqI5pY0AYylEeBfAWQS9sFbwBJVgKsYWa+Q1NUlF+0+UYRSgsQ==, tarball: https://npm.pkg.github.com/download/@mutakamel/common/0.1.2/151d150c30637ff69342188ef2f562d01245d1b8}
+  '@mutakamel/common@0.1.3':
+    resolution: {integrity: sha512-oiqFUC9yjzCtAs8t6RgiwpifVf8BWDd4FVxQlcA6STA4i5mp/ZMV0g4OMQQglXupwoLDsWZ64bgw8KzUcjcNeQ==, tarball: https://npm.pkg.github.com/download/@mutakamel/common/0.1.3/584b5806d327ac6151dee184d0cc475f28c0a77e}
     peerDependencies:
       '@nestjs/common': ^11.0.0
       class-transformer: ^0.5.1
@@ -897,11 +897,11 @@ packages:
       reflect-metadata: ^0.1.14 || ^0.2.0
       rxjs: ^7.8.0
 
-  '@mutakamel/core-app-common@0.0.2':
-    resolution: {integrity: sha512-P0curjT7ALQOWHWeWxPPYuSDNxgUYJ2UnECOY7PjkYa5PW8Jgv/5HJDDcLGyCV+htD4otrQ+CtHVOMga1KJPzQ==, tarball: https://npm.pkg.github.com/download/@mutakamel/core-app-common/0.0.2/4dde6a138f444da558b4c73832dc2cc0ffccceec}
+  '@mutakamel/core-app-common@0.0.3':
+    resolution: {integrity: sha512-t7PjAJDCFq1wifQEhULyvbns1UyG0Rlc3dpjAngC+ACNwZlIQgDAeefovYoUciXJIj8OHkU0UWHOM73WLRWVog==, tarball: https://npm.pkg.github.com/download/@mutakamel/core-app-common/0.0.3/4478b664b02921c5447c62e6ed581b1a092806cf}
 
-  '@mutakamel/core-app-contracts@0.0.23':
-    resolution: {integrity: sha512-AcCZHQusumtoCjlYUuN/M4qqVdgxV4wsuWRxyeNt3blsNudtoMnkclQOPxYUkQbLhzUq3QyTvd0hm5sSclL7YQ==, tarball: https://npm.pkg.github.com/download/@mutakamel/core-app-contracts/0.0.23/c2ccbce3c46611460923268f93220fafcd7e7471}
+  '@mutakamel/core-app-contracts@0.0.36':
+    resolution: {integrity: sha512-0etZ0X9UhQQGP/HGBnIfelkG40thASAfnbEFuhB4eNju7aU3HzhalZiu/eI+uKEzoS00fSXSwcFXucMiiMj5+A==, tarball: https://npm.pkg.github.com/download/@mutakamel/core-app-contracts/0.0.36/67fb3538fb0ccddb2df9e75b65e0d4449e9304e1}
 
   '@mutakamel/realtime-app-client@0.0.2':
     resolution: {integrity: sha512-+fJuvUu+w5pqgKJpkPG6j5O1Hu3K3KNUec3GNnJYS7nP7SEzJX9BOX7k0tlZtbrCC5tcGMZRg1VjP0jPAWsWTA==, tarball: https://npm.pkg.github.com/download/@mutakamel/realtime-app-client/0.0.2/f483b0ff5bd104e354b472c8a138388d42f20888}
@@ -4769,7 +4769,7 @@ snapshots:
 
   '@lukeed/csprng@1.1.0': {}
 
-  '@mutakamel/common@0.1.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@mutakamel/common@0.1.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
       '@nestjs/common': 11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
       class-transformer: 0.5.1
@@ -4778,14 +4778,14 @@ snapshots:
       rxjs: 7.8.2
       tslib: 2.8.1
 
-  '@mutakamel/core-app-common@0.0.2':
+  '@mutakamel/core-app-common@0.0.3':
     dependencies:
       tslib: 2.8.1
 
-  '@mutakamel/core-app-contracts@0.0.23(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
+  '@mutakamel/core-app-contracts@0.0.36(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
-      '@mutakamel/common': 0.1.2(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@mutakamel/core-app-common': 0.0.2
+      '@mutakamel/common': 0.1.3(@nestjs/common@11.2.3(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@mutakamel/core-app-common': 0.0.3
       '@mutakamel/template-schema': 0.0.2
       tslib: 2.8.1
     transitivePeerDependencies:

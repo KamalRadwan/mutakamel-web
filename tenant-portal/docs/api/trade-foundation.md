@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-09-27** (Items scope and search rechecked)
 
 Owning app: **trade-app**
 
@@ -13,17 +13,17 @@ Canonical prefixes: `/api/tenant/trade/v1/items`, `.../uoms`,
 Upstream: `/api/v1/trade/*` (global prefix `api`, URI versioning, default `1` —
 `trade-app/src/main.ts`)
 
-Portal status: **built** — MASTER-PLAN Phase 10 landed on 2026-08-31. All 42
+Portal status: **built** — MASTER-PLAN Phase 10 landed on 2026-08-31. All 45
 routes are called from `src/app/(tenant)/trade/{items,uoms,channels,commercial-accounts,configuration}`.
 What building them turned up is in
 [Corrections and additions from building Phase 10](#corrections-and-additions-from-building-phase-10--2026-08-31).
 
-**42 routes.** Items 12 · UOM master 4 · UOM catalogue 1 · Channels 6 ·
+**45 routes.** Items 15 · UOM master 4 · UOM catalogue 1 · Channels 6 ·
 Commercial accounts 10 · Configuration 9.
 
-Together with [trade-documents.md](trade-documents.md) (60) and
-[trade-advanced.md](trade-advanced.md) (129) this accounts for all
-**231** Trade routes exactly once. 42 + 60 + 129 = 231.
+Use the generated [trade-reference.md](trade-reference.md) as the canonical
+cross-family route total; this hand-maintained page owns only the 45 foundation
+routes above.
 
 Source inspected:
 `trade-app/src/main.ts`,
@@ -418,24 +418,54 @@ cannot be satisfied on any Trade screen. Recorded as
 
 ---
 
-## Items — 12 routes
+## Items — 15 routes
+
+### Portal scope and empty-state recovery
+
+The Items list and detail scope selectors offer **Item master (all items)**.
+This clears company, branch and channel and sends no operating-context headers;
+the backend evaluates authorization for the resulting tenant-scoped read. The explicit
+choice is retained after reload, including when only one company is accessible.
+Other Trade pages retain their company selection requirements.
+
+A company-scoped list includes only items with a company profile; a branch
+narrows it to assorted branch profiles. Creating an item writes its tenant
+identity, not those profiles. An empty scoped view therefore offers a route
+back to the item master. Successful creation returns to the unfiltered first
+page of the item master so the new identity is visible; cancellation and failed
+creation retain the selected scope. An empty unfiltered master says **No items yet** and
+offers creation only with catalog-master management permission. A filtered
+empty view offers to clear search and filters. Scope changes reset pagination.
+
+Browsing uses `GET /items`; a nonempty query uses `POST /items/search` with
+server-side free-text matching across localized names, canonical code and
+barcode. Document pickers use `GET /items?purpose=SALES|PURCHASE&search=...`
+so capability and active-state admission happen before an item is selectable.
+
+Read-only investigation on 2026-09-27 confirmed the reported Mersany company
+had an actually empty tenant catalog: zero live items, company/branch profiles
+and channels. The screenshot did not demonstrate hidden existing rows. No
+catalog data or backend query semantics were changed for the UI repair.
 
 | Method | Canonical path | Permission | Scope target | Body / query |
 | --- | --- | --- | --- | --- |
 | GET | `/api/tenant/trade/v1/items` | `trade.items.read` | `OPERATING_CONTEXT` | `CatalogListQueryDto` |
 | POST | `/api/tenant/trade/v1/items/search` | `trade.items.read` | `OPERATING_CONTEXT` | `CatalogSearchDto` — **200**, not 201 |
+| GET | `/api/tenant/trade/v1/items/reference-data` | `trade.items.read` | `OPERATING_CONTEXT` | `ItemReferenceDataQueryDto` |
 | GET | `/api/tenant/trade/v1/items/:id` | `trade.items.read` | `OPERATING_CONTEXT` | — |
 | POST | `/api/tenant/trade/v1/items` | `trade.catalog_master.manage` | `TENANT` | `CreateItemDto` |
 | PATCH | `/api/tenant/trade/v1/items/:id` | `trade.catalog_master.manage` | `TENANT` | `UpdateItemDto` · `If-Match` |
 | POST | `/api/tenant/trade/v1/items/:id/company-profile` | `trade.items.manage` | `COMPANY` | `UpsertItemCompanyProfileDto` |
 | PATCH | `/api/tenant/trade/v1/items/:id/company-profile` | `trade.items.manage` | `COMPANY` | `UpsertItemCompanyProfileDto` · `If-Match` |
+| GET | `/api/tenant/trade/v1/items/:id/standard-cost` | `trade.pricing.view_cost` | `COMPANY` | separately protected cost projection |
+| PATCH | `/api/tenant/trade/v1/items/:id/standard-cost` | `trade.pricing.manage` | `COMPANY` | `UpdateItemStandardCostDto` · `If-Match` |
 | POST | `/api/tenant/trade/v1/items/:id/branch-profile` | `trade.items.manage` | `BRANCH` | `UpsertItemBranchProfileDto` |
 | PATCH | `/api/tenant/trade/v1/items/:id/branch-profile` | `trade.items.manage` | `BRANCH` | `UpsertItemBranchProfileDto` · `If-Match` |
 | GET | `/api/tenant/trade/v1/items/:id/channel-listings` | `trade.items.read` | `COMPANY_OR_BRANCH` | `ItemChannelListingListQueryDto` |
 | POST | `/api/tenant/trade/v1/items/:id/channel-listings` | `trade.items.manage` | `COMPANY_OR_BRANCH` | `ItemChannelListingDto` |
 | PATCH | `/api/tenant/trade/v1/items/:id/channel-listings/:channelId` | `trade.items.manage` | `COMPANY_OR_BRANCH` | `UpdateItemChannelListingDto` · `If-Match` |
 
-All twelve are gated on the **`trade.catalog`** feature. Every mutating route
+All fifteen are gated on the **`trade.catalog`** feature. Every mutating route
 requires `x-idempotency-key`.
 
 > **Three permissions and three scopes on one screen.** Creating the item is
@@ -448,15 +478,17 @@ requires `x-idempotency-key`.
 
 | DTO | Fields |
 | --- | --- |
-| `CreateItemDto` | `canonicalCode` (1–80), `itemKind`, `localizedNames` (object, required), `baseUomId`, `categoryId?`, `variantIdentity?` (object) |
-| `UpdateItemDto` | `localizedNames?`, `categoryId?` (nullable), `variantIdentity?` (nullable), `status?` |
-| `UpsertItemCompanyProfileDto` | `canSell`, `canPurchase`, `trackInventory`, `trackingMode` — **all four required booleans/enum**; `taxClassificationKey?`, `defaultSalesUomId?`, `defaultPurchaseUomId?`, `accountingMappingKey?`, `capabilitySet?` (array ≤ 64, **defaults to `[]`**) |
+| `CreateItemDto` | Core identity plus `barcode?`, `notes?`, `ownerUserId?`, `weightKg?`, `volumeM3?`, four document descriptions, `comboComponents?` and `optionalProducts?` |
+| `UpdateItemDto` | Mutable identity fields, descriptions and full replacement relation sets; code, kind and base UOM remain immutable |
+| `UpsertItemCompanyProfileDto` | `canSell`, `canPurchase`, `canPos`, inventory settings, default UOMs, `salesPrice`, `currencyCode`, `salesTaxId`, `purchaseTaxId`, mapping and capability data |
+| `UpdateItemStandardCostDto` | `standardCost` (nullable `numeric(24,8)` string); cost is never returned by ordinary item reads |
 | `UpsertItemBranchProfileDto` | `isAssorted` **required**; `defaultFulfillmentNodeId?`, `replenishmentPolicyKey?`, `restrictions?` (object, **defaults to `{}`**) |
 | `ItemChannelListingDto` | `channelId` **required**, `publicationStatus?` (**defaults to `"DRAFT"`**), `saleConstraints?` (**defaults to `{}`**) |
 | `UpdateItemChannelListingDto` | `publicationStatus?` (**defaults to `"DRAFT"`**), `saleConstraints?` (**defaults to `{}`**) |
-| `CatalogListQueryDto` | `page`, `limit` (≤ 100, default 25), `itemKind?`, `status?` |
+| `CatalogListQueryDto` | `page`, `limit` (≤ 100, default 25), `itemKind?`, `status?`, `purpose?`, `search?` |
+| `ItemReferenceDataQueryDto` | `search?`, `limit` (≤ 100, default 50); returns bounded owner/tax choices and company currency |
 | `ItemChannelListingListQueryDto` | `page`, `limit` (≤ 100, **default 50**) |
-| `CatalogSearchDto` | `CatalogListQueryDto` + `filters[]` — ≤ 50 entries, each `{ field, value }` where `field` is exactly `canonicalCode`, `status` or `itemKind` |
+| `CatalogSearchDto` | `CatalogListQueryDto` + `filters[]` — ≤ 50 entries; exact filters include `canonicalCode`, `barcode`, `status` and `itemKind` |
 
 Both `company-profile` and `branch-profile` bodies are **full upserts, not
 patches**, even on `PATCH`. Send the complete object; an omitted optional with
@@ -470,9 +502,15 @@ Always send both.
 
 ### Enums
 
+Category integration (source verified **2026-09-27**): Item reads include fresh
+`categorySummary` alongside nullable `categoryId`. Create requires an explicit
+frontend choice; an unchanged edit omits `categoryId`, and explicit clear sends
+null. The shared picker replaces raw UUID entry. See
+[Trade Categories](./trade-categories.md) for scope, response validation and recovery.
+
 | Enum | Values |
 | --- | --- |
-| `ItemKind` | **`PRODUCT`** · **`SERVICE`** |
+| `ItemKind` | **`PRODUCT`** · **`SERVICE`** · **`COMBO`** |
 | `ItemStatus` | **`DRAFT`** · **`ACTIVE`** · **`INACTIVE`** · **`DISCONTINUED`** |
 | `ItemTrackingMode` | **`NONE`** · **`LOT`** · **`SERIAL`** |
 
@@ -488,7 +526,7 @@ string and the portal cannot enumerate the states from source. Recorded as
 | --- | --- | --- |
 | `TRADE.CATALOG.ITEM_NOT_FOUND` | **404**, also **422** | 404 from `get`; 422 from the read projection when the item is out of the company scope |
 | `TRADE.CATALOG.CODE_TAKEN` | 409 | `canonicalCode` collides |
-| `TRADE.CATALOG.ITEM_IDENTITY_INVALID` | 422 | `variantIdentity` is malformed |
+| `TRADE.CATALOG.ITEM_IDENTITY_INVALID` | 422 | Barcode or relation identity/shape is invalid; duplicate barcode responses include `field: barcode` |
 | `TRADE.CATALOG.UOM_INVALID` | 422 | `baseUomId` / default UOM is not an active catalogue UOM |
 | `TRADE.CATALOG.CAPABILITY_INCOMPATIBLE` | 422 | `capabilitySet` conflicts with `canSell`/`canPurchase` |
 | `TRADE.CATALOG.TRACKING_LOCKED` | — | in the catalogue, **no throw site found** — see [Not verified](#not-verified) |

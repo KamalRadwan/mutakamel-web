@@ -220,8 +220,8 @@ export const BACKUP_SUBNAV: { href: string; labelKey: { en: string; ar: string }
   { href: "/backup/restores", labelKey: { en: "Restores", ar: "الاستعادات" } },
 ];
 
-/** The 8 settings SubNav items — see SettingsSidebar.tsx. */
-export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string } }[] = [
+/** Settings SubNav items — see SettingsSidebar.tsx. */
+export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string }; permission?: string }[] = [
   { href: "/settings/platform", labelKey: { en: "Platform & Branding", ar: "الهوية والهوية البصرية" } },
   { href: "/settings/auth", labelKey: { en: "Auth & Security", ar: "المصادقة والأمان" } },
   { href: "/settings/billing", labelKey: { en: "Billing & Gateways", ar: "الفواتير وبوابات الدفع" } },
@@ -232,4 +232,5 @@ export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string
   { href: "/settings/smtp", labelKey: { en: "Email (SMTP)", ar: "البريد الإلكتروني (SMTP)" } },
   { href: "/settings/fatal-alerts", labelKey: { en: "Fatal Alerts", ar: "التنبيهات الحرجة" } },
   { href: "/settings/storage", labelKey: { en: "Storage Runtime", ar: "تشغيل التخزين" } },
+  { href: "/settings/worker-events", labelKey: { en: "Worker Messages", ar: "رسائل Worker" }, permission: "admin.provisioning.publisher-keys.read" },
 ];

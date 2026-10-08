@@ -12,6 +12,9 @@ import {
   Pagination,
   PermissionGate,
   Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@/design-system";
 import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
@@ -22,13 +25,15 @@ import { tradeLocalizedName } from "../../trade-validation";
 import { useItemDetail } from "../hooks/useItemDetail";
 import { useItemListings } from "../hooks/useItemListings";
 import { useItemProfiles } from "../hooks/useItemProfiles";
-import { isItemKind, isItemStatus } from "../item-contract";
+import { isItemStatus } from "../item-contract";
 import { isTrackingMode } from "../item-profile-contract";
 import {
   BranchProfileDrawer,
   CompanyProfileDrawer,
   ListingDrawer,
 } from "./ItemProfileDrawers";
+import { ItemIdentityDetails } from "./ItemIdentityDetails";
+import { ItemStandardCostSection } from "./ItemStandardCostSection";
 
 export function ItemDetailScreen({ id }: { id: string }) {
   const { t, lang, detail, isLoading, error, isGone, reload } = useItemDetail(id);
@@ -61,7 +66,7 @@ export function ItemDetailScreen({ id }: { id: string }) {
           }
         />
 
-        <TradeScopeBar />
+        <TradeScopeBar allowItemMaster />
 
         {isLoading ? (
           <Skeleton className="h-64" />
@@ -76,44 +81,7 @@ export function ItemDetailScreen({ id }: { id: string }) {
           <ErrorState title={t.trade.itemLoadFailed} onRetry={reload} retryLabel={t.common.retry} />
         ) : (
           <>
-            <DetailSection
-              title={t.trade.itemDetailTitle}
-              description={t.trade.itemScopeNote}
-              emptyValueLabel="—"
-              fields={[
-                {
-                  label: t.trade.itemCode,
-                  value: <IdentifierText>{item.canonicalCode}</IdentifierText>,
-                },
-                {
-                  label: t.trade.itemKind,
-                  value: isItemKind(item.itemKind)
-                    ? t.trade[`itemKind_${item.itemKind}`]
-                    : item.itemKind,
-                },
-                {
-                  label: t.trade.itemBaseUom,
-                  value: <IdentifierText className="text-xs">{item.baseUomId}</IdentifierText>,
-                },
-                {
-                  label: t.trade.itemCategory,
-                  value: item.categoryId ? (
-                    <IdentifierText className="text-xs">{item.categoryId}</IdentifierText>
-                  ) : null,
-                },
-                { label: t.trade.version, value: <IdentifierText>{item.version}</IdentifierText> },
-                { label: t.trade.updatedAt, value: formatDateTime(item.updatedAt, lang) },
-                {
-                  label: t.trade.itemVariantIdentity,
-                  wide: true,
-                  value: item.variantIdentity ? (
-                    <pre dir="ltr" className="overflow-x-auto font-mono text-xs">
-                      {JSON.stringify(item.variantIdentity, null, 2)}
-                    </pre>
-                  ) : null,
-                },
-              ]}
-            />
+            <ItemIdentityDetails item={item} />
 
             <DetailSection
               title={t.trade.companyProfileTitle}
@@ -147,6 +115,10 @@ export function ItemDetailScreen({ id }: { id: string }) {
                           : t.common.inactive,
                       },
                       {
+                        label: t.trade.canPos,
+                        value: detail.companyProfile.canPos ? t.common.active : t.common.inactive,
+                      },
+                      {
                         label: t.trade.trackInventory,
                         value: detail.companyProfile.trackInventory
                           ? t.common.active
@@ -174,6 +146,20 @@ export function ItemDetailScreen({ id }: { id: string }) {
                           </IdentifierText>
                         ) : null,
                       },
+                      { label: t.trade.itemSalesPrice, value: detail.companyProfile.salesPrice },
+                      { label: t.trade.itemCurrencyCode, value: detail.companyProfile.currencyCode },
+                      {
+                        label: t.trade.itemSalesTax,
+                        value: detail.companyProfile.salesTaxId ? (
+                          <IdentifierText className="text-xs">{detail.companyProfile.salesTaxId}</IdentifierText>
+                        ) : null,
+                      },
+                      {
+                        label: t.trade.itemPurchaseTax,
+                        value: detail.companyProfile.purchaseTaxId ? (
+                          <IdentifierText className="text-xs">{detail.companyProfile.purchaseTaxId}</IdentifierText>
+                        ) : null,
+                      },
                       { label: t.trade.taxClassificationKey, value: detail.companyProfile.taxClassificationKey },
                       { label: t.trade.accountingMappingKey, value: detail.companyProfile.accountingMappingKey },
                     ]
@@ -189,12 +175,20 @@ export function ItemDetailScreen({ id }: { id: string }) {
               )}
             </DetailSection>
 
+            {detail?.companyProfile ? (
+              <ItemStandardCostSection
+                key={`standard-cost-${detail.companyProfile.version}`}
+                itemId={item.id}
+                onSaved={reload}
+              />
+            ) : null}
+
             <DetailSection
               title={t.trade.branchProfileTitle}
               description={t.trade.branchProfileDescription}
               emptyValueLabel="—"
               action={
-                profiles.canManage && !profiles.branchScopeGap ? (
+                profiles.canManage && !profiles.branchScopeGap && detail?.companyProfile ? (
                   <Button variant="outline" size="sm" onClick={profiles.openBranch}>
                     {detail?.branchProfile ? (
                       <Pencil className="size-4" aria-hidden="true" />
@@ -232,9 +226,13 @@ export function ItemDetailScreen({ id }: { id: string }) {
             >
               {detail?.branchProfile ? null : (
                 <p className="text-xs text-muted-foreground">
-                  {profiles.branchScopeGap
-                    ? t.trade.channelBranchScopeRequired
-                    : t.trade.branchProfileMissing}
+                  {profiles.companyScopeGap
+                    ? t.trade.errorMissingCompany
+                    : !detail?.companyProfile
+                      ? t.trade.branchProfileRequiresCompany
+                      : profiles.branchScopeGap
+                        ? t.trade.channelBranchScopeRequired
+                        : t.trade.branchProfileMissing}
                 </p>
               )}
             </DetailSection>
@@ -284,14 +282,19 @@ export function ItemDetailScreen({ id }: { id: string }) {
                             <IdentifierText>{listing.publicationStatus}</IdentifierText>
                           </Badge>
                           {listings.canManage ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              aria-label={t.trade.listingEditTitle}
-                              onClick={() => listings.openEdit(listing)}
-                            >
-                              <Pencil className="size-4" aria-hidden="true" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label={t.trade.listingEditTitle}
+                                  onClick={() => listings.openEdit(listing)}
+                                >
+                                  <Pencil className="size-4" aria-hidden="true" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{t.trade.listingEditTitle}</TooltipContent>
+                            </Tooltip>
                           ) : null}
                         </span>
                       </li>
@@ -316,6 +319,7 @@ export function ItemDetailScreen({ id }: { id: string }) {
         <CompanyProfileDrawer
           key={`company-${detail?.companyProfile?.version ?? "new"}-${profiles.companyOpen}`}
           open={profiles.companyOpen}
+          itemKind={item?.itemKind ?? "PRODUCT"}
           profile={detail?.companyProfile ?? null}
           isSubmitting={profiles.isSubmitting}
           error={profiles.companyFormError}

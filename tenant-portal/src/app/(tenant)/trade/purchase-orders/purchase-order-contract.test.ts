@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PURCHASE_ORDER_REASON_REQUIRED,
   parsePurchaseOrder,
+  parsePurchaseOrderDetail,
   purchaseOrderLadder,
   type PurchaseOrder,
 } from "./purchase-order-contract";
@@ -34,6 +35,21 @@ const raw = {
   supplierAccountId: UUID,
   receivingNodeId: UUID,
   totalsSnapshot: null,
+  lines: [
+    {
+      id: UUID,
+      clientLineId: CHECKER,
+      uomId: UUID,
+      descriptionSnapshot: "Packing supplies",
+      receiptDescriptionSnapshot: "Count cartons on receipt",
+      orderedQuantity: "4",
+      unitPrice: "25",
+      lineTotal: "100",
+      taxSnapshot: { jurisdiction: "EG", rate: "14" },
+      expectedDate: "2026-09-15",
+      printLineNumber: 1,
+    },
+  ],
 };
 
 const everything = () => true;
@@ -106,5 +122,42 @@ describe("parsePurchaseOrder", () => {
 
   it("keeps a null totals snapshot, which means the order cannot be printed", () => {
     expect(parsePurchaseOrder(raw).totalsSnapshot).toBeNull();
+  });
+
+  it("retains immutable document, receipt, and tax snapshots on each line", () => {
+    expect(parsePurchaseOrderDetail(raw).lines[0]).toMatchObject({
+      descriptionSnapshot: "Packing supplies",
+      receiptDescriptionSnapshot: "Count cartons on receipt",
+      taxSnapshot: { jurisdiction: "EG", rate: "14" },
+    });
+  });
+
+  it("preserves absent line snapshots as null", () => {
+    const withoutSnapshots = {
+      ...raw,
+      lines: [
+        {
+          ...raw.lines[0],
+          descriptionSnapshot: null,
+          receiptDescriptionSnapshot: null,
+          taxSnapshot: null,
+        },
+      ],
+    };
+    expect(parsePurchaseOrderDetail(withoutSnapshots).lines[0]).toMatchObject({
+      descriptionSnapshot: null,
+      receiptDescriptionSnapshot: null,
+      taxSnapshot: null,
+    });
+  });
+
+  it("rejects a non-object tax snapshot at the runtime boundary", () => {
+    const malformed = {
+      ...raw,
+      lines: [{ ...raw.lines[0], taxSnapshot: "14%" }],
+    };
+    expect(() => parsePurchaseOrderDetail(malformed)).toThrow(
+      "Invalid Trade document response.",
+    );
   });
 });

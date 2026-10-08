@@ -4,6 +4,7 @@ import { useId } from "react";
 import { X } from "lucide-react";
 import {
   Button,
+  cn,
   DatePicker,
   Field,
   FieldControlBoundary,
@@ -43,16 +44,17 @@ export function ActivityScheduleFields({ form, disabled }: ActivityScheduleField
   const hasEnd = values.endDate !== "" || values.endTime !== "";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={cn("grid gap-2", traits.hasEnd && "md:grid-cols-2")}>
       <span id={`${id}-time`} className="sr-only">{copy.form.time}</span>
       <div className="flex flex-col gap-1">
         <span id={`${id}-start`} aria-hidden="true" className="text-xs font-medium text-muted-foreground">
-          {startLabel}
+          {startLabel} <span className="text-destructive">*</span>
         </span>
         <Field label={startLabel} error={activityValidationMessage(copy, "start", errors.start)} required>
-          <div className="flex flex-wrap items-start gap-2">
-            <div className="min-w-40 flex-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5">
+            <div className="min-w-0">
               <DatePicker
+                size="xs"
                 value={fromLocalDate(values.startDate)}
                 onValueChange={(date) => form.setStart({ startDate: date ? toLocalDate(date) : "" })}
                 onBlur={() => form.touch("start")}
@@ -64,9 +66,10 @@ export function ActivityScheduleFields({ form, disabled }: ActivityScheduleField
               {/* dir="ltr" on the control only: the browser owns a time input's
                   segment order, and mirroring it swaps the hour and the minute. */}
               <Input
+                size="xs"
                 type="time"
                 dir="ltr"
-                className="w-32"
+                className="w-28"
                 value={values.startTime}
                 onChange={(event) => form.setStart({ startTime: event.target.value })}
                 onBlur={() => form.touch("start")}
@@ -83,12 +86,13 @@ export function ActivityScheduleFields({ form, disabled }: ActivityScheduleField
       {traits.hasEnd && (
         <div className="flex flex-col gap-1">
           <span id={`${id}-end`} aria-hidden="true" className="text-xs font-medium text-muted-foreground">
-            {copy.form.end}
+            {copy.form.end} <span className="font-normal">· {copy.form.endOptional}</span>
           </span>
-          <Field label={copy.form.end} hint={copy.form.endOptional} error={activityValidationMessage(copy, "end", errors.end)}>
-            <div className="flex flex-wrap items-start gap-2">
-              <div className="min-w-40 flex-1">
+          <Field label={`${copy.form.end} (${copy.form.endOptional})`} error={activityValidationMessage(copy, "end", errors.end)}>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1.5">
+              <div className="min-w-0">
                 <DatePicker
+                  size="xs"
                   value={fromLocalDate(values.endDate)}
                   onValueChange={(date) => form.setField("endDate", date ? toLocalDate(date) : "")}
                   onBlur={() => form.touch("end")}
@@ -97,27 +101,30 @@ export function ActivityScheduleFields({ form, disabled }: ActivityScheduleField
                 />
               </div>
               <FieldControlBoundary>
-                <Input
-                  type="time"
-                  dir="ltr"
-                  className="w-32"
-                  value={values.endTime}
-                  onChange={(event) => form.setField("endTime", event.target.value)}
-                  onBlur={() => form.touch("end")}
-                  aria-labelledby={`${id}-end ${id}-time`}
-                  aria-invalid={errors.end ? true : undefined}
-                  disabled={disabled}
-                />
-                {hasEnd && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="sm" aria-label={copy.form.clearEnd} onClick={form.clearEnd} disabled={disabled}>
-                        <X className={iconSize({ size: "sm" })} aria-hidden="true" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{copy.form.clearEnd}</TooltipContent>
-                  </Tooltip>
-                )}
+                <div className="flex items-center gap-0.5">
+                  <Input
+                    size="xs"
+                    type="time"
+                    dir="ltr"
+                    className="w-28"
+                    value={values.endTime}
+                    onChange={(event) => form.setField("endTime", event.target.value)}
+                    onBlur={() => form.touch("end")}
+                    aria-labelledby={`${id}-end ${id}-time`}
+                    aria-invalid={errors.end ? true : undefined}
+                    disabled={disabled}
+                  />
+                  {hasEnd && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="xs" aria-label={copy.form.clearEnd} onClick={form.clearEnd} disabled={disabled}>
+                          <X className={iconSize({ size: "xs" })} aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{copy.form.clearEnd}</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
               </FieldControlBoundary>
             </div>
           </Field>

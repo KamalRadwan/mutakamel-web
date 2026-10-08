@@ -8,12 +8,14 @@ import { canonicalizeDecimalInput, POSITIVE_DECIMAL, isCanonicalDecimal } from "
 import { computeDocumentTotals, findDuplicateClientLineId } from "../document-totals";
 import {
   TRADE_LOOKUP_RESPONSE_BYTES,
+  TRADE_ITEM_SEARCH_MAX_LENGTH,
   parseTradeItems,
   parseTradePriceDecision,
   parseTradeUoms,
   tradeItemsPath,
   tradeUomCataloguePath,
   TRADE_PRICING_EVALUATE_PATH,
+  isItemEligibleForPurpose,
   type TradeItemOption,
   type TradePricePurpose,
   type TradeUomOption,
@@ -35,7 +37,7 @@ interface TradeLineDraft {
 export interface TradeLineDraftState {
   lines: TradeLineDraft[];
   items: TradeItemOption[];
-  itemTotal: number;
+  itemsById: Record<string, TradeItemOption>;
   uomsByItem: Record<string, TradeUomOption[]>;
   lookupError: NormalizedApiError | null;
   isLoadingItems: boolean;
@@ -43,6 +45,8 @@ export interface TradeLineDraftState {
   runningTotal: string | null;
   /** The first reason the server would refuse this line set, if any. */
   invalidLineIndex: number | null;
+  purpose: TradePricePurpose;
+  searchItems: (query: string) => void;
   addLine: () => void;
   removeLine: (index: number) => void;
   setItem: (index: number, itemId: string) => void;
@@ -87,7 +91,8 @@ export function useTradeLineDraft(
 ): TradeLineDraftState {
   const [lines, setLines] = useState<TradeLineDraft[]>([emptyLineDraft()]);
   const [items, setItems] = useState<TradeItemOption[]>([]);
-  const [itemTotal, setItemTotal] = useState(0);
+  const [itemsById, setItemsById] = useState<Record<string, TradeItemOption>>({});
+  const [itemSearch, setItemSearch] = useState("");
   const [uomsByItem, setUomsByItem] = useState<Record<string, TradeUomOption[]>>({});
   const [lookupError, setLookupError] = useState<NormalizedApiError | null>(null);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
@@ -103,16 +108,21 @@ export function useTradeLineDraft(
       setIsLoadingItems(true);
       void (async () => {
         try {
-          const result = await tradeGet(tradeItemsPath(1), {
+          const result = await tradeGet(tradeItemsPath(1, purpose, itemSearch), {
             signal: controller.signal,
             headers,
             maxResponseBytes: TRADE_LOOKUP_RESPONSE_BYTES,
           });
-          const page = parseTradeItems(result.data);
+          const page = parseTradeItems(result.data, purpose);
           setItems(page.items);
-          setItemTotal(page.total);
+          setItemsById((current) => ({
+            ...current,
+            ...Object.fromEntries(page.items.map((item) => [item.id, item])),
+          }));
+          setLookupError(null);
         } catch (error) {
           if (isAbortError(error)) return;
+          setItems([]);
           setLookupError(normalizeApiError(error));
         } finally {
           if (!controller.signal.aborted) setIsLoadingItems(false);
@@ -120,7 +130,7 @@ export function useTradeLineDraft(
       })();
     });
     return () => controller.abort();
-  }, [headers, isEnabled]);
+  }, [headers, isEnabled, itemSearch, purpose]);
 
   const loadUoms = useCallback(
     async (itemId: string): Promise<void> => {
@@ -217,19 +227,23 @@ export function useTradeLineDraft(
   return {
     lines,
     items,
-    itemTotal,
+    itemsById,
     uomsByItem,
     lookupError,
     isLoadingItems,
     runningTotal: outcome?.ok ? outcome.value.totals.grandTotal : null,
     invalidLineIndex:
       duplicateIndex ?? (outcome && !outcome.ok ? (outcome.lineIndex ?? null) : null),
+    purpose,
+    searchItems: (query: string) => setItemSearch(query.slice(0, TRADE_ITEM_SEARCH_MAX_LENGTH)),
     addLine: () => setLines((current) => [...current, emptyLineDraft()]),
     removeLine: (index: number) =>
       setLines((current) =>
         current.length > 1 ? current.filter((_, position) => position !== index) : current,
       ),
     setItem: (index: number, itemId: string) => {
+      const item = itemsById[itemId];
+      if (!item || !isItemEligibleForPurpose(item, purpose)) return;
       void loadUoms(itemId);
       // The UOM set is item-scoped, so keeping the previous one would submit a
       // pairing `/catalog/uoms` never authorised.

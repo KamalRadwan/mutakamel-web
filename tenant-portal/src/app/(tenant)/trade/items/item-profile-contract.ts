@@ -9,7 +9,7 @@ import {
   record,
   type TradePage,
 } from "../trade-validation";
-import { itemPath } from "./item-contract";
+import { isItemDecimalString, itemPath } from "./item-contract";
 
 // The three sub-resources of an item, each at a different scope:
 //
@@ -44,9 +44,14 @@ export interface ItemCompanyProfile {
   id: string;
   canSell: boolean;
   canPurchase: boolean;
+  canPos: boolean;
   trackInventory: boolean;
   trackingMode: string;
   taxClassificationKey: string | null;
+  salesPrice: string | null;
+  currencyCode: string | null;
+  salesTaxId: string | null;
+  purchaseTaxId: string | null;
   defaultSalesUomId: string | null;
   defaultPurchaseUomId: string | null;
   accountingMappingKey: string | null;
@@ -78,9 +83,14 @@ export interface ItemChannelListing {
 export interface CompanyProfileFormValues {
   canSell: boolean;
   canPurchase: boolean;
+  canPos: boolean;
   trackInventory: boolean;
   trackingMode: ItemTrackingMode;
   taxClassificationKey: string;
+  salesPrice: string;
+  currencyCode: string;
+  salesTaxId: string;
+  purchaseTaxId: string;
   defaultSalesUomId: string;
   defaultPurchaseUomId: string;
   accountingMappingKey: string;
@@ -103,9 +113,14 @@ export interface ListingFormValues {
 export const EMPTY_COMPANY_PROFILE_FORM: CompanyProfileFormValues = {
   canSell: false,
   canPurchase: false,
+  canPos: false,
   trackInventory: false,
   trackingMode: "NONE",
   taxClassificationKey: "",
+  salesPrice: "",
+  currencyCode: "",
+  salesTaxId: "",
+  purchaseTaxId: "",
   defaultSalesUomId: "",
   defaultPurchaseUomId: "",
   accountingMappingKey: "",
@@ -129,9 +144,14 @@ export function toCompanyProfileForm(profile: ItemCompanyProfile): CompanyProfil
   return {
     canSell: profile.canSell,
     canPurchase: profile.canPurchase,
+    canPos: profile.canPos,
     trackInventory: profile.trackInventory,
     trackingMode: isTrackingMode(profile.trackingMode) ? profile.trackingMode : "NONE",
     taxClassificationKey: profile.taxClassificationKey ?? "",
+    salesPrice: profile.salesPrice ?? "",
+    currencyCode: profile.currencyCode ?? "",
+    salesTaxId: profile.salesTaxId ?? "",
+    purchaseTaxId: profile.purchaseTaxId ?? "",
     defaultSalesUomId: profile.defaultSalesUomId ?? "",
     defaultPurchaseUomId: profile.defaultPurchaseUomId ?? "",
     accountingMappingKey: profile.accountingMappingKey ?? "",
@@ -208,17 +228,33 @@ function parseJsonArray(raw: string, failure: string): unknown[] {
 
 /** `UpsertItemCompanyProfileDto` — always complete, never a partial patch. */
 export function buildCompanyProfileRequest(values: CompanyProfileFormValues) {
-  const optionalId = (raw: string): string | undefined => {
+  const optionalId = (raw: string, failure = "PROFILE_FORM_UOM"): string | undefined => {
     const trimmed = raw.trim();
     if (!trimmed) return undefined;
-    if (!isUuidV7(trimmed)) throw new Error("PROFILE_FORM_UOM");
+    if (!isUuidV7(trimmed)) throw new Error(failure);
     return trimmed;
   };
+  if (values.canPos && !values.canSell) throw new Error("PROFILE_FORM_POS_REQUIRES_SALES");
+  if (!values.trackInventory && values.trackingMode !== "NONE") {
+    throw new Error("PROFILE_FORM_TRACKING_REQUIRES_INVENTORY");
+  }
+  const salesPrice = values.salesPrice.trim();
+  if (salesPrice && !isItemDecimalString(salesPrice)) throw new Error("PROFILE_FORM_PRICE");
+  const currencyCode = values.currencyCode.trim().toUpperCase();
+  if (currencyCode && !/^[A-Z]{3}$/u.test(currencyCode)) throw new Error("PROFILE_FORM_CURRENCY");
+  if (salesPrice && !currencyCode) throw new Error("PROFILE_FORM_CURRENCY");
+  const salesTaxId = optionalId(values.salesTaxId, "PROFILE_FORM_TAX") ?? null;
+  const purchaseTaxId = optionalId(values.purchaseTaxId, "PROFILE_FORM_TAX") ?? null;
   return {
     canSell: values.canSell,
     canPurchase: values.canPurchase,
+    canPos: values.canPos,
     trackInventory: values.trackInventory,
     trackingMode: values.trackingMode,
+    salesPrice: salesPrice || null,
+    currencyCode: currencyCode || null,
+    salesTaxId,
+    purchaseTaxId,
     capabilitySet: parseJsonArray(values.capabilitySet, "PROFILE_FORM_CAPABILITY"),
     ...(values.taxClassificationKey.trim()
       ? { taxClassificationKey: values.taxClassificationKey.trim() }
@@ -277,13 +313,21 @@ export function parseCompanyProfileResponse(payload: unknown): ItemCompanyProfil
     !isUuidV7(profile.id) ||
     typeof profile.canSell !== "boolean" ||
     typeof profile.canPurchase !== "boolean" ||
+    typeof profile.canPos !== "boolean" ||
     typeof profile.trackInventory !== "boolean" ||
     typeof profile.trackingMode !== "string" ||
     !Array.isArray(profile.capabilitySet) ||
     typeof profile.status !== "string" ||
     !isRowVersion(profile.version) ||
     !isNullableUuidV7(profile.defaultSalesUomId) ||
-    !isNullableUuidV7(profile.defaultPurchaseUomId)
+    !isNullableUuidV7(profile.defaultPurchaseUomId) ||
+    !(profile.salesPrice == null || isItemDecimalString(profile.salesPrice)) ||
+    !(
+      profile.currencyCode == null ||
+      (typeof profile.currencyCode === "string" && /^[A-Z]{3}$/u.test(profile.currencyCode))
+    ) ||
+    !isNullableUuidV7(profile.salesTaxId) ||
+    !isNullableUuidV7(profile.purchaseTaxId)
   ) {
     invalidResponse();
   }
@@ -291,10 +335,15 @@ export function parseCompanyProfileResponse(payload: unknown): ItemCompanyProfil
     id: profile.id,
     canSell: profile.canSell,
     canPurchase: profile.canPurchase,
+    canPos: profile.canPos,
     trackInventory: profile.trackInventory,
     trackingMode: profile.trackingMode,
     taxClassificationKey:
       typeof profile.taxClassificationKey === "string" ? profile.taxClassificationKey : null,
+    salesPrice: typeof profile.salesPrice === "string" ? profile.salesPrice : null,
+    currencyCode: typeof profile.currencyCode === "string" ? profile.currencyCode : null,
+    salesTaxId: (profile.salesTaxId as string | null | undefined) ?? null,
+    purchaseTaxId: (profile.purchaseTaxId as string | null | undefined) ?? null,
     defaultSalesUomId: (profile.defaultSalesUomId as string | null | undefined) ?? null,
     defaultPurchaseUomId: (profile.defaultPurchaseUomId as string | null | undefined) ?? null,
     accountingMappingKey:

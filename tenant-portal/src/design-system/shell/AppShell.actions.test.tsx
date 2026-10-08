@@ -46,6 +46,7 @@ vi.mock("@/context/AuthContext", () => ({
         "crm.customer_profiles.read",
         "crm.opportunities.read",
         "crm.pipelines.read",
+        "trade.items.read",
         // Two setup screens, so that section renders as a MENU. With one it
         // would render as a direct link instead — NavMenu.test.tsx covers that.
         "crm.custom_fields.read",
@@ -68,10 +69,13 @@ vi.mock("../patterns/offline-banner/useConnectivity", () => ({
   useConnectivity: () => ({ status: "online" }),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  pathname = "/crm/leads";
+});
 
-function renderShell(children: React.ReactNode) {
-  const { container } = render(<AppShell initialApp="crm">{children}</AppShell>);
+function renderShell(children: React.ReactNode, initialApp: "crm" | "trade" = "crm") {
+  const { container } = render(<AppShell initialApp={initialApp}>{children}</AppShell>);
   // The bar is the sibling directly after the <header>, and the only element
   // between it and <main>.
   const bar = container.querySelector("header")!.nextElementSibling as HTMLElement;
@@ -81,10 +85,19 @@ function renderShell(children: React.ReactNode) {
 describe("the page action bar", () => {
   it("renders a PageHeader's primary action inside the bar, not in the page", () => {
     const { bar, main } = renderShell(
-      <PageHeader title="Leads" primaryAction={{ label: "Add lead", onClick: vi.fn() }} />,
+      <PageHeader
+        title="Leads"
+        primaryAction={{
+          label: "Add lead",
+          icon: <span aria-hidden="true">+</span>,
+          onClick: vi.fn(),
+        }}
+      />,
     );
 
-    expect(within(bar).getByRole("button", { name: "Add lead" })).toBeInTheDocument();
+    const action = within(bar).getByRole("button", { name: "Add lead" });
+    expect(action).toBeInTheDocument();
+    expect(action).toHaveTextContent("+Add lead");
     expect(within(main).queryByRole("button", { name: "Add lead" })).toBeNull();
   });
 
@@ -97,10 +110,14 @@ describe("the page action bar", () => {
     expect(within(bar).queryByRole("heading", { level: 1 })).toBeNull();
   });
 
-  it("routes each slot to its own region, in actions · search · view order", () => {
+  it("puts the primary action first on Leads and preserves the trailing control order", () => {
     const { bar } = renderShell(
       <>
-        <PageHeader title="Leads" primaryAction={{ label: "Add lead", onClick: vi.fn() }} />
+        <PageHeader
+          title="Leads"
+          primaryAction={{ label: "Add lead", onClick: vi.fn() }}
+          secondaryActions={<Button variant="outline">Branch</Button>}
+        />
         <PageActions slot="search">
           <Button variant="outline">Search</Button>
         </PageActions>
@@ -113,24 +130,61 @@ describe("the page action bar", () => {
     const order = within(bar)
       .getAllByRole("button")
       .map((button) => button.textContent);
-    expect(order).toEqual(["Add lead", "Search", "Board"]);
+    expect(order).toEqual(["Add lead", "Branch", "Search", "Board"]);
   });
 
-  // What the sidebar used to say by marking a row. If this regresses, the shell
-  // has no persistent answer to "where am I" at all.
-  it("names the current location from the nav map", () => {
+  // Leads is already a first-level destination in GlobalNav. Repeating its
+  // section and screen consumes the exact inline-start position its primary
+  // action needs, so the exact list route replaces that location with Add.
+  it("omits a primary page's redundant location even when create is unavailable", () => {
     const { bar } = renderShell(<PageHeader title="Leads" />);
 
+    expect(within(bar).queryByText(en.nav.navMenuRecords)).toBeNull();
+    expect(within(bar).queryByRole("link", { name: en.nav.leads })).toBeNull();
+  });
+
+  it("starts the Items bar with + New Item and omits Foundation / Items", () => {
+    pathname = "/trade/items";
+    const { bar } = renderShell(
+      <PageHeader
+        title="Items"
+        primaryAction={{
+          label: "New Item",
+          icon: <span aria-hidden="true">+</span>,
+          onClick: vi.fn(),
+        }}
+        secondaryActions={<Button variant="outline">Refresh</Button>}
+      />,
+      "trade",
+    );
+
+    expect(within(bar).queryByText(en.nav.navMenuFoundation)).toBeNull();
+    expect(within(bar).queryByRole("link", { name: en.nav.tradeItems })).toBeNull();
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "+New Item",
+      "Refresh",
+    ]);
+  });
+
+  // What the sidebar used to say by marking a row. Routes that are not
+  // explicitly promoted still need the persistent answer to "where am I".
+  it("names an ordinary current location from the nav map", () => {
+    pathname = "/crm/opportunities";
+    const { bar } = renderShell(<PageHeader title="Opportunities" />);
+
     expect(bar).toHaveTextContent(en.nav.navMenuRecords);
-    expect(bar).toHaveTextContent(en.nav.leads);
+    expect(bar).toHaveTextContent(en.nav.opportunities);
   });
 
   it("names the location of a detail route by its list entry", () => {
     pathname = "/crm/leads/018f-a-lead";
     const { bar } = renderShell(<PageHeader title="A lead" />);
 
-    expect(bar).toHaveTextContent(en.nav.leads);
-    pathname = "/crm/leads";
+    expect(bar).toHaveTextContent(en.nav.navMenuRecords);
+    expect(within(bar).getByRole("link", { name: en.nav.leads })).toHaveAttribute(
+      "href",
+      "/crm/leads",
+    );
   });
 });
 

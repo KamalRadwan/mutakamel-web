@@ -47,6 +47,11 @@ describe("useNavLocation", () => {
     expect(locate("/trade/items/018f/history").itemId).toBe("tradeItems");
   });
 
+  it("marks only the exact Leads list route as a primary page", () => {
+    expect(locate("/crm/leads").isPrimaryPage).toBe(true);
+    expect(locate("/crm/leads/018f-not-a-real-id").isPrimaryPage).toBe(false);
+  });
+
   // THE case the length comparison exists for. `/core/settings` and
   // `/core/settings/currencies` are both nav items and both prefix this route;
   // a first-match scan returns whichever the map happens to list first, and the

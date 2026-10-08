@@ -41,6 +41,7 @@ export interface AddressPlaceFieldsProps {
   /** The column bound, from the caller's own contract — both are 120 today. */
   maxLength: number;
   disabled?: boolean;
+  showLabel?: boolean;
 }
 
 /**
@@ -67,6 +68,7 @@ export function AddressPlaceFields({
   errorPrefix,
   maxLength,
   disabled,
+  showLabel = false,
 }: AddressPlaceFieldsProps) {
   const { t } = useI18n();
   const [pickedStateCode, setPickedStateCode] = useState<string | null>(null);
@@ -126,7 +128,7 @@ export function AddressPlaceFields({
 
   return (
     <>
-      <Field label={labels.country} error={errors?.[path("country")]}>
+      <Field label={labels.country} error={errors?.[path("country")]} showLabel={showLabel}>
         <AddressCountrySelect
           value={values.country}
           disabled={disabled}
@@ -135,7 +137,7 @@ export function AddressPlaceFields({
         />
       </Field>
 
-      <Field label={labels.state} error={errors?.[path("state")]}>
+      <Field label={labels.state} error={errors?.[path("state")]} showLabel={showLabel}>
         <AddressPlaceSelect
           value={values.state}
           loader={loadStates}
@@ -152,7 +154,7 @@ export function AddressPlaceFields({
         />
       </Field>
 
-      <Field label={labels.city} error={errors?.[path("city")]}>
+      <Field label={labels.city} error={errors?.[path("city")]} showLabel={showLabel}>
         <AddressPlaceSelect
           value={values.city}
           loader={loadCities}

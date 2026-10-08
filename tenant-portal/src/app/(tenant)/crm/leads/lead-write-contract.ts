@@ -4,55 +4,84 @@
 // key is a 400 rather than a silently-ignored field. Every key below is copied
 // from `crm-app/src/crm/leads/dto/lead.dto.ts` and nothing else is sent.
 
+import type { CardColor } from "@/design-system";
 import { looksLikeEmail } from "../shared/crm-form-validation";
+import type { CreateLeadAddressRequest } from "./lead-create-contract";
+
+export const LEAD_CARD_COLORS = [
+  "RED",
+  "ORANGE",
+  "AMBER",
+  "YELLOW",
+  "GREEN",
+  "TEAL",
+  "BLUE",
+  "INDIGO",
+  "PURPLE",
+  "PINK",
+  "SLATE",
+] as const satisfies readonly CardColor[];
+
+interface UpdateLeadContactRequest {
+  contactPartyId?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  honorificTitle?: string | null;
+  jobTitle?: string | null;
+  phones?: string[];
+  email?: string | null;
+  isPrimary?: boolean;
+}
 
 /**
- * The `UpdateLeadDto` fields used by the company/contact editors.
+ * The verified `UpdateLeadDto` fields accepted by PATCH /api/tenant/crm/v1/leads/:id.
  *
- * Three absences are load-bearing and none of them is an oversight:
- *
- * - **no `stageId`** — a stage move is `POST /leads/:id/stage`, which derives
- *   lifecycle `status` from the destination stage's semantic flag;
- * - **no `status`** — same reason, it is derived and never set;
- * - **no `companyPhone`** — the update DTO takes the `companyPhones` array
- *   only, while `CreateLeadDto` takes both. Sending the singular here is a 400.
+ * Rules:
+ * - Omitted property preserves existing value.
+ * - Send only properties that changed.
+ * - phones: [] clears individual numbers.
+ * - companyPhones: [] clears company numbers.
+ * - contacts is a complete replacement list; [] removes all contacts.
+ * - rating: 0, 1, 2, or 3 (null is invalid).
+ * - cardColor: CardColor or null (to clear).
+ * - acquisitionSourceId: UUIDv7 or null (to clear).
+ * - honorificTitle, primaryMobile, email, companyEmail, companyWebsite, taxNumber,
+ *   commercialRegistrationNumber, ownerUserId: cleared with null.
+ * - description, interestSummary, expectedNeed: cleared with empty string "".
+ * - displayName and companyName: cannot be blank when supplied.
+ * - Forbidden on PATCH: branchId, leadProfileType, stageId, status, tagIds,
+ *   existingCompanyPartyId, legalName, companyPhone.
  */
 export interface UpdateLeadRequest {
+  // Individual
   displayName?: string;
   firstName?: string;
   lastName?: string;
   honorificTitle?: string | null;
   primaryMobile?: string | null;
-  /** Full individual MOBILE list; [] clears it, omission preserves it. */
   phones?: string[];
   email?: string | null;
-  /** Existing people only in the detail editor; the server replaces this list. */
-  contacts?: Array<{ contactPartyId: string; jobTitle: string; isPrimary: boolean }>;
+
+  // Corporate
   companyName?: string;
-  /**
-   * The plural the update DTO actually takes — `@ArrayMaxSize(10)`,
-   * `@MaxLength(32, { each: true })`. Sending `[]` is a real edit that clears
-   * every stored number, which is why the array is never omitted for being
-   * empty; omitting it is what "leave the numbers alone" means.
-   */
   companyPhones?: string[];
-  /**
-   * The rest of the company identity, all four `string | null` on the DTO.
-   *
-   * Nullable because a cleared box is a real edit that has to reach the Party
-   * as `NULL` — `undefined` would leave the stored value in place, which is
-   * how a user empties a field, saves, and watches the old value come back.
-   * `companyEmail` carries `@IsEmail()`, so a non-address that reaches the
-   * server is a 400 rather than a stored oddity.
-   */
   companyEmail?: string | null;
   companyWebsite?: string | null;
   taxNumber?: string | null;
   commercialRegistrationNumber?: string | null;
+  contacts?: UpdateLeadContactRequest[];
+
+  // Shared
+  address?: CreateLeadAddressRequest;
   acquisitionSourceId?: string | null;
+  rating?: number;
+  cardColor?: CardColor | null;
   description?: string;
   interestSummary?: string;
   expectedNeed?: string;
+  ownerUserId?: string | null;
+  customFields?: Record<string, unknown>;
 }
 
 /**

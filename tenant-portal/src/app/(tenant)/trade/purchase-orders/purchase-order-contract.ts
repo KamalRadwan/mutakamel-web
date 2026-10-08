@@ -5,6 +5,8 @@ import {
   isTradeDecimal,
   isTradeStatus,
   jsonObject,
+  nullableJsonObject,
+  nullableString,
   optionalUuid,
   parseTradeDocumentHeader,
   record,
@@ -50,9 +52,12 @@ interface PurchaseOrderLine {
   id: string;
   clientLineId: string;
   uomId: string;
+  descriptionSnapshot: string | null;
+  receiptDescriptionSnapshot: string | null;
   orderedQuantity: string;
   unitPrice: string;
   lineTotal: string;
+  taxSnapshot: Record<string, unknown> | null;
   expectedDate: string | null;
   printLineNumber: number | null;
 }
@@ -148,9 +153,12 @@ function parsePurchaseOrderLine(payload: unknown): PurchaseOrderLine {
     id: line.id,
     clientLineId: line.clientLineId,
     uomId: line.uomId,
+    descriptionSnapshot: nullableString(line.descriptionSnapshot, 500),
+    receiptDescriptionSnapshot: nullableString(line.receiptDescriptionSnapshot, 500),
     orderedQuantity: line.orderedQuantity,
     unitPrice: line.unitPrice,
     lineTotal: line.lineTotal,
+    taxSnapshot: nullableJsonObject(line.taxSnapshot),
     expectedDate:
       line.expectedDate == null
         ? null

@@ -27,14 +27,15 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const nextDir = join(repoRoot, ".next");
 
 // Shared and largest-chunk budgets remain anchored to the 2026-08-31 baseline.
-// The total budget was rebased on 2026-09-18 after the app reached 100 routes:
-// HEAD already emitted 6221.1 kB before the CRM view enrichment, and the updated
-// views emit 6240.0 kB. The 6.25 MiB limit restores a narrow growth margin while
-// the user-facing shared and largest-chunk gates remain unchanged.
+// Total was 6240.0 kB at the 2026-09-18 / 100-route checkpoint. The 2026-09-27
+// build emits 6426.5 kB across 146 app paths, including Category tree/detail and
+// Item integration (the Category workspace chunk is 42.1 kB). Rebase only the
+// aggregate cap to 6.375 MiB for the added screens. Shared remains 526.6 kB;
+// neither per-user budget nor the feature-isolation assertion is relaxed.
 const BUDGETS = {
   sharedBytes: 600 * 1024, // measured 526.6 kB
   largestChunkBytes: 1500 * 1024, // measured 1389.4 kB — the recharts/date-fns vendor chunk
-  totalBytes: 6.25 * 1024 * 1024, // measured 6240.0 kB across 100 routes
+  totalBytes: 6.375 * 1024 * 1024, // measured 6426.5 kB across 146 app paths
 };
 
 // Feature code that must never reach a chunk every route loads.

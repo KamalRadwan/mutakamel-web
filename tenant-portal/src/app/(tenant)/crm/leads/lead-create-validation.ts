@@ -113,6 +113,7 @@ function validateAddress(bag: CrmErrorBag, form: CreateLeadForm): void {
   bag.maxLength("address.street2", address.street2, limits.addressShort);
   bag.maxLength("address.buildingNo", address.buildingNo, limits.addressShort);
   bag.maxLength("address.floor", address.floor, limits.addressShort);
+  bag.maxLength("address.apartment", address.apartment, limits.addressShort);
   bag.maxLength("address.landmark", address.landmark, limits.addressLong);
   bag.maxLength("address.postalCode", address.postalCode, limits.postalCode);
 }

@@ -29,6 +29,7 @@ export default function TradeIndexPage() {
   const entitlement = useTradeEntitlement();
 
   const copy: Record<TradeFoundationRoute, { title: string; description: string }> = {
+    [TENANT_ROUTES.tradeCategories]: { title: t.trade.categories.title, description: t.trade.categories.subtitle },
     [TENANT_ROUTES.tradeItems]: {
       title: t.trade.itemsTitle,
       description: t.trade.itemsSubtitle,

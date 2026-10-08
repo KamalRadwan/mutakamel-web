@@ -1747,6 +1747,8 @@ export const en: Dictionary = {
           "The database Application needs an active permission manifest.",
         databasePermissionManifestInvalid:
           "The active database permission manifest failed validation.",
+        databasePermissionManifestReleaseMismatch:
+          "The active database permission manifest belongs to a different component release.",
       },
       selectionTitle: "New tenant selection blockers",
       selectionBlockers: {
@@ -2464,6 +2466,10 @@ export const en: Dictionary = {
     selectOperationTitle: "Select an operation.",
     generationLabelLower: "generation",
     retryButton: "Retry",
+    reprovisionButton: "Re-provision",
+    cancellationPendingNote: "Cancellation is still in progress. Re-provisioning becomes available after the worker confirms that the operation has stopped. This page updates automatically.",
+    openOperationNote: "An operation is still open. Finish it or complete cancellation before starting another operation.",
+    viewCurrentOperationButton: "View current operation",
     requestCancelButton: "Request cancel",
     historicalOperationNote: (currentGen: number, latestGen: number) =>
       `This is a historical operation. Generation ${currentGen} was superseded by generation ${latestGen}; retry and cancel actions are available only for the latest operation.`,

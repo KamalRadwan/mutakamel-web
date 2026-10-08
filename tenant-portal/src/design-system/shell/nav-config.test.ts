@@ -76,6 +76,14 @@ describe("the three app navs", () => {
       expect(ids(app.sections)).toEqual(EXPECTED[app.id]);
     }
   });
+
+  it("promotes Items so its create action replaces the redundant location label", () => {
+    const items = TRADE_NAV_SECTIONS.flatMap((section) => section.items).find(
+      (item) => item.id === "tradeItems",
+    );
+
+    expect(items?.primaryPage).toBe(true);
+  });
 });
 
 // The i18n gate. Every nav surface reads labels as

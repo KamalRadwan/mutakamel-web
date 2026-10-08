@@ -131,7 +131,7 @@ export function useItemProfiles(
 
   const saveBranchProfile = useCallback(
     async (values: BranchProfileFormValues): Promise<boolean> => {
-      if (!canManage || branch.gap || isSubmitting) return false;
+      if (!companyProfile || !canManage || branch.gap || isSubmitting) return false;
       setIsSubmitting(true);
       setBranchFormError(null);
       try {
@@ -161,6 +161,7 @@ export function useItemProfiles(
     },
     [
       canManage,
+      companyProfile,
       branch,
       isSubmitting,
       runWrite,
@@ -210,5 +211,12 @@ function profileMessage(error: unknown, t: Dictionary): string {
   if (reason === "PROFILE_FORM_CAPABILITY") return t.trade.capabilitySetHint;
   if (reason === "PROFILE_FORM_RESTRICTIONS") return t.trade.restrictionsHint;
   if (reason === "PROFILE_FORM_UOM" || reason === "PROFILE_FORM_NODE") return t.trade.itemFormUom;
+  if (reason === "PROFILE_FORM_POS_REQUIRES_SALES") return t.trade.canPosRequiresSales;
+  if (reason === "PROFILE_FORM_TRACKING_REQUIRES_INVENTORY") {
+    return t.trade.itemTrackingRequiresInventory;
+  }
+  if (reason === "PROFILE_FORM_PRICE") return t.trade.itemFormNonNegativeDecimal;
+  if (reason === "PROFILE_FORM_CURRENCY") return t.trade.itemFormCurrency;
+  if (reason === "PROFILE_FORM_TAX") return t.trade.itemFormTax;
   return t.trade.jsonInvalid;
 }

@@ -301,4 +301,21 @@ describe("BoardView — column header controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add lead: Qualified" }));
     expect(onAddToColumn).toHaveBeenCalledWith("qualified");
   });
+
+  it("omits add from an ineligible terminal column while keeping valid column actions", () => {
+    const onAddToColumn = vi.fn();
+    renderBoard({
+      onAddToColumn,
+      canAddToColumn: (columnId) => columnId !== "converted",
+      labels: { ...labels, addToColumn: "Add lead" },
+    });
+
+    expect(screen.getByRole("button", { name: "Add lead: New" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add lead: Qualified" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add lead: Converted" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add lead: New" }));
+    expect(onAddToColumn).toHaveBeenCalledOnce();
+    expect(onAddToColumn).toHaveBeenCalledWith("new");
+  });
 });

@@ -3,15 +3,15 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-09-12T00:38:57.431Z**
+Generated at: **2026-09-29T18:08:31.172Z**
 
-Frontend revision: `602f0dac3576+dirty`
+Frontend revision: `c57e1f853ef8+dirty`
 
-Backend revision: `40c06870bc0c+dirty`
+Backend revision: `7acae5756765+dirty`
 
 ## Coverage
 
-This inventory contains **283** browser-visible Core Admin routes.
+This inventory contains **288** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
@@ -20,9 +20,9 @@ feature flags, deployment, or current frontend implementation.
 | --- | ---: |
 | AUTHENTICATED | 103 |
 | PUBLIC | 6 |
-| READ_HEAVY | 21 |
-| WRITE_SENSITIVE | 153 |
-| **Total** | **283** |
+| READ_HEAVY | 23 |
+| WRITE_SENSITIVE | 156 |
+| **Total** | **288** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -31,7 +31,7 @@ Machine-readable source:
 
 | Gateway route-key domain | Routes |
 | --- | ---: |
-| applications | 42 |
+| applications | 43 |
 | audit | 3 |
 | auth | 12 |
 | auth-invalidation-outbox | 1 |
@@ -43,7 +43,7 @@ Machine-readable source:
 | notifications | 14 |
 | payments | 5 |
 | permissions | 1 |
-| provisioning | 31 |
+| provisioning | 35 |
 | reports | 5 |
 | roles | 6 |
 | storage-migrations | 3 |
@@ -106,6 +106,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/adopt` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.adopt` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/primary-component` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.primary-component.create` |
 | POST | `/api/admin/core/v1/applications/onboarding` | WRITE_SENSITIVE | yes | ALL | admin.applications.create + admin.applications.update + admin.applications.critical | `core.admin.applications.onboard` |
+| POST | `/api/admin/core/v1/applications/trade/permission-manifest-v3-cutover` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.trade.permission-manifest-v3-cutover` |
 | GET | `/api/admin/core/v1/audit` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.list` |
 | GET | `/api/admin/core/v1/audit/:id` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.detail` |
 | GET | `/api/admin/core/v1/audit/entities/:entityType/:entityId` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.entity-history` |
@@ -212,6 +213,10 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/provisioning/releases` | READ_HEAVY | yes | ALL | admin.provisioning.releases.read | `core.admin.provisioning.releases.list` |
 | GET | `/api/admin/core/v1/provisioning/releases/:releaseId` | READ_HEAVY | yes | ALL | admin.provisioning.releases.read | `core.admin.provisioning.releases.get` |
 | POST | `/api/admin/core/v1/provisioning/releases/:releaseId/retire` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.releases.retire + admin.provisioning.critical | `core.admin.provisioning.releases.retire` |
+| GET | `/api/admin/core/v1/provisioning/worker-event-verification-keys` | READ_HEAVY | yes | ALL | admin.provisioning.publisher-keys.read | `core.admin.provisioning.worker-event-verification-keys.list` |
+| PATCH | `/api/admin/core/v1/provisioning/worker-event-verification-keys/:verificationKeyId/lifecycle` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.publisher-keys.manage + admin.provisioning.critical | `core.admin.provisioning.worker-event-verification-keys.lifecycle` |
+| POST | `/api/admin/core/v1/provisioning/worker-event-verification-keys/adopt-configured` | WRITE_SENSITIVE | yes | ALL | admin.provisioning.publisher-keys.manage + admin.provisioning.critical | `core.admin.provisioning.worker-event-verification-keys.adopt-configured` |
+| GET | `/api/admin/core/v1/provisioning/worker-event-verification-keys/configured` | READ_HEAVY | yes | ALL | admin.provisioning.publisher-keys.read | `core.admin.provisioning.worker-event-verification-keys.configured` |
 | GET | `/api/admin/core/v1/reports/billing` | READ_HEAVY | yes | ALL | admin.reports.read | `core.admin.reports.billing` |
 | GET | `/api/admin/core/v1/reports/overview` | READ_HEAVY | yes | ALL | admin.reports.read | `core.admin.reports.overview` |
 | GET | `/api/admin/core/v1/reports/provisioning` | READ_HEAVY | yes | ALL | admin.reports.read | `core.admin.reports.provisioning` |

@@ -1,30 +1,30 @@
 {
   "metadata": {
-    "generatedAt": "2026-09-12T00:38:57.431Z",
+    "generatedAt": "2026-09-29T18:08:31.172Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "602f0dac3576+dirty",
-    "backendRevision": "40c06870bc0c+dirty",
+    "frontendRevision": "c57e1f853ef8+dirty",
+    "backendRevision": "7acae5756765+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
   },
   "counts": {
-    "total": 283,
+    "total": 288,
     "byMethod": {
-      "GET": 115,
-      "POST": 118,
+      "GET": 117,
+      "POST": 120,
       "DELETE": 17,
-      "PATCH": 30,
+      "PATCH": 31,
       "PUT": 3
     },
     "byRouteClass": {
       "AUTHENTICATED": 103,
-      "WRITE_SENSITIVE": 153,
+      "WRITE_SENSITIVE": 156,
       "PUBLIC": 6,
-      "READ_HEAVY": 21
+      "READ_HEAVY": 23
     },
     "byDomain": {
-      "applications": 42,
+      "applications": 43,
       "catalog": 17,
       "audit": 3,
       "auth-invalidation-outbox": 1,
@@ -36,7 +36,7 @@
       "notifications": 14,
       "payments": 5,
       "permissions": 1,
-      "provisioning": 31,
+      "provisioning": 35,
       "reports": 5,
       "roles": 6,
       "storage-migrations": 3,
@@ -58,7 +58,8 @@
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-command.route-contracts.ts": "5cd09f208fe88bcecc34645e5d06ef8a9fb051441afb6a8adc4dbb3551ae2474",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "708333c057052443f3f19042cd71e94d7f7dbf342de325a4ebb53d497a33d282",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "93ed6f9c8bd64823da42530961312184a7acd3286eb332a12ebb54b6ecc6c7cc",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "8f988fc01a9bd98999499e5323c8d0aeb3b2a0888e4f2e88db3a40865180ca4e",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-worker-evidence-authority.route-contracts.ts": "7dc61ccbebc551900e5c0fbe35803affd5d242eb19d8e1465a1294e973eb3627",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "674bd3f4f5c280f381dd41e3ffbf86b3ae06d8138b1e9a1d697be8cec23ba349",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
@@ -883,6 +884,24 @@
       "timeoutClass": "DEFAULT",
       "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": "CORE.ADMIN.APPLICATIONS.ONBOARD"
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/applications/trade/permission-manifest-v3-cutover",
+      "upstreamPath": "/api/v1/admin/applications/trade/permission-manifest-v3-cutover",
+      "routeKey": "core.admin.applications.trade.permission-manifest-v3-cutover",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.applications.update",
+        "admin.applications.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.ADMIN.APPLICATIONS.PUBLISH"
     },
     {
       "method": "GET",
@@ -2696,6 +2715,76 @@
       "timeoutClass": "DEFAULT",
       "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": "CORE.TENANT_PROVISIONING.RELEASE.RETIRE"
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/provisioning/worker-event-verification-keys",
+      "upstreamPath": "/api/v1/admin/provisioning/worker-event-verification-keys",
+      "routeKey": "core.admin.provisioning.worker-event-verification-keys.list",
+      "routeClass": "READ_HEAVY",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [
+        "admin.provisioning.publisher-keys.read"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "PATCH",
+      "canonicalPath": "/api/admin/core/v1/provisioning/worker-event-verification-keys/:verificationKeyId/lifecycle",
+      "upstreamPath": "/api/v1/admin/provisioning/worker-event-verification-keys/:verificationKeyId/lifecycle",
+      "routeKey": "core.admin.provisioning.worker-event-verification-keys.lifecycle",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.provisioning.publisher-keys.manage",
+        "admin.provisioning.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.TENANT_PROVISIONING.WORKER_EVENT_VERIFICATION_KEY.LIFECYCLE"
+    },
+    {
+      "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/provisioning/worker-event-verification-keys/adopt-configured",
+      "upstreamPath": "/api/v1/admin/provisioning/worker-event-verification-keys/adopt-configured",
+      "routeKey": "core.admin.provisioning.worker-event-verification-keys.adopt-configured",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.provisioning.publisher-keys.manage",
+        "admin.provisioning.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": "CORE.TENANT_PROVISIONING.WORKER_EVENT_VERIFICATION_KEY.ADOPT"
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/provisioning/worker-event-verification-keys/configured",
+      "upstreamPath": "/api/v1/admin/provisioning/worker-event-verification-keys/configured",
+      "routeKey": "core.admin.provisioning.worker-event-verification-keys.configured",
+      "routeClass": "READ_HEAVY",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "requiredPermissions": [
+        "admin.provisioning.publisher-keys.read"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": "DEFAULT_JSON",
+      "timeoutClass": "DEFAULT",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "domainIdempotencyOperation": null
     },
     {
       "method": "GET",

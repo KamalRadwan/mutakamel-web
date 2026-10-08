@@ -6,6 +6,7 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { resolveCompanyForBranch } from "@/lib/api/organization-scope";
 import { formatTemplate } from "@/lib/format/template";
+import { getHonorificOptions } from "@/lib/catalogues/contact-titles";
 import { isUUIDv7 } from "@/lib/uuid";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
@@ -70,7 +71,7 @@ export function CreateLeadsModal({
   initialStageId,
   error,
 }: CreateLeadsModalProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user } = useTenantAuth();
   const companyOptions = useLeadCompanyOptions(branchId, isOpen);
   const acquisitionSources = useCrmAcquisitionSources();
@@ -88,7 +89,13 @@ export function CreateLeadsModal({
     }),
     [fieldMessages, t],
   );
-  const state = useCreateLeadForm(messages, customFields.requiredFieldKeys, initialStageId);
+  const defaultHonorificTitle = getHonorificOptions(lang)[0]?.label ?? "";
+  const state = useCreateLeadForm(
+    messages,
+    customFields.requiredFieldKeys,
+    initialStageId,
+    defaultHonorificTitle,
+  );
   const { form, errors, allErrors } = state;
 
   const corporate = isCorporateLead(form);
@@ -176,29 +183,53 @@ export function CreateLeadsModal({
     }
   }
 
-  const visibleSections = useMemo<LeadCreateSectionId[]>(() => {
-    const sections: LeadCreateSectionId[] = ["classification"];
-    if (corporate) sections.push("company", "contacts");
-    else sections.push("person");
-    if (!existingCompany) sections.push("address");
-    sections.push("qualification");
-    if (customFields.definitions.length > 0) sections.push("customFields");
-    return sections;
-  }, [corporate, existingCompany, customFields.definitions.length]);
+  const indexEntries = useMemo<FormModalSection[]>(() => {
+    const entries: FormModalSection[] = [];
 
-  const indexEntries = useMemo<FormModalSection[]>(
-    () =>
-      visibleSections.map((section) => {
-        const count = leadCreateSectionErrorCount(errors, section);
-        return {
-          id: section,
-          label: t.crmLeads.create.sections[section],
-          invalid: count > 0,
-          hint: undefined,
-        };
-      }),
-    [visibleSections, errors, t],
-  );
+    // Step 1: Essential details (Classification + Person / Company & Contacts)
+    const essentialSections: LeadCreateSectionId[] = corporate
+      ? ["classification", "company", "contacts"]
+      : ["classification", "person"];
+    const essentialHasErrors = essentialSections.some(
+      (sec) => leadCreateSectionErrorCount(errors, sec) > 0,
+    );
+    entries.push({
+      id: "essential",
+      targetSectionIds: essentialSections,
+      label: t.crmLeads.create.steps.essential.title,
+      invalid: essentialHasErrors,
+    });
+
+    // Step 2: Address (if not using an existing company)
+    if (!existingCompany) {
+      entries.push({
+        id: "address",
+        targetSectionIds: ["address"],
+        label: t.crmLeads.create.steps.address.title,
+        invalid: leadCreateSectionErrorCount(errors, "address") > 0,
+      });
+    }
+
+    // Step 3: Qualification
+    entries.push({
+      id: "qualification",
+      targetSectionIds: ["qualification"],
+      label: t.crmLeads.create.steps.qualification.title,
+      invalid: leadCreateSectionErrorCount(errors, "qualification") > 0,
+    });
+
+    // Step 4: Custom fields (if any configured)
+    if (customFields.definitions.length > 0) {
+      entries.push({
+        id: "customFields",
+        targetSectionIds: ["customFields"],
+        label: t.crmLeads.create.steps.customFields.title,
+        invalid: leadCreateSectionErrorCount(errors, "customFields") > 0,
+      });
+    }
+
+    return entries;
+  }, [corporate, existingCompany, customFields.definitions.length, errors, t]);
 
   async function handleSubmit() {
     // Every field speaks now, including the ones never focused. Submit is NOT
@@ -231,10 +262,17 @@ export function CreateLeadsModal({
           onClose();
         }}
         title={t.crmLeads.addTitle}
+        density="compact"
         isDirty={state.isDirty}
         isSubmitting={isSubmitting}
         onSubmit={() => void handleSubmit()}
         error={error ?? undefined}
+        sidebarHeader={
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
+            {t.crmLeads.create.sidebarTitle}
+          </span>
+        }
+        sectionVariant="stepper"
         sections={indexEntries}
         labels={{
           submit: isSubmitting ? t.crmLeads.creating : t.common.create,
@@ -348,6 +386,7 @@ export function CreateLeadsModal({
             address={form.address}
             errors={errors}
             disabled={isSubmitting}
+            defaultOpen={false}
             onChange={state.setAddressField}
             onBlur={state.touch}
           />

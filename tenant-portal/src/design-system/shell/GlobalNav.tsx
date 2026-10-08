@@ -36,7 +36,7 @@ export interface GlobalNavProps {
  * brand zone, the app switcher and the account cluster — roughly 570px before a
  * single section is drawn. Trade's six triggers need about 600px. At 1280px
  * that fits with room to spare; at 1024px it does not, and the honest choices
- * there are a clipped row, a horizontal scrollbar inside a 45px bar, or the
+ * there are a clipped row, a horizontal scrollbar inside a 35px bar, or the
  * sheet. The sheet shows every section with its full heading, so that is the
  * one this takes. It also matches what the old shell did at the same width,
  * where `lg`–`xl` defaulted the sidebar to its icon rail.

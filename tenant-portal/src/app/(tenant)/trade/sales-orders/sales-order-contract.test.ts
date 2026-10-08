@@ -38,12 +38,15 @@ const order = {
       id: UUID,
       clientLineId: OTHER,
       uomId: UUID,
+      descriptionSnapshot: "Blue widget",
+      deliveryDescriptionSnapshot: "Handle with care",
       orderedQuantity: "2",
       unitPrice: "125",
       lineTotal: "250",
       discountTotal: null,
       chargeTotal: null,
       taxTotal: null,
+      taxSnapshot: { jurisdiction: "EG", rate: "14" },
       printLineNumber: 1,
     },
   ],
@@ -73,6 +76,41 @@ describe("the sales order's four axes", () => {
     // The three evidence columns are nullable on a converted or legacy draft,
     // and "not recorded" is not the same fact as "zero".
     expect(parseSalesOrderDetail(order).lines[0].discountTotal).toBeNull();
+  });
+
+  it("retains immutable document, delivery, and tax snapshots on each line", () => {
+    expect(parseSalesOrderDetail(order).lines[0]).toMatchObject({
+      descriptionSnapshot: "Blue widget",
+      deliveryDescriptionSnapshot: "Handle with care",
+      taxSnapshot: { jurisdiction: "EG", rate: "14" },
+    });
+  });
+
+  it("preserves absent line snapshots as null", () => {
+    const withoutSnapshots = {
+      ...order,
+      lines: [
+        {
+          ...order.lines[0],
+          descriptionSnapshot: null,
+          deliveryDescriptionSnapshot: null,
+          taxSnapshot: null,
+        },
+      ],
+    };
+    expect(parseSalesOrderDetail(withoutSnapshots).lines[0]).toMatchObject({
+      descriptionSnapshot: null,
+      deliveryDescriptionSnapshot: null,
+      taxSnapshot: null,
+    });
+  });
+
+  it("rejects a non-object tax snapshot at the runtime boundary", () => {
+    const malformed = {
+      ...order,
+      lines: [{ ...order.lines[0], taxSnapshot: ["not", "an", "object"] }],
+    };
+    expect(() => parseSalesOrderDetail(malformed)).toThrow("Invalid Trade document response.");
   });
 });
 

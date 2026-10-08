@@ -23,6 +23,7 @@ import { TradeDocumentSkeleton } from "../../documents/components/TradeDocumentS
 import { TradeDocumentTotals } from "../../documents/components/TradeDocumentTotals";
 import { TradeDraftReferenceDrawer } from "../../documents/components/TradeDraftReferenceDrawer";
 import { TradeGate } from "../../documents/components/TradeGate";
+import { TradeOrderLinesPanel } from "../../documents/components/TradeOrderLinesPanel";
 import { TradePdfPanel } from "../../documents/components/TradePdfPanel";
 import { TradeStatusBadge } from "../../documents/components/TradeStatusBadge";
 import {
@@ -204,6 +205,15 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                   ),
                 },
               ]}
+            />
+
+            <TradeOrderLinesPanel
+              lines={order.lines}
+              currencyCode={order.currencyCode}
+              secondaryDescriptionLabel={t.tradeDocuments.receiptDescription}
+              secondaryDescription={(line) => line.receiptDescriptionSnapshot}
+              emptyTitle={t.tradeDocuments.orderLinesEmpty}
+              errorTitle={t.tradeDocuments.purchaseOrders.loadFailed}
             />
 
             <TradeDocumentTotals

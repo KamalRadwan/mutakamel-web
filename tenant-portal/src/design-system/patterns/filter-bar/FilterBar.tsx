@@ -153,7 +153,7 @@ export function FilterBar({
           That is the split the bar makes natural: the bar is where you ASK a
           question of the data, the body is where the answer's current
           conditions are listed and removed. Chips also wrap onto a second line
-          by design, which a 45px bar has nowhere to put. */}
+          by design, which a 35px bar has nowhere to put. */}
       <PageActions slot="search">
         <div className="relative w-60">
           <Search

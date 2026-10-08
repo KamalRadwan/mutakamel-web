@@ -11,7 +11,7 @@ import {
   TRADE_CONCURRENCY_CODES,
   TRADE_PERMISSIONS,
 } from "../../trade-scope";
-import { useTradeScopeRequest } from "../../useTradeScope";
+import { useTradeScope, useTradeScopeRequest } from "../../useTradeScope";
 import { useTradeWrite } from "../../useTradeWrite";
 import {
   buildCreateItemRequest,
@@ -25,6 +25,7 @@ import {
   ITEM_UOM_INVALID_CODE,
   itemPath,
   itemsListPath,
+  parseItemDetailResponse,
   parseItemsResponse,
   type Item,
   type ItemFormValues,
@@ -49,10 +50,16 @@ export function useItems() {
   const runWrite = useTradeWrite();
   const canManage = canPerformTradeAction(user, TRADE_PERMISSIONS.catalogMasterManage);
   const { headers } = useTradeScopeRequest(READ_TARGET);
+  const { context, selectCompany } = useTradeScope();
 
   const [items, setItems] = useState<Item[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageScope, setPageScope] = useState(headers);
+  if (pageScope !== headers) {
+    setPageScope(headers);
+    setPage(1);
+  }
   const [kindFilter, setKindFilter] = useState<ItemKind | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<ItemStatus | undefined>(undefined);
   const [search, setSearch] = useState("");
@@ -63,6 +70,7 @@ export function useItems() {
   const [formError, setFormError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
+  const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
 
   const load = useCallback(
@@ -71,9 +79,8 @@ export function useItems() {
       setQueryError(null);
       try {
         const trimmed = search.trim();
-        // `POST /items/search` is the read-like variant: a 200, not a 201, and
-        // the only way to filter by `canonicalCode`. Its filters are equality
-        // matches, so it is used only when a code was actually typed.
+        // `POST /items/search` is the read-like free-text variant: a 200, not
+        // a 201. The term matches localized names, canonical code and barcode.
         const result = trimmed
           ? await tradePost(
               ITEMS_SEARCH_PATH,
@@ -86,11 +93,12 @@ export function useItems() {
               maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
             });
         const parsed = parseItemsResponse(result.data);
+        if (signal?.aborted) return;
         setItems(parsed.items);
         setTotal(parsed.total);
         setHasLoaded(true);
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
@@ -132,7 +140,17 @@ export function useItems() {
         if (!outcome.ok) return false;
         setCreateOpen(false);
         toast.success(t.trade.savedTitle, replayMessage(outcome.replayed, t));
-        await load();
+        // Creation writes only the tenant identity; a company-profile read
+        // cannot include it yet. Let the changed query load the master page.
+        if (context.companyId || page !== 1 || search || kindFilter || statusFilter) {
+          if (context.companyId) selectCompany(null);
+          setPage(1);
+          setSearch("");
+          setKindFilter(undefined);
+          setStatusFilter(undefined);
+        } else {
+          await load();
+        }
         return true;
       } catch (error) {
         setFormError(formMessage(error, t));
@@ -141,7 +159,7 @@ export function useItems() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, runWrite, describe, toast, t, load],
+    [canManage, isSubmitting, runWrite, describe, toast, t, load, context.companyId, selectCompany, page, search, kindFilter, statusFilter],
   );
 
   const update = useCallback(
@@ -225,6 +243,37 @@ export function useItems() {
   const reload = useCallback(() => load(), [load]);
   useRealtimeResync(reload);
 
+  const hasFilters = Boolean(search.trim() || kindFilter || statusFilter);
+  const resetFilters = () => {
+    setPage(1);
+    setSearch("");
+    setKindFilter(undefined);
+    setStatusFilter(undefined);
+  };
+  const openCreate = () => {
+    setFormError(null);
+    setCreateOpen(true);
+  };
+  const openEdit = useCallback(async (item: Item): Promise<void> => {
+    if (!canManage || isSubmitting || editLoadingId) return;
+    setFormError(null);
+    setEditLoadingId(item.id);
+    try {
+      // Identity edits are tenant-master writes. Fetch the authoritative
+      // detail first because list projections intentionally omit relations;
+      // opening the drawer from a list row would otherwise clear them.
+      const result = await tradeGet(itemPath(item.id), {
+        headers: {},
+        maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+      });
+      setEditing(parseItemDetailResponse(result.data));
+    } catch (thrown) {
+      toast.errorFromApi(t.trade.itemLoadFailed, normalizeApiError(thrown));
+    } finally {
+      setEditLoadingId(null);
+    }
+  }, [canManage, editLoadingId, isSubmitting, t, toast]);
+
   return {
     t,
     lang,
@@ -234,6 +283,17 @@ export function useItems() {
     kindFilter,
     statusFilter,
     search,
+    emptyTitle: hasFilters
+      ? t.trade.itemEmpty
+      : context.companyId ? t.trade.itemScopeEmpty : t.trade.itemMasterEmpty,
+    emptyDescription: hasFilters
+      ? t.trade.itemFilterEmptyDescription
+      : context.companyId ? t.trade.itemScopeEmptyDescription : t.trade.itemMasterEmptyDescription,
+    emptyAction: hasFilters
+      ? { label: t.trade.clearFilters, onClick: resetFilters }
+      : context.companyId
+        ? { label: t.trade.scopeItemMaster, onClick: () => selectCompany(null) }
+        : canManage ? { label: t.trade.itemCreate, onClick: openCreate } : undefined,
     isLoading: isLoading && !hasLoaded,
     isRefreshing: isLoading,
     isSubmitting,
@@ -242,6 +302,7 @@ export function useItems() {
     formError,
     createOpen,
     editing,
+    editLoadingId,
     setPage,
     setKindFilter: (next: ItemKind | undefined) => {
       setPage(1);
@@ -255,19 +316,13 @@ export function useItems() {
       setPage(1);
       setSearch(next);
     },
-    openCreate: () => {
-      setFormError(null);
-      setCreateOpen(true);
-    },
+    openCreate,
     closeCreate: () => {
       if (isSubmitting) return;
       setFormError(null);
       setCreateOpen(false);
     },
-    openEdit: (item: Item) => {
-      setFormError(null);
-      setEditing(item);
-    },
+    openEdit,
     closeEdit: () => {
       if (isSubmitting) return;
       setFormError(null);
@@ -291,7 +346,15 @@ function formMessage(error: unknown, t: Dictionary): string {
   if (reason === "ITEM_FORM_CODE") return t.trade.itemFormCode;
   if (reason === "ITEM_FORM_NAMES") return t.trade.itemFormNames;
   if (reason === "ITEM_FORM_UOM") return t.trade.itemFormUom;
+  if (reason === "ITEM_FORM_CATEGORY") return t.trade.itemFormCategory;
   if (reason === "ITEM_FORM_VARIANT") return t.trade.itemFormVariant;
+  if (reason === "ITEM_FORM_BARCODE") return t.trade.itemFormBarcode;
+  if (reason === "ITEM_FORM_NOTES") return t.trade.itemFormNotes;
+  if (reason === "ITEM_FORM_OWNER") return t.trade.itemFormOwner;
+  if (reason === "ITEM_FORM_DECIMAL") return t.trade.itemFormPositiveDecimal;
+  if (reason === "ITEM_FORM_DESCRIPTION") return t.trade.itemFormDescription;
+  if (reason === "ITEM_FORM_COMBO") return t.trade.itemFormComboComponents;
+  if (reason === "ITEM_FORM_OPTIONAL_PRODUCTS") return t.trade.itemFormOptionalProducts;
   return t.trade.itemCreateFailed;
 }
 

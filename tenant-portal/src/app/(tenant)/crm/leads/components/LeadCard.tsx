@@ -1,7 +1,7 @@
 "use client";
 
-import { Building2, UserRound } from "lucide-react";
-import { Badge, cn, iconSize } from "@/design-system";
+import { UserRound } from "lucide-react";
+import { cn, iconSize } from "@/design-system";
 import { leadCardHeading } from "../lead-card-contract";
 import type { LeadItem } from "../hooks/useLeads";
 import { LeadTagList } from "./lead-card/LeadTagList";
@@ -31,24 +31,20 @@ export interface LeadCardLabels {
 export function LeadCard({ lead, labels }: { lead: LeadItem; labels: LeadCardLabels }) {
   const { title, contactName } = leadCardHeading(lead);
   const isCompany = lead.leadProfileType === "CORPORATE";
-  const TypeIcon = isCompany ? Building2 : UserRound;
 
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex min-w-0 items-center gap-1.5">
-        <TypeIcon
-          className={cn(iconSize({ size: "sm" }), "shrink-0 text-muted-foreground")}
-          aria-hidden="true"
-        />
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
           {title}
         </span>
-        <Badge
-          tone="neutral"
-          className="shrink-0 px-1 py-0 text-xs font-medium leading-none normal-case tracking-normal"
-        >
+        {/* Profile type is record metadata, not one of the lead's tags. Keep it
+            as quiet text while the actual tag chips retain their distinct row
+            below. With no leading avatar or type glyph, the card starts with
+            the lead/company name in both reading directions. */}
+        <span className="shrink-0 text-xs font-medium text-muted-foreground">
           {isCompany ? labels.company : labels.individual}
-        </Badge>
+        </span>
       </div>
       {contactName && (
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">

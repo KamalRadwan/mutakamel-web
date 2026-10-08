@@ -141,7 +141,7 @@ export function OpportunitySearchBar({
 
   // The mode toggle and the basic row render in the page action bar; the
   // advanced card renders where this component sits, in the page body. A card
-  // that grows to several rows of conditions has nowhere to go in a 45px bar,
+  // that grows to several rows of conditions has nowhere to go in a 35px bar,
   // and the basic row is exactly one row of 28px controls, which is what the
   // bar is sized for.
   return (

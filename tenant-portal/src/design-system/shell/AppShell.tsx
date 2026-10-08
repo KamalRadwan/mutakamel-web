@@ -27,18 +27,18 @@ export interface AppShellProps {
 }
 
 /**
- * Two 45px bars stacked above `<main>` — see docs/design/shell.md.
+ * Two 35px bars stacked above `<main>` — see docs/design/shell.md.
  *
  * ```text
- * ┌ GlobalNav 45px ── brand · app · sections ·········· account ┐
- * ├ PageActionBar 45px ── where you are ··· this screen's controls ┤
+ * ┌ GlobalNav 35px ── brand · app · sections ·········· account ┐
+ * ├ PageActionBar 35px ── where you are ··· this screen's controls ┤
  * │ main                                                          │
  * ```
  *
- * This replaced a 240px sidebar beside a 48px topbar. The chrome costs 42px
+ * This replaced a 240px sidebar beside a 48px topbar. The chrome costs 22px
  * more vertically and gives back the sidebar's whole 240px horizontally, which
  * on the 1366×768 laptop this is built for is the trade that matters: a dense
- * table gains room for several more columns and loses about one row, and the
+ * table gains room for several more columns and loses part of one row, and the
  * row comes back because a screen's actions now live in the bar rather than in
  * a header block above the table.
  *

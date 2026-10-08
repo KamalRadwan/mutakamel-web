@@ -118,3 +118,22 @@ describe("lead company phones payload", () => {
     });
   });
 });
+
+describe("lead update contract - verified CRM contract", () => {
+  it("defines the exact eleven supported card colors", async () => {
+    const { LEAD_CARD_COLORS } = await import("./lead-write-contract");
+    expect(LEAD_CARD_COLORS).toEqual([
+      "RED",
+      "ORANGE",
+      "AMBER",
+      "YELLOW",
+      "GREEN",
+      "TEAL",
+      "BLUE",
+      "INDIGO",
+      "PURPLE",
+      "PINK",
+      "SLATE",
+    ]);
+  });
+});

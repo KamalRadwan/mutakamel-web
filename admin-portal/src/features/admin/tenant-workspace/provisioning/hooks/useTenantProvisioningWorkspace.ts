@@ -33,6 +33,11 @@ export interface ManagedTargetDraft {
 export function useTenantProvisioningWorkspace(tenantId: string) {
   const { lang, dir } = useI18n();
   const provisioning = useTenantProvisioning(tenantId);
+  const latestOperation = provisioning.operations.data.items.reduce(
+    (latest, candidate) => !latest || candidate.generation > latest.generation ? candidate : latest,
+    null as (typeof provisioning.operations.data.items)[number] | null,
+  );
+  const hasOpenOperation = !!latestOperation && ["REQUESTED", "PLANNING", "QUEUED", "RUNNING", "WAITING_RETRY", "CANCEL_REQUESTED"].includes(latestOperation.status);
   const [section, setSection] =
     useState<ProvisioningWorkspaceSection>("operations");
   const [selectedUpdateKeys, setSelectedUpdateKeys] = useState<string[]>([]);
@@ -247,6 +252,8 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     lang,
     dir,
     provisioning,
+    latestOperation,
+    hasOpenOperation,
     section,
     setSection,
     selectedUpdateKeys: effectiveSelectedUpdateKeys,
