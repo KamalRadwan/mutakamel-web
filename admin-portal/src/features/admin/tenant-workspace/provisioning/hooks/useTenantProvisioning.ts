@@ -13,6 +13,7 @@ import {
   normalizeApiError,
   type NormalizedApiError,
 } from "@/shared/api/normalized-api-error";
+import { useOperatorRefreshGuard } from "@/shared/hooks/useOperatorRefreshGuard";
 import { usePollWhile } from "@/shared/hooks/usePollWhile";
 import { tenantProvisioningApi } from "../api/tenant-provisioning.api";
 import {
@@ -21,6 +22,15 @@ import {
   validateAddApplicationInput,
 } from "../model/commands";
 import { deriveProvisioningPermissions } from "../model/permissions";
+import {
+  PROVISIONING_POLL_BASE_MS,
+  appendPage,
+  mergeFirstPage,
+  newestEventFirst,
+  newestOperationFirst,
+  provisioningPollFingerprint,
+  provisioningPollIntervalMs,
+} from "../model/polling";
 import { isOperationTerminal } from "../model/readers";
 import type {
   ApplyTenantUpdatesDto,
@@ -58,7 +68,13 @@ const DEFAULT_PAGE_META = {
 
 export interface UseTenantProvisioningOptions {
   enabled?: boolean;
+  /** The fastest poll cadence; quiet polls back off to 5× and then 20× it. */
   pollIntervalMs?: number;
+  /**
+   * A caller-owned pause, such as an open confirmation dialog. Polling also
+   * pauses on its own while the page is hidden.
+   */
+  paused?: boolean;
 }
 
 export interface TenantProvisioningController {
@@ -67,13 +83,24 @@ export interface TenantProvisioningController {
   operations: ProvisioningResource<ProvisioningPage<TenantOperationSummary>>;
   selectedOperationId: string | null;
   selectedOperation: ProvisioningResource<TenantOperationDetail | null>;
+  /**
+   * When the selected operation was last read, in browser time. Running steps
+   * measure their elapsed time against it, so it advances with every read
+   * rather than on a ticking clock.
+   */
+  selectedOperationReadAtMs: number | null;
   timeline: ProvisioningResource<ProvisioningPage<TenantOperationTimelineEvent>>;
   updates: ProvisioningResource<ProvisioningPage<TenantAvailableUpdate>>;
   components: ProvisioningResource<ProvisioningPage<TenantComponentInstallation>>;
   seeds: ProvisioningResource<ProvisioningPage<TenantSeedState>>;
   prerequisites: ProvisioningResource<TenantPrerequisiteEvidenceRecord[]>;
   mutation: ProvisioningMutationState;
+  /** Open work or prerequisites remain, so the workspace refreshes itself. */
   polling: boolean;
+  /** Refresh is held: the page is hidden or the caller paused it. */
+  pollPaused: boolean;
+  /** The current refresh cadence, which slows while nothing changes. */
+  pollIntervalMs: number;
   selectOperation: (operationId: string) => void;
   /**
    * Loads the next page of operations and appends it.
@@ -117,7 +144,14 @@ export function useTenantProvisioning(
 ): TenantProvisioningController {
   const { user, isLoading: authLoading } = useAuth();
   const enabled = options.enabled !== false;
-  const pollIntervalMs = Math.max(100, options.pollIntervalMs ?? 3_000);
+  const basePollIntervalMs = Math.max(
+    100,
+    options.pollIntervalMs ?? PROVISIONING_POLL_BASE_MS,
+  );
+  const refreshGuard = useOperatorRefreshGuard({
+    modalOrMenuOpen: options.paused === true,
+  });
+  const pollPaused = refreshGuard.isPaused;
   const permissions = useMemo(
     () => deriveProvisioningPermissions(user),
     [user],
@@ -146,9 +180,14 @@ export function useTenantProvisioning(
   const [selectedOperation, setSelectedOperation] = useState(() =>
     idleResource<TenantOperationDetail | null>(null),
   );
+  const [selectedOperationReadAtMs, setSelectedOperationReadAtMs] = useState<
+    number | null
+  >(null);
   const [timeline, setTimeline] = useState(() =>
     idleResource(emptyPage<TenantOperationTimelineEvent>()),
   );
+  /** Whose events the timeline holds, so a refresh can keep its older pages. */
+  const timelineOperationIdRef = useRef<string | null>(null);
   const [updates, setUpdates] = useState(() =>
     idleResource(emptyPage<TenantAvailableUpdate>()),
   );
@@ -169,13 +208,34 @@ export function useTenantProvisioning(
   const [loadingMoreOperations, setLoadingMoreOperations] = useState(false);
   const [loadingMoreTimeline, setLoadingMoreTimeline] = useState(false);
 
+  /**
+   * Poll backoff. Consecutive polls that changed nothing slow the cadence
+   * from 3 s to 15 s to 60 s; anything that changed, and every operator
+   * intent, returns it to 3 s.
+   */
+  const [quietPolls, setQuietPolls] = useState(0);
+  const quietPollsRef = useRef(0);
+  const lastPollFingerprintRef = useRef<string | null>(null);
+  const pollIntervalMs = provisioningPollIntervalMs(
+    quietPolls,
+    basePollIntervalMs,
+  );
+
   const intentKeys = useRef(new Map<string, string>());
 
+  const resetPollBackoff = useCallback(() => {
+    quietPollsRef.current = 0;
+    lastPollFingerprintRef.current = null;
+    setQuietPolls(0);
+  }, []);
+
   const loadOperations = useCallback(
-    async (signal?: AbortSignal) => {
+    async (
+      signal?: AbortSignal,
+    ): Promise<ProvisioningPage<TenantOperationSummary> | null> => {
       if (!permissions.canReadOperations) {
         setOperations((current) => forbiddenResource(current.data));
-        return;
+        return null;
       }
       startResource(setOperations);
       try {
@@ -184,23 +244,36 @@ export function useTenantProvisioning(
           { page: 1, limit: 100, sortBy: "generation", sortDir: "DESC" },
           signal,
         );
-        if (signal?.aborted) return;
-        setOperations(readyResource(page));
+        if (signal?.aborted) return null;
+        // A refresh re-reads page one only; older pages the operator loaded
+        // stay, unless they describe another tenant.
+        setOperations((current) =>
+          readyResource(
+            current.data.items.every((item) => item.tenantId === tenantId)
+              ? mergeFirstPage(current.data, page, newestOperationFirst)
+              : page,
+          ),
+        );
         setSelectedOperationId((current) => current ?? page.items[0]?.id ?? null);
+        return page;
       } catch (error) {
-        if (signal?.aborted || isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return null;
         failResource(setOperations, error);
+        return null;
       }
     },
     [permissions.canReadOperations, tenantId],
   );
 
   const loadSelectedOperation = useCallback(
-    async (operationId: string, signal?: AbortSignal) => {
+    async (
+      operationId: string,
+      signal?: AbortSignal,
+    ): Promise<TenantOperationDetail | null> => {
       if (!permissions.canReadOperations) {
         setSelectedOperation(forbiddenResource(null));
         setTimeline(forbiddenResource(emptyPage()));
-        return;
+        return null;
       }
       startResource(setSelectedOperation);
       startResource(setTimeline);
@@ -217,18 +290,31 @@ export function useTenantProvisioning(
       // abort, so the operation the response describes is the only thing that
       // can say whether it is still the one on screen.
       if (signal?.aborted || selectedOperationIdRef.current !== operationId) {
-        return;
+        return null;
       }
       if (detailResult.status === "fulfilled") {
         setSelectedOperation(readyResource(detailResult.value));
+        setSelectedOperationReadAtMs(Date.now());
       } else if (!isAbortError(detailResult.reason)) {
         failResource(setSelectedOperation, detailResult.reason);
       }
       if (timelineResult.status === "fulfilled") {
-        setTimeline(readyResource(timelineResult.value));
+        // The same operation's timeline keeps the older pages already loaded;
+        // another operation's replaces it.
+        const sameOperation = timelineOperationIdRef.current === operationId;
+        timelineOperationIdRef.current = operationId;
+        const page = timelineResult.value;
+        setTimeline((current) =>
+          readyResource(
+            sameOperation
+              ? mergeFirstPage(current.data, page, newestEventFirst)
+              : page,
+          ),
+        );
       } else if (!isAbortError(timelineResult.reason)) {
         failResource(setTimeline, timelineResult.reason);
       }
+      return detailResult.status === "fulfilled" ? detailResult.value : null;
     },
     [permissions.canReadOperations, tenantId],
   );
@@ -300,10 +386,12 @@ export function useTenantProvisioning(
   );
 
   const loadPrerequisites = useCallback(
-    async (signal?: AbortSignal) => {
+    async (
+      signal?: AbortSignal,
+    ): Promise<TenantPrerequisiteEvidenceRecord[] | null> => {
       if (!permissions.canReadPrerequisites) {
         setPrerequisites((current) => forbiddenResource(current.data));
-        return;
+        return null;
       }
       startResource(setPrerequisites);
       try {
@@ -311,16 +399,20 @@ export function useTenantProvisioning(
           tenantId,
           signal,
         );
-        if (!signal?.aborted) setPrerequisites(readyResource(records));
+        if (signal?.aborted) return null;
+        setPrerequisites(readyResource(records));
+        return records;
       } catch (error) {
-        if (signal?.aborted || isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return null;
         failResource(setPrerequisites, error);
+        return null;
       }
     },
     [permissions.canReadPrerequisites, tenantId],
   );
 
   const refreshAll = useCallback(async () => {
+    resetPollBackoff();
     const tasks: Promise<unknown>[] = [];
     if (permissions.canReadOperations) {
       tasks.push(loadOperations(), loadUpdates(), loadComponents(), loadSeeds());
@@ -339,6 +431,7 @@ export function useTenantProvisioning(
     loadUpdates,
     permissions.canReadOperations,
     permissions.canReadPrerequisites,
+    resetPollBackoff,
     selectedOperationId,
   ]);
 
@@ -403,30 +496,65 @@ export function useTenantProvisioning(
     return enabled && (operationPending || prerequisitePending);
   }, [enabled, operations.data.items, prerequisites.data, selectedOperation.data]);
 
-  usePollWhile(
-    polling && !authLoading,
-    () => {
-      const tasks: Promise<unknown>[] = [loadOperations()];
-      if (selectedOperationId) {
-        tasks.push(loadSelectedOperation(selectedOperationId));
-      }
-      if (permissions.canReadPrerequisites) tasks.push(loadPrerequisites());
-      return Promise.all(tasks).then(() => undefined);
+  /**
+   * One background read. What it observed decides the next cadence: the same
+   * fingerprint as last time is a quiet poll and slows the cadence, anything
+   * else returns it to the base.
+   */
+  const pollOnce = useCallback(async () => {
+    const operationId = selectedOperationIdRef.current;
+    const [page, detail, records] = await Promise.all([
+      loadOperations(),
+      operationId ? loadSelectedOperation(operationId) : Promise.resolve(null),
+      permissions.canReadPrerequisites
+        ? loadPrerequisites()
+        : Promise.resolve(null),
+    ]);
+    const fingerprint = provisioningPollFingerprint({
+      operations: page?.items ?? null,
+      detail,
+      prerequisites: records,
+    });
+    const quiet = fingerprint === lastPollFingerprintRef.current;
+    lastPollFingerprintRef.current = fingerprint;
+    quietPollsRef.current = quiet ? quietPollsRef.current + 1 : 0;
+    setQuietPolls(quietPollsRef.current);
+  }, [
+    loadOperations,
+    loadPrerequisites,
+    loadSelectedOperation,
+    permissions.canReadPrerequisites,
+  ]);
+
+  // Nothing is read while the page is hidden or the caller holds refresh
+  // (an open confirmation dialog); the rows on screen stay as they are.
+  usePollWhile(polling && !authLoading && !pollPaused, pollOnce, {
+    intervalMs: pollIntervalMs,
+    deps: [pollOnce, selectedOperationId],
+  });
+
+  // Coming back resumes at the base cadence rather than a slowed one: the
+  // operator is looking again, and whatever changed meanwhile is unseen.
+  const wasPollPausedRef = useRef(pollPaused);
+  useEffect(() => {
+    const resumed = wasPollPausedRef.current && !pollPaused;
+    wasPollPausedRef.current = pollPaused;
+    if (!resumed) return;
+    const timer = window.setTimeout(resetPollBackoff, 0);
+    return () => window.clearTimeout(timer);
+  }, [pollPaused, resetPollBackoff]);
+
+  const selectOperation = useCallback(
+    (operationId: string) => {
+      resetPollBackoff();
+      setSelectedOperationId(operationId);
     },
-    {
-      intervalMs: pollIntervalMs,
-      deps: [
-        loadOperations,
-        loadPrerequisites,
-        loadSelectedOperation,
-        permissions.canReadPrerequisites,
-        selectedOperationId,
-      ],
-    },
+    [resetPollBackoff],
   );
 
   const refreshAfterOperation = useCallback(
     async (operationId: string, detail?: TenantOperationDetail) => {
+      resetPollBackoff();
       setSelectedOperationId(operationId);
       if (detail) setSelectedOperation(readyResource(detail));
       await Promise.all([
@@ -446,6 +574,7 @@ export function useTenantProvisioning(
       loadSelectedOperation,
       loadUpdates,
       permissions.canReadPrerequisites,
+      resetPollBackoff,
     ],
   );
 
@@ -635,10 +764,7 @@ export function useTenantProvisioning(
       });
       setOperations((previous) =>
         previous.data.meta.page === nextPage - 1
-          ? readyResource({
-              items: [...previous.data.items, ...page.items],
-              meta: page.meta,
-            })
+          ? readyResource(appendPage(previous.data, page))
           : previous,
       );
     } catch (error) {
@@ -681,10 +807,7 @@ export function useTenantProvisioning(
       if (selectedOperationIdRef.current !== operationId) return;
       setTimeline((previous) =>
         previous.data.meta.page === nextPage - 1
-          ? readyResource({
-              items: [...previous.data.items, ...page.items],
-              meta: page.meta,
-            })
+          ? readyResource(appendPage(previous.data, page))
           : previous,
       );
     } catch (error) {
@@ -705,6 +828,7 @@ export function useTenantProvisioning(
     operations,
     selectedOperationId,
     selectedOperation,
+    selectedOperationReadAtMs,
     timeline,
     updates,
     components,
@@ -712,7 +836,9 @@ export function useTenantProvisioning(
     prerequisites,
     mutation,
     polling,
-    selectOperation: setSelectedOperationId,
+    pollPaused,
+    pollIntervalMs,
+    selectOperation,
     loadMoreOperations,
     loadMoreTimeline,
     loadingMoreOperations,

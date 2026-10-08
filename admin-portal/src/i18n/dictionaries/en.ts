@@ -528,7 +528,7 @@ export const en: Dictionary = {
       "payment-reconciliation-open": "Payment reconciliations await a checker decision.",
       "payments-attention": "Payments need review or settlement attention.",
       "provisioning-manual-recovery": "Tenant operations require manual recovery.",
-      "provisioning-stuck": "Provisioning attempts have remained pending for more than 30 minutes.",
+      "provisioning-stuck": "Open tenant operations have reported no progress for more than {n} minutes.",
       "provisioning-waiting-retry": "Tenant operations are waiting for retry.",
       "security-admins-locked": "Administrator accounts are currently locked.",
       "security-failed-login-activity": "Administrator accounts have failed-login activity.",
@@ -702,7 +702,10 @@ export const en: Dictionary = {
       stalePlacementCommittedMigrations: "Stale Placement Committed Migrations",
       stalePreCommitMigrations: "Stale Pre Commit Migrations",
       staleStagedRotations: "Stale Staged Rotations",
-      stuckAttempts: "Stuck Attempts",
+      stalledOperations: "Stalled Operations",
+      stalledOperationsByReason: "Stalled Operations by Reason",
+      stalledOperationsByStep: "Stalled Operations by Step",
+      stalledOperationsByType: "Stalled Operations by Type",
       succeeded: "Succeeded",
       successRatio: "Success Ratio",
       syntheticFailures: "Synthetic Failures",
@@ -985,6 +988,19 @@ export const en: Dictionary = {
       "Classification Conflicts": "Classification Conflicts",
       "Within a month": "Within a month",
       "Within a week": "Within a week",
+      "Add Application": "Add Application",
+      "Addon Install": "Add-on Install",
+      "Awaiting Prerequisites": "Awaiting Prerequisites",
+      "Cancel Pending": "Cancel Pending",
+      "Cancel Requested": "Cancel Requested",
+      Decommission: "Decommission",
+      "Dispatch Lease Expired": "Dispatch Lease Expired",
+      "Initial Provision": "Initial Provision",
+      "No Progress": "No Progress",
+      Queued: "Queued",
+      Repair: "Repair",
+      Retry: "Retry",
+      Update: "Update",
     },
     visuals: {
       other: "Other",
@@ -2452,7 +2468,8 @@ export const en: Dictionary = {
   tenantProvisioning: {
     ariaLabel: "Tenant provisioning management",
     title: "Tenant provisioning",
-    livePollingBadge: "Live polling",
+    livePollingBadge: (interval: string) => `Live · every ${interval}`,
+    pollingPausedBadge: "Auto-refresh paused",
     asyncNote:
       "Operations are asynchronous. The tenant database is ready only after activation succeeds.",
     refreshButton: "Refresh",
@@ -2471,6 +2488,43 @@ export const en: Dictionary = {
     openOperationNote: "An operation is still open. Finish it or complete cancellation before starting another operation.",
     viewCurrentOperationButton: "View current operation",
     requestCancelButton: "Request cancel",
+    stalledBadge: (duration: string) => `Stalled · no progress for ${duration}`,
+    stallNoProgressNote: (duration: string, step: string | null) =>
+      step
+        ? `No progress has been reported for ${duration} at ${step}. The Worker may have stopped, or the step is taking longer than expected.`
+        : `No progress has been reported for ${duration}. The Worker may have stopped, or the work is taking longer than expected.`,
+    stallDispatchLeaseExpiredNote: (duration: string, step: string | null) =>
+      `${step ?? "A step"} was handed to its owning application ${duration} ago and no result has come back. Its 5-minute dispatch lease has expired and the Worker has not sent it again.`,
+    stallCancelPendingNote: (duration: string, step: string | null) =>
+      step
+        ? `Cancellation was requested ${duration} ago and the Worker has not confirmed that ${step} stopped.`
+        : `Cancellation was requested ${duration} ago and the Worker has not confirmed the stop.`,
+    stallCancelGuidance:
+      "Request cancellation to stop it. Re-provisioning becomes available once the Worker confirms the stop.",
+    stallAwaitWorkerGuidance:
+      "No operator action can move it on until the Worker confirms the stop. Check that the Worker is running.",
+    exitBlockedReasons: {
+      OPERATION_SUPERSEDED: "A newer generation exists. Act on the latest operation instead.",
+      ADDON_INSTALLATION_OWNED:
+        "Add-on installations are stopped and recovered by their commercial flow, not from here.",
+      CANCELLATION_PENDING:
+        "Cancellation is still in progress. This becomes available once the Worker confirms the stop.",
+      OPERATION_OPEN:
+        "An operation is still open. This becomes available after it finishes or its cancellation completes.",
+      OPERATION_SUCCEEDED: "The operation succeeded; there is nothing to re-provision.",
+      OPERATION_TERMINAL: "The operation has already finished; there is nothing to cancel.",
+    },
+    cancelConfirmTitle: (operation: string, generation: number) =>
+      `Request cancellation of ${operation} · generation ${generation}?`,
+    cancelConfirmDescription:
+      "Core records the request and the Worker stops the operation at its next safe point. Work that already completed stays applied and nothing is deleted; unfinished steps are marked cancelled. The operation stays open until the Worker confirms the stop, and can then be re-provisioned. A tenant still in its initial provisioning becomes provisioning-failed.",
+    retryConfirmTitle: (operation: string, generation: number) =>
+      `Re-provision ${operation} · generation ${generation}?`,
+    retryConfirmDescription: (nextGeneration: number) =>
+      `Core plans generation ${nextGeneration}, which runs again only the steps that did not complete, pinned to the same releases. This generation and its timeline stay as history. A tenant whose initial provisioning failed returns to provisioning.`,
+    repairConfirmTitle: (component: string) => `Repair ${component}?`,
+    repairConfirmDescription:
+      "Core opens a repair operation pinned to the component's current desired release; it does not upgrade. The component's migrations are checked against that release and every seed pack is applied again under its policy, including seeds closed by a conflict decision; its dependencies are only verified. Backup and maintenance prerequisites are requested first when the release requires them, and no other operation can start until the repair finishes.",
     historicalOperationNote: (currentGen: number, latestGen: number) =>
       `This is a historical operation. Generation ${currentGen} was superseded by generation ${latestGen}; retry and cancel actions are available only for the latest operation.`,
     weightedProgressLabel: "Weighted progress",
@@ -2484,6 +2538,9 @@ export const en: Dictionary = {
     kindColumnHeader: "Kind",
     statusColumnHeader: "Status",
     attemptsColumnHeader: "Attempts",
+    startedColumnHeader: "Started",
+    finishedColumnHeader: "Finished",
+    elapsedColumnHeader: "Elapsed",
     timelineLabel: "Timeline",
     availableUpdatesTitle: "Available updates",
     updatesNote:

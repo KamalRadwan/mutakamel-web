@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Ban,
   Boxes,
   Check,
   CheckCircle2,
@@ -7,12 +8,16 @@ import {
   CircleDashed,
   DatabaseZap,
   History,
+  Hourglass,
+  LoaderCircle,
+  Pause,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
   Wrench,
   X,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { en as enDict } from "@/i18n/dictionaries/en";
@@ -27,6 +32,7 @@ import {
   CardHeader,
   CardTitle,
   Checkbox,
+  ConfirmActionModal,
   EmptyState,
   Field,
   Input,
@@ -47,9 +53,14 @@ import {
   TabsTrigger,
 } from "@/design-system";
 import type {
+  ProvisioningConfirmation,
   ProvisioningWorkspaceSection,
   TenantProvisioningWorkspaceModel,
 } from "../hooks/useTenantProvisioningWorkspace";
+import {
+  formatProvisioningDuration,
+  stepElapsedSeconds,
+} from "../model/operation-timing";
 import { canResolveSeedConflict } from "../model/readers";
 import {
   provisioningEventLabel,
@@ -60,7 +71,10 @@ import {
 import type {
   ProvisioningResource,
   SeedConflictDecision,
+  TenantOperationDetail,
+  TenantOperationStall,
   TenantOperationStatus,
+  TenantOperationStep,
   TenantOperationStepStatus,
 } from "../types";
 
@@ -108,12 +122,20 @@ export function TenantProvisioningWorkspaceView({
             <h2 className="text-base font-semibold text-foreground">
               {copy.title}
             </h2>
-            {provisioning.polling && (
-              <Badge tone="info" role="status" aria-live="polite">
-                <RefreshCw className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-                {copy.livePollingBadge}
-              </Badge>
-            )}
+            {provisioning.polling &&
+              (provisioning.pollPaused ? (
+                <Badge tone="neutral" role="status" aria-live="polite">
+                  <Pause className="size-3" aria-hidden="true" />
+                  {copy.pollingPausedBadge}
+                </Badge>
+              ) : (
+                <Badge tone="info" role="status" aria-live="polite">
+                  <RefreshCw className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                  {copy.livePollingBadge(
+                    formatProvisioningDuration(provisioning.pollIntervalMs / 1_000, model.lang),
+                  )}
+                </Badge>
+              ))}
           </div>
         </div>
         <Button
@@ -182,8 +204,82 @@ export function TenantProvisioningWorkspaceView({
         )}
         {model.section === "managed" && <ManagedSection model={model} />}
       </div>
+
+      <ProvisioningConfirmationDialog model={model} />
     </section>
   );
+}
+
+/**
+ * The one confirmation for cancel, re-provision and repair. It names the
+ * exact operation or component and states the consequence before anything
+ * is sent; it cannot be dismissed while the confirmed command is in flight.
+ */
+function ProvisioningConfirmationDialog({ model }: TenantProvisioningWorkspaceViewProps) {
+  const pending = model.confirmation;
+  const content = pending ? confirmationContent(pending) : null;
+  return (
+    <ConfirmActionModal
+      isOpen={pending !== null}
+      onClose={model.dismissConfirmation}
+      onConfirm={model.confirmPending}
+      titleEn={content?.titleEn ?? ""}
+      titleAr={content?.titleAr ?? ""}
+      descriptionEn={content?.descriptionEn ?? ""}
+      descriptionAr={content?.descriptionAr ?? ""}
+      confirmTextEn={content?.confirmEn}
+      confirmTextAr={content?.confirmAr}
+      variant={content?.variant ?? "warning"}
+      isLoading={model.provisioning.mutation.name !== null}
+    />
+  );
+}
+
+function confirmationContent(pending: ProvisioningConfirmation): {
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  confirmEn: string;
+  confirmAr: string;
+  variant: "danger" | "warning";
+} {
+  const en = enDict.tenantProvisioning;
+  const ar = arDict.tenantProvisioning;
+  if (pending.kind === "repair") {
+    return {
+      titleEn: en.repairConfirmTitle(pending.component.componentKey),
+      titleAr: ar.repairConfirmTitle(pending.component.componentKey),
+      descriptionEn: en.repairConfirmDescription,
+      descriptionAr: ar.repairConfirmDescription,
+      confirmEn: en.createRepairButton,
+      confirmAr: ar.createRepairButton,
+      variant: "warning",
+    };
+  }
+  const { operation } = pending;
+  const typeEn = operationTypeLabel(operation.type, false);
+  const typeAr = operationTypeLabel(operation.type, true);
+  if (pending.kind === "cancel") {
+    return {
+      titleEn: en.cancelConfirmTitle(typeEn, operation.generation),
+      titleAr: ar.cancelConfirmTitle(typeAr, operation.generation),
+      descriptionEn: en.cancelConfirmDescription,
+      descriptionAr: ar.cancelConfirmDescription,
+      confirmEn: en.requestCancelButton,
+      confirmAr: ar.requestCancelButton,
+      variant: "danger",
+    };
+  }
+  return {
+    titleEn: en.retryConfirmTitle(typeEn, operation.generation),
+    titleAr: ar.retryConfirmTitle(typeAr, operation.generation),
+    descriptionEn: en.retryConfirmDescription(operation.generation + 1),
+    descriptionAr: ar.retryConfirmDescription(operation.generation + 1),
+    confirmEn: en.reprovisionButton,
+    confirmAr: ar.reprovisionButton,
+    variant: "warning",
+  };
 }
 
 function OperationsSection({ model }: TenantProvisioningWorkspaceViewProps) {
@@ -305,26 +401,16 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
           {(() => {
             const operation = provisioning.selectedOperation.data;
             const latestOperation = model.latestOperation;
-            const isLatestOperation = latestOperation?.id === operation.id;
+            const actions = model.operationActions;
             const isHistoricalOperation =
               !!latestOperation && operation.generation < latestOperation.generation;
-            const canRetry =
-              provisioning.permissions.canRetryOrCancel &&
-              isLatestOperation &&
-              ["FAILED_RETRYABLE", "MANUAL_RECOVERY_REQUIRED", "CANCELLED"].includes(
-                operation.status,
-              );
-            const cancellationPending = isLatestOperation && operation.status === "CANCEL_REQUESTED";
-            const canCancel =
-              provisioning.permissions.canRetryOrCancel &&
-              isLatestOperation &&
-              [
-                "REQUESTED",
-                "PLANNING",
-                "QUEUED",
-                "RUNNING",
-                "WAITING_RETRY",
-              ].includes(operation.status);
+            // Core states this from the latest generation, so it holds even
+            // when the loaded history has not caught up yet.
+            const superseded = operation.exits.retry.reasonCode === "OPERATION_SUPERSEDED";
+            const cancellationPending = operation.exits.retry.reasonCode === "CANCELLATION_PENDING";
+            const retryReason =
+              actions.retry.visible && !cancellationPending ? actions.retry.reasonCode : null;
+            const cancelReason = actions.cancel.visible ? actions.cancel.reasonCode : null;
             return (
               <>
                 <div className="rounded-lg border border-border p-4">
@@ -337,43 +423,68 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                         {provisioningStepLabel(operation.currentPhase, ar)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <StatusBadge status={operation.status} ar={ar} />
-                      {(canRetry || (cancellationPending && provisioning.permissions.canRetryOrCancel)) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={operation.status} ar={ar} live={!operation.stall} />
+                      {operation.stall && <StalledBadge stall={operation.stall} lang={model.lang} />}
+                      {actions.retry.visible && (
                         <Button
                           type="button"
                           variant="primary"
                           size="sm"
-                          onClick={() => void provisioning.retryOperation(operation.id).catch(() => undefined)}
-                          disabled={cancellationPending || provisioning.mutation.name !== null}
-                          aria-describedby={cancellationPending ? "provisioning-cancellation-status" : undefined}
+                          onClick={() => model.requestRetry(operation)}
+                          disabled={!actions.retry.enabled}
+                          aria-describedby={
+                            cancellationPending
+                              ? "provisioning-cancellation-status"
+                              : retryReason
+                                ? "provisioning-retry-blocked-reason"
+                                : undefined
+                          }
                         >
                           {copy.reprovisionButton}
                         </Button>
                       )}
-                      {canCancel && (
+                      {actions.cancel.visible && (
                         <Button
                           type="button"
                           variant="destructive"
                           size="sm"
-                          onClick={() => void provisioning.cancelOperation(operation.id).catch(() => undefined)}
-                          disabled={provisioning.mutation.name !== null}
+                          onClick={() => model.requestCancel(operation)}
+                          disabled={!actions.cancel.enabled}
+                          aria-describedby={cancelReason ? "provisioning-cancel-blocked-reason" : undefined}
                         >
                           {copy.requestCancelButton}
                         </Button>
                       )}
                     </div>
                   </div>
+                  {(retryReason || cancelReason) && (
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      {retryReason && (
+                        <p id="provisioning-retry-blocked-reason">
+                          {copy.reprovisionButton}: {copy.exitBlockedReasons[retryReason]}
+                        </p>
+                      )}
+                      {cancelReason && (
+                        <p id="provisioning-cancel-blocked-reason">
+                          {copy.requestCancelButton}: {copy.exitBlockedReasons[cancelReason]}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {operation.stall && <StallNotice operation={operation} stall={operation.stall} lang={model.lang} />}
                   {cancellationPending && (
                     <p id="provisioning-cancellation-status" role="status" className="mt-3 rounded-md bg-muted p-3 text-xs text-muted-foreground">
                       {copy.cancellationPendingNote}
                     </p>
                   )}
-                  {isHistoricalOperation && latestOperation && (
+                  {(isHistoricalOperation || superseded) && (
                     <div className="mt-3 flex items-start gap-2 rounded-md bg-muted p-2 text-xs text-muted-foreground">
                       <History className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                       <p>
-                        {copy.historicalOperationNote(operation.generation, latestOperation.generation)}
+                        {isHistoricalOperation && latestOperation
+                          ? copy.historicalOperationNote(operation.generation, latestOperation.generation)
+                          : copy.exitBlockedReasons.OPERATION_SUPERSEDED}
                       </p>
                     </div>
                   )}
@@ -412,28 +523,61 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                           <Th>{copy.stepColumnHeader}</Th>
                           <Th>{copy.kindColumnHeader}</Th>
                           <Th>{copy.statusColumnHeader}</Th>
+                          <Th>{copy.startedColumnHeader}</Th>
+                          <Th>{copy.finishedColumnHeader}</Th>
+                          <Th>{copy.elapsedColumnHeader}</Th>
                           <Th>{copy.attemptsColumnHeader}</Th>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {operation.steps.map((step) => (
-                          <TableRow key={step.id}>
-                            <Td>
-                              {/* The name leads; the plan key stays beside it,
-                                  because it is what an operator pastes into a
-                                  query and what support asks for. */}
-                              <span className="font-semibold text-foreground">
-                                {provisioningStepLabel(step.stepKey, ar)}
-                              </span>
-                              <span className="block font-mono text-2xs text-muted-foreground" dir="ltr">
-                                {step.stepKey}
-                              </span>
-                            </Td>
-                            <Td>{provisioningStepKindLabel(step.kind, ar)}</Td>
-                            <Td><StepBadge status={step.status} ar={ar} /></Td>
-                            <Td>{step.attemptCount}{step.retryable ? " ↻" : ""}</Td>
-                          </TableRow>
-                        ))}
+                        {operation.steps.map((step) => {
+                          const stall =
+                            operation.stall?.stepKey === step.stepKey ? operation.stall : null;
+                          const elapsed = stepElapsedSeconds(step, provisioning.selectedOperationReadAtMs);
+                          const error = stepErrorText(step);
+                          return (
+                            <TableRow key={step.id}>
+                              <Td>
+                                {/* The name leads; the plan key stays beside it,
+                                    because it is what an operator pastes into a
+                                    query and what support asks for. */}
+                                <span className="font-semibold text-foreground">
+                                  {provisioningStepLabel(step.stepKey, ar)}
+                                </span>
+                                <span className="block font-mono text-xs text-muted-foreground" dir="ltr">
+                                  {step.stepKey}
+                                </span>
+                                {error && (
+                                  <span
+                                    dir="auto"
+                                    className={`mt-1 block max-w-md break-words ${
+                                      step.status === "FAILED" || step.status === "CONFLICT"
+                                        ? "text-destructive"
+                                        : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {error}
+                                  </span>
+                                )}
+                              </Td>
+                              <Td>{provisioningStepKindLabel(step.kind, ar)}</Td>
+                              <Td>
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <StepBadge status={step.status} ar={ar} live={!stall} />
+                                  {stall && <StalledBadge stall={stall} lang={model.lang} />}
+                                </div>
+                              </Td>
+                              <Td><Timestamp value={step.startedAt} lang={model.lang} /></Td>
+                              <Td><Timestamp value={step.finishedAt} lang={model.lang} /></Td>
+                              <Td>
+                                <span className="whitespace-nowrap">
+                                  {elapsed === null ? "—" : formatProvisioningDuration(elapsed, model.lang)}
+                                </span>
+                              </Td>
+                              <Td>{step.attemptCount}{step.retryable ? " ↻" : ""}</Td>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -808,7 +952,21 @@ function ManagedSection({ model }: TenantProvisioningWorkspaceViewProps) {
               />
             )}
           </Field>
-          <Button type="button" variant="primary" size="sm" disabled={model.hasOpenOperation || !provisioning.permissions.canRepair || provisioning.mutation.name !== null} onClick={() => void model.submitRepair()}>{copy.createRepairButton}</Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={!model.repairAction.enabled}
+            aria-describedby={model.repairAction.reasonCode ? "provisioning-repair-blocked-reason" : undefined}
+            onClick={model.requestRepair}
+          >
+            {copy.createRepairButton}
+          </Button>
+          {model.repairAction.reasonCode && (
+            <p id="provisioning-repair-blocked-reason" className="text-xs text-muted-foreground">
+              {copy.exitBlockedReasons[model.repairAction.reasonCode]}
+            </p>
+          )}
         </CommandCard>
 
         <CommandCard title={copy.retainedDecommissionTitle} description={copy.retainedDecommissionDescription}>
@@ -921,15 +1079,49 @@ function Notice({ icon, title, description }: { icon: ReactNode; title: string; 
   );
 }
 
-function StatusBadge({ status, ar }: { status: TenantOperationStatus; ar: boolean }) {
-  return <Badge tone={statusTone(status)}>{operationStatusLabel(status, ar)}</Badge>;
+type BadgeTone = "success" | "info" | "danger" | "warn" | "neutral";
+
+interface StatusPresentation {
+  tone: BadgeTone;
+  Icon: LucideIcon;
+  /** Only work that is actually executing spins; waiting states stay still. */
+  spins: boolean;
 }
 
-function statusTone(status: TenantOperationStatus): "success" | "danger" | "warn" | "neutral" {
-  if (status === "SUCCEEDED") return "success";
-  if (status === "FAILED_RETRYABLE" || status === "MANUAL_RECOVERY_REQUIRED") return "danger";
-  if (status === "CANCEL_REQUESTED") return "warn";
-  return "neutral";
+/**
+ * Status is never colour alone: each state has its own icon and label.
+ * RUNNING is the informational tone with a spinner, distinct from the
+ * neutral waiting states; a spinner is dropped once the work has stalled,
+ * because it would claim a liveness Core no longer sees.
+ */
+function StatusBadge({ status, ar, live = false }: { status: TenantOperationStatus; ar: boolean; live?: boolean }) {
+  const { tone, Icon, spins } = operationStatusPresentation(status);
+  return (
+    <Badge tone={tone}>
+      <Icon className={`size-3 ${spins && live ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+      {operationStatusLabel(status, ar)}
+    </Badge>
+  );
+}
+
+function operationStatusPresentation(status: TenantOperationStatus): StatusPresentation {
+  switch (status) {
+    case "SUCCEEDED":
+      return { tone: "success", Icon: CheckCircle2, spins: false };
+    case "FAILED_RETRYABLE":
+    case "MANUAL_RECOVERY_REQUIRED":
+      return { tone: "danger", Icon: AlertTriangle, spins: false };
+    case "CANCEL_REQUESTED":
+      return { tone: "warn", Icon: Ban, spins: false };
+    case "WAITING_RETRY":
+      return { tone: "warn", Icon: RotateCcw, spins: false };
+    case "RUNNING":
+      return { tone: "info", Icon: LoaderCircle, spins: true };
+    case "CANCELLED":
+      return { tone: "neutral", Icon: XCircle, spins: false };
+    default:
+      return { tone: "neutral", Icon: CircleDashed, spins: false };
+  }
 }
 
 function progressTone(status: TenantOperationStatus): "running" | "succeeded" | "failed" {
@@ -938,10 +1130,97 @@ function progressTone(status: TenantOperationStatus): "running" | "succeeded" | 
   return "running";
 }
 
-function StepBadge({ status, ar }: { status: TenantOperationStepStatus; ar: boolean }) {
-  const Icon = status === "SUCCEEDED" || status === "SKIPPED" ? CheckCircle2 : status === "FAILED" || status === "CONFLICT" ? AlertTriangle : status === "CANCELLED" ? XCircle : CircleDashed;
-  const tone = status === "SUCCEEDED" || status === "SKIPPED" ? "success" : status === "FAILED" || status === "CONFLICT" ? "danger" : "neutral";
-  return <Badge tone={tone}><Icon className="size-3" aria-hidden="true" />{provisioningStepStatusLabel(status, ar)}</Badge>;
+function StepBadge({ status, ar, live }: { status: TenantOperationStepStatus; ar: boolean; live: boolean }) {
+  const { tone, Icon, spins } = stepStatusPresentation(status);
+  return (
+    <Badge tone={tone}>
+      <Icon className={`size-3 ${spins && live ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
+      {provisioningStepStatusLabel(status, ar)}
+    </Badge>
+  );
+}
+
+function stepStatusPresentation(status: TenantOperationStepStatus): StatusPresentation {
+  switch (status) {
+    case "RUNNING":
+      return { tone: "info", Icon: LoaderCircle, spins: true };
+    case "SUCCEEDED":
+    case "SKIPPED":
+      return { tone: "success", Icon: CheckCircle2, spins: false };
+    case "FAILED":
+    case "CONFLICT":
+      return { tone: "danger", Icon: AlertTriangle, spins: false };
+    case "CANCELLED":
+      return { tone: "neutral", Icon: XCircle, spins: false };
+    default:
+      return { tone: "neutral", Icon: CircleDashed, spins: false };
+  }
+}
+
+/** Amber, with its own icon and the measured time, on the operation and its stalled step. */
+function StalledBadge({ stall, lang }: { stall: TenantOperationStall; lang: "ar" | "en" }) {
+  const copy = tpCopy(lang === "ar");
+  return (
+    <Badge tone="warn">
+      <Hourglass className="size-3" aria-hidden="true" />
+      {copy.stalledBadge(formatProvisioningDuration(stall.ageSeconds, lang))}
+    </Badge>
+  );
+}
+
+/**
+ * What the stall means and which exit is left. Not a live region: its age
+ * changes on every refresh and would be re-announced each time.
+ */
+function StallNotice({
+  operation,
+  stall,
+  lang,
+}: {
+  operation: TenantOperationDetail;
+  stall: TenantOperationStall;
+  lang: "ar" | "en";
+}) {
+  const ar = lang === "ar";
+  const copy = tpCopy(ar);
+  const duration = formatProvisioningDuration(stall.ageSeconds, lang);
+  const step = stall.stepKey ? provisioningStepLabel(stall.stepKey, ar) : null;
+  const explanation =
+    stall.reason === "DISPATCH_LEASE_EXPIRED"
+      ? copy.stallDispatchLeaseExpiredNote(duration, step)
+      : stall.reason === "CANCEL_PENDING"
+        ? copy.stallCancelPendingNote(duration, step)
+        : copy.stallNoProgressNote(duration, step);
+  const guidance = operation.exits.cancel.allowed
+    ? copy.stallCancelGuidance
+    : operation.exits.cancel.reasonCode === "CANCELLATION_PENDING"
+      ? copy.stallAwaitWorkerGuidance
+      : null;
+  return (
+    <div className="mt-3 flex items-start gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning-subtle-foreground">
+      <Hourglass className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+      <div className="space-y-1">
+        <p>{explanation}</p>
+        {guidance && <p>{guidance}</p>}
+      </div>
+    </div>
+  );
+}
+
+function Timestamp({ value, lang }: { value: string | null; lang: "ar" | "en" }) {
+  if (!value) return <>—</>;
+  return (
+    <time dateTime={value} title={formatDate(value, lang)} className="whitespace-nowrap">
+      {formatStepTime(value, lang)}
+    </time>
+  );
+}
+
+/** The step's safe error, as Core projected it; nothing else is shown. */
+function stepErrorText(step: TenantOperationStep): string | null {
+  if (!step.safeError || (!step.safeError.code && !step.safeError.message)) return null;
+  const { code, message } = step.safeError;
+  return code && message ? `${code} — ${message}` : (code ?? message);
 }
 
 function CommandCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
@@ -982,6 +1261,8 @@ function Td({ children }: { children: ReactNode }) { return <TableCell className
 
 function shortDigest(value: string): string { return `${value.slice(0, 10)}…${value.slice(-6)}`; }
 function formatDate(value: string, locale: string): string { return new Intl.DateTimeFormat(localeForLanguage(locale === "ar" ? "ar" : "en"), { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
-function operationTypeLabel(type: string, ar: boolean): string { const labels: Record<string, [string, string]> = { INITIAL_PROVISION: ["Initial provision", "التجهيز الأولي"], RETRY: ["Retry", "إعادة محاولة"], UPDATE: ["Update", "تحديث"], ADD_APPLICATION: ["Add Application", "إضافة تطبيق"], REPAIR: ["Repair", "إصلاح"], DECOMMISSION: ["Decommission", "إيقاف"] }; return labels[type]?.[ar ? 1 : 0] ?? type; }
+/** Step timing needs seconds; the full date stays in the element's title. */
+function formatStepTime(value: string, locale: "ar" | "en"): string { return new Intl.DateTimeFormat(localeForLanguage(locale), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value)); }
+function operationTypeLabel(type: string, ar: boolean): string { const labels: Record<string, [string, string]> = { INITIAL_PROVISION: ["Initial provision", "التجهيز الأولي"], RETRY: ["Retry", "إعادة محاولة"], UPDATE: ["Update", "تحديث"], ADD_APPLICATION: ["Add Application", "إضافة تطبيق"], ADDON_INSTALL: ["Add-on install", "تثبيت إضافة"], REPAIR: ["Repair", "إصلاح"], DECOMMISSION: ["Decommission", "إيقاف"] }; return labels[type]?.[ar ? 1 : 0] ?? type; }
 function operationStatusLabel(status: TenantOperationStatus, ar: boolean): string { if (!ar) return status; const labels: Partial<Record<TenantOperationStatus, string>> = { REQUESTED: "مطلوبة", PLANNING: "تخطيط", QUEUED: "بالطابور", RUNNING: "قيد التنفيذ", WAITING_RETRY: "انتظار إعادة", CANCEL_REQUESTED: "طلب إلغاء", SUCCEEDED: "نجحت", FAILED_RETRYABLE: "فشل قابل للإعادة", MANUAL_RECOVERY_REQUIRED: "تدخل يدوي", CANCELLED: "ملغاة" }; return labels[status] ?? status; }
 function localizeError(code: string, ar: boolean): string { const messages: Record<string, [string, string]> = { TENANT_PROVISIONING_OPERATION_ALREADY_OPEN: ["An operation is still open. Open Operations and wait for it to finish or complete cancellation before re-provisioning.", "توجد عملية مفتوحة. افتح العمليات وانتظر انتهاءها أو اكتمال إلغائها قبل إعادة التجهيز."], TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE: ["Core has not exposed the conflict revision; resolution is disabled safely.", "لم تعرض Core مراجعة التعارض؛ تم تعطيل الحل بأمان."], TENANT_UPDATE_SELECTION_REQUIRED: ["Select at least one update.", "اختر تحديثًا واحدًا على الأقل."], TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED: ["Acknowledge retained-data behavior.", "أكد سلوك الاحتفاظ بالبيانات."], TENANT_PROVISIONING_OPERATION_SUPERSEDED: ["This operation was superseded by a newer generation. Refresh the history and select the latest operation.", "حلّ جيل أحدث محل هذه العملية. حدّث السجل واختر أحدث عملية."], INVALID_PROVISIONING_REASON_CODE: ["Use an uppercase safe reason code.", "استخدم رمز سبب آمنًا بأحرف كبيرة."], "GW.IDEM.IN_FLIGHT": ["The exact command is still in flight; retry keeps the same key.", "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه."] }; return messages[code]?.[ar ? 1 : 0] ?? code; }

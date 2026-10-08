@@ -2,8 +2,21 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+// The view reads its language from the model; only the shared confirmation
+// dialog reads the I18n context.
+vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ lang: "en" }) }));
+
 import { TenantProvisioningWorkspaceView } from "./TenantProvisioningWorkspaceView";
-import type { TenantProvisioningWorkspaceModel } from "../hooks/useTenantProvisioningWorkspace";
+import type {
+  ProvisioningConfirmation,
+  TenantProvisioningWorkspaceModel,
+} from "../hooks/useTenantProvisioningWorkspace";
+import { buildRepairOperationDto } from "../model/commands";
+import {
+  provisioningActionState,
+  repairExitFromHistory,
+} from "../model/operation-actions";
 import {
   readTenantComponentInstallation,
   readTenantOperationDetail,
@@ -16,6 +29,7 @@ import {
   RETRY_OPERATION_ID,
   componentInstallation,
   operationDetail,
+  operationExits,
   operationSummary,
   seedState,
 } from "../test/fixtures";
@@ -23,21 +37,36 @@ import {
 describe("TenantProvisioningWorkspaceView", () => {
   it("renders real operation progress and dispatches operation-specific cancel", () => {
     const model = makeModel();
-    render(<TenantProvisioningWorkspaceView model={model} />);
+    const { unmount } = render(<TenantProvisioningWorkspaceView model={model} />);
 
     expect(screen.getByText("Tenant provisioning")).toBeInTheDocument();
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("Schema installation started.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Initial provision/i })).toHaveAttribute("aria-current", "true");
+    // Cancelling asks first: the click names the operation, nothing is sent.
     fireEvent.click(screen.getByRole("button", { name: "Request cancel" }));
-    expect(model.provisioning.cancelOperation).toHaveBeenCalledWith(OPERATION_ID);
+    expect(model.requestCancel).toHaveBeenCalledWith(
+      expect.objectContaining({ id: OPERATION_ID }),
+    );
+    expect(model.provisioning.cancelOperation).not.toHaveBeenCalled();
+    unmount();
+
+    const confirming = makeModel({ confirming: "cancel" });
+    render(<TenantProvisioningWorkspaceView model={confirming} />);
+    expect(
+      screen.getByText("Request cancellation of Initial provision · generation 1?"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Request cancel" }));
+    expect(confirming.confirmPending).toHaveBeenCalled();
   });
 
   it("offers re-provisioning after cancellation has completed", () => {
     const model = makeModel({ operationStatus: "CANCELLED" });
     render(<TenantProvisioningWorkspaceView model={model} />);
     fireEvent.click(screen.getByRole("button", { name: "Re-provision" }));
-    expect(model.provisioning.retryOperation).toHaveBeenCalledWith(OPERATION_ID);
+    expect(model.requestRetry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: OPERATION_ID }),
+    );
   });
 
   it("explains pending cancellation and keeps re-provisioning visible but disabled", () => {
@@ -63,7 +92,9 @@ describe("TenantProvisioningWorkspaceView", () => {
     const retry = screen.getByRole("button", { name: /^Re-provision$/u });
     fireEvent.click(retry);
 
-    expect(model.provisioning.retryOperation).toHaveBeenCalledWith(OPERATION_ID);
+    expect(model.requestRetry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: OPERATION_ID }),
+    );
   });
 
   it("treats a superseded retryable operation as read-only history", () => {
@@ -198,10 +229,14 @@ function makeModel(
     selectedGeneration?: number;
     latestGeneration?: number;
     localError?: string;
+    confirming?: ProvisioningConfirmation["kind"];
   } = {},
 ): TenantProvisioningWorkspaceModel {
   const operationStatus = options.operationStatus ?? "RUNNING";
   const selectedGeneration = options.selectedGeneration ?? 1;
+  const superseded =
+    options.latestGeneration !== undefined &&
+    options.latestGeneration > selectedGeneration;
   const summary = readTenantOperationSummary(
     operationSummary({ status: operationStatus, generation: selectedGeneration }),
   );
@@ -210,13 +245,22 @@ function makeModel(
       status: operationStatus,
       generation: selectedGeneration,
       prerequisiteCount: options.prerequisiteCount ?? 0,
+      // A newer generation in these fixtures has always succeeded.
+      exits: operationExits(operationStatus, {
+        superseded,
+        latestStatus: superseded ? "SUCCEEDED" : operationStatus,
+      }),
     }),
   );
+  const component = readTenantComponentInstallation(componentInstallation());
+  const confirmation: ProvisioningConfirmation | null =
+    options.confirming === "repair"
+      ? { kind: "repair", component, dto: buildRepairOperationDto(component, "ADMIN.REPAIR") }
+      : options.confirming
+        ? { kind: options.confirming, operation: detail }
+        : null;
   const operations = [summary];
-  if (
-    options.latestGeneration !== undefined &&
-    options.latestGeneration > selectedGeneration
-  ) {
+  if (superseded) {
     operations.unshift(
       readTenantOperationSummary(
         operationSummary({
@@ -245,11 +289,28 @@ function makeModel(
   });
   const noop = vi.fn();
   const asyncNoop = vi.fn().mockResolvedValue(undefined);
+  const latestOperation = operations.reduce((a, b) => a.generation > b.generation ? a : b);
   return {
     lang: options.lang ?? "en",
     dir: options.lang === "ar" ? "rtl" : "ltr",
-    latestOperation: operations.reduce((a, b) => a.generation > b.generation ? a : b),
-    hasOpenOperation: ["REQUESTED", "PLANNING", "QUEUED", "RUNNING", "WAITING_RETRY", "CANCEL_REQUESTED"].includes(options.operationStatus ?? "RUNNING"),
+    latestOperation,
+    hasOpenOperation: ["REQUESTED", "PLANNING", "QUEUED", "RUNNING", "WAITING_RETRY", "CANCEL_REQUESTED"].includes(latestOperation.status),
+    operationActions: {
+      cancel: provisioningActionState("cancel", detail.exits.cancel, true, false),
+      retry: provisioningActionState("retry", detail.exits.retry, true, false),
+    },
+    repairAction: provisioningActionState(
+      "repair",
+      detail.exits.repair.allowed ? repairExitFromHistory(latestOperation) : detail.exits.repair,
+      true,
+      false,
+    ),
+    confirmation,
+    requestCancel: noop,
+    requestRetry: noop,
+    requestRepair: noop,
+    dismissConfirmation: noop,
+    confirmPending: asyncNoop,
     section: options.section ?? "operations",
     setSection: noop,
     selectedUpdateKeys: [],
@@ -284,7 +345,6 @@ function makeModel(
     clearLocalError: noop,
     applySelectedUpdates: asyncNoop,
     requestSelectedPrerequisites: asyncNoop,
-    submitRepair: asyncNoop,
     submitDecommission: asyncNoop,
     submitAddApplication: asyncNoop,
     resolveConflict: vi.fn().mockResolvedValue(undefined),
@@ -304,6 +364,7 @@ function makeModel(
       operations: ready({ items: operations, meta: META }),
       selectedOperationId: OPERATION_ID,
       selectedOperation: ready(detail),
+      selectedOperationReadAtMs: null,
       timeline: ready({
         items: [
           {
@@ -325,13 +386,15 @@ function makeModel(
       }),
       updates: ready({ items: [], meta: META }),
       components: ready({
-        items: [readTenantComponentInstallation(componentInstallation())],
+        items: [component],
         meta: META,
       }),
       seeds: ready({ items: [seed], meta: META }),
       prerequisites: ready([]),
       mutation: { name: null, intentKey: null, error: null },
       polling: true,
+      pollPaused: false,
+      pollIntervalMs: 3_000,
       selectOperation: noop,
       refreshAll: asyncNoop,
       retryOperation: asyncNoop,

@@ -90,6 +90,58 @@ function operationStep(
   };
 }
 
+const OPEN_STATUSES = [
+  "REQUESTED",
+  "PLANNING",
+  "QUEUED",
+  "RUNNING",
+  "WAITING_RETRY",
+  "CANCEL_REQUESTED",
+];
+const RETRYABLE_STATUSES = [
+  "FAILED_RETRYABLE",
+  "MANUAL_RECOVERY_REQUIRED",
+  "CANCELLED",
+];
+
+/**
+ * The exits Core states for an operation in `status` (core-app
+ * `tenant-operation-exits.ts`): superseded first, then cancellation pending,
+ * then the status sets. `latestStatus` is the tenant's latest generation.
+ */
+export function operationExits(
+  status: string,
+  options: { superseded?: boolean; latestStatus?: string } = {},
+): Record<string, unknown> {
+  const allowed = { allowed: true, reasonCode: null };
+  const blocked = (reasonCode: string) => ({ allowed: false, reasonCode });
+  const latestStatus = options.latestStatus ?? status;
+  return {
+    cancel: options.superseded
+      ? blocked("OPERATION_SUPERSEDED")
+      : status === "CANCEL_REQUESTED"
+        ? blocked("CANCELLATION_PENDING")
+        : OPEN_STATUSES.includes(status)
+          ? allowed
+          : blocked("OPERATION_TERMINAL"),
+    retry: options.superseded
+      ? blocked("OPERATION_SUPERSEDED")
+      : status === "CANCEL_REQUESTED"
+        ? blocked("CANCELLATION_PENDING")
+        : OPEN_STATUSES.includes(status)
+          ? blocked("OPERATION_OPEN")
+          : RETRYABLE_STATUSES.includes(status)
+            ? allowed
+            : blocked("OPERATION_SUCCEEDED"),
+    repair:
+      latestStatus === "CANCEL_REQUESTED"
+        ? blocked("CANCELLATION_PENDING")
+        : OPEN_STATUSES.includes(latestStatus)
+          ? blocked("OPERATION_OPEN")
+          : allowed,
+  };
+}
+
 export function operationDetail(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
@@ -106,6 +158,8 @@ export function operationDetail(
     },
     timelineEventCount: 1,
     steps: [operationStep()],
+    stall: null,
+    exits: operationExits("RUNNING"),
     ...overrides,
   };
 }

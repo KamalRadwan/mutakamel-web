@@ -7,9 +7,17 @@ import {
   buildDecommissionOperationDto,
   buildRepairOperationDto,
 } from "../model/commands";
+import {
+  provisioningActionState,
+  repairExitFromHistory,
+  type ProvisioningActionState,
+} from "../model/operation-actions";
 import type {
   CreateAddApplicationOperationDto,
+  CreateRepairOperationDto,
   SeedConflictDecision,
+  TenantComponentInstallation,
+  TenantOperationDetail,
   TenantSeedState,
 } from "../types";
 import { useTenantProvisioning } from "./useTenantProvisioning";
@@ -20,6 +28,31 @@ export type ProvisioningWorkspaceSection =
   | "state"
   | "prerequisites"
   | "managed";
+
+/**
+ * The command awaiting the operator's confirmation, with the exact resource
+ * it was raised on so the dialog names what will change. A repair carries its
+ * already-validated body: what is confirmed is exactly what is sent.
+ */
+export type ProvisioningConfirmation =
+  | { kind: "cancel"; operation: TenantOperationDetail }
+  | { kind: "retry"; operation: TenantOperationDetail }
+  | {
+      kind: "repair";
+      component: TenantComponentInstallation;
+      dto: CreateRepairOperationDto;
+    };
+
+export interface ProvisioningOperationActions {
+  cancel: ProvisioningActionState;
+  retry: ProvisioningActionState;
+}
+
+const NO_ACTION: ProvisioningActionState = {
+  visible: false,
+  enabled: false,
+  reasonCode: null,
+};
 
 export interface ManagedTargetDraft {
   key: string;
@@ -32,12 +65,43 @@ export interface ManagedTargetDraft {
 
 export function useTenantProvisioningWorkspace(tenantId: string) {
   const { lang, dir } = useI18n();
-  const provisioning = useTenantProvisioning(tenantId);
+  const [confirmation, setConfirmation] =
+    useState<ProvisioningConfirmation | null>(null);
+  // An open confirmation holds background refresh so the state the operator
+  // is deciding on does not shift underneath the dialog.
+  const provisioning = useTenantProvisioning(tenantId, {
+    paused: confirmation !== null,
+  });
   const latestOperation = provisioning.operations.data.items.reduce(
     (latest, candidate) => !latest || candidate.generation > latest.generation ? candidate : latest,
     null as (typeof provisioning.operations.data.items)[number] | null,
   );
   const hasOpenOperation = !!latestOperation && ["REQUESTED", "PLANNING", "QUEUED", "RUNNING", "WAITING_RETRY", "CANCEL_REQUESTED"].includes(latestOperation.status);
+  const selectedDetail = provisioning.selectedOperation.data;
+  const commandInFlight = provisioning.mutation.name !== null;
+
+  /** Cancel and re-provision for the selected operation, from Core's exits. */
+  const operationActions = useMemo<ProvisioningOperationActions>(() => {
+    if (!selectedDetail) return { cancel: NO_ACTION, retry: NO_ACTION };
+    const permitted = provisioning.permissions.canRetryOrCancel;
+    return {
+      cancel: provisioningActionState("cancel", selectedDetail.exits.cancel, permitted, commandInFlight),
+      retry: provisioningActionState("retry", selectedDetail.exits.retry, permitted, commandInFlight),
+    };
+  }, [commandInFlight, provisioning.permissions.canRetryOrCancel, selectedDetail]);
+
+  /**
+   * Repair needs no open operation. Core's exit on the selected detail is
+   * authoritative when it holds repair closed; the history can only close it
+   * further, for when no detail is loaded or a newer operation has appeared.
+   */
+  const repairAction = useMemo<ProvisioningActionState>(() => {
+    const exit =
+      selectedDetail && !selectedDetail.exits.repair.allowed
+        ? selectedDetail.exits.repair
+        : repairExitFromHistory(latestOperation);
+    return provisioningActionState("repair", exit, provisioning.permissions.canRepair, commandInFlight);
+  }, [commandInFlight, latestOperation, provisioning.permissions.canRepair, selectedDetail]);
   const [section, setSection] =
     useState<ProvisioningWorkspaceSection>("operations");
   const [selectedUpdateKeys, setSelectedUpdateKeys] = useState<string[]>([]);
@@ -124,7 +188,22 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     }
   }, [prerequisiteReasonCode, provisioning]);
 
-  const submitRepair = useCallback(async () => {
+  /**
+   * Cancel, re-provision and repair are significant, recoverable commands:
+   * each first opens a confirmation naming the resource and its consequence.
+   * Nothing is sent until `confirmPending`.
+   */
+  const requestCancel = useCallback((operation: TenantOperationDetail) => {
+    setLocalError(null);
+    setConfirmation({ kind: "cancel", operation });
+  }, []);
+
+  const requestRetry = useCallback((operation: TenantOperationDetail) => {
+    setLocalError(null);
+    setConfirmation({ kind: "retry", operation });
+  }, []);
+
+  const requestRepair = useCallback(() => {
     setLocalError(null);
     const component = provisioning.components.data.items.find(
       (row) => row.id === effectiveRepairComponentId,
@@ -133,15 +212,47 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
       setLocalError("TENANT_REPAIR_COMPONENT_REQUIRED");
       return;
     }
+    // Invalid evidence or reason code is reported before asking to confirm.
+    let dto: CreateRepairOperationDto;
     try {
-      await provisioning.repair(
-        buildRepairOperationDto(component, repairReasonCode),
-      );
-      setSection("operations");
+      dto = buildRepairOperationDto(component, repairReasonCode);
     } catch (error) {
       setLocalError(readLocalError(error));
+      return;
     }
-  }, [effectiveRepairComponentId, provisioning, repairReasonCode]);
+    setConfirmation({ kind: "repair", component, dto });
+  }, [effectiveRepairComponentId, provisioning.components.data.items, repairReasonCode]);
+
+  /** Closing is refused while the confirmed command is still in flight. */
+  const dismissConfirmation = useCallback(() => {
+    if (provisioning.mutation.name !== null) return;
+    setConfirmation(null);
+  }, [provisioning.mutation.name]);
+
+  /**
+   * Sends the confirmed command once. The dialog closes either way; a
+   * rejection is shown in the workspace alert, which takes focus, and an
+   * uncertain outcome keeps its idempotency key for the exact retry.
+   */
+  const confirmPending = useCallback(async () => {
+    const pending = confirmation;
+    if (!pending || provisioning.mutation.name !== null) return;
+    setLocalError(null);
+    try {
+      if (pending.kind === "cancel") {
+        await provisioning.cancelOperation(pending.operation.id);
+      } else if (pending.kind === "retry") {
+        await provisioning.retryOperation(pending.operation.id);
+      } else {
+        await provisioning.repair(pending.dto);
+        setSection("operations");
+      }
+    } catch (error) {
+      setLocalError(readLocalError(error));
+    } finally {
+      setConfirmation(null);
+    }
+  }, [confirmation, provisioning]);
 
   const submitDecommission = useCallback(async () => {
     setLocalError(null);
@@ -254,6 +365,14 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     provisioning,
     latestOperation,
     hasOpenOperation,
+    operationActions,
+    repairAction,
+    confirmation,
+    requestCancel,
+    requestRetry,
+    requestRepair,
+    dismissConfirmation,
+    confirmPending,
     section,
     setSection,
     selectedUpdateKeys: effectiveSelectedUpdateKeys,
@@ -288,7 +407,6 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     clearLocalError: () => setLocalError(null),
     applySelectedUpdates,
     requestSelectedPrerequisites,
-    submitRepair,
     submitDecommission,
     submitAddApplication,
     resolveConflict,

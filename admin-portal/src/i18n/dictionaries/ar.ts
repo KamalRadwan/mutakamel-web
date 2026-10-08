@@ -511,7 +511,7 @@ export const ar = {
       "payment-reconciliation-open": "تسويات دفع تنتظر قرار المراجع.",
       "payments-attention": "مدفوعات تحتاج مراجعة أو متابعة تسوية.",
       "provisioning-manual-recovery": "عمليات مستأجرين تتطلب استردادًا يدويًا.",
-      "provisioning-stuck": "محاولات تجهيز ظلت معلقة أكثر من ٣٠ دقيقة.",
+      "provisioning-stuck": "عمليات مستأجرين مفتوحة لم تُبلغ عن أي تقدّم منذ أكثر من {n} دقائق.",
       "provisioning-waiting-retry": "عمليات مستأجرين تنتظر إعادة المحاولة.",
       "security-admins-locked": "حسابات مسؤولين مقفلة حاليًا.",
       "security-failed-login-activity": "حسابات مسؤولين عليها نشاط تسجيل دخول فاشل.",
@@ -685,7 +685,10 @@ export const ar = {
       stalePlacementCommittedMigrations: "توزيعات مثبَّتة عالقة",
       stalePreCommitMigrations: "عمليات نقل قبل التثبيت عالقة",
       staleStagedRotations: "تدويرات مُجهَّزة عالقة",
-      stuckAttempts: "محاولات عالقة",
+      stalledOperations: "عمليات متعثرة",
+      stalledOperationsByReason: "العمليات المتعثرة حسب السبب",
+      stalledOperationsByStep: "العمليات المتعثرة حسب الخطوة",
+      stalledOperationsByType: "العمليات المتعثرة حسب النوع",
       succeeded: "ناجح",
       successRatio: "نسبة النجاح",
       syntheticFailures: "أعطال اصطناعية",
@@ -968,6 +971,19 @@ export const ar = {
       "Classification Conflicts": "تعارضات التصنيف",
       "Within a month": "خلال شهر",
       "Within a week": "خلال أسبوع",
+      "Add Application": "إضافة تطبيق",
+      "Addon Install": "تثبيت إضافة",
+      "Awaiting Prerequisites": "بانتظار المتطلبات",
+      "Cancel Pending": "إلغاء لم يُؤكَّد",
+      "Cancel Requested": "طُلب الإلغاء",
+      Decommission: "إيقاف",
+      "Dispatch Lease Expired": "انتهت مهلة الإرسال",
+      "Initial Provision": "التجهيز الأولي",
+      "No Progress": "بلا تقدّم",
+      Queued: "في قائمة الانتظار",
+      Repair: "إصلاح",
+      Retry: "إعادة محاولة",
+      Update: "تحديث",
     },
     visuals: {
       other: "أخرى",
@@ -2357,7 +2373,8 @@ export const ar = {
   tenantProvisioning: {
     ariaLabel: "إدارة تجهيز المستأجر",
     title: "تجهيز المستأجر",
-    livePollingBadge: "متابعة مباشرة",
+    livePollingBadge: (interval: string) => `متابعة مباشرة · كل ${interval}`,
+    pollingPausedBadge: "التحديث التلقائي متوقف مؤقتًا",
     asyncNote: "العمليات غير متزامنة. لا تُعتبر قاعدة البيانات جاهزة إلا بعد نجاح التفعيل.",
     refreshButton: "تحديث",
     actionErrorPrefix: "تعذر تنفيذ الإجراء: ",
@@ -2375,6 +2392,43 @@ export const ar = {
     openOperationNote: "توجد عملية مفتوحة. يجب انتهاؤها أو اكتمال إلغائها قبل بدء عملية جديدة.",
     viewCurrentOperationButton: "عرض العملية الحالية",
     requestCancelButton: "طلب الإلغاء",
+    stalledBadge: (duration: string) => `متعثرة · لا تقدّم منذ ${duration}`,
+    stallNoProgressNote: (duration: string, step: string | null) =>
+      step
+        ? `لم يُسجَّل أي تقدّم منذ ${duration} في الخطوة «${step}». ربما توقف Worker، أو أن الخطوة تستغرق وقتًا أطول من المتوقع.`
+        : `لم يُسجَّل أي تقدّم منذ ${duration}. ربما توقف Worker، أو أن العمل يستغرق وقتًا أطول من المتوقع.`,
+    stallDispatchLeaseExpiredNote: (duration: string, step: string | null) =>
+      `أُرسلت ${step ? `الخطوة «${step}»` : "خطوة"} إلى التطبيق المالك لها منذ ${duration} ولم تصل نتيجتها. انتهت مهلة الإرسال البالغة ٥ دقائق ولم يُعِد Worker إرسالها.`,
+    stallCancelPendingNote: (duration: string, step: string | null) =>
+      step
+        ? `طُلب الإلغاء منذ ${duration} ولم يؤكد Worker توقف الخطوة «${step}».`
+        : `طُلب الإلغاء منذ ${duration} ولم يؤكد Worker التوقف.`,
+    stallCancelGuidance:
+      "اطلب الإلغاء لإيقافها. تصبح إعادة التجهيز متاحة بعد أن يؤكد Worker التوقف.",
+    stallAwaitWorkerGuidance:
+      "لا يمكن لأي إجراء من المشغّل أن يدفعها للأمام حتى يؤكد Worker التوقف. تحقّق من أن Worker يعمل.",
+    exitBlockedReasons: {
+      OPERATION_SUPERSEDED: "يوجد جيل أحدث. نفّذ الإجراء على أحدث عملية.",
+      ADDON_INSTALLATION_OWNED:
+        "تُوقَف عمليات تثبيت الإضافات وتُستعاد عبر مسارها التجاري، لا من هنا.",
+      CANCELLATION_PENDING:
+        "الإلغاء ما زال قيد التنفيذ. يصبح هذا الإجراء متاحًا بعد أن يؤكد Worker التوقف.",
+      OPERATION_OPEN:
+        "توجد عملية مفتوحة. يصبح هذا الإجراء متاحًا بعد انتهائها أو اكتمال إلغائها.",
+      OPERATION_SUCCEEDED: "نجحت العملية؛ لا يوجد ما يُعاد تجهيزه.",
+      OPERATION_TERMINAL: "انتهت العملية بالفعل؛ لا يوجد ما يُلغى.",
+    },
+    cancelConfirmTitle: (operation: string, generation: number) =>
+      `طلب إلغاء ${operation} · الجيل ${generation}؟`,
+    cancelConfirmDescription:
+      "تسجّل Core الطلب ويوقف Worker العملية عند أقرب نقطة آمنة. يبقى ما اكتمل من عمل مطبّقًا ولا يُحذف شيء، وتُعلَّم الخطوات غير المكتملة كملغاة. تظل العملية مفتوحة حتى يؤكد Worker التوقف، ثم يمكن إعادة تجهيزها. والمستأجر الذي ما زال في تجهيزه الأولي يصبح في حالة فشل التجهيز.",
+    retryConfirmTitle: (operation: string, generation: number) =>
+      `إعادة تجهيز ${operation} · الجيل ${generation}؟`,
+    retryConfirmDescription: (nextGeneration: number) =>
+      `تخطط Core للجيل ${nextGeneration} الذي يعيد تشغيل الخطوات غير المكتملة فقط، مثبتةً على الإصدارات نفسها. يبقى هذا الجيل وخطه الزمني ضمن السجل. والمستأجر الذي فشل تجهيزه الأولي يعود إلى حالة التجهيز.`,
+    repairConfirmTitle: (component: string) => `إصلاح ${component}؟`,
+    repairConfirmDescription:
+      "تفتح Core عملية إصلاح مثبتة على الإصدار المطلوب الحالي للمكوّن ولا تُجري ترقية. يُتحقَّق من ترحيلات المكوّن مقابل ذلك الإصدار وتُطبَّق كل حزم البذور مجددًا وفق سياستها، بما فيها البذور التي أُغلقت بقرار تعارض، ويُكتفى بالتحقق من تبعياته. تُطلب متطلبات النسخ الاحتياطي والصيانة أولًا إذا اشترطها الإصدار، ولا يمكن بدء أي عملية أخرى حتى ينتهي الإصلاح.",
     historicalOperationNote: (currentGen: number, latestGen: number) =>
       `هذه عملية تاريخية. حلّ الجيل ${latestGen} محل الجيل ${currentGen}؛ إجراءات إعادة المحاولة والإلغاء متاحة لأحدث عملية فقط.`,
     weightedProgressLabel: "التقدم الموزون",
@@ -2388,6 +2442,9 @@ export const ar = {
     kindColumnHeader: "النوع",
     statusColumnHeader: "الحالة",
     attemptsColumnHeader: "المحاولات",
+    startedColumnHeader: "البدء",
+    finishedColumnHeader: "الانتهاء",
+    elapsedColumnHeader: "المدة",
     timelineLabel: "الخط الزمني",
     availableUpdatesTitle: "التحديثات المتاحة",
     updatesNote: "يُرسل الاختيار ببصمات الإصدار الحالي والهدف كما أعادها الخادم.",

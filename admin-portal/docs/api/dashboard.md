@@ -219,6 +219,33 @@ This is a display-correctness rule, not an access control. The server already
 refuses to send what it does not authorize; the client's duty is to stop showing
 what it was sent before.
 
+### Provisioning group: stalled operations
+
+Source verified **2026-10-08** against
+`core-app/src/admin/admin-dashboard/providers/dashboard-provisioning.provider.ts`.
+
+`provisioning.snapshot.stalledOperations` counts open tenant operations of
+every type (initial provisioning, retry, update, add-Application, add-on
+install, repair, decommission) whose stall signal is set — the same rule as
+the operation detail's `stall` in `docs/api/tenant-operations.md`: no progress
+for more than 10 minutes, never `WAITING_RETRY`. It replaced `stuckAttempts`,
+which counted legacy provisioning-attempt rows still `PENDING` 30 minutes after
+`requested_at`; a retry keeps that timestamp, so healthy retries read as stuck,
+and updates and repairs were never counted.
+
+Three breakdowns name the work: `stalledOperationsByStep` (the step the stall
+is attributed to, or the operation's current phase when none is running),
+`stalledOperationsByType`, and `stalledOperationsByReason` (`NO_PROGRESS`,
+`DISPATCH_LEASE_EXPIRED`, `CANCEL_PENDING`). Their keys are wire values; the
+exact-values table humanizes them and translates the type, reason and phase
+terms.
+
+The critical `provisioning-stuck` alert carries the same count. Core's English
+message names the threshold first, then the longest stall's operation type,
+step and idle minutes; the Arabic dictionary entry carries the threshold
+through `{n}` (the first number in Core's sentence) and does not repeat the
+step, which the breakdowns show.
+
 
 ## DTOs (Migrated from dtos.md)
 

@@ -29,7 +29,7 @@ import {
 } from "../test/fixtures";
 
 describe("tenant provisioning wire readers", () => {
-  it("accepts only the current six operation types and rejects stale reconcile/add-module contracts", () => {
+  it("accepts only the current seven operation types and rejects stale reconcile/add-module contracts", () => {
     expect(readTenantOperationSummary(operationSummary()).type).toBe(
       "INITIAL_PROVISION",
     );

@@ -91,7 +91,10 @@ Implementation note (representative, not product-wide): the shared operator
 refresh guard and the admin dashboard are the first owned-region/overlay
 reference. Active-call support is a typed integration signal on the shared hook,
 but the dashboard does not currently supply that signal. Product-wide call-state
-wiring remains pending. The tenant core/provisioning pollers, logging live
+wiring remains pending. The tenant provisioning poller (2026-10-08) composes the
+guard for the hidden page and its own confirmation dialog, shows "Auto-refresh
+paused" while held, and backs off 3 s → 15 s → 60 s while nothing changes (see
+`docs/api/tenant-operations.md`). The tenant core poller, logging live
 transport, and notification dropdown were audited but retain their existing
 domain-specific scheduling until each surface receives its own owned-region and
 overlay/call signals.

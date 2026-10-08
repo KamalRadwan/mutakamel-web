@@ -7,6 +7,8 @@ import {
   TENANT_COMPONENT_INSTALLATION_STATES,
   TENANT_COMPONENT_SELECTION_SOURCES,
   TENANT_OPERATION_ACTOR_TYPES,
+  TENANT_OPERATION_EXIT_REASON_CODES,
+  TENANT_OPERATION_STALL_REASONS,
   TENANT_OPERATION_STATUSES,
   TENANT_OPERATION_STEP_KINDS,
   TENANT_OPERATION_STEP_STATUSES,
@@ -25,7 +27,10 @@ import {
   type TenantMaintenanceFence,
   type TenantOperationActor,
   type TenantOperationDetail,
+  type TenantOperationExit,
+  type TenantOperationExits,
   type TenantOperationProgress,
+  type TenantOperationStall,
   type TenantOperationStep,
   type TenantOperationSummary,
   type TenantOperationTimelineEvent,
@@ -110,6 +115,41 @@ export function readTenantOperationDetail(value: unknown): TenantOperationDetail
     progress: readProgress(operation.progress, code),
     timelineEventCount: nonNegativeInteger(operation.timelineEventCount, code),
     steps: array(operation.steps, code).map(readTenantOperationStep),
+    stall: readStall(operation.stall, code),
+    exits: readExits(operation.exits, code),
+  };
+}
+
+function readStall(value: unknown, code: string): TenantOperationStall | null {
+  if (value === null) return null;
+  const stall = object(value, code);
+  return {
+    stepKey: nullableString(stall.stepKey, code, 160),
+    since: isoDate(stall.since, code),
+    ageSeconds: nonNegativeInteger(stall.ageSeconds, code),
+    reason: oneOf(stall.reason, TENANT_OPERATION_STALL_REASONS, code),
+  };
+}
+
+function readExits(value: unknown, code: string): TenantOperationExits {
+  const exits = object(value, code);
+  return {
+    cancel: readExit(exits.cancel, code),
+    retry: readExit(exits.retry, code),
+    repair: readExit(exits.repair, code),
+  };
+}
+
+/** An allowed exit carries no reason; a blocked one must say why. */
+function readExit(value: unknown, code: string): TenantOperationExit {
+  const exit = object(value, code);
+  if (boolean(exit.allowed, code)) {
+    if (exit.reasonCode !== null) invalid(code);
+    return { allowed: true, reasonCode: null };
+  }
+  return {
+    allowed: false,
+    reasonCode: oneOf(exit.reasonCode, TENANT_OPERATION_EXIT_REASON_CODES, code),
   };
 }
 

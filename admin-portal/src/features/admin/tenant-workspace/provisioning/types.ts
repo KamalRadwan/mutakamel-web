@@ -8,6 +8,7 @@ export const TENANT_OPERATION_TYPES = [
   "RETRY",
   "UPDATE",
   "ADD_APPLICATION",
+  "ADDON_INSTALL",
   "REPAIR",
   "DECOMMISSION",
 ] as const;
@@ -230,11 +231,65 @@ export interface TenantOperationProgress {
   percent: number;
 }
 
+/**
+ * Why Core reports an open operation as no longer progressing. The threshold
+ * is ten minutes without an accepted transition, twice the Worker's step lease.
+ */
+export const TENANT_OPERATION_STALL_REASONS = [
+  "NO_PROGRESS",
+  "DISPATCH_LEASE_EXPIRED",
+  "CANCEL_PENDING",
+] as const;
+
+export type TenantOperationStallReason =
+  (typeof TENANT_OPERATION_STALL_REASONS)[number];
+
+export interface TenantOperationStall {
+  /** The step the stall is attributed to; null when no step is running. */
+  stepKey: string | null;
+  /** The last progress (or cancellation request) the stall is measured from. */
+  since: string;
+  /** Measured by Core when the detail response was built. */
+  ageSeconds: number;
+  reason: TenantOperationStallReason;
+}
+
+/** Stable reasons an operator exit is unavailable, as Core states them. */
+export const TENANT_OPERATION_EXIT_REASON_CODES = [
+  "OPERATION_SUPERSEDED",
+  "ADDON_INSTALLATION_OWNED",
+  "CANCELLATION_PENDING",
+  "OPERATION_OPEN",
+  "OPERATION_SUCCEEDED",
+  "OPERATION_TERMINAL",
+] as const;
+
+export type TenantOperationExitReasonCode =
+  (typeof TENANT_OPERATION_EXIT_REASON_CODES)[number];
+
+export type TenantOperationExit =
+  | { allowed: true; reasonCode: null }
+  | { allowed: false; reasonCode: TenantOperationExitReasonCode };
+
+/**
+ * The operator commands the operation's state leaves open. Operation-level
+ * statements only: the command still revalidates when it runs.
+ */
+export interface TenantOperationExits {
+  cancel: TenantOperationExit;
+  /** The retry command, labelled "Re-provision". */
+  retry: TenantOperationExit;
+  /** Creating a component repair, which needs no open operation. */
+  repair: TenantOperationExit;
+}
+
 export interface TenantOperationDetail extends TenantOperationSummary {
   prerequisiteCount: number;
   progress: TenantOperationProgress;
   timelineEventCount: number;
   steps: TenantOperationStep[];
+  stall: TenantOperationStall | null;
+  exits: TenantOperationExits;
 }
 
 export interface TenantOperationTimelineEvent {

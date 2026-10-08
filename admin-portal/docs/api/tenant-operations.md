@@ -2,11 +2,13 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-09-29** (cancellation and re-provision recovery)
+Last source verification: **2026-10-08** (stall signal, operator exits,
+confirmed cancel/re-provision/repair, polling backoff)
 
 Verified against the current Gateway contracts, Core controllers, DTOs,
 operation/read-model services, provisioning command services, database enums,
-and the Admin Portal tenant-detail source.
+`core-app/src/admin/tenants/provisioning/tenant-operation-exits.ts`, and the
+Admin Portal tenant-detail source.
 
 This document covers the 15 tenant-prefixed operation/provisioning routes used
 to observe and manage a single tenant. Fleet rollout and release-publishing
@@ -84,6 +86,7 @@ enum TenantOperationTypeEnum {
   RETRY = "RETRY",
   UPDATE = "UPDATE",
   ADD_APPLICATION = "ADD_APPLICATION",
+  ADDON_INSTALL = "ADDON_INSTALL",
   REPAIR = "REPAIR",
   DECOMMISSION = "DECOMMISSION",
 }
@@ -174,6 +177,7 @@ interface TenantOperationStepView {
 }
 
 interface TenantOperationDetailView extends TenantOperationSummaryView {
+  prerequisiteCount: number;
   progress: {
     totalSteps: number;
     completedSteps: number;
@@ -184,6 +188,33 @@ interface TenantOperationDetailView extends TenantOperationSummaryView {
   };
   timelineEventCount: number;
   steps: TenantOperationStepView[];
+  stall: TenantOperationStall | null; // admin routes only
+  exits: TenantOperationExits;        // admin routes only
+}
+
+interface TenantOperationStall {
+  stepKey: string | null; // step the stall is attributed to; null when none is running
+  since: string;          // last progress (or cancellation request) it is measured from
+  ageSeconds: number;     // measured by Core when the response was built
+  reason: "NO_PROGRESS" | "DISPATCH_LEASE_EXPIRED" | "CANCEL_PENDING";
+}
+
+type TenantOperationExitReasonCode =
+  | "OPERATION_SUPERSEDED"      // a newer generation exists
+  | "ADDON_INSTALLATION_OWNED"  // add-on installs stop/recover through their commercial flow
+  | "CANCELLATION_PENDING"      // the Worker has not confirmed a requested stop
+  | "OPERATION_OPEN"            // an operation still owns the tenant
+  | "OPERATION_SUCCEEDED"       // nothing to retry
+  | "OPERATION_TERMINAL";       // nothing to cancel
+
+type TenantOperationExit =
+  | { allowed: true; reasonCode: null }
+  | { allowed: false; reasonCode: TenantOperationExitReasonCode };
+
+interface TenantOperationExits {
+  cancel: TenantOperationExit; // POST .../operations/:operationId/cancel
+  retry: TenantOperationExit;  // POST .../operations/:operationId/retry ("Re-provision")
+  repair: TenantOperationExit; // POST .../provisioning/operations/repair
 }
 
 interface TenantOperationTimelineEventView {
@@ -211,6 +242,47 @@ never returned.
 
 Progress counts `SUCCEEDED` and `SKIPPED` as completed. `FAILED` and
 `CONFLICT` count as failed. Percentage is weighted, floored, and capped at 100.
+
+### Stall signal
+
+`heartbeatAt` is the time of the last *accepted transition*, not a liveness
+ping: the Worker never reports a step dispatched to Core, CRM or Trade while
+its owner works. `stall` is Core's statement that an open operation has stopped
+moving. It is null unless the operation is open and nothing was reported for
+more than 10 minutes — twice the Worker's five-minute step lease, so a healthy
+re-dispatch (a fresh `STEP_STARTED`) always lands inside it.
+
+| `reason` | When | `stepKey` |
+| --- | --- | --- |
+| `CANCEL_PENDING` | `CANCEL_REQUESTED` for 10+ minutes since the request | oldest running step, else `null` |
+| `DISPATCH_LEASE_EXPIRED` | a running step owned by Core/CRM/Trade (`producer` not `worker`, kind not `DATABASE`) has no progress for 10+ minutes: its lease expired without a result or a re-dispatch | that step |
+| `NO_PROGRESS` | a running step the Worker executes itself, or no running step and no change for 10+ minutes (plus the two-hour prerequisite window while `AWAITING_PREREQUISITES`) | the step, or `null` |
+
+`WAITING_RETRY` is never reported as a stall: an owner may schedule a retry up
+to a day out and the due time is not projected. `ageSeconds` is measured when
+the response is built, so it is excluded from the portal's change detection.
+
+### Operator exits
+
+`exits` states, per operator command, whether the operation's current state
+leaves it open and, when not, why. Core mirrors the commands' own
+operation-level checks in their order; the commands still revalidate tenant
+lifecycle, access-policy revision, Application authority and component
+evidence and remain the authority (an allowed exit can still be refused).
+
+| Exit | Closed by, in order |
+| --- | --- |
+| `cancel` | `OPERATION_SUPERSEDED`, `ADDON_INSTALLATION_OWNED`, `CANCELLATION_PENDING`, `OPERATION_TERMINAL` |
+| `retry` | `OPERATION_SUPERSEDED`, `ADDON_INSTALLATION_OWNED`, `CANCELLATION_PENDING`, `OPERATION_OPEN`, `OPERATION_SUCCEEDED` |
+| `repair` | the tenant's latest generation is `CANCEL_REQUESTED` (`CANCELLATION_PENDING`) or otherwise open (`OPERATION_OPEN`) |
+
+`exits` is computed against the tenant's latest generation, so it is correct
+even when the loaded history has not caught up. Both fields are admin-only:
+the tenant-facing `GET /tenant/provisioning/operations/:operationId` and the
+self-service `POST /tenant/provisioning/updates/apply` result return the
+tenant-scoped projection, which carries neither (nor actor identity or
+reason). The reader rejects a detail without `exits`; deploy Core before the
+portal.
 
 ## List operations
 
@@ -318,6 +390,10 @@ Cancel preconditions:
 
 Success changes the operation to `CANCEL_REQUESTED`. Continue polling until a
 terminal state; `202` does not mean cancellation is complete.
+
+Both results embed the admin detail, including `stall` and `exits`. The
+portal drives both buttons from `exits` rather than recomputing these
+preconditions locally.
 
 ## Available updates and exact apply
 
@@ -622,8 +698,37 @@ The tenant workspace implements all 15 routes in this document with strict
 response readers, independent permission states, bounded live polling, and
 caller-owned UUIDv7 command identities. Operation selection exposes weighted
 progress, the complete step DAG, safe errors, generation/current phase, and the
-bounded event timeline. Retry and cancel visibility follows the latest
-operation and exact terminal/nonterminal status rules.
+bounded event timeline. Retry and cancel visibility follows Core's `exits`.
+
+Operation detail, as rendered:
+
+- `RUNNING` (operation and step) is the informational tone with a spinner,
+  distinct from the neutral `PENDING`/queued states; a stalled operation or
+  step keeps its status but drops the spinner.
+- Each step shows its start, finish, elapsed time (start to finish, or to the
+  last read while running; `startedAt` is the first start, so a re-dispatched
+  step keeps counting) and its safe error, if any.
+- A set `stall` adds an amber "Stalled · no progress for …" badge to the
+  operation and to the step it names, and a notice explaining the reason and
+  the exit that is left (request cancellation, or wait for the Worker to
+  confirm a pending stop).
+- **Request cancel**, **Re-provision** and **Create repair** each open the
+  design-system `ConfirmActionModal`, naming the operation generation or
+  component and the command's consequence; nothing is sent until confirmed and
+  the dialog cannot be dismissed while the command is in flight. An exit Core
+  holds closed renders the control disabled with its reason beside it, except
+  where the control is meaningless (cancelling a finished, superseded or
+  already-cancelling operation; re-provisioning a superseded or successful one).
+
+Polling (`useTenantProvisioning`) runs while any operation is open or a
+prerequisite is unsettled. It reads every 3 s, slows to 15 s after 15 quiet
+seconds and to 60 s after a further quiet minute, and returns to 3 s on any
+observed change, command, selection, manual refresh, or return to the tab.
+"Quiet" compares the operations, the selected detail's statuses, steps and
+stall reason, and prerequisite states — never `ageSeconds`. It pauses while the
+page is hidden or a confirmation dialog is open (the badge reads "Auto-refresh
+paused"), and a refresh merges page one into the operations and timeline pages
+already loaded instead of discarding "Load older".
 
 Updates copy the current and target release evidence returned by Core. The
 state workspace exposes component installations and seed state, including the
@@ -649,6 +754,7 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/dto/`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-command.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-managed-operations.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-operation-exits.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-prerequisite.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-read-models.service.ts`
 - `../backend/mutakamel-apps/core-app/packages/database/src/enums/tenant-provisioning.enum.ts`
@@ -656,4 +762,4 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 
 ## Cancellation and re-provision recovery
 
-`CANCEL_REQUESTED` remains an open operation until the Worker commits stop evidence. The Operations tab keeps **Re-provision** visible but disabled during cancellation and continues polling. Once cancelled, that button submits the existing operation-specific retry command. Failed retryable operations offer the same **Re-provision** action through the existing retry endpoint. Managed commands are disabled while an operation is open, with **View current operation** navigation. A raced `TENANT_PROVISIONING_OPERATION_ALREADY_OPEN` response explains how to recover instead of displaying only the raw code. Failed requests clear the busy state while retaining the same idempotency key where the outcome is uncertain.
+`CANCEL_REQUESTED` remains an open operation until the Worker commits stop evidence. The Operations tab keeps **Re-provision** visible but disabled during cancellation (`exits.retry.reasonCode = CANCELLATION_PENDING`) and continues polling; if the Worker has not confirmed the stop after 10 minutes the operation is marked stalled (`CANCEL_PENDING`) and the notice says no operator action can move it on until the Worker confirms. Once cancelled, that button submits the existing operation-specific retry command after confirmation. Failed retryable operations offer the same **Re-provision** action through the existing retry endpoint. Repair follows `exits.repair` (falling back to the history's latest status while no detail is loaded) and is disabled with its reason while an operation is open; add-Application and decommission stay disabled while an operation is open, with **View current operation** navigation. A raced `TENANT_PROVISIONING_OPERATION_ALREADY_OPEN` response explains how to recover instead of displaying only the raw code. Failed requests clear the busy state while retaining the same idempotency key where the outcome is uncertain.
