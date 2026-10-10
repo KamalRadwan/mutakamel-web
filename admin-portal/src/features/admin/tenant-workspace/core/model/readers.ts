@@ -1,4 +1,5 @@
 import {
+  TENANT_DESTROY_PHASES,
   TENANT_FQDN_VALIDATION_STATUSES,
   TENANT_OPERATION_STATUSES,
   TENANT_OPERATION_TYPES,
@@ -6,6 +7,7 @@ import {
   type FqdnAvailabilityResult,
   type TenantAddress,
   type TenantDatabaseServerSummary,
+  type TenantDestroyPhase,
   type TenantFqdnView,
   type TenantProfileDraft,
   type TenantProvisioningCommandResult,
@@ -15,26 +17,75 @@ import {
   type TenantDestroyView,
   type UpdateTenantProfileDto,
 } from "../types";
+import { isTenantDestroyAdvancing } from "./destroy";
 
 const UUID_V7_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const TENANT_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
+/**
+ * The shape Core and Worker accept for a safe code (`varchar(100)`), so a
+ * code without a localized label can still be shown verbatim.
+ */
+const SAFE_CODE_PATTERN = /^[A-Z][A-Z0-9_]*(?:\.[A-Z0-9_]+)*$/;
+const SAFE_CODE_MAX_LENGTH = 100;
+
+/** The only phases in which Core keeps the provisioning operation it waits on. */
+const BLOCKING_OPERATION_PHASES: ReadonlySet<TenantDestroyPhase> = new Set([
+  "STOPPING_PROVISIONING",
+  "BLOCKED",
+  "ABANDONED",
+]);
+
+/**
+ * Reads Core's destruction projection, as answered by the status read, the
+ * destroy command and the abandon command. Every field must be present —
+ * nullable ones as an explicit `null` — and the pairings Core's table checks
+ * and projection guarantee are enforced, so a drifted response fails closed
+ * instead of rendering a contradictory state:
+ *
+ * - `completedAt` exactly when SUCCEEDED, `abandonedAt` exactly when ABANDONED;
+ * - `nextAttemptAt` exactly while Worker still advances the request;
+ * - `blockedAt` and `blockedReason` together, always on BLOCKED, and kept
+ *   only on BLOCKED or a later ABANDONED;
+ * - `blockingOperationId` only while stopping provisioning or after it blocked.
+ */
 export function readTenantDestroy(value: unknown): TenantDestroyView | null {
   if (value === null) return null;
-  const row = object(value, 'INVALID_TENANT_DESTROY_RESPONSE');
-  const code = 'INVALID_TENANT_DESTROY_RESPONSE';
-  if (!['STOPPING_PROVISIONING','DROPPING_DATABASE','FINALIZING','SUCCEEDED'].includes(String(row.phase))) invalid(code);
-  if ((row.phase === 'SUCCEEDED') !== (row.completedAt !== null)) invalid(code);
-  return {
-    operationId: uuidV7(row.operationId,code), tenantId: uuidV7(row.tenantId,code),
-    phase: row.phase as TenantDestroyView['phase'],
-    requestedAt: requiredString(row.requestedAt,code), updatedAt: requiredString(row.updatedAt,code),
-    completedAt: row.completedAt === null ? null : requiredString(row.completedAt,code),
-    lastErrorCode: row.lastErrorCode === null ? null : requiredString(row.lastErrorCode,code),
+  const code = "INVALID_TENANT_DESTROY_RESPONSE";
+  const row = object(value, code);
+  const phase = oneOf(row.phase, TENANT_DESTROY_PHASES, code);
+  const parsed: TenantDestroyView = {
+    operationId: uuidV7(row.operationId, code),
+    tenantId: uuidV7(row.tenantId, code),
+    phase,
+    requestedAt: isoDate(row.requestedAt, code),
+    updatedAt: isoDate(row.updatedAt, code),
+    completedAt: nullable(row.completedAt, isoDate, code),
+    lastErrorCode: nullable(row.lastErrorCode, safeCode, code),
+    attempts: nonNegativeInteger(row.attempts, code),
+    nextAttemptAt: nullable(row.nextAttemptAt, isoDate, code),
+    blockedAt: nullable(row.blockedAt, isoDate, code),
+    blockedReason: nullable(row.blockedReason, safeCode, code),
+    blockingOperationId: nullable(row.blockingOperationId, uuidV7, code),
+    abandonedAt: nullable(row.abandonedAt, isoDate, code),
   };
+  if (
+    (phase === "SUCCEEDED") !== (parsed.completedAt !== null) ||
+    (phase === "ABANDONED") !== (parsed.abandonedAt !== null) ||
+    isTenantDestroyAdvancing(phase) !== (parsed.nextAttemptAt !== null) ||
+    (parsed.blockedAt === null) !== (parsed.blockedReason === null) ||
+    (phase === "BLOCKED" && parsed.blockedAt === null) ||
+    (parsed.blockedAt !== null && phase !== "BLOCKED" && phase !== "ABANDONED") ||
+    (parsed.blockingOperationId !== null &&
+      !BLOCKING_OPERATION_PHASES.has(phase))
+  ) {
+    invalid(code);
+  }
+  return parsed;
 }
+
 const DECIMAL_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const SUBSCRIPTION_STATUSES = [
   "TRIAL",
@@ -630,6 +681,26 @@ function isoDate(value: unknown, code: string): string {
 
 function nullableIsoDate(value: unknown, code: string): string | null {
   return value === undefined || value === null ? null : isoDate(value, code);
+}
+
+/** An explicit `null`, or a value `read` accepts; an absent field is invalid. */
+function nullable<T>(
+  value: unknown,
+  read: (value: unknown, code: string) => T,
+  code: string,
+): T | null {
+  return value === null ? null : read(value, code);
+}
+
+function safeCode(value: unknown, code: string): string {
+  if (
+    typeof value !== "string" ||
+    value.length > SAFE_CODE_MAX_LENGTH ||
+    !SAFE_CODE_PATTERN.test(value)
+  ) {
+    invalid(code);
+  }
+  return value;
 }
 
 function nonNegativeInteger(value: unknown, code: string): number {

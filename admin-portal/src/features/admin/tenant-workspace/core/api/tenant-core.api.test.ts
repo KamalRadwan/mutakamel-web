@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CUSTOM_FQDN_ID,
+  DESTROY_OPERATION_ID,
   OPERATION_ID,
+  OTHER_TENANT_ID,
   TENANT_ID,
   UPDATED_AT,
   customFqdnFixture,
+  tenantDestroyFixture,
   tenantPayload,
 } from "../__tests__/fixtures";
 
@@ -127,7 +130,7 @@ describe("tenant core API", () => {
   });
 
   it("uses exact soft-delete and destroy query contracts", async () => {
-    deleteMock.mockResolvedValue(envelope({ tenantId: TENANT_ID, operationId: OPERATION_ID, phase: "STOPPING_PROVISIONING", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null }));
+    deleteMock.mockResolvedValue(envelope(tenantDestroyFixture()));
 
     await tenantCoreApi.softDelete(TENANT_ID, key);
     await tenantCoreApi.destroy(TENANT_ID, true, key);
@@ -147,6 +150,60 @@ describe("tenant core API", () => {
       `/api/admin/core/v1/tenants/${TENANT_ID}/destroy?destroySubscriptions=false`,
       keyed,
     );
+  });
+
+  it.each(["BLOCKED", "ABANDONED", "SUCCEEDED"] as const)(
+    "reads a %s destruction projection, or null when none was requested",
+    async (phase) => {
+      const controller = new AbortController();
+      getMock
+        .mockResolvedValueOnce(envelope(tenantDestroyFixture(phase)))
+        .mockResolvedValueOnce(envelope(null));
+
+      await expect(
+        tenantCoreApi.getDestroy(TENANT_ID, controller.signal),
+      ).resolves.toEqual(tenantDestroyFixture(phase));
+      await expect(tenantCoreApi.getDestroy(TENANT_ID)).resolves.toBeNull();
+      expect(getMock).toHaveBeenNthCalledWith(
+        1,
+        `/api/admin/core/v1/tenants/${TENANT_ID}/destroy`,
+        { signal: controller.signal },
+      );
+    },
+  );
+
+  it("rejects another tenant's destruction projection", async () => {
+    getMock.mockResolvedValue(
+      envelope(tenantDestroyFixture("BLOCKED", { tenantId: OTHER_TENANT_ID })),
+    );
+    await expect(tenantCoreApi.getDestroy(TENANT_ID)).rejects.toThrow(
+      "INVALID_TENANT_DESTROY_RESPONSE",
+    );
+  });
+
+  it("abandons the exact destruction request through the keyed POST route", async () => {
+    postMock.mockResolvedValue(envelope(tenantDestroyFixture("ABANDONED")));
+
+    await expect(
+      tenantCoreApi.abandonDestroy(TENANT_ID, DESTROY_OPERATION_ID, key),
+    ).resolves.toEqual(tenantDestroyFixture("ABANDONED"));
+    expect(postMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/tenants/${TENANT_ID}/destroy/${DESTROY_OPERATION_ID}/abandon`,
+      undefined,
+      keyed,
+    );
+  });
+
+  it.each([
+    ["is not abandoned", tenantDestroyFixture("BLOCKED")],
+    ["names another request", tenantDestroyFixture("ABANDONED", { operationId: OPERATION_ID })],
+    ["names another tenant", tenantDestroyFixture("ABANDONED", { tenantId: OTHER_TENANT_ID })],
+    ["is empty", null],
+  ])("rejects an abandon answer that %s", async (_label, answer) => {
+    postMock.mockResolvedValue(envelope(answer));
+    await expect(
+      tenantCoreApi.abandonDestroy(TENANT_ID, DESTROY_OPERATION_ID, key),
+    ).rejects.toThrow("INVALID_TENANT_DESTROY_RESPONSE");
   });
 
   it("preflights through the singular global POST and opts out of auto keys", async () => {
@@ -172,7 +229,7 @@ describe("tenant core API", () => {
 
   it("adds from POST evidence and reconciles remove/promotion through tenant detail", async () => {
     postMock.mockResolvedValueOnce(envelope(customFqdnFixture()));
-    deleteMock.mockResolvedValue(envelope({ tenantId: TENANT_ID, operationId: OPERATION_ID, phase: "STOPPING_PROVISIONING", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null }));
+    deleteMock.mockResolvedValue({ data: undefined });
     postMock.mockResolvedValueOnce({ data: undefined });
 
     await expect(

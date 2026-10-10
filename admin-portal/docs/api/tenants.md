@@ -9,6 +9,8 @@ Canonical initial commercial amendment (2026-09-09): the wizard uses the single 
 
 Create-recovery amendment (2026-09-11): a status check that finds no tenant once the create can no longer be in flight now resolves the recovery marker, rotates the command key and unlocks the wizard, instead of holding the tab until a tenant that was never created appears. A rejected create is one rolled-back transaction, so an absent row past the Gateway in-flight lease is authoritative.
 
+Tenant-destruction amendment (2026-10-08): a destruction request now ends in `SUCCEEDED`, `BLOCKED` or `ABANDONED`. The status read returns the live request or, when none is live, the latest abandoned one, with attempts, the next attempt, block evidence and the provisioning operation it waits on; `POST /tenants/:id/destroy/:operationId/abandon` gives up a request Core has not yet authorized to drop. Verified against Core `tenant-destroy.service.ts`, `tenant-destroy-response.dto.ts`, `tenant-destroy-params.dto.ts`, `tenants.controller.ts`, the `tenant_destroy_operations` table checks in `@mutakamel/core-app-database`, Worker's `tenant-destroy.runner.ts`, and Gateway route `core.admin.tenants.destroy-abandon`. See [Permanent destroy](#permanent-destroy).
+
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
 tenant-detail shell. It covers identity validation, creation, list/detail,
 profile updates, lifecycle, and FQDN management. Tenant users, provisioning
@@ -29,33 +31,42 @@ permissioned nested resources.
 | Current integration | `/tenants` has server pagination/filters and authoritative database options; `/tenants/new` uses identity, create-options, quote, reverse-geocode, and canonical geography contracts; `/tenants/:id` is a tenant-first, permission-isolated workspace for profile/lifecycle/FQDN, provisioning, tenant access, subscription/items, wallet/ledger, invoices, and payments. |
 
 The historical migration design is absent from current source. The Gateway
-currently exposes **62** routes whose browser paths start with
-`/api/admin/core/v1/tenants`. They are divided as follows:
+currently exposes **70** routes whose browser paths start with
+`/api/admin/core/v1/tenants` (counted from the
+[generated route inventory](../generated/admin-core-api-routes.md) on
+2026-10-08). They are divided as follows:
 
 | Family | Count | Detailed reference |
 |:---|---:|:---|
-| Tenant creation, registry, lifecycle, and FQDNs | 20 | This document |
+| Tenant creation, registry, lifecycle, destruction, and FQDNs | 23 | This document |
 | Operation history and tenant-scoped provisioning | 15 | [Tenant Operations and Provisioning](tenant-operations.md) |
 | Tenant users and access catalogues | 18 | [Tenant Users](tenant-users.md) |
-| Subscription and billing summary | 4 | [Subscriptions](subscriptions.md), [Invoices](invoices.md) |
+| Subscription, subscription operations, and billing summary | 6 | [Subscriptions](subscriptions.md), [Invoices](invoices.md) |
 | Wallet, ledger, adjustments, and payments | 5 | [Wallet and Ledger](wallet.md) |
-| Tenant Storage Server migrations | 0 | [Historical design only](tenant-storage-migrations.md) |
+| Placement-move preflights and storage migration | 3 | [Tenant placement moves](tenant-placement-moves.md) |
 
-The creation wizard also needs two Core routes outside that 62-route prefix:
+The eight-route Storage Server migration design in
+[Tenant Storage Server Migrations](tenant-storage-migrations.md) remains
+historical; the placement-move routes above replaced it.
+
+The creation wizard also needs two Core routes outside that 70-route prefix:
 the FQDN preflight and subscription quote documented below.
 
 Browser code must use the canonical Gateway paths. Controller-relative
 `/admin/tenants/...` paths are not frontend URLs.
 
-### Other nested tenant routes in the 62-route inventory
+### Other nested tenant routes in the 70-route inventory
 
-The nine billing/wallet routes below complete the current accounting above.
-Their detailed DTOs and response models live in the linked domain documents.
+The eleven billing/wallet routes below complete the subscription and wallet
+families above. Their detailed DTOs and response models live in the linked
+domain documents.
 
 | Method and browser path | Permission | Success | Idempotency key | Detailed reference |
 |:---|:---|:---:|:---:|:---|
 | `GET /api/admin/core/v1/tenants/:tenantId/subscription` | `admin.subscriptions.read` | `200` | No | [Subscriptions](subscriptions.md) |
 | `GET /api/admin/core/v1/tenants/:tenantId/subscription/items` | `admin.subscriptions.read` | `200` | No | [Subscriptions](subscriptions.md) |
+| `GET /api/admin/core/v1/tenants/:tenantId/subscription/operations/:operationId` | `admin.subscriptions.read` | `200` | No | [Subscriptions](subscriptions.md) |
+| `POST /api/admin/core/v1/tenants/:tenantId/subscription/operations/:operationId/recovery` | `admin.subscriptions.update` + `admin.subscriptions.critical` | `202` | Yes | [Subscriptions](subscriptions.md) |
 | `GET /api/admin/core/v1/tenants/:tenantId/billing-summary` | `admin.invoices.read` | `200` | No | [Invoices](invoices.md) |
 | `POST /api/admin/core/v1/tenants/:tenantId/subscription` | `admin.subscriptions.create` + `admin.subscriptions.critical` | `201` | Yes | [Subscriptions](subscriptions.md) |
 | `GET /api/admin/core/v1/tenants/:tenantId/wallet` | `admin.wallet.read` | `200` | No | [Wallet and Ledger](wallet.md) |
@@ -94,7 +105,8 @@ generated for one mutation intent.
 | `POST /api/admin/core/v1/tenants/:id/provisioning/cancel` | `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Compatibility cancellation of the latest active operation |
 | `DELETE /api/admin/core/v1/tenants/:id` | `admin.tenants.delete` + `admin.tenants.critical` | `204` | Yes | Soft-delete a tenant |
 | `DELETE /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.destroy` + `admin.tenants.critical` | `202` | Yes | Accept durable destruction of a soft-deleted tenant |
-| `GET /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.read` | `200` | No | Read destruction progress or null |
+| `GET /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.read` | `200` | No | Read the live destruction request, else the latest abandoned one, else null |
+| `POST /api/admin/core/v1/tenants/:id/destroy/:operationId/abandon` | `admin.tenants.destroy` + `admin.tenants.critical` | `200` | Yes | Give up a `BLOCKED` or `STOPPING_PROVISIONING` destruction request |
 
 ### FQDNs
 
@@ -1088,7 +1100,12 @@ from normal lists. Deleted records remain available through direct detail and
 
 ### Permanent destroy
 
-Source verified: **2026-09-12**.
+Source verified: **2026-10-08** (Core `tenant-destroy.service.ts`,
+`dto/tenant-destroy-response.dto.ts`, `dto/tenant-destroy-params.dto.ts`,
+`tenants.controller.ts`; `tenant_destroy_operations` checks in
+`@mutakamel/core-app-database`; Worker `tenant-destroy.runner.ts` and
+`core-tenant-destroy.client.ts`; Gateway `core.admin.tenants.destroy`,
+`core.admin.tenants.destroy-status`, `core.admin.tenants.destroy-abandon`).
 
 `DELETE /api/admin/core/v1/tenants/:id/destroy?destroySubscriptions=false`
 
@@ -1104,37 +1121,121 @@ The tenant must already be soft-deleted. The compatibility flag must be false;
 `true` returns `TENANT_DESTROY_HISTORY_RETAINED`. Financial, subscription and audit
 records remain attached to a retained tenant tombstone.
 
-The DELETE returns **202** with the destruction operation under `data`.
+The DELETE returns **202** with the destruction request under `data`. Core
+uses the UUIDv7 `x-idempotency-key` as the request id: an exact replay of a key
+returns the request that key created, whatever became of it — including an
+abandoned one — while a different key returns the tenant's live request if one
+exists. A new request after an abandonment therefore needs a new key.
+
 `GET /api/admin/core/v1/tenants/:id/destroy` requires `admin.tenants.read` and
-returns that operation (including after completion), or `null` when none exists.
+returns the live request (including after it succeeded), or the most recent
+abandoned one when none is live, or `null` when destruction was never requested.
+All three routes answer with the same projection:
 
 ```ts
+type TenantDestroyPhase =
+  | "STOPPING_PROVISIONING" // Worker advances
+  | "DROPPING_DATABASE"     // Worker advances; the drop is authorized
+  | "FINALIZING"            // Worker advances; the database is gone
+  | "SUCCEEDED"             // final
+  | "BLOCKED"               // final for Worker; waits for an operator
+  | "ABANDONED";            // final; retained evidence
+
 interface TenantDestroyView {
-  operationId: string;
+  operationId: string;              // UUIDv7, the request's idempotency key
   tenantId: string;
-  phase: "STOPPING_PROVISIONING" | "DROPPING_DATABASE" | "FINALIZING" | "SUCCEEDED";
+  phase: TenantDestroyPhase;
   requestedAt: string;
   updatedAt: string;
-  completedAt: string | null;
-  lastErrorCode: string | null;
+  completedAt: string | null;       // set exactly when SUCCEEDED
+  lastErrorCode: string | null;     // safe code of the latest waited or failed attempt
+  attempts: number;                 // attempts in the current phase
+  nextAttemptAt: string | null;     // set exactly while Worker still advances
+  blockedAt: string | null;         // with blockedReason; BLOCKED, or ABANDONED after a block
+  blockedReason: string | null;     // safe code that blocked the request
+  blockingOperationId: string | null; // provisioning operation waited on (STOPPING_PROVISIONING, BLOCKED, ABANDONED)
+  abandonedAt: string | null;       // set exactly when ABANDONED
 }
 ```
 
-Core authorizes and stores one immutable request per tenant. Worker owns
-background recovery, requests provisioning cancellation through Core, waits
-for actual stop evidence, acquires the exclusive database claim, drops the
-pinned database and verifies absence. Core then releases domain identity and
-capacity exactly once. Restore and placement changes are prohibited once the
-request is accepted. Repeated requests return the same operation.
+There is no `abandonedBy` in the projection; Core keeps the actor in the row
+only. Codes match `^[A-Z][A-Z0-9_]*(\.[A-Z0-9_]+)*$` and are at most 100
+characters.
+
+Core authorizes and stores the request; Worker drives every advance. Each
+attempt in a phase is counted and the next is scheduled 5 s later, doubling to
+a 5-minute ceiling; attempts reset when the phase changes. Stopping
+provisioning is the only phase that waits on another owner: while a blocker is
+still observed — an open provisioning operation, including one stuck in
+`CANCEL_REQUESTED` (`TENANT_DESTROY_OPEN_PROVISIONING_OPERATION`), two open
+generations (`TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS`), a cancellation Core
+refused (its own code, such as `TENANT_PROVISIONING_CANCEL_NOT_ALLOWED`, or
+`TENANT_DESTROY_CANCELLATION_REFUSED`), or a Worker failure (`WORKER.*`) — the
+request becomes `BLOCKED` after 20 attempts or one hour after it was accepted,
+whichever comes first. `DROPPING_DATABASE` and `FINALIZING` never block: the
+database may already be gone, so they keep retrying at the ceiling with the
+latest code in `lastErrorCode`.
+
+Every request that was not abandoned holds the tenant: restore answers
+`TENANT_DESTROY_IN_PROGRESS`, placement changes are refused, and a new destroy
+returns the same request. Worker acquires the exclusive database claim, drops
+the pinned database and verifies absence; Core then releases domain identity
+and capacity exactly once.
 
 Late authenticated provisioning results remain projectable after soft deletion.
 When Core still shows an open operation whose Worker execution has stopped,
 Worker replays its original signed terminal outbox event with the same identity
 and checksum. Destruction still waits for Core to acknowledge the terminal state.
 
-The UI retains the tenant while pending and polls progress, including after a
-page reload. Only `SUCCEEDED` displays completion. A retry delay keeps the
-request and target intact; it never reports an unverified drop as success.
+#### Abandon
+
+`POST /api/admin/core/v1/tenants/:id/destroy/:operationId/abandon`
+
+Permissions: `admin.tenants.destroy` + `admin.tenants.critical` (the same pair
+as destroy). No body. The Gateway route is `WRITE_SENSITIVE` and
+`idempotent: true`, so it requires a UUIDv7 `x-idempotency-key`; Core itself is
+idempotent by state. Both path ids must be UUIDv7; `operationId` names the
+exact request, so a replay can never reach a newer request accepted after this
+one was abandoned.
+
+It gives up a `BLOCKED` or `STOPPING_PROVISIONING` request and answers **200**
+with the request in `ABANDONED`; repeating it returns that request unchanged.
+Any later phase answers `409 TENANT_DESTROY_NOT_ABANDONABLE` (the drop is
+authorized, so the request can only finish), and an unknown request
+`404 TENANT_DESTROY_NOT_FOUND`. The database was never dropped: the row stays
+as evidence, the tenant stays soft-deleted, and restore and a new destruction
+request (under a new key) become available. A cancellation already requested
+on the provisioning operation stays requested.
+
+#### Workspace behavior
+
+- The overview's lifecycle panel shows the request while the tenant is
+  `DELETED`: the phase and what it means, the localized reason (or the raw safe
+  code when it has no label) with the code kept as copyable evidence, the
+  provisioning operation it waits on, attempts in the phase, the next attempt,
+  block/abandon/request/update times and the request id. No deep link is
+  offered for the provisioning operation: the workspace has no per-operation
+  route and closes the Provisioning tab for a deleted tenant.
+- Progress is polled only while the phase is `STOPPING_PROVISIONING`,
+  `DROPPING_DATABASE` or `FINALIZING`, including after a page reload. The
+  cadence starts at 3 s and backs off to 15 s and 60 s while consecutive reads
+  change nothing (the provisioning workspace's model); any change, command,
+  manual refresh or return to the tab resets it, and nothing is read while the
+  page is hidden. `SUCCEEDED`, `BLOCKED` and `ABANDONED` stop polling; only
+  `SUCCEEDED` displays completion, and a retry delay never reports an
+  unverified drop as success.
+- Restore and destroy stay visible but disabled, pointing at the explanation,
+  while a request holds the tenant. **Abandon destruction** is offered for
+  `BLOCKED` and `STOPPING_PROVISIONING` to holders of the destroy pair, behind
+  the design-system confirmation that states the consequences above.
+- The abandon dialog closes on any outcome. A rejection is shown in the
+  workspace alert; `TENANT_DESTROY_NOT_ABANDONABLE` and
+  `TENANT_DESTROY_NOT_FOUND` also re-read the request and explain beside the
+  refreshed status. A transient failure keeps the idempotency key for the exact
+  retry. Observing an abandoned request discards any retained destroy key, so
+  the next destroy cannot replay the abandoned one.
+- A projection that breaks the pairings above fails closed as
+  `INVALID_TENANT_DESTROY_RESPONSE` instead of rendering a contradictory state.
 
 ## FQDN management
 
@@ -1195,6 +1296,8 @@ so the UI should not show a “set primary” action.
 | Add/remove/promote FQDN | `admin.tenants.manage_fqdns` + `admin.tenants.critical` |
 | Soft delete | `admin.tenants.delete` + `admin.tenants.critical` |
 | Permanent destroy | `admin.tenants.destroy` + `admin.tenants.critical` |
+| Read destruction progress | `admin.tenants.read` |
+| Abandon a blocked or still-stopping destruction | `admin.tenants.destroy` + `admin.tenants.critical` |
 
 Nested tab permissions are independent. Having `admin.tenants.read` does not
 grant tenant-user, subscription, invoice, wallet, payment, or advanced
@@ -1230,6 +1333,11 @@ provisioning permissions.
 | `409` | `TENANT_UPDATE_STALE` | Reload and review the newer profile |
 | `409` | `TENANT_BILLING_HOLD` | Wait for collection/refund reconciliation before soft delete |
 | `409` | `TENANT_FINANCIAL_HISTORY_EXISTS` | Permanent destruction is forbidden |
+| `409` | `TENANT_DESTROY_HISTORY_RETAINED` | `destroySubscriptions=true` was sent; destruction always retains financial history |
+| `409` | `TENANT_DESTROY_IN_PROGRESS` | Restore while a destruction request that was not abandoned holds the tenant; abandon it first if it is still abandonable |
+| `409` | `TENANT_DESTROY_NOT_ABANDONABLE` | Abandon after Core authorized the drop (or after success); re-read progress, the request can only finish |
+| `404` | `TENANT_DESTROY_NOT_FOUND` | Abandon named a request this tenant does not have; re-read progress |
+| `409` | `IDEMPOTENCY_KEY_CONFLICT` | A destroy key already belongs to another tenant's or actor's request; generate a new key |
 | `409` | `NO_CAPACITY` | Refresh placement options or use automatic placement |
 | `409` | `TENANT_CREATE_STORAGE_PLACEMENT_INCOMPLETE` | Storage catalogue exceeded its bounded safe projection; block creation and escalate |
 | `409` | `SUBSCRIPTION_QUOTE_EXPIRED` | Re-quote |
@@ -1313,8 +1421,12 @@ The tenant detail workspace is source-integrated:
   `ACTIVE` or `SUSPENDED`;
 - FQDN rows load from exact `GET /tenants/:id/fqdns`; the list is reconciled
   after mutations and tenant detail remains an independent resource;
-- profile concurrency, lifecycle, delete/destroy, and every FQDN command use
-  caller-owned UUIDv7 intent keys and exact permission/state gates;
+- profile concurrency, lifecycle, delete/destroy/abandon-destroy, and every
+  FQDN command use caller-owned UUIDv7 intent keys and exact permission/state
+  gates;
+- a deleted tenant shows its destruction request, polls it only while Worker
+  advances it, and offers abandon for `BLOCKED` and `STOPPING_PROVISIONING`
+  (see [Permanent destroy](#permanent-destroy));
 - all 15 tenant provisioning routes and all 18 tenant access routes have typed
   UI surfaces;
 - subscription, billing summary, wallet, ledger, payment, refund, and payment

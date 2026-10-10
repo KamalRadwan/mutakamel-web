@@ -3,15 +3,15 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-09-29T18:08:31.172Z**
+Generated at: **2026-10-08T07:34:08.064Z**
 
-Frontend revision: `c57e1f853ef8+dirty`
+Frontend revision: `b9c222313a0e+dirty`
 
-Backend revision: `7acae5756765+dirty`
+Backend revision: `21aff55b3944+dirty`
 
 ## Coverage
 
-This inventory contains **288** browser-visible Core Admin routes.
+This inventory contains **289** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
@@ -21,8 +21,8 @@ feature flags, deployment, or current frontend implementation.
 | AUTHENTICATED | 103 |
 | PUBLIC | 6 |
 | READ_HEAVY | 23 |
-| WRITE_SENSITIVE | 156 |
-| **Total** | **288** |
+| WRITE_SENSITIVE | 157 |
+| **Total** | **289** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -51,7 +51,7 @@ Machine-readable source:
 | subscriptions | 12 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
-| tenants | 58 |
+| tenants | 59 |
 | users | 10 |
 | wallets | 6 |
 
@@ -272,6 +272,7 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/tenants/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.tenants.suspend + admin.tenants.critical | `core.admin.tenants.activate` |
 | DELETE | `/api/admin/core/v1/tenants/:id/destroy` | WRITE_SENSITIVE | yes | ALL | admin.tenants.destroy + admin.tenants.critical | `core.admin.tenants.destroy` |
 | GET | `/api/admin/core/v1/tenants/:id/destroy` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.destroy-status` |
+| POST | `/api/admin/core/v1/tenants/:id/destroy/:operationId/abandon` | WRITE_SENSITIVE | yes | ALL | admin.tenants.destroy + admin.tenants.critical | `core.admin.tenants.destroy-abandon` |
 | GET | `/api/admin/core/v1/tenants/:id/fqdns` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.fqdns.list` |
 | POST | `/api/admin/core/v1/tenants/:id/fqdns` | WRITE_SENSITIVE | yes | ALL | admin.tenants.manage_fqdns + admin.tenants.critical | `core.admin.tenants.fqdns.add` |
 | DELETE | `/api/admin/core/v1/tenants/:id/fqdns/:fqdnId` | WRITE_SENSITIVE | yes | ALL | admin.tenants.manage_fqdns + admin.tenants.critical | `core.admin.tenants.fqdns.delete` |

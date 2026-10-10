@@ -12,8 +12,15 @@ import {
   normalizeApiError,
   type NormalizedApiError,
 } from "@/shared/api/normalized-api-error";
+import { useOperatorRefreshGuard } from "@/shared/hooks/useOperatorRefreshGuard";
 import { usePollWhile } from "@/shared/hooks/usePollWhile";
+import { provisioningPollIntervalMs } from "../../provisioning/model/polling";
 import { tenantCoreApi } from "../api/tenant-core.api";
+import {
+  canAbandonTenantDestroy,
+  isTenantDestroyAdvancing,
+  tenantDestroyPollFingerprint,
+} from "../model/destroy";
 import {
   createTenantIntentKeyStore,
   shouldRetainTenantIntentKey,
@@ -35,6 +42,10 @@ import type {
 } from "../types";
 
 export interface TenantCoreWorkspaceOptions {
+  /**
+   * Base cadence. Provisioning status polls at it; destruction progress
+   * starts at it and backs off while nothing changes.
+   */
   pollIntervalMs?: number;
   maxProvisioningPolls?: number;
 }
@@ -88,6 +99,26 @@ export function useTenantCoreWorkspace(
   const [pollAttempts, setPollAttempts] = useState(0);
   const [pollExhausted, setPollExhausted] = useState(false);
 
+  /**
+   * Destruction progress backs off like the provisioning workspace: 3 s →
+   * 15 s → 60 s while consecutive polls observe nothing new, back to the base
+   * after any change, operator command, manual refresh or return to the tab.
+   * A status read started before a command answered is discarded by
+   * `destroyReadGeneration`, so it cannot overwrite the command's result.
+   */
+  const destroyReadGeneration = useRef(0);
+  const destroyQuietPollsRef = useRef(0);
+  const destroyPollFingerprintRef = useRef<string | null>(null);
+  const [destroyQuietPolls, setDestroyQuietPolls] = useState(0);
+  // Nothing is read while the page is hidden; the evidence on screen stays.
+  const destroyPollPaused = useOperatorRefreshGuard().isPaused;
+
+  const resetDestroyPollBackoff = useCallback(() => {
+    destroyQuietPollsRef.current = 0;
+    destroyPollFingerprintRef.current = null;
+    setDestroyQuietPolls(0);
+  }, []);
+
   const applyTenant = useCallback(
     (next: TenantView, resetProfile: boolean) => {
       if (tenantIdRef.current !== next.id) return;
@@ -98,6 +129,13 @@ export function useTenantCoreWorkspace(
       setLoadError(null);
       if (next.status !== "PROVISIONING") {
         setPollExhausted(false);
+      }
+      if (next.status !== "DELETED") {
+        // Only a soft-deleted tenant carries a destruction request. Restoring
+        // one after its request was abandoned leaves that request as Core
+        // evidence; the workspace stops showing it and polls nothing.
+        setDestroyOperation(null);
+        setDestroyError(null);
       }
       if (resetProfile) {
         const draft = createTenantProfileDraft(next);
@@ -119,6 +157,12 @@ export function useTenantCoreWorkspace(
   const applyDestruction = useCallback((operation: TenantDestroyView | null) => {
     setDestroyOperation(operation);
     setDestroyError(null);
+    if (operation?.phase === "ABANDONED") {
+      // Core keys a destruction request by its idempotency key and replays an
+      // abandoned one unchanged, so a retained destroy key would bring this
+      // request back instead of accepting a new one.
+      intentKeys.current.clear("destroy");
+    }
     if (operation?.phase === "SUCCEEDED") {
       tenantRef.current = null;
       profileExpectedUpdatedAtRef.current = null;
@@ -128,16 +172,56 @@ export function useTenantCoreWorkspace(
     }
   }, []);
 
-  const loadDestruction = useCallback(async () => {
+  /**
+   * Reads the destruction projection. Resolves to what was applied, or
+   * `undefined` when the read failed or was superseded — by another tenant, a
+   * newer read, or a command's own answer.
+   */
+  const loadDestruction = useCallback(async (): Promise<
+    TenantDestroyView | null | undefined
+  > => {
     const identityGeneration = tenantIdentityGeneration.current;
+    const readGeneration = ++destroyReadGeneration.current;
+    const current = () =>
+      identityGeneration === tenantIdentityGeneration.current &&
+      tenantIdRef.current === tenantId &&
+      readGeneration === destroyReadGeneration.current;
     try {
       const operation = await tenantCoreApi.getDestroy(tenantId);
-      if (identityGeneration !== tenantIdentityGeneration.current || tenantIdRef.current !== tenantId) return;
+      if (!current()) return undefined;
       applyDestruction(operation);
+      return operation;
     } catch (caught) {
-      if (identityGeneration === tenantIdentityGeneration.current && tenantIdRef.current === tenantId) setDestroyError(normalizeApiError(caught));
+      if (current()) setDestroyError(normalizeApiError(caught));
+      return undefined;
     }
   }, [applyDestruction, tenantId]);
+
+  /** Adopts a command's answer as newer than any status read in flight. */
+  const adoptDestruction = useCallback(
+    (operation: TenantDestroyView) => {
+      destroyReadGeneration.current += 1;
+      applyDestruction(operation);
+    },
+    [applyDestruction],
+  );
+
+  /**
+   * One background read. The same fingerprint as the last one is a quiet poll
+   * and slows the cadence; a failed read is quiet too, so an unavailable
+   * status route is not hammered at the base cadence.
+   */
+  const pollDestruction = useCallback(async () => {
+    const operation = await loadDestruction();
+    const fingerprint =
+      operation === undefined ? null : tenantDestroyPollFingerprint(operation);
+    const quiet =
+      fingerprint === null ||
+      fingerprint === destroyPollFingerprintRef.current;
+    if (fingerprint !== null) destroyPollFingerprintRef.current = fingerprint;
+    destroyQuietPollsRef.current = quiet ? destroyQuietPollsRef.current + 1 : 0;
+    setDestroyQuietPolls(destroyQuietPollsRef.current);
+  }, [loadDestruction]);
 
   const loadTenant = useCallback(
     async (background = false): Promise<TenantView | null> => {
@@ -214,6 +298,7 @@ export function useTenantCoreWorkspace(
       setLastProvisioningCommand(null);
       setDestroyOperation(null);
       setDestroyError(null);
+      resetDestroyPollBackoff();
       setPollAttempts(0);
       setPollExhausted(false);
       void loadTenant(false);
@@ -224,7 +309,7 @@ export function useTenantCoreWorkspace(
       requestGeneration.current += 1;
       requestAbort.current?.abort();
     };
-  }, [isAuthLoading, loadTenant, tenantId]);
+  }, [isAuthLoading, loadTenant, resetDestroyPollBackoff, tenantId]);
 
   const currentTenant = loadedTenantId === tenantId ? tenant : null;
 
@@ -241,11 +326,29 @@ export function useTenantCoreWorkspace(
     },
   );
 
-  usePollWhile(
-    !!destroyOperation && destroyOperation.tenantId === tenantId && destroyOperation.phase !== "SUCCEEDED" && permissions.canRead,
-    loadDestruction,
-    { intervalMs: pollIntervalMs, deps: [loadDestruction] },
-  );
+  // Only phases Worker still advances are polled. SUCCEEDED, BLOCKED and
+  // ABANDONED are final: BLOCKED waits for an operator, not for Worker.
+  const destroyAdvancing =
+    destroyOperation !== null &&
+    destroyOperation.tenantId === tenantId &&
+    isTenantDestroyAdvancing(destroyOperation.phase);
+  const destroyPolling =
+    destroyAdvancing && permissions.canRead && !destroyPollPaused;
+  usePollWhile(destroyPolling, pollDestruction, {
+    intervalMs: provisioningPollIntervalMs(destroyQuietPolls, pollIntervalMs),
+    deps: [pollDestruction],
+  });
+
+  // Coming back resumes at the base cadence rather than a slowed one: the
+  // operator is looking again, and whatever changed meanwhile is unseen.
+  const wasDestroyPollPausedRef = useRef(destroyPollPaused);
+  useEffect(() => {
+    const resumed = wasDestroyPollPausedRef.current && !destroyPollPaused;
+    wasDestroyPollPausedRef.current = destroyPollPaused;
+    if (!resumed) return;
+    const timer = window.setTimeout(resetDestroyPollBackoff, 0);
+    return () => window.clearTimeout(timer);
+  }, [destroyPollPaused, resetDestroyPollBackoff]);
 
   const assertCurrentTenant = useCallback((): TenantView => {
     const current = tenantRef.current;
@@ -539,6 +642,7 @@ export function useTenantCoreWorkspace(
       requirePermission(permissions.canDestroy, "TENANT_DESTROY_FORBIDDEN");
       const current = assertCurrentTenant();
       requireState(current.status === "DELETED", "TENANT_DESTROY_NOT_ALLOWED");
+      resetDestroyPollBackoff();
       const operation = await runWrite(
         "destroy",
         {
@@ -548,17 +652,75 @@ export function useTenantCoreWorkspace(
         },
         (key) => tenantCoreApi.destroy(tenantId, destroySubscriptions, key),
       );
-      applyDestruction(operation);
+      adoptDestruction(operation);
       return operation;
     },
     [
       assertCurrentTenant,
       permissions.canDestroy,
-      applyDestruction,
+      adoptDestruction,
+      resetDestroyPollBackoff,
       runWrite,
       tenantId,
     ],
   );
+
+  /**
+   * Gives up the shown destruction request while Core still allows it
+   * (STOPPING_PROVISIONING or BLOCKED), under the same permissions as
+   * destroy. The database is kept and the tenant stays soft-deleted, so
+   * restore and a new destruction request become available again.
+   */
+  const abandonDestruction = useCallback(async () => {
+    requirePermission(permissions.canDestroy, "TENANT_DESTROY_FORBIDDEN");
+    const current = assertCurrentTenant();
+    const operation = destroyOperation;
+    requireState(
+      current.status === "DELETED" &&
+        operation !== null &&
+        operation.tenantId === tenantId &&
+        canAbandonTenantDestroy(operation),
+      "TENANT_DESTROY_NOT_ABANDONABLE",
+    );
+    const { operationId } = operation;
+    resetDestroyPollBackoff();
+    try {
+      const abandoned = await runWrite(
+        "abandon-destroy",
+        { action: "tenant.destroy.abandon", tenantId, operationId },
+        (key) => tenantCoreApi.abandonDestroy(tenantId, operationId, key),
+      );
+      adoptDestruction(abandoned);
+      return abandoned;
+    } catch (caught) {
+      const error = normalizeApiError(caught);
+      // Core already moved the request past the point it can be abandoned
+      // (or no longer knows it): show what it is now, not the stale phase
+      // that offered the action.
+      if (
+        error.errorCode === "TENANT_DESTROY_NOT_ABANDONABLE" ||
+        error.errorCode === "TENANT_DESTROY_NOT_FOUND"
+      ) {
+        await loadDestruction();
+      }
+      throw error;
+    }
+  }, [
+    adoptDestruction,
+    assertCurrentTenant,
+    destroyOperation,
+    loadDestruction,
+    permissions.canDestroy,
+    resetDestroyPollBackoff,
+    runWrite,
+    tenantId,
+  ]);
+
+  /** Manual re-read of destruction progress; resets the poll back-off. */
+  const refreshDestruction = useCallback(() => {
+    resetDestroyPollBackoff();
+    return loadDestruction();
+  }, [loadDestruction, resetDestroyPollBackoff]);
 
   const replaceTenant = useCallback(
     (next: TenantView) => applyTenant(next, !profileDirtyRef.current),
@@ -568,8 +730,9 @@ export function useTenantCoreWorkspace(
   const refresh = useCallback(() => {
     setPollAttempts(0);
     setPollExhausted(false);
+    resetDestroyPollBackoff();
     return loadTenant(false);
-  }, [loadTenant]);
+  }, [loadTenant, resetDestroyPollBackoff]);
 
   return {
     tenant: currentTenant,
@@ -584,6 +747,8 @@ export function useTenantCoreWorkspace(
     lastProvisioningCommand,
     destroyOperation: destroyOperation?.tenantId === tenantId ? destroyOperation : null,
     destroyError,
+    /** Destruction progress is being re-read automatically. */
+    destroyPolling,
     pollAttempts,
     pollExhausted,
     isPolling: currentTenant?.status === "PROVISIONING" && !pollExhausted,
@@ -602,6 +767,8 @@ export function useTenantCoreWorkspace(
     softDelete,
     restore,
     destroy,
+    abandonDestruction,
+    refreshDestruction,
   };
 }
 

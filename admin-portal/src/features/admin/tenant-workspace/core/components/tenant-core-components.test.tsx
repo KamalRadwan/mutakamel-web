@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  DESTROY_OPERATION_ID,
   CUSTOM_FQDN_ID,
+  OPERATION_ID,
   customFqdnFixture,
+  tenantDestroyFixture,
   tenantFixture,
 } from "../__tests__/fixtures";
 import type { UseTenantCoreWorkspaceResult } from "../hooks/useTenantCoreWorkspace";
@@ -12,9 +15,23 @@ import type { UseTenantFqdnManagementResult } from "../hooks/useTenantFqdnManage
 import { createTenantProfileDraft } from "../model/readers";
 import type { TenantStatus, TenantView } from "../types";
 
+// The design-system confirmation modal and code references read the app
+// language; the panels themselves take it as a prop.
+const i18n = vi.hoisted(() => ({
+  current: { lang: "en" as "en" | "ar", dir: "ltr" as "ltr" | "rtl" },
+}));
+vi.mock("@/i18n/I18nContext", () => ({
+  useI18n: () => i18n.current,
+  useOptionalI18n: () => i18n.current,
+}));
+
 import { TenantFqdnPanel } from "./TenantFqdnPanel";
 import { TenantLifecyclePanel } from "./TenantLifecyclePanel";
 import { TenantProfilePanel } from "./TenantProfilePanel";
+
+afterEach(() => {
+  i18n.current = { lang: "en", dir: "ltr" };
+});
 
 function workspaceFixture(
   status: TenantStatus = "ACTIVE",
@@ -42,6 +59,9 @@ function workspaceFixture(
     profileStale: false,
     mutation: { name: null, error: null },
     lastProvisioningCommand: null,
+    destroyOperation: null,
+    destroyError: null,
+    destroyPolling: false,
     pollAttempts: 0,
     pollExhausted: false,
     isPolling: false,
@@ -60,6 +80,8 @@ function workspaceFixture(
     softDelete: vi.fn().mockResolvedValue(tenant),
     restore: vi.fn().mockResolvedValue(tenant),
     destroy: vi.fn().mockResolvedValue(undefined),
+    abandonDestruction: vi.fn().mockResolvedValue(undefined),
+    refreshDestruction: vi.fn().mockResolvedValue(null),
     ...overrides,
   } as UseTenantCoreWorkspaceResult;
 }
@@ -177,11 +199,214 @@ describe("tenant profile and lifecycle panels", () => {
 
   it("shows pending progress and disables restore and duplicate destroy", () => {
     render(<TenantLifecyclePanel locale="en" workspace={workspaceFixture("DELETED", {
-      destroyOperation: { operationId: "op", tenantId: "tenant", phase: "STOPPING_PROVISIONING", requestedAt: "now", updatedAt: "now", completedAt: null, lastErrorCode: null },
+      destroyOperation: tenantDestroyFixture("STOPPING_PROVISIONING"),
+      destroyPolling: true,
     })} />);
     expect(screen.getByRole("status")).toHaveTextContent("Stopping provisioning");
+    expect(screen.getByText("Status refreshes automatically.")).toBeInTheDocument();
+    for (const name of ["Restore tenant", "Destroy permanently"]) {
+      const action = screen.getByRole("button", { name });
+      expect(action).toBeDisabled();
+      // The disabled action points at the note that says why.
+      expect(action).toHaveAccessibleDescription(/Restore and a new destruction request stay unavailable/);
+    }
+    // Stopping provisioning is still before the drop, so it can be abandoned.
+    expect(screen.getByRole("button", { name: "Abandon destruction" })).toBeEnabled();
+  });
+
+  it("explains a blocked destruction with its reason, waited-on operation and attempts", () => {
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("BLOCKED", { attempts: 20 }),
+        })}
+      />,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Destruction is blocked");
+    expect(status).toHaveTextContent("automatic attempts have ended");
+    expect(screen.getByText("An open provisioning operation has not stopped.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy reference TENANT_DESTROY_OPEN_PROVISIONING_OPERATION" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Copy reference ${OPERATION_ID}` })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Copy reference ${DESTROY_OPERATION_ID}` })).toBeInTheDocument();
+    expect(screen.getByText("Attempts in this phase").nextElementSibling).toHaveTextContent("20");
+    // Automation has ended, so there is no next attempt and nothing polls.
+    expect(screen.queryByText("Next attempt")).not.toBeInTheDocument();
+    expect(screen.queryByText("Status refreshes automatically.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore tenant" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Destroy permanently" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Abandon destruction" })).toBeEnabled();
+  });
+
+  it("shows a code without a localized label verbatim", () => {
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("BLOCKED", {
+            blockedReason: "WORKER.TENANT_DESTROY.SOMETHING_NEW",
+            blockingOperationId: null,
+          }),
+        })}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy reference WORKER.TENANT_DESTROY.SOMETHING_NEW" }),
+    ).toHaveTextContent("WORKER.TENANT_DESTROY.SOMETHING_NEW");
+    expect(screen.queryByText("Provisioning operation")).not.toBeInTheDocument();
+  });
+
+  it("abandons a blocked destruction only after the consequences are confirmed", async () => {
+    const abandonDestruction = vi.fn().mockResolvedValue(tenantDestroyFixture("ABANDONED"));
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("BLOCKED"),
+          abandonDestruction,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Abandon destruction" }));
+    expect(abandonDestruction).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("alertdialog", { name: "Abandon the destruction of acme?" });
+    expect(dialog).toHaveTextContent("The database is kept and the tenant stays soft-deleted");
+    expect(dialog).toHaveTextContent("restored or destroyed again");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Abandon destruction" }));
+
+    await vi.waitFor(() => expect(abandonDestruction).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
+  it("closes the abandon dialog when Core refuses, leaving the refusal to the workspace alert", async () => {
+    const abandonDestruction = vi.fn().mockRejectedValue({
+      isNormalized: true,
+      httpStatus: 409,
+      errorCode: "TENANT_DESTROY_NOT_ABANDONABLE",
+      message: "Not abandonable",
+    });
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("STOPPING_PROVISIONING"),
+          abandonDestruction,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Abandon destruction" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Abandon destruction" }));
+
+    await vi.waitFor(() => expect(abandonDestruction).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
+  it("explains a refused abandon beside the refreshed progress", () => {
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("DROPPING_DATABASE"),
+          mutation: {
+            name: null,
+            error: {
+              isNormalized: true,
+              httpStatus: 409,
+              errorCode: "TENANT_DESTROY_NOT_ABANDONABLE",
+              message: "Not abandonable",
+            },
+          },
+        })}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Deleting the database");
+    expect(screen.getByText(/can no longer be abandoned/)).toBeInTheDocument();
+    // The drop is authorized: nothing to abandon, nothing to restore.
+    expect(screen.queryByRole("button", { name: "Abandon destruction" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore tenant" })).toBeDisabled();
+  });
+
+  it("offers restore and a new destruction after the request was abandoned", () => {
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("ABANDONED", {
+            blockedAt: "2026-08-11T19:34:00.000Z",
+            blockedReason: "TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS",
+          }),
+        })}
+      />,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Destruction was abandoned");
+    expect(status).toHaveTextContent("The database was kept");
+    expect(screen.getByText("Abandoned")).toBeInTheDocument();
+    expect(screen.getByText("Blocked by")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Restore tenant" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Destroy permanently" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Abandon destruction" })).not.toBeInTheDocument();
+  });
+
+  it("withholds abandon from an admin without the destroy grant", () => {
+    const base = workspaceFixture("DELETED");
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("BLOCKED"),
+          permissions: { ...base.permissions, canDestroy: false },
+        })}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Destruction is blocked");
+    expect(screen.queryByRole("button", { name: "Abandon destruction" })).not.toBeInTheDocument();
+  });
+
+  it("reports an unreadable destruction status with a retry", () => {
+    const refreshDestruction = vi.fn().mockResolvedValue(null);
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: null,
+          destroyError: {
+            isNormalized: true,
+            httpStatus: 503,
+            errorCode: "CORE_UNAVAILABLE",
+            message: "Core is unavailable",
+            correlationId: "corr-1",
+          },
+          refreshDestruction,
+        })}
+      />,
+    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Destruction status could not be loaded.");
+    expect(within(alert).getByRole("button", { name: "Copy reference CORE_UNAVAILABLE" })).toBeInTheDocument();
+    expect(within(alert).getByRole("button", { name: "Copy reference corr-1" })).toBeInTheDocument();
+    fireEvent.click(within(alert).getByRole("button", { name: "Refresh status" }));
+    expect(refreshDestruction).toHaveBeenCalledOnce();
+  });
+
+  it("renders blocked destruction in Arabic", () => {
+    i18n.current = { lang: "ar", dir: "rtl" };
+    render(
+      <TenantLifecyclePanel
+        locale="ar"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("BLOCKED"),
+        })}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("الحذف النهائي متوقف");
+    expect(screen.getByText("توجد عملية تجهيز مفتوحة لم تتوقف بعد.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "التخلي عن الحذف النهائي" }));
+    const dialog = screen.getByRole("alertdialog", { name: "التخلي عن الحذف النهائي للمستأجر acme؟" });
+    expect(dialog).toHaveTextContent("تُحفظ قاعدة البيانات");
   });
 
   it("offers restore beside destroy on a deleted tenant", async () => {

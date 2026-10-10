@@ -147,14 +147,57 @@ export const tenantCoreApi = {
       keyed(idempotencyKey),
     );
     const result = readTenantDestroy(extractCoreData(response));
-    if (!result || result.tenantId !== tenantId) throw new Error('INVALID_TENANT_DESTROY_RESPONSE');
+    if (!result || result.tenantId !== tenantId) {
+      throw new Error("INVALID_TENANT_DESTROY_RESPONSE");
+    }
     return result;
   },
 
-  getDestroy: async (tenantId: string, signal?: AbortSignal): Promise<TenantDestroyView | null> => {
-    const response = await axiosClient.get<SuccessResponse<unknown>>(`${TENANTS_URL}/${tenantId}/destroy`, { signal });
+  /**
+   * The live destruction request, or the most recent abandoned one when none
+   * is live, or `null` when destruction was never requested.
+   */
+  getDestroy: async (
+    tenantId: string,
+    signal?: AbortSignal,
+  ): Promise<TenantDestroyView | null> => {
+    const response = await axiosClient.get<SuccessResponse<unknown>>(
+      `${TENANTS_URL}/${tenantId}/destroy`,
+      { signal },
+    );
     const result = readTenantDestroy(extractCoreData(response));
-    if (result && result.tenantId !== tenantId) throw new Error('INVALID_TENANT_DESTROY_RESPONSE');
+    if (result && result.tenantId !== tenantId) {
+      throw new Error("INVALID_TENANT_DESTROY_RESPONSE");
+    }
+    return result;
+  },
+
+  /**
+   * Gives up a request Core has not yet authorized to drop the database
+   * (BLOCKED or STOPPING_PROVISIONING). The request is named exactly, so a
+   * replay can never reach a newer request accepted after this one was
+   * abandoned. Core answers with the abandoned request, unchanged on repeat;
+   * a later phase answers `409 TENANT_DESTROY_NOT_ABANDONABLE`.
+   */
+  abandonDestroy: async (
+    tenantId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ): Promise<TenantDestroyView> => {
+    const response = await axiosClient.post<SuccessResponse<unknown>>(
+      `${TENANTS_URL}/${tenantId}/destroy/${operationId}/abandon`,
+      undefined,
+      keyed(idempotencyKey),
+    );
+    const result = readTenantDestroy(extractCoreData(response));
+    if (
+      !result ||
+      result.tenantId !== tenantId ||
+      result.operationId !== operationId ||
+      result.phase !== "ABANDONED"
+    ) {
+      throw new Error("INVALID_TENANT_DESTROY_RESPONSE");
+    }
     return result;
   },
 

@@ -208,7 +208,8 @@ export type TenantMutationName =
   | "cancel-provisioning"
   | "soft-delete"
   | "restore"
-  | "destroy";
+  | "destroy"
+  | "abandon-destroy";
 
 export type TenantFqdnMutationName =
   | "preflight"
@@ -232,12 +233,48 @@ export interface TenantCorePermissions {
   canValidateFqdn: boolean;
   canManageFqdns: boolean;
 }
+
+/**
+ * Worker advances STOPPING_PROVISIONING → DROPPING_DATABASE → FINALIZING →
+ * SUCCEEDED. BLOCKED (provisioning could not be stopped) and ABANDONED (an
+ * operator gave the request up) end automation before Core authorized the
+ * database drop, so the tenant database still exists in both.
+ */
+export const TENANT_DESTROY_PHASES = [
+  "STOPPING_PROVISIONING",
+  "DROPPING_DATABASE",
+  "FINALIZING",
+  "SUCCEEDED",
+  "BLOCKED",
+  "ABANDONED",
+] as const;
+
+export type TenantDestroyPhase = (typeof TENANT_DESTROY_PHASES)[number];
+
+/** The phases Worker still advances; SUCCEEDED, BLOCKED and ABANDONED are final. */
+export const TENANT_DESTROY_ADVANCING_PHASES = [
+  "STOPPING_PROVISIONING",
+  "DROPPING_DATABASE",
+  "FINALIZING",
+] as const satisfies readonly TenantDestroyPhase[];
+
 export interface TenantDestroyView {
   operationId: string;
   tenantId: string;
-  phase: 'STOPPING_PROVISIONING' | 'DROPPING_DATABASE' | 'FINALIZING' | 'SUCCEEDED';
+  phase: TenantDestroyPhase;
   requestedAt: string;
   updatedAt: string;
   completedAt: string | null;
+  /** Safe code explaining why the latest attempt waited or failed. */
   lastErrorCode: string | null;
+  /** Attempts made in the current phase. */
+  attempts: number;
+  /** When Worker next advances the request; null once automation has ended. */
+  nextAttemptAt: string | null;
+  blockedAt: string | null;
+  /** Safe code that blocked the request; kept after it is abandoned. */
+  blockedReason: string | null;
+  /** Provisioning operation the stop waits on, or waited on before it blocked. */
+  blockingOperationId: string | null;
+  abandonedAt: string | null;
 }

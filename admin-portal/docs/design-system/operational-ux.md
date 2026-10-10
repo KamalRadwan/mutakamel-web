@@ -94,10 +94,13 @@ but the dashboard does not currently supply that signal. Product-wide call-state
 wiring remains pending. The tenant provisioning poller (2026-10-08) composes the
 guard for the hidden page and its own confirmation dialog, shows "Auto-refresh
 paused" while held, and backs off 3 s → 15 s → 60 s while nothing changes (see
-`docs/api/tenant-operations.md`). The tenant core poller, logging live
-transport, and notification dropdown were audited but retain their existing
-domain-specific scheduling until each surface receives its own owned-region and
-overlay/call signals.
+`docs/api/tenant-operations.md`). The tenant destruction poller (2026-10-08)
+reuses that 3 s → 15 s → 60 s back-off, pauses while the page is hidden, and
+reads only while Worker still advances the request; `BLOCKED`, `ABANDONED` and
+`SUCCEEDED` end it (see `docs/api/tenants.md#permanent-destroy`). The tenant
+core provisioning-status poller, logging live transport, and notification
+dropdown were audited but retain their existing domain-specific scheduling
+until each surface receives its own owned-region and overlay/call signals.
 Logging's hidden-page privacy stop remains a separate, stricter transport rule.
 
 ## Mutation lifecycle

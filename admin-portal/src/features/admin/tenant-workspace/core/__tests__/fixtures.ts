@@ -1,4 +1,9 @@
-import type { TenantStatus, TenantView } from "../types";
+import type {
+  TenantDestroyPhase,
+  TenantDestroyView,
+  TenantStatus,
+  TenantView,
+} from "../types";
 
 export const TENANT_ID = "019ff251-02e5-71fc-a7e9-05495cb3c6a8";
 export const OTHER_TENANT_ID = "019ff252-02e5-71fc-a7e9-05495cb3c6a8";
@@ -7,8 +12,45 @@ export const DATABASE_ID = "019ff251-3333-7333-8333-333333333333";
 export const PLATFORM_FQDN_ID = "019ff251-4444-7444-8444-444444444444";
 export const CUSTOM_FQDN_ID = "019ff251-5555-7555-8555-555555555555";
 export const OPERATION_ID = "019ff251-6666-7666-8666-666666666666";
+export const DESTROY_OPERATION_ID = "019ff251-8888-7888-8888-888888888888";
 export const UPDATED_AT = "2026-08-11T19:33:49.000Z";
 export const NEXT_UPDATED_AT = "2026-08-11T19:34:49.000Z";
+
+/**
+ * A destruction projection exactly as Core answers it for `phase`, honouring
+ * the table's pairings: completion only on SUCCEEDED, abandonment only on
+ * ABANDONED, a next attempt only while Worker advances, block evidence on
+ * BLOCKED, and the provisioning operation it waits on while stopping.
+ */
+export function tenantDestroyFixture(
+  phase: TenantDestroyPhase = "STOPPING_PROVISIONING",
+  overrides: Partial<TenantDestroyView> = {},
+): TenantDestroyView {
+  const advancing =
+    phase === "STOPPING_PROVISIONING" ||
+    phase === "DROPPING_DATABASE" ||
+    phase === "FINALIZING";
+  return {
+    operationId: DESTROY_OPERATION_ID,
+    tenantId: TENANT_ID,
+    phase,
+    requestedAt: UPDATED_AT,
+    updatedAt: NEXT_UPDATED_AT,
+    completedAt: phase === "SUCCEEDED" ? NEXT_UPDATED_AT : null,
+    lastErrorCode: null,
+    attempts: advancing || phase === "BLOCKED" ? 3 : 0,
+    nextAttemptAt: advancing ? NEXT_UPDATED_AT : null,
+    blockedAt: phase === "BLOCKED" ? NEXT_UPDATED_AT : null,
+    blockedReason:
+      phase === "BLOCKED" ? "TENANT_DESTROY_OPEN_PROVISIONING_OPERATION" : null,
+    blockingOperationId:
+      phase === "STOPPING_PROVISIONING" || phase === "BLOCKED"
+        ? OPERATION_ID
+        : null,
+    abandonedAt: phase === "ABANDONED" ? NEXT_UPDATED_AT : null,
+    ...overrides,
+  };
+}
 
 export function tenantFixture(
   status: TenantStatus = "ACTIVE",

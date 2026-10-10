@@ -8,6 +8,7 @@ import {
   TENANT_ID,
   UPDATED_AT,
   customFqdnFixture,
+  tenantDestroyFixture,
   tenantFixture,
   tenantPayload,
 } from "../__tests__/fixtures";
@@ -20,12 +21,86 @@ import {
   isTenantDatabaseReady,
   platformFqdnForTenant,
   readFqdnAvailability,
+  readTenantDestroy,
   readTenantFqdn,
   readTenantFqdnList,
   readTenantProvisioningCommandResult,
   readTenantView,
   replaceTenantFqdn,
 } from "./readers";
+
+describe("tenant destruction reader", () => {
+  it("passes through Core's null when destruction was never requested", () => {
+    expect(readTenantDestroy(null)).toBeNull();
+  });
+
+  it.each([
+    ["STOPPING_PROVISIONING", { lastErrorCode: "TENANT_DESTROY_OPEN_PROVISIONING_OPERATION" }],
+    ["DROPPING_DATABASE", { lastErrorCode: "WORKER.TENANT.DATABASE_TEARDOWN_FAILED" }],
+    ["FINALIZING", {}],
+    ["SUCCEEDED", {}],
+    ["BLOCKED", { blockedReason: "WORKER.TENANT_DESTROY.CORE_UNREACHABLE", blockingOperationId: null }],
+    // Abandoned straight from stopping: no block evidence.
+    ["ABANDONED", {}],
+    // Abandoned after it blocked: the block evidence survives.
+    [
+      "ABANDONED",
+      {
+        blockedAt: UPDATED_AT,
+        blockedReason: "TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS",
+        blockingOperationId: OPERATION_ID,
+        lastErrorCode: "TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS",
+      },
+    ],
+  ] as const)("reads the %s projection exactly", (phase, overrides) => {
+    const operation = tenantDestroyFixture(phase, overrides);
+    expect(readTenantDestroy({ ...operation })).toEqual(operation);
+  });
+
+  it("drops fields Core does not document", () => {
+    const parsed = readTenantDestroy({
+      ...tenantDestroyFixture("BLOCKED"),
+      databaseName: "tenant_acme",
+      abandonedBy: OPERATION_ID,
+    });
+    expect(parsed).not.toHaveProperty("databaseName");
+    expect(parsed).not.toHaveProperty("abandonedBy");
+  });
+
+  it.each([
+    ["an unknown phase", { phase: "PAUSED" }],
+    ["a missing attempt count", { attempts: undefined }],
+    ["a negative attempt count", { attempts: -1 }],
+    ["a fractional attempt count", { attempts: 1.5 }],
+    ["an absent nullable field", { abandonedAt: undefined }],
+    ["a malformed timestamp", { requestedAt: "yesterday" }],
+    ["a non-v7 request id", { operationId: "00000000-0000-4000-8000-000000000000" }],
+    ["a non-v7 provisioning operation", { blockingOperationId: "not-an-id" }],
+    ["a code that is not a safe code", { blockedReason: "pg: relation does not exist" }],
+    ["an over-long code", { blockedReason: `WORKER.${"A".repeat(100)}` }],
+    ["a BLOCKED request without its reason", { blockedReason: null, blockedAt: null }],
+    ["a block time without a reason", { blockedReason: null }],
+    ["a scheduled attempt after automation ended", { nextAttemptAt: NEXT_UPDATED_AT }],
+    ["a completion on a blocked request", { completedAt: NEXT_UPDATED_AT }],
+    ["an abandonment time on a blocked request", { abandonedAt: NEXT_UPDATED_AT }],
+  ] as const)("rejects %s", (_label, overrides) => {
+    expect(() =>
+      readTenantDestroy({ ...tenantDestroyFixture("BLOCKED"), ...overrides }),
+    ).toThrow("INVALID_TENANT_DESTROY_RESPONSE");
+  });
+
+  it.each([
+    ["an advancing request without its next attempt", "DROPPING_DATABASE", { nextAttemptAt: null }],
+    ["block evidence while advancing", "STOPPING_PROVISIONING", { blockedAt: UPDATED_AT, blockedReason: "TENANT_DESTROY_OPEN_PROVISIONING_OPERATION" }],
+    ["a waited-on operation after the drop was authorized", "DROPPING_DATABASE", { blockingOperationId: OPERATION_ID }],
+    ["a success without its completion time", "SUCCEEDED", { completedAt: null }],
+    ["an abandoned request without its abandonment time", "ABANDONED", { abandonedAt: null }],
+  ] as const)("rejects %s", (_label, phase, overrides) => {
+    expect(() =>
+      readTenantDestroy({ ...tenantDestroyFixture(phase), ...overrides }),
+    ).toThrow("INVALID_TENANT_DESTROY_RESPONSE");
+  });
+});
 
 describe("tenant core response readers", () => {
   it("parses the exact tenant projection and retains only safe storage fields", () => {

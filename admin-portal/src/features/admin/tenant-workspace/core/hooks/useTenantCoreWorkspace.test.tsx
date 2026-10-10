@@ -4,13 +4,19 @@ import { StrictMode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  DESTROY_OPERATION_ID,
   NEXT_UPDATED_AT,
   OTHER_TENANT_ID,
   TENANT_ID,
   UPDATED_AT,
+  tenantDestroyFixture,
   tenantFixture,
 } from "../__tests__/fixtures";
-import type { TenantCorePermissions, TenantView } from "../types";
+import type {
+  TenantCorePermissions,
+  TenantDestroyView,
+  TenantView,
+} from "../types";
 
 const api = vi.hoisted(() => ({
   get: vi.fn(),
@@ -21,7 +27,9 @@ const api = vi.hoisted(() => ({
   reprovision: vi.fn(),
   cancelProvisioning: vi.fn(),
   softDelete: vi.fn(),
+  restore: vi.fn(),
   destroy: vi.fn(),
+  abandonDestroy: vi.fn(),
 }));
 
 const permissionState = vi.hoisted(() => ({
@@ -363,26 +371,233 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
 
   it("waits for verified destruction before entering terminal local state", async () => {
     api.get.mockResolvedValue(tenantFixture("DELETED"));
-    const operation = { tenantId: TENANT_ID, operationId: OTHER_TENANT_ID, phase: "STOPPING_PROVISIONING", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null };
-    api.destroy.mockResolvedValue(operation);
+    api.destroy.mockResolvedValue(tenantDestroyFixture("STOPPING_PROVISIONING"));
     const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 20 }));
     await waitFor(() => expect(result.current.tenant?.status).toBe("DELETED"));
     await act(async () => { await result.current.destroy(false); });
     expect(result.current.resourceState).toBe("ready");
     expect(result.current.destroyOperation?.phase).toBe("STOPPING_PROVISIONING");
-    api.getDestroy.mockResolvedValue({ ...operation, phase: "SUCCEEDED", completedAt: UPDATED_AT });
+    expect(result.current.destroyPolling).toBe(true);
+    api.getDestroy.mockResolvedValue(tenantDestroyFixture("SUCCEEDED"));
     await waitFor(() => expect(result.current.resourceState).toBe("destroyed"));
     expect(result.current.tenant).toBeNull();
   });
 
   it("recovers pending destruction on reload and keeps polling after a temporary read failure", async () => {
     api.get.mockResolvedValue(tenantFixture("DELETED"));
-    const operation = { tenantId: TENANT_ID, operationId: OTHER_TENANT_ID, phase: "DROPPING_DATABASE", requestedAt: UPDATED_AT, updatedAt: UPDATED_AT, completedAt: null, lastErrorCode: null };
-    api.getDestroy.mockResolvedValueOnce(operation).mockRejectedValueOnce(normalizedError(503,"TEMPORARY")).mockResolvedValue({ ...operation, phase: "SUCCEEDED", completedAt: UPDATED_AT });
+    api.getDestroy
+      .mockResolvedValueOnce(tenantDestroyFixture("DROPPING_DATABASE"))
+      .mockRejectedValueOnce(normalizedError(503, "TEMPORARY"))
+      .mockResolvedValue(tenantDestroyFixture("SUCCEEDED"));
     const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 20 }));
     await waitFor(() => expect(result.current.resourceState).toBe("destroyed"));
     expect(api.destroy).not.toHaveBeenCalled();
     expect(api.getDestroy.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  // BLOCKED waits for an operator and ABANDONED is evidence: Worker will not
+  // move either, so re-reading them only spends requests.
+  it.each(["BLOCKED", "ABANDONED"] as const)(
+    "stops polling once destruction is %s and keeps the tenant",
+    async (phase) => {
+      api.get.mockResolvedValue(tenantFixture("DELETED"));
+      api.getDestroy
+        .mockResolvedValueOnce(tenantDestroyFixture("STOPPING_PROVISIONING"))
+        .mockResolvedValue(tenantDestroyFixture(phase));
+      const { result } = renderHook(() =>
+        useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 5 }),
+      );
+
+      await waitFor(() => expect(result.current.destroyOperation?.phase).toBe(phase));
+      expect(result.current.destroyPolling).toBe(false);
+      const reads = api.getDestroy.mock.calls.length;
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60));
+      });
+      expect(api.getDestroy).toHaveBeenCalledTimes(reads);
+      expect(result.current.resourceState).toBe("ready");
+      expect(result.current.tenant?.status).toBe("DELETED");
+    },
+  );
+
+  it("backs off while an advancing request stays unchanged", async () => {
+    vi.useFakeTimers();
+    try {
+      api.get.mockResolvedValue(tenantFixture("DELETED"));
+      api.getDestroy.mockResolvedValue(tenantDestroyFixture("STOPPING_PROVISIONING"));
+      const { result } = renderHook(() =>
+        useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 100 }),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(result.current.destroyPolling).toBe(true);
+      expect(api.getDestroy).toHaveBeenCalledTimes(1);
+
+      // Small steps, each its own act, so every poll's result re-renders the
+      // hook and can slow the cadence before the next tick.
+      for (let elapsed = 0; elapsed < 10_000; elapsed += 50) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(50);
+        });
+      }
+      // 100 ms → 500 ms → 2 s: about fourteen reads where a fixed cadence
+      // would have made a hundred.
+      expect(api.getDestroy.mock.calls.length).toBeGreaterThan(8);
+      expect(api.getDestroy.mock.calls.length).toBeLessThan(20);
+      expect(result.current.destroyPolling).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("abandons the shown request by its id and stops polling", async () => {
+    api.get.mockResolvedValue(tenantFixture("DELETED"));
+    api.getDestroy.mockResolvedValue(tenantDestroyFixture("BLOCKED"));
+    api.abandonDestroy.mockResolvedValue(tenantDestroyFixture("ABANDONED"));
+    const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID));
+    await waitFor(() => expect(result.current.destroyOperation?.phase).toBe("BLOCKED"));
+
+    await act(async () => {
+      await result.current.abandonDestruction();
+    });
+
+    expect(api.abandonDestroy).toHaveBeenCalledWith(
+      TENANT_ID,
+      DESTROY_OPERATION_ID,
+      expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7/i),
+    );
+    expect(result.current.destroyOperation?.phase).toBe("ABANDONED");
+    expect(result.current.destroyPolling).toBe(false);
+    expect(result.current.mutation).toEqual({ name: null, error: null });
+  });
+
+  it("refreshes destruction progress when Core can no longer abandon it", async () => {
+    api.get.mockResolvedValue(tenantFixture("DELETED"));
+    api.getDestroy
+      .mockResolvedValueOnce(tenantDestroyFixture("STOPPING_PROVISIONING"))
+      .mockResolvedValue(tenantDestroyFixture("DROPPING_DATABASE"));
+    api.abandonDestroy.mockRejectedValue(
+      normalizedError(409, "TENANT_DESTROY_NOT_ABANDONABLE"),
+    );
+    const { result } = renderHook(() =>
+      useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 60_000 }),
+    );
+    await waitFor(() =>
+      expect(result.current.destroyOperation?.phase).toBe("STOPPING_PROVISIONING"),
+    );
+
+    await act(async () => {
+      await expect(result.current.abandonDestruction()).rejects.toMatchObject({
+        errorCode: "TENANT_DESTROY_NOT_ABANDONABLE",
+      });
+    });
+
+    expect(result.current.destroyOperation?.phase).toBe("DROPPING_DATABASE");
+    expect(result.current.mutation.error?.errorCode).toBe(
+      "TENANT_DESTROY_NOT_ABANDONABLE",
+    );
+  });
+
+  it.each([
+    ["a request Core already authorized to drop", "DROPPING_DATABASE", true, "TENANT_DESTROY_NOT_ABANDONABLE"],
+    ["an abandoned request", "ABANDONED", true, "TENANT_DESTROY_NOT_ABANDONABLE"],
+    ["an admin without the destroy grant", "BLOCKED", false, "TENANT_DESTROY_FORBIDDEN"],
+  ] as const)(
+    "refuses to abandon %s before any I/O",
+    async (_label, phase, canDestroy, errorCode) => {
+      permissionState.current = { ...permissionState.current, canDestroy };
+      api.get.mockResolvedValue(tenantFixture("DELETED"));
+      api.getDestroy.mockResolvedValue(tenantDestroyFixture(phase));
+      const { result } = renderHook(() =>
+        useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 60_000 }),
+      );
+      await waitFor(() => expect(result.current.destroyOperation?.phase).toBe(phase));
+
+      await expect(result.current.abandonDestruction()).rejects.toMatchObject({
+        errorCode,
+      });
+      expect(api.abandonDestroy).not.toHaveBeenCalled();
+    },
+  );
+
+  it("discards a status read that started before the abandon answered", async () => {
+    const staleRead = deferred<TenantDestroyView>();
+    api.get.mockResolvedValue(tenantFixture("DELETED"));
+    api.getDestroy
+      .mockResolvedValueOnce(tenantDestroyFixture("STOPPING_PROVISIONING"))
+      .mockReturnValueOnce(staleRead.promise);
+    api.abandonDestroy.mockResolvedValue(tenantDestroyFixture("ABANDONED"));
+    const { result } = renderHook(() =>
+      useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 60_000 }),
+    );
+    await waitFor(() =>
+      expect(result.current.destroyOperation?.phase).toBe("STOPPING_PROVISIONING"),
+    );
+
+    let read!: Promise<unknown>;
+    act(() => {
+      read = result.current.refreshDestruction();
+    });
+    await act(async () => {
+      await result.current.abandonDestruction();
+    });
+    await act(async () => {
+      staleRead.resolve(tenantDestroyFixture("STOPPING_PROVISIONING"));
+      await read;
+    });
+
+    expect(result.current.destroyOperation?.phase).toBe("ABANDONED");
+    expect(result.current.destroyPolling).toBe(false);
+  });
+
+  // Core replays an abandoned request for its own key, so a key retained for
+  // an ambiguous destroy must not survive the abandonment it led to.
+  it("requests a new destruction under a fresh key once the previous one was abandoned", async () => {
+    api.get.mockResolvedValue(tenantFixture("DELETED"));
+    api.getDestroy.mockResolvedValue(null);
+    api.destroy
+      .mockRejectedValueOnce(normalizedError(503, "TEMPORARY"))
+      .mockResolvedValueOnce(tenantDestroyFixture("STOPPING_PROVISIONING"));
+    const { result } = renderHook(() =>
+      useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 60_000 }),
+    );
+    await waitFor(() => expect(result.current.tenant?.status).toBe("DELETED"));
+
+    await act(async () => {
+      await result.current.destroy(false).catch(() => undefined);
+    });
+    const ambiguousKey = api.destroy.mock.calls[0]?.[2] as string;
+    api.getDestroy.mockResolvedValue(
+      tenantDestroyFixture("ABANDONED", { operationId: ambiguousKey }),
+    );
+    await act(async () => {
+      await result.current.refreshDestruction();
+    });
+    expect(result.current.destroyOperation?.phase).toBe("ABANDONED");
+
+    await act(async () => {
+      await result.current.destroy(false);
+    });
+    expect(api.destroy.mock.calls[1]?.[2]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7/i);
+    expect(api.destroy.mock.calls[1]?.[2]).not.toBe(ambiguousKey);
+    expect(result.current.destroyOperation?.phase).toBe("STOPPING_PROVISIONING");
+  });
+
+  it("stops showing abandoned evidence once the tenant is restored", async () => {
+    api.get.mockResolvedValue(tenantFixture("DELETED"));
+    api.getDestroy.mockResolvedValue(tenantDestroyFixture("ABANDONED"));
+    api.restore.mockResolvedValue(tenantFixture("SUSPENDED"));
+    const { result } = renderHook(() => useTenantCoreWorkspace(TENANT_ID));
+    await waitFor(() => expect(result.current.destroyOperation?.phase).toBe("ABANDONED"));
+
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    expect(result.current.tenant?.status).toBe("SUSPENDED");
+    expect(result.current.destroyOperation).toBeNull();
+    expect(result.current.destroyError).toBeNull();
   });
 
   it("cannot let tenant A destruction mark tenant B as destroyed", async () => {

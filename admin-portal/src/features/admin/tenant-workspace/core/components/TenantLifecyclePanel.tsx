@@ -13,12 +13,18 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmActionModal,
 } from "@/design-system";
 import type { useTenantCoreWorkspace } from "../hooks/useTenantCoreWorkspace";
+import {
+  canAbandonTenantDestroy,
+  tenantDestroyHoldsTenant,
+} from "../model/destroy";
 import {
   tenantWorkspaceCopy,
   type TenantWorkspaceLocale,
 } from "./copy";
+import { TenantDestroyStatus } from "./TenantDestroyStatus";
 
 type LifecycleAction =
   | "suspend"
@@ -27,7 +33,12 @@ type LifecycleAction =
   | "cancel-provisioning"
   | "soft-delete"
   | "restore"
-  | "destroy";
+  | "destroy"
+  | "abandon-destroy";
+
+type DialogAction = Exclude<LifecycleAction, "abandon-destroy">;
+
+const DESTROY_STATUS_ID = "tenant-destroy-status";
 
 export interface TenantLifecyclePanelProps {
   locale: TenantWorkspaceLocale;
@@ -45,9 +56,16 @@ export function TenantLifecyclePanel({
   );
   if (!tenant) return null;
 
-  const destroying = !!workspace.destroyOperation;
-  const busy = workspace.mutation.name !== null || destroying;
-  const actionLabel: Record<LifecycleAction, string> = {
+  const deleted = tenant.status === "DELETED";
+  const destroyOperation = deleted ? workspace.destroyOperation : null;
+  // A request that was not abandoned holds the tenant: Core refuses restore
+  // and answers a new destroy with that same request.
+  const heldByDestruction = tenantDestroyHoldsTenant(destroyOperation);
+  const canAbandon =
+    workspace.permissions.canDestroy && canAbandonTenantDestroy(destroyOperation);
+  const busy = workspace.mutation.name !== null;
+  const heldReason = heldByDestruction ? `${DESTROY_STATUS_ID}-hint` : undefined;
+  const actionLabel: Record<DialogAction, string> = {
     suspend: text.suspend,
     activate: text.activate,
     reprovision: text.reprovision,
@@ -56,28 +74,47 @@ export function TenantLifecyclePanel({
     restore: text.restore,
     destroy: text.destroy,
   };
-  const actionHint: Partial<Record<LifecycleAction, string>> = {
+  const actionHint: Partial<Record<DialogAction, string>> = {
     restore: text.restoreHint,
     destroy: text.destroyHint,
   };
+  const dialogAction =
+    confirmation === "abandon-destroy" ? null : confirmation;
+  const en = tenantWorkspaceCopy("en");
+  const ar = tenantWorkspaceCopy("ar");
 
   const confirm = async () => {
-    if (!confirmation) return;
+    if (!dialogAction) return;
     try {
-      if (confirmation === "suspend") await workspace.suspend();
-      if (confirmation === "activate") await workspace.activate();
-      if (confirmation === "reprovision") await workspace.reprovision();
-      if (confirmation === "cancel-provisioning") {
+      if (dialogAction === "suspend") await workspace.suspend();
+      if (dialogAction === "activate") await workspace.activate();
+      if (dialogAction === "reprovision") await workspace.reprovision();
+      if (dialogAction === "cancel-provisioning") {
         await workspace.cancelProvisioning();
       }
-      if (confirmation === "soft-delete") await workspace.softDelete();
-      if (confirmation === "restore") await workspace.restore();
-      if (confirmation === "destroy") {
+      if (dialogAction === "soft-delete") await workspace.softDelete();
+      if (dialogAction === "restore") await workspace.restore();
+      if (dialogAction === "destroy") {
         await workspace.destroy(false);
       }
       setConfirmation(null);
     } catch {
       // The hook exposes normalized failure evidence beside the controls.
+    }
+  };
+
+  // Sent once; the dialog closes either way. This modal cannot hold an error,
+  // and a notice behind an open modal is unreadable, so a rejection lands in
+  // the workspace alert and, for a request Core already moved on, in the
+  // refreshed status block. A transient failure keeps its idempotency key for
+  // the exact retry.
+  const confirmAbandon = async () => {
+    try {
+      await workspace.abandonDestruction();
+    } catch {
+      // Shown by the workspace alert and the destruction status block.
+    } finally {
+      setConfirmation(null);
     }
   };
 
@@ -99,12 +136,19 @@ export function TenantLifecyclePanel({
         </p>
       )}
 
-      {workspace.destroyOperation ? (
-        <p role="status" aria-live="polite" className="rounded-lg bg-info-subtle p-3 text-xs text-info-subtle-foreground">
-          {text.destroyPhases[workspace.destroyOperation.phase]}
-          <span className="mt-1 block">{text.destroyBackground}</span>
-          {workspace.destroyOperation.lastErrorCode || workspace.destroyError ? <span className="mt-1 block">{text.destroyRetry}</span> : null}
-        </p>
+      {deleted ? (
+        <TenantDestroyStatus
+          id={DESTROY_STATUS_ID}
+          locale={locale}
+          operation={destroyOperation}
+          loadError={workspace.destroyError}
+          polling={workspace.destroyPolling}
+          notAbandonable={
+            workspace.mutation.error?.errorCode ===
+            "TENANT_DESTROY_NOT_ABANDONABLE"
+          }
+          onRefresh={() => void workspace.refreshDestruction()}
+        />
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -152,42 +196,54 @@ export function TenantLifecyclePanel({
             onClick={() => setConfirmation("soft-delete")}
           />
         )}
+        {/* While destruction holds the tenant, abandoning it is the one way
+            back, so it leads the deleted tenant's actions. */}
+        {canAbandon && (
+          <ActionButton
+            label={text.abandonDestroy}
+            disabled={busy}
+            variant="secondary"
+            onClick={() => setConfirmation("abandon-destroy")}
+          />
+        )}
         {/* Restore is offered before destroy so the reversible action is the
             first one an admin reaches on a deleted tenant. */}
-        {tenant.status === "DELETED" && workspace.permissions.canRestore && (
+        {deleted && workspace.permissions.canRestore && (
           <ActionButton
             label={text.restore}
-            disabled={busy}
+            disabled={busy || heldByDestruction}
+            describedBy={heldReason}
             variant="primary"
             onClick={() => setConfirmation("restore")}
           />
         )}
-        {tenant.status === "DELETED" && workspace.permissions.canDestroy && (
+        {deleted && workspace.permissions.canDestroy && (
           <ActionButton
             label={text.destroy}
-            disabled={busy}
+            disabled={busy || heldByDestruction}
+            describedBy={heldReason}
             variant="destructive"
             onClick={() => setConfirmation("destroy")}
           />
         )}
       </div>
 
-      <AlertDialog open={confirmation !== null} onOpenChange={(open) => !open && setConfirmation(null)}>
-        {confirmation ? (
+      <AlertDialog open={dialogAction !== null} onOpenChange={(open) => !open && setConfirmation(null)}>
+        {dialogAction ? (
           <AlertDialogContent dir={locale === "ar" ? "rtl" : "ltr"}>
             <AlertDialogHeader>
-              <AlertDialogTitle>{actionLabel[confirmation]}</AlertDialogTitle>
+              <AlertDialogTitle>{actionLabel[dialogAction]}</AlertDialogTitle>
               <AlertDialogDescription>
-                {text.confirmAction(actionLabel[confirmation])}
-                {actionHint[confirmation] ? (
-                  <span className="mt-2 block">{actionHint[confirmation]}</span>
+                {text.confirmAction(actionLabel[dialogAction])}
+                {actionHint[dialogAction] ? (
+                  <span className="mt-2 block">{actionHint[dialogAction]}</span>
                 ) : null}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={busy}>{text.cancel}</AlertDialogCancel>
               <AlertDialogAction
-                destructive={confirmation === "soft-delete" || confirmation === "destroy"}
+                destructive={dialogAction === "soft-delete" || dialogAction === "destroy"}
                 disabled={busy}
                 onClick={(event) => {
                   event.preventDefault();
@@ -200,6 +256,21 @@ export function TenantLifecyclePanel({
           </AlertDialogContent>
         ) : null}
       </AlertDialog>
+
+      <ConfirmActionModal
+        isOpen={confirmation === "abandon-destroy"}
+        onClose={() => setConfirmation(null)}
+        onConfirm={confirmAbandon}
+        titleEn={en.abandonConfirmTitle(tenant.name)}
+        titleAr={ar.abandonConfirmTitle(tenant.name)}
+        descriptionEn={en.abandonConfirmDescription(tenant.name)}
+        descriptionAr={ar.abandonConfirmDescription(tenant.name)}
+        confirmTextEn={en.abandonDestroy}
+        confirmTextAr={ar.abandonDestroy}
+        loadingLabel={text.abandoning}
+        variant="warning"
+        isLoading={workspace.mutation.name === "abandon-destroy"}
+      />
     </Card>
     </section>
   );
@@ -208,11 +279,13 @@ export function TenantLifecyclePanel({
 function ActionButton({
   label,
   disabled,
+  describedBy,
   variant,
   onClick,
 }: {
   label: string;
   disabled: boolean;
+  describedBy?: string;
   variant: "primary" | "secondary" | "destructive";
   onClick: () => void;
 }) {
@@ -222,6 +295,7 @@ function ActionButton({
       variant={variant}
       size="sm"
       disabled={disabled}
+      aria-describedby={describedBy}
       onClick={onClick}
     >
       {label}

@@ -71,11 +71,11 @@ authoritative for its exact route permissions.
 ### 6. Tenants Control (`admin.tenants.*`)
 - **Guard**: `AdminGuard`
 - `admin.tenants.create` — Validate identity, placement options, reverse geocode, preview provisioning, create tenant
-- `admin.tenants.read` — Directory list, tenant details, view operations history & timeline
+- `admin.tenants.read` — Directory list, tenant details, view operations history & timeline, read destruction progress
 - `admin.tenants.update` — Update tenant profile metadata
 - `admin.tenants.suspend` — Suspend or activate tenant
 - `admin.tenants.reprovision` — Reprovision tenant, cancel provisioning, retry/cancel operations
-- `admin.tenants.destroy` — Hard delete / destroy tenant (permanent)
+- `admin.tenants.destroy` — Hard delete / destroy tenant (permanent), and abandon a destruction request that is `BLOCKED` or still `STOPPING_PROVISIONING` (verified 2026-10-08); both routes also require `admin.tenants.critical`
 - `admin.tenants.delete` — Soft delete tenant
 - `admin.tenants.manage_fqdns` — Add/remove secondary FQDNs, set primary FQDN
 
