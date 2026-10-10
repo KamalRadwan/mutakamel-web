@@ -226,6 +226,20 @@ mismatch about a command that had never run.
 `RUNTIME_UNAVAILABLE`, `WORKER.TENANT_CLAIM.HELD`,
 `WORKER.BACKUP.COMMAND_ACTOR_REQUIRED`.
 
+Core's restore readiness refuses a restored copy with
+`409 CORE.TENANT_DATABASE_RESTORE.READINESS_<reason>`, and Worker writes that
+code with Core's message into the failed step's `detail`
+(`backup-restore.utils.ts`, `redactError`), which the monitor shows verbatim -
+there is no label map for these codes. Source verified **2026-10-11** (Core
+commit `de03f1d2`): readiness skips manifest grants and checks for objects
+owned by components the tenant does not have installed (CRM views and
+quotation guards on a Trade-only tenant), grants and verifies the
+cross-application projections when their owner is installed, and adds three
+reasons for them: `READINESS_PROJECTION_RELATION_MISSING`,
+`READINESS_PROJECTION_GRANT_MISSING` and `READINESS_PROJECTION_GRANTEE_INVALID`.
+Authority digests now include the installed components, so readiness proved
+before that deploy re-verifies once.
+
 ## Move storage — browser contract
 
 | Method and path | Permissions | Success | Body |

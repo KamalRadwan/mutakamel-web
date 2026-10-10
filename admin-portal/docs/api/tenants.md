@@ -11,6 +11,8 @@ Create-recovery amendment (2026-09-11): a status check that finds no tenant once
 
 Tenant-destruction amendment (2026-10-08): a destruction request now ends in `SUCCEEDED`, `BLOCKED` or `ABANDONED`. The status read returns the live request or, when none is live, the latest abandoned one, with attempts, the next attempt, block evidence and the provisioning operation it waits on; `POST /tenants/:id/destroy/:operationId/abandon` gives up a request Core has not yet authorized to drop. Verified against Core `tenant-destroy.service.ts`, `tenant-destroy-response.dto.ts`, `tenant-destroy-params.dto.ts`, `tenants.controller.ts`, the `tenant_destroy_operations` table checks in `@mutakamel/core-app-database`, Worker's `tenant-destroy.runner.ts`, and Gateway route `core.admin.tenants.destroy-abandon`. See [Permanent destroy](#permanent-destroy).
 
+Current-release amendment (2026-10-11): `DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH` is gone from the create-options `readinessReasons` enum (Core commit `de03f1d2`: a permission manifest's `componentRelease` is provenance only and is no longer compared with the catalogue); the strict reader now rejects it. `POST /tenants/:id/reprovision` follows the current-release retry rules and can answer `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` or `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` (Core commit `d5af4407`); see [Retry and cancel provisioning](#retry-and-cancel-provisioning).
+
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
 tenant-detail shell. It covers identity validation, creation, list/detail,
 profile updates, lifecycle, and FQDN management. Tenant users, provisioning
@@ -500,8 +502,7 @@ type TenantCreateReadinessReason =
   | "PUBLISHED_RELEASE_REQUIRED"
   | "MINIMUM_RELEASE_NOT_SATISFIED"
   | "DATABASE_PERMISSION_MANIFEST_REQUIRED"
-  | "DATABASE_PERMISSION_MANIFEST_INVALID"
-  | "DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH";
+  | "DATABASE_PERMISSION_MANIFEST_INVALID";
 
 interface TenantCreateOptionsView {
   quoteRequired: true;
@@ -1070,6 +1071,14 @@ available.
 Retry creates a new immutable generation only for the latest operation in
 `FAILED_RETRYABLE`, `MANUAL_RECOVERY_REQUIRED`, or `CANCELLED`. Initial
 provisioning retries can move `PROVISIONING_FAILED` back to `PROVISIONING`.
+Every release the retry pins must still be its component's current release
+(`409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` otherwise), and its
+backup/maintenance prerequisites are re-derived from the current release
+controls; a retry that would run a Core foundation step under one is refused
+with `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE`. The workspace
+alert shows both in the portal's language (the provisioning workspace's
+`tenantProvisioning.commandErrors` wording) with the code beneath; full rules
+are in [Retry and cancel](tenant-operations.md#retry-and-cancel).
 
 Cancel applies only to the latest operation in `REQUESTED`, `PLANNING`,
 `QUEUED`, `RUNNING`, or `WAITING_RETRY`; it changes the operation to
@@ -1336,6 +1345,8 @@ provisioning permissions.
 | `409` | `TENANT_DESTROY_HISTORY_RETAINED` | `destroySubscriptions=true` was sent; destruction always retains financial history |
 | `409` | `TENANT_DESTROY_IN_PROGRESS` | Restore while a destruction request that was not abandoned holds the tenant; abandon it first if it is still abandonable |
 | `409` | `TENANT_DESTROY_NOT_ABANDONABLE` | Abandon after Core authorized the drop (or after success); re-read progress, the request can only finish |
+| `409` | `TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Retry provisioning would pin a release that is not current; update the tenant to the current release first |
+| `409` | `TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Retry provisioning would run a Core foundation step under a backup or maintenance prerequisite; nothing was planned |
 | `404` | `TENANT_DESTROY_NOT_FOUND` | Abandon named a request this tenant does not have; re-read progress |
 | `409` | `IDEMPOTENCY_KEY_CONFLICT` | A destroy key already belongs to another tenant's or actor's request; generate a new key |
 | `409` | `NO_CAPACITY` | Refresh placement options or use automatic placement |

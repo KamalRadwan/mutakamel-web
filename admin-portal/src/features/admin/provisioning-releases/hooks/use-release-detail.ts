@@ -12,6 +12,10 @@ import {
 } from "../model/release-intents";
 import { readReleasePermissions } from "../model/release-permissions";
 import {
+  releaseCatalogueStanding,
+  SUPERSEDED_RETIREMENT_REASON_CODE,
+} from "../model/release-standing";
+import {
   buildRetireReleaseDto,
   validateRetireDraft,
 } from "../model/release-validation";
@@ -23,6 +27,7 @@ import type {
   ResourceState,
   RetireDraft,
 } from "../types/provisioning-releases";
+import { useReleaseCatalogue } from "./use-release-catalogue";
 
 const EMPTY_MUTATION: ReleaseMutationState = {
   name: null,
@@ -46,6 +51,13 @@ export function useReleaseDetail(releaseId: string) {
   const requestGeneration = useRef(0);
   const hasSnapshot = useRef(false);
   const intents = useRef(createReleaseIntentStore());
+  const catalogue = useReleaseCatalogue(revision, permissions.canRead);
+  const standing = snapshot
+    ? releaseCatalogueStanding(snapshot.data, catalogue.catalogue)
+    : "UNKNOWN";
+  // Retirement waits for the standing read to settle, so a current release is
+  // never retired in the moment before it is recognised as current.
+  const standingSettled = catalogue.state !== "LOADING";
 
   const applyRelease = useCallback((next: CoreSnapshot<ProvisioningRelease>) => {
     hasSnapshot.current = true;
@@ -114,6 +126,9 @@ export function useReleaseDetail(releaseId: string) {
     if (
       !release ||
       release.status !== "PUBLISHED" ||
+      // Retiring a component's current release leaves it nothing to execute.
+      standing === "CURRENT" ||
+      !standingSettled ||
       !permissions.canRetireCritical ||
       mutation.phase === "PENDING"
     ) {
@@ -148,7 +163,7 @@ export function useReleaseDetail(releaseId: string) {
       }
       return null;
     }
-  }, [applyRelease, mutation.phase, permissions.canRetireCritical, retireDraft, snapshot]);
+  }, [applyRelease, mutation.phase, permissions.canRetireCritical, retireDraft, snapshot, standing, standingSettled]);
 
   const visibleState: ResourceState = isAuthLoading
     ? "LOADING"
@@ -164,8 +179,20 @@ export function useReleaseDetail(releaseId: string) {
     retireDraft,
     retireErrors,
     mutation,
-    canRetire: Boolean(permissions.canRetireCritical && snapshot?.data.status === "PUBLISHED"),
+    standing,
+    catalogueState: catalogue.state,
+    componentKey: snapshot
+      ? (catalogue.catalogue?.get(snapshot.data.componentId.toLowerCase())?.key ?? null)
+      : null,
+    canRetire: Boolean(
+      permissions.canRetireCritical &&
+        snapshot?.data.status === "PUBLISHED" &&
+        standing !== "CURRENT" &&
+        standingSettled,
+    ),
     updateRetireDraft,
+    applySupersededReason: () =>
+      updateRetireDraft("reasonCode", SUPERSEDED_RETIREMENT_REASON_CODE),
     retire,
     refresh: () => setRevision((current) => current + 1),
   };

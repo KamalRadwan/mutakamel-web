@@ -1710,8 +1710,6 @@ export const ar = {
           "يحتاج التطبيق المتصل بقاعدة البيانات إلى بيانات أذونات نشطة.",
         databasePermissionManifestInvalid:
           "فشل التحقق من بيانات أذونات قاعدة البيانات النشطة.",
-        databasePermissionManifestReleaseMismatch:
-          "بيانات أذونات قاعدة البيانات النشطة مرتبطة بإصدار مكوّن مختلف.",
       },
       selectionTitle: "عوائق اختيار المستأجر الجديد",
       selectionBlockers: {
@@ -2379,6 +2377,46 @@ export const ar = {
     refreshButton: "تحديث",
     actionErrorPrefix: "تعذر تنفيذ الإجراء: ",
     dismissErrorAriaLabel: "إغلاق الخطأ",
+    /** Keyed by Core/Gateway or local code; an unlisted code shows verbatim. */
+    commandErrors: {
+      TENANT_PROVISIONING_OPERATION_ALREADY_OPEN:
+        "توجد عملية مفتوحة. افتح العمليات وانتظر انتهاءها أو اكتمال إلغائها قبل إعادة التجهيز.",
+      TENANT_PROVISIONING_OPERATION_SUPERSEDED:
+        "حلّ جيل أحدث محل هذه العملية. حدّث السجل واختر أحدث عملية.",
+      TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED:
+        "يعمل أحد مكوّنات هذا المستأجر على إصدار سابق، والتجهيز لا يخطط إلا للإصدارات الحالية. حدّث المستأجر إلى الإصدار الحالي أولًا، ثم أعد المحاولة.",
+      TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE:
+        "تحتاج هذه الخطة إلى متطلب مسبق للنسخ الاحتياطي أو الصيانة، ولا يمكن تشغيل خطوات أساس النواة في ظله. لم يُخطَّط أي شيء، ويمكن تنفيذ الأمر عندما تتوقف الإصدارات التي يثبّتها عن اشتراط نسخة احتياطية أو نافذة صيانة.",
+      TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE:
+        "لم تعرض Core مراجعة التعارض؛ تم تعطيل الحل بأمان.",
+      TENANT_UPDATE_SELECTION_REQUIRED: "اختر تحديثًا واحدًا على الأقل.",
+      TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED:
+        "أكد سلوك الاحتفاظ بالبيانات.",
+      INVALID_PROVISIONING_REASON_CODE: "استخدم رمز سبب آمنًا بأحرف كبيرة.",
+      "GW.IDEM.IN_FLIGHT":
+        "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه.",
+    },
+    /** Keyed by safe step/operation error code; an unlisted code shows alone. */
+    safeCodeHints: {
+      CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED:
+        "تثبّت هذه الخطوة إصدارًا من Core لم يعد حاليًا، لذا لن تنجح إعادة الخطة نفسها. حدّث المستأجر إلى الإصدار الحالي.",
+      "CRM.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
+        "تثبّت هذه الخطوة إصدارًا من إدارة العملاء لم يعد حاليًا، لذا لن تنجح إعادة الخطة نفسها. حدّث المستأجر إلى الإصدار الحالي.",
+      "TRADE.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
+        "تثبّت هذه الخطوة إصدارًا من التجارة لم يعد حاليًا، لذا لن تنجح إعادة الخطة نفسها. حدّث المستأجر إلى الإصدار الحالي.",
+      "WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED":
+        "تثبّت هذه الخطوة إصدارًا من الهاتف المرئي أو من أساس النواة لم يعد حاليًا، لذا لن تنجح إعادة الخطة نفسها. حدّث المستأجر إلى الإصدار الحالي.",
+      CORE_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE:
+        "تحمل الخطة متطلبًا مسبقًا للنسخ الاحتياطي أو الصيانة لا تستطيع Core التحقق منه، لذا لن تعمل خطوات أساس النواة فيها أبدًا. وإعادة التجهيز تستمد متطلباتها من ضوابط الإصدار الحالية من جديد.",
+      CORE_PROVISIONING_MAINTENANCE_FENCE_OPEN:
+        "ما زال سياج صيانة للتجهيز أو لنقل قاعدة البيانات مفتوحًا لهذا المستأجر، لذا لم تبدأ الخطوة. يعيد Worker المحاولة بعد 60 ثانية.",
+      CORE_PROVISIONING_FENCE_NOT_READY:
+        "ظل سجل هذه الخطوة لدى Core متأخرًا عن الأمر بعد 60 ثانية. الفشل قابل لإعادة المحاولة ويعيد Worker إرسال الخطوة.",
+      CORE_PROVISIONING_COMMAND_INVALID:
+        "رفضت Core أمر الخطوة لعدم صلاحيته (المُرسِل أو التوجيه أو المحتوى) ونقلته إلى قائمة الرسائل الميتة دون تنفيذ أي شيء.",
+      "CRM.PROVISIONING.PROJECTION_GRANT_MISSING":
+        "يفتقد أحد عروض إدارة العملاء التي يقرؤها تطبيق آخر صلاحيةَ SELECT. يعيد إصلاح إدارة العملاء تشغيل خطوة المخطط التي تمنحها.",
+    },
     noOperationsTitle: "لا توجد عمليات تجهيز.",
     showingOfTotal: "معروض {shown} من {total}",
     loadMore: "تحميل الأقدم",
@@ -2425,10 +2463,10 @@ export const ar = {
     retryConfirmTitle: (operation: string, generation: number) =>
       `إعادة تجهيز ${operation} · الجيل ${generation}؟`,
     retryConfirmDescription: (nextGeneration: number) =>
-      `تخطط Core للجيل ${nextGeneration} الذي يعيد تشغيل الخطوات غير المكتملة فقط، مثبتةً على الإصدارات نفسها. يبقى هذا الجيل وخطه الزمني ضمن السجل. والمستأجر الذي فشل تجهيزه الأولي يعود إلى حالة التجهيز.`,
+      `تخطط Core للجيل ${nextGeneration} الذي يعيد تشغيل الخطوات غير المكتملة فقط، مثبتةً على الإصدارات نفسها، ويجب أن يظل كلٌّ منها الإصدار الحالي لمكوّنه. يبقى هذا الجيل وخطه الزمني ضمن السجل. والمستأجر الذي فشل تجهيزه الأولي يعود إلى حالة التجهيز.`,
     repairConfirmTitle: (component: string) => `إصلاح ${component}؟`,
     repairConfirmDescription:
-      "تفتح Core عملية إصلاح مثبتة على الإصدار المطلوب الحالي للمكوّن ولا تُجري ترقية. يُتحقَّق من ترحيلات المكوّن مقابل ذلك الإصدار وتُطبَّق كل حزم البذور مجددًا وفق سياستها، بما فيها البذور التي أُغلقت بقرار تعارض، ويُكتفى بالتحقق من تبعياته. تُطلب متطلبات النسخ الاحتياطي والصيانة أولًا إذا اشترطها الإصدار، ولا يمكن بدء أي عملية أخرى حتى ينتهي الإصلاح.",
+      "تفتح Core عملية إصلاح مثبتة على الإصدار المطلوب الحالي للمكوّن ولا تُجري ترقية. يُتحقَّق من ترحيلات المكوّن مقابل ذلك الإصدار وتُطبَّق كل حزم البذور مجددًا وفق سياستها، بما فيها البذور التي أُغلقت بقرار تعارض، ويُكتفى بالتحقق من تبعياته. يُرفض الإصلاح الذي تشترط إصداراته نسخة احتياطية أو نافذة صيانة، لأن خطوات أساس النواة لا تعمل في ظلها، ولا يمكن بدء أي عملية أخرى حتى ينتهي الإصلاح.",
     historicalOperationNote: (currentGen: number, latestGen: number) =>
       `هذه عملية تاريخية. حلّ الجيل ${latestGen} محل الجيل ${currentGen}؛ إجراءات إعادة المحاولة والإلغاء متاحة لأحدث عملية فقط.`,
     weightedProgressLabel: "التقدم الموزون",
@@ -2446,8 +2484,16 @@ export const ar = {
     finishedColumnHeader: "الانتهاء",
     elapsedColumnHeader: "المدة",
     timelineLabel: "الخط الزمني",
+    updateScopeTitle: "المكوّنات التي يحدّثها هذا التحديث",
+    updateScopeRequestedLabel: "المطلوبة",
+    updateScopeAutoAddedLabel: "حُدّثت أيضًا لأنها كانت متأخرة",
+    updateScopeAutoAddedNote:
+      "حدّثت Core هذه أيضًا: كان كلٌّ منها على إصدار سابق، ويعتمد عليه مكوّن مطلوب أو لن يكون متوافقًا مع الإصدارات الجديدة.",
+    updateScopeOriginNote:
+      "تحدّث Core أيضًا كل مكوّن على إصدار سابق تعتمد عليه هذه المكوّنات أو لن يكون متوافقًا مع الإصدارات الجديدة، لذا قد تضم هذه القائمة مكوّنات لم يخترها أحد.",
     availableUpdatesTitle: "التحديثات المتاحة",
-    updatesNote: "يُرسل الاختيار ببصمات الإصدار الحالي والهدف كما أعادها الخادم.",
+    updatesNote:
+      "يُرسل الاختيار ببصمات الإصدار الحالي والهدف كما أعادها الخادم. وتحدّث Core أيضًا كل مكوّن على إصدار سابق يعتمد عليه الاختيار أو لن يكون متوافقًا مع الإصدارات الجديدة، وتعرض العملية المخطط لها كلًّا منها.",
     applySelectedButton: (count: number) => `تطبيق المحدد (${count})`,
     noUpdatesTitle: "لا توجد تحديثات آمنة متاحة حاليًا.",
     currentLabel: "الحالي",

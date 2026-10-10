@@ -57,6 +57,7 @@ import type {
   ProvisioningWorkspaceSection,
   TenantProvisioningWorkspaceModel,
 } from "../hooks/useTenantProvisioningWorkspace";
+import { provisioningCodeText } from "../model/code-text";
 import {
   formatProvisioningDuration,
   stepElapsedSeconds,
@@ -68,6 +69,10 @@ import {
   provisioningStepLabel,
   provisioningStepStatusLabel,
 } from "../model/step-labels";
+import {
+  provisioningUpdateScope,
+  type ProvisioningUpdateScope,
+} from "../model/update-scope";
 import type {
   ProvisioningResource,
   SeedConflictDecision,
@@ -177,7 +182,7 @@ export function TenantProvisioningWorkspaceView({
         >
           <span>
             <strong>{copy.actionErrorPrefix}</strong>
-            {localizeError(visibleError, ar)}
+            {provisioningCodeText(copy.commandErrors, visibleError) ?? visibleError}
           </span>
           <Button
             type="button"
@@ -411,6 +416,17 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
             const retryReason =
               actions.retry.visible && !cancellationPending ? actions.retry.reasonCode : null;
             const cancelReason = actions.cancel.visible ? actions.cancel.reasonCode : null;
+            const operationErrorHint = provisioningCodeText(
+              copy.safeCodeHints,
+              operation.safeError?.code,
+            );
+            const updateScope =
+              operation.type === "UPDATE"
+                ? provisioningUpdateScope(
+                    operation,
+                    model.requestedUpdateKeys[operation.id] ?? null,
+                  )
+                : null;
             return (
               <>
                 <div className="rounded-lg border border-border p-4">
@@ -506,11 +522,16 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                   </dl>
                   {operation.safeError && (operation.safeError.code || operation.safeError.message) && (
                     <div className="mt-3 rounded-md bg-destructive-subtle p-2 text-xs text-destructive-subtle-foreground">
-                      {operation.safeError.code ?? "OPERATION_FAILED"}
-                      {operation.safeError.message ? ` — ${operation.safeError.message}` : ""}
+                      <p dir="auto" className="break-words">
+                        {operation.safeError.code ?? "OPERATION_FAILED"}
+                        {operation.safeError.message ? ` — ${operation.safeError.message}` : ""}
+                      </p>
+                      {operationErrorHint && <p className="mt-1">{operationErrorHint}</p>}
                     </div>
                   )}
                 </div>
+
+                {updateScope && <UpdateScope scope={updateScope} ar={ar} />}
 
                 <div>
                   <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
@@ -535,6 +556,10 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                             operation.stall?.stepKey === step.stepKey ? operation.stall : null;
                           const elapsed = stepElapsedSeconds(step, provisioning.selectedOperationReadAtMs);
                           const error = stepErrorText(step);
+                          const errorHint = provisioningCodeText(
+                            copy.safeCodeHints,
+                            step.safeError?.code,
+                          );
                           return (
                             <TableRow key={step.id}>
                               <Td>
@@ -557,6 +582,11 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                                     }`}
                                   >
                                     {error}
+                                  </span>
+                                )}
+                                {errorHint && (
+                                  <span className="mt-0.5 block max-w-md break-words text-muted-foreground">
+                                    {errorHint}
                                   </span>
                                 )}
                               </Td>
@@ -621,6 +651,65 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
         </div>
       )}
     </ResourceBoundary>
+  );
+}
+
+/**
+ * The components an UPDATE moves. Core can move more than the operator
+ * selected, so for an update applied from this page the ones it added are
+ * listed apart, under why they are there.
+ */
+function UpdateScope({ scope, ar }: { scope: ProvisioningUpdateScope; ar: boolean }) {
+  const copy = tpCopy(ar);
+  return (
+    <div>
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
+        {copy.updateScopeTitle}
+      </h4>
+      <div className="space-y-2 rounded-lg border border-border p-3 text-xs">
+        {scope.requested ? (
+          <>
+            <ComponentKeyList label={copy.updateScopeRequestedLabel} componentKeys={scope.requested} />
+            {scope.autoAdded.length > 0 && (
+              <>
+                <ComponentKeyList
+                  label={copy.updateScopeAutoAddedLabel}
+                  componentKeys={scope.autoAdded}
+                  tone="warn"
+                />
+                <p className="text-muted-foreground">{copy.updateScopeAutoAddedNote}</p>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <ComponentKeyList componentKeys={scope.moved} />
+            <p className="text-muted-foreground">{copy.updateScopeOriginNote}</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ComponentKeyList({
+  label,
+  componentKeys,
+  tone = "neutral",
+}: {
+  label?: string;
+  componentKeys: readonly string[];
+  tone?: "neutral" | "warn";
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {label && <span className="font-semibold text-foreground">{label}</span>}
+      {componentKeys.map((componentKey) => (
+        <Badge key={componentKey} tone={tone} className="font-mono" dir="ltr">
+          {componentKey}
+        </Badge>
+      ))}
+    </div>
   );
 }
 
@@ -1265,4 +1354,3 @@ function formatDate(value: string, locale: string): string { return new Intl.Dat
 function formatStepTime(value: string, locale: "ar" | "en"): string { return new Intl.DateTimeFormat(localeForLanguage(locale), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(value)); }
 function operationTypeLabel(type: string, ar: boolean): string { const labels: Record<string, [string, string]> = { INITIAL_PROVISION: ["Initial provision", "التجهيز الأولي"], RETRY: ["Retry", "إعادة محاولة"], UPDATE: ["Update", "تحديث"], ADD_APPLICATION: ["Add Application", "إضافة تطبيق"], ADDON_INSTALL: ["Add-on install", "تثبيت إضافة"], REPAIR: ["Repair", "إصلاح"], DECOMMISSION: ["Decommission", "إيقاف"] }; return labels[type]?.[ar ? 1 : 0] ?? type; }
 function operationStatusLabel(status: TenantOperationStatus, ar: boolean): string { if (!ar) return status; const labels: Partial<Record<TenantOperationStatus, string>> = { REQUESTED: "مطلوبة", PLANNING: "تخطيط", QUEUED: "بالطابور", RUNNING: "قيد التنفيذ", WAITING_RETRY: "انتظار إعادة", CANCEL_REQUESTED: "طلب إلغاء", SUCCEEDED: "نجحت", FAILED_RETRYABLE: "فشل قابل للإعادة", MANUAL_RECOVERY_REQUIRED: "تدخل يدوي", CANCELLED: "ملغاة" }; return labels[status] ?? status; }
-function localizeError(code: string, ar: boolean): string { const messages: Record<string, [string, string]> = { TENANT_PROVISIONING_OPERATION_ALREADY_OPEN: ["An operation is still open. Open Operations and wait for it to finish or complete cancellation before re-provisioning.", "توجد عملية مفتوحة. افتح العمليات وانتظر انتهاءها أو اكتمال إلغائها قبل إعادة التجهيز."], TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE: ["Core has not exposed the conflict revision; resolution is disabled safely.", "لم تعرض Core مراجعة التعارض؛ تم تعطيل الحل بأمان."], TENANT_UPDATE_SELECTION_REQUIRED: ["Select at least one update.", "اختر تحديثًا واحدًا على الأقل."], TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED: ["Acknowledge retained-data behavior.", "أكد سلوك الاحتفاظ بالبيانات."], TENANT_PROVISIONING_OPERATION_SUPERSEDED: ["This operation was superseded by a newer generation. Refresh the history and select the latest operation.", "حلّ جيل أحدث محل هذه العملية. حدّث السجل واختر أحدث عملية."], INVALID_PROVISIONING_REASON_CODE: ["Use an uppercase safe reason code.", "استخدم رمز سبب آمنًا بأحرف كبيرة."], "GW.IDEM.IN_FLIGHT": ["The exact command is still in flight; retry keeps the same key.", "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه."] }; return messages[code]?.[ar ? 1 : 0] ?? code; }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Archive } from "lucide-react";
+import { ArrowLeft, ArrowRight, Archive, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Button, Card, Checkbox, Field, Input, Textarea } from "@/design-system";
 import { useReleaseDetail } from "../hooks/use-release-detail";
@@ -15,6 +15,7 @@ import {
   ReleasePageFrame,
   ReleaseSnapshotMeta,
   ReleaseStatePanel,
+  StandingBadge,
   StatusBadge,
   type ReleaseCopy,
 } from "./release-shared";
@@ -60,6 +61,7 @@ function ReleaseBody({ detail, copy, lang }: { detail: ReturnType<typeof useRele
             <div className="flex items-center gap-2.5">
               <h1 dir="ltr" className="font-mono text-lg font-semibold text-foreground">{release.releaseVersion}</h1>
               <StatusBadge status={release.status} />
+              <StandingBadge standing={detail.standing} copy={copy} />
             </div>
             <code dir="ltr" className="mt-1 block break-all text-start text-xs text-muted-foreground">{release.releaseId}</code>
           </div>
@@ -76,6 +78,7 @@ function ReleaseBody({ detail, copy, lang }: { detail: ReturnType<typeof useRele
           <Evidence label={copy.retirementReason} value={release.retirementReasonCode ?? "—"} mono />
         </EvidenceCard>
         <EvidenceCard title={copy.manifestEvidence}>
+          {detail.componentKey ? <Evidence label={copy.component} value={detail.componentKey} mono /> : null}
           <Evidence label={copy.componentId} value={release.componentId} mono />
           <Evidence label={copy.manifestVersion} value={String(release.manifestVersion)} mono />
           <Evidence label={copy.contractVersion} value={String(release.contractVersion)} mono />
@@ -112,9 +115,25 @@ function ReleaseBody({ detail, copy, lang }: { detail: ReturnType<typeof useRele
 
 function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDetail>; copy: ReleaseCopy }) {
   const pending = detail.mutation.phase === "PENDING";
+  // A property of the release, not of the reader, so it leads the permission
+  // check: nobody may retire a component's current release from here.
+  if (detail.standing === "CURRENT") {
+    return (
+      <Card className="p-3 sm:p-3.5">
+        <section aria-labelledby="current-release-title" className="flex items-start gap-2.5">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
+          <div>
+            <h2 id="current-release-title" className="text-base font-semibold text-foreground">{copy.currentReleaseTitle}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{copy.currentReleaseNotice}</p>
+          </div>
+        </section>
+      </Card>
+    );
+  }
   if (!detail.permissions.canRetireCritical) {
     return <ReleaseStatePanel kind="forbidden" title={copy.commandForbidden} detail="admin.provisioning.releases.retire + admin.provisioning.critical" copy={copy} />;
   }
+  const superseded = detail.standing === "SUPERSEDED";
   return (
     <Card className="border-destructive/30 bg-destructive-subtle p-3 sm:p-3.5">
       <form
@@ -128,23 +147,33 @@ function RetireForm({ detail, copy }: { detail: ReturnType<typeof useReleaseDeta
         <div>
           <h2 className="text-base font-semibold text-foreground">{copy.retireTitle}</h2>
           <p className="mt-1 text-xs text-muted-foreground">{copy.retireHelp}</p>
+          <p className="mt-1 text-xs font-medium text-foreground">
+            {superseded ? copy.supersededRetireHelp : copy.unknownStandingRetireHelp}
+          </p>
         </div>
-        <Field label={copy.retirementReason} hideLabel className="max-w-2xl">
-          {(fieldProps) => (
-            <Input
-              id={fieldProps.id}
-              size="sm"
-              placeholder={copy.retirementReason}
-              aria-describedby={detail.retireErrors.reasonCode ? "retirement-reason-error" : undefined}
-              dir="ltr"
-              value={detail.retireDraft.reasonCode}
-              maxLength={96}
-              invalid={Boolean(detail.retireErrors.reasonCode)}
-              onChange={(event) => detail.updateRetireDraft("reasonCode", event.target.value)}
-              className="font-mono"
-            />
-          )}
-        </Field>
+        <div className="flex max-w-2xl flex-wrap items-start gap-2">
+          <Field label={copy.retirementReason} hideLabel className="min-w-48 flex-1">
+            {(fieldProps) => (
+              <Input
+                id={fieldProps.id}
+                size="sm"
+                placeholder={copy.retirementReason}
+                aria-describedby={detail.retireErrors.reasonCode ? "retirement-reason-error" : undefined}
+                dir="ltr"
+                value={detail.retireDraft.reasonCode}
+                maxLength={96}
+                invalid={Boolean(detail.retireErrors.reasonCode)}
+                onChange={(event) => detail.updateRetireDraft("reasonCode", event.target.value)}
+                className="font-mono"
+              />
+            )}
+          </Field>
+          {superseded ? (
+            <Button type="button" variant="outline" size="sm" disabled={pending} onClick={detail.applySupersededReason}>
+              {copy.useSupersededReason}
+            </Button>
+          ) : null}
+        </div>
         <ReleaseFieldError id="retirement-reason-error" code={detail.retireErrors.reasonCode} copy={copy} />
         <label className="flex items-start gap-2.5 rounded-lg border border-destructive/30 bg-card/60 p-2.5 text-xs font-semibold text-foreground">
           <Checkbox

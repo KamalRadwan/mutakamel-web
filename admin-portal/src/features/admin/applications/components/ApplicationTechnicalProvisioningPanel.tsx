@@ -62,8 +62,6 @@ export function ApplicationTechnicalProvisioningPanel({
       copy.reasons.databasePermissionManifestRequired,
     DATABASE_PERMISSION_MANIFEST_INVALID:
       copy.reasons.databasePermissionManifestInvalid,
-    DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH:
-      copy.reasons.databasePermissionManifestReleaseMismatch,
   };
   const selectionLabels: Record<ApplicationSelectionBlocker, string> = {
     APPLICATION_LIFECYCLE_NOT_ACTIVE:
@@ -185,7 +183,9 @@ export function ApplicationTechnicalProvisioningPanel({
                 {readiness.reasons.map((item) => (
                   <li key={item} className="flex gap-2">
                     <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>{reasonLabels[item]}</span>
+                    {/* The projection is not parsed strictly, so a reason this
+                        build does not know is shown as its code, not blank. */}
+                    <span>{reasonLabels[item] ?? item}</span>
                   </li>
                 ))}
               </ul>

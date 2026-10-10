@@ -129,6 +129,14 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     "ADMIN.SEED_CONFLICT",
   );
   const [localError, setLocalError] = useState<string | null>(null);
+  /**
+   * The components the operator selected, per UPDATE operation this page
+   * applied. Core may move more than that; the operation detail shows which
+   * components it added (see `model/update-scope.ts`).
+   */
+  const [requestedUpdateKeys, setRequestedUpdateKeys] = useState<
+    Readonly<Record<string, readonly string[]>>
+  >({});
 
   const availableUpdateKeys = useMemo(
     () => new Set(provisioning.updates.data.items.map((row) => row.componentKey)),
@@ -158,7 +166,14 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
       const selected = provisioning.updates.data.items.filter((update) =>
         effectiveSelectedUpdateKeys.includes(update.componentKey),
       );
-      await provisioning.applyUpdates(buildApplyUpdatesDto(selected));
+      const dto = buildApplyUpdatesDto(selected);
+      const result = await provisioning.applyUpdates(dto);
+      setRequestedUpdateKeys((current) => ({
+        ...current,
+        [result.operation.id]: dto.selections.map(
+          (selection) => selection.componentKey,
+        ),
+      }));
       setSelectedUpdateKeys([]);
       setSection("operations");
     } catch (error) {
@@ -376,6 +391,7 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     section,
     setSection,
     selectedUpdateKeys: effectiveSelectedUpdateKeys,
+    requestedUpdateKeys,
     toggleUpdate,
     prerequisiteReasonCode,
     setPrerequisiteReasonCode,

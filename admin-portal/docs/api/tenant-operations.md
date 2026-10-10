@@ -2,13 +2,26 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-10-08** (stall signal, operator exits,
-confirmed cancel/re-provision/repair, polling backoff)
+Last source verification: **2026-10-11** (one current release per component:
+release-upgrade and prerequisite refusals, update scope, new step codes;
+2026-10-08: stall signal, operator exits, confirmed cancel/re-provision/repair,
+polling backoff)
 
 Verified against the current Gateway contracts, Core controllers, DTOs,
 operation/read-model services, provisioning command services, database enums,
-`core-app/src/admin/tenants/provisioning/tenant-operation-exits.ts`, and the
-Admin Portal tenant-detail source.
+`core-app/src/admin/tenants/provisioning/tenant-operation-exits.ts`,
+`core-app/src/admin/tenants/provisioning/provisioning-current-release.ts`,
+`core-app/src/admin/tenants/provisioning/tenant-provisioning-plan.service.ts`
+(Core commit `d5af4407`), and the Admin Portal tenant-detail source.
+
+Current-release amendment (2026-10-11): Core plans, offers and executes only
+the current catalogue release of each component. An update moves every
+lagging component it has to (see [Apply selected updates](#apply-selected-updates));
+retry, add-Application, repair, decommission and the add-on closure refuse a
+lagging tenant with `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED`; a plan
+that would run a Core foundation step under a backup or maintenance
+prerequisite is refused with `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE`.
+New step codes are listed under [Step and operation safe codes](#step-and-operation-safe-codes).
 
 This document covers the 15 tenant-prefixed operation/provisioning routes used
 to observe and manage a single tenant. Fleet rollout and release-publishing
@@ -376,7 +389,16 @@ Retry preconditions:
 - its access-policy revision must still be compatible;
 - initial activation retries require a tenant in `PROVISIONING`,
   `PROVISIONING_FAILED`, or a narrowly supported already-active replay case;
-- update retries require `ACTIVE` or `SUSPENDED`.
+- update retries require `ACTIVE` or `SUSPENDED`;
+- every release the copied plan pins must still be its component's current
+  release, otherwise `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED`. A
+  tenant whose latest operation failed while pinned to a superseded release has
+  no in-place path: its retry is refused this way, and an update needs a
+  `SUCCEEDED` latest operation;
+- backup and maintenance prerequisites are re-derived from the current release
+  controls, not copied (a retained decommission keeps both); a retry whose plan
+  would then run a Core foundation step under one is refused with
+  `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE`.
 
 An initial retry can transition the tenant from `PROVISIONING_FAILED` back to
 `PROVISIONING`. The retry is a new operation with the next generation; it does
@@ -450,6 +472,15 @@ standard `meta`; `checkedAt` is not present in the browser response. Treat the
 selection evidence fields themselves as authoritative and refetch immediately
 before applying.
 
+Each lagging component (applied release not its component's current release)
+is offered exactly one target: its current catalogue release, selected by
+catalogue identity rather than as the newest `PUBLISHED` row, and judged on the
+all-current result, so nothing is offered while that result is incompatible.
+The tenant self-service list (`GET /api/tenant/core/v1/provisioning/updates`)
+offers an update only when every lagging release is self-service; every current
+release is closed to self-service, so that list is normally empty. The shape of
+both responses is unchanged.
+
 ### Apply selected updates
 
 `POST /api/admin/core/v1/tenants/:tenantId/provisioning/updates/apply`
@@ -480,6 +511,29 @@ Copy all evidence from the no-store update response; never synthesize release
 ids, versions, or checksums. Core rejects stale/changed evidence and
 incompatible release combinations. Success returns
 `TenantProvisioningCommandResult`.
+
+**An update can move more than was selected.** Every requested target must be
+its component's current release, newer than the applied one. Core then grows
+the targets to a fixed point: every lagging component a target structurally
+depends on, and every lagging component whose release rejects the resulting
+release set, moves too. Each moved component is planned as a `SCHEMA` step,
+its chained seeds and a `VERIFICATION` step at its current release; a
+structural dependency that is already current keeps its release and gets only a
+`VERIFICATION` step. A plan that would run a Core foundation step under a backup
+or maintenance prerequisite is refused before it is saved:
+`409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` (admin and tenant
+apply alike).
+
+Core records the moved components as `componentKeys` and the actor's selection
+as `requestedComponentKeys` in the `OPERATION_PLANNED` event's safe metadata.
+The timeline projection does not return event metadata, so the portal reads
+the moved set from the returned operation detail - the components with a
+`SCHEMA` step - and remembers the selection for updates applied from the page.
+The operation detail of an `UPDATE` lists **Components this update moves**; for
+an update applied in this session it separates **Requested** from **Also
+updated because they were behind**, and otherwise lists the moved components
+with a note that Core can add lagging ones nobody selected
+(`model/update-scope.ts`).
 
 ## Provisioning state
 
@@ -665,6 +719,22 @@ the component-key pattern, and reason codes use the safe-code pattern.
 Decommission requires an explicit boolean acknowledgment; a truthy string is
 not a substitute for UI consent.
 
+Managed commands plan only current releases and refuse a lagging tenant with
+`409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED`:
+
+| Command | Refused when |
+| --- | --- |
+| Add-Application | a component the plan only verifies, or a retained runtime owner the closure needs, is not on its current release |
+| Repair | the closure desires a release that is not current, or a dependency the repair only verifies does not run its current release. The target itself may still run an earlier release: repairing it at a current desired release finishes an interrupted update |
+| Decommission | the component does not desire and run its current release |
+
+Add-Application and repair also refuse a plan that would run a Core foundation
+step under a backup or maintenance prerequisite
+(`409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE`); a decommission
+carries no Core step and keeps its mandatory backup and maintenance. Both
+commands chain their seed steps and run each as the kind Core's
+`provisioningSeedStepKind` assigns.
+
 ## Errors and UI behavior
 
 | Status | Code | UI behavior |
@@ -683,6 +753,8 @@ not a substitute for UI consent.
 | `409` | `TENANT_PROVISIONING_UPDATE_SELECTION_STALE` | Reload update choices |
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_PLAN_STALE` | Reload operation |
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_NOT_REQUIRED` | Hide prerequisite action |
+| `409` | `TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Retry, add-Application, repair, decommission or the add-on closure would pin a release that is not current. Localized: update this tenant to the current release first |
+| `409` | `TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Update apply (admin and tenant), retry, add-Application or repair would run a Core foundation step under a backup or maintenance prerequisite. Nothing was planned; localized |
 | `422` | `TENANT_PROVISIONING_UPDATE_SELECTION_INVALID` | Correct duplicate/incomplete selection |
 | `422` | `TENANT_PROVISIONING_UPDATE_INCOMPATIBLE` | Present compatibility conflict |
 | `422` | `TENANT_PROVISIONING_NO_ADMIN_MANAGED_UPDATES` | Empty state, not generic failure |
@@ -691,6 +763,38 @@ not a substitute for UI consent.
 Gateway idempotency errors use Problem Details `code`:
 `GW.IDEM.MISSING`, `GW.IDEM.BAD_VALUE`, `GW.IDEM.IN_FLIGHT`, and
 `GW.IDEM.MISMATCH`.
+
+The workspace alert shows the operator wording from
+`tenantProvisioning.commandErrors` (en + ar dictionaries) for a code it lists
+and the raw code otherwise. The tenant overview's lifecycle alert uses the same
+wording for **Retry provisioning** (`POST /tenants/:id/reprovision`, the same
+retry rules), keeps the code beneath it, and falls back to Core's message for
+any other code.
+
+## Step and operation safe codes
+
+A step's or operation's `safeError.code` is free text (at most 160
+characters); the reader accepts any value and the table always shows the raw
+code with Core's safe message. For the codes below the portal adds one line of
+operator guidance (`tenantProvisioning.safeCodeHints`, en + ar); any other code
+is shown on its own.
+
+| Code | Owner | Lane | Meaning |
+| --- | --- | --- | --- |
+| `CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Core | terminal | the step or the installation it drives pins a Core release that is not current; an update has to move the tenant |
+| `CRM.PROVISIONING.RELEASE_UPGRADE_REQUIRED` | CRM | terminal | same, for a CRM release |
+| `TRADE.PROVISIONING.RELEASE_UPGRADE_REQUIRED` | Trade | terminal | same, for a Trade release |
+| `WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED` | Worker | terminal | the WebPhone step pins a WebPhone or Core foundation release that is not current |
+| `CORE_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Core | terminal | the plan carries a backup or maintenance prerequisite Core cannot verify (safeguard behind the planning-time 409); a re-provision re-derives prerequisites from the current controls |
+| `CORE_PROVISIONING_MAINTENANCE_FENCE_OPEN` | Core | retryable, 60 s | a provisioning or relocation maintenance fence of the tenant is still open |
+| `CORE_PROVISIONING_FENCE_NOT_READY` | Core | retryable | Core's step projection was still behind the command 60 s after it was issued (genuine ordering lag only) |
+| `CORE_PROVISIONING_COMMAND_INVALID` | Core | dead-lettered | the step command failed its own contract (producer, routing or payload) and was dead-lettered on first delivery. Core sends no result - the code travels as the dead letter's `x-dlq-code` - so the step usually surfaces as stalled (`DISPATCH_LEASE_EXPIRED`); the hint applies wherever the code is reported |
+| `CRM.PROVISIONING.PROJECTION_GRANT_MISSING` | CRM | terminal | a CRM view another application reads lacks its `SELECT` grant; a CRM repair re-runs the schema step, which grants it |
+
+`CORE_PROVISIONING_CANCELLATION_PENDING` now means a real cancellation only.
+Restore and relocation readiness codes
+(`CORE.TENANT_DATABASE_RESTORE.READINESS_*`) are not provisioning step codes;
+see [Tenant Placement Moves](tenant-placement-moves.md#other-error-codes).
 
 ## Current frontend integration
 
@@ -730,8 +834,13 @@ page is hidden or a confirmation dialog is open (the badge reads "Auto-refresh
 paused"), and a refresh merges page one into the operations and timeline pages
 already loaded instead of discarding "Load older".
 
-Updates copy the current and target release evidence returned by Core. The
-state workspace exposes component installations and seed state, including the
+Updates copy the current and target release evidence returned by Core, and the
+Updates note says Core can move further lagging components with the selection.
+After an apply the workspace opens the new operation, whose detail lists the
+components the update moves and, apart, those Core added because they were
+behind. A step or operation error keeps its raw safe code and gains a line of
+guidance for the codes in [Step and operation safe codes](#step-and-operation-safe-codes).
+The state workspace exposes component installations and seed state, including the
 exact `revision` required for a conflict decision. Prerequisite requests and
 evidence, add-Application, repair, retained decommission, and conflict resolve
 are separately permission-gated. Raw Worker logs, secrets, and unbounded
@@ -755,6 +864,9 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-command.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-managed-operations.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-operation-exits.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/provisioning-current-release.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-plan.service.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/installer/core-tenant-provisioning.types.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-prerequisite.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-read-models.service.ts`
 - `../backend/mutakamel-apps/core-app/packages/database/src/enums/tenant-provisioning.enum.ts`

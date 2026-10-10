@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { AlertTriangle, FileJson2, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { Badge, Button, Card, PageHeader } from "@/design-system";
+import type { ReleaseCatalogueStanding } from "../model/release-standing";
 import type {
   CoreSnapshot,
   ReleaseDraftStatus,
@@ -90,6 +91,17 @@ export const RELEASE_COPY = {
     retireConfirm: "I verified the release identity and manifest checksum and intend to retire this release.",
     retire: "Retire release",
     retiring: "Retiring…",
+    component: "Component",
+    catalogueStanding: "Catalogue standing",
+    standingCurrent: "Current",
+    standingSuperseded: "Superseded",
+    standingUnavailable: "Current and superseded releases are told apart through the provisioning component catalogue, which needs admin.tenants.read and could not be read. Never retire a component's current release.",
+    supersededSummary: (count: number) => `Superseded published releases: ${count}. Retire each one with the reason code SUPERSEDED_BY_CURRENT_RELEASE once the read-only pin check finds nothing that still pins it.`,
+    currentReleaseTitle: "Current catalogue release",
+    currentReleaseNotice: "This is its component's current catalogue release, the only release Core plans and executes for it. Retiring it would leave the component without an executable release, so it cannot be retired here.",
+    supersededRetireHelp: "This is not its component's current catalogue release, so nothing selects or executes it. Retire it only after the read-only pin check finds no installation, open or retryable operation, prerequisite request, execution or add-on binding, rollout or live preview that still pins it.",
+    unknownStandingRetireHelp: "This page could not confirm whether this is its component's current release. Never retire a current release; retire a superseded one only after the read-only pin check.",
+    useSupersededReason: "Use SUPERSEDED_BY_CURRENT_RELEASE",
     definition: "Complete release definition",
     manifestEvidence: "Manifest and compatibility evidence",
     lifecycleEvidence: "Lifecycle evidence",
@@ -197,6 +209,17 @@ export const RELEASE_COPY = {
     retireConfirm: "راجعت هوية الإصدار وبصمة البيان وأقصد إحالة هذا الإصدار للتقاعد.",
     retire: "إحالة الإصدار للتقاعد",
     retiring: "جارٍ التقاعد…",
+    component: "المكوّن",
+    catalogueStanding: "الوضع في الكتالوج",
+    standingCurrent: "حالي",
+    standingSuperseded: "مُستبدَل",
+    standingUnavailable: "يُميَّز الإصدار الحالي من المُستبدَل عبر كتالوج مكوّنات التزويد، الذي يتطلب admin.tenants.read وتعذّرت قراءته. لا تُحِل الإصدار الحالي لأي مكوّن إلى التقاعد مطلقًا.",
+    supersededSummary: (count: number) => `الإصدارات المنشورة المُستبدَلة: ${count}. أحِل كلًّا منها للتقاعد برمز السبب SUPERSEDED_BY_CURRENT_RELEASE بعد أن يثبت فحص التثبيت للقراءة فقط أن لا شيء ما زال يثبّته.`,
+    currentReleaseTitle: "إصدار الكتالوج الحالي",
+    currentReleaseNotice: "هذا هو الإصدار الحالي لمكوّنه في الكتالوج، وهو الإصدار الوحيد الذي تخطط له Core وتنفّذه. إحالته للتقاعد تترك المكوّن بلا إصدار قابل للتنفيذ، لذا لا يمكن إحالته للتقاعد من هنا.",
+    supersededRetireHelp: "ليس هذا الإصدار الإصدارَ الحالي لمكوّنه في الكتالوج، لذا لا يختاره شيء ولا ينفّذه. لا تُحِله للتقاعد إلا بعد أن يثبت فحص التثبيت للقراءة فقط أنه لا يثبّته أي تثبيت أو عملية مفتوحة أو قابلة لإعادة المحاولة أو طلب متطلبات مسبقة أو ربط تنفيذ أو ربط إضافة أو طرح أو معاينة حية.",
+    unknownStandingRetireHelp: "تعذّر على هذه الصفحة التأكد مما إذا كان هذا هو الإصدار الحالي لمكوّنه. لا تُحِل إصدارًا حاليًا إلى التقاعد مطلقًا، ولا تُحِل الإصدار المُستبدَل إلا بعد فحص التثبيت للقراءة فقط.",
+    useSupersededReason: "استخدام SUPERSEDED_BY_CURRENT_RELEASE",
     definition: "تعريف الإصدار الكامل",
     manifestEvidence: "أدلة البيان والتوافق",
     lifecycleEvidence: "أدلة دورة الحياة",
@@ -297,6 +320,13 @@ export function ReleaseSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSn
 export function StatusBadge({ status }: { status: ReleaseDraftStatus | ReleaseStatus }) {
   const tone = status === "PUBLISHED" ? "success" : status === "RETIRED" || status === "ABANDONED" ? "neutral" : status === "VALIDATED" ? "info" : "warn";
   return <Badge tone={tone} className="font-mono" dir="ltr">{status}</Badge>;
+}
+
+/** Current or superseded; a retired or unknown standing shows `fallback`. */
+export function StandingBadge({ standing, copy, fallback = null }: { standing: ReleaseCatalogueStanding; copy: ReleaseCopy; fallback?: ReactNode }) {
+  if (standing === "CURRENT") return <Badge tone="success">{copy.standingCurrent}</Badge>;
+  if (standing === "SUPERSEDED") return <Badge tone="warn">{copy.standingSuperseded}</Badge>;
+  return <>{fallback}</>;
 }
 
 export function ReleaseFieldError({ id, code, copy }: { id: string; code?: ReleaseValidationCode; copy: ReleaseCopy }) {

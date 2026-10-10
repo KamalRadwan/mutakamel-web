@@ -2,7 +2,9 @@
 
 Complete inventory of NestJS Guards, Custom Decorators, and RBAC Permission Keys used across the Admin Portal backend (`core-app`).
 
-Last source verification: **2026-08-02**.
+Last source verification: **2026-08-02**; amended **2026-10-11** for the
+removed Trade permission-manifest V3 cutover, the current-release provisioning
+refusals, and the release-standing read (Core commits `de03f1d2`, `d5af4407`).
 
 ---
 
@@ -71,7 +73,7 @@ authoritative for its exact route permissions.
 ### 6. Tenants Control (`admin.tenants.*`)
 - **Guard**: `AdminGuard`
 - `admin.tenants.create` — Validate identity, placement options, reverse geocode, preview provisioning, create tenant
-- `admin.tenants.read` — Directory list, tenant details, view operations history & timeline, read destruction progress
+- `admin.tenants.read` — Directory list, tenant details, view operations history & timeline, read destruction progress, and the provisioning component catalogue that `/provisioning/releases` reads to tell current from superseded releases (without it those rows show no standing)
 - `admin.tenants.update` — Update tenant profile metadata
 - `admin.tenants.suspend` — Suspend or activate tenant
 - `admin.tenants.reprovision` — Reprovision tenant, cancel provisioning, retry/cancel operations
@@ -112,6 +114,13 @@ permission.
 - `admin.provisioning.decommission` — Decommission tenant components
 - `admin.provisioning.prerequisites.request` — Request backup or maintenance evidence for a blocked provisioning update
 - `admin.provisioning.prerequisites.read` — Read bounded provisioning prerequisite evidence
+
+`409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` and
+`409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` from add-Application,
+repair, decommission, retry or update apply are state refusals, not
+authorization failures: the portal explains them in the workspace alert and
+never renders them as a permission gate. See
+[Tenant Operations](../api/tenant-operations.md#errors-and-ui-behavior).
 
 ### 9. Subscriptions (`admin.subscriptions.*`)
 - **Guard**: `AdminGuard`
@@ -223,7 +232,12 @@ permissions; see §20.
 
 Application metadata update requires only `admin.applications.update`.
 Database-policy update and activate/deprecate/disable require
-`admin.applications.update` plus `admin.applications.critical`. There is no
+`admin.applications.update` plus `admin.applications.critical`. The one-shot
+Trade permission-manifest V3 cutover
+(`POST /api/admin/core/v1/applications/trade/permission-manifest-v3-cutover`,
+`admin.applications.update` + `admin.applications.critical`) was removed from
+Core and the Gateway on 2026-10-11; the portal never exposed it, and both keys
+remain in use by the commands above. There is no
 public `/modules` CRUD contract, and the portal must not invent an action merely
 because the unconsumed `admin.catalog.destroy` seed key still exists.
 

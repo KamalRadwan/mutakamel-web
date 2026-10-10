@@ -17,14 +17,14 @@ import { TenantProfilePanel } from "./core/components/TenantProfilePanel";
 import { useTenantCoreWorkspace } from "./core/hooks/useTenantCoreWorkspace";
 import { useTenantFqdnManagement } from "./core/hooks/useTenantFqdnManagement";
 import { isTenantDatabaseReady } from "./core/model/readers";
-import { TenantProvisioningWorkspace } from "./provisioning";
+import { TenantProvisioningWorkspace, provisioningCodeText } from "./provisioning";
 import { TenantStorageMigrationPanel } from "./storage";
 
 type WorkspaceTab = "overview" | "provisioning" | "access" | "billing" | "storage";
 
 export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
   const router = useRouter();
-  const { lang, dir } = useI18n();
+  const { lang, dir, t } = useI18n();
   const copy = workspaceCopy[lang];
   const activePanelRef = useRef<HTMLDivElement>(null);
   const mutationErrorRef = useRef<HTMLDivElement>(null);
@@ -230,7 +230,14 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
 
         {core.mutation.error ? (
           <div ref={mutationErrorRef} role="alert" tabIndex={-1} className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <p>{core.mutation.error.message}</p>
+            {/* Lifecycle re-provisioning shares the provisioning workspace's
+                refusals (a release upgrade or prerequisite it cannot run
+                under); Core's message is English-only, so known codes are
+                shown in the portal's language and the code stays below. */}
+            <p>
+              {provisioningCodeText(t.tenantProvisioning.commandErrors, core.mutation.error.errorCode) ??
+                core.mutation.error.message}
+            </p>
             <p className="mt-1 font-mono text-xs">{core.mutation.error.errorCode}{core.mutation.error.correlationId ? ` · ${copy.correlation}: ${core.mutation.error.correlationId}` : ""}</p>
           </div>
         ) : null}

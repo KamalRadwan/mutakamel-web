@@ -3,15 +3,15 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-10-08T07:34:08.064Z**
+Generated at: **2026-10-10T21:14:04.465Z**
 
-Frontend revision: `b9c222313a0e+dirty`
+Frontend revision: `f4841d302b48+dirty`
 
-Backend revision: `21aff55b3944+dirty`
+Backend revision: `b31b95d2a4ed+dirty`
 
 ## Coverage
 
-This inventory contains **289** browser-visible Core Admin routes.
+This inventory contains **288** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
@@ -21,8 +21,8 @@ feature flags, deployment, or current frontend implementation.
 | AUTHENTICATED | 103 |
 | PUBLIC | 6 |
 | READ_HEAVY | 23 |
-| WRITE_SENSITIVE | 157 |
-| **Total** | **289** |
+| WRITE_SENSITIVE | 156 |
+| **Total** | **288** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -31,7 +31,7 @@ Machine-readable source:
 
 | Gateway route-key domain | Routes |
 | --- | ---: |
-| applications | 43 |
+| applications | 42 |
 | audit | 3 |
 | auth | 12 |
 | auth-invalidation-outbox | 1 |
@@ -106,7 +106,6 @@ Machine-readable source:
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/adopt` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.adopt` |
 | POST | `/api/admin/core/v1/applications/:applicationKey/technical-provisioning/primary-component` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.technical-provisioning.primary-component.create` |
 | POST | `/api/admin/core/v1/applications/onboarding` | WRITE_SENSITIVE | yes | ALL | admin.applications.create + admin.applications.update + admin.applications.critical | `core.admin.applications.onboard` |
-| POST | `/api/admin/core/v1/applications/trade/permission-manifest-v3-cutover` | WRITE_SENSITIVE | yes | ALL | admin.applications.update + admin.applications.critical | `core.admin.applications.trade.permission-manifest-v3-cutover` |
 | GET | `/api/admin/core/v1/audit` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.list` |
 | GET | `/api/admin/core/v1/audit/:id` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.detail` |
 | GET | `/api/admin/core/v1/audit/entities/:entityType/:entityId` | AUTHENTICATED | yes | ALL | admin.audit.read | `core.admin.audit.entity-history` |

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { FilePlus2 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
-import { Button, DataTable, type ColumnDef } from "@/design-system";
-import { useReleaseIndex } from "../hooks/use-release-index";
-import type { ProvisioningRelease, ReleaseDraft } from "../types/provisioning-releases";
+import { Button, DataTable, DegradedBanner, type ColumnDef } from "@/design-system";
+import { useReleaseIndex, type ReleaseIndexRow } from "../hooks/use-release-index";
+import type { ReleaseDraft } from "../types/provisioning-releases";
 import {
   formatDate,
   RELEASE_COPY,
@@ -14,6 +14,7 @@ import {
   ReleasePageFrame,
   ReleaseSnapshotMeta,
   ReleaseStatePanel,
+  StandingBadge,
   StatusBadge,
   type ReleaseCopy,
 } from "./release-shared";
@@ -83,7 +84,12 @@ function IndexBody({ index, copy, lang }: { index: ReturnType<typeof useReleaseI
   return (
     <div className="space-y-3" aria-busy={index.isRefreshing}>
       <DraftTable drafts={index.drafts.data} copy={copy} lang={lang} isRefreshing={index.isRefreshing} />
-      <ReleaseTable releases={index.releases.data} copy={copy} lang={lang} isRefreshing={index.isRefreshing} />
+      {index.catalogueState === "FORBIDDEN" || index.catalogueState === "UNAVAILABLE" ? (
+        <DegradedBanner>{copy.standingUnavailable}</DegradedBanner>
+      ) : index.supersededCount > 0 ? (
+        <DegradedBanner>{copy.supersededSummary(index.supersededCount)}</DegradedBanner>
+      ) : null}
+      <ReleaseTable releases={index.releaseRows} copy={copy} lang={lang} isRefreshing={index.isRefreshing} />
       <div className="grid gap-3 xl:grid-cols-2">
         <ReleaseSnapshotMeta snapshot={index.drafts} copy={copy} lang={lang} />
         <ReleaseSnapshotMeta snapshot={index.releases} copy={copy} lang={lang} />
@@ -135,11 +141,22 @@ function DraftTable({ drafts, copy, lang, isRefreshing }: { drafts: ReleaseDraft
   );
 }
 
-function ReleaseTable({ releases, copy, lang, isRefreshing }: { releases: ProvisioningRelease[]; copy: ReleaseCopy; lang: "ar" | "en"; isRefreshing: boolean }) {
-  const columns: ColumnDef<ProvisioningRelease>[] = [
+function ReleaseTable({ releases, copy, lang, isRefreshing }: { releases: ReleaseIndexRow[]; copy: ReleaseCopy; lang: "ar" | "en"; isRefreshing: boolean }) {
+  const columns: ColumnDef<ReleaseIndexRow>[] = [
     { key: "releaseVersion", headerEn: copy.releaseVersion, headerAr: copy.releaseVersion, cell: (row) => <span dir="ltr" className="font-mono text-xs">{row.releaseVersion}</span> },
     { key: "status", headerEn: copy.status, headerAr: copy.status, cell: (row) => <StatusBadge status={row.status} /> },
-    { key: "componentId", headerEn: copy.componentId, headerAr: copy.componentId, cell: (row) => <span dir="ltr" className="font-mono text-xs">{row.componentId}</span> },
+    { key: "standing", headerEn: RELEASE_COPY.en.catalogueStanding, headerAr: RELEASE_COPY.ar.catalogueStanding, cell: (row) => <StandingBadge standing={row.standing} copy={copy} fallback={<span className="text-xs text-muted-foreground">—</span>} /> },
+    {
+      key: "componentId",
+      headerEn: RELEASE_COPY.en.component,
+      headerAr: RELEASE_COPY.ar.component,
+      cell: (row) => (
+        <span dir="ltr" className="block text-start font-mono text-xs">
+          {row.componentKey ? <span className="block text-foreground">{row.componentKey}</span> : null}
+          <span className="block text-muted-foreground">{row.componentId}</span>
+        </span>
+      ),
+    },
     { key: "manifestVersion", headerEn: copy.manifestVersion, headerAr: copy.manifestVersion, cell: (row) => <span dir="ltr" className="font-mono text-xs">{row.manifestVersion}</span> },
     { key: "publicationSource", headerEn: copy.publicationSource, headerAr: copy.publicationSource, cell: (row) => <span dir="ltr" className="font-mono text-xs">{row.publicationSource}</span> },
     { key: "publishedAt", headerEn: copy.publishedAt, headerAr: copy.publishedAt, cell: (row) => formatDate(row.publishedAt, lang) },

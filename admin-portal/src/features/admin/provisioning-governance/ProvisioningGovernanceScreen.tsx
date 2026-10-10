@@ -402,9 +402,11 @@ function ComponentTable({
       cell: (component) => <Badge tone="neutral">{component.kind}</Badge>,
     },
     {
-      key: "latestRelease",
-      headerEn: COPY.en.latestRelease,
-      headerAr: COPY.ar.latestRelease,
+      // Core names the component's current catalogue release here, not the
+      // newest PUBLISHED row (core-app `provisioning-current-release.ts`).
+      key: "currentRelease",
+      headerEn: COPY.en.currentRelease,
+      headerAr: COPY.ar.currentRelease,
       cell: (component) =>
         component.latestPublishedRelease ? (
           <div className="text-xs">

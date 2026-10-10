@@ -6,6 +6,8 @@ Last source verification: **2026-08-25**
 
 Source amendment (2026-09-09): [Application-owned Addons and the canonical commercial contract](./application-addons-target.md). Nested Addon catalogue/forms/pricing uses one unversioned commercial payload and exact revision/idempotency fences. Real owner registration gates publication and owner-dependent editors; metadata, compatibility and dynamic prices remain available. Existing Application pending-draft presentation remains source-integrated. Runtime acceptance is separately tracked; older examples do not prove complete Addon acceptance.
 
+Source amendment (2026-10-11, Core commit `de03f1d2`): technical readiness no longer compares a permission manifest's `componentRelease` with the component's published release - it is provenance only, validated for shape - so `DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH` is gone from `ApplicationTechnicalReadinessReason` and the tenant create-options enum. The Trade permission-manifest V3 cutover command (`POST /applications/trade/permission-manifest-v3-cutover`, route key `core.admin.applications.trade.permission-manifest-v3-cutover`) was removed end to end; the portal never called it, and the generated route inventory no longer lists it. The readiness panel shows any reason it has no label for as its code.
+
 This is the Admin Portal implementation contract for the Application Catalogue:
 Application identity, independent publication and lifecycle, immutable runtime
 target evidence, technical readiness, database policy and safe manifest
@@ -234,8 +236,7 @@ type ApplicationTechnicalReadinessReason =
   | "PUBLISHED_RELEASE_REQUIRED"
   | "MINIMUM_RELEASE_NOT_SATISFIED"
   | "DATABASE_PERMISSION_MANIFEST_REQUIRED"
-  | "DATABASE_PERMISSION_MANIFEST_INVALID"
-  | "DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH";
+  | "DATABASE_PERMISSION_MANIFEST_INVALID";
 
 type ApplicationSelectionBlocker =
   | "APPLICATION_LIFECYCLE_NOT_ACTIVE"

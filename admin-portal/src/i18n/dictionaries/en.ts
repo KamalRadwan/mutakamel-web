@@ -1763,8 +1763,6 @@ export const en: Dictionary = {
           "The database Application needs an active permission manifest.",
         databasePermissionManifestInvalid:
           "The active database permission manifest failed validation.",
-        databasePermissionManifestReleaseMismatch:
-          "The active database permission manifest belongs to a different component release.",
       },
       selectionTitle: "New tenant selection blockers",
       selectionBlockers: {
@@ -2475,6 +2473,52 @@ export const en: Dictionary = {
     refreshButton: "Refresh",
     actionErrorPrefix: "Action could not complete: ",
     dismissErrorAriaLabel: "Dismiss error",
+    /**
+     * Operator wording for command refusals, keyed by Core/Gateway code or a
+     * local validation code. A code missing here is shown verbatim.
+     */
+    commandErrors: {
+      TENANT_PROVISIONING_OPERATION_ALREADY_OPEN:
+        "An operation is still open. Open Operations and wait for it to finish or complete cancellation before re-provisioning.",
+      TENANT_PROVISIONING_OPERATION_SUPERSEDED:
+        "This operation was superseded by a newer generation. Refresh the history and select the latest operation.",
+      TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED:
+        "A component of this tenant runs an earlier release, and provisioning plans only current releases. Update this tenant to the current release first, then try again.",
+      TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE:
+        "This plan needs a backup or maintenance prerequisite, and Core foundation steps cannot run under one. Nothing was planned; the command can run once the releases it pins no longer require a backup or maintenance window.",
+      TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE:
+        "Core has not exposed the conflict revision; resolution is disabled safely.",
+      TENANT_UPDATE_SELECTION_REQUIRED: "Select at least one update.",
+      TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED:
+        "Acknowledge retained-data behavior.",
+      INVALID_PROVISIONING_REASON_CODE: "Use an uppercase safe reason code.",
+      "GW.IDEM.IN_FLIGHT":
+        "The exact command is still in flight; retry keeps the same key.",
+    },
+    /**
+     * What a step's or operation's safe error code means for the operator,
+     * shown under the code itself. A code missing here is shown on its own.
+     */
+    safeCodeHints: {
+      CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED:
+        "This step pins a Core release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+      "CRM.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
+        "This step pins a CRM release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+      "TRADE.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
+        "This step pins a Trade release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+      "WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED":
+        "This step pins a WebPhone or Core foundation release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+      CORE_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE:
+        "The plan carries a backup or maintenance prerequisite that Core cannot verify, so its Core foundation steps can never run. A re-provision derives its prerequisites from the current release controls again.",
+      CORE_PROVISIONING_MAINTENANCE_FENCE_OPEN:
+        "A provisioning or relocation maintenance fence of this tenant is still open, so the step could not start. The Worker retries it after 60 seconds.",
+      CORE_PROVISIONING_FENCE_NOT_READY:
+        "Core's record of this step was still behind the command after 60 seconds. The failure is retryable and the Worker sends the step again.",
+      CORE_PROVISIONING_COMMAND_INVALID:
+        "Core rejected the step command as invalid (producer, routing or payload) and dead-lettered it without running anything.",
+      "CRM.PROVISIONING.PROJECTION_GRANT_MISSING":
+        "A CRM view that another application reads is missing its SELECT grant. A CRM repair runs the schema step again, which grants it.",
+    },
     noOperationsTitle: "No provisioning operations.",
     showingOfTotal: "Showing {shown} of {total}",
     loadMore: "Load older",
@@ -2521,10 +2565,10 @@ export const en: Dictionary = {
     retryConfirmTitle: (operation: string, generation: number) =>
       `Re-provision ${operation} · generation ${generation}?`,
     retryConfirmDescription: (nextGeneration: number) =>
-      `Core plans generation ${nextGeneration}, which runs again only the steps that did not complete, pinned to the same releases. This generation and its timeline stay as history. A tenant whose initial provisioning failed returns to provisioning.`,
+      `Core plans generation ${nextGeneration}, which runs again only the steps that did not complete, pinned to the same releases; each must still be its component's current release. This generation and its timeline stay as history. A tenant whose initial provisioning failed returns to provisioning.`,
     repairConfirmTitle: (component: string) => `Repair ${component}?`,
     repairConfirmDescription:
-      "Core opens a repair operation pinned to the component's current desired release; it does not upgrade. The component's migrations are checked against that release and every seed pack is applied again under its policy, including seeds closed by a conflict decision; its dependencies are only verified. Backup and maintenance prerequisites are requested first when the release requires them, and no other operation can start until the repair finishes.",
+      "Core opens a repair operation pinned to the component's current desired release; it does not upgrade. The component's migrations are checked against that release and every seed pack is applied again under its policy, including seeds closed by a conflict decision; its dependencies are only verified. A repair whose releases require a backup or maintenance window is refused, because Core foundation steps cannot run under one, and no other operation can start until the repair finishes.",
     historicalOperationNote: (currentGen: number, latestGen: number) =>
       `This is a historical operation. Generation ${currentGen} was superseded by generation ${latestGen}; retry and cancel actions are available only for the latest operation.`,
     weightedProgressLabel: "Weighted progress",
@@ -2542,9 +2586,16 @@ export const en: Dictionary = {
     finishedColumnHeader: "Finished",
     elapsedColumnHeader: "Elapsed",
     timelineLabel: "Timeline",
+    updateScopeTitle: "Components this update moves",
+    updateScopeRequestedLabel: "Requested",
+    updateScopeAutoAddedLabel: "Also updated because they were behind",
+    updateScopeAutoAddedNote:
+      "Core moved these too: each was on an earlier release, and a requested component depends on it or it would not be compatible with the new releases.",
+    updateScopeOriginNote:
+      "Core also moves every component on an earlier release that these depend on or that would not be compatible with the new releases, so this list can include components nobody selected.",
     availableUpdatesTitle: "Available updates",
     updatesNote:
-      "Selections submit the exact current and target release evidence returned by Core.",
+      "Selections submit the exact current and target release evidence returned by Core. Core also moves every component on an earlier release that the selection depends on or that would not be compatible with the new releases; the planned operation lists each one.",
     applySelectedButton: (count: number) => `Apply selected (${count})`,
     noUpdatesTitle: "No safe updates are currently offered.",
     currentLabel: "Current",

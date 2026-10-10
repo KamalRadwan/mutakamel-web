@@ -6,12 +6,24 @@ import { normalizeApiError, type NormalizedApiError } from "@/shared/api/normali
 import { provisioningReleasesApi } from "../api/provisioning-releases-api";
 import { classifyReleaseReadError } from "../model/release-errors";
 import { readReleasePermissions } from "../model/release-permissions";
+import {
+  releaseCatalogueStanding,
+  type ReleaseCatalogueStanding,
+} from "../model/release-standing";
 import type {
   CoreSnapshot,
   ProvisioningRelease,
   ReleaseDraft,
   ResourceState,
 } from "../types/provisioning-releases";
+import { useReleaseCatalogue } from "./use-release-catalogue";
+
+/** A published release and where it stands in the provisioning catalogue. */
+export type ReleaseIndexRow = ProvisioningRelease & {
+  standing: ReleaseCatalogueStanding;
+  /** The component's key, when the catalogue names the component. */
+  componentKey: string | null;
+};
 
 export function useReleaseIndex() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -24,6 +36,7 @@ export function useReleaseIndex() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const generation = useRef(0);
   const hasSnapshot = useRef(false);
+  const catalogue = useReleaseCatalogue(revision, permissions.canRead);
 
   useEffect(() => {
     if (isAuthLoading || !permissions.canRead) return;
@@ -67,11 +80,28 @@ export function useReleaseIndex() {
       ? "FORBIDDEN"
       : state;
   const refresh = useCallback(() => setRevision((current) => current + 1), []);
+  const visibleReleases =
+    visibleState === "READY" || visibleState === "EMPTY" ? releases : null;
+  const releaseRows = useMemo<ReleaseIndexRow[]>(
+    () =>
+      (visibleReleases?.data ?? []).map((release) => ({
+        ...release,
+        standing: releaseCatalogueStanding(release, catalogue.catalogue),
+        componentKey:
+          catalogue.catalogue?.get(release.componentId.toLowerCase())?.key ??
+          null,
+      })),
+    [catalogue.catalogue, visibleReleases],
+  );
   return {
     permissions,
     state: visibleState,
     drafts: visibleState === "READY" || visibleState === "EMPTY" ? drafts : null,
-    releases: visibleState === "READY" || visibleState === "EMPTY" ? releases : null,
+    releases: visibleReleases,
+    releaseRows,
+    catalogueState: catalogue.state,
+    supersededCount: releaseRows.filter((row) => row.standing === "SUPERSEDED")
+      .length,
     error,
     isRefreshing,
     refresh,

@@ -28,7 +28,7 @@ export interface ProvisioningGovernanceCopy {
   releases: string;
   inspectReleases: string;
   close: string;
-  latestRelease: string;
+  currentRelease: string;
   noRelease: string;
   mandatory: string;
   optional: string;
@@ -130,8 +130,8 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     releases: "Published releases",
     inspectReleases: "Inspect releases",
     close: "Close",
-    latestRelease: "Latest release",
-    noRelease: "No published release",
+    currentRelease: "Current release",
+    noRelease: "No current release",
     mandatory: "Mandatory",
     optional: "Optional",
     contract: "Contract version",
@@ -234,8 +234,8 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     releases: "الإصدارات المنشورة",
     inspectReleases: "فحص الإصدارات",
     close: "إغلاق",
-    latestRelease: "أحدث إصدار",
-    noRelease: "لا يوجد إصدار منشور",
+    currentRelease: "الإصدار الحالي",
+    noRelease: "لا يوجد إصدار حالي",
     mandatory: "إلزامي",
     optional: "اختياري",
     contract: "إصدار العقد",

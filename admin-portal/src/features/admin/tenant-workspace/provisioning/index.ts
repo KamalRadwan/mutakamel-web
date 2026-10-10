@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./api/tenant-provisioning.api";
+export * from "./model/code-text";
 export * from "./model/commands";
 export * from "./model/permissions";
 export * from "./model/readers";

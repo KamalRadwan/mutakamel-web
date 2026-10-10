@@ -1,6 +1,8 @@
 # Admin Portal — Key Interfaces & Types
 
-Selected high-use response types. Last verified: **2026-08-09**.
+Selected high-use response types. Last verified: **2026-08-09**; the
+Application readiness reasons were re-verified on **2026-10-11** (Core commit
+`de03f1d2` removed `DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH`).
 
 ---
 
@@ -587,8 +589,7 @@ type ApplicationTechnicalReadinessReason =
   | 'PUBLISHED_RELEASE_REQUIRED'
   | 'MINIMUM_RELEASE_NOT_SATISFIED'
   | 'DATABASE_PERMISSION_MANIFEST_REQUIRED'
-  | 'DATABASE_PERMISSION_MANIFEST_INVALID'
-  | 'DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH';
+  | 'DATABASE_PERMISSION_MANIFEST_INVALID';
 
 type ApplicationSelectionBlocker =
   | 'APPLICATION_LIFECYCLE_NOT_ACTIVE'
