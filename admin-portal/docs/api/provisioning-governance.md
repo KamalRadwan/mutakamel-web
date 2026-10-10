@@ -3,8 +3,10 @@
 Status: **[Verified]**
 
 Last source verification: **2026-10-11** for current versus superseded
-releases and their retirement (Core commit `d5af4407`); other route families
-retain their **2026-08-12** evidence.
+releases and their retirement (Core commit `d5af4407`), and for the fleet
+preview's moved components and Core's refusal to retire a current release
+(Core commit `77447fb9`); other route families retain their **2026-08-12**
+evidence.
 
 Owner: **Core**
 
@@ -98,9 +100,65 @@ Retirement uses the existing `RELEASE_RETIRE` command with the row's
 releases"). Core does not check pins on retire, so run the read-only pin check
 first: no installation, open or retryable operation, prerequisite request,
 execution or add-on binding, rollout or live preview may still pin the row.
-Never retire a current release; the seed would then refuse the catalogue
-(`PROVISIONING_RELEASE_SEED_DRIFT`) and only a new release could recover. The
-components table on `/provisioning` labels the same field **Current release**.
+The components table on `/provisioning` labels the same field **Current release**.
+
+Core refuses to retire a current release itself: a row whose identity is its
+component's catalogue release answers `409 TENANT_PROVISIONING_RELEASE_IS_CURRENT`
+before anything changes (Core commit `77447fb9`), because retiring it would
+fail every tenant's planning closed. The detail page already offers no retire
+form for a row it judges current, so the refusal reaches an operator only when
+standing was unknown or stale. The notice then shows the portal's own wording
+(`RELEASE_COPY.commandErrors` in `release-shared.tsx`, en + ar) in place of the
+generic conflict text, keeps the code beneath it, and re-reads the release and
+the component catalogue.
+
+## Fleet update preview rows
+
+Core judges each tenant of an UPDATE preview with the update its planner would
+build for that tenant (`TenantProvisioningPlanService.previewUpdate`, Core
+commit `77447fb9`): the requested targets grow to every lagging component that
+has to move with them, and compatibility is judged over that expanded set. So
+`GET /fleet-rollout-previews/:previewId/tenants` returns `movedComponents` on
+every row:
+
+```ts
+interface FleetMovedComponent {
+  componentKey: string;
+  requested: boolean; // selected (true), or pulled in because it was behind (false)
+  fromReleaseId: string; // UUIDv7, the release the tenant runs
+  fromReleaseVersion: string;
+  toReleaseId: string; // UUIDv7, the component's current release
+  toReleaseVersion: string;
+  toManifestChecksum: string; // 64 lowercase hex
+}
+
+interface FleetPreviewTenant {
+  tenantId: string;
+  eligible: boolean;
+  deterministicRank: number;
+  safeReasonCode: string | null; // null exactly when eligible
+  eligibilityDigest: string;
+  // The moves of an eligible UPDATE row, in plan order; null for an
+  // ineligible row and for every other operation type.
+  movedComponents: FleetMovedComponent[] | null;
+}
+```
+
+The reader (`provisioning-fleet/contracts.ts`) stays strict: it rejects a row
+without the field, a move with any other key or a malformed id, version or
+checksum, more than 100 moves, a component key listed twice, and moves on an
+ineligible row. An UPDATE preview adds a **Moved components** column to its
+tenant table, each move written `componentKey from → to`, with a **Pulled in**
+label on every component the update moves although nobody selected it.
+
+A planner refusal becomes the row's safe reason code:
+`TENANT_PROVISIONING_UPDATE_INCOMPATIBLE` as `PROVISIONING_FLEET_RELEASE_INCOMPATIBLE`,
+`TENANT_PROVISIONING_NO_ADMIN_MANAGED_UPDATES` as `PROVISIONING_FLEET_UPDATE_NOT_APPLICABLE`,
+`TENANT_PROVISIONING_UPDATE_SELECTION_STALE` as `PROVISIONING_FLEET_CURRENT_PIN_STALE`,
+`TENANT_PROVISIONING_CATALOG_INVALID` as `PROVISIONING_FLEET_COMPATIBILITY_EVIDENCE_INVALID`,
+and any other code as itself. The moved set is part of the eligibility digest,
+so a tenant whose expansion changes before dispatch fails stale instead of
+moving further than previewed.
 
 ## State and mutation rules
 

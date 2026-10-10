@@ -129,17 +129,29 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(model.provisioning.cancelOperation).not.toHaveBeenCalled();
   });
 
-  it("localizes a superseded-operation conflict returned after a race", () => {
+  it("localizes command refusals and points a release-upgrade refusal at Updates", () => {
     const model = makeModel({
       localError: "TENANT_PROVISIONING_OPERATION_SUPERSEDED",
     });
-    render(<TenantProvisioningWorkspaceView model={model} />);
+    const { unmount } = render(<TenantProvisioningWorkspaceView model={model} />);
 
     expect(
       screen.getByText(
         /this operation was superseded by a newer generation\. refresh the history and select the latest operation/i,
       ),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open updates" })).toBeNull();
+    unmount();
+
+    const lagging = makeModel({
+      localError: "TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED",
+    });
+    render(<TenantProvisioningWorkspaceView model={lagging} />);
+    expect(
+      screen.getByText(/runs an earlier release.*from the Updates section of the Provisioning tab/i),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open updates" }));
+    expect(lagging.setSection).toHaveBeenCalledWith("updates");
   });
 
   it("uses add-Application terminology and contains no stale reconcile/add-module action", () => {

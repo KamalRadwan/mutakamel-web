@@ -32,6 +32,7 @@ import {
 import type {
   CreateFleetRolloutCommand,
   FieldErrors,
+  FleetMovedComponent,
   FleetPreview,
   FleetPreviewTenant,
   FleetRolloutDraft,
@@ -79,6 +80,16 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
       headerAr: copy.rank,
       cell: (tenant) => tenant.deterministicRank,
     },
+    // Only an UPDATE plan grows past its targets; every other operation's
+    // rows carry no moves, so the column would only repeat "none".
+    ...(preview?.operationType === "UPDATE"
+      ? [{
+          key: "movedComponents",
+          headerEn: copy.movedComponents,
+          headerAr: copy.movedComponents,
+          cell: (tenant: FleetPreviewTenant) => <MovedComponents moves={tenant.movedComponents} copy={copy} />,
+        }]
+      : []),
     {
       key: "safeReason",
       headerEn: copy.safeReason,
@@ -132,6 +143,9 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
                 {copy.total}: {view.tenants.data?.total ?? 0}
               </span>
             </header>
+            {preview.operationType === "UPDATE" ? (
+              <p className="text-xs leading-5 text-muted-foreground">{copy.movedComponentsHint}</p>
+            ) : null}
             <FleetStatePanel
               state={view.tenants.state}
               error={view.tenants.error}
@@ -268,6 +282,32 @@ function PreviewTargets({ preview, copy }: { preview: FleetPreview; copy: Return
         </dl>
       )) : <p className="text-xs text-muted-foreground">{copy.none}</p>}
     </Card>
+  );
+}
+
+/**
+ * What an eligible UPDATE row's plan moves, each as `componentKey from → to`.
+ * A component the update pulled in because it was behind, rather than one the
+ * operator selected, is labelled so; the label is text, not colour alone.
+ */
+function MovedComponents({ moves, copy }: { moves: FleetMovedComponent[] | null; copy: ReturnType<typeof getProvisioningFleetCopy> }) {
+  if (!moves?.length) return <span dir="ltr" className="text-start font-mono text-xs">{copy.none}</span>;
+  return (
+    <ul className="space-y-1">
+      {moves.map((move) => (
+        <li key={move.componentKey} className="flex flex-wrap items-center gap-1.5">
+          <span dir="ltr" className="text-start font-mono text-xs">
+            {move.componentKey} {move.fromReleaseVersion}{" "}
+            <span aria-hidden="true">→</span>
+            <span className="sr-only">{copy.movesTo}</span>{" "}
+            {move.toReleaseVersion}
+          </span>
+          {move.requested ? null : (
+            <Badge tone="warn" className="whitespace-nowrap">{copy.pulledIn}</Badge>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 

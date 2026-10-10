@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
   type ColumnDef,
 } from "@/design-system";
+import { provisioningCodeText } from "@/features/admin/tenant-workspace/provisioning/model/code-text";
 import {
   useTenants,
   type TenantDirectoryModalAction,
@@ -203,7 +204,13 @@ export default function TenantsDirectoryPage() {
       ) : null}
       {actionError && !activeModalTenant ? (
         <ErrorBanner
-          message={actionError.message}
+          // Retry provisioning shares the provisioning workspace's refusals
+          // (a release upgrade or a prerequisite it cannot run under), worded
+          // in the portal's language; any other code keeps Core's message.
+          message={
+            provisioningCodeText(t.tenantProvisioning.commandErrors, actionError.errorCode) ??
+            actionError.message
+          }
           errorCode={actionError.errorCode}
           correlationId={actionError.correlationId}
           dismissLabel={copy.dismiss}

@@ -82,12 +82,32 @@ export interface FleetPreview {
   createdAt: string;
 }
 
+/**
+ * One component an eligible UPDATE preview row's plan moves, from the release
+ * the tenant runs to its current one (core-app `TenantProvisioningUpdateMove`).
+ */
+export interface FleetMovedComponent {
+  componentKey: string;
+  /** The operator selected it (true), or the update pulled it in because it was behind (false). */
+  requested: boolean;
+  fromReleaseId: string;
+  fromReleaseVersion: string;
+  toReleaseId: string;
+  toReleaseVersion: string;
+  toManifestChecksum: string;
+}
+
 export interface FleetPreviewTenant {
   tenantId: string;
   eligible: boolean;
   deterministicRank: number;
   safeReasonCode: string | null;
   eligibilityDigest: string;
+  /**
+   * Every component an eligible UPDATE row's plan moves, in plan order, pulled-in
+   * ones included; null for an ineligible row and for every other operation type.
+   */
+  movedComponents: FleetMovedComponent[] | null;
 }
 
 export interface CreateFleetRolloutCommand {

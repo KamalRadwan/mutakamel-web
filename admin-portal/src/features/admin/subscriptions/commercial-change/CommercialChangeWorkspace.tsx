@@ -21,7 +21,7 @@ function CommercialChangeSession(props: CommercialChangeWorkspaceProps) {
     <Card className="space-y-3 p-3 sm:p-3.5">
       <div><h3 className="text-xs font-semibold">{copy.title}</h3><p className="mt-0.5 text-xs text-muted-foreground">{copy.intro}</p></div>
       {state.error && <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-md bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <p>{state.error.message}</p><p className="break-all font-mono text-xs"><bdi>{state.error.errorCode} {state.error.correlationId}</bdi></p>
+        <p>{state.errorMessage}</p><p className="break-all font-mono text-xs"><bdi>{state.error.errorCode} {state.error.correlationId}</bdi></p>
       </div>}
       {!state.canPrepare && <p className="text-xs text-muted-foreground">{copy.forbidden}</p>}
       {!state.lifecycleAllowsChange && <p role="status" className="text-xs text-muted-foreground">{copy.lifecycleUnavailable}</p>}

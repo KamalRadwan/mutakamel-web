@@ -12,6 +12,7 @@ export const commercialWorkspaceCopy = (lang: string) => lang === "ar" ? {
   recovery: "استعادة العملية", reason: "سبب الاستعادة", reasonHint: "لا يُحفظ النص في المتصفح. عند إعادة أمر غير محسوم، أدخل السبب الأصلي نفسه.", reconcile: "إعادة التحقق والتوفيق", cancel: "طلب إلغاء التحضير",
   recoveryHint: "الإلغاء والتوفيق يخضعان لفحص الخادم لمراجعة العملية وحالتها الحالية.", operationId: "مرجع العملية", receiptId: "مرجع التسعيرة المسوّاة", readReceipt: "قراءة الإيصال الأصلي", lookup: "البحث عن عملية أو إيصال سابق",
   forbidden: "لا تملك صلاحية تنفيذ تعديل الاشتراك.", limited: "تبقى ترقية تعريف الإضافة غير متاحة. وقد يرفض الخادم تخفيض أو إزالة WebPhone لحين اكتمال متطلبات الحجز.", references: "مراجع الاختيار", previewNeeded: "بعد اكتمال التحضير، اطلب تسعيرة لمراجعة المبالغ الحالية.",
+  releaseUpgradeRequired: "يعمل أحد المكوّنات المثبتة لدى هذا المستأجر على إصدار سابق، ولا يُخطَّط التعديل إلا على الإصدارات الحالية. حدّث المستأجر من قسم «التحديثات» في تبويب «التجهيز» أولاً، ثم حضّر التعديل من جديد.",
 } : {
   title: "Change applications and addons", intro: "Edit the selections together, prepare the operation, then review the priced changes before wallet settlement.",
   lifecycleUnavailable: "Plan changes are available only while the subscription is in trial or active.",
@@ -26,4 +27,5 @@ export const commercialWorkspaceCopy = (lang: string) => lang === "ar" ? {
   recovery: "Recover operation", reason: "Recovery reason", reasonHint: "This text is not stored in the browser. To retry an unresolved command, re-enter its exact original reason.", reconcile: "Reconcile operation", cancel: "Request preparation cancellation",
   recoveryHint: "The server checks the current operation state and revision before cancellation or reconciliation.", operationId: "Operation reference", receiptId: "Applied preview reference", readReceipt: "Read original receipt", lookup: "Find a previous operation or receipt",
   forbidden: "You do not have permission to change this subscription.", limited: "Addon definition adoption remains unavailable. The server may refuse WebPhone reduction or removal while its reservation prerequisites are incomplete.", references: "Selection references", previewNeeded: "Once preparation is complete, request a preview to review current amounts.",
+  releaseUpgradeRequired: "A component this tenant already runs is on an earlier release, and the change is planned only on current releases. Update the tenant from the Updates section of its Provisioning tab first, then prepare the change again.",
 };

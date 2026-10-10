@@ -5,6 +5,7 @@ import type {
   FieldErrors,
   FleetAttestationDraft,
   FleetManageDraft,
+  FleetMovedComponent,
   FleetOperationCommand,
   FleetOperationType,
   FleetPage,
@@ -501,16 +502,47 @@ function readPreviewTenant(value: unknown): FleetPreviewTenant {
     "deterministicRank",
     "safeReasonCode",
     "eligibilityDigest",
+    "movedComponents",
   ]);
   const eligible = bool(row.eligible);
   const safeReasonCode = nullableMatching(row.safeReasonCode, SAFE_CODE, 96);
   if ((eligible && safeReasonCode !== null) || (!eligible && safeReasonCode === null)) fail();
+  // Core names the moves of an eligible UPDATE row only; a refused plan moves
+  // nothing, so an ineligible row carrying moves is impossible evidence.
+  const movedComponents = row.movedComponents === null
+    ? null
+    : array(row.movedComponents, 100).map(readMovedComponent);
+  if (!eligible && movedComponents !== null) fail();
+  if (movedComponents) unique(movedComponents.map((move) => move.componentKey));
   return {
     tenantId: uuid(row.tenantId),
     eligible,
     deterministicRank: positiveInteger(row.deterministicRank),
     safeReasonCode,
     eligibilityDigest: matching(row.eligibilityDigest, SHA256, 64),
+    movedComponents,
+  };
+}
+
+function readMovedComponent(value: unknown): FleetMovedComponent {
+  const row = object(value);
+  exact(row, [
+    "componentKey",
+    "requested",
+    "fromReleaseId",
+    "fromReleaseVersion",
+    "toReleaseId",
+    "toReleaseVersion",
+    "toManifestChecksum",
+  ]);
+  return {
+    componentKey: matching(row.componentKey, COMPONENT_KEY, 128),
+    requested: bool(row.requested),
+    fromReleaseId: uuid(row.fromReleaseId),
+    fromReleaseVersion: matching(row.fromReleaseVersion, RELEASE_VERSION, 120),
+    toReleaseId: uuid(row.toReleaseId),
+    toReleaseVersion: matching(row.toReleaseVersion, RELEASE_VERSION, 120),
+    toManifestChecksum: matching(row.toManifestChecksum, SHA256, 64),
   };
 }
 

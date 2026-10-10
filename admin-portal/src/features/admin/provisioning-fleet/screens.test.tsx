@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { directoryMock, previewMock, rolloutMock } = vi.hoisted(() => ({
@@ -79,9 +79,17 @@ describe("provisioning fleet screens", () => {
 
     expect(screen.getAllByText(PREVIEW_ID).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Tenant evidence" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: "Fleet preview tenant evidence" }),
-    ).toHaveAttribute("tabindex", "0");
+    const tenantEvidence = screen.getByRole("region", { name: "Fleet preview tenant evidence" });
+    expect(tenantEvidence).toHaveAttribute("tabindex", "0");
+    // An UPDATE row names every component it moves; the one the update pulled
+    // in, not the selected one, carries the label.
+    expect(within(tenantEvidence).getByRole("columnheader", { name: "Moved components" })).toBeInTheDocument();
+    const moves = within(tenantEvidence).getAllByRole("listitem");
+    expect(moves.map((item) => item.textContent)).toEqual([
+      "accounts 1.2.2 →to 1.2.3",
+      "core.foundation 0.0.1 →to 0.0.2Pulled in",
+    ]);
+    expect(screen.getAllByText("Pulled in")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Launch rollout" }));
     expect(screen.getByRole("alertdialog", {
       name: "Launch this critical rollout?",
@@ -313,6 +321,26 @@ function previewTenantFixture() {
     deterministicRank: 1,
     safeReasonCode: null,
     eligibilityDigest: DIGEST,
+    movedComponents: [
+      {
+        componentKey: "accounts",
+        requested: true,
+        fromReleaseId: ROLLOUT_ID,
+        fromReleaseVersion: "1.2.2",
+        toReleaseId: KEY_ID,
+        toReleaseVersion: "1.2.3",
+        toManifestChecksum: DIGEST,
+      },
+      {
+        componentKey: "core.foundation",
+        requested: false,
+        fromReleaseId: ROLLOUT_ID,
+        fromReleaseVersion: "0.0.1",
+        toReleaseId: KEY_ID,
+        toReleaseVersion: "0.0.2",
+        toManifestChecksum: DIGEST,
+      },
+    ],
   };
 }
 

@@ -116,6 +116,14 @@ export const RELEASE_COPY = {
     commandInFlight: "This exact UUIDv7 command is still in flight. An unchanged retry keeps the same command identity.",
     commandUnavailable: "The command outcome may be ambiguous. State is being reconciled; retry unchanged fields to reuse the same command identity.",
     commandError: "The release-governance command failed.",
+    /**
+     * Operator wording for a refusal Core names by code, shown instead of the
+     * phase message. Any other code keeps the phase message and Core's text.
+     */
+    commandErrors: {
+      TENANT_PROVISIONING_RELEASE_IS_CURRENT:
+        "This is the component's current catalogue release. Make another release current before retiring it.",
+    },
     invalidUuid: "Enter a UUID v7 identifier.",
     invalidVersion: "Use 1–64 safe version characters: letters, digits, dot, underscore, colon, plus, or hyphen.",
     invalidInteger: "Enter an integer from 1 through 2,147,483,647.",
@@ -234,6 +242,10 @@ export const RELEASE_COPY = {
     commandInFlight: "أمر UUIDv7 نفسه قيد التنفيذ. تحتفظ الإعادة دون تغيير بهوية الأمر نفسها.",
     commandUnavailable: "قد تكون نتيجة الأمر ملتبسة. تجري مطابقة الحالة؛ أعد دون تغيير لاستخدام الهوية نفسها.",
     commandError: "فشل أمر حوكمة الإصدار.",
+    commandErrors: {
+      TENANT_PROVISIONING_RELEASE_IS_CURRENT:
+        "هذا هو الإصدار الحالي للمكوّن في الكتالوج. اجعل إصدارًا آخر هو الحالي قبل إحالته للتقاعد.",
+    },
     invalidUuid: "أدخل معرّفًا بصيغة UUID v7.",
     invalidVersion: "استخدم من 1 إلى 64 حرف نسخة آمنًا.",
     invalidInteger: "أدخل عددًا صحيحًا من 1 إلى 2,147,483,647.",
@@ -284,7 +296,10 @@ export function ReleaseMutationNotice({ mutation, copy }: { mutation: ReleaseMut
     }
   }, [mutation.phase]);
   if (mutation.phase === "IDLE" || mutation.phase === "PENDING") return null;
-  const message = { SUCCEEDED: copy.commandSucceeded, FORBIDDEN: copy.commandForbidden, CONFLICT: copy.commandConflict, VALIDATION: copy.commandValidation, IN_FLIGHT: copy.commandInFlight, UNAVAILABLE: copy.commandUnavailable, ERROR: copy.commandError }[mutation.phase];
+  // A refusal the portal words itself replaces both the phase message and
+  // Core's text, which is not in the portal's language; the code stays below.
+  const codeMessage = releaseCommandErrorText(copy, mutation.error?.errorCode);
+  const message = codeMessage ?? { SUCCEEDED: copy.commandSucceeded, FORBIDDEN: copy.commandForbidden, CONFLICT: copy.commandConflict, VALIDATION: copy.commandValidation, IN_FLIGHT: copy.commandInFlight, UNAVAILABLE: copy.commandUnavailable, ERROR: copy.commandError }[mutation.phase];
   const danger = mutation.phase === "ERROR" || mutation.phase === "FORBIDDEN";
   const tone = danger
     ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
@@ -299,11 +314,17 @@ export function ReleaseMutationNotice({ mutation, copy }: { mutation: ReleaseMut
       className={`rounded-lg border px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tone}`}
     >
       <p className="font-semibold">{message}</p>
-      {mutation.error ? <p className="mt-1">{mutation.error.message}</p> : null}
+      {mutation.error && !codeMessage ? <p className="mt-1">{mutation.error.message}</p> : null}
       {mutation.error?.errorCode ? <code dir="ltr" className="mt-1 block break-all text-xs">{mutation.error.errorCode}</code> : null}
       {mutation.correlationId ? <p className="mt-1 text-xs"><strong>{copy.correlation}:</strong> <code dir="ltr">{mutation.correlationId}</code></p> : null}
     </div>
   );
+}
+
+/** `hasOwnProperty` keeps a code such as `constructor` from resolving to an `Object.prototype` member. */
+function releaseCommandErrorText(copy: ReleaseCopy, code: string | undefined): string | null {
+  const texts: Readonly<Record<string, string>> = copy.commandErrors;
+  return code && Object.prototype.hasOwnProperty.call(texts, code) ? (texts[code] ?? null) : null;
 }
 
 export function ReleaseSnapshotMeta({ snapshot, copy, lang }: { snapshot: CoreSnapshot<unknown>; copy: ReleaseCopy; lang: "ar" | "en" }) {

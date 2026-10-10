@@ -103,16 +103,22 @@ describe("provisioning fleet contracts", () => {
 
   it("strictly reads canonical preview, page, rollout, and report envelopes", () => {
     expect(readPreviewEnvelope(envelope(previewFixture())).data.previewId).toBe(ID);
-    expect(readPreviewTenantPage(envelope({
-      data: [{
-        tenantId: ID,
-        eligible: true,
-        deterministicRank: 1,
-        safeReasonCode: null,
+    // An eligible UPDATE row names every component its plan moves, the
+    // lagging ones it pulls in included; an ineligible row moves nothing.
+    expect(readPreviewTenantPage(tenantPage([
+      previewTenantFixture(),
+      {
+        tenantId: ID_2,
+        eligible: false,
+        deterministicRank: 2,
+        safeReasonCode: "PROVISIONING_FLEET_RELEASE_INCOMPATIBLE",
         eligibilityDigest: DIGEST,
-      }],
-      meta: { page: 1, limit: 50, total: 1 },
-    })).items).toHaveLength(1);
+        movedComponents: null,
+      },
+    ])).items.map((item) => item.movedComponents)).toEqual([
+      [moveFixture("accounts", true), moveFixture("core.foundation", false)],
+      null,
+    ]);
     expect(readRolloutEnvelope(envelope(rolloutFixture())).data.status).toBe("RUNNING");
     expect(readReportEnvelope(envelope(reportFixture())).data.status)
       .toBe("READY_FOR_ATTESTATION");
@@ -134,8 +140,51 @@ describe("provisioning fleet contracts", () => {
       status: "SUCCEEDED",
       completedAt: null,
     }))).toThrow(ProvisioningFleetContractError);
+
+    const withoutMoves: Record<string, unknown> = { ...previewTenantFixture() };
+    delete withoutMoves.movedComponents;
+    for (const row of [
+      withoutMoves,
+      { ...previewTenantFixture(), movedComponents: [{ ...moveFixture("accounts", true), unknown: true }] },
+      { ...previewTenantFixture(), movedComponents: [{ ...moveFixture("accounts", true), requested: "true" }] },
+      { ...previewTenantFixture(), movedComponents: [moveFixture("accounts", true), moveFixture("accounts", false)] },
+      {
+        ...previewTenantFixture(),
+        eligible: false,
+        safeReasonCode: "PROVISIONING_FLEET_RELEASE_INCOMPATIBLE",
+      },
+    ]) {
+      expect(() => readPreviewTenantPage(tenantPage([row]))).toThrow(ProvisioningFleetContractError);
+    }
   });
 });
+
+function previewTenantFixture() {
+  return {
+    tenantId: ID,
+    eligible: true,
+    deterministicRank: 1,
+    safeReasonCode: null,
+    eligibilityDigest: DIGEST,
+    movedComponents: [moveFixture("accounts", true), moveFixture("core.foundation", false)],
+  };
+}
+
+function moveFixture(componentKey: string, requested: boolean) {
+  return {
+    componentKey,
+    requested,
+    fromReleaseId: ID_2,
+    fromReleaseVersion: "0.0.1",
+    toReleaseId: ID_3,
+    toReleaseVersion: "0.0.2",
+    toManifestChecksum: DIGEST,
+  };
+}
+
+function tenantPage(rows: unknown[]) {
+  return envelope({ data: rows, meta: { page: 1, limit: 50, total: rows.length } });
+}
 
 function target(componentKey: string, componentId: string) {
   return {

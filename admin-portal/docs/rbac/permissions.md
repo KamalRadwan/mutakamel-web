@@ -4,7 +4,9 @@ Complete inventory of NestJS Guards, Custom Decorators, and RBAC Permission Keys
 
 Last source verification: **2026-08-02**; amended **2026-10-11** for the
 removed Trade permission-manifest V3 cutover, the current-release provisioning
-refusals, and the release-standing read (Core commits `de03f1d2`, `d5af4407`).
+refusals, and the release-standing read (Core commits `de03f1d2`, `d5af4407`),
+and for the retry re-pin and the current-release retirement refusal (Core
+commit `77447fb9`).
 
 ---
 
@@ -120,7 +122,12 @@ permission.
 repair, decommission, retry or update apply are state refusals, not
 authorization failures: the portal explains them in the workspace alert and
 never renders them as a permission gate. See
-[Tenant Operations](../api/tenant-operations.md#errors-and-ui-behavior).
+[Tenant Operations](../api/tenant-operations.md#errors-and-ui-behavior). The
+same holds for the release-upgrade refusal of a subscription change's
+preparation ([Subscriptions](../api/subscriptions.md)) and for
+`409 TENANT_PROVISIONING_RELEASE_IS_CURRENT`, which
+`admin.provisioning.releases.retire` meets on a component's current release
+([Provisioning Governance](../api/provisioning-governance.md#current-and-superseded-releases)).
 
 ### 9. Subscriptions (`admin.subscriptions.*`)
 - **Guard**: `AdminGuard`

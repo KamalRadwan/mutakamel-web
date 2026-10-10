@@ -1,6 +1,6 @@
 # Subscriptions API
 
-Status: PARTIAL SOURCE INTEGRATION. Last source verification: 2026-09-09.
+Status: PARTIAL SOURCE INTEGRATION. Last source verification: 2026-09-09; amended 2026-10-11 for the release-upgrade refusal of a preparation (Core commit `77447fb9`).
 Owner: Core. No authenticated runtime, financial execution or package-adoption acceptance is claimed by this change.
 
 ## Routes
@@ -21,6 +21,8 @@ Owner: Core. No authenticated runtime, financial execution or package-adoption a
 | `POST /api/admin/core/v1/subscriptions/:tenantId/cancel` | ALL `admin.subscriptions.cancel` + `admin.subscriptions.critical` | Whole-subscription cancellation |
 
 Tenant billing now mounts the canonical aggregate workspace. The obsolete scalar plan form, API methods, hook state, DTOs and readers have been removed. Operators edit Application tiers/seats and Addon seats together, add published catalogue selections and remove selections while retaining at least one base Application. Child seats cannot exceed the parent. The complete intended change set is locked once preparation begins. Definition adoption is unavailable until its genuine governed owner is source-integrated; no ADOPT-to-CHANGE translation exists. The server retains WebPhone reduction/removal and readiness gates.
+
+Preparation plans the selection's provisioning closure, which runs only current releases: while a component the tenant already runs lags its current release, Core refuses it with `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` (the add-on and commercial closure row of Core's lagging-tenant rules). Core's message is not in the portal's language, so the workspace shows its own wording (`commercial-workspace-copy.ts`, `releaseUpgradeRequired`, en + ar): update the tenant from the Updates section of its Provisioning tab, then prepare again; the code and correlation stay beside it. Every other failure keeps Core's message. The definitive refusal releases the draft for a fresh intent.
 
 Preparation uses `expectedSubscriptionRevision,changes,reason?`; preview adds `preparationId`. Admin's editor sends no optional reason, prices or actor claims. The 13-field preview preserves22fields per change, complete before/after accepted prices and the owner's nine-field financial observation, including `canApply`. It retains a five-minute expiry and a separate `preparation:{preparationId}` binding. The reader checks the reviewed request's exact selections and retained arithmetic without calculating prices, proration or eligibility. The operator explicitly reviews all amounts before the exact empty-object apply request.
 

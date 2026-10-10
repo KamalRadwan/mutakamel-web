@@ -2483,7 +2483,7 @@ export const en: Dictionary = {
       TENANT_PROVISIONING_OPERATION_SUPERSEDED:
         "This operation was superseded by a newer generation. Refresh the history and select the latest operation.",
       TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED:
-        "A component of this tenant runs an earlier release, and provisioning plans only current releases. Update this tenant to the current release first, then try again.",
+        "A component of this tenant runs an earlier release, and provisioning plans only current releases. Update it to its current release from the Updates section of the Provisioning tab first, then try again.",
       TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE:
         "This plan needs a backup or maintenance prerequisite, and Core foundation steps cannot run under one. Nothing was planned; the command can run once the releases it pins no longer require a backup or maintenance window.",
       TENANT_SEED_CONFLICT_REVISION_UNAVAILABLE:
@@ -2501,13 +2501,13 @@ export const en: Dictionary = {
      */
     safeCodeHints: {
       CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED:
-        "This step pins a Core release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+        "This step pins a Core release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
       "CRM.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
-        "This step pins a CRM release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+        "This step pins a CRM release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
       "TRADE.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
-        "This step pins a Trade release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+        "This step pins a Trade release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
       "WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED":
-        "This step pins a WebPhone or Core foundation release that is no longer current, so retrying the same plan cannot succeed. Update the tenant to the current release.",
+        "This step pins a WebPhone or Core foundation release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
       CORE_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE:
         "The plan carries a backup or maintenance prerequisite that Core cannot verify, so its Core foundation steps can never run. A re-provision derives its prerequisites from the current release controls again.",
       CORE_PROVISIONING_MAINTENANCE_FENCE_OPEN:
@@ -2531,6 +2531,7 @@ export const en: Dictionary = {
     cancellationPendingNote: "Cancellation is still in progress. Re-provisioning becomes available after the worker confirms that the operation has stopped. This page updates automatically.",
     openOperationNote: "An operation is still open. Finish it or complete cancellation before starting another operation.",
     viewCurrentOperationButton: "View current operation",
+    openUpdatesButton: "Open updates",
     requestCancelButton: "Request cancel",
     stalledBadge: (duration: string) => `Stalled · no progress for ${duration}`,
     stallNoProgressNote: (duration: string, step: string | null) =>

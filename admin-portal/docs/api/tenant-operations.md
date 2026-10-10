@@ -3,7 +3,8 @@
 Status: **[Verified]**
 
 Last source verification: **2026-10-11** (one current release per component:
-release-upgrade and prerequisite refusals, update scope, new step codes;
+release-upgrade and prerequisite refusals, update scope, new step codes; a
+retry re-pins a failed plan on superseded releases;
 2026-10-08: stall signal, operator exits, confirmed cancel/re-provision/repair,
 polling backoff)
 
@@ -12,16 +13,23 @@ operation/read-model services, provisioning command services, database enums,
 `core-app/src/admin/tenants/provisioning/tenant-operation-exits.ts`,
 `core-app/src/admin/tenants/provisioning/provisioning-current-release.ts`,
 `core-app/src/admin/tenants/provisioning/tenant-provisioning-plan.service.ts`
-(Core commit `d5af4407`), and the Admin Portal tenant-detail source.
+(Core commits `d5af4407`, `77447fb9`), and the Admin Portal tenant-detail source.
 
 Current-release amendment (2026-10-11): Core plans, offers and executes only
 the current catalogue release of each component. An update moves every
 lagging component it has to (see [Apply selected updates](#apply-selected-updates));
-retry, add-Application, repair, decommission and the add-on closure refuse a
+add-Application, repair, decommission and the add-on closure refuse a
 lagging tenant with `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED`; a plan
 that would run a Core foundation step under a backup or maintenance
 prerequisite is refused with `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE`.
 New step codes are listed under [Step and operation safe codes](#step-and-operation-safe-codes).
+
+Retry amendment (2026-10-11, Core commit `77447fb9`): a retry of a failed
+generation that pins a release since superseded is re-pinned to the current
+releases instead of refused, and answers the release-upgrade 409 only where
+re-pinning is impossible; see [Retry and cancel](#retry-and-cancel). The
+portal's guidance for a step that failed on a superseded release now points at
+**Re-provision**.
 
 This document covers the 15 tenant-prefixed operation/provisioning routes used
 to observe and manage a single tenant. Fleet rollout and release-publishing
@@ -390,11 +398,17 @@ Retry preconditions:
 - initial activation retries require a tenant in `PROVISIONING`,
   `PROVISIONING_FAILED`, or a narrowly supported already-active replay case;
 - update retries require `ACTIVE` or `SUSPENDED`;
-- every release the copied plan pins must still be its component's current
-  release, otherwise `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED`. A
-  tenant whose latest operation failed while pinned to a superseded release has
-  no in-place path: its retry is refused this way, and an update needs a
-  `SUCCEEDED` latest operation;
+- a failed plan that pins a release since superseded is re-pinned rather than
+  refused (Core commit `77447fb9`, `repinRetryProjection`): every superseded
+  component moves to its current release with its whole schema, seed and
+  verification chain planned again, lagging components the result needs are
+  pulled in as an update would pull them, and everything else is retried as
+  before. A plan that pins only current releases keeps the ordinary retry;
+- the retry answers `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` only
+  where re-pinning is impossible: a retried decommission, an active tenant's
+  retry that still carries the activation step, an add-on binding that pins
+  the superseded release, or an installed component that cannot move and
+  rejects the result;
 - backup and maintenance prerequisites are re-derived from the current release
   controls, not copied (a retained decommission keeps both); a retry whose plan
   would then run a Core foundation step under one is refused with
@@ -403,6 +417,14 @@ Retry preconditions:
 An initial retry can transition the tenant from `PROVISIONING_FAILED` back to
 `PROVISIONING`. The retry is a new operation with the next generation; it does
 not mutate the failed history row.
+
+A re-pinning retry records `repinnedComponentKeys` and `repinnedComponents`
+(`componentKey`, `fromReleaseId`, `fromReleaseVersion`, `toReleaseId`,
+`toReleaseVersion`) in its `OPERATION_PLANNED` event's safe metadata, beside
+`sourceOperationId` and `componentKeys`. The timeline projection does not
+return event metadata (`TenantOperationTimelineEventView` above), and the
+portal reads no metadata, so these keys need no reader change; the retry's own
+detail shows the moved components' steps at their current release.
 
 Cancel preconditions:
 
@@ -753,7 +775,7 @@ commands chain their seed steps and run each as the kind Core's
 | `409` | `TENANT_PROVISIONING_UPDATE_SELECTION_STALE` | Reload update choices |
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_PLAN_STALE` | Reload operation |
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_NOT_REQUIRED` | Hide prerequisite action |
-| `409` | `TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Retry, add-Application, repair, decommission or the add-on closure would pin a release that is not current. Localized: update this tenant to the current release first |
+| `409` | `TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Add-Application, repair, decommission, an installation retarget or the add-on closure would pin a release that is not current, or a retry cannot re-pin its failed plan. Localized: update it from the Updates section of the Provisioning tab first; the workspace alert offers **Open updates** |
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Update apply (admin and tenant), retry, add-Application or repair would run a Core foundation step under a backup or maintenance prerequisite. Nothing was planned; localized |
 | `422` | `TENANT_PROVISIONING_UPDATE_SELECTION_INVALID` | Correct duplicate/incomplete selection |
 | `422` | `TENANT_PROVISIONING_UPDATE_INCOMPATIBLE` | Present compatibility conflict |
@@ -766,10 +788,15 @@ Gateway idempotency errors use Problem Details `code`:
 
 The workspace alert shows the operator wording from
 `tenantProvisioning.commandErrors` (en + ar dictionaries) for a code it lists
-and the raw code otherwise. The tenant overview's lifecycle alert uses the same
-wording for **Retry provisioning** (`POST /tenants/:id/reprovision`, the same
-retry rules), keeps the code beneath it, and falls back to Core's message for
-any other code.
+and the raw code otherwise. For `TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED`
+it also offers **Open updates**, which switches the workspace to its Updates
+section (hidden while that section is open). The tenant overview's lifecycle
+alert uses the same wording for **Retry provisioning**
+(`POST /tenants/:id/reprovision`, the same retry rules), keeps the code beneath
+it, and falls back to Core's message for any other code. A subscription change
+on the tenant's Billing tab meets the same refusal when its preparation plans
+the add-on closure; that workspace words it in its own copy
+([Subscriptions](subscriptions.md)).
 
 ## Step and operation safe codes
 
@@ -781,10 +808,10 @@ is shown on its own.
 
 | Code | Owner | Lane | Meaning |
 | --- | --- | --- | --- |
-| `CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Core | terminal | the step or the installation it drives pins a Core release that is not current; an update has to move the tenant |
+| `CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Core | terminal | the step or the installation it drives pins a Core release that is not current; the tenant moves to the current release by re-provisioning the failed operation, whose retry re-pins its plan (an update moves a tenant whose latest operation succeeded). The hint points at **Re-provision** |
 | `CRM.PROVISIONING.RELEASE_UPGRADE_REQUIRED` | CRM | terminal | same, for a CRM release |
 | `TRADE.PROVISIONING.RELEASE_UPGRADE_REQUIRED` | Trade | terminal | same, for a Trade release |
-| `WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED` | Worker | terminal | the WebPhone step pins a WebPhone or Core foundation release that is not current |
+| `WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED` | Worker | terminal | the WebPhone step pins a WebPhone or Core foundation release that is not current; same recovery |
 | `CORE_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Core | terminal | the plan carries a backup or maintenance prerequisite Core cannot verify (safeguard behind the planning-time 409); a re-provision re-derives prerequisites from the current controls |
 | `CORE_PROVISIONING_MAINTENANCE_FENCE_OPEN` | Core | retryable, 60 s | a provisioning or relocation maintenance fence of the tenant is still open |
 | `CORE_PROVISIONING_FENCE_NOT_READY` | Core | retryable | Core's step projection was still behind the command 60 s after it was issued (genuine ordering lag only) |

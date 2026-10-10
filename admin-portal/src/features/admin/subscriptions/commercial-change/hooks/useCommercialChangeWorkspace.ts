@@ -9,6 +9,7 @@ import { shouldRotateWriteCommandKey } from "@/shared/api/write-command-recovery
 import type { SubscriptionCommercial } from "@/features/admin/tenant-workspace/billing/model/subscription-commercial";
 import { commercialChangeApi } from "../commercial-change.api";
 import { commercialDraftRequest, initialCommercialTargets, type ApplicationTarget } from "../commercial-change-draft";
+import { commercialWorkspaceCopy } from "../commercial-workspace-copy";
 import { emptyCommercialJournal, newPreparationJournal, readCommercialJournal, saveCommercialJournal, type CommercialJournal } from "../commercial-change-journal";
 import type { CommercialApplyReceipt, CommercialOperationReceipt, CommercialPreview } from "../commercial-change-readers";
 import { readCommercialRecoveryRequest, type CommercialRecoveryRequest } from "../commercial-change-request";
@@ -19,7 +20,7 @@ export function useCommercialChangeSessionKey(source: SubscriptionCommercial) {
   const { user } = useAuth();
   return JSON.stringify([user?.id, user?.isSuperAdmin, [...(user?.permissions ?? [])].sort(), source.subscription.tenantId, source.subscription.id]);
 }
-export function useCommercialChangeWorkspace({ source, onCommitted }: CommercialChangeWorkspaceProps) {
+export function useCommercialChangeWorkspace({ source, lang, onCommitted }: CommercialChangeWorkspaceProps) {
   const { user } = useAuth();
   const actor = user?.id ?? "";
   const canRead = Boolean(actor) && adminCanAll(user, ["admin.subscriptions.read"]);
@@ -87,6 +88,13 @@ export function useCommercialChangeWorkspace({ source, onCommitted }: Commercial
     if (!current.current) return;
     setOperation(previous => previous?.operationId === value.operationId && BigInt(previous.operationRevision) > BigInt(value.operationRevision) ? previous : value);
   };
+  // Preparing plans the selection's provisioning closure, which Core refuses
+  // while an installed component lags its current release. Core's message is
+  // not in the portal's language, so that refusal is worded here; the code
+  // and correlation stay beside it.
+  const errorMessage = error?.errorCode === "TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED"
+    ? commercialWorkspaceCopy(lang).releaseUpgradeRequired
+    : error?.message ?? null;
   const terminal = operation?.state === "COMMITTED" || operation?.state === "ABORTED";
   const draftLocked = !journalReady || busy || Boolean(journal.request || journal.preparationId || operation);
   const sourceChanged = source.subscriptionRevision !== (journal.request?.expectedSubscriptionRevision ?? baseline.subscriptionRevision);
@@ -225,7 +233,7 @@ export function useCommercialChangeWorkspace({ source, onCommitted }: Commercial
     updateTarget(addonParent.selectionKey, { addons: [...addonParent.addons, { selectionKey: generateUUIDv7(), addonId: catalogue.detail.id,
       name: catalogue.detail.name, definitionVersionId: definition.id, seats: 1, removed: false }] });
   };
-  return { targets, updateTarget, request, journal, journalReady, operation, preview, receipt, historicalReceipt, error, errorRef, busy, expired, reviewed,
+  return { targets, updateTarget, request, journal, journalReady, operation, preview, receipt, historicalReceipt, error, errorMessage, errorRef, busy, expired, reviewed,
     setReviewed, reason, setReason, operationReference, setOperationReference, receiptReference, setReceiptReference,
     canRead, canPrepare, canApply, canReadApplications, canReadCatalogue, catalogue, draftLocked, sourceChanged, lifecycleAllowsChange, labels, terminal,
     selectedTier, setSelectedTier, chooseApplication, useTier, addonAvailable, addAddon,

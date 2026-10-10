@@ -180,10 +180,26 @@ export function TenantProvisioningWorkspaceView({
           tabIndex={-1}
           className="mx-3 mt-3 flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive-subtle px-3 py-2 text-xs text-destructive-subtle-foreground"
         >
-          <span>
-            <strong>{copy.actionErrorPrefix}</strong>
-            {provisioningCodeText(copy.commandErrors, visibleError) ?? visibleError}
-          </span>
+          <div className="min-w-0">
+            <p>
+              <strong>{copy.actionErrorPrefix}</strong>
+              {provisioningCodeText(copy.commandErrors, visibleError) ?? visibleError}
+            </p>
+            {/* A lagging component is moved by an update, which this
+                workspace offers one section away. */}
+            {visibleError === "TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED" &&
+              model.section !== "updates" && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => model.setSection("updates")}
+                >
+                  {copy.openUpdatesButton}
+                </Button>
+              )}
+          </div>
           <Button
             type="button"
             variant="ghost"
