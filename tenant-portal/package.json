@@ -37,7 +37,7 @@
     "@mutakamel/core-app-contracts": "0.0.36",
     "@mutakamel/identifiers": "workspace:*",
     "@hello-pangea/dnd": "^18.0.1",
-    "@mutakamel/realtime-app-client": "0.0.2",
+    "@mutakamel/realtime-app-client": "0.0.3",
     "@noble/hashes": "2.4.0",
     "@radix-ui/react-accordion": "^1.2.20",
     "@radix-ui/react-alert-dialog": "^1.1.23",

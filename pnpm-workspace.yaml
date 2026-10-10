@@ -27,6 +27,8 @@ overrides:
 
 minimumReleaseAgeExclude:
   - '@mutakamel/core-app-contracts@0.0.23 || 0.0.36'
+  - '@mutakamel/realtime-app-client@0.0.3'
+  - '@mutakamel/realtime-app-contracts@0.0.3'
   - '@next/env@16.3.3'
   - '@next/eslint-plugin-next@16.3.3'
   - '@next/swc-darwin-arm64@16.3.3'
