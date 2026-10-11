@@ -133,24 +133,50 @@ describe("tenant host admission", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  // Core answers 200 with these two since the host-status route stopped
+  // hiding a tenant that exists but is not active yet; the boundary renders
+  // them rather than 404 (OPEN-QUESTIONS.md Q19).
+  it.each(["PROVISIONING", "PROVISIONING_FAILED"] as const)(
+    "admits the pre-activation state %s for its boundary screen",
+    async (status) => {
+      const fetcher = vi.fn(async () => new Response(JSON.stringify({
+        success: true,
+        data: { status },
+      }), { status: 200 })) as unknown as typeof fetch;
+
+      await expect(fetchTenantHostStatus(
+        "erp.example.com",
+        "http://gateway.internal:9000",
+        fetcher,
+      )).resolves.toBe(status);
+    },
+  );
+
   it("fails closed for upstream errors and malformed success envelopes", async () => {
     const unavailable = vi.fn(
       async () => new Response(null, { status: 503 }),
     ) as unknown as typeof fetch;
+    const notFound = vi.fn(async () => new Response(JSON.stringify({
+      success: false,
+      errorCode: "TENANT_HOST_NOT_FOUND",
+    }), { status: 404 })) as unknown as typeof fetch;
+    // A deleted tenant's hosts are released and answer 404, so DELETED on a
+    // 200 is a value Core never sends and must not be admitted.
+    const unknownStatus = vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: { status: "DELETED" },
+    }), { status: 200 })) as unknown as typeof fetch;
     const malformed = vi.fn(async () => new Response(JSON.stringify({
       success: true,
-      data: { status: "PROVISIONING" },
+      data: { status: "provisioning" },
     }), { status: 200 })) as unknown as typeof fetch;
 
-    await expect(fetchTenantHostStatus(
-      "erp.example.com",
-      "http://gateway.internal:9000",
-      unavailable,
-    )).resolves.toBeNull();
-    await expect(fetchTenantHostStatus(
-      "erp.example.com",
-      "http://gateway.internal:9000",
-      malformed,
-    )).resolves.toBeNull();
+    for (const fetcher of [unavailable, notFound, unknownStatus, malformed]) {
+      await expect(fetchTenantHostStatus(
+        "erp.example.com",
+        "http://gateway.internal:9000",
+        fetcher,
+      )).resolves.toBeNull();
+    }
   });
 });

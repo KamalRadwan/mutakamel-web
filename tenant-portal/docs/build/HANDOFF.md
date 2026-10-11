@@ -149,6 +149,25 @@ retry screen that could only produce the same 401.
 `TenantHostAdmission.tsx` and `TenantPortalRuntime.tsx` stay fenced in full.
 The rest of Tier 1 is unchanged.
 
+#### Amendment · 2026-10-11 — the two pre-activation host states
+
+Core's public host-status route now answers `200` with `PROVISIONING` and
+`PROVISIONING_FAILED` instead of hiding them behind a 404
+(`core-app/src/tenant/tenant-host/tenant-host-status.service.ts`), which is what
+[OPEN-QUESTIONS.md Q19](OPEN-QUESTIONS.md#q19--three-of-the-five-tenant-statuses-cannot-be-observed-by-the-portal--resolved-2026-10-11)
+was waiting for. Mapping them to not-found told a tenant whose workspace was
+still being set up that it did not exist. Rendering them needs two Tier-1 files
+and one new file beside them; the admission decision does not move.
+
+| Permitted | Not permitted |
+| --- | --- |
+| Widening `TenantHostStatus` in `src/shared/tenancy/tenant-host-admission.server.ts` to the four values Core's `TENANT_HOST_STATUSES` lists | Admitting any other value, or treating a `404`, a timeout or a malformed envelope as anything but `null` → `notFound()` |
+| A screen per new state in `TenantHostStateBoundary.tsx`, on every path — Core refuses sign-in too until the first setup finishes — sharing one full-screen chrome with the suspended screen | Rendering the app beneath either state, or any change to the `SUSPENDED` admission rule (form on `/login`, screen elsewhere) |
+| Re-asking admission with `router.refresh()` from `src/components/auth/useHostStatusRecheck.ts`: bounded automatic checks while `PROVISIONING`, manual only while `PROVISIONING_FAILED` | Navigating or redirecting from either screen, or an unbounded poll |
+
+`TenantHostAdmission.tsx` and `TenantPortalRuntime.tsx` stay fenced in full;
+neither changed. The rest of Tier 1 is unchanged.
+
 ### Tier 2 — live features. Keep the logic, replace the markup.
 
 ~6,500 lines of hooks with strict runtime response validation, serving 9 CRM

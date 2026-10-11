@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/design-system";
+import { CirclePause, Hourglass, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Button, LanguageToggle, ThemeToggle, cn, proseMeasure } from "@/design-system";
 import { I18nProvider, useI18n } from "@/i18n/I18nContext";
 import type { TenantHostStatus } from "@/shared/tenancy/tenant-host-admission.server";
+import { useHostStatusRecheck } from "./useHostStatusRecheck";
 
 // This boundary sits ABOVE the app's own I18nProvider — TenantHostAdmission
 // wraps TenantPortalRuntime, not the other way round — so its chrome brings
@@ -26,24 +28,126 @@ function SuspendedBanner() {
   );
 }
 
-function SuspendedScreen() {
-  const { t } = useI18n();
+const ICON_TONE = {
+  caution: "text-warning",
+  negative: "text-destructive",
+  neutral: "text-muted-foreground",
+} as const;
+
+/**
+ * The full-screen chrome of a host that does not admit the product, laid out
+ * like the fence screens (`src/app/(fence)/components/FenceScreen.tsx`, which
+ * this Tier-1 file may not import). Nothing around it can change the language
+ * or the theme, so it carries both toggles itself.
+ */
+function HostStateScreen({
+  icon: Icon,
+  tone,
+  title,
+  description,
+  isAlert = false,
+  children,
+}: {
+  icon: LucideIcon;
+  tone: keyof typeof ICON_TONE;
+  title: string;
+  description: string;
+  /** A blocked host is announced at once; one still being prepared is not. */
+  isAlert?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-      <div className="flex max-w-prose flex-col items-center gap-3 rounded-md border border-border bg-card p-8 text-center">
-        <h1 className="text-lg font-semibold text-foreground">{t.hostState.suspendedTitle}</h1>
-        <p className="text-sm text-muted-foreground">{t.hostState.suspendedDescription}</p>
-        <Button asChild variant="primary" size="sm">
-          <Link href="/login">{t.hostState.goToLogin}</Link>
-        </Button>
+    <div className="flex min-h-screen flex-col bg-canvas p-4">
+      <div className="flex justify-end gap-2">
+        <LanguageToggle />
+        <ThemeToggle />
       </div>
-    </main>
+      <main className="flex flex-1 items-center justify-center py-8">
+        <div
+          role={isAlert ? "alert" : undefined}
+          className="flex w-full max-w-prose flex-col items-center gap-3 rounded-md border border-border bg-card p-8 text-center"
+        >
+          <Icon className={cn("size-8", ICON_TONE[tone])} aria-hidden="true" />
+          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+          <p className={cn("text-sm text-muted-foreground", proseMeasure)}>{description}</p>
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
 
-// Presentation-only conversion of a Tier-1 file, permitted by the 2026-08-31
-// amendment in docs/build/HANDOFF.md. The admission decision itself is
-// unchanged and still lives in TenantHostAdmission.
+function CheckAgainButton({ isChecking, onClick }: { isChecking: boolean; onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <Button variant="outline" size="sm" className="mt-2" loading={isChecking} onClick={onClick}>
+      {isChecking ? t.hostState.checking : t.hostState.checkAgain}
+    </Button>
+  );
+}
+
+function SuspendedScreen() {
+  const { t } = useI18n();
+  return (
+    <HostStateScreen
+      icon={CirclePause}
+      tone="caution"
+      isAlert
+      title={t.hostState.suspendedTitle}
+      description={t.hostState.suspendedDescription}
+    >
+      <Button asChild variant="primary" size="sm" className="mt-2">
+        <Link href="/login">{t.hostState.goToLogin}</Link>
+      </Button>
+    </HostStateScreen>
+  );
+}
+
+// PROVISIONING. Waiting is the only thing to do, so the screen asks admission
+// again on a bounded schedule and the requested page opens in place once Core
+// reports the tenant ACTIVE.
+function PreparingScreen() {
+  const { t } = useI18n();
+  const { isChecking, isAutoChecking, checkNow } = useHostStatusRecheck({ automatic: true });
+  return (
+    <HostStateScreen
+      icon={Hourglass}
+      tone="neutral"
+      title={t.hostState.preparingTitle}
+      description={t.hostState.preparingDescription}
+    >
+      <p role="status" className="text-xs text-muted-foreground">
+        {isAutoChecking ? t.hostState.preparingAutoCheck : t.hostState.preparingAutoCheckStopped}
+      </p>
+      <CheckAgainButton isChecking={isChecking} onClick={checkNow} />
+    </HostStateScreen>
+  );
+}
+
+// PROVISIONING_FAILED. Only an operator's retry can resume the setup, so
+// nothing is checked automatically; the user checks again once support has
+// answered.
+function SetupFailedScreen() {
+  const { t } = useI18n();
+  const { isChecking, checkNow } = useHostStatusRecheck({ automatic: false });
+  return (
+    <HostStateScreen
+      icon={TriangleAlert}
+      tone="negative"
+      isAlert
+      title={t.hostState.setupFailedTitle}
+      description={t.hostState.setupFailedDescription}
+    >
+      <p className="text-xs text-muted-foreground">{t.hostState.setupFailedNextStep}</p>
+      <CheckAgainButton isChecking={isChecking} onClick={checkNow} />
+    </HostStateScreen>
+  );
+}
+
+// The rendered chrome for the status TenantHostAdmission decides; the
+// admission decision itself still lives there. Permitted by two amendments in
+// docs/build/HANDOFF.md: the presentation-only conversion (2026-08-31) and the
+// two pre-activation states with their bounded re-check (2026-10-11).
 export function TenantHostStateBoundary({
   children,
   status,
@@ -54,6 +158,23 @@ export function TenantHostStateBoundary({
   const pathname = usePathname();
 
   if (status === "ACTIVE") return children;
+
+  // Until the first setup finishes, Core refuses every tenant route, sign-in
+  // included (TENANT_INACTIVE), so these replace every page, /login too.
+  if (status === "PROVISIONING") {
+    return (
+      <I18nProvider>
+        <PreparingScreen />
+      </I18nProvider>
+    );
+  }
+  if (status === "PROVISIONING_FAILED") {
+    return (
+      <I18nProvider>
+        <SetupFailedScreen />
+      </I18nProvider>
+    );
+  }
 
   if (pathname === "/login") {
     return (

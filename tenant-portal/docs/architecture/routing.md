@@ -2,7 +2,9 @@
 
 Status: **verified against current source**
 
-Last source verification: **2026-08-27**
+Last source verification: **2026-08-27**; host admission's pre-activation
+states re-verified **2026-10-11** against Core
+`src/tenant/tenant-host/tenant-host-status.service.ts`.
 
 ## Route groups
 
@@ -43,7 +45,11 @@ the login form renders, not after.
 3. Call Core's public host-status route through the **server-only** Gateway
    origin, with a 2s timeout and `redirect: "error"`.
 4. `null` → `notFound()`. `ACTIVE` → render. `SUSPENDED` → the suspension
-   boundary.
+   boundary. `PROVISIONING` → the "workspace is being prepared" screen.
+   `PROVISIONING_FAILED` → the "setup could not be completed" screen. Core
+   answers `404 TENANT_HOST_NOT_FOUND` for an unknown, unverified or released
+   host — every host of a deleted tenant included — and that, any other
+   status value and any failure stay `null`.
 
 ```text
 TENANT_GATEWAY_INTERNAL_ORIGIN   required by `next start`; server-only.
@@ -75,6 +81,26 @@ applies only to page admission; use the real tenant host for authentication.
 administrator must still be able to reach `/login` — the boundary shows the
 suspension state without removing the form. Everything else renders the
 suspension screen.
+
+**A tenant that is not active yet admits nothing — verified 2026-10-11.** Until
+its first provisioning finishes, Core's `FqdnTenantResolverGuard` answers every
+tenant route, sign-in included, with `503 TENANT_INACTIVE`. So
+`TenantHostStateBoundary` renders its screen on every path, `/login` and the
+invite and reset screens too, and never renders the app beneath it:
+
+| Host status | Screen | Re-check |
+| --- | --- | --- |
+| `PROVISIONING` | Workspace is being prepared; signing in waits until it is ready | Automatic and bounded (`useHostStatusRecheck`): every 15 s four times, every 30 s four times, then every minute twelve times — 15 minutes, past Core's 10-minute provisioning p95 target. A hidden tab holds its next check until it is shown. Then the checks stop and the screen says so; **Check again** checks at once and starts a fresh bounded run |
+| `PROVISIONING_FAILED` | Setup could not be completed; contact support, who can resume it | Manual only — **Check again** — because only an operator's retry can change it |
+
+A check is `router.refresh()`: it re-renders the route's server components, so
+`TenantHostAdmission` reads the host status again and the boundary receives the
+new one in place. Nothing navigates or redirects, so there is no loop; once the
+status is `ACTIVE` the requested page renders, and `TenantAuthGuard` takes over
+from there. A check that cannot reach Core fails admission closed like any page
+load, and the root not-found screen replaces the waiting screen. Both screens
+carry the language and theme toggles, as the fence screens do, because nothing
+else on the page can change them.
 
 ## The release allowlist
 

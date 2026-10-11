@@ -2,7 +2,23 @@ import { isIP } from "node:net";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 
-export type TenantHostStatus = "ACTIVE" | "SUSPENDED";
+/**
+ * Every status Core's public host-status route answers 200 with
+ * (`TENANT_HOST_STATUSES` in core-app
+ * `src/tenant/tenant-host/tenant-host-status.service.ts`). A tenant still
+ * being provisioned, or whose provisioning failed, reports that state rather
+ * than 404 so the portal can say so; neither admits the product. Deleting a
+ * tenant releases its hosts, so a deleted tenant answers 404 like a host that
+ * was never registered, and any other value fails admission closed.
+ */
+const TENANT_HOST_STATUSES = [
+  "ACTIVE",
+  "SUSPENDED",
+  "PROVISIONING",
+  "PROVISIONING_FAILED",
+] as const;
+
+export type TenantHostStatus = (typeof TENANT_HOST_STATUSES)[number];
 
 const HOST_STATUS_PATH = "/api/tenant/core/v1/public/tenant-host/status";
 const HOST_STATUS_TIMEOUT_MS = 2_000;
@@ -157,10 +173,14 @@ export async function fetchTenantHostStatus(
     }
 
     const status = payload.data.status;
-    return status === "ACTIVE" || status === "SUSPENDED" ? status : null;
+    return isTenantHostStatus(status) ? status : null;
   } catch {
     return null;
   }
+}
+
+function isTenantHostStatus(value: unknown): value is TenantHostStatus {
+  return TENANT_HOST_STATUSES.some((status) => status === value);
 }
 
 function hostStatusEndpoint(gatewayOrigin: string | undefined): URL | null {

@@ -565,7 +565,18 @@ export const ar = {
     suspendedBanner: "خدمات المؤسسة معلّقة مؤقتًا. لا يزال تسجيل الدخول متاحًا لمسؤول المؤسسة.",
     suspendedTitle: "خدمات المؤسسة غير متاحة مؤقتًا",
     suspendedDescription: "تم تعليق الوصول إلى صفحات المؤسسة. يمكن لمسؤول المؤسسة متابعة تسجيل الدخول للوصول إلى المسارات المسموح بها قبل المصادقة.",
-    goToLogin: "الانتقال إلى تسجيل الدخول"
+    goToLogin: "الانتقال إلى تسجيل الدخول",
+    // PROVISIONING: the tenant exists and its first setup is still running.
+    preparingTitle: "يجري تجهيز مساحة العمل",
+    preparingDescription: "لا تزال مساحة العمل هذه قيد التجهيز، ويستغرق ذلك عادةً بضع دقائق. لا يمكن لأحد تسجيل الدخول قبل أن تصبح جاهزة.",
+    preparingAutoCheck: "تتحقق هذه الصفحة تلقائيًا وتفتح مساحة العمل فور جاهزيتها.",
+    preparingAutoCheckStopped: "توقف التحقق التلقائي. اختر «تحقق مجددًا» لمعرفة ما وصل إليه التجهيز.",
+    // PROVISIONING_FAILED: the first setup stopped and needs support to resume it.
+    setupFailedTitle: "تعذّر إكمال تجهيز مساحة العمل",
+    setupFailedDescription: "حدث خطأ أثناء تجهيز مساحة العمل هذه، ولا يمكن لأحد تسجيل الدخول قبل اكتماله. تواصل مع الدعم ليُكمل التجهيز.",
+    setupFailedNextStep: "بعد أن يستأنف الدعم التجهيز، اختر «تحقق مجددًا» لمتابعة تقدّمه.",
+    checkAgain: "تحقق مجددًا",
+    checking: "جارٍ التحقق…"
   },
   auth: {
     title: "تسجيل الدخول إلى بوابة المستأجر",

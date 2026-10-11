@@ -554,7 +554,16 @@ export const en: Dictionary = {
     suspendedBanner: "Workspace services are temporarily suspended. Sign-in is still available to the workspace administrator.",
     suspendedTitle: "Workspace services are temporarily unavailable",
     suspendedDescription: "Access to workspace pages is suspended. The workspace administrator can still sign in to reach the routes permitted before authentication.",
-    goToLogin: "Go to sign-in"
+    goToLogin: "Go to sign-in",
+    preparingTitle: "Your workspace is being prepared",
+    preparingDescription: "This workspace is still being set up, which usually takes a few minutes. Nobody can sign in until it is ready.",
+    preparingAutoCheck: "This page checks again on its own and opens the workspace as soon as it is ready.",
+    preparingAutoCheckStopped: "Automatic checks have stopped. Select “Check again” to see where the setup stands.",
+    setupFailedTitle: "Workspace setup could not be completed",
+    setupFailedDescription: "Something went wrong while this workspace was being set up, and nobody can sign in until it is finished. Contact support so they can complete the setup.",
+    setupFailedNextStep: "Once support has resumed the setup, select “Check again” to follow its progress.",
+    checkAgain: "Check again",
+    checking: "Checking…"
   },
   auth: {
     title: "Sign in to the Tenant Portal",

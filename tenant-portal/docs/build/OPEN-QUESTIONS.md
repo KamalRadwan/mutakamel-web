@@ -658,9 +658,26 @@ routing `AuthContext`'s two `router.replace("/login")` calls through the same
 decision the guard makes. Both are one-line Tier-1 edits and want their own
 review.
 
-## Q19 — three of the five tenant statuses cannot be observed by the portal
+## Q19 — three of the five tenant statuses cannot be observed by the portal · resolved 2026-10-11
 
-Found 2026-08-31 building MASTER-PLAN 4.26.
+Found 2026-08-31 building MASTER-PLAN 4.26. **Closed 2026-10-11 by Core.**
+
+> **Status — closed.** `TenantHostStatusService.resolve` now admits four
+> statuses (`TENANT_HOST_STATUSES`: ACTIVE, SUSPENDED, PROVISIONING,
+> PROVISIONING_FAILED) and answers `200` with the real one, so a tenant that
+> exists but is not active yet is no longer a 404. DELETED was decided the
+> other way: deleting a tenant releases its hosts, and every host of a deleted
+> tenant answers `404 TENANT_HOST_NOT_FOUND` like one that was never
+> registered. That is deliberate, so the portal still renders it as not found.
+>
+> `TenantHostStatus` is the same four values. `TenantHostStateBoundary` renders
+> PROVISIONING as "your workspace is being prepared", re-asking admission on a
+> bounded schedule so the workspace opens in place once it is ready, and
+> PROVISIONING_FAILED as "setup could not be completed, contact support" — on
+> every path, because Core refuses sign-in with `503 TENANT_INACTIVE` until the
+> first setup finishes. See
+> [routing.md](../architecture/routing.md#host-admission--server-side-fails-closed)
+> and HANDOFF.md's 2026-10-11 amendment for the Tier-1 change.
 
 `TenantStatusEnum` has five values — PROVISIONING, PROVISIONING_FAILED, ACTIVE,
 SUSPENDED, DELETED — and the task asks the portal to render the first, second
