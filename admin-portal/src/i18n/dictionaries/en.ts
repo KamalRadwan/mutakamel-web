@@ -2496,32 +2496,70 @@ export const en: Dictionary = {
       INVALID_PROVISIONING_REASON_CODE: "Use an uppercase safe reason code.",
       TENANT_PROVISIONING_RESYNC_NOT_ALLOWED:
         "Core refused the resync: the Worker does not hold this operation's plan yet, or the operation is already settled. Refresh the operation to see which actions it allows now.",
+      TENANT_PROVISIONING_ADDON_REBIND_REQUIRED:
+        "An Add-on binding of this tenant pins a component this update would move to another release, and the Add-on works only on exactly that release. Re-bind the Add-on to the new release or remove it first, then apply the update.",
       "GW.IDEM.IN_FLIGHT":
         "The exact command is still in flight; retry keeps the same key.",
     },
     /**
      * What a step's or operation's safe error code means for the operator,
-     * shown under the code itself. A code missing here is shown on its own.
+     * shown under the code itself. An exact code is listed here; the codes
+     * Core, CRM and Trade share are in `ownerSafeCodeHints`. A code found in
+     * neither is shown on its own.
      */
     safeCodeHints: {
-      CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED:
-        "This step pins a Core release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
-      "CRM.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
-        "This step pins a CRM release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
-      "TRADE.PROVISIONING.RELEASE_UPGRADE_REQUIRED":
-        "This step pins a Trade release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
       "WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED":
         "This step pins a WebPhone or Core foundation release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.",
       CORE_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE:
         "The plan carries a backup or maintenance prerequisite that Core cannot verify, so its Core foundation steps can never run. A re-provision derives its prerequisites from the current release controls again.",
-      CORE_PROVISIONING_MAINTENANCE_FENCE_OPEN:
-        "A provisioning or relocation maintenance fence of this tenant is still open, so the step could not start. The Worker retries it after 60 seconds.",
-      CORE_PROVISIONING_FENCE_NOT_READY:
-        "Core's record of this step was still behind the command after 60 seconds. The failure is retryable and the Worker sends the step again.",
       CORE_PROVISIONING_COMMAND_INVALID:
         "Core rejected the step command as invalid (producer, routing or payload) and dead-lettered it without running anything.",
       "CRM.PROVISIONING.PROJECTION_GRANT_MISSING":
         "A CRM view that another application reads is missing its SELECT grant. A CRM repair runs the schema step again, which grants it.",
+      "WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT":
+        "The owning application never answered this step: no result arrived within 45 minutes of the dispatch, longer than any wait after which it can still answer. The Worker failed the step as retryable and stopped the operation; re-provision it once the owning application is running.",
+      "WORKER.PROVISIONING.FOUNDATION_ABANDONED":
+        "The tenant database foundation step stopped responding while the operation was being stopped, typically because the Worker restarted during database creation. After 15 minutes without a sign of life the Worker recorded it as failed so the stop could finish; re-provision to run it again.",
+      "WORKER.PROVISIONING.OPTIONAL_DEPENDENCY_FAILED":
+        "This step never ran: an optional step it depends on failed, so the Worker skipped it and it applied nothing. The operation can still succeed without it; the failed optional step shows why.",
+      "WORKER.PROVISIONING.LEASE_RECLAIM_EXHAUSTED":
+        "This step's lease ran out five times without any reported outcome, so the Worker stopped claiming it again and failed it. Find out why it never reports (an owning application or a Worker that keeps stopping), then re-provision the operation if this ended it.",
+    },
+    /**
+     * Hints for the codes every owner gives the same failure
+     * (`classifyTenantProvisioningOwnerFailure`), keyed by the part after the
+     * owner's prefix: `CORE_PROVISIONING_`, `CRM.PROVISIONING.` or
+     * `TRADE.PROVISIONING.`. Each names the owner from `provisioningOwners`.
+     */
+    ownerSafeCodeHints: {
+      RELEASE_UPGRADE_REQUIRED: (owner: string) =>
+        `This step pins a ${owner} release that is no longer current, so it cannot succeed as planned. Re-provision the operation: the retry moves its plan to the current releases.`,
+      FENCE_NOT_READY: (owner: string) =>
+        `${owner}'s record of this step, or of a step it depends on, was still behind the command 60 seconds after the Worker issued it, so ${owner} failed the step as retryable without running it. If this ended the operation, re-provision it: the new generation runs the step again.`,
+      MAINTENANCE_FENCE_OPEN: (owner: string) =>
+        `A provisioning or relocation maintenance fence of this tenant was still open. ${owner} waited 60 seconds for it to close, then failed the step as retryable without running it. Once the maintenance or relocation has finished, re-provision the operation if this ended it.`,
+      EFFECT_READINESS_CONTENDED: (owner: string) =>
+        `${owner} could not take this component's readiness record, which another step was holding, within 60 seconds, so it failed the step as retryable without running it. This clears on its own; re-provision the operation if this ended it.`,
+      EFFECT_RESERVATION_OVERLAP: (owner: string) =>
+        `Another operation still held an admission reservation on this component, so ${owner} waited 60 seconds and then failed the step as retryable without running it. Once that operation has finished, re-provision this one if this ended it.`,
+      PLACEMENT_UNAVAILABLE: (owner: string) =>
+        `The tenant's Database Server is offline, or a provisioning credential ${owner} needs for it is missing, so the step could not run. The failure is retryable: bring the server back online or restore the credential, then re-provision the operation if this ended it.`,
+      COMMAND_STALE: (owner: string) =>
+        `The step command no longer matched the operation, its plan or its authority: the operation was closed, superseded or cancelled, or the step moved on to another attempt. ${owner} cancelled it without running anything; act on the latest operation.`,
+      CONTROL_PLANE_UNAVAILABLE: (owner: string) =>
+        `${owner} could not read the control plane, so nothing was decided about this step. It waited up to 25 minutes for the outage to end, then failed the step as retryable. Once the control-plane database is reachable, re-provision the operation if this ended it.`,
+      INFRASTRUCTURE_UNAVAILABLE: (owner: string) =>
+        `${owner} could not reach Redis or the message broker. It waited up to 25 minutes for the outage to end, then failed the step as retryable. Once the outage is over, re-provision the operation if this ended it.`,
+      INTERNAL_FAILURE: (owner: string) =>
+        `${owner} hit an unexpected internal error. This is a defect, not a condition that clears on its own, so retrying repeats it: report the operation and the step to the platform team.`,
+    },
+    /** Any transient database code behind an owner prefix (`CORE_PROVISIONING_CONNECTION_REFUSED`, …). */
+    ownerDatabaseOutageHint: (owner: string) =>
+      `A database this step uses was briefly unusable (a lost or refused connection, a timeout, a lock conflict or a restart). ${owner} waited up to 25 minutes for it to recover, then failed the step as retryable. Once the database is healthy, re-provision the operation if this ended it.`,
+    provisioningOwners: {
+      CORE: "Core",
+      CRM: "CRM",
+      TRADE: "Trade",
     },
     noOperationsTitle: "No provisioning operations.",
     showingOfTotal: "Showing {shown} of {total}",
@@ -2551,7 +2589,7 @@ export const en: Dictionary = {
         ? `${step} has reported neither a transition nor a Worker heartbeat for ${duration}, three heartbeats missed. The Worker may have stopped, lost its record of the step, or let the step's lease run out.`
         : `No progress has been reported for ${duration}. The Worker may have stopped, or the work is taking longer than expected.`,
     stallDispatchLeaseExpiredNote: (duration: string, step: string | null) =>
-      `${step ?? "A step"} was handed to its owning application ${duration} ago and no result has come back. Its 5-minute dispatch lease has expired and the Worker has not sent it again.`,
+      `${step ?? "A step"} was handed to its owning application ${duration} ago and no result has come back. Its 5-minute dispatch lease has expired; the Worker does not send it again but keeps waiting for the result, and fails the step as retryable (WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT) if none arrives within 45 minutes of the dispatch.`,
     stallCancelPendingNote: (duration: string, step: string | null) =>
       step
         ? `Cancellation was requested ${duration} ago and the Worker has not confirmed that ${step} stopped.`
@@ -2612,7 +2650,7 @@ export const en: Dictionary = {
       "Core also moves every component on an earlier release that these depend on or that would not be compatible with the new releases, so this list can include components nobody selected.",
     availableUpdatesTitle: "Available updates",
     updatesNote:
-      "Selections submit the exact current and target release evidence returned by Core. Core also moves every component on an earlier release that the selection depends on or that would not be compatible with the new releases; the planned operation lists each one.",
+      "Selections submit the exact current and target release evidence returned by Core. Core also moves every component on an earlier release that the selection depends on or that would not be compatible with the new releases; the planned operation lists each one. Nothing is offered while an Add-on binding pins a component an update would move to another release: re-bind or remove that Add-on first.",
     applySelectedButton: (count: number) => `Apply selected (${count})`,
     noUpdatesTitle: "No safe updates are currently offered.",
     currentLabel: "Current",

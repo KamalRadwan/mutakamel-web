@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDashed,
+  CircleSlash,
   DatabaseZap,
   History,
   Hourglass,
@@ -57,7 +58,10 @@ import type {
   ProvisioningWorkspaceSection,
   TenantProvisioningWorkspaceModel,
 } from "../hooks/useTenantProvisioningWorkspace";
-import { provisioningCodeText } from "../model/code-text";
+import {
+  provisioningCodeText,
+  provisioningSafeCodeHint,
+} from "../model/code-text";
 import {
   formatProvisioningDuration,
   stepElapsedSeconds,
@@ -433,8 +437,8 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
               actions.retry.visible && !cancellationPending ? actions.retry.reasonCode : null;
             const cancelReason = actions.cancel.visible ? actions.cancel.reasonCode : null;
             const resyncReason = actions.resync.visible ? actions.resync.reasonCode : null;
-            const operationErrorHint = provisioningCodeText(
-              copy.safeCodeHints,
+            const operationErrorHint = provisioningSafeCodeHint(
+              copy,
               operation.safeError?.code,
             );
             const updateScope =
@@ -596,8 +600,8 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                             operation.stall?.stepKey === step.stepKey ? operation.stall : null;
                           const elapsed = stepElapsedSeconds(step, provisioning.selectedOperationReadAtMs);
                           const error = stepErrorText(step);
-                          const errorHint = provisioningCodeText(
-                            copy.safeCodeHints,
+                          const errorHint = provisioningSafeCodeHint(
+                            copy,
                             step.safeError?.code,
                           );
                           return (
@@ -1269,13 +1273,19 @@ function StepBadge({ status, ar, live }: { status: TenantOperationStepStatus; ar
   );
 }
 
+/**
+ * SKIPPED is neutral, never success: Core settles a step SKIPPED when an
+ * optional step it depends on failed (`WORKER.PROVISIONING.OPTIONAL_DEPENDENCY_FAILED`),
+ * so it never ran and applied nothing.
+ */
 function stepStatusPresentation(status: TenantOperationStepStatus): StatusPresentation {
   switch (status) {
     case "RUNNING":
       return { tone: "info", Icon: LoaderCircle, spins: true };
     case "SUCCEEDED":
-    case "SKIPPED":
       return { tone: "success", Icon: CheckCircle2, spins: false };
+    case "SKIPPED":
+      return { tone: "neutral", Icon: CircleSlash, spins: false };
     case "FAILED":
     case "CONFLICT":
       return { tone: "danger", Icon: AlertTriangle, spins: false };

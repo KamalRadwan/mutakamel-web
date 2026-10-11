@@ -30,9 +30,72 @@ import {
   componentInstallation,
   operationDetail,
   operationExits,
+  operationStep,
   operationSummary,
   seedState,
 } from "../test/fixtures";
+
+const STEP_A = "019f0000-0000-7000-8000-000000000021";
+const STEP_B = "019f0000-0000-7000-8000-000000000022";
+const STEP_C = "019f0000-0000-7000-8000-000000000023";
+const STEP_D = "019f0000-0000-7000-8000-000000000024";
+const FINISHED_AT = "2026-08-11T19:40:00.000Z";
+
+/**
+ * A generation that failed on a CRM step held by an open maintenance fence,
+ * with the CRM verification that depended on it skipped, a Trade schema step
+ * failed by a database outage, and a Core step with a code this build does
+ * not know; the operation itself stopped on an owner that never answered.
+ */
+function failedGenerationSteps(): Record<string, unknown>[] {
+  return [
+    operationStep({
+      id: STEP_A,
+      componentKey: "crm",
+      stepKey: "crm.seed.crm.settings",
+      kind: "CONFIG",
+      status: "FAILED",
+      required: false,
+      producer: "crm-app",
+      finishedAt: FINISHED_AT,
+      safeError: { code: "CRM.PROVISIONING.MAINTENANCE_FENCE_OPEN", message: null },
+    }),
+    operationStep({
+      id: STEP_B,
+      componentKey: "crm",
+      stepKey: "crm.verify",
+      kind: "VERIFICATION",
+      status: "SKIPPED",
+      producer: "crm-app",
+      attemptCount: 0,
+      dependsOnStepKeys: ["crm.seed.crm.settings"],
+      startedAt: null,
+      heartbeatAt: FINISHED_AT,
+      finishedAt: FINISHED_AT,
+      safeError: {
+        code: "WORKER.PROVISIONING.OPTIONAL_DEPENDENCY_FAILED",
+        message: "Skipped because an optional step it depends on failed.",
+      },
+    }),
+    operationStep({
+      id: STEP_C,
+      componentKey: "trade",
+      stepKey: "trade.schema",
+      status: "FAILED",
+      producer: "trade-app",
+      finishedAt: FINISHED_AT,
+      safeError: { code: "TRADE.PROVISIONING.CONNECTION_REFUSED", message: null },
+    }),
+    operationStep({
+      id: STEP_D,
+      stepKey: "core.foundation.verify",
+      kind: "VERIFICATION",
+      status: "FAILED",
+      finishedAt: FINISHED_AT,
+      safeError: { code: "CORE_PROVISIONING_SOMETHING_NEW", message: null },
+    }),
+  ];
+}
 
 describe("TenantProvisioningWorkspaceView", () => {
   it("renders real operation progress and dispatches operation-specific cancel", () => {
@@ -223,6 +286,98 @@ describe("TenantProvisioningWorkspaceView", () => {
     ).toBeInTheDocument();
   });
 
+  // A dispatched owner step is not re-sent once its lease expired; the Worker
+  // waits for its result and fails it retryably after 45 minutes.
+  it("bounds a DISPATCH_LEASE_EXPIRED stall by the owner-result deadline", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({
+          stall: {
+            stepKey: "core.foundation.schema",
+            since: "2026-08-11T19:20:00.000Z",
+            ageSeconds: 720,
+            reason: "DISPATCH_LEASE_EXPIRED",
+          },
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        /Core foundation — schema was handed to its owning application 12 min ago.*fails the step as retryable \(WORKER\.PROVISIONING\.OWNER_RESULT_TIMEOUT\) if none arrives within 45 minutes/u,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  // Core, CRM and Trade answer one failure with one suffix behind their own
+  // prefix, so one hint per suffix names whichever owner answered.
+  it("explains owner codes by the owner that answered, Worker codes, and a skipped step", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({
+          operationStatus: "FAILED_RETRYABLE",
+          safeError: { code: "WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT", message: null },
+          steps: failedGenerationSteps(),
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText(/^The owning application never answered this step: no result arrived within 45 minutes/u),
+    ).toBeInTheDocument();
+    // A passing condition waits 60 s in the owner, then answers retryable.
+    expect(
+      screen.getByText(/^A provisioning or relocation maintenance fence of this tenant was still open\. CRM waited 60 seconds for it to close, then failed the step as retryable/u),
+    ).toBeInTheDocument();
+    // An outage waits up to 25 minutes, whatever its database code.
+    expect(
+      screen.getByText(/Trade waited up to 25 minutes for it to recover, then failed the step as retryable/u),
+    ).toBeInTheDocument();
+    // A skipped step is neutral, never a success, and says why it never ran.
+    const skipped = screen.getByText("Skipped");
+    expect(skipped).toHaveClass("bg-muted");
+    expect(skipped).not.toHaveClass("bg-success-subtle");
+    expect(
+      screen.getByText(/^This step never ran: an optional step it depends on failed/u),
+    ).toBeInTheDocument();
+    // A code this build does not know is shown on its own.
+    expect(
+      screen.getByText("CORE_PROVISIONING_SOMETHING_NEW").nextElementSibling,
+    ).toBeNull();
+  });
+
+  it("explains owner codes in Arabic with the owner's Arabic name", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({
+          lang: "ar",
+          operationStatus: "FAILED_RETRYABLE",
+          steps: failedGenerationSteps(),
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText(/انتظرت إدارة العملاء إغلاقه 60 ثانية، ثم أفشلت الخطوة فشلًا قابلًا لإعادة المحاولة/u),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/انتظرت التجارة حتى 25 دقيقة تعافيها/u)).toBeInTheDocument();
+    expect(screen.getByText("تم تخطيها")).toBeInTheDocument();
+    expect(screen.getByText(/^لم تُنفَّذ هذه الخطوة: فشلت خطوة اختيارية تعتمد عليها/u)).toBeInTheDocument();
+  });
+
+  it("tells the operator to re-bind or remove an Add-on that pins a component the update would move", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({ localError: "TENANT_PROVISIONING_ADDON_REBIND_REQUIRED" })}
+      />,
+    );
+
+    expect(
+      screen.getByText(/An Add-on binding of this tenant pins a component this update would move.*Re-bind the Add-on to the new release or remove it first/u),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open updates" })).toBeNull();
+  });
+
   it("localizes command refusals and points a release-upgrade refusal at Updates", () => {
     const model = makeModel({
       localError: "TENANT_PROVISIONING_OPERATION_SUPERSEDED",
@@ -348,6 +503,10 @@ function makeModel(
     unsettledSteps?: boolean;
     stall?: Record<string, unknown> | null;
     resyncing?: boolean;
+    /** The detail's steps, as Core projects them; one running Core schema step by default. */
+    steps?: Record<string, unknown>[];
+    /** The operation's own safe error. */
+    safeError?: Record<string, unknown> | null;
   } = {},
 ): TenantProvisioningWorkspaceModel {
   const operationStatus = options.operationStatus ?? "RUNNING";
@@ -364,6 +523,8 @@ function makeModel(
       generation: selectedGeneration,
       prerequisiteCount: options.prerequisiteCount ?? 0,
       stall: options.stall ?? null,
+      ...(options.steps ? { steps: options.steps } : {}),
+      ...(options.safeError !== undefined ? { safeError: options.safeError } : {}),
       // A newer generation in these fixtures has always succeeded.
       exits: operationExits(operationStatus, {
         superseded,

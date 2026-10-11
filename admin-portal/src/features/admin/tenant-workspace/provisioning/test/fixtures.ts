@@ -58,7 +58,8 @@ export function operationSummary(
   };
 }
 
-function operationStep(
+/** One step of the operation detail, as Core projects it; a running Core schema step by default. */
+export function operationStep(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {

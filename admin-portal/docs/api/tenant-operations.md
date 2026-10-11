@@ -5,7 +5,8 @@ Status: **[Verified]**
 Last source verification: **2026-10-11** (one current release per component:
 release-upgrade and prerequisite refusals, update scope, new step codes; a
 retry re-pins a failed plan on superseded releases; Worker heartbeats and
-Resync;
+Resync; one owner-failure classification with bounded waits, Worker settlement
+codes, skipped steps, Add-on pins on updates;
 2026-10-08: stall signal, operator exits, confirmed cancel/re-provision/repair,
 polling backoff)
 
@@ -44,6 +45,26 @@ offers **Resync** beside **Re-provision** and **Request cancel**; see
 `tenant-provisioning-command.service.ts` (`resyncAdminOperation`),
 `tenant-operation-exits.ts` and Gateway route
 `core.admin.tenants.operations.resync`.
+
+Owner-failure amendment (2026-10-11, backend commit `9552e246`): Core, CRM and
+Trade classify a failed step with one rule
+(`classifyTenantProvisioningOwnerFailure`, `@mutakamel/core-app-database`
+`admission/tenant-provisioning-owner-failure.ts`), so one failure carries one
+suffix behind each owner's prefix (`CORE_PROVISIONING_`, `CRM.PROVISIONING.`,
+`TRADE.PROVISIONING.`). A passing condition (ordering lag, an open maintenance
+fence, a contended readiness record or an overlapping reservation) waits 60 s
+in the owner and then answers `FAILED_RETRYABLE`; an outage waits up to 25
+minutes and then answers `FAILED_RETRYABLE`; the operator's way on is
+**Re-provision**. The Worker bounds its own waits with
+`WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT`, `FOUNDATION_ABANDONED` and
+`LEASE_RECLAIM_EXHAUSTED`, and the descendants of a failed optional step are
+settled `SKIPPED` (`WORKER.PROVISIONING.OPTIONAL_DEPENDENCY_FAILED`). An update
+that would move a component an Add-on binding pins is refused with
+`409 TENANT_PROVISIONING_ADDON_REBIND_REQUIRED`. The portal's hints for all of
+them are under [Step and operation safe codes](#step-and-operation-safe-codes).
+Verified against LLD 29 §6, §6.5, §6.6, §6.8, §6.9 and §6.11, Worker
+`provisioning-dag.repository.ts` and Core `tenant-operation-progress.service.ts`
+(`projectSkippedDescendants`).
 
 This document covers the 16 tenant-prefixed operation/provisioning routes used
 to observe and manage a single tenant. Fleet rollout and release-publishing
@@ -293,7 +314,7 @@ of these holds (the oldest running step wins):
 | `reason` | When | `stepKey` |
 | --- | --- | --- |
 | `NO_PROGRESS` | a running step reported neither a transition nor a heartbeat for more than 3 minutes (three missed heartbeats); or no step is running and nothing changed for more than 10 minutes, plus the two-hour prerequisite window while `AWAITING_PREREQUISITES` | the step, or `null` |
-| `DISPATCH_LEASE_EXPIRED` | a running step owned by Core/CRM/Trade (`producer` not `worker`, kind not `DATABASE`) stayed silent for more than 10 minutes, twice its lease: no result and no re-dispatch | that step |
+| `DISPATCH_LEASE_EXPIRED` | a running step owned by Core/CRM/Trade (`producer` not `worker`, kind not `DATABASE`) stayed silent for more than 10 minutes, twice its lease: no result and no re-dispatch. The Worker does not re-send it but waits for the owner's result, and 45 minutes after the claim fails it retryably with `WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT`, which ends the operation `FAILED_RETRYABLE`; the notice says so | that step |
 | `CANCEL_PENDING` | `CANCEL_REQUESTED` for 10+ minutes since the request | oldest running step, else `null` |
 
 The workspace's stall badge on the operation names the step when `stepKey` is
@@ -572,7 +593,11 @@ all-current result, so nothing is offered while that result is incompatible.
 The tenant self-service list (`GET /api/tenant/core/v1/provisioning/updates`)
 offers an update only when every lagging release is self-service; every current
 release is closed to self-service, so that list is normally empty. The shape of
-both responses is unchanged.
+both responses is unchanged. Nothing is offered either while an Add-on
+execution binding of the tenant pins a lagging component to another release
+(the planner would refuse the update, below); the workspace's Updates note says
+so, since such a tenant otherwise only sees "No safe updates are currently
+offered."
 
 ### Apply selected updates
 
@@ -615,7 +640,12 @@ structural dependency that is already current keeps its release and gets only a
 `VERIFICATION` step. A plan that would run a Core foundation step under a backup
 or maintenance prerequisite is refused before it is saved:
 `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` (admin and tenant
-apply alike).
+apply alike). An update never moves a component, requested or pulled in, away
+from the release an Add-on binding of the tenant pins, because the Add-on's
+runtime access requires exactly that release:
+`409 TENANT_PROVISIONING_ADDON_REBIND_REQUIRED` until the Add-on is re-bound or
+removed (the fleet UPDATE preview reports the same code for such a tenant). The
+workspace alert words it from `tenantProvisioning.commandErrors` (en + ar).
 
 Core records the moved components as `componentKeys` and the actor's selection
 as `requestedComponentKeys` in the `OPERATION_PLANNED` event's safe metadata.
@@ -849,6 +879,7 @@ commands chain their seed steps and run each as the kind Core's
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_NOT_REQUIRED` | Hide prerequisite action |
 | `409` | `TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Add-Application, repair, decommission, an installation retarget or the add-on closure would pin a release that is not current, or a retry cannot re-pin its failed plan. Localized: update it from the Updates section of the Provisioning tab first; the workspace alert offers **Open updates** |
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Update apply (admin and tenant), retry, add-Application or repair would run a Core foundation step under a backup or maintenance prerequisite. Nothing was planned; localized |
+| `409` | `TENANT_PROVISIONING_ADDON_REBIND_REQUIRED` | Update apply would move a component an Add-on binding of the tenant pins to another release. Nothing was planned; localized: re-bind or remove the Add-on first |
 | `422` | `TENANT_PROVISIONING_UPDATE_SELECTION_INVALID` | Correct duplicate/incomplete selection |
 | `422` | `TENANT_PROVISIONING_UPDATE_INCOMPATIBLE` | Present compatibility conflict |
 | `422` | `TENANT_PROVISIONING_NO_ADMIN_MANAGED_UPDATES` | Empty state, not generic failure |
@@ -875,23 +906,55 @@ the add-on closure; that workspace words it in its own copy
 A step's or operation's `safeError.code` is free text (at most 160
 characters); the reader accepts any value and the table always shows the raw
 code with Core's safe message. For the codes below the portal adds one line of
-operator guidance (`tenantProvisioning.safeCodeHints`, en + ar); any other code
-is shown on its own.
+operator guidance, in English and Arabic, under the code
+(`provisioningSafeCodeHint` in `model/code-text.ts`); any other code is shown
+on its own.
 
-| Code | Owner | Lane | Meaning |
+**Codes every owner shares.** Core, CRM and Trade classify a failed step with
+one rule (`classifyTenantProvisioningOwnerFailure`), so the same failure has
+the same suffix behind each owner's prefix: `CORE_PROVISIONING_<suffix>`,
+`CRM.PROVISIONING.<suffix>`, `TRADE.PROVISIONING.<suffix>`. The portal keeps one
+hint per suffix (`tenantProvisioning.ownerSafeCodeHints`) and names the owner
+that answered (`provisioningOwners`: Core, CRM / إدارة العملاء, Trade /
+التجارة). Every wait is measured from the command's `occurredAt`. Owner steps
+(seed, identity, configuration and verification) are not retried within a
+generation, so a retryable answer there ends the operation `FAILED_RETRYABLE`
+and the way on is **Re-provision**; each hint says to re-provision "if this
+ended the operation".
+
+| Suffix | Outcome | Meaning |
+| --- | --- | --- |
+| `RELEASE_UPGRADE_REQUIRED` | terminal | the step or the installation it drives pins a release of that owner that is not current; the tenant moves to the current release by re-provisioning the failed operation, whose retry re-pins its plan (an update moves a tenant whose latest operation succeeded). The hint points at **Re-provision** |
+| `FENCE_NOT_READY` | retryable after a 60 s wait (retry after 15 s) | ordering lag only: the owner's record of the step, its command admission or a dependency was still behind the command 60 s after the Worker issued it |
+| `MAINTENANCE_FENCE_OPEN` | retryable after a 60 s wait (retry after 60 s) | a provisioning or relocation maintenance fence of the tenant was still open. It used to end the generation at once |
+| `EFFECT_READINESS_CONTENDED` | retryable after a 60 s wait (retry after 15 s) | the component's readiness record was held by another step past the wait |
+| `EFFECT_RESERVATION_OVERLAP` | retryable after a 60 s wait (retry after 15 s) | another operation still held an admission reservation on the component |
+| `PLACEMENT_UNAVAILABLE` | retryable (retry after 30 s) | the tenant's Database Server is `OFFLINE` or a provisioning credential is missing; bring it back, then re-provision |
+| `COMMAND_STALE` | cancelled | the command no longer matches the operation, plan or authority (closed, superseded or cancelled operation, or a step moved to another attempt); nothing ran. CRM used to answer `CONFLICT` `COMMAND_CONFLICT` and Trade `FAILED_TERMINAL` `NOT_AUTHORIZED` |
+| `CONTROL_PLANE_UNAVAILABLE` | retryable after up to 25 min (retry after 30 s) | the control plane could not be read; nothing was decided |
+| `INFRASTRUCTURE_UNAVAILABLE` | retryable after up to 25 min (retry after 30 s) | Redis or the message broker was unreachable |
+| a transient database code (`CONNECTION_REFUSED`, `CONNECTION_TIMEOUT`, `SERIALIZATION_FAILURE`, `DEADLOCK_DETECTED`, `STATEMENT_TIMEOUT`, `LOCK_NOT_AVAILABLE`, `TOO_MANY_CONNECTIONS`, … - `DATABASE_FAILURE_CODES` of kind `transient`) | retryable after up to 25 min (retry after 30 s) | a database the step uses was briefly unusable; one shared hint (`ownerDatabaseOutageHint`) |
+| `INTERNAL_FAILURE` | terminal | an unexpected error, a defect that retrying repeats; report the operation and step |
+
+Other database codes behind an owner prefix (`DATABASE_MISSING`, `DUPLICATE_ENTRY`,
+`UNDEFINED_TABLE`, `EFFECT_OWNER_UNAVAILABLE`, …) are shown without a hint.
+
+**Exact codes.**
+
+| Code | Owner | Outcome | Meaning |
 | --- | --- | --- | --- |
-| `CORE_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Core | terminal | the step or the installation it drives pins a Core release that is not current; the tenant moves to the current release by re-provisioning the failed operation, whose retry re-pins its plan (an update moves a tenant whose latest operation succeeded). The hint points at **Re-provision** |
-| `CRM.PROVISIONING.RELEASE_UPGRADE_REQUIRED` | CRM | terminal | same, for a CRM release |
-| `TRADE.PROVISIONING.RELEASE_UPGRADE_REQUIRED` | Trade | terminal | same, for a Trade release |
-| `WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED` | Worker | terminal | the WebPhone step pins a WebPhone or Core foundation release that is not current; same recovery |
+| `WORKER.PROVISIONING.WEBPHONE_RELEASE_UPGRADE_REQUIRED` | Worker | terminal | the WebPhone step pins a WebPhone or Core foundation release that is not current; same recovery as `RELEASE_UPGRADE_REQUIRED` |
 | `CORE_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Core | terminal | the plan carries a backup or maintenance prerequisite Core cannot verify (safeguard behind the planning-time 409); a re-provision re-derives prerequisites from the current controls |
-| `CORE_PROVISIONING_MAINTENANCE_FENCE_OPEN` | Core | retryable, 60 s | a provisioning or relocation maintenance fence of the tenant is still open |
-| `CORE_PROVISIONING_FENCE_NOT_READY` | Core | retryable | Core's step projection was still behind the command 60 s after it was issued (genuine ordering lag only) |
 | `CORE_PROVISIONING_COMMAND_INVALID` | Core | dead-lettered | the step command failed its own contract (producer, routing or payload) and was dead-lettered on first delivery. Core sends no result - the code travels as the dead letter's `x-dlq-code` - so the step usually surfaces as stalled (`DISPATCH_LEASE_EXPIRED`); the hint applies wherever the code is reported |
 | `CRM.PROVISIONING.PROJECTION_GRANT_MISSING` | CRM | terminal | a CRM view another application reads lacks its `SELECT` grant; a CRM repair re-runs the schema step, which grants it |
+| `WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT` | Worker | retryable | an admitted Core, CRM or Trade owner step got no result within 45 minutes of its claim, longer than any wait after which an owner can still answer; the Worker fails it through the operation's stop, which ends the operation `FAILED_RETRYABLE` |
+| `WORKER.PROVISIONING.FOUNDATION_ABANDONED` | Worker | failed | a local database foundation step was running when the operation's stop became pending and its run died (a Worker restart during `database.create`); 15 minutes after its lease expired, with no live tenant claim left, the stop records it failed so it can settle |
+| `WORKER.PROVISIONING.OPTIONAL_DEPENDENCY_FAILED` | Worker | skipped | the step never ran because an optional step it depends on failed; Core settles it `SKIPPED` (`finishedAt` set, no `startedAt`) and the operation can still succeed |
+| `WORKER.PROVISIONING.LEASE_RECLAIM_EXHAUSTED` | Worker | failed | the step's lease expired five times without a reported outcome (`safeMetadata.reclaimLimit`); the Worker failed it instead of reclaiming it again |
 
-`CORE_PROVISIONING_CANCELLATION_PENDING` now means a real cancellation only.
-Restore and relocation readiness codes
+A real cancellation (`CANCELLATION_PENDING`) is acknowledged without a result:
+the Worker's own stop settles the step, so no `*_CANCELLATION_PENDING` code
+reaches a step. Restore and relocation readiness codes
 (`CORE.TENANT_DATABASE_RESTORE.READINESS_*`) are not provisioning step codes;
 see [Tenant Placement Moves](tenant-placement-moves.md#other-error-codes).
 
@@ -909,6 +972,10 @@ Operation detail, as rendered:
 - `RUNNING` (operation and step) is the informational tone with a spinner,
   distinct from the neutral `PENDING`/queued states; a stalled operation or
   step keeps its status but drops the spinner.
+- A `SKIPPED` step is neutral with its own icon, never the success tone: it
+  never ran, because an optional step it depends on failed. It shows its finish
+  time, no start or elapsed time, and the
+  `WORKER.PROVISIONING.OPTIONAL_DEPENDENCY_FAILED` code with its hint.
 - Each step shows its start, finish, elapsed time (start to finish, or to the
   last read while running; `startedAt` is the first start, so a re-dispatched
   step keeps counting) and its safe error, if any.
@@ -970,6 +1037,10 @@ Paths are relative to `C:\mutakamel.ai\frontend`:
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-prerequisite.service.ts`
 - `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-provisioning-read-models.service.ts`
 - `../backend/mutakamel-apps/core-app/packages/database/src/enums/tenant-provisioning.enum.ts`
+- `../backend/mutakamel-apps/core-app/packages/database/src/admission/tenant-provisioning-owner-failure.ts`
+- `../backend/mutakamel-apps/core-app/src/admin/tenants/provisioning/tenant-operation-progress.service.ts`
+- `../backend/mutakamel-apps/worker-app/packages/database/src/provisioning-dag.repository.ts`
+- `../backend/mutakamel-apps/shared-libs/packages/database/src/constants/database-failure-codes.constant.ts`
 - `../backend/mutakamel-apps/shared-libs/packages/common/src/interceptors/response-envelope.interceptor.ts`
 
 ## Cancellation and re-provision recovery
