@@ -73,7 +73,7 @@ describe("TenantsDirectoryPage", () => {
     expect(document.body.textContent).not.toContain("srv-de-02");
   });
 
-  it("gates create and lifecycle controls and reprovisions only a failed row", () => {
+  it("gates create and lifecycle controls and offers a provisioning retry only on a failed row", () => {
     const failed = tenantRecord("PROVISIONING_FAILED", "failed");
     const active = tenantRecord("ACTIVE", "active");
     const suspended = tenantRecord("SUSPENDED", "suspended");
@@ -97,6 +97,9 @@ describe("TenantsDirectoryPage", () => {
     ).not.toBeInTheDocument();
     openMenu("Tenant actions: Acme active");
     expect(screen.getByRole("menuitem", { name: "Suspend" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: "Retry provisioning" }),
+    ).not.toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
 
     openMenu("Tenant actions: Acme suspended");
@@ -107,10 +110,75 @@ describe("TenantsDirectoryPage", () => {
     expect(screen.queryByRole("menuitem", { name: "Soft delete" })).not.toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
 
+    // The row item only asks: the retry is sent from its confirmation.
     openMenu("Tenant actions: Acme failed");
     fireEvent.click(screen.getByRole("menuitem", { name: "Retry provisioning" }));
-    expect(controller.handleReprovision).toHaveBeenCalledWith(failed);
-    expect(controller.handleReprovision).toHaveBeenCalledTimes(1);
+    expect(controller.openReprovisionModal).toHaveBeenCalledWith(failed);
+    expect(controller.openReprovisionModal).toHaveBeenCalledTimes(1);
+    expect(controller.confirmModalAction).not.toHaveBeenCalled();
+  });
+
+  it("confirms a provisioning retry with the workspace's re-provision dialog before sending it", () => {
+    const failed = tenantRecord("PROVISIONING_FAILED", "failed");
+    const controller = baseController({
+      tenants: [failed],
+      activeModalTenant: failed,
+      modalActionType: "reprovision",
+    });
+    hookMock.mockReturnValue(controller as never);
+    const { unmount } = render(<TenantsDirectoryPage />);
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Retry provisioning for Acme failed (acme-failed)?",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/runs again only the steps that did not complete/),
+    ).toBeInTheDocument();
+    // Like the workspace's re-provision, and unlike suspend or delete, it
+    // asks for no typed tenant name.
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry provisioning" }));
+    expect(controller.confirmModalAction).toHaveBeenCalledTimes(1);
+    unmount();
+
+    i18nMock.lang = "ar";
+    i18nMock.t = arabicDictionary();
+    hookMock.mockReturnValue(
+      baseController({
+        t: arabicDictionary(),
+        tenants: [failed],
+        activeModalTenant: failed,
+        modalActionType: "reprovision",
+      }) as never,
+    );
+    render(<TenantsDirectoryPage />);
+    expect(
+      screen.getByRole("heading", {
+        name: "إعادة محاولة تجهيز Acme failed (acme-failed)؟",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "إعادة محاولة التجهيز" }),
+    ).toBeEnabled();
+  });
+
+  it("keeps the retry dialog open and undismissable while the retry is in flight", () => {
+    const failed = tenantRecord("PROVISIONING_FAILED", "failed");
+    const controller = baseController({
+      tenants: [failed],
+      activeModalTenant: failed,
+      modalActionType: "reprovision",
+      pendingAction: { action: "reprovision", tenantId: failed.id },
+    });
+    hookMock.mockReturnValue(controller as never);
+    render(<TenantsDirectoryPage />);
+
+    expect(screen.getByRole("button", { name: "Executing..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(controller.closeModal).not.toHaveBeenCalled();
   });
 
   it("shows trustworthy errors and drives server pagination without guessing", () => {
@@ -265,7 +333,7 @@ function baseController(overrides: Record<string, unknown> = {}) {
     openActivateModal: vi.fn(),
     openSuspendModal: vi.fn(),
     openDeleteModal: vi.fn(),
-    handleReprovision: vi.fn().mockResolvedValue(undefined),
+    openReprovisionModal: vi.fn(),
     refresh: vi.fn().mockResolvedValue(undefined),
     isLoading: false,
     loadError: null,

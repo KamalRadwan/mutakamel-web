@@ -317,7 +317,7 @@ describe("useTenants", () => {
     expect(result.current.permissions.canSoftDelete).toBe(true);
   });
 
-  it("uses canonical reprovision and reuses the same key after an ambiguous 503", async () => {
+  it("confirms canonical reprovision first and reuses the same key after an ambiguous 503", async () => {
     apiMock.get.mockResolvedValue({
       data: directoryEnvelope({
         items: [tenantPayload("PROVISIONING_FAILED")],
@@ -332,12 +332,26 @@ describe("useTenants", () => {
     );
     const failedTenant = result.current.tenants[0];
 
-    await act(async () => await result.current.handleReprovision(failedTenant));
+    // Choosing the row item only opens the confirmation.
+    act(() => result.current.openReprovisionModal(failedTenant));
+    expect(result.current.activeModalTenant).toEqual(failedTenant);
+    expect(result.current.modalActionType).toBe("reprovision");
+    expect(apiMock.post).not.toHaveBeenCalled();
+
+    await act(async () => await result.current.confirmModalAction());
     expect(result.current.actionError).toMatchObject({
       httpStatus: 503,
       errorCode: "TENANT_DATABASE_NOT_READY",
     });
-    await act(async () => await result.current.handleReprovision(failedTenant));
+    // Sent once, as in the provisioning workspace: the dialog closes and the
+    // refusal belongs to the directory banner.
+    expect(result.current.activeModalTenant).toBeNull();
+    expect(result.current.modalActionType).toBeNull();
+
+    act(() => result.current.openReprovisionModal(failedTenant));
+    await act(async () => await result.current.confirmModalAction());
+    expect(result.current.actionError).toBeNull();
+    expect(result.current.activeModalTenant).toBeNull();
 
     expect(apiMock.post).toHaveBeenCalledTimes(2);
     expect(apiMock.post.mock.calls.map((call) => call[0])).toEqual([
@@ -380,18 +394,35 @@ describe("useTenants", () => {
       canReprovision: false,
       canSoftDelete: false,
     });
-    await act(
-      async () =>
-        await result.current.handleReprovision(result.current.tenants[0]),
-    );
-    act(() => result.current.openDeleteModal(result.current.tenants[0]));
-
-    expect(apiMock.post).not.toHaveBeenCalled();
-    expect(apiMock.delete).not.toHaveBeenCalled();
+    act(() => result.current.openReprovisionModal(result.current.tenants[0]));
+    expect(result.current.activeModalTenant).toBeNull();
     expect(result.current.actionError).toMatchObject({
       httpStatus: 403,
       errorCode: "TENANT_ACTION_FORBIDDEN",
     });
+    act(() => result.current.openDeleteModal(result.current.tenants[0]));
+
+    expect(apiMock.post).not.toHaveBeenCalled();
+    expect(apiMock.delete).not.toHaveBeenCalled();
+    expect(result.current.activeModalTenant).toBeNull();
+    expect(result.current.actionError).toMatchObject({
+      httpStatus: 403,
+      errorCode: "TENANT_ACTION_FORBIDDEN",
+    });
+  });
+
+  it("offers a provisioning retry only for a failed initial provisioning", async () => {
+    const { result } = renderHook(() => useTenants());
+    await waitFor(() => expect(result.current.tenants[0]?.status).toBe("ACTIVE"));
+
+    act(() => result.current.openReprovisionModal(result.current.tenants[0]));
+
+    expect(result.current.activeModalTenant).toBeNull();
+    expect(result.current.actionError).toMatchObject({
+      httpStatus: 409,
+      errorCode: "TENANT_REPROVISION_UNAVAILABLE",
+    });
+    expect(apiMock.post).not.toHaveBeenCalled();
   });
 });
 

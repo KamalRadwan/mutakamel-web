@@ -11,6 +11,8 @@ Create-recovery amendment (2026-09-11): a status check that finds no tenant once
 
 Tenant-destruction amendment (2026-10-08): a destruction request now ends in `SUCCEEDED`, `BLOCKED` or `ABANDONED`. The status read returns the live request or, when none is live, the latest abandoned one, with attempts, the next attempt, block evidence and the provisioning operation it waits on; `POST /tenants/:id/destroy/:operationId/abandon` gives up a request Core has not yet authorized to drop. Verified against Core `tenant-destroy.service.ts`, `tenant-destroy-response.dto.ts`, `tenant-destroy-params.dto.ts`, `tenants.controller.ts`, the `tenant_destroy_operations` table checks in `@mutakamel/core-app-database`, Worker's `tenant-destroy.runner.ts`, and Gateway route `core.admin.tenants.destroy-abandon`. See [Permanent destroy](#permanent-destroy).
 
+Directory retry confirmation amendment (2026-10-11): the `/tenants` row action **Retry provisioning** no longer posts `POST /tenants/:id/reprovision` on selection. It opens the same re-provision confirmation the provisioning workspace uses and sends only from that dialog, keeping the ambiguous-outcome key rules; see [Retry and cancel provisioning](#retry-and-cancel-provisioning). Verified against Core `tenants.controller.ts` (`reprovision`: `admin.tenants.reprovision` + `admin.tenants.critical`, `202`, idempotency key required) and `tenant-provisioning-command.service.ts` (`retryLatestAdminOperation`).
+
 Current-release amendment (2026-10-11): `DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH` is gone from the create-options `readinessReasons` enum (Core commit `de03f1d2`: a permission manifest's `componentRelease` is provenance only and is no longer compared with the catalogue); the strict reader now rejects it. `POST /tenants/:id/reprovision` follows the current-release retry rules and can answer `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` or `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` (Core commit `d5af4407`); since Core commit `77447fb9` a retry re-pins a failed plan that pins a superseded release, so the release-upgrade 409 remains only where re-pinning is impossible; see [Retry and cancel provisioning](#retry-and-cancel-provisioning).
 
 This is the implementation contract for `/tenants`, `/tenants/new`, and the
@@ -1081,6 +1083,21 @@ alert shows both in the portal's language (the provisioning workspace's
 `tenantProvisioning.commandErrors` wording) with the code beneath, and so does
 the `/tenants` directory banner after its **Retry provisioning** row action;
 full rules are in [Retry and cancel](tenant-operations.md#retry-and-cancel).
+
+The directory's **Retry provisioning** row action (offered only for a
+`PROVISIONING_FAILED` row, with `admin.tenants.reprovision` +
+`admin.tenants.critical`) sends nothing on its own. It opens the provisioning
+workspace's re-provision confirmation (`ConfirmActionModal`, warning variant,
+no typed name): the title names the tenant, and the description says Core
+plans a new generation of the latest failed or cancelled operation that
+re-runs only the unfinished steps on the current releases, keeps the failed
+generation as history and returns the tenant to provisioning. **Retry
+provisioning** in the dialog sends `POST /tenants/:id/reprovision` once; the
+dialog cannot be dismissed while it is in flight and closes whatever the
+outcome, so a refusal lands in the directory banner. An ambiguous outcome
+(`5xx`, `401`, `429`, `GW.IDEM.IN_FLIGHT`) keeps the UUIDv7 key, and
+confirming the retry again from the row repeats that exact request; cancelling
+the dialog abandons the intent and its key.
 
 Cancel applies only to the latest operation in `REQUESTED`, `PLANNING`,
 `QUEUED`, `RUNNING`, or `WAITING_RETRY`; it changes the operation to

@@ -70,7 +70,7 @@ export default function TenantsDirectoryPage() {
     openActivateModal,
     openSuspendModal,
     openDeleteModal,
-    handleReprovision,
+    openReprovisionModal,
     refresh,
     isLoading,
     loadError,
@@ -177,7 +177,7 @@ export default function TenantsDirectoryPage() {
           onActivate={openActivateModal}
           onSuspend={openSuspendModal}
           onDelete={openDeleteModal}
-          onReprovision={handleReprovision}
+          onReprovision={openReprovisionModal}
         />
       ),
     },
@@ -391,7 +391,7 @@ function TenantRowActions({
   onActivate: (tenant: TenantRecord) => void;
   onSuspend: (tenant: TenantRecord) => void;
   onDelete: (tenant: TenantRecord) => void;
-  onReprovision: (tenant: TenantRecord) => Promise<void>;
+  onReprovision: (tenant: TenantRecord) => void;
 }) {
   const busy = pendingAction !== null;
   const thisRowBusy = pendingAction?.tenantId === tenant.id;
@@ -422,7 +422,7 @@ function TenantRowActions({
             </DropdownMenuItem>
           ) : null}
           {canReprovision && tenant.status === "PROVISIONING_FAILED" ? (
-            <DropdownMenuItem disabled={busy} onSelect={() => void onReprovision(tenant)}>
+            <DropdownMenuItem disabled={busy} onSelect={() => onReprovision(tenant)}>
               <RotateCcw className="size-3.5" aria-hidden="true" />
               {copy.reprovision}
             </DropdownMenuItem>
@@ -456,6 +456,29 @@ function TenantActionModal({
 }) {
   const copyEn = directoryCopy("en");
   const copyAr = directoryCopy("ar");
+  if (action === "reprovision") {
+    // The provisioning workspace's re-provision confirmation
+    // (TenantProvisioningWorkspaceView): it names the tenant, states what Core
+    // will do, and cannot be dismissed while the command is in flight. It
+    // holds no error: the hook closes it either way and a refusal is shown in
+    // the directory banner.
+    const label = `${tenant.companyName} (${tenant.name})`;
+    return (
+      <ConfirmActionModal
+        isOpen
+        onClose={onClose}
+        onConfirm={onConfirm}
+        titleEn={copyEn.modalReprovisionTitle(label)}
+        titleAr={copyAr.modalReprovisionTitle(label)}
+        descriptionEn={copyEn.modalReprovisionDescription}
+        descriptionAr={copyAr.modalReprovisionDescription}
+        confirmTextEn={copyEn.reprovision}
+        confirmTextAr={copyAr.reprovision}
+        variant="warning"
+        isLoading={isSubmitting}
+      />
+    );
+  }
   const titleEn =
     action === "activate" ? copyEn.modalActivateTitle : action === "suspend" ? copyEn.modalSuspendTitle : copyEn.modalDeleteTitle;
   const titleAr =
@@ -550,6 +573,9 @@ function directoryCopy(lang: "ar" | "en") {
         modalActivateDescription: "سيصبح المستأجر نشطاً وسيُسمح لمستخدميه بالوصول مجدداً:",
         modalSuspendDescription: "سيُعلّق وصول مستخدمي المستأجر حتى تتم إعادة تفعيله:",
         modalDeleteDescription: "سيُنقل المستأجر إلى حالة الحذف المؤقت وفق قيود الفوترة والعمليات:",
+        modalReprovisionTitle: (tenant: string) => `إعادة محاولة تجهيز ${tenant}؟`,
+        modalReprovisionDescription:
+          "تخطط Core لجيل جديد من آخر عملية تجهيز فاشلة أو ملغاة لهذا المستأجر، يعيد تشغيل الخطوات غير المكتملة فقط على الإصدارات الحالية. يبقى الجيل الفاشل وخطه الزمني ضمن السجل، ويعود المستأجر إلى حالة التجهيز أثناء التنفيذ.",
       }
     : {
         statusFilter: "Filter by status",
@@ -575,5 +601,8 @@ function directoryCopy(lang: "ar" | "en") {
         modalActivateDescription: "The tenant becomes active and its users can access it again:",
         modalSuspendDescription: "Tenant-user access remains suspended until the tenant is activated again:",
         modalDeleteDescription: "The tenant is soft-deleted subject to billing and operation safeguards:",
+        modalReprovisionTitle: (tenant: string) => `Retry provisioning for ${tenant}?`,
+        modalReprovisionDescription:
+          "Core plans a new generation of this tenant's latest failed or cancelled provisioning operation, which runs again only the steps that did not complete, on the current releases. The failed generation and its timeline stay as history, and the tenant returns to provisioning while it runs.",
       };
 }

@@ -2,7 +2,9 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-12**
+Last source verification: **2026-08-12**; the provisioning report was
+re-verified on **2026-10-11** (see
+[`stuck` is not the stall rule](#provisioning-report-stuck-is-not-the-stall-rule)).
 
 Owner: **Core**
 
@@ -47,8 +49,49 @@ loading/empty/forbidden/unavailable states, bilingual copy, and focused tests.
 The Dashboard remains a separate grouped overview. Authenticated runtime and
 deployment verification remain separate gates.
 
+## Provisioning report: `stuck` is not the stall rule
+
+Source verified **2026-10-11** against Core
+`src/admin/admin-reports/admin-reports.service.ts` (`provisioning()`),
+`admin-reports.controller.ts` and
+`src/admin/admin-dashboard/providers/dashboard-provisioning.provider.ts`.
+
+The **Provisioning** tab reads `GET /api/admin/core/v1/reports/provisioning`
+through `readProvisioningReport`: the **Stuck tenants** tile is `data.stuck`
+and the table is `data.items` (`id`, `name`, `status`, `createdAt`). Core
+computes `stuck` as the number of tenants whose lifecycle status is
+`PROVISIONING`, within the optional `createdAt` window, and returns those
+tenants oldest first. It never evaluates `operationStall`, so a tenant whose
+provisioning is progressing normally counts as stuck, and a stalled update,
+repair or retry on an `ACTIVE` tenant is not counted at all.
+
+Only the dashboard applies the stall rule:
+`provisioning.snapshot.stalledOperations` counts the open operations whose
+`operationStall` is set ([dashboard](dashboard.md#provisioning-group-stalled-operations)).
+Core's `uq_tenant_operations_open` index allows one open operation per tenant,
+so that count is also the number of tenants with a stalled operation. The
+report rows carry no operation, step or progress timestamps, so the portal
+cannot derive the signal from them. It does not borrow the dashboard figure
+either: that group needs `admin.reports.provisioning` on top of
+`admin.reports.read`, names no tenant, and would contradict the rows beside it.
+
+The tile therefore renders Core's `stuck` as returned. Closing the gap needs
+Core to:
+
+1. compute `stuck` with `operationStall` at `asOf`: the tenants whose open
+   operation of any type is stalled, whatever their lifecycle status;
+2. return those tenants as `items`, each with its open operation (`id`, `type`,
+   `status`, `currentPhase`, `generation`) and the operation detail's `stall`
+   object (`stepKey`, `since`, `ageSeconds`, `reason`: `NO_PROGRESS`,
+   `DISPATCH_LEASE_EXPIRED` or `CANCEL_PENDING`);
+3. say whether the `createdAt` window still applies to a current-state signal.
+
+The portal then only has to read and show the new row fields; the tile's label
+already describes a stall-based `stuck`.
+
 ## Source map
 
-- `../backend/mutakamel-apps/core-app/src/admin/reports/`
-- `../backend/mutakamel-apps/core-app/src/admin/reports/dto/`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-reports/`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-reports/dto/`
+- `../backend/mutakamel-apps/core-app/src/admin/admin-dashboard/providers/dashboard-provisioning.provider.ts`
 - `../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts`

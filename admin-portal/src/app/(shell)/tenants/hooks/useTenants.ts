@@ -24,8 +24,12 @@ import {
 import { databaseServersApi } from "@/features/admin/database-servers/api/database-servers.api";
 
 export type TenantStatusFilter = TenantStatus | "ALL";
-export type TenantDirectoryModalAction = "activate" | "suspend" | "delete";
-export type TenantDirectoryAction = TenantDirectoryModalAction | "reprovision";
+/** Every directory row command; each one is confirmed in a dialog first. */
+export type TenantDirectoryModalAction =
+  | "activate"
+  | "suspend"
+  | "delete"
+  | "reprovision";
 
 export interface TenantRecord {
   id: string;
@@ -153,7 +157,7 @@ export function useTenants() {
     null,
   );
   const [pendingAction, setPendingAction] = useState<{
-    action: TenantDirectoryAction;
+    action: TenantDirectoryModalAction;
     tenantId: string;
   } | null>(null);
   const [activeModalTenant, setActiveModalTenant] =
@@ -406,32 +410,16 @@ export function useTenants() {
 
   const openModal = useCallback(
     (tenant: TenantRecord, action: TenantDirectoryModalAction) => {
-      const permitted =
-        action === "delete"
-          ? permissions.canSoftDelete
-          : permissions.canSuspendOrActivate;
-      const validState =
-        action === "delete"
-          ? tenant.status !== "DELETED"
-          : (action === "activate" && tenant.status === "SUSPENDED") ||
-            (action === "suspend" && tenant.status === "ACTIVE");
-      if (!permitted || !validState) {
-        setActionError(
-          localError(
-            permitted ? 409 : 403,
-            permitted ? "TENANT_ACTION_UNAVAILABLE" : "TENANT_ACTION_FORBIDDEN",
-            permitted
-              ? "This tenant action is unavailable for the current lifecycle state."
-              : "You do not have permission for this tenant action.",
-          ),
-        );
+      const refusal = directoryCommandRefusal(action, tenant, permissions);
+      if (refusal) {
+        setActionError(refusal);
         return;
       }
       setActionError(null);
       setActiveModalTenant(tenant);
       setModalActionType(action);
     },
-    [permissions.canSoftDelete, permissions.canSuspendOrActivate],
+    [permissions],
   );
 
   const closeModal = useCallback(() => {
@@ -449,7 +437,7 @@ export function useTenants() {
   const runAction = useCallback(
     async (
       tenant: TenantRecord,
-      action: TenantDirectoryAction,
+      action: TenantDirectoryModalAction,
       transport: (key: string) => Promise<void>,
     ) => {
       if (actionInFlight.current) {
@@ -494,80 +482,24 @@ export function useTenants() {
     const action = modalActionType;
     if (!tenant || !action) return;
 
-    const permitted =
-      action === "delete"
-        ? permissions.canSoftDelete
-        : permissions.canSuspendOrActivate;
-    const validState =
-      action === "delete"
-        ? tenant.status !== "DELETED"
-        : action === "activate"
-          ? tenant.status === "SUSPENDED"
-          : tenant.status === "ACTIVE";
-    if (!permitted || !validState) {
-      setActionError(
-        localError(
-          permitted ? 409 : 403,
-          permitted ? "TENANT_ACTION_UNAVAILABLE" : "TENANT_ACTION_FORBIDDEN",
-          permitted
-            ? "This tenant action is unavailable for the current lifecycle state."
-            : "You do not have permission for this tenant action.",
-        ),
+    const refusal = directoryCommandRefusal(action, tenant, permissions);
+    if (refusal) {
+      setActionError(refusal);
+    } else {
+      await runAction(tenant, action, (key) =>
+        sendDirectoryCommand(action, tenant.id, key),
       );
-      return;
     }
-
-    await runAction(tenant, action, async (key) => {
-      const base = `/api/admin/core/v1/tenants/${encodeURIComponent(tenant.id)}`;
-      if (action === "delete") {
-        await axiosClient.delete(base, idempotentWrite(key));
-        return;
-      }
-      const response = await axiosClient.post<unknown>(
-        `${base}/${action}`,
-        undefined,
-        idempotentWrite(key),
-      );
-      readTenantView(readSuccessData(response.data));
-    });
-  }, [
-    activeModalTenant,
-    modalActionType,
-    permissions.canSoftDelete,
-    permissions.canSuspendOrActivate,
-    runAction,
-  ]);
-
-  const handleReprovision = useCallback(
-    async (tenant: TenantRecord) => {
-      if (
-        !permissions.canReprovision ||
-        tenant.status !== "PROVISIONING_FAILED"
-      ) {
-        setActionError(
-          localError(
-            permissions.canReprovision ? 409 : 403,
-            permissions.canReprovision
-              ? "TENANT_REPROVISION_UNAVAILABLE"
-              : "TENANT_ACTION_FORBIDDEN",
-            permissions.canReprovision
-              ? "Provisioning can be retried only after provisioning failed."
-              : "You do not have permission to retry tenant provisioning.",
-          ),
-        );
-        return;
-      }
-      await runAction(tenant, "reprovision", async (key) => {
-        const response = await axiosClient.post<unknown>(
-          `/api/admin/core/v1/tenants/${encodeURIComponent(tenant.id)}/reprovision`,
-          undefined,
-          idempotentWrite(key),
-        );
-        readTenantProvisioningCommandResult(readSuccessData(response.data));
-      });
-    },
-    [permissions.canReprovision, runAction],
-  );
+    // A provisioning retry is confirmed once, as in the provisioning
+    // workspace: its dialog closes whatever the outcome, and a refusal is
+    // shown in the directory banner in that workspace's wording. An uncertain
+    // outcome keeps its idempotency key, so confirming the retry again from
+    // the row is the exact retry.
+    if (action === "reprovision") {
+      setActiveModalTenant(null);
+      setModalActionType(null);
+    }
+  }, [activeModalTenant, modalActionType, permissions, runAction]);
 
   return {
     t,
@@ -597,7 +529,8 @@ export function useTenants() {
     openActivateModal: (tenant: TenantRecord) => openModal(tenant, "activate"),
     openSuspendModal: (tenant: TenantRecord) => openModal(tenant, "suspend"),
     openDeleteModal: (tenant: TenantRecord) => openModal(tenant, "delete"),
-    handleReprovision,
+    openReprovisionModal: (tenant: TenantRecord) =>
+      openModal(tenant, "reprovision"),
     refresh: fetchTenants,
     isLoading: isLoading || isAuthLoading,
     loadError,
@@ -690,11 +623,112 @@ function readSuccessData(value: unknown): unknown {
   return root.data;
 }
 
+interface DirectoryCommandPermissions {
+  canSuspendOrActivate: boolean;
+  canReprovision: boolean;
+  canSoftDelete: boolean;
+}
+
+/**
+ * Who may run each row command — Core's permission pair for its route, each
+ * with `admin.tenants.critical` — and the lifecycle state the directory offers
+ * it from. A retry is offered here only after a failed initial provisioning;
+ * retrying any other operation is the provisioning workspace's.
+ */
+const DIRECTORY_COMMANDS: Record<
+  TenantDirectoryModalAction,
+  {
+    permission: keyof DirectoryCommandPermissions;
+    acceptsStatus: (status: TenantStatus) => boolean;
+  }
+> = {
+  activate: {
+    permission: "canSuspendOrActivate",
+    acceptsStatus: (status) => status === "SUSPENDED",
+  },
+  suspend: {
+    permission: "canSuspendOrActivate",
+    acceptsStatus: (status) => status === "ACTIVE",
+  },
+  delete: {
+    permission: "canSoftDelete",
+    acceptsStatus: (status) => status !== "DELETED",
+  },
+  reprovision: {
+    permission: "canReprovision",
+    acceptsStatus: (status) => status === "PROVISIONING_FAILED",
+  },
+};
+
+/**
+ * The local refusal for a row command the actor may not run on this row, or
+ * null. Checked when its confirmation opens and again when it is confirmed,
+ * so nothing is sent for a row or a permission set that changed meanwhile.
+ */
+function directoryCommandRefusal(
+  action: TenantDirectoryModalAction,
+  tenant: TenantRecord,
+  permissions: DirectoryCommandPermissions,
+): NormalizedApiError | null {
+  const command = DIRECTORY_COMMANDS[action];
+  const permitted = permissions[command.permission];
+  if (permitted && command.acceptsStatus(tenant.status)) return null;
+  if (action === "reprovision") {
+    return permitted
+      ? localError(
+          409,
+          "TENANT_REPROVISION_UNAVAILABLE",
+          "Provisioning can be retried only after provisioning failed.",
+        )
+      : localError(
+          403,
+          "TENANT_ACTION_FORBIDDEN",
+          "You do not have permission to retry tenant provisioning.",
+        );
+  }
+  return permitted
+    ? localError(
+        409,
+        "TENANT_ACTION_UNAVAILABLE",
+        "This tenant action is unavailable for the current lifecycle state.",
+      )
+    : localError(
+        403,
+        "TENANT_ACTION_FORBIDDEN",
+        "You do not have permission for this tenant action.",
+      );
+}
+
+/**
+ * Sends one confirmed row command and validates Core's answer: the tenant view
+ * for activate and suspend, the provisioning command result for a retry, and
+ * nothing for the soft delete's 204.
+ */
+async function sendDirectoryCommand(
+  action: TenantDirectoryModalAction,
+  tenantId: string,
+  idempotencyKey: string,
+): Promise<void> {
+  const base = `/api/admin/core/v1/tenants/${encodeURIComponent(tenantId)}`;
+  if (action === "delete") {
+    await axiosClient.delete(base, idempotentWrite(idempotencyKey));
+    return;
+  }
+  const response = await axiosClient.post<unknown>(
+    `${base}/${action}`,
+    undefined,
+    idempotentWrite(idempotencyKey),
+  );
+  const data = readSuccessData(response.data);
+  if (action === "reprovision") readTenantProvisioningCommandResult(data);
+  else readTenantView(data);
+}
+
 function idempotentWrite(idempotencyKey: string) {
   return { headers: { "x-idempotency-key": idempotencyKey } };
 }
 
-function actionScope(action: TenantDirectoryAction, tenantId: string) {
+function actionScope(action: TenantDirectoryModalAction, tenantId: string) {
   return `directory:${action}:${tenantId}`;
 }
 
