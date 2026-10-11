@@ -160,6 +160,16 @@ const en = {
   yes: "Yes",
   no: "No",
   none: "—",
+  /**
+   * Labels for the reason codes a preview or rollout tenant row carries
+   * verbatim from Core's planner (the fleet maps its other refusals to
+   * `PROVISIONING_FLEET_*`). The code itself is still shown beneath; a code
+   * without a label is shown as sent.
+   */
+  safeReasonLabel: {
+    TENANT_PROVISIONING_ADDON_REBIND_REQUIRED: "Add-on re-bind required: an Add-on binding pins this component to its current release",
+    TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED: "Update to the current release first",
+  },
   operation: {
     UPDATE: "Update installed components",
     ADD_APPLICATION: "Add Application",
@@ -369,6 +379,10 @@ const ar: CopyShape<typeof en> = {
   yes: "نعم",
   no: "لا",
   none: "—",
+  safeReasonLabel: {
+    TENANT_PROVISIONING_ADDON_REBIND_REQUIRED: "يلزم إعادة ربط الإضافة: ربط إضافة يثبّت هذا المكوّن على إصداره الحالي",
+    TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED: "حدِّث إلى الإصدار الحالي أولًا",
+  },
   operation: {
     UPDATE: "تحديث المكوّنات المثبتة",
     ADD_APPLICATION: "إضافة تطبيق",

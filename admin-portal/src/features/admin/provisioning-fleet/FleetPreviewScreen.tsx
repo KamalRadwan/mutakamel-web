@@ -24,6 +24,7 @@ import {
   FleetHero,
   FleetMeta,
   FleetPageFrame,
+  FleetSafeReason,
   FleetStatePanel,
   FleetStatusBadge,
   RefreshButton,
@@ -94,7 +95,7 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
       key: "safeReason",
       headerEn: copy.safeReason,
       headerAr: copy.safeReason,
-      cell: (tenant) => <span dir="ltr" className="text-start font-mono text-xs">{tenant.safeReasonCode ?? copy.none}</span>,
+      cell: (tenant) => <FleetSafeReason code={tenant.safeReasonCode} copy={copy} />,
     },
     {
       key: "digest",

@@ -305,6 +305,27 @@ export function FleetDatum({
   );
 }
 
+/**
+ * A tenant row's safe reason code: its localized label when the copy has one
+ * (`safeReasonLabel`), and the code itself, which operators quote, beneath.
+ */
+export function FleetSafeReason({
+  code,
+  copy,
+}: {
+  code: string | null;
+  copy: ProvisioningFleetCopy;
+}) {
+  if (!code) return <span className="text-xs">{copy.none}</span>;
+  const label = (copy.safeReasonLabel as Readonly<Record<string, string | undefined>>)[code];
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5">
+      {label && <span className="text-xs font-semibold text-foreground">{label}</span>}
+      <span dir="ltr" className="text-start font-mono text-xs">{code}</span>
+    </span>
+  );
+}
+
 export function FleetStatusBadge({
   status,
   label,

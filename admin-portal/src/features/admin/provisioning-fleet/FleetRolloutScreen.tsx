@@ -27,6 +27,7 @@ import {
   FleetHero,
   FleetMeta,
   FleetPageFrame,
+  FleetSafeReason,
   FleetStatePanel,
   FleetStatusBadge,
   RefreshButton,
@@ -363,7 +364,7 @@ function RolloutTenants({ view, copy, lang }: { view: ReturnType<typeof useFleet
     { key: "operationId", headerEn: copy.operationId, headerAr: copy.operationId, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.operationId ?? copy.none}</span> },
     { key: "eligibilityDigest", headerEn: copy.eligibilityDigest, headerAr: copy.eligibilityDigest, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.eligibilityDigest}</span> },
     { key: "evidenceDigest", headerEn: copy.evidenceDigest, headerAr: copy.evidenceDigest, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.evidenceDigest ?? copy.none}</span> },
-    { key: "safeReason", headerEn: copy.safeReason, headerAr: copy.safeReason, cell: (t) => <span dir="ltr" className="text-start font-mono text-xs">{t.safeReasonCode ?? copy.none}</span> },
+    { key: "safeReason", headerEn: copy.safeReason, headerAr: copy.safeReason, cell: (t) => <FleetSafeReason code={t.safeReasonCode} copy={copy} /> },
     { key: "dispatchedAt", headerEn: copy.dispatchedAt, headerAr: copy.dispatchedAt, cell: (t) => <span className="text-xs">{formatInstant(t.dispatchedAt, lang)}</span> },
     { key: "completedAt", headerEn: copy.completedAt, headerAr: copy.completedAt, cell: (t) => <span className="text-xs">{formatInstant(t.completedAt, lang)}</span> },
   ];
