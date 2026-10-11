@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-09-27T16:36:31.257Z",
+    "generatedAt": "2026-10-11T01:32:52.580Z",
     "generator": "scripts/docs/generate-route-inventory.mjs",
-    "frontendRevision": "c57e1f853ef8+dirty",
-    "backendRevision": "2d4118e2d64d+dirty",
+    "frontendRevision": "52ce61ba74fa+dirty",
+    "backendRevision": "805710806ce9+dirty",
     "sourcePolicy": "Gateway master ownership and canonicalization rules for master=tenant",
     "canonicalNamespaces": [
       "/api/tenant/core/v1/*",
@@ -43,7 +43,8 @@
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-command.route-contracts.ts": "5cd09f208fe88bcecc34645e5d06ef8a9fb051441afb6a8adc4dbb3551ae2474",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "708333c057052443f3f19042cd71e94d7f7dbf342de325a4ebb53d497a33d282",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "93ed6f9c8bd64823da42530961312184a7acd3286eb332a12ebb54b6ecc6c7cc",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "a8b13609debbd009bd333180f22dbe2ea3e229900a9a80a93f7b13d899c7d8a8",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-worker-evidence-authority.route-contracts.ts": "84a6d1d52d0699b6d40ba12d2521e0ee39c0dd55b106c1b80c1f317e2cef112e",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "b05f755df72e9487118c16fe168fef0982a1eb61b2a7bc5c62bd0890babddc5e",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "ebdcbc7c1e52d540d6bcae26f0627a9baaa8a1d942b0785882028fccb0c37611",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "f936fa08de190e99732fe6c3c996e4a13f3a3f5f3e9b310c582dc2e0f4221d53",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/webphone.route-contracts.ts": "aa0eead9bed5f0d27c370f5d7e273b22dba8a5d07184fe39a980979dd401b370",

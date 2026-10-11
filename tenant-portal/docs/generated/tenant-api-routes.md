@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-09-27T16:36:31.257Z**
+Generated at: **2026-10-11T01:32:52.580Z**
 
-Frontend revision: `c57e1f853ef8+dirty`
+Frontend revision: `52ce61ba74fa+dirty`
 
-Backend revision: `2d4118e2d64d+dirty`
+Backend revision: `805710806ce9+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
