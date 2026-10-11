@@ -40,6 +40,27 @@ describe("tenant destruction reader", () => {
     ["FINALIZING", {}],
     ["SUCCEEDED", {}],
     ["BLOCKED", { blockedReason: "WORKER.TENANT_DESTROY.CORE_UNREACHABLE", blockingOperationId: null }],
+    // Halted after the drop was authorized: Core cleared the waited-on
+    // provisioning operation when it authorized the drop.
+    [
+      "BLOCKED",
+      {
+        blockedPhase: "DROPPING_DATABASE",
+        blockedReason: "WORKER.TENANT_DESTROY.AUTHORITY_CHANGED",
+        lastErrorCode: "WORKER.TENANT_DESTROY.AUTHORITY_CHANGED",
+        blockingOperationId: null,
+        attempts: 20,
+      },
+    ],
+    [
+      "BLOCKED",
+      {
+        blockedPhase: "FINALIZING",
+        blockedReason: "WORKER.TENANT_DESTROY.CORE_REJECTED",
+        blockingOperationId: null,
+        attempts: 20,
+      },
+    ],
     // Abandoned straight from stopping: no block evidence.
     ["ABANDONED", {}],
     // Abandoned after it blocked: the block evidence survives.
@@ -48,6 +69,7 @@ describe("tenant destruction reader", () => {
       {
         blockedAt: UPDATED_AT,
         blockedReason: "TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS",
+        blockedPhase: "STOPPING_PROVISIONING",
         blockingOperationId: OPERATION_ID,
         lastErrorCode: "TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS",
       },
@@ -83,6 +105,13 @@ describe("tenant destruction reader", () => {
     ["a scheduled attempt after automation ended", { nextAttemptAt: NEXT_UPDATED_AT }],
     ["a completion on a blocked request", { completedAt: NEXT_UPDATED_AT }],
     ["an abandonment time on a blocked request", { abandonedAt: NEXT_UPDATED_AT }],
+    ["an absent blocked phase", { blockedPhase: undefined }],
+    ["a blocked phase Core cannot stop in", { blockedPhase: "SUCCEEDED" }],
+    ["a BLOCKED request without the phase it stopped in", { blockedPhase: null }],
+    [
+      "a halted request still naming a provisioning operation",
+      { blockedPhase: "DROPPING_DATABASE", blockingOperationId: OPERATION_ID },
+    ],
   ] as const)("rejects %s", (_label, overrides) => {
     expect(() =>
       readTenantDestroy({ ...tenantDestroyFixture("BLOCKED"), ...overrides }),
@@ -91,10 +120,16 @@ describe("tenant destruction reader", () => {
 
   it.each([
     ["an advancing request without its next attempt", "DROPPING_DATABASE", { nextAttemptAt: null }],
-    ["block evidence while advancing", "STOPPING_PROVISIONING", { blockedAt: UPDATED_AT, blockedReason: "TENANT_DESTROY_OPEN_PROVISIONING_OPERATION" }],
+    ["block evidence while advancing", "STOPPING_PROVISIONING", { blockedAt: UPDATED_AT, blockedReason: "TENANT_DESTROY_OPEN_PROVISIONING_OPERATION", blockedPhase: "STOPPING_PROVISIONING" }],
+    ["a blocked phase without block evidence", "DROPPING_DATABASE", { blockedPhase: "DROPPING_DATABASE" }],
     ["a waited-on operation after the drop was authorized", "DROPPING_DATABASE", { blockingOperationId: OPERATION_ID }],
     ["a success without its completion time", "SUCCEEDED", { completedAt: null }],
     ["an abandoned request without its abandonment time", "ABANDONED", { abandonedAt: null }],
+    [
+      "an abandoned request that halted after the drop was authorized",
+      "ABANDONED",
+      { blockedAt: UPDATED_AT, blockedReason: "WORKER.TENANT_DESTROY.AUTHORITY_CHANGED", blockedPhase: "FINALIZING" },
+    ],
   ] as const)("rejects %s", (_label, phase, overrides) => {
     expect(() =>
       readTenantDestroy({ ...tenantDestroyFixture(phase), ...overrides }),

@@ -232,8 +232,11 @@ export interface TenantOperationProgress {
 }
 
 /**
- * Why Core reports an open operation as no longer progressing. The threshold
- * is ten minutes without an accepted transition, twice the Worker's step lease.
+ * Why Core reports an open operation as no longer progressing: a running step
+ * with neither a transition nor a Worker heartbeat for three missed heartbeats
+ * (`NO_PROGRESS`, naming the step), a dispatched step silent for twice its
+ * lease (`DISPATCH_LEASE_EXPIRED`), a stop the Worker never confirmed
+ * (`CANCEL_PENDING`), or otherwise no change at all for ten minutes.
  */
 export const TENANT_OPERATION_STALL_REASONS = [
   "NO_PROGRESS",
@@ -262,6 +265,7 @@ export const TENANT_OPERATION_EXIT_REASON_CODES = [
   "OPERATION_OPEN",
   "OPERATION_SUCCEEDED",
   "OPERATION_TERMINAL",
+  "OPERATION_NOT_DISPATCHED",
 ] as const;
 
 export type TenantOperationExitReasonCode =
@@ -281,6 +285,11 @@ export interface TenantOperationExits {
   retry: TenantOperationExit;
   /** Creating a component repair, which needs no open operation. */
   repair: TenantOperationExit;
+  /**
+   * Asking the Worker to re-deliver the progress it retained for this
+   * operation, under the original event ids. Changes nothing by itself.
+   */
+  resync: TenantOperationExit;
 }
 
 export interface TenantOperationDetail extends TenantOperationSummary {
@@ -310,6 +319,18 @@ export interface TenantOperationTimelineEvent {
 export interface TenantProvisioningCommandResult {
   replayed: boolean;
   operation: TenantOperationDetail;
+}
+
+/** The recorded Resync request: the Worker logs `requestId` when it acts on it. */
+export interface TenantProvisioningResyncRequest {
+  requestId: string;
+  requestedAt: string;
+  reasonCode: string;
+}
+
+export interface TenantProvisioningResyncResult
+  extends TenantProvisioningCommandResult {
+  resync: TenantProvisioningResyncRequest;
 }
 
 export interface SafeReleaseEvidence {
@@ -623,6 +644,7 @@ export interface ProvisioningResource<T> {
 export type ProvisioningMutationName =
   | "retry"
   | "cancel"
+  | "resync"
   | "apply-updates"
   | "request-prerequisites"
   | "add-application"
@@ -639,6 +661,7 @@ export interface ProvisioningMutationState {
 export interface ProvisioningPermissions {
   canReadOperations: boolean;
   canRetryOrCancel: boolean;
+  canResync: boolean;
   canApplyUpdates: boolean;
   canReadPrerequisites: boolean;
   canRequestPrerequisites: boolean;

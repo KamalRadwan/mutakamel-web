@@ -37,7 +37,7 @@ export function validateReportFilters(
   draft: ReportFilterDraft,
 ): ReportFilterErrors {
   const errors: ReportFilterErrors = {};
-  if (kind === "OVERVIEW" || kind === "BILLING" || kind === "PROVISIONING") {
+  if (hasReportWindow(kind)) {
     if (draft.from && !isValidDateInput(draft.from)) {
       errors.from = "INVALID_FROM";
     }
@@ -87,13 +87,18 @@ export function buildTenantQuery(
   };
 }
 
+/**
+ * The reports that take a `[from, to)` window. The provisioning report does
+ * not: it lists the tenants stalled now, and Core rejects a window on it.
+ */
+export function hasReportWindow(kind: ReportKind): boolean {
+  return kind === "OVERVIEW" || kind === "BILLING";
+}
+
 export function buildProvisioningQuery(
   draft: ReportFilterDraft,
 ): ProvisioningReportQuery {
-  return {
-    ...buildWindowQuery(draft),
-    limit: Number(draft.limit),
-  };
+  return { limit: Number(draft.limit) };
 }
 
 export function dateInputToIso(

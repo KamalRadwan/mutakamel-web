@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   buildApplyUpdatesDto,
@@ -46,6 +47,7 @@ export type ProvisioningConfirmation =
 export interface ProvisioningOperationActions {
   cancel: ProvisioningActionState;
   retry: ProvisioningActionState;
+  resync: ProvisioningActionState;
 }
 
 const NO_ACTION: ProvisioningActionState = {
@@ -64,7 +66,8 @@ export interface ManagedTargetDraft {
 }
 
 export function useTenantProvisioningWorkspace(tenantId: string) {
-  const { lang, dir } = useI18n();
+  const { lang, dir, t } = useI18n();
+  const toast = useToast();
   const [confirmation, setConfirmation] =
     useState<ProvisioningConfirmation | null>(null);
   // An open confirmation holds background refresh so the state the operator
@@ -80,15 +83,28 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
   const selectedDetail = provisioning.selectedOperation.data;
   const commandInFlight = provisioning.mutation.name !== null;
 
-  /** Cancel and re-provision for the selected operation, from Core's exits. */
+  /** Cancel, re-provision and resync for the selected operation, from Core's exits. */
   const operationActions = useMemo<ProvisioningOperationActions>(() => {
-    if (!selectedDetail) return { cancel: NO_ACTION, retry: NO_ACTION };
+    if (!selectedDetail) {
+      return { cancel: NO_ACTION, retry: NO_ACTION, resync: NO_ACTION };
+    }
     const permitted = provisioning.permissions.canRetryOrCancel;
     return {
       cancel: provisioningActionState("cancel", selectedDetail.exits.cancel, permitted, commandInFlight),
       retry: provisioningActionState("retry", selectedDetail.exits.retry, permitted, commandInFlight),
+      resync: provisioningActionState(
+        "resync",
+        selectedDetail.exits.resync,
+        provisioning.permissions.canResync,
+        commandInFlight,
+      ),
     };
-  }, [commandInFlight, provisioning.permissions.canRetryOrCancel, selectedDetail]);
+  }, [
+    commandInFlight,
+    provisioning.permissions.canResync,
+    provisioning.permissions.canRetryOrCancel,
+    selectedDetail,
+  ]);
 
   /**
    * Repair needs no open operation. Core's exit on the selected detail is
@@ -238,6 +254,28 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     setConfirmation({ kind: "repair", component, dto });
   }, [effectiveRepairComponentId, provisioning.components.data.items, repairReasonCode]);
 
+  /**
+   * Resync changes nothing by itself -- the Worker re-delivers what it already
+   * signed, and Core applies each record as the first delivery would have --
+   * so, like a prerequisite request, it is sent without a confirmation. An
+   * accepted request is a toast; a refusal lands in the workspace alert.
+   */
+  const requestResync = useCallback(
+    async (operation: TenantOperationDetail) => {
+      setLocalError(null);
+      try {
+        await provisioning.resyncOperation(operation.id);
+        toast.success(
+          t.tenantProvisioning.resyncRequestedTitle,
+          t.tenantProvisioning.resyncRequestedMessage,
+        );
+      } catch (error) {
+        setLocalError(readLocalError(error));
+      }
+    },
+    [provisioning, t, toast],
+  );
+
   /** Closing is refused while the confirmed command is still in flight. */
   const dismissConfirmation = useCallback(() => {
     if (provisioning.mutation.name !== null) return;
@@ -385,6 +423,7 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     confirmation,
     requestCancel,
     requestRetry,
+    requestResync,
     requestRepair,
     dismissConfirmation,
     confirmPending,

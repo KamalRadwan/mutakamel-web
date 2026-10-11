@@ -54,8 +54,18 @@ import type {
   TenantPrerequisiteEvidenceRecord,
   TenantPrerequisiteRequest,
   TenantProvisioningCommandResult,
+  TenantProvisioningResyncResult,
   TenantSeedState,
 } from "../types";
+
+/**
+ * How long after an accepted Resync the operation is read again. Core answers
+ * at once and the Worker's re-delivered records follow (core-app
+ * `tenant-operations.controller.ts`: "refresh the detail a few seconds
+ * later"). An open operation is polled anyway; a success whose step was left
+ * unsettled is not, and would show the settled step only on a manual refresh.
+ */
+const RESYNC_FOLLOW_UP_MS = 5_000;
 
 const DEFAULT_PAGE_META = {
   page: 1,
@@ -119,6 +129,11 @@ export interface TenantProvisioningController {
   refreshAll: () => Promise<void>;
   retryOperation: (operationId: string) => Promise<TenantProvisioningCommandResult>;
   cancelOperation: (operationId: string) => Promise<TenantProvisioningCommandResult>;
+  /**
+   * Asks the Worker to re-deliver the operation's retained progress, then
+   * reads the operation again once the records have had time to arrive.
+   */
+  resyncOperation: (operationId: string) => Promise<TenantProvisioningResyncResult>;
   applyUpdates: (dto: ApplyTenantUpdatesDto) => Promise<TenantProvisioningCommandResult>;
   requestPrerequisites: (
     dto: RequestTenantPrerequisiteDto,
@@ -644,6 +659,48 @@ export function useTenantProvisioning(
     ],
   );
 
+  const resyncFollowUpRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (resyncFollowUpRef.current !== null) {
+        window.clearTimeout(resyncFollowUpRef.current);
+      }
+    },
+    [],
+  );
+
+  const resyncOperation = useCallback(
+    (operationId: string) =>
+      runCommand(
+        "resync",
+        permissions.canResync,
+        { tenantId, operationId },
+        (key) => tenantProvisioningApi.resyncOperation(tenantId, operationId, key),
+        async (result) => {
+          await refreshAfterOperation(result.operation.id, result.operation);
+          if (resyncFollowUpRef.current !== null) {
+            window.clearTimeout(resyncFollowUpRef.current);
+          }
+          resyncFollowUpRef.current = window.setTimeout(() => {
+            resyncFollowUpRef.current = null;
+            void loadOperations();
+            // Only while it is still the operation on screen.
+            if (selectedOperationIdRef.current === result.operation.id) {
+              void loadSelectedOperation(result.operation.id);
+            }
+          }, RESYNC_FOLLOW_UP_MS);
+        },
+      ),
+    [
+      loadOperations,
+      loadSelectedOperation,
+      permissions.canResync,
+      refreshAfterOperation,
+      runCommand,
+      tenantId,
+    ],
+  );
+
   const applyUpdates = useCallback(
     (dto: ApplyTenantUpdatesDto) =>
       runCommand(
@@ -846,6 +903,7 @@ export function useTenantProvisioning(
     refreshAll,
     retryOperation,
     cancelOperation,
+    resyncOperation,
     applyUpdates,
     requestPrerequisites,
     addApplication,

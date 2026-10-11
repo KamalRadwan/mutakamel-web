@@ -12,6 +12,13 @@ export const PROVISIONING_PERMISSION_REQUIREMENTS = {
     "admin.tenants.reprovision",
     "admin.tenants.critical",
   ],
+  // Gateway `core.admin.tenants.operations.resync`: the same pair as retry
+  // and cancel, although the command changes nothing by itself.
+  resync: [
+    "admin.tenants.read",
+    "admin.tenants.reprovision",
+    "admin.tenants.critical",
+  ],
   applyUpdates: [
     "admin.tenants.reprovision",
     "admin.tenants.critical",
@@ -49,6 +56,7 @@ export function deriveProvisioningPermissions(
       user,
       PROVISIONING_PERMISSION_REQUIREMENTS.retryOrCancel,
     ),
+    canResync: adminCanAll(user, PROVISIONING_PERMISSION_REQUIREMENTS.resync),
     canApplyUpdates: adminCanAll(
       user,
       PROVISIONING_PERMISSION_REQUIREMENTS.applyUpdates,

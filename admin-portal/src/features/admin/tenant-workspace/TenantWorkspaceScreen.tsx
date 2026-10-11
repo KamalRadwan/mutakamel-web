@@ -11,6 +11,7 @@ import { TENANT_RELOCATION_READ_PERMISSION } from "./database-relocation";
 import { STORAGE_MIGRATION_READ_PERMISSION } from "./storage-migration";
 import { TenantBillingPanel } from "./billing/components/TenantBillingPanel";
 import { useTenantBillingWorkspace } from "./billing/hooks/useTenantBillingWorkspace";
+import { tenantDestroyCommandErrorText } from "./core/components/copy";
 import { TenantFqdnPanel } from "./core/components/TenantFqdnPanel";
 import { TenantLifecyclePanel } from "./core/components/TenantLifecyclePanel";
 import { TenantProfilePanel } from "./core/components/TenantProfilePanel";
@@ -232,10 +233,12 @@ export function TenantWorkspaceScreen({ tenantId }: { tenantId: string }) {
           <div ref={mutationErrorRef} role="alert" tabIndex={-1} className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             {/* Lifecycle re-provisioning shares the provisioning workspace's
                 refusals (a release upgrade or prerequisite it cannot run
-                under); Core's message is English-only, so known codes are
-                shown in the portal's language and the code stays below. */}
+                under), and destruction commands have their own; Core's
+                message is English-only, so known codes are shown in the
+                portal's language and the code stays below. */}
             <p>
-              {provisioningCodeText(t.tenantProvisioning.commandErrors, core.mutation.error.errorCode) ??
+              {tenantDestroyCommandErrorText(lang, core.mutation.error.errorCode) ??
+                provisioningCodeText(t.tenantProvisioning.commandErrors, core.mutation.error.errorCode) ??
                 core.mutation.error.message}
             </p>
             <p className="mt-1 font-mono text-xs">{core.mutation.error.errorCode}{core.mutation.error.correlationId ? ` · ${copy.correlation}: ${core.mutation.error.correlationId}` : ""}</p>

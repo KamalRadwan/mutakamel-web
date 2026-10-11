@@ -1,27 +1,44 @@
 import { describe, expect, it } from "vitest";
-import { OPERATION_ID, tenantDestroyFixture } from "../__tests__/fixtures";
+import {
+  OPERATION_ID,
+  haltedTenantDestroyFixture,
+  tenantDestroyFixture,
+} from "../__tests__/fixtures";
 import { TENANT_DESTROY_PHASES } from "../types";
 import {
   canAbandonTenantDestroy,
+  canResumeTenantDestroy,
   isTenantDestroyAdvancing,
+  tenantDestroyHaltedPhase,
   tenantDestroyHoldsTenant,
   tenantDestroyPollFingerprint,
 } from "./destroy";
 
 describe("tenant destruction lifecycle model", () => {
   it.each([
-    ["STOPPING_PROVISIONING", true, true, true],
-    ["DROPPING_DATABASE", true, false, true],
-    ["FINALIZING", true, false, true],
-    ["SUCCEEDED", false, false, true],
-    ["BLOCKED", false, true, true],
-    ["ABANDONED", false, false, false],
+    ["STOPPING_PROVISIONING", null, true, true, false, true],
+    ["DROPPING_DATABASE", null, true, false, false, true],
+    ["FINALIZING", null, true, false, false, true],
+    ["SUCCEEDED", null, false, false, false, true],
+    // Blocked before the drop: abandoned, never resumed (Core answers a new
+    // request with this one unchanged).
+    ["BLOCKED", "STOPPING_PROVISIONING", false, true, false, true],
+    // Halted after the drop was authorized: resumed, never abandoned.
+    ["BLOCKED", "DROPPING_DATABASE", false, false, true, true],
+    ["BLOCKED", "FINALIZING", false, false, true, true],
+    ["ABANDONED", null, false, false, false, false],
+    ["ABANDONED", "STOPPING_PROVISIONING", false, false, false, false],
   ] as const)(
-    "%s: polled=%s, abandonable=%s, holds the tenant=%s",
-    (phase, advancing, abandonable, holds) => {
+    "%s stopped in %s: polled=%s, abandonable=%s, resumable=%s, holds the tenant=%s",
+    (phase, blockedPhase, advancing, abandonable, resumable, holds) => {
+      const operation = { phase, blockedPhase };
       expect(isTenantDestroyAdvancing(phase)).toBe(advancing);
-      expect(canAbandonTenantDestroy({ phase })).toBe(abandonable);
-      expect(tenantDestroyHoldsTenant({ phase })).toBe(holds);
+      expect(canAbandonTenantDestroy(operation)).toBe(abandonable);
+      expect(canResumeTenantDestroy(operation)).toBe(resumable);
+      expect(tenantDestroyHaltedPhase(operation)).toBe(
+        resumable ? blockedPhase : null,
+      );
+      expect(tenantDestroyHoldsTenant(operation)).toBe(holds);
     },
   );
 
@@ -40,6 +57,8 @@ describe("tenant destruction lifecycle model", () => {
 
   it("offers nothing and holds nothing when no request exists", () => {
     expect(canAbandonTenantDestroy(null)).toBe(false);
+    expect(canResumeTenantDestroy(null)).toBe(false);
+    expect(tenantDestroyHaltedPhase(null)).toBeNull();
     expect(tenantDestroyHoldsTenant(null)).toBe(false);
   });
 
@@ -63,6 +82,12 @@ describe("tenant destruction lifecycle model", () => {
       tenantDestroyPollFingerprint(
         tenantDestroyFixture("BLOCKED", { blockingOperationId: OPERATION_ID }),
       ),
+    );
+    // Where a request halted is part of what was observed.
+    expect(
+      tenantDestroyPollFingerprint(haltedTenantDestroyFixture("FINALIZING")),
+    ).not.toBe(
+      tenantDestroyPollFingerprint(haltedTenantDestroyFixture("DROPPING_DATABASE")),
     );
   });
 });

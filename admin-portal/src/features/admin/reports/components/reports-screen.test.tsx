@@ -60,6 +60,61 @@ function overviewData() {
   };
 }
 
+/** Two of three stalled tenants: `limit` cut the third. */
+function provisioningData() {
+  return {
+    kind: "PROVISIONING",
+    snapshot: {
+      data: {
+        asOf: TIMESTAMP,
+        stuck: 3,
+        items: [
+          {
+            id: "019f0000-0000-7000-8000-0000000000a3",
+            name: "initech",
+            status: "SUSPENDED",
+            createdAt: "2026-08-01T10:00:00.000Z",
+            operation: {
+              id: "019f0000-0000-7000-8000-0000000000b3",
+              type: "REPAIR",
+              status: "CANCEL_REQUESTED",
+              currentPhase: "core.seed",
+              generation: 7,
+            },
+            stall: {
+              stepKey: null,
+              since: "2026-08-12T07:35:00.000Z",
+              ageSeconds: 25 * 60,
+              reason: "CANCEL_PENDING",
+            },
+          },
+          {
+            id: "019f0000-0000-7000-8000-0000000000a1",
+            name: "globex",
+            status: "ACTIVE",
+            createdAt: "2026-08-02T10:00:00.000Z",
+            operation: {
+              id: "019f0000-0000-7000-8000-0000000000b1",
+              type: "UPDATE",
+              status: "RUNNING",
+              currentPhase: "crm.schema",
+              generation: 4,
+            },
+            stall: {
+              stepKey: "crm.schema",
+              since: "2026-08-12T07:52:00.000Z",
+              ageSeconds: 8 * 60,
+              reason: "NO_PROGRESS",
+            },
+          },
+        ],
+      },
+      correlationId: "corr-provisioning",
+      responseTimestamp: TIMESTAMP,
+    },
+  };
+}
+
 describe("ReportsScreen", () => {
   beforeEach(() => {
     languageMock.lang = "en";
@@ -153,6 +208,60 @@ describe("ReportsScreen", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Enter a UUID v7 database server identifier.",
     );
+  });
+
+  it("lists stalled tenants with their operation, stall point, reason and silence, without a date window", () => {
+    reportMock.activeReport = "PROVISIONING";
+    reportMock.draft = { from: "", to: "", status: "", serverId: "", limit: "50" };
+    reportMock.data = provisioningData();
+
+    render(<ReportsScreen />);
+
+    // Current state: no window to choose, only how many rows to list.
+    expect(screen.queryByLabelText("From date (UTC)")).toBeNull();
+    expect(screen.queryByLabelText("Through date (UTC)")).toBeNull();
+    expect(screen.getByLabelText("Rows per report")).toBeTruthy();
+
+    expect(screen.getByText("Stuck tenants")).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Showing the 2 longest stalls of 3. Choose more rows per report to list more.",
+      ),
+    ).toBeTruthy();
+
+    const update = screen.getByRole("row", { name: /globex/ });
+    expect(update).toHaveTextContent("Update");
+    expect(update).toHaveTextContent("Generation 4");
+    expect(update).toHaveTextContent("crm.schema");
+    expect(update).toHaveTextContent("No progress");
+    expect(update).toHaveTextContent("for 8 min");
+    expect(screen.getByRole("link", { name: "globex" })).toHaveAttribute(
+      "href",
+      "/tenants/019f0000-0000-7000-8000-0000000000a1",
+    );
+
+    // No step running: the current phase is where it stopped.
+    const repair = screen.getByRole("row", { name: /initech/ });
+    expect(repair).toHaveTextContent("Repair");
+    expect(repair).toHaveTextContent("Phase");
+    expect(repair).toHaveTextContent("core.seed");
+    expect(repair).toHaveTextContent("Cancellation not confirmed");
+    expect(repair).toHaveTextContent("for 25 min");
+  });
+
+  it("shows the stalled tenants in Arabic", () => {
+    languageMock.lang = "ar";
+    reportMock.activeReport = "PROVISIONING";
+    reportMock.draft = { from: "", to: "", status: "", serverId: "", limit: "50" };
+    reportMock.data = provisioningData();
+
+    render(<ReportsScreen />);
+
+    expect(screen.getByText("المستأجرون العالقون")).toBeTruthy();
+    const repair = screen.getByRole("row", { name: /initech/ });
+    expect(repair).toHaveTextContent("إصلاح");
+    expect(repair).toHaveTextContent("الإلغاء لم يُؤكَّد");
   });
 
   it("hides report controls at the client permission gate", () => {

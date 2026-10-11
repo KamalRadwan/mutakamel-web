@@ -18,6 +18,7 @@ import { provisioningPollIntervalMs } from "../../provisioning/model/polling";
 import { tenantCoreApi } from "../api/tenant-core.api";
 import {
   canAbandonTenantDestroy,
+  canResumeTenantDestroy,
   isTenantDestroyAdvancing,
   tenantDestroyPollFingerprint,
 } from "../model/destroy";
@@ -667,9 +668,10 @@ export function useTenantCoreWorkspace(
 
   /**
    * Gives up the shown destruction request while Core still allows it
-   * (STOPPING_PROVISIONING or BLOCKED), under the same permissions as
-   * destroy. The database is kept and the tenant stays soft-deleted, so
-   * restore and a new destruction request become available again.
+   * (STOPPING_PROVISIONING, or BLOCKED while stopping provisioning), under the
+   * same permissions as destroy. The database is kept and the tenant stays
+   * soft-deleted, so restore and a new destruction request become available
+   * again.
    */
   const abandonDestruction = useCallback(async () => {
     requirePermission(permissions.canDestroy, "TENANT_DESTROY_FORBIDDEN");
@@ -710,6 +712,46 @@ export function useTenantCoreWorkspace(
     assertCurrentTenant,
     destroyOperation,
     loadDestruction,
+    permissions.canDestroy,
+    resetDestroyPollBackoff,
+    runWrite,
+    tenantId,
+  ]);
+
+  /**
+   * Resumes the shown request after it halted in DROPPING_DATABASE or
+   * FINALIZING, under the same permissions as destroy. Core resumes a halted
+   * request when destruction is requested again under a new idempotency key:
+   * attempts reset, the halt clears, and Worker continues in the same phase.
+   * The key scope is its own, so it can never be the request's original key,
+   * whose exact replay Core answers unchanged; the halt time is part of the
+   * intent, so a retained key retries one resume exactly and a later halt of
+   * the same request gets a new key.
+   */
+  const resumeDestruction = useCallback(async () => {
+    requirePermission(permissions.canDestroy, "TENANT_DESTROY_FORBIDDEN");
+    const current = assertCurrentTenant();
+    const operation = destroyOperation;
+    requireState(
+      current.status === "DELETED" &&
+        operation !== null &&
+        operation.tenantId === tenantId &&
+        canResumeTenantDestroy(operation),
+      "TENANT_DESTROY_NOT_RESUMABLE",
+    );
+    const { operationId, blockedAt } = operation;
+    resetDestroyPollBackoff();
+    const resumed = await runWrite(
+      "resume-destroy",
+      { action: "tenant.destroy.resume", tenantId, operationId, blockedAt },
+      (key) => tenantCoreApi.destroy(tenantId, false, key),
+    );
+    adoptDestruction(resumed);
+    return resumed;
+  }, [
+    adoptDestruction,
+    assertCurrentTenant,
+    destroyOperation,
     permissions.canDestroy,
     resetDestroyPollBackoff,
     runWrite,
@@ -768,6 +810,7 @@ export function useTenantCoreWorkspace(
     restore,
     destroy,
     abandonDestruction,
+    resumeDestruction,
     refreshDestruction,
   };
 }

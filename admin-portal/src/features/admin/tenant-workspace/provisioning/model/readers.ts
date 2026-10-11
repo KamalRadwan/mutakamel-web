@@ -38,6 +38,7 @@ import {
   type TenantPrerequisiteEvidenceRecord,
   type TenantPrerequisiteRequest,
   type TenantProvisioningCommandResult,
+  type TenantProvisioningResyncResult,
   type TenantReleaseState,
   type TenantSeedState,
 } from "../types";
@@ -121,7 +122,17 @@ export function readTenantOperationDetail(value: unknown): TenantOperationDetail
 }
 
 function readStall(value: unknown, code: string): TenantOperationStall | null {
-  if (value === null) return null;
+  return value === null ? null : readTenantOperationStall(value, code);
+}
+
+/**
+ * Core's `stall` object, as the operation detail carries it and as the admin
+ * provisioning report repeats it for each stalled tenant.
+ */
+export function readTenantOperationStall(
+  value: unknown,
+  code: string,
+): TenantOperationStall {
   const stall = object(value, code);
   return {
     stepKey: nullableString(stall.stepKey, code, 160),
@@ -137,6 +148,7 @@ function readExits(value: unknown, code: string): TenantOperationExits {
     cancel: readExit(exits.cancel, code),
     retry: readExit(exits.retry, code),
     repair: readExit(exits.repair, code),
+    resync: readExit(exits.resync, code),
   };
 }
 
@@ -215,6 +227,23 @@ export function readTenantProvisioningCommandResult(
   return {
     replayed: boolean(result.replayed, code),
     operation: readTenantOperationDetail(result.operation),
+  };
+}
+
+/** `POST .../operations/:operationId/resync`: the request Core recorded, and the operation as it stands. */
+export function readTenantProvisioningResyncResult(
+  value: unknown,
+): TenantProvisioningResyncResult {
+  const code = "INVALID_TENANT_PROVISIONING_RESYNC_RESPONSE";
+  const result = object(value, code);
+  const resync = object(result.resync, code);
+  return {
+    ...readTenantProvisioningCommandResult(result),
+    resync: {
+      requestId: uuidV7(resync.requestId, code),
+      requestedAt: isoDate(resync.requestedAt, code),
+      reasonCode: safeCode(resync.reasonCode, code),
+    },
   };
 }
 
@@ -653,6 +682,12 @@ function componentKey(value: unknown, code: string): string {
 
 function nullableComponentKey(value: unknown, code: string): string | null {
   return value === null ? null : componentKey(value, code);
+}
+
+function safeCode(value: unknown, code: string): string {
+  const result = requiredString(value, code, 96);
+  if (!SAFE_CODE_PATTERN.test(result)) invalid(code);
+  return result;
 }
 
 function seedKey(value: unknown, code: string): string {

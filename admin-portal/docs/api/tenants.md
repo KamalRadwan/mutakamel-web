@@ -11,6 +11,8 @@ Create-recovery amendment (2026-09-11): a status check that finds no tenant once
 
 Tenant-destruction amendment (2026-10-08): a destruction request now ends in `SUCCEEDED`, `BLOCKED` or `ABANDONED`. The status read returns the live request or, when none is live, the latest abandoned one, with attempts, the next attempt, block evidence and the provisioning operation it waits on; `POST /tenants/:id/destroy/:operationId/abandon` gives up a request Core has not yet authorized to drop. Verified against Core `tenant-destroy.service.ts`, `tenant-destroy-response.dto.ts`, `tenant-destroy-params.dto.ts`, `tenants.controller.ts`, the `tenant_destroy_operations` table checks in `@mutakamel/core-app-database`, Worker's `tenant-destroy.runner.ts`, and Gateway route `core.admin.tenants.destroy-abandon`. See [Permanent destroy](#permanent-destroy).
 
+Tenant-destruction halt amendment (2026-10-11): `BLOCKED` now has two causes, told apart by the new projection field `blockedPhase`. `STOPPING_PROVISIONING` means the stop blocked before Core authorized the drop: the database still exists and the request is abandoned. `DROPPING_DATABASE` or `FINALIZING` means the request halted after the drop was authorized: the database may already be gone, abandon answers `409 TENANT_DESTROY_NOT_ABANDONABLE`, and `DELETE /tenants/:id/destroy` under a new idempotency key resumes it in that phase with a fresh attempt budget. The workspace reads `blockedPhase` strictly, offers **Abandon destruction** only before the drop, adds a confirmed **Resume destruction** for a halted request, titles and explains both blocked states, and localizes the `409` in English and Arabic. Verified against Core `tenant-destroy.service.ts`, `dto/tenant-destroy-response.dto.ts`, the `tenant_destroy_operations` checks (`ck_tenant_destroy_blocked_evidence`, `ck_tenant_destroy_blocking_operation`) and the Core LLD `06_tenants.md`. See [Permanent destroy](#permanent-destroy).
+
 Directory retry confirmation amendment (2026-10-11): the `/tenants` row action **Retry provisioning** no longer posts `POST /tenants/:id/reprovision` on selection. It opens the same re-provision confirmation the provisioning workspace uses and sends only from that dialog, keeping the ambiguous-outcome key rules; see [Retry and cancel provisioning](#retry-and-cancel-provisioning). Verified against Core `tenants.controller.ts` (`reprovision`: `admin.tenants.reprovision` + `admin.tenants.critical`, `202`, idempotency key required) and `tenant-provisioning-command.service.ts` (`retryLatestAdminOperation`).
 
 Current-release amendment (2026-10-11): `DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH` is gone from the create-options `readinessReasons` enum (Core commit `de03f1d2`: a permission manifest's `componentRelease` is provenance only and is no longer compared with the catalogue); the strict reader now rejects it. `POST /tenants/:id/reprovision` follows the current-release retry rules and can answer `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` or `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` (Core commit `d5af4407`); since Core commit `77447fb9` a retry re-pins a failed plan that pins a superseded release, so the release-upgrade 409 remains only where re-pinning is impossible; see [Retry and cancel provisioning](#retry-and-cancel-provisioning).
@@ -108,9 +110,9 @@ generated for one mutation intent.
 | `POST /api/admin/core/v1/tenants/:id/reprovision` | `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Compatibility retry of the latest failed/cancelled operation |
 | `POST /api/admin/core/v1/tenants/:id/provisioning/cancel` | `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Compatibility cancellation of the latest active operation |
 | `DELETE /api/admin/core/v1/tenants/:id` | `admin.tenants.delete` + `admin.tenants.critical` | `204` | Yes | Soft-delete a tenant |
-| `DELETE /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.destroy` + `admin.tenants.critical` | `202` | Yes | Accept durable destruction of a soft-deleted tenant |
+| `DELETE /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.destroy` + `admin.tenants.critical` | `202` | Yes | Accept durable destruction of a soft-deleted tenant; under a new key, resume a request halted after the drop was authorized |
 | `GET /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.read` | `200` | No | Read the live destruction request, else the latest abandoned one, else null |
-| `POST /api/admin/core/v1/tenants/:id/destroy/:operationId/abandon` | `admin.tenants.destroy` + `admin.tenants.critical` | `200` | Yes | Give up a `BLOCKED` or `STOPPING_PROVISIONING` destruction request |
+| `POST /api/admin/core/v1/tenants/:id/destroy/:operationId/abandon` | `admin.tenants.destroy` + `admin.tenants.critical` | `200` | Yes | Give up a `STOPPING_PROVISIONING` request, or a `BLOCKED` one whose `blockedPhase` is `STOPPING_PROVISIONING` |
 
 ### FQDNs
 
@@ -1128,12 +1130,14 @@ from normal lists. Deleted records remain available through direct detail and
 
 ### Permanent destroy
 
-Source verified: **2026-10-08** (Core `tenant-destroy.service.ts`,
+Source verified: **2026-10-11** (Core `tenant-destroy.service.ts`,
 `dto/tenant-destroy-response.dto.ts`, `dto/tenant-destroy-params.dto.ts`,
 `tenants.controller.ts`; `tenant_destroy_operations` checks in
-`@mutakamel/core-app-database`; Worker `tenant-destroy.runner.ts` and
-`core-tenant-destroy.client.ts`; Gateway `core.admin.tenants.destroy`,
-`core.admin.tenants.destroy-status`, `core.admin.tenants.destroy-abandon`).
+`@mutakamel/core-app-database`, including the halt repair
+`1800000001300-tenant-destroy-halt-after-drop-authorization`; Worker
+`tenant-destroy.runner.ts` and `core-tenant-destroy.client.ts`; Gateway
+`core.admin.tenants.destroy`, `core.admin.tenants.destroy-status`,
+`core.admin.tenants.destroy-abandon`).
 
 `DELETE /api/admin/core/v1/tenants/:id/destroy?destroySubscriptions=false`
 
@@ -1153,7 +1157,8 @@ The DELETE returns **202** with the destruction request under `data`. Core
 uses the UUIDv7 `x-idempotency-key` as the request id: an exact replay of a key
 returns the request that key created, whatever became of it — including an
 abandoned one — while a different key returns the tenant's live request if one
-exists. A new request after an abandonment therefore needs a new key.
+exists, after resuming it when it halted (see [Resume](#resume)). A new request
+after an abandonment therefore needs a new key.
 
 `GET /api/admin/core/v1/tenants/:id/destroy` requires `admin.tenants.read` and
 returns the live request (including after it succeeded), or the most recent
@@ -1166,8 +1171,13 @@ type TenantDestroyPhase =
   | "DROPPING_DATABASE"     // Worker advances; the drop is authorized
   | "FINALIZING"            // Worker advances; the database is gone
   | "SUCCEEDED"             // final
-  | "BLOCKED"               // final for Worker; waits for an operator
+  | "BLOCKED"               // final for Worker; waits for an operator (see blockedPhase)
   | "ABANDONED";            // final; retained evidence
+
+type TenantDestroyBlockedPhase =
+  | "STOPPING_PROVISIONING" // blocked before the drop was authorized: abandon it
+  | "DROPPING_DATABASE"     // halted after the drop was authorized: resume it
+  | "FINALIZING";           // halted after the database was dropped: resume it
 
 interface TenantDestroyView {
   operationId: string;              // UUIDv7, the request's idempotency key
@@ -1177,11 +1187,12 @@ interface TenantDestroyView {
   updatedAt: string;
   completedAt: string | null;       // set exactly when SUCCEEDED
   lastErrorCode: string | null;     // safe code of the latest waited or failed attempt
-  attempts: number;                 // attempts in the current phase
+  attempts: number;                 // attempts in the current phase, or in the phase a BLOCKED request stopped in
   nextAttemptAt: string | null;     // set exactly while Worker still advances
-  blockedAt: string | null;         // with blockedReason; BLOCKED, or ABANDONED after a block
-  blockedReason: string | null;     // safe code that blocked the request
-  blockingOperationId: string | null; // provisioning operation waited on (STOPPING_PROVISIONING, BLOCKED, ABANDONED)
+  blockedAt: string | null;         // with blockedReason and blockedPhase; BLOCKED, or ABANDONED after a block
+  blockedReason: string | null;     // safe code that blocked or halted the request
+  blockedPhase: TenantDestroyBlockedPhase | null; // where a BLOCKED request stopped; STOPPING_PROVISIONING on a later ABANDONED
+  blockingOperationId: string | null; // provisioning operation waited on (STOPPING_PROVISIONING, or BLOCKED/ABANDONED after a stop)
   abandonedAt: string | null;       // set exactly when ABANDONED
 }
 ```
@@ -1200,9 +1211,20 @@ generations (`TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS`), a cancellation Core
 refused (its own code, such as `TENANT_PROVISIONING_CANCEL_NOT_ALLOWED`, or
 `TENANT_DESTROY_CANCELLATION_REFUSED`), or a Worker failure (`WORKER.*`) — the
 request becomes `BLOCKED` after 20 attempts or one hour after it was accepted,
-whichever comes first. `DROPPING_DATABASE` and `FINALIZING` never block: the
-database may already be gone, so they keep retrying at the ceiling with the
-latest code in `lastErrorCode`.
+whichever comes first, with `blockedPhase: "STOPPING_PROVISIONING"`; the
+database still exists.
+
+`DROPPING_DATABASE` and `FINALIZING` come after Core authorized the drop, so the
+database may already be gone. After 20 failed attempts in the phase (about 75
+minutes) the request **halts** in place: Core reports it as `BLOCKED` with
+`blockedPhase` naming that phase, `blockedReason` carries Worker's code —
+`WORKER.TENANT_DESTROY.PROVISIONING_NOT_STOPPED`,
+`WORKER.TENANT_DESTROY.AUTHORITY_CHANGED`,
+`WORKER.TENANT_DESTROY.DATABASE.<class>` for a Database Server Worker cannot
+use, a refusal's own code such as `WORKER.TENANT_CLAIM.HELD`, or what Core
+answered a rejected call with — `nextAttemptAt` is `null`, and
+`blockingOperationId` is `null` (Core clears it when it authorizes the drop).
+A halted request cannot be abandoned and keeps holding the tenant.
 
 Every request that was not abandoned holds the tenant: restore answers
 `TENANT_DESTROY_IN_PROGRESS`, placement changes are refused, and a new destroy
@@ -1226,14 +1248,30 @@ idempotent by state. Both path ids must be UUIDv7; `operationId` names the
 exact request, so a replay can never reach a newer request accepted after this
 one was abandoned.
 
-It gives up a `BLOCKED` or `STOPPING_PROVISIONING` request and answers **200**
-with the request in `ABANDONED`; repeating it returns that request unchanged.
-Any later phase answers `409 TENANT_DESTROY_NOT_ABANDONABLE` (the drop is
-authorized, so the request can only finish), and an unknown request
-`404 TENANT_DESTROY_NOT_FOUND`. The database was never dropped: the row stays
-as evidence, the tenant stays soft-deleted, and restore and a new destruction
-request (under a new key) become available. A cancellation already requested
-on the provisioning operation stays requested.
+It gives up a `STOPPING_PROVISIONING` request, or a `BLOCKED` one whose
+`blockedPhase` is `STOPPING_PROVISIONING`, and answers **200** with the request
+in `ABANDONED`; repeating it returns that request unchanged. Any later phase,
+halted or not, answers `409 TENANT_DESTROY_NOT_ABANDONABLE` (the drop is
+authorized, so the request can only finish, or resume once halted), and an
+unknown request `404 TENANT_DESTROY_NOT_FOUND`. The database was never dropped:
+the row stays as evidence, the tenant stays soft-deleted, and restore and a new
+destruction request (under a new key) become available. A cancellation already
+requested on the provisioning operation stays requested.
+
+#### Resume
+
+`DELETE /api/admin/core/v1/tenants/:id/destroy?destroySubscriptions=false`
+under a **new** `x-idempotency-key` resumes a halted request (`BLOCKED` with
+`blockedPhase` `DROPPING_DATABASE` or `FINALIZING`): attempts reset to 0, the
+halt is cleared, and Worker picks it up at once in the same phase. Core answers
+**202** with the request advancing again in that phase. Resuming is safe
+whether or not the database still exists: Worker drops it with
+`DROP DATABASE IF EXISTS` and then checks that it is absent, and finalizing a
+finalized tenant changes nothing. The request's own key is an exact replay and
+returns it unchanged, so it never resumes anything. A request `BLOCKED` before
+the drop (`blockedPhase: "STOPPING_PROVISIONING"`) is not resumed: Core answers
+a new key with that request unchanged, so it is abandoned and destruction
+requested again instead.
 
 #### Workspace behavior
 
@@ -1244,6 +1282,13 @@ on the provisioning operation stays requested.
   block/abandon/request/update times and the request id. No deep link is
   offered for the provisioning operation: the workspace has no per-operation
   route and closes the Provisioning tab for a deleted tenant.
+- The two blocked states are titled and explained apart, in English and
+  Arabic: **Destruction is blocked** (provisioning could not be stopped; the
+  database still exists; abandon it) and **Destruction halted while deleting
+  the database** / **while finalizing** (the drop was authorized and the
+  database may be gone; fix the reason, then resume). Every
+  `WORKER.TENANT_DESTROY.DATABASE.<class>` code shares one Database Server
+  label, with the full code kept beside it.
 - Progress is polled only while the phase is `STOPPING_PROVISIONING`,
   `DROPPING_DATABASE` or `FINALIZING`, including after a page reload. The
   cadence starts at 3 s and backs off to 15 s and 60 s while consecutive reads
@@ -1253,17 +1298,32 @@ on the provisioning operation stays requested.
   `SUCCEEDED` displays completion, and a retry delay never reports an
   unverified drop as success.
 - Restore and destroy stay visible but disabled, pointing at the explanation,
-  while a request holds the tenant. **Abandon destruction** is offered for
-  `BLOCKED` and `STOPPING_PROVISIONING` to holders of the destroy pair, behind
-  the design-system confirmation that states the consequences above.
-- The abandon dialog closes on any outcome. A rejection is shown in the
-  workspace alert; `TENANT_DESTROY_NOT_ABANDONABLE` and
-  `TENANT_DESTROY_NOT_FOUND` also re-read the request and explain beside the
-  refreshed status. A transient failure keeps the idempotency key for the exact
-  retry. Observing an abandoned request discards any retained destroy key, so
-  the next destroy cannot replay the abandoned one.
+  while a request holds the tenant. To holders of the destroy pair,
+  **Abandon destruction** is offered exactly when Core accepts it —
+  `STOPPING_PROVISIONING`, or `BLOCKED` with `blockedPhase`
+  `STOPPING_PROVISIONING` — and **Resume destruction** exactly for a halted
+  request (`BLOCKED` with `blockedPhase` `DROPPING_DATABASE` or `FINALIZING`).
+  Each sits behind its own design-system confirmation stating the consequences
+  above; resume asks to fix the halt's reason first.
+- Resume sends the destroy DELETE under a key scoped to resuming, never the
+  request's own key, and the halt time is part of that intent: an ambiguous
+  failure retries the same resume under the same key, while a later halt of the
+  same request gets a new one. Core's answer is adopted at once, so the status
+  block shows the phase Worker advances again and polling restarts.
+- Both dialogs close on any outcome. A rejection is shown in the workspace
+  alert, which localizes `409 TENANT_DESTROY_NOT_ABANDONABLE` (Core's message is
+  English-only) and keeps the code and correlation id;
+  `TENANT_DESTROY_NOT_ABANDONABLE` and `TENANT_DESTROY_NOT_FOUND` also re-read
+  the request and explain beside the refreshed status. A transient failure
+  keeps the idempotency key for the exact retry. Observing an abandoned request
+  discards any retained destroy key, so the next destroy cannot replay the
+  abandoned one.
 - A projection that breaks the pairings above fails closed as
-  `INVALID_TENANT_DESTROY_RESPONSE` instead of rendering a contradictory state.
+  `INVALID_TENANT_DESTROY_RESPONSE` instead of rendering a contradictory state:
+  `blockedPhase` must be present and one of the three phases exactly when
+  `blockedAt` is set, an abandoned request can only carry
+  `STOPPING_PROVISIONING`, and a halted request never names a provisioning
+  operation.
 
 ## FQDN management
 
@@ -1325,7 +1385,8 @@ so the UI should not show a “set primary” action.
 | Soft delete | `admin.tenants.delete` + `admin.tenants.critical` |
 | Permanent destroy | `admin.tenants.destroy` + `admin.tenants.critical` |
 | Read destruction progress | `admin.tenants.read` |
-| Abandon a blocked or still-stopping destruction | `admin.tenants.destroy` + `admin.tenants.critical` |
+| Abandon a still-stopping destruction, or one blocked before the drop | `admin.tenants.destroy` + `admin.tenants.critical` |
+| Resume a destruction halted after the drop was authorized | `admin.tenants.destroy` + `admin.tenants.critical` |
 
 Nested tab permissions are independent. Having `admin.tenants.read` does not
 grant tenant-user, subscription, invoice, wallet, payment, or advanced
@@ -1363,7 +1424,7 @@ provisioning permissions.
 | `409` | `TENANT_FINANCIAL_HISTORY_EXISTS` | Permanent destruction is forbidden |
 | `409` | `TENANT_DESTROY_HISTORY_RETAINED` | `destroySubscriptions=true` was sent; destruction always retains financial history |
 | `409` | `TENANT_DESTROY_IN_PROGRESS` | Restore while a destruction request that was not abandoned holds the tenant; abandon it first if it is still abandonable |
-| `409` | `TENANT_DESTROY_NOT_ABANDONABLE` | Abandon after Core authorized the drop (or after success); re-read progress, the request can only finish |
+| `409` | `TENANT_DESTROY_NOT_ABANDONABLE` | Abandon after Core authorized the drop (or after success); re-read progress, the request can only finish, or, halted, be resumed by a destroy under a new key. The workspace alert localizes it in English and Arabic |
 | `409` | `TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` | Retry provisioning cannot re-pin its failed plan to the current releases (a retried decommission, an active tenant's retry that still carries activation, an add-on binding on the superseded release, or an installed component that cannot move and rejects the result); update the tenant to the current release first |
 | `409` | `TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` | Retry provisioning would run a Core foundation step under a backup or maintenance prerequisite; nothing was planned |
 | `404` | `TENANT_DESTROY_NOT_FOUND` | Abandon named a request this tenant does not have; re-read progress |
@@ -1451,13 +1512,14 @@ The tenant detail workspace is source-integrated:
   `ACTIVE` or `SUSPENDED`;
 - FQDN rows load from exact `GET /tenants/:id/fqdns`; the list is reconciled
   after mutations and tenant detail remains an independent resource;
-- profile concurrency, lifecycle, delete/destroy/abandon-destroy, and every
-  FQDN command use caller-owned UUIDv7 intent keys and exact permission/state
-  gates;
+- profile concurrency, lifecycle, delete/destroy/abandon-destroy/resume-destroy,
+  and every FQDN command use caller-owned UUIDv7 intent keys and exact
+  permission/state gates;
 - a deleted tenant shows its destruction request, polls it only while Worker
-  advances it, and offers abandon for `BLOCKED` and `STOPPING_PROVISIONING`
-  (see [Permanent destroy](#permanent-destroy));
-- all 15 tenant provisioning routes and all 18 tenant access routes have typed
+  advances it, offers abandon only before the drop was authorized
+  (`STOPPING_PROVISIONING`, or `BLOCKED` in `STOPPING_PROVISIONING`) and resume
+  for a request halted after it (see [Permanent destroy](#permanent-destroy));
+- all 16 tenant provisioning routes and all 18 tenant access routes have typed
   UI surfaces;
 - subscription, billing summary, wallet, ledger, payment, refund, and payment
   reconciliation resources load independently by permission and only when the

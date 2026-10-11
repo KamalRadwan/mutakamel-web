@@ -192,6 +192,68 @@ describe("ProvisioningGovernanceScreen", () => {
     );
   });
 
+  // Core commit ba273fea: an installation judged against its component's
+  // current release can be lagging (OUTDATED) or unjudgeable (INCOMPATIBLE).
+  it("explains discovery codes in the reader's language and keeps Core's code beneath", () => {
+    const view = baseView();
+    const result = (
+      safeCode: string,
+      discoveredState: "OUTDATED" | "INCOMPATIBLE" | "DRIFTED",
+      suffix: string,
+    ) => ({
+      tenantId: "019f0000-0000-7000-8000-0000000000a1",
+      componentId: `019f0000-0000-7000-8000-0000000000${suffix}`,
+      discoveredState,
+      observedReleaseId: null,
+      observedSchemaVersion: null,
+      observedManifestChecksum: null,
+      safeCode,
+      resultDigest: "c".repeat(64),
+      observedAt: "2026-08-12T08:00:30.000Z",
+    });
+    view.selectedRunId = RUN.runId;
+    view.detail = {
+      state: "READY",
+      data: {
+        ...RUN,
+        results: [
+          result("PROVISIONING_DISCOVERY_RELEASE_UPGRADE_REQUIRED", "OUTDATED", "b1"),
+          result("PROVISIONING_DISCOVERY_CURRENT_RELEASE_UNAVAILABLE", "INCOMPATIBLE", "b2"),
+          result("PROVISIONING_DISCOVERY_NOT_YET_KNOWN", "DRIFTED", "b3"),
+        ],
+        resultsTruncated: false,
+      },
+      error: null,
+      isRefreshing: false,
+    };
+    hookMock.mockReturnValue(view);
+    const { unmount } = render(<ProvisioningGovernanceScreen />);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Discovery runs" }));
+
+    expect(
+      screen.getByText(/no longer its component's current release\. Only an update moves it/u),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("PROVISIONING_DISCOVERY_RELEASE_UPGRADE_REQUIRED"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/does not hold the component's current catalogue release/u),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("PROVISIONING_DISCOVERY_CURRENT_RELEASE_UNAVAILABLE"),
+    ).toBeInTheDocument();
+    // A code with no wording yet is shown as Core sent it.
+    expect(screen.getByText("PROVISIONING_DISCOVERY_NOT_YET_KNOWN")).toBeInTheDocument();
+    // Lagging tenants count in `driftedCount`, so the column says so.
+    expect(screen.getAllByText("Drifted or outdated").length).toBeGreaterThan(0);
+    unmount();
+
+    languageMock.lang = "ar";
+    render(<ProvisioningGovernanceScreen />);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "عمليات الاكتشاف" }));
+    expect(screen.getByText(/لا ينقله إلا تحديث/u)).toBeInTheDocument();
+  });
+
   it("fails closed for catalogue and discovery permissions and supports Arabic RTL", () => {
     languageMock.lang = "ar";
     const view = baseView();

@@ -39,7 +39,8 @@ import {
   Button,
   type ColumnDef,
 } from "@/design-system";
-import { formatDecimalString } from "../lib/report-filters";
+import { formatProvisioningDuration } from "@/features/admin/tenant-workspace/provisioning/model/operation-timing";
+import { formatDecimalString, hasReportWindow } from "../lib/report-filters";
 import { useReports } from "../hooks/use-reports";
 import {
   REPORT_KINDS,
@@ -86,7 +87,7 @@ const COPY = {
     error: "The report could not be loaded.",
     retry: "Retry",
     empty: "No rows match the applied report filters.",
-    healthyEmpty: "No tenants are currently stuck in provisioning.",
+    healthyEmpty: "No tenant's open operation is stalled.",
     responseAsOf: "Data as of",
     responseAt: "Response received",
     correlation: "Correlation ID",
@@ -110,6 +111,31 @@ const COPY = {
     count: "Count",
     total: "Total",
     stuck: "Stuck tenants",
+    stuckDescription:
+      "Tenants whose open operation has reported no progress past its threshold, by the same rule as the operation detail and the dashboard. Current state: the report takes no date window.",
+    operation: "Operation",
+    generation: (generation: string) => `Generation ${generation}`,
+    stalledAt: "Stalled at",
+    phase: "Phase",
+    reason: "Reason",
+    noProgressSince: "No progress since",
+    silentFor: (duration: string) => `for ${duration}`,
+    listedOfStuck: (listed: string, stuck: string) =>
+      `Showing the ${listed} longest stalls of ${stuck}. Choose more rows per report to list more.`,
+    operationTypes: {
+      INITIAL_PROVISION: "Initial provision",
+      RETRY: "Retry",
+      UPDATE: "Update",
+      ADD_APPLICATION: "Add Application",
+      ADDON_INSTALL: "Add-on install",
+      REPAIR: "Repair",
+      DECOMMISSION: "Decommission",
+    },
+    stallReasons: {
+      NO_PROGRESS: "No progress",
+      DISPATCH_LEASE_EXPIRED: "Dispatch lease expired",
+      CANCEL_PENDING: "Cancellation not confirmed",
+    },
     unknown: "Not recorded",
     allZero: "No tenant status rows were returned.",
     refreshing: "Refreshing report",
@@ -145,7 +171,7 @@ const COPY = {
     error: "تعذر تحميل التقرير.",
     retry: "إعادة المحاولة",
     empty: "لا توجد صفوف تطابق عوامل التصفية المطبقة.",
-    healthyEmpty: "لا يوجد مستأجرون عالقون في التجهيز حاليًا.",
+    healthyEmpty: "لا توجد عملية مفتوحة متعثرة لأي مستأجر.",
     responseAsOf: "البيانات حتى",
     responseAt: "وقت استلام الاستجابة",
     correlation: "معرف التتبع",
@@ -169,6 +195,31 @@ const COPY = {
     count: "العدد",
     total: "الإجمالي",
     stuck: "المستأجرون العالقون",
+    stuckDescription:
+      "المستأجرون الذين لم تُبلغ عمليتهم المفتوحة عن أي تقدّم بعد تجاوز حدّها، وفق القاعدة نفسها المعتمدة في تفاصيل العملية ولوحة المتابعة. الحالة الراهنة: لا يقبل التقرير نطاقًا زمنيًا.",
+    operation: "العملية",
+    generation: (generation: string) => `الجيل ${generation}`,
+    stalledAt: "موضع التعثر",
+    phase: "المرحلة",
+    reason: "السبب",
+    noProgressSince: "دون تقدّم منذ",
+    silentFor: (duration: string) => `منذ ${duration}`,
+    listedOfStuck: (listed: string, stuck: string) =>
+      `تُعرض أطول ${listed} حالات تعثر من أصل ${stuck}. اختر عددًا أكبر من الصفوف لعرض المزيد.`,
+    operationTypes: {
+      INITIAL_PROVISION: "التجهيز الأولي",
+      RETRY: "إعادة محاولة",
+      UPDATE: "تحديث",
+      ADD_APPLICATION: "إضافة تطبيق",
+      ADDON_INSTALL: "تثبيت إضافة",
+      REPAIR: "إصلاح",
+      DECOMMISSION: "إيقاف",
+    },
+    stallReasons: {
+      NO_PROGRESS: "لا تقدّم",
+      DISPATCH_LEASE_EXPIRED: "انتهت مهلة الإرسال",
+      CANCEL_PENDING: "الإلغاء لم يُؤكَّد",
+    },
     unknown: "غير مسجل",
     allZero: "لم يُرجع الخادم صفوفًا لحالات المستأجرين.",
     refreshing: "جارٍ تحديث التقرير",
@@ -340,7 +391,7 @@ function ReportFilters({
 
   return (
     <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-      {kind === "OVERVIEW" || kind === "BILLING" || kind === "PROVISIONING" ? (
+      {hasReportWindow(kind) ? (
         <>
           <Field
             label={copy.from}
@@ -926,12 +977,56 @@ function ProvisioningView({
       cell: (row) => <StatusBadge status={row.status} />,
     },
     {
-      key: "createdAt",
-      headerEn: copy.createdAt,
-      headerAr: copy.createdAt,
+      key: "operation",
+      headerEn: copy.operation,
+      headerAr: copy.operation,
       cell: (row) => (
-        <span className="whitespace-nowrap">
-          {formatDateTime(row.createdAt, lang)}
+        <span className="flex flex-col">
+          <span className="font-semibold text-foreground">
+            {copy.operationTypes[row.operation.type]}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {copy.generation(formatInteger(row.operation.generation, lang))}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "stalledAt",
+      headerEn: copy.stalledAt,
+      headerAr: copy.stalledAt,
+      // Core attributes the stall to a step when one is running; otherwise
+      // the operation's current phase is where it stopped.
+      cell: (row) =>
+        row.stall.stepKey ? (
+          <code dir="ltr" className="font-mono text-xs">
+            {row.stall.stepKey}
+          </code>
+        ) : (
+          <span className="flex flex-col">
+            <span className="text-xs text-muted-foreground">{copy.phase}</span>
+            <code dir="ltr" className="font-mono text-xs">
+              {row.operation.currentPhase}
+            </code>
+          </span>
+        ),
+    },
+    {
+      key: "reason",
+      headerEn: copy.reason,
+      headerAr: copy.reason,
+      cell: (row) => copy.stallReasons[row.stall.reason],
+    },
+    {
+      key: "since",
+      headerEn: copy.noProgressSince,
+      headerAr: copy.noProgressSince,
+      cell: (row) => (
+        <span className="flex flex-col whitespace-nowrap">
+          <span>{formatDateTime(row.stall.since, lang)}</span>
+          <span className="text-xs text-muted-foreground">
+            {copy.silentFor(formatProvisioningDuration(row.stall.ageSeconds, lang))}
+          </span>
         </span>
       ),
     },
@@ -943,10 +1038,19 @@ function ProvisioningView({
         <StatCard
           label={copy.stuck}
           value={formatInteger(data.stuck, lang)}
+          description={copy.stuckDescription}
           icon={TriangleAlert}
           tone={data.stuck > 0 ? "warn" : undefined}
         />
       </StatGrid>
+      {data.stuck > data.items.length ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          {copy.listedOfStuck(
+            formatInteger(data.items.length, lang),
+            formatInteger(data.stuck, lang),
+          )}
+        </p>
+      ) : null}
       <DataTable
         labelEn={COPY.en.provisioning}
         labelAr={COPY.ar.provisioning}

@@ -129,6 +129,100 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(model.provisioning.cancelOperation).not.toHaveBeenCalled();
   });
 
+  // Resync changes nothing by itself, so it is sent from the button, with no
+  // confirmation, and only while Core's `exits.resync` allows it.
+  it("offers Resync for an open operation and sends it without a confirmation", () => {
+    const model = makeModel();
+    render(<TenantProvisioningWorkspaceView model={model} />);
+
+    const resync = screen.getByRole("button", { name: "Resync" });
+    expect(resync).toBeEnabled();
+    fireEvent.click(resync);
+    expect(model.requestResync).toHaveBeenCalledWith(
+      expect.objectContaining({ id: OPERATION_ID }),
+    );
+    expect(model.requestCancel).not.toHaveBeenCalled();
+  });
+
+  it("keeps Resync visible but disabled until the Worker holds the plan", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({ operationStatus: "QUEUED", notDispatched: true })}
+      />,
+    );
+
+    const resync = screen.getByRole("button", { name: "Resync" });
+    expect(resync).toBeDisabled();
+    expect(resync).toHaveAccessibleDescription(
+      /Nothing has been handed to the Worker yet/u,
+    );
+  });
+
+  it("points a failed generation at Re-provision instead of Resync", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({ operationStatus: "FAILED_RETRYABLE" })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Resync" })).toBeDisabled();
+    expect(
+      screen.getByText(
+        "Resync: A failed or cancelled generation is settled; re-provision it instead.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("offers Resync for a success only while one of its steps is unsettled", () => {
+    const { unmount } = render(
+      <TenantProvisioningWorkspaceView model={makeModel({ operationStatus: "SUCCEEDED" })} />,
+    );
+    expect(screen.queryByRole("button", { name: "Resync" })).toBeNull();
+    unmount();
+
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({ operationStatus: "SUCCEEDED", unsettledSteps: true })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Resync" })).toBeEnabled();
+  });
+
+  it("shows a resync in flight on its own button", () => {
+    render(<TenantProvisioningWorkspaceView model={makeModel({ resyncing: true })} />);
+
+    const resync = screen.getByRole("button", { name: "Resync" });
+    expect(resync).toBeDisabled();
+    expect(resync).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("names the step a NO_PROGRESS stall is attributed to, and offers Resync first", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({
+          stall: {
+            stepKey: "core.foundation.schema",
+            since: "2026-08-11T19:30:00.000Z",
+            ageSeconds: 240,
+            reason: "NO_PROGRESS",
+          },
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText("Stalled at Core foundation — schema · no progress for 4 min"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Core foundation — schema has reported neither a transition nor a Worker heartbeat for 4 min/u,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Resync asks the Worker now to re-deliver the progress it retained/u),
+    ).toBeInTheDocument();
+  });
+
   it("localizes command refusals and points a release-upgrade refusal at Updates", () => {
     const model = makeModel({
       localError: "TENANT_PROVISIONING_OPERATION_SUPERSEDED",
@@ -237,11 +331,23 @@ function makeModel(
     section?: "operations" | "updates" | "state" | "prerequisites" | "managed";
     seedRevision?: number | null;
     prerequisiteCount?: number;
-    operationStatus?: "RUNNING" | "FAILED_RETRYABLE" | "CANCEL_REQUESTED" | "CANCELLED";
+    operationStatus?:
+      | "QUEUED"
+      | "RUNNING"
+      | "SUCCEEDED"
+      | "FAILED_RETRYABLE"
+      | "CANCEL_REQUESTED"
+      | "CANCELLED";
     selectedGeneration?: number;
     latestGeneration?: number;
     localError?: string;
     confirming?: ProvisioningConfirmation["kind"];
+    /** A QUEUED plan still awaiting its prerequisites. */
+    notDispatched?: boolean;
+    /** A success whose step projection was left RUNNING. */
+    unsettledSteps?: boolean;
+    stall?: Record<string, unknown> | null;
+    resyncing?: boolean;
   } = {},
 ): TenantProvisioningWorkspaceModel {
   const operationStatus = options.operationStatus ?? "RUNNING";
@@ -257,10 +363,13 @@ function makeModel(
       status: operationStatus,
       generation: selectedGeneration,
       prerequisiteCount: options.prerequisiteCount ?? 0,
+      stall: options.stall ?? null,
       // A newer generation in these fixtures has always succeeded.
       exits: operationExits(operationStatus, {
         superseded,
         latestStatus: superseded ? "SUCCEEDED" : operationStatus,
+        notDispatched: options.notDispatched,
+        unsettledSteps: options.unsettledSteps,
       }),
     }),
   );
@@ -310,6 +419,12 @@ function makeModel(
     operationActions: {
       cancel: provisioningActionState("cancel", detail.exits.cancel, true, false),
       retry: provisioningActionState("retry", detail.exits.retry, true, false),
+      resync: provisioningActionState(
+        "resync",
+        detail.exits.resync,
+        true,
+        options.resyncing === true,
+      ),
     },
     repairAction: provisioningActionState(
       "repair",
@@ -320,6 +435,7 @@ function makeModel(
     confirmation,
     requestCancel: noop,
     requestRetry: noop,
+    requestResync: asyncNoop,
     requestRepair: noop,
     dismissConfirmation: noop,
     confirmPending: asyncNoop,
@@ -365,6 +481,7 @@ function makeModel(
       permissions: {
         canReadOperations: true,
         canRetryOrCancel: true,
+        canResync: true,
         canApplyUpdates: true,
         canReadPrerequisites: true,
         canRequestPrerequisites: true,
@@ -403,7 +520,11 @@ function makeModel(
       }),
       seeds: ready({ items: [seed], meta: META }),
       prerequisites: ready([]),
-      mutation: { name: null, intentKey: null, error: null },
+      mutation: {
+        name: options.resyncing ? "resync" : null,
+        intentKey: null,
+        error: null,
+      },
       polling: true,
       pollPaused: false,
       pollIntervalMs: 3_000,
@@ -411,6 +532,7 @@ function makeModel(
       refreshAll: asyncNoop,
       retryOperation: asyncNoop,
       cancelOperation: vi.fn().mockResolvedValue(undefined),
+      resyncOperation: asyncNoop,
       applyUpdates: asyncNoop,
       requestPrerequisites: asyncNoop,
       addApplication: asyncNoop,

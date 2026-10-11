@@ -5,7 +5,10 @@ import { CircleX, RefreshCw, TriangleAlert, Undo2 } from "lucide-react";
 import { Button, CodeRef, cn } from "@/design-system";
 import { formatLocaleNumber, localeForLanguage } from "@/i18n/locale";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
-import { isTenantDestroyAdvancing } from "../model/destroy";
+import {
+  isTenantDestroyAdvancing,
+  tenantDestroyHaltedPhase,
+} from "../model/destroy";
 import type { TenantDestroyPhase, TenantDestroyView } from "../types";
 import {
   tenantDestroyReasonLabel,
@@ -20,7 +23,7 @@ export interface TenantDestroyStatusProps {
   operation: TenantDestroyView | null;
   loadError: NormalizedApiError | null;
   polling: boolean;
-  /** Core refused an abandon because the drop was already authorized. */
+  /** Core refused an abandon because the drop was already authorized (409 `TENANT_DESTROY_NOT_ABANDONABLE`). */
   notAbandonable: boolean;
   onRefresh: () => void;
 }
@@ -74,6 +77,12 @@ export function TenantDestroyStatus({
 
   const { phase } = operation;
   const advancing = isTenantDestroyAdvancing(phase);
+  // A request BLOCKED after the drop was authorized halted in place: it is
+  // resumed rather than abandoned, so it is titled and explained apart from a
+  // stop that blocked before the drop.
+  const halted = tenantDestroyHaltedPhase(operation);
+  const title = halted ? text.destroyHaltedPhases[halted] : text.destroyPhases[phase];
+  const hint = halted ? text.destroyHaltedHints[halted] : text.destroyPhaseHints[phase];
   const Icon =
     phase === "BLOCKED" ? TriangleAlert : phase === "ABANDONED" ? Undo2 : RefreshCw;
 
@@ -92,10 +101,10 @@ export function TenantDestroyStatus({
             )}
             aria-hidden="true"
           />
-          {text.destroyPhases[phase]}
+          {title}
         </p>
         <p id={`${id}-hint`} className="mt-1">
-          {text.destroyPhaseHints[phase]}
+          {hint}
         </p>
       </div>
 

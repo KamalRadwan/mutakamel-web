@@ -18,6 +18,7 @@ import {
 import type { useTenantCoreWorkspace } from "../hooks/useTenantCoreWorkspace";
 import {
   canAbandonTenantDestroy,
+  canResumeTenantDestroy,
   tenantDestroyHoldsTenant,
 } from "../model/destroy";
 import {
@@ -34,9 +35,11 @@ type LifecycleAction =
   | "soft-delete"
   | "restore"
   | "destroy"
-  | "abandon-destroy";
+  | "abandon-destroy"
+  | "resume-destroy";
 
-type DialogAction = Exclude<LifecycleAction, "abandon-destroy">;
+/** Actions confirmed by the shared dialog; abandon and resume have their own. */
+type DialogAction = Exclude<LifecycleAction, "abandon-destroy" | "resume-destroy">;
 
 const DESTROY_STATUS_ID = "tenant-destroy-status";
 
@@ -61,8 +64,12 @@ export function TenantLifecyclePanel({
   // A request that was not abandoned holds the tenant: Core refuses restore
   // and answers a new destroy with that same request.
   const heldByDestruction = tenantDestroyHoldsTenant(destroyOperation);
+  // Abandon is offered only before the drop was authorized; a request that
+  // halted after it is resumed instead, which Core does on a new request.
   const canAbandon =
     workspace.permissions.canDestroy && canAbandonTenantDestroy(destroyOperation);
+  const canResume =
+    workspace.permissions.canDestroy && canResumeTenantDestroy(destroyOperation);
   const busy = workspace.mutation.name !== null;
   const heldReason = heldByDestruction ? `${DESTROY_STATUS_ID}-hint` : undefined;
   const actionLabel: Record<DialogAction, string> = {
@@ -79,7 +86,9 @@ export function TenantLifecyclePanel({
     destroy: text.destroyHint,
   };
   const dialogAction =
-    confirmation === "abandon-destroy" ? null : confirmation;
+    confirmation === "abandon-destroy" || confirmation === "resume-destroy"
+      ? null
+      : confirmation;
   const en = tenantWorkspaceCopy("en");
   const ar = tenantWorkspaceCopy("ar");
 
@@ -113,6 +122,19 @@ export function TenantLifecyclePanel({
       await workspace.abandonDestruction();
     } catch {
       // Shown by the workspace alert and the destruction status block.
+    } finally {
+      setConfirmation(null);
+    }
+  };
+
+  // Same contract as abandon: sent once, the dialog closes either way, and a
+  // rejection lands in the workspace alert. Success shows in the status block,
+  // whose phase changes back to the one Worker now advances.
+  const confirmResume = async () => {
+    try {
+      await workspace.resumeDestruction();
+    } catch {
+      // Shown by the workspace alert.
     } finally {
       setConfirmation(null);
     }
@@ -196,14 +218,23 @@ export function TenantLifecyclePanel({
             onClick={() => setConfirmation("soft-delete")}
           />
         )}
-        {/* While destruction holds the tenant, abandoning it is the one way
-            back, so it leads the deleted tenant's actions. */}
+        {/* While destruction holds the tenant, the operator's way forward
+            leads the deleted tenant's actions: abandon before the drop was
+            authorized (the one way back), resume after it halted. */}
         {canAbandon && (
           <ActionButton
             label={text.abandonDestroy}
             disabled={busy}
             variant="secondary"
             onClick={() => setConfirmation("abandon-destroy")}
+          />
+        )}
+        {canResume && (
+          <ActionButton
+            label={text.resumeDestroy}
+            disabled={busy}
+            variant="destructive"
+            onClick={() => setConfirmation("resume-destroy")}
           />
         )}
         {/* Restore is offered before destroy so the reversible action is the
@@ -270,6 +301,21 @@ export function TenantLifecyclePanel({
         loadingLabel={text.abandoning}
         variant="warning"
         isLoading={workspace.mutation.name === "abandon-destroy"}
+      />
+
+      <ConfirmActionModal
+        isOpen={confirmation === "resume-destroy"}
+        onClose={() => setConfirmation(null)}
+        onConfirm={confirmResume}
+        titleEn={en.resumeConfirmTitle(tenant.name)}
+        titleAr={ar.resumeConfirmTitle(tenant.name)}
+        descriptionEn={en.resumeConfirmDescription(tenant.name)}
+        descriptionAr={ar.resumeConfirmDescription(tenant.name)}
+        confirmTextEn={en.resumeDestroy}
+        confirmTextAr={ar.resumeDestroy}
+        loadingLabel={text.resuming}
+        variant="danger"
+        isLoading={workspace.mutation.name === "resume-destroy"}
       />
     </Card>
     </section>

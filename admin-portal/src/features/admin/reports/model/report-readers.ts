@@ -1,8 +1,14 @@
+import { readTenantOperationStall } from "@/features/admin/tenant-workspace/provisioning/model/readers";
+import {
+  TENANT_OPERATION_STATUSES,
+  TENANT_OPERATION_TYPES,
+} from "@/features/admin/tenant-workspace/provisioning/types";
 import type {
   BillingReport,
   BillingReportBucket,
   OverviewReport,
   ProvisioningReport,
+  ProvisioningReportOperation,
   ProvisioningReportRow,
   ReportSnapshot,
   ServerReportRow,
@@ -13,6 +19,7 @@ import type {
 
 const WIRE_IDENTIFIER = /^[A-Z][A-Z0-9_]*$/;
 const DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+const REPORT_ERROR = "INVALID_ADMIN_REPORT_RESPONSE";
 
 export function readOverviewReport(
   payload: unknown,
@@ -105,9 +112,13 @@ export function readProvisioningReport(
   return readEnvelope(payload, (value) => {
     const data = requiredRecord(value);
     if (!Array.isArray(data.items)) invalid();
+    const stuck = nonNegativeInteger(data.stuck);
+    // `stuck` counts every stalled tenant and `items` lists at most `limit`
+    // of them, so a page longer than the count is a broken projection.
+    if (data.items.length > stuck) invalid();
     return {
       asOf: isoTimestamp(data.asOf),
-      stuck: nonNegativeInteger(data.stuck),
+      stuck,
       items: data.items.map(readProvisioningRow),
     };
   });
@@ -201,7 +212,28 @@ function readProvisioningRow(value: unknown): ProvisioningReportRow {
     name: boundedString(row.name, 500),
     status: wireIdentifier(row.status),
     createdAt: isoTimestamp(row.createdAt),
+    operation: readProvisioningOperation(row.operation),
+    stall: readTenantOperationStall(row.stall, REPORT_ERROR),
   };
+}
+
+function readProvisioningOperation(value: unknown): ProvisioningReportOperation {
+  const operation = requiredRecord(value);
+  return {
+    id: boundedString(operation.id, 200),
+    type: oneOf(operation.type, TENANT_OPERATION_TYPES),
+    status: oneOf(operation.status, TENANT_OPERATION_STATUSES),
+    currentPhase: boundedString(operation.currentPhase, 160),
+    generation: positiveInteger(operation.generation),
+  };
+}
+
+function oneOf<const Values extends readonly string[]>(
+  value: unknown,
+  values: Values,
+): Values[number] {
+  if (typeof value !== "string" || !values.includes(value)) invalid();
+  return value as Values[number];
 }
 
 function requiredRecord(value: unknown): Record<string, unknown> {
@@ -281,5 +313,5 @@ function requiredBoolean(value: unknown): boolean {
 }
 
 function invalid(): never {
-  throw new Error("INVALID_ADMIN_REPORT_RESPONSE");
+  throw new Error(REPORT_ERROR);
 }

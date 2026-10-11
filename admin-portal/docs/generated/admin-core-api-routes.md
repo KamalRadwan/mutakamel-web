@@ -3,15 +3,15 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-10-10T21:14:04.465Z**
+Generated at: **2026-10-11T01:32:03.648Z**
 
-Frontend revision: `f4841d302b48+dirty`
+Frontend revision: `52ce61ba74fa+dirty`
 
-Backend revision: `b31b95d2a4ed+dirty`
+Backend revision: `805710806ce9+dirty`
 
 ## Coverage
 
-This inventory contains **288** browser-visible Core Admin routes.
+This inventory contains **289** browser-visible Core Admin routes.
 It proves Gateway method/path, route class, idempotency, and permission
 metadata. It does not prove DTO fields, response projections, runtime
 feature flags, deployment, or current frontend implementation.
@@ -21,8 +21,8 @@ feature flags, deployment, or current frontend implementation.
 | AUTHENTICATED | 103 |
 | PUBLIC | 6 |
 | READ_HEAVY | 23 |
-| WRITE_SENSITIVE | 156 |
-| **Total** | **288** |
+| WRITE_SENSITIVE | 157 |
+| **Total** | **289** |
 
 Machine-readable source:
 [admin-core-api-routes.json](admin-core-api-routes.json).
@@ -51,7 +51,7 @@ Machine-readable source:
 | subscriptions | 12 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
-| tenants | 59 |
+| tenants | 60 |
 | users | 10 |
 | wallets | 6 |
 
@@ -299,6 +299,7 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/tenants/:tenantId/operations` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.operations.list` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/operations/:operationId` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.operations.get` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/operations/:operationId/cancel` | WRITE_SENSITIVE | yes | ALL | admin.tenants.read + admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.operations.cancel` |
+| POST | `/api/admin/core/v1/tenants/:tenantId/operations/:operationId/resync` | WRITE_SENSITIVE | yes | ALL | admin.tenants.read + admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.operations.resync` |
 | POST | `/api/admin/core/v1/tenants/:tenantId/operations/:operationId/retry` | WRITE_SENSITIVE | yes | ALL | admin.tenants.read + admin.tenants.reprovision + admin.tenants.critical | `core.admin.tenants.operations.retry` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/operations/:operationId/timeline` | AUTHENTICATED | yes | ALL | admin.tenants.read | `core.admin.tenants.operations.timeline` |
 | GET | `/api/admin/core/v1/tenants/:tenantId/payments` | AUTHENTICATED | yes | ALL | admin.wallet.read | `core.admin.payments.by-tenant.list` |

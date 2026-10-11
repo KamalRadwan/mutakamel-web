@@ -94,6 +94,12 @@ export interface ProvisioningGovernanceCopy {
   component: string;
   observed: string;
   safeCode: string;
+  /**
+   * What a discovery result's `safeCode` means, keyed by Core's code
+   * (core-app `provisioning-discovery.service.ts`). The raw code is always
+   * shown beneath; a code missing here is shown on its own.
+   */
+  discoverySafeCodes: Readonly<Partial<Record<string, string>>>;
   truncated: string;
   errorCode: string;
 }
@@ -191,7 +197,7 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     scanned: "Scanned",
     eligible: "Eligible",
     remaining: "Remaining",
-    drifted: "Drifted",
+    drifted: "Drifted or outdated",
     incompatible: "Incompatible",
     complete: "Sweep complete",
     inspect: "Inspect results",
@@ -200,6 +206,22 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     component: "Component",
     observed: "Observed",
     safeCode: "Safe code",
+    discoverySafeCodes: {
+      PROVISIONING_DISCOVERY_RELEASE_UPGRADE_REQUIRED:
+        "Runs, or is moving to, a release that is no longer its component's current release. Only an update moves it: apply the update from the tenant's Provisioning tab.",
+      PROVISIONING_DISCOVERY_CURRENT_RELEASE_UNAVAILABLE:
+        "This control plane does not hold the component's current catalogue release, so the installation cannot be judged against it.",
+      PROVISIONING_DISCOVERY_DESIRED_RELEASE_INVALID:
+        "The release the installation is meant to run is not a known release of this component, or its checksum does not match.",
+      PROVISIONING_DISCOVERY_APPLIED_EVIDENCE_DRIFTED:
+        "The applied release evidence does not match a known release of this component.",
+      PROVISIONING_DISCOVERY_INSTALLATION_STATE_DRIFTED:
+        "The installation runs its current release but is not in the READY state.",
+      PROVISIONING_DISCOVERY_EXPECTED_INSTALLATION_MISSING:
+        "The tenant's subscription includes this component, but it has no installation of it.",
+      PROVISIONING_DISCOVERY_EXPECTED_RELEASE_UNAVAILABLE:
+        "The tenant's subscription includes this component, which has no installation and no current release this control plane holds.",
+    },
     truncated: "Only the first 1,000 results are shown.",
     errorCode: "Error code",
   },
@@ -295,7 +317,7 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     scanned: "تم فحصه",
     eligible: "المؤهل",
     remaining: "المتبقي",
-    drifted: "المنحرف",
+    drifted: "منحرف أو متأخر",
     incompatible: "غير المتوافق",
     complete: "اكتمل المسح",
     inspect: "فحص النتائج",
@@ -304,6 +326,22 @@ export const COPY: Record<"ar" | "en", ProvisioningGovernanceCopy> = {
     component: "المكوّن",
     observed: "وقت الرصد",
     safeCode: "الرمز الآمن",
+    discoverySafeCodes: {
+      PROVISIONING_DISCOVERY_RELEASE_UPGRADE_REQUIRED:
+        "يعمل على إصدار، أو ينتقل إلى إصدار، لم يعد الإصدار الحالي لمكوّنه. لا ينقله إلا تحديث: طبّق التحديث من تبويب «التجهيز» لدى المستأجر.",
+      PROVISIONING_DISCOVERY_CURRENT_RELEASE_UNAVAILABLE:
+        "لا تملك لوحة التحكم هذه الإصدار الحالي لهذا المكوّن في الكتالوج، لذا لا يمكن تقييم التثبيت مقارنةً به.",
+      PROVISIONING_DISCOVERY_DESIRED_RELEASE_INVALID:
+        "الإصدار الذي يُفترض أن يعمل عليه التثبيت ليس إصدارًا معروفًا لهذا المكوّن، أو أن بصمته لا تطابق.",
+      PROVISIONING_DISCOVERY_APPLIED_EVIDENCE_DRIFTED:
+        "أدلة الإصدار المطبّق لا تطابق إصدارًا معروفًا لهذا المكوّن.",
+      PROVISIONING_DISCOVERY_INSTALLATION_STATE_DRIFTED:
+        "يعمل التثبيت على إصداره الحالي لكنه ليس في حالة READY.",
+      PROVISIONING_DISCOVERY_EXPECTED_INSTALLATION_MISSING:
+        "يتضمن اشتراك المستأجر هذا المكوّن، لكن لا يوجد تثبيت له.",
+      PROVISIONING_DISCOVERY_EXPECTED_RELEASE_UNAVAILABLE:
+        "يتضمن اشتراك المستأجر هذا المكوّن، ولا يوجد له تثبيت ولا إصدار حالي تملكه لوحة التحكم هذه.",
+    },
     truncated: "تظهر أول 1,000 نتيجة فقط.",
     errorCode: "رمز الخطأ",
   },

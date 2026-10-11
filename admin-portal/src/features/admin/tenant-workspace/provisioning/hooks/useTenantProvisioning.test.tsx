@@ -14,6 +14,7 @@ const { apiMock, authMock, generateMock } = vi.hoisted(() => ({
     listSeeds: vi.fn(),
     retryOperation: vi.fn(),
     cancelOperation: vi.fn(),
+    resyncOperation: vi.fn(),
     applyUpdates: vi.fn(),
     requestPrerequisites: vi.fn(),
     addApplication: vi.fn(),
@@ -268,6 +269,53 @@ describe("useTenantProvisioning", () => {
     ]);
     expect(generateMock).toHaveBeenCalledTimes(1);
     expect(result.current.selectedOperationId).toBe(RETRY_OPERATION_ID);
+  });
+
+  // Core accepts a Resync at once and the Worker's re-delivered records
+  // follow, so the operation is read again a few seconds later even when the
+  // poll is not watching it.
+  it("resyncs under its own key and reads the operation again once the records can have arrived", async () => {
+    const detail = readTenantOperationDetail(operationDetail());
+    apiMock.resyncOperation.mockResolvedValue({
+      replayed: false,
+      resync: {
+        requestId: "019f0000-0000-7000-8000-000000000060",
+        requestedAt: "2026-08-11T19:33:49.000Z",
+        reasonCode: "CORE.PROVISIONING.RESYNC_REQUESTED_BY_ADMIN",
+      },
+      operation: detail,
+    });
+    const { result } = renderHook(() =>
+      useTenantProvisioning(TENANT_ID, { pollIntervalMs: 60_000 }),
+    );
+    await waitFor(() =>
+      expect(result.current.selectedOperation.status).toBe("ready"),
+    );
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        await result.current.resyncOperation(OPERATION_ID);
+      });
+      expect(apiMock.resyncOperation).toHaveBeenCalledWith(
+        TENANT_ID,
+        OPERATION_ID,
+        COMMAND_ID,
+      );
+      expect(result.current.mutation.name).toBeNull();
+      const readsAfterAccept = apiMock.getOperation.mock.calls.length;
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_999);
+      });
+      expect(apiMock.getOperation).toHaveBeenCalledTimes(readsAfterAccept);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(apiMock.getOperation).toHaveBeenCalledTimes(readsAfterAccept + 1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("never dispatches a seed conflict command without the hidden revision fence", async () => {

@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   status: "PROVISIONING" as string,
+  lang: "en" as "en" | "ar",
+  mutationError: null as unknown,
   permissions: [] as string[],
   accessPanel: vi.fn(),
   billingHook: vi.fn(),
@@ -39,7 +41,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => ({ lang: "en", dir: "ltr" }),
+  useI18n: () => ({ lang: mocks.lang, dir: mocks.lang === "ar" ? "rtl" : "ltr" }),
 }));
 vi.mock("./core/hooks/useTenantCoreWorkspace", () => ({
   useTenantCoreWorkspace: (tenantId: string) => ({
@@ -51,7 +53,7 @@ vi.mock("./core/hooks/useTenantCoreWorkspace", () => ({
     },
     resourceState: "ready",
     permissions: {},
-    mutation: { name: null, error: null },
+    mutation: { name: null, error: mocks.mutationError },
     isPolling: mocks.status === "PROVISIONING",
     pollExhausted: false,
     refresh: mocks.refresh,
@@ -94,6 +96,8 @@ import { TenantWorkspaceScreen } from "./TenantWorkspaceScreen";
 describe("TenantWorkspaceScreen post-create lifecycle", () => {
   beforeEach(() => {
     mocks.status = "PROVISIONING";
+    mocks.lang = "en";
+    mocks.mutationError = null;
     mocks.permissions = [];
     mocks.accessPanel.mockReset();
     mocks.billingHook.mockReset();
@@ -204,11 +208,40 @@ describe("TenantWorkspaceScreen post-create lifecycle", () => {
     await screen.findByText("provisioning-panel");
     expect(screen.queryByText("billing-panel")).not.toBeInTheDocument();
   });
+
+  // Core's refusal message is English-only; the alert speaks the portal's
+  // language and keeps the code as evidence.
+  it.each([
+    ["en", "This destruction request can no longer be abandoned"],
+    ["ar", "لم يعد ممكنًا التخلي عن طلب الحذف النهائي هذا"],
+  ] as const)("localizes Core's refusal to abandon a destruction (%s)", (lang, text) => {
+    mocks.status = "DELETED";
+    mocks.lang = lang;
+    mocks.mutationError = {
+      isNormalized: true,
+      httpStatus: 409,
+      errorCode: "TENANT_DESTROY_NOT_ABANDONABLE",
+      message:
+        "The database drop was already authorized and the database may be gone, so this request cannot be abandoned. Request destruction again to resume it.",
+      correlationId: "corr-9",
+    };
+    render(
+      <TenantWorkspaceScreen tenantId="019f0000-0000-7000-8000-000000000001" />,
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(text);
+    expect(alert).not.toHaveTextContent("Request destruction again");
+    expect(alert).toHaveTextContent("TENANT_DESTROY_NOT_ABANDONABLE");
+    expect(alert).toHaveTextContent("corr-9");
+  });
 });
 
 describe("TenantWorkspaceScreen placement-move entry points", () => {
   beforeEach(() => {
     mocks.status = "ACTIVE";
+    mocks.lang = "en";
+    mocks.mutationError = null;
     mocks.permissions = [];
   });
 

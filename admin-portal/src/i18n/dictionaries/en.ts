@@ -1732,8 +1732,10 @@ export const en: Dictionary = {
       blocked: "Blocked",
       pending: "Pending",
       contractShort: "contract v",
-      release: "Release",
-      releaseRequired: "Release required",
+      // `latestPublishedRelease` is the component's current catalogue release
+      // (Core commit ba273fea), null when this control plane does not hold it.
+      release: "Current release",
+      releaseRequired: "Current release required",
       noCredential:
         "Worker routing is server-authoritative. No password, secret, SQL, or migration body is exposed.",
       checks: {
@@ -2492,6 +2494,8 @@ export const en: Dictionary = {
       TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED:
         "Acknowledge retained-data behavior.",
       INVALID_PROVISIONING_REASON_CODE: "Use an uppercase safe reason code.",
+      TENANT_PROVISIONING_RESYNC_NOT_ALLOWED:
+        "Core refused the resync: the Worker does not hold this operation's plan yet, or the operation is already settled. Refresh the operation to see which actions it allows now.",
       "GW.IDEM.IN_FLIGHT":
         "The exact command is still in flight; retry keeps the same key.",
     },
@@ -2533,10 +2537,18 @@ export const en: Dictionary = {
     viewCurrentOperationButton: "View current operation",
     openUpdatesButton: "Open updates",
     requestCancelButton: "Request cancel",
+    resyncButton: "Resync",
+    resyncRequestedTitle: "Resync requested",
+    resyncRequestedMessage:
+      "The Worker re-delivers the progress it retained for this operation, and Core applies each record as it arrives. This view reads the operation again in a few seconds.",
+    resyncTerminalReason:
+      "A failed or cancelled generation is settled; re-provision it instead.",
     stalledBadge: (duration: string) => `Stalled · no progress for ${duration}`,
+    stalledAtStepBadge: (step: string, duration: string) =>
+      `Stalled at ${step} · no progress for ${duration}`,
     stallNoProgressNote: (duration: string, step: string | null) =>
       step
-        ? `No progress has been reported for ${duration} at ${step}. The Worker may have stopped, or the step is taking longer than expected.`
+        ? `${step} has reported neither a transition nor a Worker heartbeat for ${duration}, three heartbeats missed. The Worker may have stopped, lost its record of the step, or let the step's lease run out.`
         : `No progress has been reported for ${duration}. The Worker may have stopped, or the work is taking longer than expected.`,
     stallDispatchLeaseExpiredNote: (duration: string, step: string | null) =>
       `${step ?? "A step"} was handed to its owning application ${duration} ago and no result has come back. Its 5-minute dispatch lease has expired and the Worker has not sent it again.`,
@@ -2548,6 +2560,8 @@ export const en: Dictionary = {
       "Request cancellation to stop it. Re-provisioning becomes available once the Worker confirms the stop.",
     stallAwaitWorkerGuidance:
       "No operator action can move it on until the Worker confirms the stop. Check that the Worker is running.",
+    stallResyncGuidance:
+      "Resync asks the Worker now to re-deliver the progress it retained, which settles a step whose result was lost on the way. Core also asks for it on its own, with backoff.",
     exitBlockedReasons: {
       OPERATION_SUPERSEDED: "A newer generation exists. Act on the latest operation instead.",
       ADDON_INSTALLATION_OWNED:
@@ -2558,6 +2572,8 @@ export const en: Dictionary = {
         "An operation is still open. This becomes available after it finishes or its cancellation completes.",
       OPERATION_SUCCEEDED: "The operation succeeded; there is nothing to re-provision.",
       OPERATION_TERMINAL: "The operation has already finished; there is nothing to cancel.",
+      OPERATION_NOT_DISPATCHED:
+        "Nothing has been handed to the Worker yet: the plan is not dispatched, or it is waiting on its backup or maintenance prerequisites.",
     },
     cancelConfirmTitle: (operation: string, generation: number) =>
       `Request cancellation of ${operation} · generation ${generation}?`,
@@ -2566,7 +2582,7 @@ export const en: Dictionary = {
     retryConfirmTitle: (operation: string, generation: number) =>
       `Re-provision ${operation} · generation ${generation}?`,
     retryConfirmDescription: (nextGeneration: number) =>
-      `Core plans generation ${nextGeneration}, which runs again only the steps that did not complete, pinned to the same releases; each must still be its component's current release. This generation and its timeline stay as history. A tenant whose initial provisioning failed returns to provisioning.`,
+      `Core plans generation ${nextGeneration}, which runs again only the steps that did not complete, on the current releases: a component this generation pinned to a release since superseded moves to its current release. This generation and its timeline stay as history. A tenant whose initial provisioning failed returns to provisioning.`,
     repairConfirmTitle: (component: string) => `Repair ${component}?`,
     repairConfirmDescription:
       "Core opens a repair operation pinned to the component's current desired release; it does not upgrade. The component's migrations are checked against that release and every seed pack is applied again under its policy, including seeds closed by a conflict decision; its dependencies are only verified. A repair whose releases require a backup or maintenance window is refused, because Core foundation steps cannot run under one, and no other operation can start until the repair finishes.",

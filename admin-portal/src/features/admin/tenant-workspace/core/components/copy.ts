@@ -44,6 +44,17 @@ const copy = {
       ABANDONED:
         "The database was kept. The tenant stays soft-deleted and can be restored or destroyed again.",
     },
+    /** A BLOCKED request that halted after the drop was authorized. */
+    destroyHaltedPhases: {
+      DROPPING_DATABASE: "Destruction halted while deleting the database",
+      FINALIZING: "Destruction halted while finalizing",
+    },
+    destroyHaltedHints: {
+      DROPPING_DATABASE:
+        "Deleting the database kept failing, so automatic attempts have ended. The drop was already authorized and the database may already be gone, so this request cannot be abandoned and the tenant cannot be restored. Fix the reason below, then resume destruction.",
+      FINALIZING:
+        "The database was dropped, but releasing the tenant's identity and capacity kept failing, so automatic attempts have ended. This request cannot be abandoned and the tenant cannot be restored. Fix the reason below, then resume destruction.",
+    },
     destroyReason: "Reason",
     destroyBlockedBy: "Blocked by",
     destroyLatestAttempt: "Latest attempt",
@@ -61,7 +72,15 @@ const copy = {
     destroyRefreshFailed:
       "The latest status refresh failed; the last known status is shown.",
     destroyNotAbandonable:
-      "This request can no longer be abandoned: the database drop was already authorized, so it can only finish. Its status was refreshed.",
+      "This request can no longer be abandoned: the database drop was already authorized and the database may already be gone. It can only finish, or be resumed if it halted. Its status was refreshed.",
+    /** Core refusals of a destruction command, shown in the workspace alert. */
+    destroyCommandErrors: {
+      TENANT_DESTROY_NOT_ABANDONABLE:
+        "This destruction request can no longer be abandoned: the database drop was already authorized and the database may already be gone. It can only finish, or be resumed if it halted.",
+    },
+    /** Any `WORKER.TENANT_DESTROY.DATABASE.<class>` code; the class stays in the code. */
+    destroyDatabaseReason:
+      "The worker could not use the tenant's Database Server.",
     destroyReasons: {
       TENANT_DESTROY_OPEN_PROVISIONING_OPERATION:
         "An open provisioning operation has not stopped.",
@@ -95,6 +114,8 @@ const copy = {
         "The worker hit an unexpected failure.",
       "WORKER.TENANT.DATABASE_TEARDOWN_FAILED":
         "The database was still present after the drop.",
+      "WORKER.TENANT_CLAIM.HELD":
+        "Another database operation holds the tenant's database.",
     },
     abandonDestroy: "Abandon destruction",
     abandoning: "Abandoning…",
@@ -102,6 +123,12 @@ const copy = {
       `Abandon the destruction of ${name}?`,
     abandonConfirmDescription: (name: string) =>
       `Destruction of ${name} stops before its database is dropped. The database is kept and the tenant stays soft-deleted, so it can be restored or destroyed again later.\nA cancellation already requested for its provisioning operation stays requested. The abandoned request is kept as evidence.`,
+    resumeDestroy: "Resume destruction",
+    resuming: "Resuming…",
+    resumeConfirmTitle: (name: string) =>
+      `Resume the destruction of ${name}?`,
+    resumeConfirmDescription: (name: string) =>
+      `Destruction of ${name} continues in the phase where it halted, with a new budget of automatic attempts. Fix the reason it halted first, or it halts again once those attempts are spent.\nResuming is safe whether or not the database still exists: the drop only removes a database that is still present, then checks that it is gone. The request still cannot be abandoned.`,
     confirm: "Confirm",
     cancel: "Keep tenant",
     polling: "Provisioning is running. Status refreshes automatically.",
@@ -170,6 +197,16 @@ const copy = {
       ABANDONED:
         "تم الإبقاء على قاعدة البيانات. ويبقى المستأجر محذوفًا حذفًا قابلًا للاسترداد، ويمكن استعادته أو حذفه نهائيًا من جديد.",
     },
+    destroyHaltedPhases: {
+      DROPPING_DATABASE: "توقف الحذف النهائي أثناء حذف قاعدة البيانات",
+      FINALIZING: "توقف الحذف النهائي أثناء الإتمام",
+    },
+    destroyHaltedHints: {
+      DROPPING_DATABASE:
+        "تكرر فشل حذف قاعدة البيانات فتوقفت المحاولات التلقائية. وقد سبق اعتماد الحذف وربما حُذفت قاعدة البيانات بالفعل، لذا لا يمكن التخلي عن هذا الطلب ولا استعادة المستأجر. عالج السبب الموضح أدناه ثم استأنف الحذف النهائي.",
+      FINALIZING:
+        "حُذفت قاعدة البيانات، لكن تكرر فشل تحرير هوية المستأجر وسعته فتوقفت المحاولات التلقائية. لا يمكن التخلي عن هذا الطلب ولا استعادة المستأجر. عالج السبب الموضح أدناه ثم استأنف الحذف النهائي.",
+    },
     destroyReason: "السبب",
     destroyBlockedBy: "سبب التوقف",
     destroyLatestAttempt: "آخر محاولة",
@@ -186,7 +223,13 @@ const copy = {
     destroyLoadFailed: "تعذّر تحميل حالة الحذف النهائي.",
     destroyRefreshFailed: "تعذّر آخر تحديث للحالة؛ تُعرض آخر حالة معروفة.",
     destroyNotAbandonable:
-      "لم يعد ممكنًا التخلي عن هذا الطلب: فقد اعتُمد حذف قاعدة البيانات بالفعل ولا يمكن إلا إكماله. وتم تحديث حالته.",
+      "لم يعد ممكنًا التخلي عن هذا الطلب: فقد اعتُمد حذف قاعدة البيانات بالفعل وربما حُذفت. لا يمكن إلا إكماله، أو استئنافه إن توقف. وتم تحديث حالته.",
+    destroyCommandErrors: {
+      TENANT_DESTROY_NOT_ABANDONABLE:
+        "لم يعد ممكنًا التخلي عن طلب الحذف النهائي هذا: فقد اعتُمد حذف قاعدة البيانات بالفعل وربما حُذفت. لا يمكن إلا إكماله، أو استئنافه إن توقف.",
+    },
+    destroyDatabaseReason:
+      "تعذّر على العامل استخدام خادم قاعدة بيانات المستأجر.",
     destroyReasons: {
       TENANT_DESTROY_OPEN_PROVISIONING_OPERATION:
         "توجد عملية تجهيز مفتوحة لم تتوقف بعد.",
@@ -220,6 +263,8 @@ const copy = {
         "واجه العامل خطأً غير متوقع.",
       "WORKER.TENANT.DATABASE_TEARDOWN_FAILED":
         "ظلت قاعدة البيانات موجودة بعد محاولة الحذف.",
+      "WORKER.TENANT_CLAIM.HELD":
+        "عملية أخرى على قاعدة البيانات تحتجز قاعدة بيانات المستأجر.",
     },
     abandonDestroy: "التخلي عن الحذف النهائي",
     abandoning: "جارٍ التخلي…",
@@ -227,6 +272,12 @@ const copy = {
       `التخلي عن الحذف النهائي للمستأجر ${name}؟`,
     abandonConfirmDescription: (name: string) =>
       `يتوقف الحذف النهائي للمستأجر ${name} قبل حذف قاعدة بياناته. تُحفظ قاعدة البيانات ويبقى المستأجر محذوفًا حذفًا قابلًا للاسترداد، فيمكن استعادته أو حذفه نهائيًا لاحقًا.\nيبقى طلب إلغاء عملية التجهيز الخاصة به قائمًا إن كان قد قُدِّم، ويُحتفظ بالطلب المتخلّى عنه كدليل.`,
+    resumeDestroy: "استئناف الحذف النهائي",
+    resuming: "جارٍ الاستئناف…",
+    resumeConfirmTitle: (name: string) =>
+      `استئناف الحذف النهائي للمستأجر ${name}؟`,
+    resumeConfirmDescription: (name: string) =>
+      `يُستأنف الحذف النهائي للمستأجر ${name} من المرحلة التي توقف عندها، مع رصيد جديد من المحاولات التلقائية. عالج سبب التوقف أولًا، وإلا سيتوقف مجددًا بعد استنفاد هذه المحاولات.\nالاستئناف آمن سواء بقيت قاعدة البيانات أم لا: فالحذف لا يزيل إلا قاعدة بيانات ما زالت موجودة ثم يتحقق من زوالها. ويظل التخلي عن الطلب غير ممكن.`,
     confirm: "تأكيد",
     cancel: "الإبقاء على المستأجر",
     polling: "التجهيز قيد التنفيذ. يتم تحديث الحالة تلقائيًا.",
@@ -258,17 +309,38 @@ export function tenantWorkspaceCopy(locale: TenantWorkspaceLocale) {
   return copy[locale];
 }
 
+/** Worker's codes for a Database Server failure, one per failure class. */
+const DESTROY_DATABASE_REASON_PREFIX = "WORKER.TENANT_DESTROY.DATABASE.";
+
 /**
  * The localized label for a safe destruction code, or `null` when it has none
  * so the caller shows the code verbatim. Codes come from Core and Worker and
- * are not an enum this browser can exhaust.
+ * are not an enum this browser can exhaust; Worker's Database Server failures
+ * share one label, and the code beside it keeps the failure class.
  */
 export function tenantDestroyReasonLabel(
   locale: TenantWorkspaceLocale,
   code: string,
 ): string | null {
   const labels: Readonly<Record<string, string>> = copy[locale].destroyReasons;
-  return Object.prototype.hasOwnProperty.call(labels, code)
-    ? labels[code]
+  if (Object.prototype.hasOwnProperty.call(labels, code)) return labels[code];
+  return code.startsWith(DESTROY_DATABASE_REASON_PREFIX) &&
+    code.length > DESTROY_DATABASE_REASON_PREFIX.length
+    ? copy[locale].destroyDatabaseReason
+    : null;
+}
+
+/**
+ * The localized text for Core's refusal of a destruction command, or `null`
+ * when the code is not one of them (Core's own message is English-only).
+ */
+export function tenantDestroyCommandErrorText(
+  locale: TenantWorkspaceLocale,
+  code: string | null | undefined,
+): string | null {
+  const texts: Readonly<Record<string, string>> =
+    copy[locale].destroyCommandErrors;
+  return code && Object.prototype.hasOwnProperty.call(texts, code)
+    ? texts[code]
     : null;
 }

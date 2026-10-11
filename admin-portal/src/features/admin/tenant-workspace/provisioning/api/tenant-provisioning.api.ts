@@ -13,6 +13,7 @@ import {
   readTenantPrerequisiteEvidenceRecord,
   readTenantPrerequisiteRequest,
   readTenantProvisioningCommandResult,
+  readTenantProvisioningResyncResult,
   readTenantSeedState,
 } from "../model/readers";
 import type {
@@ -134,6 +135,23 @@ export const tenantProvisioningApi = {
       commandConfig(idempotencyKey),
     );
     return readTenantProvisioningCommandResult(extractCoreData(response));
+  },
+
+  /**
+   * Asks the Worker to re-deliver the progress it retained for the operation.
+   * Accepted with `202` at once; the re-delivered records arrive afterwards.
+   */
+  async resyncOperation(
+    tenantId: string,
+    operationId: string,
+    idempotencyKey: string,
+  ) {
+    const response = await axiosClient.post<SuccessResponse<unknown>>(
+      `${tenantRoot(tenantId)}/operations/${encodeURIComponent(operationId)}/resync`,
+      {},
+      commandConfig(idempotencyKey),
+    );
+    return readTenantProvisioningResyncResult(extractCoreData(response));
   },
 
   async listUpdates(

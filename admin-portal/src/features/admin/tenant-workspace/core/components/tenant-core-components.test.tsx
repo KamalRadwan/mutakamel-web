@@ -7,6 +7,7 @@ import {
   CUSTOM_FQDN_ID,
   OPERATION_ID,
   customFqdnFixture,
+  haltedTenantDestroyFixture,
   tenantDestroyFixture,
   tenantFixture,
 } from "../__tests__/fixtures";
@@ -81,6 +82,7 @@ function workspaceFixture(
     restore: vi.fn().mockResolvedValue(tenant),
     destroy: vi.fn().mockResolvedValue(undefined),
     abandonDestruction: vi.fn().mockResolvedValue(undefined),
+    resumeDestruction: vi.fn().mockResolvedValue(undefined),
     refreshDestruction: vi.fn().mockResolvedValue(null),
     ...overrides,
   } as UseTenantCoreWorkspaceResult;
@@ -237,6 +239,87 @@ describe("tenant profile and lifecycle panels", () => {
     expect(screen.getByRole("button", { name: "Restore tenant" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Destroy permanently" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Abandon destruction" })).toBeEnabled();
+    // Blocked before the drop: Core would answer a new request with this one
+    // unchanged, so there is nothing to resume.
+    expect(screen.queryByRole("button", { name: "Resume destruction" })).not.toBeInTheDocument();
+  });
+
+  it("explains a request halted after the drop was authorized and offers resume, not abandon", () => {
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: haltedTenantDestroyFixture("DROPPING_DATABASE"),
+        })}
+      />,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Destruction halted while deleting the database");
+    expect(status).toHaveTextContent("the database may already be gone");
+    expect(status).not.toHaveTextContent("Destruction is blocked");
+    // Worker's Database Server failures share one label; the code keeps the class.
+    expect(screen.getByText("The worker could not use the tenant's Database Server.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy reference WORKER.TENANT_DESTROY.DATABASE.CONNECTION_REFUSED" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Provisioning operation")).not.toBeInTheDocument();
+    expect(screen.getByText("Attempts in this phase").nextElementSibling).toHaveTextContent("20");
+    expect(screen.queryByText("Next attempt")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abandon destruction" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resume destruction" })).toBeEnabled();
+    for (const name of ["Restore tenant", "Destroy permanently"]) {
+      const action = screen.getByRole("button", { name });
+      expect(action).toBeDisabled();
+      expect(action).toHaveAccessibleDescription(/cannot be abandoned and the tenant cannot be restored/);
+    }
+  });
+
+  it("resumes a halted destruction only after the consequences are confirmed", async () => {
+    const resumeDestruction = vi.fn().mockResolvedValue(tenantDestroyFixture("FINALIZING"));
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: haltedTenantDestroyFixture("FINALIZING"),
+          resumeDestruction,
+        })}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Destruction halted while finalizing");
+    fireEvent.click(screen.getByRole("button", { name: "Resume destruction" }));
+    expect(resumeDestruction).not.toHaveBeenCalled();
+
+    const dialog = screen.getByRole("alertdialog", { name: "Resume the destruction of acme?" });
+    expect(dialog).toHaveTextContent("continues in the phase where it halted");
+    expect(dialog).toHaveTextContent("Fix the reason it halted first");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Resume destruction" }));
+
+    await vi.waitFor(() => expect(resumeDestruction).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+  });
+
+  it("closes the resume dialog when Core refuses, leaving the refusal to the workspace alert", async () => {
+    const resumeDestruction = vi.fn().mockRejectedValue({
+      isNormalized: true,
+      httpStatus: 503,
+      errorCode: "CORE_UNAVAILABLE",
+      message: "Core is unavailable",
+    });
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: haltedTenantDestroyFixture("DROPPING_DATABASE"),
+          resumeDestruction,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Resume destruction" }));
+    const dialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Resume destruction" }));
+
+    await vi.waitFor(() => expect(resumeDestruction).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
   it("shows a code without a localized label verbatim", () => {
@@ -337,6 +420,7 @@ describe("tenant profile and lifecycle panels", () => {
           destroyOperation: tenantDestroyFixture("ABANDONED", {
             blockedAt: "2026-08-11T19:34:00.000Z",
             blockedReason: "TENANT_DESTROY_MULTIPLE_OPEN_OPERATIONS",
+            blockedPhase: "STOPPING_PROVISIONING",
           }),
         })}
       />,
@@ -351,9 +435,9 @@ describe("tenant profile and lifecycle panels", () => {
     expect(screen.queryByRole("button", { name: "Abandon destruction" })).not.toBeInTheDocument();
   });
 
-  it("withholds abandon from an admin without the destroy grant", () => {
+  it("withholds abandon and resume from an admin without the destroy grant", () => {
     const base = workspaceFixture("DELETED");
-    render(
+    const view = render(
       <TenantLifecyclePanel
         locale="en"
         workspace={workspaceFixture("DELETED", {
@@ -364,6 +448,18 @@ describe("tenant profile and lifecycle panels", () => {
     );
     expect(screen.getByRole("status")).toHaveTextContent("Destruction is blocked");
     expect(screen.queryByRole("button", { name: "Abandon destruction" })).not.toBeInTheDocument();
+
+    view.rerender(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: haltedTenantDestroyFixture("DROPPING_DATABASE"),
+          permissions: { ...base.permissions, canDestroy: false },
+        })}
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Destruction halted while deleting the database");
+    expect(screen.queryByRole("button", { name: "Resume destruction" })).not.toBeInTheDocument();
   });
 
   it("reports an unreadable destruction status with a retry", () => {
@@ -407,6 +503,28 @@ describe("tenant profile and lifecycle panels", () => {
     fireEvent.click(screen.getByRole("button", { name: "التخلي عن الحذف النهائي" }));
     const dialog = screen.getByRole("alertdialog", { name: "التخلي عن الحذف النهائي للمستأجر acme؟" });
     expect(dialog).toHaveTextContent("تُحفظ قاعدة البيانات");
+  });
+
+  it("renders a halted destruction and its resume confirmation in Arabic", () => {
+    i18n.current = { lang: "ar", dir: "rtl" };
+    render(
+      <TenantLifecyclePanel
+        locale="ar"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: haltedTenantDestroyFixture("FINALIZING", {
+            blockedReason: "WORKER.TENANT_CLAIM.HELD",
+          }),
+        })}
+      />,
+    );
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("توقف الحذف النهائي أثناء الإتمام");
+    expect(status).toHaveTextContent("لا يمكن التخلي عن هذا الطلب ولا استعادة المستأجر");
+    expect(screen.getByText("عملية أخرى على قاعدة البيانات تحتجز قاعدة بيانات المستأجر.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "التخلي عن الحذف النهائي" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "استئناف الحذف النهائي" }));
+    const dialog = screen.getByRole("alertdialog", { name: "استئناف الحذف النهائي للمستأجر acme؟" });
+    expect(dialog).toHaveTextContent("عالج سبب التوقف أولًا");
   });
 
   it("offers restore beside destroy on a deleted tenant", async () => {

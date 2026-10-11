@@ -29,6 +29,7 @@ import {
   operationSummary,
   prerequisiteEvidenceRecord,
   prerequisiteRequest,
+  resyncResult,
   seedResolution,
   seedState,
   timelineEvent,
@@ -56,6 +57,7 @@ describe("tenant provisioning canonical API", () => {
       if (url.endsWith("/retry") || url.endsWith("/cancel") || url.endsWith("/updates/apply")) {
         return Promise.resolve(envelope({ replayed: false, operation: operationDetail() }));
       }
+      if (url.endsWith("/resync")) return Promise.resolve(envelope(resyncResult()));
       if (url.endsWith("/prerequisite-requests")) return Promise.resolve(envelope(prerequisiteRequest()));
       if (url.endsWith("/operations/add-application")) return Promise.resolve(envelope(managedOperation({ type: "ADD_APPLICATION" })));
       if (url.endsWith("/operations/repair")) return Promise.resolve(envelope(managedOperation({ type: "REPAIR" })));
@@ -109,7 +111,7 @@ describe("tenant provisioning canonical API", () => {
     expect(getMock.mock.calls.every((call) => call[1]?.signal === signal)).toBe(true);
   });
 
-  it("uses all eight actual command routes with caller-owned UUIDv7 keys and exact bodies", async () => {
+  it("uses all nine actual command routes with caller-owned UUIDv7 keys and exact bodies", async () => {
     const updateDto = {
       selections: [
         {
@@ -166,6 +168,11 @@ describe("tenant provisioning canonical API", () => {
 
     await tenantProvisioningApi.retryOperation(TENANT_ID, OPERATION_ID, COMMAND_ID);
     await tenantProvisioningApi.cancelOperation(TENANT_ID, OPERATION_ID, COMMAND_ID);
+    const resync = await tenantProvisioningApi.resyncOperation(
+      TENANT_ID,
+      OPERATION_ID,
+      COMMAND_ID,
+    );
     await tenantProvisioningApi.applyUpdates(TENANT_ID, updateDto, COMMAND_ID);
     await tenantProvisioningApi.requestPrerequisites(
       TENANT_ID,
@@ -177,10 +184,11 @@ describe("tenant provisioning canonical API", () => {
     await tenantProvisioningApi.decommission(TENANT_ID, decommissionDto, COMMAND_ID);
     await tenantProvisioningApi.resolveSeedConflict(TENANT_ID, SEED_ID, conflictDto, COMMAND_ID);
 
-    expect(postMock).toHaveBeenCalledTimes(8);
+    expect(postMock).toHaveBeenCalledTimes(9);
     expect(postMock.mock.calls.map((call) => call[0])).toEqual([
       `/api/admin/core/v1/tenants/${TENANT_ID}/operations/${OPERATION_ID}/retry`,
       `/api/admin/core/v1/tenants/${TENANT_ID}/operations/${OPERATION_ID}/cancel`,
+      `/api/admin/core/v1/tenants/${TENANT_ID}/operations/${OPERATION_ID}/resync`,
       `/api/admin/core/v1/tenants/${TENANT_ID}/provisioning/updates/apply`,
       `/api/admin/core/v1/tenants/${TENANT_ID}/provisioning/prerequisite-requests`,
       `/api/admin/core/v1/tenants/${TENANT_ID}/provisioning/operations/add-application`,
@@ -189,9 +197,17 @@ describe("tenant provisioning canonical API", () => {
       `/api/admin/core/v1/tenants/${TENANT_ID}/provisioning/seed-conflicts/${SEED_ID}/resolve`,
     ]);
     expect(postMock.mock.calls.every((call) => call[2]?.headers?.["x-idempotency-key"] === COMMAND_ID)).toBe(true);
-    expect(postMock.mock.calls[2]?.[1]).toEqual(updateDto);
-    expect(postMock.mock.calls[4]?.[1]).toEqual(addDto);
-    expect(postMock.mock.calls[7]?.[1]).toEqual(conflictDto);
+    // Resync carries no body of its own; the request it recorded comes back.
+    expect(postMock.mock.calls[2]?.[1]).toEqual({});
+    expect(resync.resync).toEqual({
+      requestId: "019f0000-0000-7000-8000-000000000060",
+      requestedAt: expect.any(String),
+      reasonCode: "CORE.PROVISIONING.RESYNC_REQUESTED_BY_ADMIN",
+    });
+    expect(resync.operation.exits.resync).toEqual({ allowed: true, reasonCode: null });
+    expect(postMock.mock.calls[3]?.[1]).toEqual(updateDto);
+    expect(postMock.mock.calls[5]?.[1]).toEqual(addDto);
+    expect(postMock.mock.calls[8]?.[1]).toEqual(conflictDto);
     expect(JSON.stringify(postMock.mock.calls)).not.toMatch(/reconcile|add-module/i);
     expect(JSON.stringify(addDto)).not.toMatch(/expectedCurrent/i);
   });

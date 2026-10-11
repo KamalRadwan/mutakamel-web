@@ -1,4 +1,5 @@
 import {
+  TENANT_DESTROY_BLOCKED_PHASES,
   TENANT_DESTROY_PHASES,
   TENANT_FQDN_VALIDATION_STATUSES,
   TENANT_OPERATION_STATUSES,
@@ -47,9 +48,12 @@ const BLOCKING_OPERATION_PHASES: ReadonlySet<TenantDestroyPhase> = new Set([
  *
  * - `completedAt` exactly when SUCCEEDED, `abandonedAt` exactly when ABANDONED;
  * - `nextAttemptAt` exactly while Worker still advances the request;
- * - `blockedAt` and `blockedReason` together, always on BLOCKED, and kept
- *   only on BLOCKED or a later ABANDONED;
- * - `blockingOperationId` only while stopping provisioning or after it blocked.
+ * - `blockedAt`, `blockedReason` and `blockedPhase` together, always on
+ *   BLOCKED, and kept only on BLOCKED or a later ABANDONED — which only ever
+ *   follows a stop, so its `blockedPhase` is STOPPING_PROVISIONING;
+ * - `blockingOperationId` only while stopping provisioning or after that stop
+ *   blocked: Core clears it once the drop is authorized, so a request halted
+ *   in DROPPING_DATABASE or FINALIZING never carries one.
  */
 export function readTenantDestroy(value: unknown): TenantDestroyView | null {
   if (value === null) return null;
@@ -68,18 +72,28 @@ export function readTenantDestroy(value: unknown): TenantDestroyView | null {
     nextAttemptAt: nullable(row.nextAttemptAt, isoDate, code),
     blockedAt: nullable(row.blockedAt, isoDate, code),
     blockedReason: nullable(row.blockedReason, safeCode, code),
+    blockedPhase: nullable(
+      row.blockedPhase,
+      (entry, entryCode) => oneOf(entry, TENANT_DESTROY_BLOCKED_PHASES, entryCode),
+      code,
+    ),
     blockingOperationId: nullable(row.blockingOperationId, uuidV7, code),
     abandonedAt: nullable(row.abandonedAt, isoDate, code),
   };
+  const haltedAfterDropAuthorized =
+    parsed.blockedPhase !== null &&
+    parsed.blockedPhase !== "STOPPING_PROVISIONING";
   if (
     (phase === "SUCCEEDED") !== (parsed.completedAt !== null) ||
     (phase === "ABANDONED") !== (parsed.abandonedAt !== null) ||
     isTenantDestroyAdvancing(phase) !== (parsed.nextAttemptAt !== null) ||
     (parsed.blockedAt === null) !== (parsed.blockedReason === null) ||
+    (parsed.blockedAt === null) !== (parsed.blockedPhase === null) ||
     (phase === "BLOCKED" && parsed.blockedAt === null) ||
     (parsed.blockedAt !== null && phase !== "BLOCKED" && phase !== "ABANDONED") ||
+    (phase === "ABANDONED" && haltedAfterDropAuthorized) ||
     (parsed.blockingOperationId !== null &&
-      !BLOCKING_OPERATION_PHASES.has(phase))
+      (!BLOCKING_OPERATION_PHASES.has(phase) || haltedAfterDropAuthorized))
   ) {
     invalid(code);
   }

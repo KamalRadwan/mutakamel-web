@@ -11,6 +11,12 @@ describe("tenant provisioning permissions", () => {
       "admin.tenants.reprovision",
       "admin.tenants.critical",
     ]);
+    // Gateway `core.admin.tenants.operations.resync`.
+    expect(PROVISIONING_PERMISSION_REQUIREMENTS.resync).toEqual([
+      "admin.tenants.read",
+      "admin.tenants.reprovision",
+      "admin.tenants.critical",
+    ]);
     expect(PROVISIONING_PERMISSION_REQUIREMENTS.applyUpdates).toEqual([
       "admin.tenants.reprovision",
       "admin.tenants.critical",
@@ -33,6 +39,7 @@ describe("tenant provisioning permissions", () => {
     });
     expect(permissions.canReadOperations).toBe(true);
     expect(permissions.canRetryOrCancel).toBe(false);
+    expect(permissions.canResync).toBe(false);
     expect(permissions.canReadPrerequisites).toBe(false);
     expect(permissions.canRepair).toBe(false);
   });

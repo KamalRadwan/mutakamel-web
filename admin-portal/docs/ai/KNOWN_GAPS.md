@@ -49,15 +49,6 @@ provisioning-governance routes.
   ([contract](../api/storage-servers.md#credential-rotation-has-no-read-projection)),
   which cannot help a different browser or survive cleared site data. Closing
   this needs the rotation exposed on the storage-server read route.
-- The provisioning report's **Stuck tenants** is not the stall rule (verified
-  2026-10-11). Core's `GET /reports/provisioning` answers `stuck` as every
-  tenant whose lifecycle status is `PROVISIONING` and lists those tenants; it
-  never evaluates `operationStall`, which only the dashboard's
-  `provisioning.snapshot.stalledOperations` applies. The rows carry no
-  operation evidence, so the portal cannot correct the figure itself. Closing
-  this needs Core to compute `stuck` with `operationStall` and return each
-  stalled tenant's open operation and `stall` on `items`
-  ([contract](../api/reports.md#provisioning-report-stuck-is-not-the-stall-rule)).
 - Admin Realtime Socket.IO activation remains gated; notifications use the
   integrated REST contract.
 - Worker Backup package/schema adoption and authenticated runtime evidence are

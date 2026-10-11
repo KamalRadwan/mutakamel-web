@@ -20,7 +20,8 @@ export const NEXT_UPDATED_AT = "2026-08-11T19:34:49.000Z";
  * A destruction projection exactly as Core answers it for `phase`, honouring
  * the table's pairings: completion only on SUCCEEDED, abandonment only on
  * ABANDONED, a next attempt only while Worker advances, block evidence on
- * BLOCKED, and the provisioning operation it waits on while stopping.
+ * BLOCKED (a stop that blocked before the drop), and the provisioning
+ * operation it waits on while stopping.
  */
 export function tenantDestroyFixture(
   phase: TenantDestroyPhase = "STOPPING_PROVISIONING",
@@ -43,6 +44,7 @@ export function tenantDestroyFixture(
     blockedAt: phase === "BLOCKED" ? NEXT_UPDATED_AT : null,
     blockedReason:
       phase === "BLOCKED" ? "TENANT_DESTROY_OPEN_PROVISIONING_OPERATION" : null,
+    blockedPhase: phase === "BLOCKED" ? "STOPPING_PROVISIONING" : null,
     blockingOperationId:
       phase === "STOPPING_PROVISIONING" || phase === "BLOCKED"
         ? OPERATION_ID
@@ -50,6 +52,26 @@ export function tenantDestroyFixture(
     abandonedAt: phase === "ABANDONED" ? NEXT_UPDATED_AT : null,
     ...overrides,
   };
+}
+
+/**
+ * A request that halted after Core authorized the drop, as Core reports it:
+ * BLOCKED with the phase it halted in, Worker's code as the reason, its spent
+ * attempt budget, and no provisioning operation (cleared once the drop was
+ * authorized).
+ */
+export function haltedTenantDestroyFixture(
+  blockedPhase: "DROPPING_DATABASE" | "FINALIZING" = "DROPPING_DATABASE",
+  overrides: Partial<TenantDestroyView> = {},
+): TenantDestroyView {
+  return tenantDestroyFixture("BLOCKED", {
+    blockedPhase,
+    blockedReason: "WORKER.TENANT_DESTROY.DATABASE.CONNECTION_REFUSED",
+    lastErrorCode: "WORKER.TENANT_DESTROY.DATABASE.CONNECTION_REFUSED",
+    attempts: 20,
+    blockingOperationId: null,
+    ...overrides,
+  });
 }
 
 export function tenantFixture(

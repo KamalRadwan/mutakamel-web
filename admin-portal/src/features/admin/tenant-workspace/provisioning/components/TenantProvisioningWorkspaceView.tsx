@@ -432,6 +432,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
             const retryReason =
               actions.retry.visible && !cancellationPending ? actions.retry.reasonCode : null;
             const cancelReason = actions.cancel.visible ? actions.cancel.reasonCode : null;
+            const resyncReason = actions.resync.visible ? actions.resync.reasonCode : null;
             const operationErrorHint = provisioningCodeText(
               copy.safeCodeHints,
               operation.safeError?.code,
@@ -457,7 +458,9 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={operation.status} ar={ar} live={!operation.stall} />
-                      {operation.stall && <StalledBadge stall={operation.stall} lang={model.lang} />}
+                      {operation.stall && (
+                        <StalledBadge stall={operation.stall} lang={model.lang} namesStep />
+                      )}
                       {actions.retry.visible && (
                         <Button
                           type="button"
@@ -488,9 +491,22 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                           {copy.requestCancelButton}
                         </Button>
                       )}
+                      {actions.resync.visible && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void model.requestResync(operation)}
+                          disabled={!actions.resync.enabled}
+                          loading={provisioning.mutation.name === "resync"}
+                          aria-describedby={resyncReason ? "provisioning-resync-blocked-reason" : undefined}
+                        >
+                          {copy.resyncButton}
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  {(retryReason || cancelReason) && (
+                  {(retryReason || cancelReason || resyncReason) && (
                     <div className="mt-2 space-y-1 text-xs text-muted-foreground">
                       {retryReason && (
                         <p id="provisioning-retry-blocked-reason">
@@ -500,6 +516,14 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                       {cancelReason && (
                         <p id="provisioning-cancel-blocked-reason">
                           {copy.requestCancelButton}: {copy.exitBlockedReasons[cancelReason]}
+                        </p>
+                      )}
+                      {resyncReason && (
+                        <p id="provisioning-resync-blocked-reason">
+                          {copy.resyncButton}:{" "}
+                          {resyncReason === "OPERATION_TERMINAL"
+                            ? copy.resyncTerminalReason
+                            : copy.exitBlockedReasons[resyncReason]}
                         </p>
                       )}
                     </div>
@@ -1262,13 +1286,30 @@ function stepStatusPresentation(status: TenantOperationStepStatus): StatusPresen
   }
 }
 
-/** Amber, with its own icon and the measured time, on the operation and its stalled step. */
-function StalledBadge({ stall, lang }: { stall: TenantOperationStall; lang: "ar" | "en" }) {
-  const copy = tpCopy(lang === "ar");
+/**
+ * Amber, with its own icon and the measured time, on the operation and its
+ * stalled step. On the operation it also names the step Core attributes the
+ * stall to: since Worker heartbeats, a running step silent for three missed
+ * heartbeats is `NO_PROGRESS` with its `stepKey`, the commonest stall.
+ */
+function StalledBadge({
+  stall,
+  lang,
+  namesStep = false,
+}: {
+  stall: TenantOperationStall;
+  lang: "ar" | "en";
+  namesStep?: boolean;
+}) {
+  const ar = lang === "ar";
+  const copy = tpCopy(ar);
+  const duration = formatProvisioningDuration(stall.ageSeconds, lang);
   return (
     <Badge tone="warn">
       <Hourglass className="size-3" aria-hidden="true" />
-      {copy.stalledBadge(formatProvisioningDuration(stall.ageSeconds, lang))}
+      {namesStep && stall.stepKey
+        ? copy.stalledAtStepBadge(provisioningStepLabel(stall.stepKey, ar), duration)
+        : copy.stalledBadge(duration)}
     </Badge>
   );
 }
@@ -1306,6 +1347,8 @@ function StallNotice({
       <Hourglass className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
       <div className="space-y-1">
         <p>{explanation}</p>
+        {/* A lost result is the cheapest cause to rule out, so Resync is named first. */}
+        {operation.exits.resync.allowed && <p>{copy.stallResyncGuidance}</p>}
         {guidance && <p>{guidance}</p>}
       </div>
     </div>

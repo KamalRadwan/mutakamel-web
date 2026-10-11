@@ -3,10 +3,11 @@
 Status: **[Verified]**
 
 Last source verification: **2026-10-11** for current versus superseded
-releases and their retirement (Core commit `d5af4407`), and for the fleet
+releases and their retirement (Core commit `d5af4407`), for the fleet
 preview's moved components and Core's refusal to retire a current release
-(Core commit `77447fb9`); other route families retain their **2026-08-12**
-evidence.
+(Core commit `77447fb9`), and for discovery judged against the current release
+(Core commit `ba273fea`, see [Discovery results](#discovery-results)); other
+route families retain their **2026-08-12** evidence.
 
 Owner: **Core**
 
@@ -159,6 +160,38 @@ A planner refusal becomes the row's safe reason code:
 and any other code as itself. The moved set is part of the eligibility digest,
 so a tenant whose expansion changes before dispatch fails stale instead of
 moving further than previewed.
+
+## Discovery results
+
+Source verified **2026-10-11** against Core
+`src/admin/tenants/provisioning/provisioning-discovery.service.ts`
+(`discoverInstallation`, Core commit `ba273fea`).
+
+`GET /provisioning/discovery-runs/:runId` judges every result against its
+component's **current** catalogue release, selected as planning selects it
+(`currentReleaseRows`), never as the highest manifest version. An installation
+settled on, or moving to, another release is now `OUTDATED` with
+`PROVISIONING_DISCOVERY_RELEASE_UPGRADE_REQUIRED` instead of `READY` (an update
+already in flight to the current release is `OUTDATED` with no code), and a
+component whose current release the control plane does not hold is
+`INCOMPATIBLE` with `PROVISIONING_DISCOVERY_CURRENT_RELEASE_UNAVAILABLE`. A run's
+`driftedCount` counts tenants with a `DRIFTED` or `OUTDATED` result, so lagging
+tenants count in it; the runs table labels the column **Drifted or outdated**.
+
+| `safeCode` | State | Meaning |
+| --- | --- | --- |
+| `PROVISIONING_DISCOVERY_RELEASE_UPGRADE_REQUIRED` | `OUTDATED` | runs or heads to a release that is not current; only an update moves it |
+| `PROVISIONING_DISCOVERY_CURRENT_RELEASE_UNAVAILABLE` | `INCOMPATIBLE` | the control plane does not hold the component's current release |
+| `PROVISIONING_DISCOVERY_DESIRED_RELEASE_INVALID` | `INCOMPATIBLE` | the desired release is unknown for the component or its checksum differs |
+| `PROVISIONING_DISCOVERY_APPLIED_EVIDENCE_DRIFTED` | `DRIFTED` | the applied release evidence matches no known release of the component |
+| `PROVISIONING_DISCOVERY_INSTALLATION_STATE_DRIFTED` | `DRIFTED` | on its current release but not `READY` |
+| `PROVISIONING_DISCOVERY_EXPECTED_INSTALLATION_MISSING` | `DRIFTED` | the subscription includes the component and there is no installation |
+| `PROVISIONING_DISCOVERY_EXPECTED_RELEASE_UNAVAILABLE` | `INCOMPATIBLE` | the subscription includes the component, with no installation and no current release held |
+
+The reader accepts any `safeCode` (bounded string). The results dialog shows the
+code's meaning in the reader's language (`discoverySafeCodes` in
+`provisioning-governance/copy.ts`, en + ar) with Core's code beneath it; a code
+not listed there is shown on its own.
 
 ## State and mutation rules
 

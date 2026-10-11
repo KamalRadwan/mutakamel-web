@@ -4,7 +4,8 @@ Status: **[Verified]**
 
 Last source verification: **2026-10-11** (one current release per component:
 release-upgrade and prerequisite refusals, update scope, new step codes; a
-retry re-pins a failed plan on superseded releases;
+retry re-pins a failed plan on superseded releases; Worker heartbeats and
+Resync;
 2026-10-08: stall signal, operator exits, confirmed cancel/re-provision/repair,
 polling backoff)
 
@@ -29,9 +30,22 @@ generation that pins a release since superseded is re-pinned to the current
 releases instead of refused, and answers the release-upgrade 409 only where
 re-pinning is impossible; see [Retry and cancel](#retry-and-cancel). The
 portal's guidance for a step that failed on a superseded release now points at
-**Re-provision**.
+**Re-provision**, and the re-provision confirmation says the retry moves
+superseded components to their current release.
 
-This document covers the 15 tenant-prefixed operation/provisioning routes used
+Resync amendment (2026-10-11, Core commit `2400bf3e`): the Worker heartbeats
+the operations and the step lease it holds, so a running step silent for three
+missed heartbeats is `NO_PROGRESS` naming that step (see
+[Stall signal](#stall-signal)), and `POST .../operations/:operationId/resync`
+asks the Worker to re-deliver the progress it retained. The detail's `exits`
+gains `resync`, with the new reason `OPERATION_NOT_DISPATCHED`. The workspace
+offers **Resync** beside **Re-provision** and **Request cancel**; see
+[Resync](#resync). Verified against `tenant-operations.controller.ts`,
+`tenant-provisioning-command.service.ts` (`resyncAdminOperation`),
+`tenant-operation-exits.ts` and Gateway route
+`core.admin.tenants.operations.resync`.
+
+This document covers the 16 tenant-prefixed operation/provisioning routes used
 to observe and manage a single tenant. Fleet rollout and release-publishing
 routes under `/api/admin/core/v1/provisioning/...` are a separate platform
 governance surface.
@@ -49,8 +63,9 @@ All paths below are canonical browser paths.
 | `GET /api/admin/core/v1/tenants/:tenantId/operations/:operationId/timeline` | `admin.tenants.read` | `200` | No | Paginated safe event timeline |
 | `POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/retry` | `admin.tenants.read` + `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Retry the latest eligible operation |
 | `POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/cancel` | `admin.tenants.read` + `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Request cancellation |
+| `POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/resync` | `admin.tenants.read` + `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Ask the Worker to re-deliver the operation's retained progress |
 
-The two command endpoints require **both** permissions.
+The three command endpoints require **all three** permissions.
 
 ### Updates and prerequisites
 
@@ -225,8 +240,9 @@ type TenantOperationExitReasonCode =
   | "ADDON_INSTALLATION_OWNED"  // add-on installs stop/recover through their commercial flow
   | "CANCELLATION_PENDING"      // the Worker has not confirmed a requested stop
   | "OPERATION_OPEN"            // an operation still owns the tenant
-  | "OPERATION_SUCCEEDED"       // nothing to retry
-  | "OPERATION_TERMINAL";       // nothing to cancel
+  | "OPERATION_SUCCEEDED"       // nothing to retry or re-deliver
+  | "OPERATION_TERMINAL"        // nothing to cancel or re-deliver
+  | "OPERATION_NOT_DISPATCHED"; // the Worker does not hold the plan yet
 
 type TenantOperationExit =
   | { allowed: true; reasonCode: null }
@@ -236,6 +252,7 @@ interface TenantOperationExits {
   cancel: TenantOperationExit; // POST .../operations/:operationId/cancel
   retry: TenantOperationExit;  // POST .../operations/:operationId/retry ("Re-provision")
   repair: TenantOperationExit; // POST .../provisioning/operations/repair
+  resync: TenantOperationExit; // POST .../operations/:operationId/resync ("Resync")
 }
 
 interface TenantOperationTimelineEventView {
@@ -266,18 +283,23 @@ Progress counts `SUCCEEDED` and `SKIPPED` as completed. `FAILED` and
 
 ### Stall signal
 
-`heartbeatAt` is the time of the last *accepted transition*, not a liveness
-ping: the Worker never reports a step dispatched to Core, CRM or Trade while
-its owner works. `stall` is Core's statement that an open operation has stopped
-moving. It is null unless the operation is open and nothing was reported for
-more than 10 minutes — twice the Worker's five-minute step lease, so a healthy
-re-dispatch (a fresh `STEP_STARTED`) always lands inside it.
+Since Core commit `2400bf3e` the Worker heartbeats what it holds: at most once
+a minute it signs an operation heartbeat and a `STEP_HEARTBEAT` for the step
+whose lease is live. A running step's `heartbeatAt` is therefore its last
+accepted transition **or** heartbeat. `stall` is Core's statement that an open
+operation has stopped moving; it is null unless the operation is open and one
+of these holds (the oldest running step wins):
 
 | `reason` | When | `stepKey` |
 | --- | --- | --- |
+| `NO_PROGRESS` | a running step reported neither a transition nor a heartbeat for more than 3 minutes (three missed heartbeats); or no step is running and nothing changed for more than 10 minutes, plus the two-hour prerequisite window while `AWAITING_PREREQUISITES` | the step, or `null` |
+| `DISPATCH_LEASE_EXPIRED` | a running step owned by Core/CRM/Trade (`producer` not `worker`, kind not `DATABASE`) stayed silent for more than 10 minutes, twice its lease: no result and no re-dispatch | that step |
 | `CANCEL_PENDING` | `CANCEL_REQUESTED` for 10+ minutes since the request | oldest running step, else `null` |
-| `DISPATCH_LEASE_EXPIRED` | a running step owned by Core/CRM/Trade (`producer` not `worker`, kind not `DATABASE`) has no progress for 10+ minutes: its lease expired without a result or a re-dispatch | that step |
-| `NO_PROGRESS` | a running step the Worker executes itself, or no running step and no change for 10+ minutes (plus the two-hour prerequisite window while `AWAITING_PREREQUISITES`) | the step, or `null` |
+
+The workspace's stall badge on the operation names the step when `stepKey` is
+set ("Stalled at Core foundation — schema · no progress for 4 min"); the badge
+on the step row stays short. The notice under it explains the reason, names
+**Resync** first whenever `exits.resync` is open, and then the cancel guidance.
 
 `WAITING_RETRY` is never reported as a stall: an owner may schedule a retry up
 to a day out and the due time is not projected. `ageSeconds` is measured when
@@ -296,6 +318,7 @@ evidence and remain the authority (an allowed exit can still be refused).
 | `cancel` | `OPERATION_SUPERSEDED`, `ADDON_INSTALLATION_OWNED`, `CANCELLATION_PENDING`, `OPERATION_TERMINAL` |
 | `retry` | `OPERATION_SUPERSEDED`, `ADDON_INSTALLATION_OWNED`, `CANCELLATION_PENDING`, `OPERATION_OPEN`, `OPERATION_SUCCEEDED` |
 | `repair` | the tenant's latest generation is `CANCEL_REQUESTED` (`CANCELLATION_PENDING`) or otherwise open (`OPERATION_OPEN`) |
+| `resync` | `OPERATION_SUPERSEDED`; `OPERATION_NOT_DISPATCHED` while `REQUESTED`, `PLANNING`, or `QUEUED` awaiting prerequisites; open while the operation is otherwise open; after `SUCCEEDED` open only while a step is still projected `PENDING`/`RUNNING`, else `OPERATION_SUCCEEDED`; `OPERATION_TERMINAL` for a failed or cancelled generation |
 
 `exits` is computed against the tenant's latest generation, so it is correct
 even when the loaded history has not caught up. Both fields are admin-only:
@@ -438,6 +461,54 @@ terminal state; `202` does not mean cancellation is complete.
 Both results embed the admin detail, including `stall` and `exits`. The
 portal drives both buttons from `exits` rather than recomputing these
 preconditions locally.
+
+## Resync
+
+`POST /api/admin/core/v1/tenants/:tenantId/operations/:operationId/resync`
+
+Permissions: `admin.tenants.read` + `admin.tenants.reprovision` +
+`admin.tenants.critical`. A UUIDv7 `x-idempotency-key` is required; the body
+is empty (`{}`).
+
+```ts
+interface TenantProvisioningResyncResult {
+  replayed: boolean;
+  resync: {
+    requestId: string;   // UUIDv7; the Worker logs it when it acts on the request
+    requestedAt: string;
+    reasonCode: string;  // CORE.PROVISIONING.RESYNC_REQUESTED_BY_ADMIN
+  };
+  operation: TenantOperationDetailView; // including `stall` and `exits`
+}
+```
+
+Core records the request and asks the Worker to re-deliver the signed progress
+it retained for the operation (the latest record of every step and the latest
+operation-level record, terminal event included) under the original event ids.
+Core applies each record as the first delivery would have, deduplicated by
+event id and fenced by generation, so a lost `STEP_SUCCEEDED` or terminal event
+is projected and a record already applied changes nothing. Accepting the
+request changes nothing about the operation, and Core also requests a resync on
+its own, with backoff, for every stalled open operation.
+
+Allowed exactly while the detail reports `exits.resync.allowed` (see
+[Operator exits](#operator-exits)); otherwise `409
+TENANT_PROVISIONING_RESYNC_NOT_ALLOWED` or `409
+TENANT_PROVISIONING_OPERATION_SUPERSEDED`.
+
+In the workspace, **Resync** sits beside **Re-provision** and **Request
+cancel** and is sent from the button without a confirmation, because it
+changes no state (the same as a prerequisite request); the button shows a
+spinner while the request is in flight. It is hidden for a superseded
+operation and for a success whose steps are all settled, and shown disabled
+with its reason while the Worker does not hold the plan
+(`OPERATION_NOT_DISPATCHED`) or for a failed or cancelled generation ("re-provision
+it instead"). An accepted request is a toast ("Resync requested"); the
+operation is refreshed at once and read again 5 seconds later, because the
+re-delivered records follow the `202` and a success with an unsettled step is
+not polled. A refusal is shown in the workspace alert in the portal's language
+(`tenantProvisioning.commandErrors`), and an ambiguous outcome keeps its key for
+the exact retry.
 
 ## Available updates and exact apply
 
@@ -770,6 +841,7 @@ commands chain their seed steps and run each as the kind Core's
 | `409` | `TENANT_PROVISIONING_OPERATION_SUPERSEDED` | Selected row is no longer latest |
 | `409` | `TENANT_PROVISIONING_RETRY_NOT_ALLOWED` | Recompute retry visibility from latest status |
 | `409` | `TENANT_PROVISIONING_CANCEL_NOT_ALLOWED` | Operation is already terminal/not cancellable |
+| `409` | `TENANT_PROVISIONING_RESYNC_NOT_ALLOWED` | Resync refused: the plan is not dispatched yet (`OPERATION_NOT_DISPATCHED`) or the operation is settled (`OPERATION_SUCCEEDED`, `OPERATION_TERMINAL`). Localized; refresh the operation's exits |
 | `409` | `TENANT_PROVISIONING_OPERATION_STATE_INVALID` | Resolve latest operation or lifecycle first |
 | `409` | `TENANT_PROVISIONING_PLAN_STALE` | Refresh operation/access-policy evidence |
 | `409` | `TENANT_PROVISIONING_UPDATE_SELECTION_STALE` | Reload update choices |
@@ -825,11 +897,12 @@ see [Tenant Placement Moves](tenant-placement-moves.md#other-error-codes).
 
 ## Current frontend integration
 
-The tenant workspace implements all 15 routes in this document with strict
+The tenant workspace implements all 16 routes in this document with strict
 response readers, independent permission states, bounded live polling, and
 caller-owned UUIDv7 command identities. Operation selection exposes weighted
 progress, the complete step DAG, safe errors, generation/current phase, and the
-bounded event timeline. Retry and cancel visibility follows Core's `exits`.
+bounded event timeline. Retry, cancel and resync visibility follows Core's
+`exits`.
 
 Operation detail, as rendered:
 

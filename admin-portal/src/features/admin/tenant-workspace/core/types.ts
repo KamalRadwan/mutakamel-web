@@ -209,7 +209,8 @@ export type TenantMutationName =
   | "soft-delete"
   | "restore"
   | "destroy"
-  | "abandon-destroy";
+  | "abandon-destroy"
+  | "resume-destroy";
 
 export type TenantFqdnMutationName =
   | "preflight"
@@ -236,9 +237,12 @@ export interface TenantCorePermissions {
 
 /**
  * Worker advances STOPPING_PROVISIONING → DROPPING_DATABASE → FINALIZING →
- * SUCCEEDED. BLOCKED (provisioning could not be stopped) and ABANDONED (an
- * operator gave the request up) end automation before Core authorized the
- * database drop, so the tenant database still exists in both.
+ * SUCCEEDED. BLOCKED ends automation until an operator acts, and
+ * `blockedPhase` says where it stopped: STOPPING_PROVISIONING before Core
+ * authorized the database drop (the database still exists; abandon it), or
+ * DROPPING_DATABASE / FINALIZING after it (the database may be gone; resume
+ * it). ABANDONED (an operator gave the request up) only ever follows a stop
+ * before the drop, so the tenant database still exists.
  */
 export const TENANT_DESTROY_PHASES = [
   "STOPPING_PROVISIONING",
@@ -258,6 +262,20 @@ export const TENANT_DESTROY_ADVANCING_PHASES = [
   "FINALIZING",
 ] as const satisfies readonly TenantDestroyPhase[];
 
+/**
+ * Where a BLOCKED request stopped. DROPPING_DATABASE and FINALIZING mean Core
+ * had already authorized the drop: the request halted in place, cannot be
+ * abandoned, and a new destruction request resumes it.
+ */
+export const TENANT_DESTROY_BLOCKED_PHASES = [
+  "STOPPING_PROVISIONING",
+  "DROPPING_DATABASE",
+  "FINALIZING",
+] as const satisfies readonly TenantDestroyPhase[];
+
+export type TenantDestroyBlockedPhase =
+  (typeof TENANT_DESTROY_BLOCKED_PHASES)[number];
+
 export interface TenantDestroyView {
   operationId: string;
   tenantId: string;
@@ -274,6 +292,11 @@ export interface TenantDestroyView {
   blockedAt: string | null;
   /** Safe code that blocked the request; kept after it is abandoned. */
   blockedReason: string | null;
+  /**
+   * The phase a BLOCKED request stopped in, kept on a later ABANDONED one
+   * (always STOPPING_PROVISIONING there); null exactly when `blockedAt` is.
+   */
+  blockedPhase: TenantDestroyBlockedPhase | null;
   /** Provisioning operation the stop waits on, or waited on before it blocked. */
   blockingOperationId: string | null;
   abandonedAt: string | null;

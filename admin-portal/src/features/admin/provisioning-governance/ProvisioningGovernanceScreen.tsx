@@ -1067,7 +1067,21 @@ function DiscoveryResults({
       key: "safeCode",
       headerEn: COPY.en.safeCode,
       headerAr: COPY.ar.safeCode,
-      cell: (result) => <span className="text-xs">{result.safeCode ?? "—"}</span>,
+      // What the code means in the reader's language, with Core's code kept
+      // beneath it; an unknown code is shown on its own.
+      cell: (result) =>
+        result.safeCode ? (
+          <span className="flex flex-col gap-0.5 text-xs">
+            {copy.discoverySafeCodes[result.safeCode] ? (
+              <span>{copy.discoverySafeCodes[result.safeCode]}</span>
+            ) : null}
+            <code dir="ltr" className="break-all font-mono text-xs text-muted-foreground">
+              {result.safeCode}
+            </code>
+          </span>
+        ) : (
+          <span className="text-xs">—</span>
+        ),
     },
   ];
 

@@ -4,7 +4,7 @@ import type {
   TenantOperationSummary,
 } from "../types";
 
-export type ProvisioningOperatorAction = "cancel" | "retry" | "repair";
+export type ProvisioningOperatorAction = "cancel" | "retry" | "repair" | "resync";
 
 export interface ProvisioningActionState {
   /** Whether the control is rendered at all. */
@@ -17,10 +17,13 @@ export interface ProvisioningActionState {
 
 /**
  * Reasons that make a control meaningless rather than temporarily blocked.
- * Cancelling a finished, superseded or already-cancelling operation, or
- * re-provisioning a superseded or successful one, is not an exit the operator
+ * Cancelling a finished, superseded or already-cancelling operation,
+ * re-provisioning a superseded or successful one, or resyncing a superseded
+ * one or a success whose every step is settled, is not an exit the operator
  * is waiting for; the status, historical note and cancellation note already
- * say why. Every other closed exit stays visible with its reason.
+ * say why. Every other closed exit stays visible with its reason — a resync
+ * of a plan the Worker does not hold yet, or of a failed or cancelled
+ * generation that a retry replaces.
  */
 const HIDDEN_WHEN: Record<
   ProvisioningOperatorAction,
@@ -33,6 +36,7 @@ const HIDDEN_WHEN: Record<
   ]),
   retry: new Set(["OPERATION_SUPERSEDED", "OPERATION_SUCCEEDED"]),
   repair: new Set(),
+  resync: new Set(["OPERATION_SUPERSEDED", "OPERATION_SUCCEEDED"]),
 };
 
 /**

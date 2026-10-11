@@ -95,10 +95,8 @@ describe("reportsApi", () => {
 
     await reportsApi.servers();
     await reportsApi.billing({ from: "2026-08-01T00:00:00.000Z" });
-    await reportsApi.provisioning({
-      to: "2026-08-12T23:59:59.999Z",
-      limit: 50,
-    });
+    // Current state: the provisioning report takes `limit` and no window.
+    await reportsApi.provisioning({ limit: 50 });
 
     expect(getMock.mock.calls).toEqual([
       ["/api/admin/core/v1/reports/servers", { cache: "no-store" }],
@@ -107,7 +105,7 @@ describe("reportsApi", () => {
         { cache: "no-store" },
       ],
       [
-        "/api/admin/core/v1/reports/provisioning?to=2026-08-12T23%3A59%3A59.999Z&limit=50",
+        "/api/admin/core/v1/reports/provisioning?limit=50",
         { cache: "no-store" },
       ],
     ]);

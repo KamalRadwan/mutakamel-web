@@ -6,6 +6,7 @@ import {
   copyDefaultReportFilters,
   dateInputToIso,
   formatDecimalString,
+  hasReportWindow,
   isValidDateInput,
   validateReportFilters,
 } from "./report-filters";
@@ -74,13 +75,16 @@ describe("report filter validation", () => {
       serverId: "019f0000-0000-7000-8000-000000000001",
     });
 
+    // The provisioning report is current state: Core rejects a window on it,
+    // so a stale date in its draft is neither validated nor sent.
     const provisioningDraft = copyDefaultReportFilters().PROVISIONING;
-    provisioningDraft.from = "2026-08-01";
+    provisioningDraft.from = "2026-02-30";
     provisioningDraft.limit = "50";
-    expect(buildProvisioningQuery(provisioningDraft)).toEqual({
-      from: "2026-08-01T00:00:00.000Z",
-      limit: 50,
-    });
+    expect(validateReportFilters("PROVISIONING", provisioningDraft)).toEqual({});
+    expect(buildProvisioningQuery(provisioningDraft)).toEqual({ limit: 50 });
+    expect(hasReportWindow("PROVISIONING")).toBe(false);
+    expect(hasReportWindow("OVERVIEW")).toBe(true);
+    expect(hasReportWindow("BILLING")).toBe(true);
   });
 
   it("formats decimal strings without converting through binary numbers", () => {

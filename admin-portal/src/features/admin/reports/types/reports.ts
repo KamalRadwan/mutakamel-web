@@ -1,4 +1,9 @@
 import type { PageResult } from "@/types/common";
+import type {
+  TENANT_OPERATION_TYPES,
+  TenantOperationStall,
+  TenantOperationStatus,
+} from "@/features/admin/tenant-workspace/provisioning/types";
 
 export const REPORT_KINDS = [
   "OVERVIEW",
@@ -32,7 +37,11 @@ export interface TenantReportQuery {
   serverId?: string;
 }
 
-export interface ProvisioningReportQuery extends ReportWindowQuery {
+/**
+ * The provisioning report is current state, so it takes no reporting window:
+ * Core rejects `from`/`to` on it. `limit` bounds the stalled tenants listed.
+ */
+export interface ProvisioningReportQuery {
   limit?: number;
 }
 
@@ -95,15 +104,29 @@ export interface BillingReport {
   buckets: BillingReportBucket[];
 }
 
+/** The stalled tenant's open operation. */
+export interface ProvisioningReportOperation {
+  id: string;
+  type: (typeof TENANT_OPERATION_TYPES)[number];
+  status: TenantOperationStatus;
+  currentPhase: string;
+  generation: number;
+}
+
+/** A tenant whose open operation Core reports stalled at `asOf`. */
 export interface ProvisioningReportRow {
   id: string;
   name: string;
   status: string;
   createdAt: string;
+  operation: ProvisioningReportOperation;
+  /** The operation detail's own `stall` object. */
+  stall: TenantOperationStall;
 }
 
 export interface ProvisioningReport {
   asOf: string;
+  /** Tenants whose open operation is stalled; `items` lists the longest stalls. */
   stuck: number;
   items: ProvisioningReportRow[];
 }

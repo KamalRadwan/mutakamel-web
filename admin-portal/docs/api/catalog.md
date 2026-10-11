@@ -279,6 +279,9 @@ interface ApplicationTechnicalReadinessView {
     required: boolean;
     activationRequired: boolean;
     minimumRelease: string | null;
+    // The component's current catalogue release (Core commit ba273fea), not
+    // the highest published manifest; null when this control plane does not
+    // hold it. The technical-readiness panel labels it "Current release".
     latestPublishedRelease: {
       id: string;
       releaseVersion: string;

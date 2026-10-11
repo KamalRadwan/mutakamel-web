@@ -134,6 +134,13 @@ export const tenantCoreApi = {
     );
   },
 
+  /**
+   * Requests destruction of a soft-deleted tenant. Core keys the request by
+   * `idempotencyKey`: an exact replay returns the request that key created,
+   * and a new key returns the tenant's live request — resuming it first when
+   * it halted after the drop was authorized (BLOCKED with `blockedPhase`
+   * DROPPING_DATABASE or FINALIZING).
+   */
   destroy: async (
     tenantId: string,
     destroySubscriptions: boolean,
@@ -174,10 +181,11 @@ export const tenantCoreApi = {
 
   /**
    * Gives up a request Core has not yet authorized to drop the database
-   * (BLOCKED or STOPPING_PROVISIONING). The request is named exactly, so a
-   * replay can never reach a newer request accepted after this one was
-   * abandoned. Core answers with the abandoned request, unchanged on repeat;
-   * a later phase answers `409 TENANT_DESTROY_NOT_ABANDONABLE`.
+   * (STOPPING_PROVISIONING, or BLOCKED with `blockedPhase`
+   * STOPPING_PROVISIONING). The request is named exactly, so a replay can
+   * never reach a newer request accepted after this one was abandoned. Core
+   * answers with the abandoned request, unchanged on repeat; a later phase,
+   * halted or not, answers `409 TENANT_DESTROY_NOT_ABANDONABLE`.
    */
   abandonDestroy: async (
     tenantId: string,

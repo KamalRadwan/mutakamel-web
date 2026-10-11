@@ -107,16 +107,35 @@ const RETRYABLE_STATUSES = [
 /**
  * The exits Core states for an operation in `status` (core-app
  * `tenant-operation-exits.ts`): superseded first, then cancellation pending,
- * then the status sets. `latestStatus` is the tenant's latest generation.
+ * then the status sets. `latestStatus` is the tenant's latest generation;
+ * `notDispatched` is a QUEUED plan still awaiting its prerequisites, and
+ * `unsettledSteps` a success whose step projection was left RUNNING.
  */
 export function operationExits(
   status: string,
-  options: { superseded?: boolean; latestStatus?: string } = {},
+  options: {
+    superseded?: boolean;
+    latestStatus?: string;
+    notDispatched?: boolean;
+    unsettledSteps?: boolean;
+  } = {},
 ): Record<string, unknown> {
   const allowed = { allowed: true, reasonCode: null };
   const blocked = (reasonCode: string) => ({ allowed: false, reasonCode });
   const latestStatus = options.latestStatus ?? status;
+  const resync = options.superseded
+    ? blocked("OPERATION_SUPERSEDED")
+    : status === "REQUESTED" || status === "PLANNING" || options.notDispatched
+      ? blocked("OPERATION_NOT_DISPATCHED")
+      : OPEN_STATUSES.includes(status)
+        ? allowed
+        : status === "SUCCEEDED"
+          ? options.unsettledSteps
+            ? allowed
+            : blocked("OPERATION_SUCCEEDED")
+          : blocked("OPERATION_TERMINAL");
   return {
+    resync,
     cancel: options.superseded
       ? blocked("OPERATION_SUPERSEDED")
       : status === "CANCEL_REQUESTED"
@@ -139,6 +158,22 @@ export function operationExits(
         : OPEN_STATUSES.includes(latestStatus)
           ? blocked("OPERATION_OPEN")
           : allowed,
+  };
+}
+
+/** An accepted Resync, as `POST .../operations/:operationId/resync` answers it. */
+export function resyncResult(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    replayed: false,
+    resync: {
+      requestId: "019f0000-0000-7000-8000-000000000060",
+      requestedAt: NOW,
+      reasonCode: "CORE.PROVISIONING.RESYNC_REQUESTED_BY_ADMIN",
+    },
+    operation: operationDetail(),
+    ...overrides,
   };
 }
 

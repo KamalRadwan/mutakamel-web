@@ -12,6 +12,7 @@ import {
   readTenantOperationTimelineEvent,
   readTenantPrerequisiteEvidenceRecord,
   readTenantProvisioningCommandResult,
+  readTenantProvisioningResyncResult,
   readTenantSeedState,
 } from "./readers";
 import {
@@ -21,8 +22,10 @@ import {
   componentInstallation,
   managedOperation,
   operationDetail,
+  operationExits,
   operationSummary,
   prerequisiteEvidenceRecord,
+  resyncResult,
   seedResolution,
   seedState,
   timelineEvent,
@@ -132,6 +135,40 @@ describe("tenant provisioning wire readers", () => {
         managedOperation({ type: "INITIAL_PROVISION" }),
       ),
     ).toThrow("INVALID_MANAGED_PROVISIONING_OPERATION_RESPONSE");
+  });
+
+  it("reads the resync exit and the accepted Resync request strictly", () => {
+    const notDispatched = readTenantOperationDetail(
+      operationDetail({
+        status: "QUEUED",
+        exits: operationExits("QUEUED", { notDispatched: true }),
+      }),
+    );
+    expect(notDispatched.exits.resync).toEqual({
+      allowed: false,
+      reasonCode: "OPERATION_NOT_DISPATCHED",
+    });
+
+    const accepted = readTenantProvisioningResyncResult(resyncResult());
+    expect(accepted.resync).toEqual({
+      requestId: "019f0000-0000-7000-8000-000000000060",
+      requestedAt: expect.any(String),
+      reasonCode: "CORE.PROVISIONING.RESYNC_REQUESTED_BY_ADMIN",
+    });
+    expect(accepted.operation.exits.resync.allowed).toBe(true);
+
+    // An exit Core no longer states, and a request it did not record, fail closed.
+    const exitsWithoutResync = Object.fromEntries(
+      Object.entries(operationExits("RUNNING")).filter(([exit]) => exit !== "resync"),
+    );
+    expect(() =>
+      readTenantOperationDetail(operationDetail({ exits: exitsWithoutResync })),
+    ).toThrow("INVALID_TENANT_OPERATION_DETAIL_RESPONSE");
+    expect(() =>
+      readTenantProvisioningResyncResult(
+        resyncResult({ resync: { requestId: "not-a-uuid", requestedAt: "x", reasonCode: "y" } }),
+      ),
+    ).toThrow("INVALID_TENANT_PROVISIONING_RESYNC_RESPONSE");
   });
 
   it("uses the exact four terminal operation states", () => {

@@ -1682,8 +1682,8 @@ export const ar = {
       blocked: "معطّل",
       pending: "قيد الانتظار",
       contractShort: "إصدار العقد",
-      release: "الإصدار",
-      releaseRequired: "الإصدار مطلوب",
+      release: "الإصدار الحالي",
+      releaseRequired: "الإصدار الحالي مطلوب",
       noCredential:
         "مسار العامل مرجعه الخادم ولا يتم عرض كلمات مرور أو أسرار أو SQL أو ملفات ترحيل.",
       checks: {
@@ -2393,6 +2393,8 @@ export const ar = {
       TENANT_DECOMMISSION_RETENTION_ACK_REQUIRED:
         "أكد سلوك الاحتفاظ بالبيانات.",
       INVALID_PROVISIONING_REASON_CODE: "استخدم رمز سبب آمنًا بأحرف كبيرة.",
+      TENANT_PROVISIONING_RESYNC_NOT_ALLOWED:
+        "رفضت Core إعادة المزامنة: لم يتسلّم Worker خطة هذه العملية بعد، أو أن العملية مستقرة بالفعل. حدّث العملية لترى الإجراءات المتاحة لها الآن.",
       "GW.IDEM.IN_FLIGHT":
         "الأمر نفسه ما زال قيد التنفيذ؛ الإعادة تحتفظ بالمفتاح نفسه.",
     },
@@ -2431,10 +2433,18 @@ export const ar = {
     viewCurrentOperationButton: "عرض العملية الحالية",
     openUpdatesButton: "فتح التحديثات",
     requestCancelButton: "طلب الإلغاء",
+    resyncButton: "إعادة المزامنة",
+    resyncRequestedTitle: "طُلبت إعادة المزامنة",
+    resyncRequestedMessage:
+      "يعيد Worker تسليم التقدّم الذي احتفظ به لهذه العملية، وتطبّق Core كل سجل فور وصوله. تُقرأ العملية مجددًا خلال ثوانٍ.",
+    resyncTerminalReason:
+      "الجيل الفاشل أو الملغى مستقر؛ أعد تجهيزه بدلًا من ذلك.",
     stalledBadge: (duration: string) => `متعثرة · لا تقدّم منذ ${duration}`,
+    stalledAtStepBadge: (step: string, duration: string) =>
+      `متعثرة عند «${step}» · لا تقدّم منذ ${duration}`,
     stallNoProgressNote: (duration: string, step: string | null) =>
       step
-        ? `لم يُسجَّل أي تقدّم منذ ${duration} في الخطوة «${step}». ربما توقف Worker، أو أن الخطوة تستغرق وقتًا أطول من المتوقع.`
+        ? `لم تُبلغ الخطوة «${step}» عن أي انتقال ولا عن نبضة من Worker منذ ${duration}، أي فاتتها ثلاث نبضات. ربما توقف Worker، أو فقد سجلّه للخطوة، أو انتهت مهلة إيجار الخطوة.`
         : `لم يُسجَّل أي تقدّم منذ ${duration}. ربما توقف Worker، أو أن العمل يستغرق وقتًا أطول من المتوقع.`,
     stallDispatchLeaseExpiredNote: (duration: string, step: string | null) =>
       `أُرسلت ${step ? `الخطوة «${step}»` : "خطوة"} إلى التطبيق المالك لها منذ ${duration} ولم تصل نتيجتها. انتهت مهلة الإرسال البالغة ٥ دقائق ولم يُعِد Worker إرسالها.`,
@@ -2446,6 +2456,8 @@ export const ar = {
       "اطلب الإلغاء لإيقافها. تصبح إعادة التجهيز متاحة بعد أن يؤكد Worker التوقف.",
     stallAwaitWorkerGuidance:
       "لا يمكن لأي إجراء من المشغّل أن يدفعها للأمام حتى يؤكد Worker التوقف. تحقّق من أن Worker يعمل.",
+    stallResyncGuidance:
+      "تطلب «إعادة المزامنة» من Worker الآن إعادة تسليم التقدّم الذي احتفظ به، فتستقر الخطوة التي ضاعت نتيجتها في الطريق. وتطلبها Core كذلك من تلقاء نفسها مع تباعد المحاولات.",
     exitBlockedReasons: {
       OPERATION_SUPERSEDED: "يوجد جيل أحدث. نفّذ الإجراء على أحدث عملية.",
       ADDON_INSTALLATION_OWNED:
@@ -2456,6 +2468,8 @@ export const ar = {
         "توجد عملية مفتوحة. يصبح هذا الإجراء متاحًا بعد انتهائها أو اكتمال إلغائها.",
       OPERATION_SUCCEEDED: "نجحت العملية؛ لا يوجد ما يُعاد تجهيزه.",
       OPERATION_TERMINAL: "انتهت العملية بالفعل؛ لا يوجد ما يُلغى.",
+      OPERATION_NOT_DISPATCHED:
+        "لم يُسلَّم شيء إلى Worker بعد: لم تُرسل الخطة، أو أنها تنتظر متطلباتها المسبقة للنسخ الاحتياطي أو الصيانة.",
     },
     cancelConfirmTitle: (operation: string, generation: number) =>
       `طلب إلغاء ${operation} · الجيل ${generation}؟`,
@@ -2464,7 +2478,7 @@ export const ar = {
     retryConfirmTitle: (operation: string, generation: number) =>
       `إعادة تجهيز ${operation} · الجيل ${generation}؟`,
     retryConfirmDescription: (nextGeneration: number) =>
-      `تخطط Core للجيل ${nextGeneration} الذي يعيد تشغيل الخطوات غير المكتملة فقط، مثبتةً على الإصدارات نفسها، ويجب أن يظل كلٌّ منها الإصدار الحالي لمكوّنه. يبقى هذا الجيل وخطه الزمني ضمن السجل. والمستأجر الذي فشل تجهيزه الأولي يعود إلى حالة التجهيز.`,
+      `تخطط Core للجيل ${nextGeneration} الذي يعيد تشغيل الخطوات غير المكتملة فقط على الإصدارات الحالية: فالمكوّن الذي ثبّته هذا الجيل على إصدار حلّ محله إصدار أحدث ينتقل إلى إصداره الحالي. يبقى هذا الجيل وخطه الزمني ضمن السجل. والمستأجر الذي فشل تجهيزه الأولي يعود إلى حالة التجهيز.`,
     repairConfirmTitle: (component: string) => `إصلاح ${component}؟`,
     repairConfirmDescription:
       "تفتح Core عملية إصلاح مثبتة على الإصدار المطلوب الحالي للمكوّن ولا تُجري ترقية. يُتحقَّق من ترحيلات المكوّن مقابل ذلك الإصدار وتُطبَّق كل حزم البذور مجددًا وفق سياستها، بما فيها البذور التي أُغلقت بقرار تعارض، ويُكتفى بالتحقق من تبعياته. يُرفض الإصلاح الذي تشترط إصداراته نسخة احتياطية أو نافذة صيانة، لأن خطوات أساس النواة لا تعمل في ظلها، ولا يمكن بدء أي عملية أخرى حتى ينتهي الإصلاح.",

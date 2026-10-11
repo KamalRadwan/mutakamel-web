@@ -78,8 +78,8 @@ authoritative for its exact route permissions.
 - `admin.tenants.read` — Directory list, tenant details, view operations history & timeline, read destruction progress, and the provisioning component catalogue that `/provisioning/releases` reads to tell current from superseded releases (without it those rows show no standing)
 - `admin.tenants.update` — Update tenant profile metadata
 - `admin.tenants.suspend` — Suspend or activate tenant
-- `admin.tenants.reprovision` — Reprovision tenant, cancel provisioning, retry/cancel operations
-- `admin.tenants.destroy` — Hard delete / destroy tenant (permanent), and abandon a destruction request that is `BLOCKED` or still `STOPPING_PROVISIONING` (verified 2026-10-08); both routes also require `admin.tenants.critical`
+- `admin.tenants.reprovision` — Reprovision tenant, cancel provisioning, retry/cancel/resync operations
+- `admin.tenants.destroy` — Hard delete / destroy tenant (permanent); abandon a destruction request that is still `STOPPING_PROVISIONING` or `BLOCKED` before the drop (`blockedPhase: STOPPING_PROVISIONING`); and resume one halted after the drop was authorized, through the same destroy route under a new key (verified 2026-10-11); both routes also require `admin.tenants.critical`
 - `admin.tenants.delete` — Soft delete tenant
 - `admin.tenants.manage_fqdns` — Add/remove secondary FQDNs, set primary FQDN
 
