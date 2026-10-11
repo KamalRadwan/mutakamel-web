@@ -2584,6 +2584,12 @@ export const en: Dictionary = {
     stalledBadge: (duration: string) => `Stalled · no progress for ${duration}`,
     stalledAtStepBadge: (step: string, duration: string) =>
       `Stalled at ${step} · no progress for ${duration}`,
+    /** A stop Core asked for (a cancellation, or a failed or expired prerequisite) that the Worker has not confirmed. */
+    stalledStopPendingBadge: (duration: string) =>
+      `Stalled · stop not confirmed for ${duration}`,
+    /** A WAITING_RETRY operation the Worker no longer heartbeats. */
+    stalledWaitingRetryBadge: (duration: string) =>
+      `Stalled · no Worker heartbeat for ${duration}`,
     stallNoProgressNote: (duration: string, step: string | null) =>
       step
         ? `${step} has reported neither a transition nor a Worker heartbeat for ${duration}, three heartbeats missed. The Worker may have stopped, lost its record of the step, or let the step's lease run out.`
@@ -2592,8 +2598,13 @@ export const en: Dictionary = {
       `${step ?? "A step"} was handed to its owning application ${duration} ago and no result has come back. Its 5-minute dispatch lease has expired; the Worker does not send it again but keeps waiting for the result, and fails the step as retryable (WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT) if none arrives within 45 minutes of the dispatch.`,
     stallCancelPendingNote: (duration: string, step: string | null) =>
       step
-        ? `Cancellation was requested ${duration} ago and the Worker has not confirmed that ${step} stopped.`
-        : `Cancellation was requested ${duration} ago and the Worker has not confirmed the stop.`,
+        ? `Cancellation was requested, and for ${duration} the Worker has neither confirmed that ${step} stopped nor reported that it is stopping.`
+        : `Cancellation was requested, and for ${duration} the Worker has neither confirmed the stop nor reported that it is stopping.`,
+    /** Core holds the operation RUNNING in PREREQUISITE_FAILED / PREREQUISITE_EXPIRED while the Worker stops it. */
+    stallPrerequisiteStopPendingNote: (duration: string, step: string | null, expired: boolean) =>
+      `${expired ? "Its backup or maintenance prerequisite expired" : "Its backup or maintenance prerequisite failed"}, so Core asked the Worker to stop this operation. For ${duration} the Worker has neither confirmed the stop nor reported that it is stopping${step ? ` ${step}` : ""}.`,
+    stallWaitingRetryNote: (duration: string) =>
+      `This operation is waiting to retry, and for ${duration} the Worker has not reported that it still holds the retry. The Worker heartbeats a retry it holds once a minute, however long the wait its owning application asked for, so it may have stopped or lost the schedule.`,
     stallCancelGuidance:
       "Request cancellation to stop it. Re-provisioning becomes available once the Worker confirms the stop.",
     stallAwaitWorkerGuidance:

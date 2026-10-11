@@ -163,6 +163,7 @@ export function FleetCommandNotice<T>({
   copy,
   successLabel,
   onRetryExact,
+  onRetry,
   onClear,
   successAction,
 }: {
@@ -170,6 +171,8 @@ export function FleetCommandNotice<T>({
   copy: ProvisioningFleetCopy;
   successLabel?: string;
   onRetryExact: () => void;
+  /** Sends the same command again under a new key after a retryable refusal. */
+  onRetry?: () => void;
   onClear: () => void;
   successAction?: ReactNode;
 }) {
@@ -185,6 +188,8 @@ export function FleetCommandNotice<T>({
     ? (successLabel ?? copy.commandSucceeded)
     : view.state === "AMBIGUOUS"
       ? copy.exactRetryHint
+      : view.state === "PUBLICATION_CHANGED"
+        ? copy.publicationChanged
       : view.state === "STALE"
         ? copy.stale
         : view.state === "CONFLICT"
@@ -232,6 +237,11 @@ export function FleetCommandNotice<T>({
             {view.exactRetryAvailable ? (
               <Button type="button" variant="outline" size="sm" onClick={onRetryExact}>
                 {copy.retryExact}
+              </Button>
+            ) : null}
+            {view.state === "PUBLICATION_CHANGED" && onRetry ? (
+              <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+                {copy.tryAgain}
               </Button>
             ) : null}
             <Button type="button" variant="ghost" size="sm" onClick={onClear}>

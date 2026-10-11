@@ -463,7 +463,12 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={operation.status} ar={ar} live={!operation.stall} />
                       {operation.stall && (
-                        <StalledBadge stall={operation.stall} lang={model.lang} namesStep />
+                        <StalledBadge
+                          stall={operation.stall}
+                          lang={model.lang}
+                          namesStep
+                          waitingRetry={operation.status === "WAITING_RETRY"}
+                        />
                       )}
                       {actions.retry.visible && (
                         <Button
@@ -1297,19 +1302,45 @@ function stepStatusPresentation(status: TenantOperationStepStatus): StatusPresen
 }
 
 /**
+ * The phases in which Core holds a RUNNING operation while the Worker stops
+ * it after a backup or maintenance prerequisite failed or expired; Core counts
+ * that as a pending stop, like a cancellation (`PREREQUISITE_STOP_PHASES` in
+ * Core's `tenant-operation-exits.ts`).
+ */
+const PREREQUISITE_STOP_PHASES: ReadonlySet<string> = new Set([
+  "PREREQUISITE_FAILED",
+  "PREREQUISITE_EXPIRED",
+]);
+
+function isPrerequisiteStop(
+  operation: Pick<TenantOperationDetail, "status" | "currentPhase">,
+): boolean {
+  return (
+    operation.status === "RUNNING" &&
+    PREREQUISITE_STOP_PHASES.has(operation.currentPhase)
+  );
+}
+
+/**
  * Amber, with its own icon and the measured time, on the operation and its
  * stalled step. On the operation it also names the step Core attributes the
  * stall to: since Worker heartbeats, a running step silent for three missed
- * heartbeats is `NO_PROGRESS` with its `stepKey`, the commonest stall.
+ * heartbeats is `NO_PROGRESS` with its `stepKey`, the commonest stall. A stop
+ * the Worker has not confirmed (`CANCEL_PENDING`: a cancellation, or the stop
+ * of a failed or expired prerequisite) and a `WAITING_RETRY` operation the
+ * Worker no longer heartbeats are named as such.
  */
 function StalledBadge({
   stall,
   lang,
   namesStep = false,
+  waitingRetry = false,
 }: {
   stall: TenantOperationStall;
   lang: "ar" | "en";
   namesStep?: boolean;
+  /** The operation is WAITING_RETRY: Core reports it only once the Worker stopped heartbeating it. */
+  waitingRetry?: boolean;
 }) {
   const ar = lang === "ar";
   const copy = tpCopy(ar);
@@ -1317,9 +1348,13 @@ function StalledBadge({
   return (
     <Badge tone="warn">
       <Hourglass className="size-3" aria-hidden="true" />
-      {namesStep && stall.stepKey
-        ? copy.stalledAtStepBadge(provisioningStepLabel(stall.stepKey, ar), duration)
-        : copy.stalledBadge(duration)}
+      {stall.reason === "CANCEL_PENDING"
+        ? copy.stalledStopPendingBadge(duration)
+        : waitingRetry && stall.reason === "NO_PROGRESS"
+          ? copy.stalledWaitingRetryBadge(duration)
+          : namesStep && stall.stepKey
+            ? copy.stalledAtStepBadge(provisioningStepLabel(stall.stepKey, ar), duration)
+            : copy.stalledBadge(duration)}
     </Badge>
   );
 }
@@ -1341,17 +1376,31 @@ function StallNotice({
   const copy = tpCopy(ar);
   const duration = formatProvisioningDuration(stall.ageSeconds, lang);
   const step = stall.stepKey ? provisioningStepLabel(stall.stepKey, ar) : null;
+  // Core counts the stop of a failed or expired prerequisite as a pending
+  // stop too; only the Worker's confirmation moves either on.
+  const prerequisiteStop =
+    stall.reason === "CANCEL_PENDING" && isPrerequisiteStop(operation);
   const explanation =
     stall.reason === "DISPATCH_LEASE_EXPIRED"
       ? copy.stallDispatchLeaseExpiredNote(duration, step)
       : stall.reason === "CANCEL_PENDING"
-        ? copy.stallCancelPendingNote(duration, step)
-        : copy.stallNoProgressNote(duration, step);
-  const guidance = operation.exits.cancel.allowed
-    ? copy.stallCancelGuidance
-    : operation.exits.cancel.reasonCode === "CANCELLATION_PENDING"
-      ? copy.stallAwaitWorkerGuidance
-      : null;
+        ? prerequisiteStop
+          ? copy.stallPrerequisiteStopPendingNote(
+              duration,
+              step,
+              operation.currentPhase === "PREREQUISITE_EXPIRED",
+            )
+          : copy.stallCancelPendingNote(duration, step)
+        : operation.status === "WAITING_RETRY"
+          ? copy.stallWaitingRetryNote(duration)
+          : copy.stallNoProgressNote(duration, step);
+  const guidance = prerequisiteStop
+    ? copy.stallAwaitWorkerGuidance
+    : operation.exits.cancel.allowed
+      ? copy.stallCancelGuidance
+      : operation.exits.cancel.reasonCode === "CANCELLATION_PENDING"
+        ? copy.stallAwaitWorkerGuidance
+        : null;
   return (
     <div className="mt-3 flex items-start gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning-subtle-foreground">
       <Hourglass className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />

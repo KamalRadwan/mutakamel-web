@@ -526,7 +526,7 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
   it("resumes a halted request under a new key and polls Worker's progress again", async () => {
     api.get.mockResolvedValue(tenantFixture("DELETED"));
     api.getDestroy.mockResolvedValue(haltedTenantDestroyFixture("DROPPING_DATABASE"));
-    api.destroy.mockResolvedValue(tenantDestroyFixture("DROPPING_DATABASE"));
+    api.destroy.mockResolvedValue({ ...tenantDestroyFixture("DROPPING_DATABASE"), resumed: true });
     const { result } = renderHook(() =>
       useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 60_000 }),
     );
@@ -535,9 +535,15 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
     );
     expect(result.current.destroyPolling).toBe(false);
 
+    let answer: Awaited<ReturnType<typeof result.current.resumeDestruction>> | undefined;
     await act(async () => {
-      await result.current.resumeDestruction();
+      answer = await result.current.resumeDestruction();
     });
+
+    // The command's answer says it resumed; the kept projection is the
+    // status read's, without the command's flag.
+    expect(answer?.resumed).toBe(true);
+    expect(result.current.destroyOperation).toEqual(tenantDestroyFixture("DROPPING_DATABASE"));
 
     expect(api.destroy).toHaveBeenCalledOnce();
     expect(api.destroy).toHaveBeenCalledWith(
@@ -586,8 +592,28 @@ describe("useTenantCoreWorkspace profile and destructive actions", () => {
     expect(api.destroy.mock.calls[2]?.[2]).not.toBe(first);
   });
 
+  it("resumes a request blocked while stopping provisioning back to stopping it", async () => {
+    api.get.mockResolvedValue(tenantFixture("DELETED"));
+    api.getDestroy.mockResolvedValue(tenantDestroyFixture("BLOCKED"));
+    api.destroy.mockResolvedValue({ ...tenantDestroyFixture("STOPPING_PROVISIONING"), resumed: true });
+    const { result } = renderHook(() =>
+      useTenantCoreWorkspace(TENANT_ID, { pollIntervalMs: 60_000 }),
+    );
+    await waitFor(() =>
+      expect(result.current.destroyOperation?.blockedPhase).toBe("STOPPING_PROVISIONING"),
+    );
+
+    await act(async () => {
+      await result.current.resumeDestruction();
+    });
+
+    expect(api.destroy).toHaveBeenCalledOnce();
+    expect(api.destroy.mock.calls[0]?.[2]).not.toBe(DESTROY_OPERATION_ID);
+    expect(result.current.destroyOperation?.phase).toBe("STOPPING_PROVISIONING");
+    expect(result.current.destroyPolling).toBe(true);
+  });
+
   it.each([
-    ["a request blocked before the drop", tenantDestroyFixture("BLOCKED"), true, "TENANT_DESTROY_NOT_RESUMABLE"],
     ["a request Worker still advances", tenantDestroyFixture("DROPPING_DATABASE"), true, "TENANT_DESTROY_NOT_RESUMABLE"],
     ["an abandoned request", tenantDestroyFixture("ABANDONED"), true, "TENANT_DESTROY_NOT_RESUMABLE"],
     ["an admin without the destroy grant", haltedTenantDestroyFixture("DROPPING_DATABASE"), false, "TENANT_DESTROY_FORBIDDEN"],

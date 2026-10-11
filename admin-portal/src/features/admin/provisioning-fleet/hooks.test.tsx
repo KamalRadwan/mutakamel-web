@@ -120,6 +120,33 @@ describe("provisioning fleet hooks", () => {
     expect(uuidMock).toHaveBeenCalledTimes(1);
   });
 
+  it("sends a preview again under a new key after Core reports a publication change", async () => {
+    apiMock.createPreview
+      .mockRejectedValueOnce({
+        isNormalized: true,
+        httpStatus: 409,
+        errorCode: "PROVISIONING_FLEET_PUBLICATION_CHANGED",
+        message: "Application publications kept changing while the fleet was evaluated. Retry the request.",
+      })
+      .mockResolvedValueOnce(result(previewFixture()));
+    const { result: hook } = renderHook(() => useFleetDirectory());
+    await waitFor(() => expect(hook.current.rollouts.state).toBe("EMPTY"));
+
+    await act(async () => {
+      await hook.current.createPreview(previewCommand());
+    });
+    expect(hook.current.previewCommand.state).toBe("PUBLICATION_CHANGED");
+    expect(hook.current.previewCommand.exactRetryAvailable).toBe(false);
+
+    await act(async () => {
+      await hook.current.retryPreview();
+    });
+    expect(apiMock.createPreview).toHaveBeenCalledTimes(2);
+    expect(apiMock.createPreview.mock.calls[1][0]).toEqual(apiMock.createPreview.mock.calls[0][0]);
+    expect(uuidMock).toHaveBeenCalledTimes(2);
+    expect(hook.current.previewCommand.state).toBe("SUCCESS");
+  });
+
   it("preflights ALL critical permissions and only exposes lifecycle routes valid for state", async () => {
     authMock.user = {
       ...fullActor(),

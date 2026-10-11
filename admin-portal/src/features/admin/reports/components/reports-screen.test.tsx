@@ -246,7 +246,7 @@ describe("ReportsScreen", () => {
     expect(repair).toHaveTextContent("Repair");
     expect(repair).toHaveTextContent("Phase");
     expect(repair).toHaveTextContent("core.seed");
-    expect(repair).toHaveTextContent("Cancellation not confirmed");
+    expect(repair).toHaveTextContent("Stop not confirmed");
     expect(repair).toHaveTextContent("for 25 min");
   });
 
@@ -261,7 +261,7 @@ describe("ReportsScreen", () => {
     expect(screen.getByText("المستأجرون العالقون")).toBeTruthy();
     const repair = screen.getByRole("row", { name: /initech/ });
     expect(repair).toHaveTextContent("إصلاح");
-    expect(repair).toHaveTextContent("الإلغاء لم يُؤكَّد");
+    expect(repair).toHaveTextContent("الإيقاف لم يُؤكَّد");
   });
 
   it("hides report controls at the client permission gate", () => {

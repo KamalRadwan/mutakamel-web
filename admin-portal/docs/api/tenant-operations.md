@@ -313,18 +313,26 @@ of these holds (the oldest running step wins):
 
 | `reason` | When | `stepKey` |
 | --- | --- | --- |
-| `NO_PROGRESS` | a running step reported neither a transition nor a heartbeat for more than 3 minutes (three missed heartbeats); or no step is running and nothing changed for more than 10 minutes, plus the two-hour prerequisite window while `AWAITING_PREREQUISITES` | the step, or `null` |
+| `NO_PROGRESS` | a running step reported neither a transition nor a heartbeat for more than 3 minutes (three missed heartbeats); or no step is running and nothing changed for more than 10 minutes — the Worker's once-a-minute operation heartbeat counts as a change, a `WAITING_RETRY` schedule included — plus the two-hour prerequisite window while `AWAITING_PREREQUISITES` | the step, or `null` |
 | `DISPATCH_LEASE_EXPIRED` | a running step owned by Core/CRM/Trade (`producer` not `worker`, kind not `DATABASE`) stayed silent for more than 10 minutes, twice its lease: no result and no re-dispatch. The Worker does not re-send it but waits for the owner's result, and 45 minutes after the claim fails it retryably with `WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT`, which ends the operation `FAILED_RETRYABLE`; the notice says so | that step |
-| `CANCEL_PENDING` | `CANCEL_REQUESTED` for 10+ minutes since the request | oldest running step, else `null` |
+| `CANCEL_PENDING` | a stop is pending — `CANCEL_REQUESTED`, or `RUNNING` in `PREREQUISITE_FAILED` / `PREREQUISITE_EXPIRED` (Core sent the Worker a stop after a backup or maintenance prerequisite failed or expired on a plan with WebPhone effects) — and for 10+ minutes since the stop request or the Worker's latest transition or heartbeat of the stop, whichever is later, the Worker has neither confirmed nor shown it is stopping | oldest running step, else `null` |
 
 The workspace's stall badge on the operation names the step when `stepKey` is
 set ("Stalled at Core foundation — schema · no progress for 4 min"); the badge
-on the step row stays short. The notice under it explains the reason, names
-**Resync** first whenever `exits.resync` is open, and then the cancel guidance.
+on the step row stays short. A pending stop reads "Stalled · stop not
+confirmed for 12 min" and a waiting retry "Stalled · no Worker heartbeat for
+12 min". The notice under it explains the reason — for `CANCEL_PENDING` it
+tells a cancellation from a failed or expired prerequisite's stop, and for a
+`WAITING_RETRY` operation it says the Worker no longer heartbeats the retry —
+names **Resync** first whenever `exits.resync` is open, and then the guidance:
+request cancellation when it is open, or, while a stop is pending (a
+cancellation in progress or a prerequisite stop), that only the Worker's
+confirmation moves it on. All of it is in English and Arabic.
 
-`WAITING_RETRY` is never reported as a stall: an owner may schedule a retry up
-to a day out and the due time is not projected. `ageSeconds` is measured when
-the response is built, so it is excluded from the portal's change detection.
+`WAITING_RETRY` is reported only when the Worker no longer holds the schedule:
+an owner may schedule a retry up to a day out, and the Worker heartbeats the
+held execution once a minute throughout. `ageSeconds` is measured when the
+response is built, so it is excluded from the portal's change detection.
 
 ### Operator exits
 

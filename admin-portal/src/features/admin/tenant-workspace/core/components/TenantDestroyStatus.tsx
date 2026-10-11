@@ -25,6 +25,8 @@ export interface TenantDestroyStatusProps {
   polling: boolean;
   /** Core refused an abandon because the drop was already authorized (409 `TENANT_DESTROY_NOT_ABANDONABLE`). */
   notAbandonable: boolean;
+  /** What the operator's last resume of this request answered, while it still applies. */
+  resumeNotice?: string | null;
   onRefresh: () => void;
 }
 
@@ -51,6 +53,7 @@ export function TenantDestroyStatus({
   loadError,
   polling,
   notAbandonable,
+  resumeNotice = null,
   onRefresh,
 }: TenantDestroyStatusProps) {
   const text = tenantWorkspaceCopy(locale);
@@ -77,9 +80,9 @@ export function TenantDestroyStatus({
 
   const { phase } = operation;
   const advancing = isTenantDestroyAdvancing(phase);
-  // A request BLOCKED after the drop was authorized halted in place: it is
-  // resumed rather than abandoned, so it is titled and explained apart from a
-  // stop that blocked before the drop.
+  // A request BLOCKED after the drop was authorized halted in place: it can
+  // only be resumed, never abandoned, so it is titled and explained apart
+  // from a stop that blocked before the drop (resume or abandon).
   const halted = tenantDestroyHaltedPhase(operation);
   const title = halted ? text.destroyHaltedPhases[halted] : text.destroyPhases[phase];
   const hint = halted ? text.destroyHaltedHints[halted] : text.destroyPhaseHints[phase];
@@ -106,6 +109,7 @@ export function TenantDestroyStatus({
         <p id={`${id}-hint`} className="mt-1">
           {hint}
         </p>
+        {resumeNotice ? <p className="mt-1 font-medium">{resumeNotice}</p> : null}
       </div>
 
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1">

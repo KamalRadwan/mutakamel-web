@@ -22,6 +22,7 @@ import {
   platformFqdnForTenant,
   readFqdnAvailability,
   readTenantDestroy,
+  readTenantDestroyRequest,
   readTenantFqdn,
   readTenantFqdnList,
   readTenantProvisioningCommandResult,
@@ -134,6 +135,32 @@ describe("tenant destruction reader", () => {
     expect(() =>
       readTenantDestroy({ ...tenantDestroyFixture(phase), ...overrides }),
     ).toThrow("INVALID_TENANT_DESTROY_RESPONSE");
+  });
+
+  it.each([
+    ["a new or returned request", "BLOCKED", false],
+    ["a stop sent back to stopping provisioning", "STOPPING_PROVISIONING", true],
+    ["a halted drop that continues", "DROPPING_DATABASE", true],
+  ] as const)("reads a destroy answer for %s with its resumed flag", (_label, phase, resumed) => {
+    const operation = tenantDestroyFixture(phase);
+    expect(readTenantDestroyRequest({ ...operation, resumed })).toEqual({
+      ...operation,
+      resumed,
+    });
+  });
+
+  it.each([
+    ["no resumed flag", undefined, "STOPPING_PROVISIONING"],
+    ["a resumed flag that is not a boolean", "true", "STOPPING_PROVISIONING"],
+    ["a resume that left the request BLOCKED", true, "BLOCKED"],
+    ["a resume of a request that already finished", true, "SUCCEEDED"],
+  ] as const)("rejects a destroy answer with %s", (_label, resumed, phase) => {
+    expect(() =>
+      readTenantDestroyRequest({ ...tenantDestroyFixture(phase), resumed }),
+    ).toThrow("INVALID_TENANT_DESTROY_RESPONSE");
+    expect(() => readTenantDestroyRequest(null)).toThrow(
+      "INVALID_TENANT_DESTROY_RESPONSE",
+    );
   });
 });
 

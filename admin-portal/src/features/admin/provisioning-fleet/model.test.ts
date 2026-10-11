@@ -50,6 +50,14 @@ describe("provisioning fleet operator policy", () => {
     ))).toBe("CONFLICT");
   });
 
+  it("tells a publication change during evaluation apart, and sends it again under a new key", () => {
+    const changed = error(409, "PROVISIONING_FLEET_PUBLICATION_CHANGED");
+    expect(classifyFleetCommandFailure(changed)).toBe("PUBLICATION_CHANGED");
+    // The Gateway stored the 409 under its key, so the same key would only
+    // replay it: the retry is a new intent.
+    expect(shouldRetainFleetIntent(changed)).toBe(false);
+  });
+
   it("retains exact intent only for ambiguous outcomes", () => {
     expect(shouldRetainFleetIntent(error(503, "CORE_UNAVAILABLE"))).toBe(true);
     expect(shouldRetainFleetIntent(error(429, "GW.RATE_LIMIT"))).toBe(true);

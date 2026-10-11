@@ -21,11 +21,51 @@ import {
   canResumeTenantDestroy,
   tenantDestroyHoldsTenant,
 } from "../model/destroy";
+import type { TenantDestroyBlockedPhase, TenantDestroyView } from "../types";
 import {
   tenantWorkspaceCopy,
   type TenantWorkspaceLocale,
 } from "./copy";
 import { TenantDestroyStatus } from "./TenantDestroyStatus";
+
+/** What the operator's last resume answered, for the request it was sent for. */
+interface ResumeOutcome {
+  operationId: string;
+  /** Where the request was blocked when the resume was sent. */
+  blockedPhase: TenantDestroyBlockedPhase;
+  resumed: boolean;
+  /** Core's `updatedAt` in the answer; a block after it is a new one. */
+  answeredAt: string;
+}
+
+/**
+ * The resume notice while it still describes the shown request: what Core
+ * answered, or, once the request blocked again after the resume (a stop whose
+ * provisioning is still running does so at once), that it did.
+ */
+function resumeNoticeText(
+  text: ReturnType<typeof tenantWorkspaceCopy>,
+  operation: TenantDestroyView | null,
+  outcome: ResumeOutcome | null,
+): string | null {
+  if (
+    !outcome ||
+    !operation ||
+    operation.operationId !== outcome.operationId ||
+    operation.phase === "SUCCEEDED" ||
+    operation.phase === "ABANDONED"
+  ) {
+    return null;
+  }
+  if (!outcome.resumed) return text.destroyNotResumed;
+  if (
+    operation.blockedAt !== null &&
+    Date.parse(operation.blockedAt) > Date.parse(outcome.answeredAt)
+  ) {
+    return text.destroyBlockedAgain;
+  }
+  return text.destroyResumed[outcome.blockedPhase];
+}
 
 type LifecycleAction =
   | "suspend"
@@ -57,6 +97,9 @@ export function TenantLifecyclePanel({
   const [confirmation, setConfirmation] = useState<LifecycleAction | null>(
     null,
   );
+  const [resumeOutcome, setResumeOutcome] = useState<ResumeOutcome | null>(
+    null,
+  );
   if (!tenant) return null;
 
   const deleted = tenant.status === "DELETED";
@@ -64,12 +107,16 @@ export function TenantLifecyclePanel({
   // A request that was not abandoned holds the tenant: Core refuses restore
   // and answers a new destroy with that same request.
   const heldByDestruction = tenantDestroyHoldsTenant(destroyOperation);
-  // Abandon is offered only before the drop was authorized; a request that
-  // halted after it is resumed instead, which Core does on a new request.
+  // Abandon is offered only before the drop was authorized. Resume, which Core
+  // does on a new destruction request, is offered for every BLOCKED request:
+  // next to abandon when it blocked while stopping provisioning, alone when it
+  // halted after the drop was authorized.
   const canAbandon =
     workspace.permissions.canDestroy && canAbandonTenantDestroy(destroyOperation);
   const canResume =
     workspace.permissions.canDestroy && canResumeTenantDestroy(destroyOperation);
+  const resumesStop = destroyOperation?.blockedPhase === "STOPPING_PROVISIONING";
+  const resumeNotice = resumeNoticeText(text, destroyOperation, resumeOutcome);
   const busy = workspace.mutation.name !== null;
   const heldReason = heldByDestruction ? `${DESTROY_STATUS_ID}-hint` : undefined;
   const actionLabel: Record<DialogAction, string> = {
@@ -118,6 +165,7 @@ export function TenantLifecyclePanel({
   // refreshed status block. A transient failure keeps its idempotency key for
   // the exact retry.
   const confirmAbandon = async () => {
+    setResumeOutcome(null);
     try {
       await workspace.abandonDestruction();
     } catch {
@@ -129,10 +177,21 @@ export function TenantLifecyclePanel({
 
   // Same contract as abandon: sent once, the dialog closes either way, and a
   // rejection lands in the workspace alert. Success shows in the status block,
-  // whose phase changes back to the one Worker now advances.
+  // whose phase changes back to the one Worker now advances, with what Core
+  // answered (`resumed`) beneath its explanation.
   const confirmResume = async () => {
+    const blockedPhase = destroyOperation?.blockedPhase ?? null;
+    setResumeOutcome(null);
     try {
-      await workspace.resumeDestruction();
+      const answer = await workspace.resumeDestruction();
+      if (blockedPhase) {
+        setResumeOutcome({
+          operationId: answer.operationId,
+          blockedPhase,
+          resumed: answer.resumed,
+          answeredAt: answer.updatedAt,
+        });
+      }
     } catch {
       // Shown by the workspace alert.
     } finally {
@@ -169,6 +228,7 @@ export function TenantLifecyclePanel({
             workspace.mutation.error?.errorCode ===
             "TENANT_DESTROY_NOT_ABANDONABLE"
           }
+          resumeNotice={resumeNotice}
           onRefresh={() => void workspace.refreshDestruction()}
         />
       ) : null}
@@ -220,7 +280,7 @@ export function TenantLifecyclePanel({
         )}
         {/* While destruction holds the tenant, the operator's way forward
             leads the deleted tenant's actions: abandon before the drop was
-            authorized (the one way back), resume after it halted. */}
+            authorized (the one way back), resume whenever it is BLOCKED. */}
         {canAbandon && (
           <ActionButton
             label={text.abandonDestroy}
@@ -309,8 +369,16 @@ export function TenantLifecyclePanel({
         onConfirm={confirmResume}
         titleEn={en.resumeConfirmTitle(tenant.name)}
         titleAr={ar.resumeConfirmTitle(tenant.name)}
-        descriptionEn={en.resumeConfirmDescription(tenant.name)}
-        descriptionAr={ar.resumeConfirmDescription(tenant.name)}
+        descriptionEn={
+          resumesStop
+            ? en.resumeStopConfirmDescription(tenant.name)
+            : en.resumeConfirmDescription(tenant.name)
+        }
+        descriptionAr={
+          resumesStop
+            ? ar.resumeStopConfirmDescription(tenant.name)
+            : ar.resumeConfirmDescription(tenant.name)
+        }
         confirmTextEn={en.resumeDestroy}
         confirmTextAr={ar.resumeDestroy}
         loadingLabel={text.resuming}

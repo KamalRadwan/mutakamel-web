@@ -39,8 +39,23 @@ import type {
   TenantProvisioningCommandResult,
   TenantResourceState,
   TenantView,
+  TenantDestroyRequestView,
   TenantDestroyView,
 } from "../types";
+
+/**
+ * The projection the status read returns. A destroy command's answer also
+ * says whether it resumed the request; that belongs to the command, not to
+ * the request's state, so it is not kept beside the polled projection.
+ */
+function destroyProjection(
+  answer: TenantDestroyView | TenantDestroyRequestView,
+): TenantDestroyView {
+  if (!("resumed" in answer)) return answer;
+  const operation: Partial<TenantDestroyRequestView> = { ...answer };
+  delete operation.resumed;
+  return operation as TenantDestroyView;
+}
 
 export interface TenantCoreWorkspaceOptions {
   /**
@@ -200,9 +215,9 @@ export function useTenantCoreWorkspace(
 
   /** Adopts a command's answer as newer than any status read in flight. */
   const adoptDestruction = useCallback(
-    (operation: TenantDestroyView) => {
+    (answer: TenantDestroyView | TenantDestroyRequestView) => {
       destroyReadGeneration.current += 1;
-      applyDestruction(operation);
+      applyDestruction(destroyProjection(answer));
     },
     [applyDestruction],
   );
@@ -719,13 +734,18 @@ export function useTenantCoreWorkspace(
   ]);
 
   /**
-   * Resumes the shown request after it halted in DROPPING_DATABASE or
-   * FINALIZING, under the same permissions as destroy. Core resumes a halted
-   * request when destruction is requested again under a new idempotency key:
-   * attempts reset, the halt clears, and Worker continues in the same phase.
+   * Resumes the shown BLOCKED request, under the same permissions as destroy.
+   * Core resumes it when destruction is requested again under a new
+   * idempotency key: attempts reset and the block clears. One BLOCKED while
+   * stopping provisioning goes back to STOPPING_PROVISIONING and Worker
+   * re-checks at once (its one-hour stop deadline still counts from the
+   * original request, so a provisioning operation that is still running
+   * blocks it again on that attempt); one halted after the drop was
+   * authorized continues in the same phase. The answer's `resumed` says
+   * whether this call resumed it or found it no longer blocked.
    * The key scope is its own, so it can never be the request's original key,
-   * whose exact replay Core answers unchanged; the halt time is part of the
-   * intent, so a retained key retries one resume exactly and a later halt of
+   * whose exact replay Core answers unchanged; the block time is part of the
+   * intent, so a retained key retries one resume exactly and a later block of
    * the same request gets a new key.
    */
   const resumeDestruction = useCallback(async () => {

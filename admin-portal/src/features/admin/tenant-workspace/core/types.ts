@@ -237,12 +237,13 @@ export interface TenantCorePermissions {
 
 /**
  * Worker advances STOPPING_PROVISIONING → DROPPING_DATABASE → FINALIZING →
- * SUCCEEDED. BLOCKED ends automation until an operator acts, and
- * `blockedPhase` says where it stopped: STOPPING_PROVISIONING before Core
- * authorized the database drop (the database still exists; abandon it), or
- * DROPPING_DATABASE / FINALIZING after it (the database may be gone; resume
- * it). ABANDONED (an operator gave the request up) only ever follows a stop
- * before the drop, so the tenant database still exists.
+ * SUCCEEDED. BLOCKED ends automation until an operator acts: a new
+ * destruction request resumes any BLOCKED request, and `blockedPhase` says
+ * where it stopped: STOPPING_PROVISIONING before Core authorized the database
+ * drop (the database still exists; resume it once provisioning has stopped,
+ * or abandon it), or DROPPING_DATABASE / FINALIZING after it (the database may
+ * be gone; resume only). ABANDONED (an operator gave the request up) only ever
+ * follows a stop before the drop, so the tenant database still exists.
  */
 export const TENANT_DESTROY_PHASES = [
   "STOPPING_PROVISIONING",
@@ -263,9 +264,10 @@ export const TENANT_DESTROY_ADVANCING_PHASES = [
 ] as const satisfies readonly TenantDestroyPhase[];
 
 /**
- * Where a BLOCKED request stopped. DROPPING_DATABASE and FINALIZING mean Core
- * had already authorized the drop: the request halted in place, cannot be
- * abandoned, and a new destruction request resumes it.
+ * Where a BLOCKED request stopped. A new destruction request resumes it in
+ * that phase with a fresh attempt count. DROPPING_DATABASE and FINALIZING mean
+ * Core had already authorized the drop: the request halted in place and
+ * cannot be abandoned.
  */
 export const TENANT_DESTROY_BLOCKED_PHASES = [
   "STOPPING_PROVISIONING",
@@ -300,4 +302,14 @@ export interface TenantDestroyView {
   /** Provisioning operation the stop waits on, or waited on before it blocked. */
   blockingOperationId: string | null;
   abandonedAt: string | null;
+}
+
+/**
+ * What a destruction request (`DELETE :id/destroy`) answers: the request as it
+ * now is, and whether this call resumed it from BLOCKED. `resumed` is false
+ * when the call created a request or returned the live one unchanged (it was
+ * no longer blocked); an exact replay of the same key returns the first answer.
+ */
+export interface TenantDestroyRequestView extends TenantDestroyView {
+  resumed: boolean;
 }

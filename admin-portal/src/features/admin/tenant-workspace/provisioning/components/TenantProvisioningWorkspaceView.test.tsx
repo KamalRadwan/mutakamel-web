@@ -286,6 +286,62 @@ describe("TenantProvisioningWorkspaceView", () => {
     ).toBeInTheDocument();
   });
 
+  // Core holds a RUNNING operation in PREREQUISITE_FAILED/EXPIRED while the
+  // Worker stops it, and counts that as a pending stop like a cancellation.
+  it.each([
+    ["PREREQUISITE_FAILED", "Its backup or maintenance prerequisite failed"],
+    ["PREREQUISITE_EXPIRED", "Its backup or maintenance prerequisite expired"],
+  ])("explains an unconfirmed stop of a %s prerequisite, not a cancellation", (currentPhase, cause) => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({
+          currentPhase,
+          stall: {
+            stepKey: null,
+            since: "2026-08-11T19:20:00.000Z",
+            ageSeconds: 720,
+            reason: "CANCEL_PENDING",
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Stalled · stop not confirmed for 12 min")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        new RegExp(`${cause}, so Core asked the Worker to stop this operation\\. For 12 min the Worker has neither confirmed the stop`, "u"),
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Cancellation was requested/u)).not.toBeInTheDocument();
+    expect(
+      screen.getByText("No operator action can move it on until the Worker confirms the stop. Check that the Worker is running."),
+    ).toBeInTheDocument();
+  });
+
+  // A held retry is heartbeated once a minute, so only one the Worker no
+  // longer holds is reported as stalled.
+  it("explains a WAITING_RETRY operation the Worker no longer heartbeats", () => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({
+          operationStatus: "WAITING_RETRY",
+          steps: [],
+          stall: {
+            stepKey: null,
+            since: "2026-08-11T19:20:00.000Z",
+            ageSeconds: 720,
+            reason: "NO_PROGRESS",
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Stalled · no Worker heartbeat for 12 min")).toBeInTheDocument();
+    expect(
+      screen.getByText(/This operation is waiting to retry, and for 12 min the Worker has not reported that it still holds the retry/u),
+    ).toBeInTheDocument();
+  });
+
   // A dispatched owner step is not re-sent once its lease expired; the Worker
   // waits for its result and fails it retryably after 45 minutes.
   it("bounds a DISPATCH_LEASE_EXPIRED stall by the owner-result deadline", () => {
@@ -489,10 +545,13 @@ function makeModel(
     operationStatus?:
       | "QUEUED"
       | "RUNNING"
+      | "WAITING_RETRY"
       | "SUCCEEDED"
       | "FAILED_RETRYABLE"
       | "CANCEL_REQUESTED"
       | "CANCELLED";
+    /** The operation's current phase; the fixture's own by default. */
+    currentPhase?: string;
     selectedGeneration?: number;
     latestGeneration?: number;
     localError?: string;
@@ -523,6 +582,7 @@ function makeModel(
       generation: selectedGeneration,
       prerequisiteCount: options.prerequisiteCount ?? 0,
       stall: options.stall ?? null,
+      ...(options.currentPhase ? { currentPhase: options.currentPhase } : {}),
       ...(options.steps ? { steps: options.steps } : {}),
       ...(options.safeError !== undefined ? { safeError: options.safeError } : {}),
       // A newer generation in these fixtures has always succeeded.

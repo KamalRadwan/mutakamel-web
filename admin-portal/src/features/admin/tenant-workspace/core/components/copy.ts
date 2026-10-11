@@ -40,10 +40,23 @@ const copy = {
         "The database was dropped. The tenant's identity and capacity are being released; this continues in the background.",
       SUCCEEDED: "The tenant database was dropped and its identity released.",
       BLOCKED:
-        "Provisioning could not be stopped, so the database was not dropped and automatic attempts have ended. Abandon the request to restore the tenant or request destruction again.",
+        "Provisioning could not be stopped, so the database was not dropped and automatic attempts have ended. Once the provisioning operation below has stopped, resume destruction; or abandon the request to restore the tenant or request destruction again.",
       ABANDONED:
         "The database was kept. The tenant stays soft-deleted and can be restored or destroyed again.",
     },
+    /** What a resume answered, shown in the status block until the request changes again. */
+    destroyResumed: {
+      STOPPING_PROVISIONING:
+        "Destruction was resumed: the worker is checking again whether provisioning has stopped. If it is still running, the request blocks again straight away.",
+      DROPPING_DATABASE:
+        "Destruction was resumed and continues deleting the database with a new budget of attempts.",
+      FINALIZING:
+        "Destruction was resumed and continues finalizing with a new budget of attempts.",
+    },
+    destroyNotResumed:
+      "The request was no longer blocked, so nothing was resumed. Its current status is shown.",
+    destroyBlockedAgain:
+      "It blocked again after it was resumed. The reason below is the current one.",
     /** A BLOCKED request that halted after the drop was authorized. */
     destroyHaltedPhases: {
       DROPPING_DATABASE: "Destruction halted while deleting the database",
@@ -129,6 +142,9 @@ const copy = {
       `Resume the destruction of ${name}?`,
     resumeConfirmDescription: (name: string) =>
       `Destruction of ${name} continues in the phase where it halted, with a new budget of automatic attempts. Fix the reason it halted first, or it halts again once those attempts are spent.\nResuming is safe whether or not the database still exists: the drop only removes a database that is still present, then checks that it is gone. The request still cannot be abandoned.`,
+    /** Resuming a request that BLOCKED while stopping provisioning. */
+    resumeStopConfirmDescription: (name: string) =>
+      `Destruction of ${name} goes back to stopping provisioning with a new budget of attempts, and the worker checks again at once. Resume only after the provisioning operation it waits on has stopped: the one-hour limit for stopping still counts from the original request, so if provisioning is still running the request blocks again straight away.\nThe database is still kept. You can abandon the request instead.`,
     confirm: "Confirm",
     cancel: "Keep tenant",
     polling: "Provisioning is running. Status refreshes automatically.",
@@ -193,10 +209,22 @@ const copy = {
         "تم حذف قاعدة البيانات. ويجري تحرير هوية المستأجر وسعته، وتستمر العملية في الخلفية.",
       SUCCEEDED: "تم حذف قاعدة بيانات المستأجر وتحرير هويته.",
       BLOCKED:
-        "تعذّر إيقاف التجهيز، لذا لم تُحذف قاعدة البيانات وتوقفت المحاولات التلقائية. تخلَّ عن الطلب لاستعادة المستأجر أو لطلب الحذف النهائي من جديد.",
+        "تعذّر إيقاف التجهيز، لذا لم تُحذف قاعدة البيانات وتوقفت المحاولات التلقائية. بعد توقف عملية التجهيز الموضحة أدناه استأنف الحذف النهائي، أو تخلَّ عن الطلب لاستعادة المستأجر أو لطلب الحذف النهائي من جديد.",
       ABANDONED:
         "تم الإبقاء على قاعدة البيانات. ويبقى المستأجر محذوفًا حذفًا قابلًا للاسترداد، ويمكن استعادته أو حذفه نهائيًا من جديد.",
     },
+    destroyResumed: {
+      STOPPING_PROVISIONING:
+        "استُؤنف الحذف النهائي: يتحقق العامل مجددًا مما إذا كان التجهيز قد توقف. وإن كان لا يزال قيد التشغيل فسيتوقف الطلب مجددًا على الفور.",
+      DROPPING_DATABASE:
+        "استُؤنف الحذف النهائي ويواصل حذف قاعدة البيانات برصيد جديد من المحاولات.",
+      FINALIZING:
+        "استُؤنف الحذف النهائي ويواصل الإتمام برصيد جديد من المحاولات.",
+    },
+    destroyNotResumed:
+      "لم يعد الطلب متوقفًا، لذا لم يُستأنف شيء. وتُعرض حالته الحالية.",
+    destroyBlockedAgain:
+      "توقف الطلب مجددًا بعد استئنافه. والسبب الموضح أدناه هو السبب الحالي.",
     destroyHaltedPhases: {
       DROPPING_DATABASE: "توقف الحذف النهائي أثناء حذف قاعدة البيانات",
       FINALIZING: "توقف الحذف النهائي أثناء الإتمام",
@@ -278,6 +306,8 @@ const copy = {
       `استئناف الحذف النهائي للمستأجر ${name}؟`,
     resumeConfirmDescription: (name: string) =>
       `يُستأنف الحذف النهائي للمستأجر ${name} من المرحلة التي توقف عندها، مع رصيد جديد من المحاولات التلقائية. عالج سبب التوقف أولًا، وإلا سيتوقف مجددًا بعد استنفاد هذه المحاولات.\nالاستئناف آمن سواء بقيت قاعدة البيانات أم لا: فالحذف لا يزيل إلا قاعدة بيانات ما زالت موجودة ثم يتحقق من زوالها. ويظل التخلي عن الطلب غير ممكن.`,
+    resumeStopConfirmDescription: (name: string) =>
+      `يعود الحذف النهائي للمستأجر ${name} إلى إيقاف التجهيز برصيد جديد من المحاولات، ويتحقق العامل مجددًا على الفور. لا تستأنف إلا بعد توقف عملية التجهيز التي ينتظرها: فمهلة الساعة المخصصة للإيقاف ما زالت تُحتسب من الطلب الأصلي، لذا إن كان التجهيز لا يزال قيد التشغيل فسيتوقف الطلب مجددًا على الفور.\nتظل قاعدة البيانات محفوظة، ويمكنك التخلي عن الطلب بدلًا من ذلك.`,
     confirm: "تأكيد",
     cancel: "الإبقاء على المستأجر",
     polling: "التجهيز قيد التنفيذ. يتم تحديث الحالة تلقائيًا.",

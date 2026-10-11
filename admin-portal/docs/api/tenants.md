@@ -13,6 +13,8 @@ Tenant-destruction amendment (2026-10-08): a destruction request now ends in `SU
 
 Tenant-destruction halt amendment (2026-10-11): `BLOCKED` now has two causes, told apart by the new projection field `blockedPhase`. `STOPPING_PROVISIONING` means the stop blocked before Core authorized the drop: the database still exists and the request is abandoned. `DROPPING_DATABASE` or `FINALIZING` means the request halted after the drop was authorized: the database may already be gone, abandon answers `409 TENANT_DESTROY_NOT_ABANDONABLE`, and `DELETE /tenants/:id/destroy` under a new idempotency key resumes it in that phase with a fresh attempt budget. The workspace reads `blockedPhase` strictly, offers **Abandon destruction** only before the drop, adds a confirmed **Resume destruction** for a halted request, titles and explains both blocked states, and localizes the `409` in English and Arabic. Verified against Core `tenant-destroy.service.ts`, `dto/tenant-destroy-response.dto.ts`, the `tenant_destroy_operations` checks (`ck_tenant_destroy_blocked_evidence`, `ck_tenant_destroy_blocking_operation`) and the Core LLD `06_tenants.md`. See [Permanent destroy](#permanent-destroy).
 
+Resume amendment (2026-10-11, later): Core now resumes **every** `BLOCKED` request on a new destroy key, including one blocked while stopping provisioning, which goes back to `STOPPING_PROVISIONING` (its one-hour stop deadline still counts from the original request, so a provisioning operation that still runs blocks it again at once). The destroy DELETE answers an extra `resumed: boolean`. The workspace offers **Resume destruction** for every `BLOCKED` request (next to **Abandon destruction** before the drop), warns about the deadline in the stop's confirmation, reads `resumed` strictly, and states the outcome in the status block, in English and Arabic. Verified against Core `tenant-destroy.service.ts` (`isResumable`, `RESUMABLE_PHASES_SQL`), `dto/tenant-destroy-response.dto.ts` (`TenantDestroyRequestDto`) and `tenants.controller.ts`.
+
 Directory retry confirmation amendment (2026-10-11): the `/tenants` row action **Retry provisioning** no longer posts `POST /tenants/:id/reprovision` on selection. It opens the same re-provision confirmation the provisioning workspace uses and sends only from that dialog, keeping the ambiguous-outcome key rules; see [Retry and cancel provisioning](#retry-and-cancel-provisioning). Verified against Core `tenants.controller.ts` (`reprovision`: `admin.tenants.reprovision` + `admin.tenants.critical`, `202`, idempotency key required) and `tenant-provisioning-command.service.ts` (`retryLatestAdminOperation`).
 
 Current-release amendment (2026-10-11): `DATABASE_PERMISSION_MANIFEST_RELEASE_MISMATCH` is gone from the create-options `readinessReasons` enum (Core commit `de03f1d2`: a permission manifest's `componentRelease` is provenance only and is no longer compared with the catalogue); the strict reader now rejects it. `POST /tenants/:id/reprovision` follows the current-release retry rules and can answer `409 TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` or `409 TENANT_PROVISIONING_PREREQUISITE_OWNER_UNAVAILABLE` (Core commit `d5af4407`); since Core commit `77447fb9` a retry re-pins a failed plan that pins a superseded release, so the release-upgrade 409 remains only where re-pinning is impossible; see [Retry and cancel provisioning](#retry-and-cancel-provisioning).
@@ -110,7 +112,7 @@ generated for one mutation intent.
 | `POST /api/admin/core/v1/tenants/:id/reprovision` | `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Compatibility retry of the latest failed/cancelled operation |
 | `POST /api/admin/core/v1/tenants/:id/provisioning/cancel` | `admin.tenants.reprovision` + `admin.tenants.critical` | `202` | Yes | Compatibility cancellation of the latest active operation |
 | `DELETE /api/admin/core/v1/tenants/:id` | `admin.tenants.delete` + `admin.tenants.critical` | `204` | Yes | Soft-delete a tenant |
-| `DELETE /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.destroy` + `admin.tenants.critical` | `202` | Yes | Accept durable destruction of a soft-deleted tenant; under a new key, resume a request halted after the drop was authorized |
+| `DELETE /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.destroy` + `admin.tenants.critical` | `202` | Yes | Accept durable destruction of a soft-deleted tenant; under a new key, resume a `BLOCKED` request (`resumed: true`) |
 | `GET /api/admin/core/v1/tenants/:id/destroy` | `admin.tenants.read` | `200` | No | Read the live destruction request, else the latest abandoned one, else null |
 | `POST /api/admin/core/v1/tenants/:id/destroy/:operationId/abandon` | `admin.tenants.destroy` + `admin.tenants.critical` | `200` | Yes | Give up a `STOPPING_PROVISIONING` request, or a `BLOCKED` one whose `blockedPhase` is `STOPPING_PROVISIONING` |
 
@@ -1157,8 +1159,14 @@ The DELETE returns **202** with the destruction request under `data`. Core
 uses the UUIDv7 `x-idempotency-key` as the request id: an exact replay of a key
 returns the request that key created, whatever became of it — including an
 abandoned one — while a different key returns the tenant's live request if one
-exists, after resuming it when it halted (see [Resume](#resume)). A new request
-after an abandonment therefore needs a new key.
+exists, after resuming it when it is `BLOCKED` (see [Resume](#resume)). A new
+request after an abandonment therefore needs a new key. The DELETE's `data` is
+the projection below plus `resumed: boolean` (the read and abandon routes do
+not carry it): `true` when this call resumed a `BLOCKED` request, `false` when
+it created one or returned the live one unchanged; a replay of the same key
+returns the first answer. The portal reads it strictly: missing or
+non-boolean, or `true` on a request that is not advancing, fails closed as
+`INVALID_TENANT_DESTROY_RESPONSE`.
 
 `GET /api/admin/core/v1/tenants/:id/destroy` requires `admin.tenants.read` and
 returns the live request (including after it succeeded), or the most recent
@@ -1175,7 +1183,7 @@ type TenantDestroyPhase =
   | "ABANDONED";            // final; retained evidence
 
 type TenantDestroyBlockedPhase =
-  | "STOPPING_PROVISIONING" // blocked before the drop was authorized: abandon it
+  | "STOPPING_PROVISIONING" // blocked before the drop was authorized: resume (once provisioning stopped) or abandon it
   | "DROPPING_DATABASE"     // halted after the drop was authorized: resume it
   | "FINALIZING";           // halted after the database was dropped: resume it
 
@@ -1261,17 +1269,25 @@ requested on the provisioning operation stays requested.
 #### Resume
 
 `DELETE /api/admin/core/v1/tenants/:id/destroy?destroySubscriptions=false`
-under a **new** `x-idempotency-key` resumes a halted request (`BLOCKED` with
-`blockedPhase` `DROPPING_DATABASE` or `FINALIZING`): attempts reset to 0, the
-halt is cleared, and Worker picks it up at once in the same phase. Core answers
-**202** with the request advancing again in that phase. Resuming is safe
-whether or not the database still exists: Worker drops it with
-`DROP DATABASE IF EXISTS` and then checks that it is absent, and finalizing a
-finalized tenant changes nothing. The request's own key is an exact replay and
-returns it unchanged, so it never resumes anything. A request `BLOCKED` before
-the drop (`blockedPhase: "STOPPING_PROVISIONING"`) is not resumed: Core answers
-a new key with that request unchanged, so it is abandoned and destruction
-requested again instead.
+under a **new** `x-idempotency-key` resumes any `BLOCKED` request: attempts
+reset to 0, the block is cleared, and Worker picks it up at once. Core answers
+**202** with `resumed: true` and the request advancing again:
+
+- `blockedPhase` `STOPPING_PROVISIONING` goes back to `STOPPING_PROVISIONING`,
+  and Worker re-checks the provisioning operation it waits on. The one-hour
+  stop deadline still counts from the original `requestedAt`, so if that
+  operation is still running the request blocks again on that attempt, naming
+  the current blocker. Resume it once the operation has stopped; the
+  alternative is to abandon it.
+- `blockedPhase` `DROPPING_DATABASE` or `FINALIZING` continues in that phase.
+  Resuming is safe whether or not the database still exists: Worker drops it
+  with `DROP DATABASE IF EXISTS` and then checks that it is absent, and
+  finalizing a finalized tenant changes nothing. This is the only way on for
+  such a request; it cannot be abandoned.
+
+The request's own key is an exact replay and returns it unchanged, so it never
+resumes anything. A new key on a request that is no longer `BLOCKED` returns it
+as it is, with `resumed: false`.
 
 #### Workspace behavior
 
@@ -1284,7 +1300,8 @@ requested again instead.
   route and closes the Provisioning tab for a deleted tenant.
 - The two blocked states are titled and explained apart, in English and
   Arabic: **Destruction is blocked** (provisioning could not be stopped; the
-  database still exists; abandon it) and **Destruction halted while deleting
+  database still exists; resume once the provisioning operation has stopped,
+  or abandon it) and **Destruction halted while deleting
   the database** / **while finalizing** (the drop was authorized and the
   database may be gone; fix the reason, then resume). Every
   `WORKER.TENANT_DESTROY.DATABASE.<class>` code shares one Database Server
@@ -1301,15 +1318,23 @@ requested again instead.
   while a request holds the tenant. To holders of the destroy pair,
   **Abandon destruction** is offered exactly when Core accepts it —
   `STOPPING_PROVISIONING`, or `BLOCKED` with `blockedPhase`
-  `STOPPING_PROVISIONING` — and **Resume destruction** exactly for a halted
-  request (`BLOCKED` with `blockedPhase` `DROPPING_DATABASE` or `FINALIZING`).
+  `STOPPING_PROVISIONING` — and **Resume destruction** for every `BLOCKED`
+  request, next to abandon when it blocked while stopping provisioning.
   Each sits behind its own design-system confirmation stating the consequences
-  above; resume asks to fix the halt's reason first.
+  above: resuming a stop says to wait until the provisioning operation has
+  stopped, because the one-hour deadline counts from the original request and
+  a still-running operation blocks it again at once; resuming a halt asks to
+  fix the halt's reason first.
 - Resume sends the destroy DELETE under a key scoped to resuming, never the
-  request's own key, and the halt time is part of that intent: an ambiguous
-  failure retries the same resume under the same key, while a later halt of the
-  same request gets a new one. Core's answer is adopted at once, so the status
-  block shows the phase Worker advances again and polling restarts.
+  request's own key, and the block time is part of that intent: an ambiguous
+  failure retries the same resume under the same key, while a later block of
+  the same request gets a new one. Core's answer is adopted at once (without
+  `resumed`, which belongs to the command), so the status block shows the phase
+  Worker advances again and polling restarts. Beneath its explanation the
+  status block then states what Core answered: resumed (for a stop: the worker
+  is checking again, and blocks again at once if provisioning still runs), not
+  resumed because the request was no longer blocked, or, once the request
+  blocks again after the resume, that it did.
 - Both dialogs close on any outcome. A rejection is shown in the workspace
   alert, which localizes `409 TENANT_DESTROY_NOT_ABANDONABLE` (Core's message is
   English-only) and keeps the code and correlation id;

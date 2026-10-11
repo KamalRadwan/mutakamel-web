@@ -79,7 +79,7 @@ authoritative for its exact route permissions.
 - `admin.tenants.update` — Update tenant profile metadata
 - `admin.tenants.suspend` — Suspend or activate tenant
 - `admin.tenants.reprovision` — Reprovision tenant, cancel provisioning, retry/cancel/resync operations
-- `admin.tenants.destroy` — Hard delete / destroy tenant (permanent); abandon a destruction request that is still `STOPPING_PROVISIONING` or `BLOCKED` before the drop (`blockedPhase: STOPPING_PROVISIONING`); and resume one halted after the drop was authorized, through the same destroy route under a new key (verified 2026-10-11); both routes also require `admin.tenants.critical`
+- `admin.tenants.destroy` — Hard delete / destroy tenant (permanent); abandon a destruction request that is still `STOPPING_PROVISIONING` or `BLOCKED` before the drop (`blockedPhase: STOPPING_PROVISIONING`); and resume any `BLOCKED` one (stopped before the drop or halted after it), through the same destroy route under a new key (verified 2026-10-11); both routes also require `admin.tenants.critical`
 - `admin.tenants.delete` — Soft delete tenant
 - `admin.tenants.manage_fqdns` — Add/remove secondary FQDNs, set primary FQDN
 

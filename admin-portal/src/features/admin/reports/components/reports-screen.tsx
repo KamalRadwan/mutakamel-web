@@ -134,7 +134,8 @@ const COPY = {
     stallReasons: {
       NO_PROGRESS: "No progress",
       DISPATCH_LEASE_EXPIRED: "Dispatch lease expired",
-      CANCEL_PENDING: "Cancellation not confirmed",
+      // A cancellation, or the stop of a failed or expired prerequisite.
+      CANCEL_PENDING: "Stop not confirmed",
     },
     unknown: "Not recorded",
     allZero: "No tenant status rows were returned.",
@@ -218,7 +219,7 @@ const COPY = {
     stallReasons: {
       NO_PROGRESS: "لا تقدّم",
       DISPATCH_LEASE_EXPIRED: "انتهت مهلة الإرسال",
-      CANCEL_PENDING: "الإلغاء لم يُؤكَّد",
+      CANCEL_PENDING: "الإيقاف لم يُؤكَّد",
     },
     unknown: "غير مسجل",
     allZero: "لم يُرجع الخادم صفوفًا لحالات المستأجرين.",

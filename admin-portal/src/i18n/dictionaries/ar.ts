@@ -2480,6 +2480,10 @@ export const ar = {
     stalledBadge: (duration: string) => `متعثرة · لا تقدّم منذ ${duration}`,
     stalledAtStepBadge: (step: string, duration: string) =>
       `متعثرة عند «${step}» · لا تقدّم منذ ${duration}`,
+    stalledStopPendingBadge: (duration: string) =>
+      `متعثرة · لم يُؤكَّد الإيقاف منذ ${duration}`,
+    stalledWaitingRetryBadge: (duration: string) =>
+      `متعثرة · لا نبضة من Worker منذ ${duration}`,
     stallNoProgressNote: (duration: string, step: string | null) =>
       step
         ? `لم تُبلغ الخطوة «${step}» عن أي انتقال ولا عن نبضة من Worker منذ ${duration}، أي فاتتها ثلاث نبضات. ربما توقف Worker، أو فقد سجلّه للخطوة، أو انتهت مهلة إيجار الخطوة.`
@@ -2488,8 +2492,12 @@ export const ar = {
       `أُرسلت ${step ? `الخطوة «${step}»` : "خطوة"} إلى التطبيق المالك لها منذ ${duration} ولم تصل نتيجتها. انتهت مهلة الإرسال البالغة ٥ دقائق؛ لا يعيد Worker إرسالها بل يواصل انتظار النتيجة، ويُفشل الخطوة فشلًا قابلًا لإعادة المحاولة (WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT) إن لم تصل خلال ٤٥ دقيقة من الإرسال.`,
     stallCancelPendingNote: (duration: string, step: string | null) =>
       step
-        ? `طُلب الإلغاء منذ ${duration} ولم يؤكد Worker توقف الخطوة «${step}».`
-        : `طُلب الإلغاء منذ ${duration} ولم يؤكد Worker التوقف.`,
+        ? `طُلب الإلغاء، ومنذ ${duration} لم يؤكد Worker توقف الخطوة «${step}» ولم يُبلغ بأنه يوقفها.`
+        : `طُلب الإلغاء، ومنذ ${duration} لم يؤكد Worker التوقف ولم يُبلغ بأنه يوقف العملية.`,
+    stallPrerequisiteStopPendingNote: (duration: string, step: string | null, expired: boolean) =>
+      `${expired ? "انتهت صلاحية متطلب النسخ الاحتياطي أو الصيانة" : "فشل متطلب النسخ الاحتياطي أو الصيانة"}، فطلبت Core من Worker إيقاف هذه العملية. ومنذ ${duration} لم يؤكد Worker التوقف ولم يُبلغ بأنه يوقف ${step ? `الخطوة «${step}»` : "العملية"}.`,
+    stallWaitingRetryNote: (duration: string) =>
+      `تنتظر هذه العملية إعادة المحاولة، ومنذ ${duration} لم يُبلغ Worker بأنه ما زال يحتفظ بها. يرسل Worker نبضة كل دقيقة لكل إعادة محاولة يحتفظ بها مهما طالت المهلة التي طلبها التطبيق المالك، لذا ربما توقف Worker أو فقد الجدولة.`,
     stallCancelGuidance:
       "اطلب الإلغاء لإيقافها. تصبح إعادة التجهيز متاحة بعد أن يؤكد Worker التوقف.",
     stallAwaitWorkerGuidance:

@@ -75,6 +75,9 @@ const en = {
   validationFailed: "Correct the highlighted fields before submitting.",
   stale: "The revision, preview, or evidence is stale. Refresh authoritative state before creating a new intent.",
   conflict: "The command conflicts with the current rollout state.",
+  publicationChanged:
+    "A release publication changed while Core was evaluating the fleet, so nothing was created. Try again.",
+  tryAgain: "Try again",
   permissionChanged: "Your permission no longer permits this command.",
   errorCode: "Error code",
   currentStatus: "Status",
@@ -294,6 +297,9 @@ const ar: CopyShape<typeof en> = {
   validationFailed: "صحّح الحقول المحددة قبل الإرسال.",
   stale: "المراجعة أو المعاينة أو الدليل قديم. حدّث الحالة الموثوقة قبل إنشاء محاولة جديدة.",
   conflict: "يتعارض الأمر مع الحالة الحالية للطرح.",
+  publicationChanged:
+    "تغيّر نشر أحد الإصدارات أثناء تقييم Core لأسطول التهيئة، لذا لم يُنشأ شيء. حاول مرة أخرى.",
+  tryAgain: "حاول مرة أخرى",
   permissionChanged: "لم تعد صلاحياتك تسمح بهذا الأمر.",
   errorCode: "رمز الخطأ",
   currentStatus: "الحالة",

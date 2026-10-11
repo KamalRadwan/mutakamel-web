@@ -159,7 +159,26 @@ A planner refusal becomes the row's safe reason code:
 `TENANT_PROVISIONING_CATALOG_INVALID` as `PROVISIONING_FLEET_COMPATIBILITY_EVIDENCE_INVALID`,
 and any other code as itself. The moved set is part of the eligibility digest,
 so a tenant whose expansion changes before dispatch fails stale instead of
-moving further than previewed.
+moving further than previewed. The preview and rollout tables label, in en and
+ar above the code, the planner codes that reach a row verbatim:
+`TENANT_PROVISIONING_ADDON_REBIND_REQUIRED` and
+`TENANT_PROVISIONING_RELEASE_UPGRADE_REQUIRED` (`safeReasonLabel` in
+`provisioning-fleet/copy.ts`).
+
+### Publication changed while evaluating
+
+Creating a preview and creating a rollout both evaluate eligibility under
+Core's publication read fence. When a queued release-publication writer stops
+the evaluation, Core starts it again on a new fence chain; after three such
+restarts it answers the retryable
+`409 PROVISIONING_FLEET_PUBLICATION_CHANGED` and nothing was created. The
+portal classifies it as its own command state (`PUBLICATION_CHANGED` in
+`provisioning-fleet/model.ts`) and shows "A release publication changed while
+Core was evaluating the fleet, so nothing was created. Try again." (en + ar)
+with a **Try again** button. The Gateway stored the 409 under the command's
+idempotency key, so the same key would only replay it: **Try again** sends the
+same frozen command under a new key (`retryFresh` in
+`provisioning-fleet/hooks.ts`), and no **Retry exact command** is offered.
 
 ## Discovery results
 

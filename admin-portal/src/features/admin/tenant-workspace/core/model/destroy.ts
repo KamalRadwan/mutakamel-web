@@ -41,10 +41,8 @@ export function canAbandonTenantDestroy(
 
 /**
  * The phase a request halted in after Core authorized the drop, or `null`.
- * Such a request holds the tenant until a new destruction request (under a new
- * idempotency key) resumes it in that phase with a fresh attempt budget. A
- * request BLOCKED before the drop is not resumed by Core — it answers the
- * same request unchanged — so it is abandoned instead.
+ * Such a request holds the tenant and cannot be abandoned: only a resume
+ * moves it on.
  */
 export function tenantDestroyHaltedPhase(
   operation: DestroyState | null,
@@ -56,8 +54,16 @@ export function tenantDestroyHaltedPhase(
     : null;
 }
 
+/**
+ * Core resumes every BLOCKED request when destruction is requested again under
+ * a new idempotency key, with a fresh attempt count: one BLOCKED while
+ * stopping provisioning goes back to STOPPING_PROVISIONING and Worker
+ * re-checks at once, one halted after the drop was authorized continues in
+ * the phase it halted in. A request BLOCKED before the drop can also be
+ * abandoned instead ({@link canAbandonTenantDestroy}).
+ */
 export function canResumeTenantDestroy(operation: DestroyState | null): boolean {
-  return tenantDestroyHaltedPhase(operation) !== null;
+  return operation?.phase === "BLOCKED" && operation.blockedPhase !== null;
 }
 
 /**

@@ -280,6 +280,7 @@ export function FleetDirectoryScreen() {
               copy={copy}
               successLabel={copy.createdPreview}
               onRetryExact={() => void view.retryPreviewExact()}
+              onRetry={() => void view.retryPreview()}
               onClear={view.clearPreviewCommand}
               successAction={
                 view.previewCommand.result ? (

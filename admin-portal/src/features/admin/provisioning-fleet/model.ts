@@ -31,6 +31,13 @@ const STALE_CODES = new Set([
   "PROVISIONING_FLEET_EVIDENCE_STALE",
 ]);
 
+/**
+ * Core restarted a preview or rollout evaluation three times because a release
+ * publication changed underneath it, then gave up with a retryable 409. It
+ * created nothing, so the command is sent again under a new key.
+ */
+const PUBLICATION_CHANGED_CODE = "PROVISIONING_FLEET_PUBLICATION_CHANGED";
+
 export function deriveProvisioningFleetPermissions(
   user: UserProfile | null | undefined,
 ): ProvisioningFleetPermissions {
@@ -77,6 +84,7 @@ export function classifyFleetCommandFailure(
     return "AMBIGUOUS";
   }
   if (error.httpStatus === 403) return "FORBIDDEN";
+  if (error.errorCode === PUBLICATION_CHANGED_CODE) return "PUBLICATION_CHANGED";
   if (STALE_CODES.has(error.errorCode)) return "STALE";
   if (error.httpStatus === 400 || error.httpStatus === 422) {
     return "VALIDATION";

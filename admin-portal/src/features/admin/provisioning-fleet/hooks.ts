@@ -72,11 +72,18 @@ function useFleetCommand<TResult>(ownerId: string | null) {
     initialCommand<TResult>,
   );
   const intentRef = useRef<StoredIntent<TResult> | null>(null);
+  /** The last submitted command, kept so a retryable refusal can send it again. */
+  const lastSubmissionRef = useRef<{
+    ownerId: string;
+    fingerprint: string;
+    createRequest: (key: string) => Promise<TResult>;
+  } | null>(null);
   const ownerRef = useRef(ownerId);
 
   useEffect(() => {
     ownerRef.current = ownerId;
     intentRef.current = null;
+    lastSubmissionRef.current = null;
     queueMicrotask(() => setView(initialCommand<TResult>()));
   }, [ownerId]);
 
@@ -122,6 +129,7 @@ function useFleetCommand<TResult>(ownerId: string | null) {
       createRequest: (key: string) => Promise<TResult>,
     ) => {
       if (!ownerId) return Promise.resolve(null);
+      lastSubmissionRef.current = { ownerId, fingerprint, createRequest };
       let intent = intentRef.current;
       if (
         !intent ||
@@ -147,6 +155,19 @@ function useFleetCommand<TResult>(ownerId: string | null) {
     return intent ? execute(intent) : Promise.resolve(null);
   }, [execute]);
 
+  /**
+   * Sends the last submitted command again after a retryable refusal (409
+   * `PROVISIONING_FLEET_PUBLICATION_CHANGED`). The refusal completed its key —
+   * the Gateway stores a 4xx answer under it, so the same key would only
+   * replay the refusal — and Core created nothing, so the command goes out
+   * again under a new key.
+   */
+  const retryFresh = useCallback(() => {
+    const last = lastSubmissionRef.current;
+    if (!last || last.ownerId !== ownerRef.current) return Promise.resolve(null);
+    return submit(last.fingerprint, last.createRequest);
+  }, [submit]);
+
   const rejectForbidden = useCallback(() => {
     const error = localPermissionError();
     setView({
@@ -165,7 +186,7 @@ function useFleetCommand<TResult>(ownerId: string | null) {
     setView(initialCommand<TResult>());
   }, [view.exactRetryAvailable, view.state]);
 
-  return { view, submit, retryExact, rejectForbidden, clear };
+  return { view, submit, retryExact, retryFresh, rejectForbidden, clear };
 }
 
 export function useFleetDirectory() {
@@ -250,6 +271,7 @@ export function useFleetDirectory() {
     previewCommand: previewCommand.view,
     createPreview,
     retryPreviewExact: previewCommand.retryExact,
+    retryPreview: previewCommand.retryFresh,
     clearPreviewCommand: previewCommand.clear,
     refresh: () => setRevision((value) => value + 1),
   };
@@ -339,6 +361,7 @@ export function useFleetPreview(previewId: string) {
     rolloutCommand: rolloutCommand.view,
     createRollout,
     retryRolloutExact: rolloutCommand.retryExact,
+    retryRollout: rolloutCommand.retryFresh,
     clearRolloutCommand: rolloutCommand.clear,
     refresh: () => setRevision((value) => value + 1),
   };

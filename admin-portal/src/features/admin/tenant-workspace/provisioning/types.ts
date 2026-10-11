@@ -235,8 +235,14 @@ export interface TenantOperationProgress {
  * Why Core reports an open operation as no longer progressing: a running step
  * with neither a transition nor a Worker heartbeat for three missed heartbeats
  * (`NO_PROGRESS`, naming the step), a dispatched step silent for twice its
- * lease (`DISPATCH_LEASE_EXPIRED`), a stop the Worker never confirmed
- * (`CANCEL_PENDING`), or otherwise no change at all for ten minutes.
+ * lease (`DISPATCH_LEASE_EXPIRED`), a stop the Worker has neither confirmed
+ * nor shown it is carrying out (`CANCEL_PENDING`: a cancellation, or the stop
+ * Core sends when a backup or maintenance prerequisite failed or expired,
+ * which holds the operation RUNNING in `PREREQUISITE_FAILED` /
+ * `PREREQUISITE_EXPIRED`), or otherwise no change at all for ten minutes
+ * (`NO_PROGRESS` without a step). The Worker heartbeats every operation it
+ * holds once a minute, a `WAITING_RETRY` schedule included, so a waiting
+ * retry is reported only once the Worker no longer holds it.
  */
 export const TENANT_OPERATION_STALL_REASONS = [
   "NO_PROGRESS",
@@ -250,7 +256,10 @@ export type TenantOperationStallReason =
 export interface TenantOperationStall {
   /** The step the stall is attributed to; null when no step is running. */
   stepKey: string | null;
-  /** The last progress (or cancellation request) the stall is measured from. */
+  /**
+   * The last progress the stall is measured from; for a pending stop, the
+   * stop request or the Worker's latest sign that it is stopping.
+   */
   since: string;
   /** Measured by Core when the detail response was built. */
   ageSeconds: number;

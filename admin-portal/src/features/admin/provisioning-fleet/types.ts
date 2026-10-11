@@ -228,6 +228,12 @@ export type FleetCommandState =
   | "VALIDATION"
   | "STALE"
   | "CONFLICT"
+  /**
+   * 409 `PROVISIONING_FLEET_PUBLICATION_CHANGED`: a release publication kept
+   * changing while Core evaluated the fleet (three restarts). Nothing was
+   * created; the same command can be sent again under a new key.
+   */
+  | "PUBLICATION_CHANGED"
   | "AMBIGUOUS"
   | "ERROR";
 

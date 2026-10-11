@@ -238,10 +238,61 @@ describe("tenant profile and lifecycle panels", () => {
     expect(screen.queryByText("Status refreshes automatically.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore tenant" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Destroy permanently" })).toBeDisabled();
+    // Blocked before the drop: abandon it, or resume it once provisioning has
+    // stopped.
+    expect(status).toHaveTextContent("resume destruction; or abandon the request");
     expect(screen.getByRole("button", { name: "Abandon destruction" })).toBeEnabled();
-    // Blocked before the drop: Core would answer a new request with this one
-    // unchanged, so there is nothing to resume.
-    expect(screen.queryByRole("button", { name: "Resume destruction" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resume destruction" })).toBeEnabled();
+  });
+
+  it("warns that resuming a stop blocks again at once while provisioning still runs, and shows what Core answered", async () => {
+    const resumeDestruction = vi
+      .fn()
+      .mockResolvedValue({ ...tenantDestroyFixture("STOPPING_PROVISIONING"), resumed: true });
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: tenantDestroyFixture("BLOCKED"),
+          resumeDestruction,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Resume destruction" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Resume the destruction of acme?" });
+    expect(dialog).toHaveTextContent("goes back to stopping provisioning");
+    expect(dialog).toHaveTextContent("the one-hour limit for stopping still counts from the original request");
+    expect(dialog).toHaveTextContent("You can abandon the request instead");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Resume destruction" }));
+
+    await vi.waitFor(() => expect(resumeDestruction).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "the worker is checking again whether provisioning has stopped",
+      ),
+    );
+  });
+
+  it("says so when the request was no longer blocked and nothing was resumed", async () => {
+    const resumeDestruction = vi
+      .fn()
+      .mockResolvedValue({ ...tenantDestroyFixture("DROPPING_DATABASE"), resumed: false });
+    render(
+      <TenantLifecyclePanel
+        locale="en"
+        workspace={workspaceFixture("DELETED", {
+          destroyOperation: haltedTenantDestroyFixture("DROPPING_DATABASE"),
+          resumeDestruction,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Resume destruction" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Resume destruction" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("The request was no longer blocked"),
+    );
   });
 
   it("explains a request halted after the drop was authorized and offers resume, not abandon", () => {
@@ -275,7 +326,9 @@ describe("tenant profile and lifecycle panels", () => {
   });
 
   it("resumes a halted destruction only after the consequences are confirmed", async () => {
-    const resumeDestruction = vi.fn().mockResolvedValue(tenantDestroyFixture("FINALIZING"));
+    const resumeDestruction = vi
+      .fn()
+      .mockResolvedValue({ ...tenantDestroyFixture("FINALIZING"), resumed: true });
     render(
       <TenantLifecyclePanel
         locale="en"
@@ -296,6 +349,9 @@ describe("tenant profile and lifecycle panels", () => {
 
     await vi.waitFor(() => expect(resumeDestruction).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Destruction was resumed and continues finalizing",
+    );
   });
 
   it("closes the resume dialog when Core refuses, leaving the refusal to the workspace alert", async () => {

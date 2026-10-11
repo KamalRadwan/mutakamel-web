@@ -10,12 +10,14 @@ import {
   readTenantProvisioningCommandResult,
   readTenantView,
   readTenantDestroy,
+  readTenantDestroyRequest,
 } from "../model/readers";
 import type {
   FqdnAvailabilityResult,
   TenantFqdnView,
   TenantProvisioningCommandResult,
   TenantView,
+  TenantDestroyRequestView,
   TenantDestroyView,
   UpdateTenantProfileDto,
 } from "../types";
@@ -136,16 +138,17 @@ export const tenantCoreApi = {
 
   /**
    * Requests destruction of a soft-deleted tenant. Core keys the request by
-   * `idempotencyKey`: an exact replay returns the request that key created,
+   * `idempotencyKey`: an exact replay returns the first answer for that key,
    * and a new key returns the tenant's live request — resuming it first when
-   * it halted after the drop was authorized (BLOCKED with `blockedPhase`
-   * DROPPING_DATABASE or FINALIZING).
+   * it is BLOCKED (`resumed: true`): before the drop it goes back to stopping
+   * provisioning, after the drop was authorized it continues in the phase it
+   * halted in, both with a fresh attempt count.
    */
   destroy: async (
     tenantId: string,
     destroySubscriptions: boolean,
     idempotencyKey: string,
-  ): Promise<TenantDestroyView> => {
+  ): Promise<TenantDestroyRequestView> => {
     const query = new URLSearchParams({
       destroySubscriptions: destroySubscriptions ? "true" : "false",
     });
@@ -153,8 +156,8 @@ export const tenantCoreApi = {
       `${TENANTS_URL}/${tenantId}/destroy?${query.toString()}`,
       keyed(idempotencyKey),
     );
-    const result = readTenantDestroy(extractCoreData(response));
-    if (!result || result.tenantId !== tenantId) {
+    const result = readTenantDestroyRequest(extractCoreData(response));
+    if (result.tenantId !== tenantId) {
       throw new Error("INVALID_TENANT_DESTROY_RESPONSE");
     }
     return result;

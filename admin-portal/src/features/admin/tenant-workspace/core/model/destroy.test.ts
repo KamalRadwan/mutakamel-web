@@ -20,9 +20,9 @@ describe("tenant destruction lifecycle model", () => {
     ["DROPPING_DATABASE", null, true, false, false, true],
     ["FINALIZING", null, true, false, false, true],
     ["SUCCEEDED", null, false, false, false, true],
-    // Blocked before the drop: abandoned, never resumed (Core answers a new
-    // request with this one unchanged).
-    ["BLOCKED", "STOPPING_PROVISIONING", false, true, false, true],
+    // Blocked before the drop: abandoned, or resumed once provisioning has
+    // stopped (Core sends it back to STOPPING_PROVISIONING).
+    ["BLOCKED", "STOPPING_PROVISIONING", false, true, true, true],
     // Halted after the drop was authorized: resumed, never abandoned.
     ["BLOCKED", "DROPPING_DATABASE", false, false, true, true],
     ["BLOCKED", "FINALIZING", false, false, true, true],
@@ -35,8 +35,9 @@ describe("tenant destruction lifecycle model", () => {
       expect(isTenantDestroyAdvancing(phase)).toBe(advancing);
       expect(canAbandonTenantDestroy(operation)).toBe(abandonable);
       expect(canResumeTenantDestroy(operation)).toBe(resumable);
+      // Only a request halted after the drop was authorized is titled apart.
       expect(tenantDestroyHaltedPhase(operation)).toBe(
-        resumable ? blockedPhase : null,
+        resumable && !abandonable ? blockedPhase : null,
       );
       expect(tenantDestroyHoldsTenant(operation)).toBe(holds);
     },

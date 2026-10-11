@@ -15,6 +15,7 @@ import {
   type TenantStorageServerSummary,
   type TenantSubscriptionSummary,
   type TenantView,
+  type TenantDestroyRequestView,
   type TenantDestroyView,
   type UpdateTenantProfileDto,
 } from "../types";
@@ -98,6 +99,21 @@ export function readTenantDestroy(value: unknown): TenantDestroyView | null {
     invalid(code);
   }
   return parsed;
+}
+
+/**
+ * Reads the answer to a destruction request: the projection above plus
+ * `resumed`, which Core always sends. A resumed request has just left
+ * BLOCKED, so it is advancing again; claiming a resume of a request that is
+ * still BLOCKED, or already final, fails closed.
+ */
+export function readTenantDestroyRequest(value: unknown): TenantDestroyRequestView {
+  const code = "INVALID_TENANT_DESTROY_RESPONSE";
+  const parsed = readTenantDestroy(value);
+  if (parsed === null) invalid(code);
+  const resumed = boolean(object(value, code).resumed, code);
+  if (resumed && !isTenantDestroyAdvancing(parsed.phase)) invalid(code);
+  return { ...parsed, resumed };
 }
 
 const DECIMAL_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;

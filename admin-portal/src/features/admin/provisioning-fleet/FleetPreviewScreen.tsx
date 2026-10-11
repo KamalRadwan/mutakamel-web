@@ -202,6 +202,7 @@ export function FleetPreviewScreen({ previewId }: { previewId: string }) {
                   copy={copy}
                   successLabel={copy.rolloutCreated}
                   onRetryExact={() => void view.retryRolloutExact()}
+                  onRetry={() => void view.retryRollout()}
                   onClear={view.clearRolloutCommand}
                   successAction={
                     view.rolloutCommand.result ? (

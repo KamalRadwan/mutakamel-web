@@ -130,10 +130,15 @@ describe("tenant core API", () => {
   });
 
   it("uses exact soft-delete and destroy query contracts", async () => {
-    deleteMock.mockResolvedValue(envelope(tenantDestroyFixture()));
+    deleteMock.mockResolvedValue(
+      envelope({ ...tenantDestroyFixture(), resumed: false }),
+    );
 
     await tenantCoreApi.softDelete(TENANT_ID, key);
-    await tenantCoreApi.destroy(TENANT_ID, true, key);
+    await expect(tenantCoreApi.destroy(TENANT_ID, true, key)).resolves.toEqual({
+      ...tenantDestroyFixture(),
+      resumed: false,
+    });
     await tenantCoreApi.destroy(TENANT_ID, false, key);
     expect(deleteMock).toHaveBeenNthCalledWith(
       1,
