@@ -42,17 +42,15 @@ const SKIP_DIR_NAMES = new Set(["node_modules", ".next", "coverage"]);
 // Delete an entry the moment its owner lands — the guard then covers it.
 const BARE_IDENTIFIER_EXEMPT = new Set([
   "src/app/(tenant)/crm/custom-fields/page.tsx",
-  "src/app/(tenant)/crm/customer-profiles/components/CustomerProfileCard.tsx",
   "src/app/(tenant)/crm/opportunities/components/useOpportunityColumns.tsx",
   "src/app/login/page.tsx",
   "src/app/tenant/components/ActionTokenScreen.tsx",
   "src/design-system/shell/NotificationsDropdown.tsx",
 ]);
 
-// Same reasoning: these three already set `dir`, so they are bidi-correct.
+// Same reasoning: these two already set `dir`, so they are bidi-correct.
 // Only the wrapping utility is wrong, and their owners hold the files.
 const BREAK_ALL_EXEMPT = new Set([
-  "src/app/(tenant)/crm/customer-profiles/[id]/components/CustomerProfileFacts.tsx",
   "src/app/(tenant)/crm/leads/[id]/components/LeadIdentityCards.tsx",
   "src/app/(tenant)/crm/opportunities/[id]/components/OpportunityFacts.tsx",
 ]);
