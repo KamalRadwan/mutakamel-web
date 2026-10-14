@@ -9,7 +9,7 @@ import {
   type ItemFormValues,
   type ItemKind,
 } from "../item-contract";
-import { useCatalogUoms } from "./useCatalogUoms";
+import { useActiveUoms } from "./useActiveUoms";
 
 export interface VariantAttributeRow {
   id: string;
@@ -40,7 +40,7 @@ export function useCreateItemForm({
   const [variantMode, setVariantMode] = useState<VariantEditorMode>("builder");
   const [variantRows, setVariantRows] = useState<VariantAttributeRow[]>([]);
   const [nextRowId, setNextRowId] = useState(1);
-  const uoms = useCatalogUoms("ANY", isOpen);
+  const uoms = useActiveUoms(isOpen);
 
   const reset = () => {
     setValues(EMPTY_ITEM_FORM);

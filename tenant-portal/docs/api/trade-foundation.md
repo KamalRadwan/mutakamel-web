@@ -587,7 +587,10 @@ fingerprint schema (`trade.uom.create.v1`, `trade.uom.update.v1`) and a
 Distinct from `/uoms`, and the controller comment says so: `/uoms` is the
 tenant master list; `/catalog/uoms` is **the UOMs authorised for the current
 operating context**, optionally narrowed to one item. It is the correct
-source for a line-editor UOM picker.
+source for a line-editor UOM picker. It lists only units an existing item already references (as a base or
+default UOM), so it is **not** the source for a new item's base-UOM picker: a
+tenant without items would see none. `CreateItemModal` reads every page of
+`GET /uoms?status=ACTIVE` instead (`useActiveUoms`).
 
 `UomCatalogueQueryDto`: `page`, `limit` (≤ 100, default 50),
 `purpose` (`ANY` · `SALES` · `PURCHASE`, default `ANY`), `itemId?`,
