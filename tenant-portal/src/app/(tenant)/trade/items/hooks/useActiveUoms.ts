@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../trade-api";
 import { useTradeScopeRequest } from "../../useTradeScope";
@@ -33,6 +33,7 @@ export function useActiveUoms(isEnabled: boolean) {
   const [options, setOptions] = useState<Uom[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,5 +72,24 @@ export function useActiveUoms(isEnabled: boolean) {
     return () => controller.abort();
   }, [isEnabled, headers, gap]);
 
-  return { options, isLoading, isUnavailable: error !== null || gap !== null };
+  // The whole master is already loaded, so the picker's search filters it here
+  // across the code and every localized name instead of re-querying: the
+  // server's `search` only matches a code prefix.
+  const matching = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    if (!needle) return options;
+    return options.filter((uom) =>
+      [uom.code, uom.displayName, ...Object.values(uom.localizedNames)].some((text) =>
+        text.toLocaleLowerCase().includes(needle),
+      ),
+    );
+  }, [options, query]);
+
+  return {
+    options: matching,
+    all: options,
+    search: setQuery,
+    isLoading,
+    isUnavailable: error !== null || gap !== null,
+  };
 }

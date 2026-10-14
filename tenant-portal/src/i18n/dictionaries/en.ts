@@ -6212,6 +6212,8 @@ export const en: Dictionary = {
     itemBaseUomPlaceholder: "Select a unit of measure",
     itemBaseUomLoading: "Loading available units…",
     itemBaseUomUnavailable: "Select a company and branch to load authorized units.",
+    itemBaseUomSearchPlaceholder: "Search by code or name",
+    itemBaseUomEmpty: "No unit matches this search.",
     itemCategory: "Category",
     itemVariantIdentity: "Variant identity",
     itemVariantHint: "An optional JSON object describing the variant's attributes.",

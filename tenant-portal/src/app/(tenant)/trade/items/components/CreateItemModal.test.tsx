@@ -20,18 +20,23 @@ vi.mock("@/i18n/I18nContext", async (importOriginal) => ({
   useI18n: () => ({ t: en, lang: "en", dir: "ltr" }),
 }));
 
-vi.mock("../hooks/useCatalogUoms", () => ({
-  useCatalogUoms: () => ({
-    options: [
-      {
-        id: "01890a5d-ac96-774b-bcce-b302099a8058",
-        code: "EA",
-        displayName: "Each",
-        isBaseUom: true,
-        canSell: true,
-        canPurchase: true,
-      },
-    ],
+const ACTIVE_UOMS = [
+  {
+    id: "01890a5d-ac96-774b-bcce-b302099a8058",
+    code: "EA",
+    displayName: "Each",
+    localizedNames: { en: "Each", ar: "قطعة" },
+    status: "ACTIVE",
+    version: 1,
+    updatedAt: "2026-10-14T00:00:00.000Z",
+  },
+];
+
+vi.mock("../hooks/useActiveUoms", () => ({
+  useActiveUoms: () => ({
+    options: ACTIVE_UOMS,
+    all: ACTIVE_UOMS,
+    search: vi.fn(),
     isLoading: false,
     isUnavailable: false,
   }),

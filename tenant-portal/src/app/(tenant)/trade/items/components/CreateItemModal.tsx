@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Package,
   Plus,
-  Search,
   Trash2,
 } from "lucide-react";
 import {
@@ -14,14 +13,10 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  Combobox,
   Field,
   FormModal,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
@@ -50,7 +45,7 @@ interface CreateItemModalProps {
 }
 
 export function CreateItemModal(props: CreateItemModalProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const form = useCreateItemForm(props);
   const ItemIcon = form.values.itemKind === "PRODUCT"
     ? Package
@@ -62,6 +57,8 @@ export function CreateItemModal(props: CreateItemModalProps) {
     : form.uoms.isUnavailable
       ? t.trade.itemBaseUomUnavailable
       : t.trade.itemBaseUomHint;
+  const selectedUom = form.uoms.all.find((uom) => uom.id === form.values.baseUomId);
+  const uomLabel = (uom: { code: string; displayName: string }) => `${uom.code} — ${uom.displayName}`;
 
   return (
     <FormModal
@@ -168,24 +165,27 @@ export function CreateItemModal(props: CreateItemModalProps) {
                 required
                 showLabel
               >
-                <Select
-                  value={form.values.baseUomId}
-                  onValueChange={(baseUomId) => form.change({ baseUomId }, "baseUomId")}
-                  disabled={props.isSubmitting || form.uoms.isLoading || form.uoms.isUnavailable}
-                  required
-                >
-                  <SelectTrigger size="md">
-                    <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <SelectValue placeholder={t.trade.itemBaseUomPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {form.uoms.options.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.code} — {option.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  size="md"
+                  value={form.values.baseUomId || undefined}
+                  selectedLabel={selectedUom ? uomLabel(selectedUom) : undefined}
+                  onValueChange={(baseUomId) => form.change({ baseUomId: baseUomId ?? "" }, "baseUomId")}
+                  options={form.uoms.options.map((uom) => ({
+                    value: uom.id,
+                    label: uomLabel(uom),
+                    description: uom.localizedNames[lang] !== uom.displayName
+                      ? uom.localizedNames[lang]
+                      : undefined,
+                  }))}
+                  onSearch={form.uoms.search}
+                  debounceMs={0}
+                  loading={form.uoms.isLoading}
+                  disabled={props.isSubmitting || form.uoms.isUnavailable}
+                  placeholder={t.trade.itemBaseUomPlaceholder}
+                  searchPlaceholder={t.trade.itemBaseUomSearchPlaceholder}
+                  loadingLabel={t.trade.itemBaseUomLoading}
+                  emptyLabel={t.trade.itemBaseUomEmpty}
+                />
               </Field>
             </div>
 

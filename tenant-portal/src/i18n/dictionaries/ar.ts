@@ -6227,6 +6227,8 @@ export const ar = {
     itemBaseUomPlaceholder: "اختر وحدة قياس",
     itemBaseUomLoading: "جارٍ تحميل الوحدات المتاحة…",
     itemBaseUomUnavailable: "اختر شركة وفرعًا لتحميل وحدات القياس المصرح بها.",
+    itemBaseUomSearchPlaceholder: "ابحث بالكود أو الاسم",
+    itemBaseUomEmpty: "لا توجد وحدة مطابقة للبحث.",
     itemCategory: "التصنيف",
     itemVariantIdentity: "هوية المتغيّر",
     itemVariantHint: "كائن JSON اختياري يصف سمات المتغيّر.",
