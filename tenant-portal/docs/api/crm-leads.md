@@ -2,14 +2,14 @@
 
 Status: **verified**
 
-Last source verification: **2026-09-07**
+Last source verification: **2026-10-16**
 
 Contact detail/write contract re-verified: **2026-09-07** (scoped update below).
 
 Basic search GET/POST, semantic text scopes, Tag, owner filtering and pagination
 re-verified: **2026-09-16**.
 
-Board/Card/Table projections verified: **2026-10-15** (board lanes now carry the list row). Card bulk document counts verified: **2026-09-16**.
+Board/Card/Table projections verified: **2026-10-16** (board lanes carry the list row; Card and Table are built on the design-system `CardView`/`TableView`). Card bulk document counts verified: **2026-09-16**.
 
 Related quotation/sales-order count scope re-verified: **2026-09-14**.
 
@@ -155,14 +155,21 @@ qualifiedLeads, byStage: [{ stageId, total, hot, overdue }] }` over **every**
 lead the filters and scoped read access select — not the loaded page. "Today"
 and "overdue" are civil dates in the tenant zone, the rule
 `nextActivity.bucket` follows. `useLeadKpis` reads it after every search and
-data revision; `LeadKpiStrip` falls back to counting the loaded rows while it
-loads or if it fails. Parser: `parseLeadKpisResponse`
-(`lead-bulk-contract.ts`).
+data revision, keyed on the serialized body. Until the first answer, and after a
+failed read, `LeadKpiStrip` renders nothing: it never counts the loaded rows.
+Parser: `parseLeadKpisResponse` (`lead-bulk-contract.ts`).
 
-The preset pills still filter the **loaded** rows on the client: rating and
-the overdue bucket have no server filter on the list, so a preset narrows what
-is on screen while its count describes the whole pipeline — see
+Re-verified **2026-10-16**. The strip filters on the server only. **Total**,
+**New** and **Qualified** are toggles that set or clear the Basic search's
+`stageFlag` filter (`NEW`, `QUALIFIED`), so the list, the board and the figures
+re-query together. **Rated 3 stars** and **Overdue activity** are figures only:
+the list has no rating-preset or overdue filter, and a toggle that narrowed only
+the loaded rows while its count described the whole pipeline was removed — see
 [Q140](../build/OPEN-QUESTIONS.md#q140--kpi-presets-filter-only-the-loaded-rows).
+The Card/Table stage bar (`LeadStageFunnelBar`, the design-system `StageBar`)
+takes its per-stage counts from `byStage`. With no stage chosen, a stage absent
+from `byStage` shows 0. Once a stage is chosen, the other stages and the "every
+stage" total show no count, because the search no longer covers them.
 
 ## POST /leads/document-counts — Card view counters (2026-10-14)
 
@@ -191,7 +198,10 @@ branch and `leads` holds only leads the user may read; `restricted` says that
 something was withheld. `useLeadDuplicateCheck` sends it 500 ms after typing
 stops, skips it when the form reuses an existing company, and swallows
 failures — the warning never blocks saving. `CreateLeadsModal` lists the
-matches under the existing company-name suggestion.
+matches under the existing company-name suggestion (`LeadDuplicateWarnings`).
+The page mounts the modal only while it is open (2026-10-16), so the duplicate
+check, the company, custom-field, tag and acquisition-source reads all belong to
+an actual create. The modal's logic lives in `useCreateLeadModal`.
 
 ## Bulk actions — POST /leads/bulk-stage · bulk-update · bulk-delete (2026-10-14)
 
@@ -204,7 +214,11 @@ least one of `rating`, `ownerUserId`, `cardColor` (`null` clears),
 `409 LEAD_ALREADY_CONVERTED` — rolls the batch back and is named in
 `details.leadId`. `useLeads` pre-filters the selection by the capabilities it
 read, sends one request per 100 ids (`leadIdBatches`), and refetches the list
-whatever the outcome. The bar asks for a second click before deleting.
+whatever the outcome. The Card/Table bar (`LeadBulkActionsBar`, the
+design-system `BulkActionBar`) offers Move stage (never to `CONVERTED`), Set
+rating and Delete. Each one opens a `BulkConfirmDialog` that names the selection
+size and holds the stage or rating picker. `useLeadsWorkspaceBulk` clears the
+selection only after a successful write (2026-10-16).
 
 ## GET /leads/capabilities
 
@@ -433,8 +447,8 @@ permits refresh, never another write. See the
 
 ## PATCH /leads/:id · DELETE /leads/:id
 
-**Inline primary-phone edits** (board card, quick-edit modal, table cell, and
-the individual path of the board inline editor) send `{ primaryPhone }`
+**Inline primary-phone edits** (the Table view's phone cell only — the board
+and Card view show the number but have no editor) send `{ primaryPhone }`
 through `leadPrimaryPhonePatch` (`lead-phone-patch.ts`, 2026-10-14). The
 backend replaces only the first mobile of the person the lead is about — the
 individual, or a corporate lead's primary contact — and keeps every other
@@ -637,20 +651,42 @@ described in [the activity template](../design/patterns.md#the-activity-template
 - Board data comes from `POST /leads/board`, 50 records per stage. More calls
   `/leads/board/stages/:stageId` for that stage only. Card/Table use the same
   list/search row with normal global pagination.
-- Card View has no row selection: it renders neither per-card checkboxes nor a
-  Select All toolbar. Table selection remains available.
-- Lead cards show an explicit Individual/Company badge and matching icon. The
-  rich Card View adds the correct Party country and flag, company/person contact
-  lines, call/WhatsApp/Telegram actions, and the source catalogue avatar. The
-  `PQ`/`SO`/`IN`, the salesperson full name, rating and activity controls form
-  one bottom-anchored block so cards in the same row keep those controls aligned.
-  Corporate cards show the primary contact's name, position, email and phones
-  with a compact Primary badge when `isPrimary` is true; the type badges use
-  the same compact treatment.
-- Quotation, sales-order and invoice counters use three permission-scoped bulk
-  Trade reads for the whole page and render as `PQ`, `SO` and `IN`. Missing
-  permission hides that counter; a failed permitted read remains unknown (`—`)
-  and is never presented as zero.
+- Editing a lead happens on its detail page, `/crm/leads/:id`; no list view opens
+  an edit modal. Activating a card, or a name or contact cell in the table,
+  navigates there.
+- Card and Table are the design-system `CardView` and `TableView` (compact
+  density, server paging and sorting by `createdAt` or `displayName`), with
+  row selection feeding the bulk bar. Selecting rows also shows a
+  **Download CSV** action (`useLeadTableViewExport`): the file is built in the
+  browser from the selected rows of the current page only — there is no lead
+  export route.
+- A card shows, from the list row: the heading (a corporate lead is filed under
+  its company with the primary contact's name and position below; an individual
+  lead is the person), an Individual/Company label, the stage badge, the Party
+  country and city, tax and commercial-registration numbers, the interest or
+  need text, and tags. Its pressable footer holds the primary number through the
+  shared `LeadPhoneActionsRow` (call, WhatsApp, Telegram), a `mailto:` email, the
+  source catalogue avatar and name, the count of further contacts, the
+  `OPP`/`PQ`/`SO`/`IN` counters, the star rating, the next-activity mark and the
+  salesperson. The overflow menu opens the lead, moves its stage (never to or
+  from a `CONVERTED` stage), sets the card colour and deletes, each gated by
+  `capabilities`.
+- The **stage-age** badge ("{age} in stage") is computed by `formatLeadStageAge`
+  from `stageEnteredAt` alone. A row without it, or with an unreadable value,
+  shows no badge — never a fallback to `createdAt` or "just now".
+- The Table has columns for name (linking to the lead), contact, phone, country,
+  stage, source, salesperson, follow-up and a delete action. The phone cell is
+  the one place a number is edited in place (`useLeadInlinePhone`: Enter saves,
+  Escape cancels; it starts from `leadEditablePrimaryPhone` and the page owns the
+  PATCH). Stage is changed from the stage cell's menu; rating and the activity
+  mark are the same controls as on the card.
+- The country flag comes from `leadCountryIso`, which returns `null` for an
+  unknown country so no flag is drawn rather than a default; `leadNameInitials`
+  and `leadOwnerInitials` supply avatar initials.
+- The `OPP`, `PQ`, `SO` and `IN` counters come from the single
+  [`POST /leads/document-counts`](#post-leadsdocument-counts--card-view-counters-2026-10-14)
+  read for the page. A kind the backend answered for no card is hidden; a card
+  without its own answer shows `—`, never zero.
 - Stage move is `POST /:id/stage`, never a generic `PATCH`.
 - Move optimistically; roll back on failure.
 - Every action control is gated by `capabilities`, not by permission strings.
@@ -708,8 +744,8 @@ described in [the activity template](../design/patterns.md#the-activity-template
 | Tags during create | live — multi-select catalogue ids in the single atomic, idempotent create request |
 | Delete | live |
 | Stage move + board | live |
-| Card view | live |
-| Table view | live — `DataTable`, first column links to the detail screen |
+| Card view | live — design-system `CardView`; selection and CSV export of the selected rows |
+| Table view | live — design-system `TableView`; first column links to the detail screen; inline primary-phone edit; CSV export of the selected rows |
 | Capabilities-driven actions | live — every control on the list and the detail screen |
 | Detail route | live — `/crm/leads/[id]`; **the proxy does not admit the path yet, see OPEN-QUESTIONS.md Q40** |
 | Update | live — `PATCH /:id`, changed keys only |

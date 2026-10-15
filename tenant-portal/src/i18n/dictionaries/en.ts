@@ -921,6 +921,7 @@ export const en: Dictionary = {
     },
     card: {
       more: "More actions for {name}",
+      stageAge: "{age} in stage",
       open: "Open",
       cardColor: "Card colour",
       colorNone: "No colour",
@@ -987,6 +988,21 @@ export const en: Dictionary = {
       moveFailed: "Unable to move the lead.",
       createAmbiguousRefreshed: "The creation result is uncertain. Page one was refreshed without filters; review it before submitting again.",
       createAmbiguousStale: "The creation result is uncertain and the unfiltered lead list could not be refreshed. Reload before trying again."
+    }
+  },
+  crmLeadBoard: {
+    activityFilter: "Filter {stage} by activity",
+    activityFilterItem: "{state}: {count}",
+    expandCard: "Show details of {name}",
+    collapseCard: "Hide details of {name}",
+    phones: "Phone numbers",
+    contacts: "Contacts ({shown} of {total})",
+    quickAdd: {
+      open: "Quick add",
+      title: "Quick add to {stage}",
+      openFullForm: "Open the full form",
+      selectCompany: "Select a company",
+      contactPhones: "Contact phones"
     }
   },
   crmOpportunities: {
@@ -1100,6 +1116,23 @@ export const en: Dictionary = {
     capabilitiesUnavailable: "Action permissions could not be loaded, so the move and edit controls are hidden. The board itself is complete.",
     loadMoreFailed: "The next page of cards could not be loaded. The cards already shown are correct."
   },
+  crmLeadViews: {
+    changeStage: "Change the stage of {name}",
+    phoneInput: "Primary phone of {name}",
+    editPhone: "Edit the primary phone of {name}",
+    exportSelected: "Export selected ({count})",
+    exportFailed: "This browser could not create the file.",
+    taxNumber: "Tax no. {value}",
+    commercialRegistration: "CR {value}",
+    opportunities: "Opportunities: {count}",
+    // Abbreviations on the card's counter strip; the full name is the title.
+    documentCountsShort: {
+      opportunities: "OPP",
+      quotations: "PQ",
+      salesOrders: "SO",
+      invoices: "INV"
+    }
+  },
   crmAcquisitionSources: {
     subtitle: "Manage the bilingual acquisition-source catalogue owned by CRM.",
     add: "Add source",
@@ -1138,6 +1171,47 @@ export const en: Dictionary = {
     iconExtensionMismatch: "The filename extension does not match the image type.",
     iconForbidden: "You do not have permission to manage acquisition sources.",
     iconFailed: "The icon could not be uploaded."
+  },
+  crmLeadWorkspace: {
+    kpis: {
+      label: "Lead pipeline figures",
+      total: "Total",
+      new: "New",
+      newToday: "+{count} today",
+      hot: "Rated 3 stars",
+      overdue: "Overdue activity",
+      qualified: "Qualified"
+    },
+    bulk: {
+      selection: "Selected leads: {count}",
+      clear: "Clear selection",
+      moveStage: "Move stage",
+      setRating: "Set rating",
+      delete: "Delete",
+      moveTitle: "Move the selected leads",
+      ratingTitle: "Rate the selected leads",
+      deleteTitle: "Delete the selected leads",
+      scope: "Selected leads: {count}.",
+      deleteScope: "Selected leads: {count}. Deleting cannot be undone.",
+      confirmMove: "Move",
+      confirmRating: "Save rating"
+    },
+    duplicates: {
+      companyMatch: "A company named \"{name}\" already exists in the Directory.",
+      useCompany: "Use existing company",
+      title: "This lead may already exist in the Directory:",
+      otherBranch: "A record in another branch",
+      matchedOn: "matches on {reasons}",
+      existingLeads: "existing leads: {count}",
+      restricted: "some details are outside your access",
+      reasons: {
+        TAX_NUMBER: "tax number",
+        COMMERCIAL_REGISTRATION: "commercial registration",
+        PHONE: "phone",
+        EMAIL: "email",
+        NAME: "name"
+      }
+    }
   },
   crmTags: {
     subtitle: "Name and colour the tags your team files leads, customers and opportunities under.",

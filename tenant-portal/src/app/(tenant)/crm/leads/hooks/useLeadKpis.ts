@@ -13,13 +13,26 @@ import {
 import { buildLeadBoardRequest } from "../lead-board-contract";
 import type { LeadSearchState } from "../lead-search-contract";
 
+/** The request body as a string, or "" when there is nothing that may be asked. */
+function kpiBodyKey(search: LeadSearchState, branchId: string, actorId: string | undefined): string {
+  if (search.mode === "basic" && search.basic.myLeads && !isUUIDv7(actorId)) return "";
+  try {
+    return JSON.stringify(
+      buildLeadBoardRequest(search, { branchId, page: 1, limit: 50, sortBy: "createdAt", sortDir: "DESC" }, actorId),
+    );
+  } catch {
+    // The list refuses the same search and reports it; the strip stays empty.
+    return "";
+  }
+}
+
 /**
  * The KPI strip's figures over EVERY lead the current search selects, from
  * `POST /api/tenant/crm/v1/leads/kpis` — not a count of the 50 rows a page or
  * a board lane happened to load. The body is the board's search body (the
  * backend ignores its paging), so the strip and the list always describe the
- * same selection. `null` while loading or when the read failed; the strip then
- * falls back to counting the loaded rows and says so.
+ * same selection. `null` until the first answer and after a failed read: the
+ * strip then shows no figures rather than counting the loaded rows.
  */
 export function useLeadKpis({
   branchId,
@@ -31,34 +44,34 @@ export function useLeadKpis({
   search: LeadSearchState;
   revision: number;
   enabled: boolean;
-}): { kpis: LeadKpis | null; failed: boolean } {
+}): LeadKpis | null {
   const { user } = useTenantAuth();
-  const [state, setState] = useState<{ kpis: LeadKpis | null; failed: boolean }>({ kpis: null, failed: false });
-  const actorId = user?.id;
+  const [kpis, setKpis] = useState<LeadKpis | null>(null);
+  // Keyed on the serialized body rather than the search object, so a render
+  // that rebuilds an equal search does not read the figures again.
+  const bodyKey = enabled && branchId ? kpiBodyKey(search, branchId, user?.id) : "";
 
   useEffect(() => {
     const controller = new AbortController();
-    if (
-      !enabled ||
-      !branchId ||
-      (search.mode === "basic" && search.basic.myLeads && !isUUIDv7(actorId))
-    ) {
+    if (!bodyKey) {
       queueMicrotask(() => {
-        if (!controller.signal.aborted) setState({ kpis: null, failed: false });
+        if (!controller.signal.aborted) setKpis(null);
       });
       return () => controller.abort();
     }
-    const body = buildLeadBoardRequest(search, { branchId, page: 1, limit: 50, sortBy: "createdAt", sortDir: "DESC" }, actorId);
     void axiosClient
-      .post<unknown>(LEADS_KPIS_PATH, body, { ...BODY_READ_OPTIONS, signal: controller.signal })
+      .post<unknown>(LEADS_KPIS_PATH, JSON.parse(bodyKey) as unknown, {
+        ...BODY_READ_OPTIONS,
+        signal: controller.signal,
+      })
       .then((response) => {
-        if (!controller.signal.aborted) setState({ kpis: parseLeadKpisResponse(response.data), failed: false });
+        if (!controller.signal.aborted) setKpis(parseLeadKpisResponse(response.data));
       })
       .catch(() => {
-        if (!controller.signal.aborted) setState({ kpis: null, failed: true });
+        if (!controller.signal.aborted) setKpis(null);
       });
     return () => controller.abort();
-  }, [actorId, branchId, enabled, revision, search]);
+  }, [bodyKey, revision]);
 
-  return state;
+  return kpis;
 }

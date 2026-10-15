@@ -196,4 +196,32 @@ describe("when errors are allowed to speak", () => {
     act(() => result.current.setCustomField("budget", 5000));
     expect(result.current.allErrors["customFields.budget"]).toBeUndefined();
   });
+
+  it("seeds the form from a quick-create draft when switching to the full modal", () => {
+    const { result } = renderHook(() =>
+      useCreateLeadForm(messages, [], "stage-new", "Mr", {
+        leadProfileType: "CORPORATE",
+        stageId: "stage-new",
+        acquisitionSourceId: "src-fb",
+        firstName: "",
+        lastName: "",
+        phones: [""],
+        existingCompanyPartyId: "",
+        companyName: "Palm Hills",
+        companyPhones: ["+201000000001"],
+        contactFirstName: "Ahmed",
+        contactLastName: "Hassan",
+        contactPhones: ["+201000000002"],
+      }),
+    );
+
+    expect(result.current.form.leadProfileType).toBe("CORPORATE");
+    expect(result.current.form.stageId).toBe("stage-new");
+    expect(result.current.form.acquisitionSourceId).toBe("src-fb");
+    expect(result.current.form.companyName).toBe("Palm Hills");
+    expect(result.current.form.companyPhones).toEqual(["+201000000001"]);
+    expect(result.current.form.contacts[0]?.firstName).toBe("Ahmed");
+    expect(result.current.form.contacts[0]?.lastName).toBe("Hassan");
+    expect(result.current.form.contacts[0]?.phones).toEqual(["+201000000002"]);
+  });
 });

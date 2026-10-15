@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 // is small and structural: this write goes through `runIdempotentWrite`, which is the
 // only thing in CRM that pairs a key with an attempt and replays it rather than
 // minting a second one.
-const source = readFileSync(resolve(__dirname, "./useLeads.ts"), "utf8");
+const source = readFileSync(resolve(__dirname, "./useLeadMutations.ts"), "utf8");
 
 function block(startMarker: string): string {
   const start = source.indexOf(startMarker);
@@ -45,9 +45,9 @@ describe("creating a lead", () => {
     // key, which the Gateway has no reason to collapse.
     expect(handleCreate).toContain("outcome.kind === \"success\"");
     expect(handleCreate).toContain("outcome.kind === \"failed\"");
-    expect(handleCreate).toContain("setIsCreateOpen(false)");
-    expect(handleCreate).toContain("changeSearch(DEFAULT_LEAD_SEARCH)");
-    expect(handleCreate).toContain("fetchLeads(undefined, 1, DEFAULT_LEAD_SEARCH)");
+    expect(handleCreate).toContain("context.closeCreate()");
+    expect(handleCreate).toContain("context.resetSearch()");
+    expect(handleCreate).toContain("await reconcile(1)");
   });
 
   it("keeps tags inside the one idempotent create write", () => {

@@ -1,47 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { DegradedBanner, FormModal, type FormModalSection } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
+import { DegradedBanner, FormModal } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { resolveCompanyForBranch } from "@/lib/api/organization-scope";
 import { formatTemplate } from "@/lib/format/template";
-import { getHonorificOptions } from "@/lib/catalogues/contact-titles";
-import { isUUIDv7 } from "@/lib/uuid";
-import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
-import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
-import { useCreateLeadForm } from "../hooks/useCreateLeadForm";
-import { useCreateLeadTags } from "../hooks/useCreateLeadTags";
-import { useLeadCompanyOptions } from "../hooks/useLeadCompanyOptions";
-import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
+import { CrmCustomFieldsFormSection } from "../../shared/components/CrmCustomFieldsFormSection";
+import { useCreateLeadModal } from "../hooks/useCreateLeadModal";
 import type { LeadStage } from "../hooks/useLeads";
-import { isCorporateLead, usesExistingCompany, LEAD_CREATE_LIMITS, type CreateLeadForm } from "../lead-create-contract";
-import type { CrmTag } from "../../shared/tag-contract";
-import {
-  leadCreateSectionErrorCount,
-  type LeadCreateSectionId,
-} from "../lead-create-validation";
+import type { CreateLeadForm, QuickCreateLeadDraft } from "../lead-create-contract";
 import { CreateTagModal } from "./create-lead/CreateTagModal";
 import { LeadAddressSection } from "./create-lead/LeadAddressSection";
 import { LeadClassificationSection } from "./create-lead/LeadClassificationSection";
 import { LeadCompanySection } from "./create-lead/LeadCompanySection";
 import { LeadContactsSection } from "./create-lead/LeadContactsSection";
-import { CrmCustomFieldsFormSection } from "../../shared/components/CrmCustomFieldsFormSection";
+import { LeadDuplicateWarnings } from "./create-lead/LeadDuplicateWarnings";
 import { LeadPersonSection } from "./create-lead/LeadPersonSection";
 import { LeadQualificationSection } from "./create-lead/LeadQualificationSection";
 
 export interface CreateLeadsModalProps {
-  isOpen: boolean;
   onClose: () => void;
   stages: LeadStage[];
   branchId: string | null;
   /**
    * Seeds the stage field — the board's `+` answers "which stage" by the column
-   * it was pressed in. Read once, when the form is created, so the caller keys
-   * this modal by the stage: a seed reapplied on every render would overwrite a
-   * stage the user had since changed by hand.
+   * it was pressed in. Read once, when the form is created; the page mounts the
+   * modal per opening, so a seed is never reapplied over a stage the user
+   * changed by hand.
    */
   initialStageId?: string;
+  /** What the board's quick-add card had typed when its user asked for the full form. */
+  initialDraft?: QuickCreateLeadDraft | null;
   onSubmit: (form: CreateLeadForm) => Promise<boolean>;
   error: string | null;
 }
@@ -50,10 +37,8 @@ export interface CreateLeadsModalProps {
  * Creating a lead, on the whole viewport.
  *
  * `CreateLeadDto` is two dozen keys plus a contacts array, an address block and
- * the tenant's own custom fields; a 448px drawer could show a fifth of it,
- * which is why the previous version of this screen sent five fields and let the
- * server default or silently drop the rest. The modal is the surface that fits
- * the record, and the section index is what keeps it navigable — see
+ * the tenant's own custom fields; the modal is the surface that fits the
+ * record, and the section index keeps it navigable — see
  * docs/design/patterns.md#formmodal.
  *
  * Which sections exist is decided by the lead's profile type and by whether it
@@ -63,209 +48,31 @@ export interface CreateLeadsModalProps {
  * blocks are all refused alongside an `existingCompanyPartyId`.
  */
 export function CreateLeadsModal({
-  isOpen,
   onClose,
   onSubmit,
   stages,
   branchId,
   initialStageId,
+  initialDraft,
   error,
 }: CreateLeadsModalProps) {
-  const { t, lang } = useI18n();
-  const { user } = useTenantAuth();
-  const companyOptions = useLeadCompanyOptions(branchId, isOpen);
-  const acquisitionSources = useCrmAcquisitionSources();
-  const customFields = useCrmCreateCustomFields("LEAD", isOpen);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pickedCompanyId, setPickedCompanyId] = useState<string | null>(null);
-
-  const fieldMessages = useCrmFieldMessages();
-  const messages = useMemo(
-    () => ({
-      ...fieldMessages,
-      contactRequired: t.crmLeads.create.errors.contactRequired,
-      tagsLimit: t.crmLeads.create.errors.tagsLimit,
-      tagsInvalid: t.crmLeads.create.errors.tagsInvalid,
-    }),
-    [fieldMessages, t],
-  );
-  const defaultHonorificTitle = getHonorificOptions(lang)[0]?.label ?? "";
-  const state = useCreateLeadForm(
-    messages,
-    customFields.requiredFieldKeys,
-    initialStageId,
-    defaultHonorificTitle,
-  );
-  const { form, errors, allErrors } = state;
-
-  const corporate = isCorporateLead(form);
-  const existingCompany = usesExistingCompany(form);
-
-  // Every branch this account may file into, paired with the company that owns
-  // it. `/auth/me` is the only proven source for either — `accessibleBranches`
-  // and the `accessibleBranchCompanies` ownership map on `TenantUserProfile`
-  // (src/context/AuthContext.tsx:65-68). `resolveCompanyForBranch` is reused
-  // rather than reading the map here because it is the SAME authority the
-  // Gateway scope headers are built from: two readings of one map is how the
-  // picker and the request end up disagreeing about who owns a branch.
-  const branchOwners = useMemo(() => {
-    const ids = [...new Set((user?.accessibleBranches ?? []).filter(isUUIDv7))];
-    return ids.map((id) => ({ branchId: id, companyId: resolveCompanyForBranch(user, id) }));
-  }, [user]);
-
-  // Companies drop out when ownership cannot be established — an older Core
-  // response with no map at all, or team memberships that pair one branch with
-  // two companies. Guessing there would pair a lead with the wrong company.
-  const companyIds = useMemo(
-    () => [
-      ...new Set(
-        branchOwners
-          .map(({ companyId }) => companyId)
-          .filter((companyId): companyId is string => companyId !== null),
-      ),
-    ],
-    [branchOwners],
-  );
-
-  // Empty `form.branchId` means the branch the list screen is on — see
-  // `buildCreateLeadRequest`.
-  const activeBranchId = form.branchId || branchId || "";
-  const leadTags = useCreateLeadTags(isOpen);
-  const [createTagModalOpen, setCreateTagModalOpen] = useState(false);
-  const [createTagInitialName, setCreateTagInitialName] = useState("");
-
-  const handleOpenCreateTag = (initialName: string) => {
-    setCreateTagInitialName(initialName);
-    setCreateTagModalOpen(true);
-  };
-
-  const handleTagCreated = (newTag: CrmTag) => {
-    leadTags.addTag(newTag);
-    if (form.tagIds.length < LEAD_CREATE_LIMITS.tags && !form.tagIds.includes(newTag.id)) {
-      state.setField("tagIds", [...form.tagIds, newTag.id]);
-    }
-  };
-
-  const companyId =
-    pickedCompanyId && companyIds.includes(pickedCompanyId)
-      ? pickedCompanyId
-      : (branchOwners.find((pair) => pair.branchId === activeBranchId)?.companyId ?? null);
-
-  // With no resolvable company the list is every accessible branch rather than
-  // none: the company is a filter over branches, and a filter that cannot be
-  // evaluated must not hide the thing it filters.
-  const branchIds = useMemo(
-    () =>
-      branchOwners
-        .filter((pair) => companyId === null || pair.companyId === companyId)
-        .map((pair) => pair.branchId),
-    [branchOwners, companyId],
-  );
-
-  // Storing the screen's own branch would mark the form dirty for a pick that
-  // changed nothing, and the close guard would then ask about edits that do
-  // not exist.
-  //
-  // A different branch is stored explicitly so `buildCreateLeadRequest` files
-  // the lead there and the response parser validates against that same branch.
-  function chooseBranch(next: string) {
-    state.setField("branchId", next === branchId ? "" : next);
-  }
-
-  // The company is not sent anywhere; it only narrows the list above. Moving to
-  // a company that does not own the active branch has to move the branch too,
-  // or the branch picker would show a value none of its options carries.
-  function chooseCompany(next: string) {
-    setPickedCompanyId(next);
-    const owned = branchOwners.filter((pair) => pair.companyId === next);
-    if (!owned.some((pair) => pair.branchId === activeBranchId)) {
-      chooseBranch(owned[0]?.branchId ?? "");
-    }
-  }
-
-  const indexEntries = useMemo<FormModalSection[]>(() => {
-    const entries: FormModalSection[] = [];
-
-    // Step 1: Essential details (Classification + Person / Company & Contacts)
-    const essentialSections: LeadCreateSectionId[] = corporate
-      ? ["classification", "company", "contacts"]
-      : ["classification", "person"];
-    const essentialHasErrors = essentialSections.some(
-      (sec) => leadCreateSectionErrorCount(errors, sec) > 0,
-    );
-    entries.push({
-      id: "essential",
-      targetSectionIds: essentialSections,
-      label: t.crmLeads.create.steps.essential.title,
-      invalid: essentialHasErrors,
-    });
-
-    // Step 2: Address (if not using an existing company)
-    if (!existingCompany) {
-      entries.push({
-        id: "address",
-        targetSectionIds: ["address"],
-        label: t.crmLeads.create.steps.address.title,
-        invalid: leadCreateSectionErrorCount(errors, "address") > 0,
-      });
-    }
-
-    // Step 3: Qualification
-    entries.push({
-      id: "qualification",
-      targetSectionIds: ["qualification"],
-      label: t.crmLeads.create.steps.qualification.title,
-      invalid: leadCreateSectionErrorCount(errors, "qualification") > 0,
-    });
-
-    // Step 4: Custom fields (if any configured)
-    if (customFields.definitions.length > 0) {
-      entries.push({
-        id: "customFields",
-        targetSectionIds: ["customFields"],
-        label: t.crmLeads.create.steps.customFields.title,
-        invalid: leadCreateSectionErrorCount(errors, "customFields") > 0,
-      });
-    }
-
-    return entries;
-  }, [corporate, existingCompany, customFields.definitions.length, errors, t]);
-
-  async function handleSubmit() {
-    // Every field speaks now, including the ones never focused. Submit is NOT
-    // disabled while the form is invalid: a disabled button gives a keyboard
-    // user no way to ask what is wrong, so the press is what reveals it.
-    state.revealAll();
-    if (Object.keys(allErrors).length > 0 || isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      if (await onSubmit(form)) {
-        state.reset();
-        setPickedCompanyId(null);
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  const errorCount = Object.keys(errors).length;
+  const { t } = useI18n();
+  const modal = useCreateLeadModal({ branchId, initialStageId, initialDraft, onSubmit });
+  const { state, isSubmitting, leadTags } = modal;
+  const { form, errors } = state;
 
   return (
     <>
       <FormModal
-        open={isOpen}
+        open
         onOpenChange={(open) => {
-          if (open) return;
-          state.reset();
-          companyOptions.reset();
-          setPickedCompanyId(null);
-          onClose();
+          if (!open) onClose();
         }}
         title={t.crmLeads.addTitle}
         density="compact"
         isDirty={state.isDirty}
         isSubmitting={isSubmitting}
-        onSubmit={() => void handleSubmit()}
+        onSubmit={() => void modal.submit()}
         error={error ?? undefined}
         sidebarHeader={
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
@@ -273,7 +80,7 @@ export function CreateLeadsModal({
           </span>
         }
         sectionVariant="stepper"
-        sections={indexEntries}
+        sections={modal.sections}
         labels={{
           submit: isSubmitting ? t.crmLeads.creating : t.common.create,
           cancel: t.common.cancel,
@@ -286,47 +93,50 @@ export function CreateLeadsModal({
           close: t.common.close,
         }}
         footerLeading={
-          errorCount > 0 ? (
+          modal.errorCount > 0 ? (
             // role="status", not "alert": the count updates as the user fixes
             // fields, and an assertive re-announcement on every keystroke would
             // talk over the field they are typing in.
             <p role="status" className="text-xs text-destructive">
-              {formatTemplate(t.crmShared.formErrorCount, { count: errorCount })}
+              {formatTemplate(t.crmShared.formErrorCount, { count: modal.errorCount })}
             </p>
           ) : undefined
         }
       >
-        {acquisitionSources.degraded && (
-          <DegradedBanner message={t.crmLeads.create.sourcesUnavailable} />
-        )}
-        {customFields.degraded && (
-          <DegradedBanner message={t.crmShared.customFieldsUnavailable} />
-        )}
+        <LeadDuplicateWarnings
+          companyMatch={modal.companyMatch}
+          onUseCompany={modal.adoptMatchedCompany}
+          matches={modal.serverDuplicates}
+          disabled={isSubmitting}
+        />
+
+        {modal.sources.degraded && <DegradedBanner message={t.crmLeads.create.sourcesUnavailable} />}
+        {modal.customFields.degraded && <DegradedBanner message={t.crmShared.customFieldsUnavailable} />}
         {(leadTags.degraded || (!leadTags.canRead && form.tagIds.length > 0)) && (
           <DegradedBanner message={t.crmLeads.create.tagsUnavailable} />
         )}
 
         <LeadClassificationSection
-          companyIds={companyIds}
-          companyId={companyId}
-          branchIds={branchIds}
-          branchId={activeBranchId}
+          companyIds={modal.companyIds}
+          companyId={modal.companyId}
+          branchIds={modal.branchIds}
+          branchId={modal.activeBranchId}
           leadProfileType={form.leadProfileType}
           stageId={form.stageId}
           acquisitionSourceId={form.acquisitionSourceId}
           tagIds={form.tagIds}
           stages={stages}
-          sources={acquisitionSources.items}
+          sources={modal.sources.items}
           tags={leadTags.items}
           showTags={leadTags.canRead || form.tagIds.length > 0}
           tagsLoading={leadTags.isLoading}
           tagsUnavailable={leadTags.degraded || !leadTags.canRead}
           canCreateTag={leadTags.canManage}
-          onCreateTag={leadTags.canManage ? handleOpenCreateTag : undefined}
+          onCreateTag={leadTags.canManage ? modal.openCreateTag : undefined}
           errors={errors}
           disabled={isSubmitting}
-          onCompanyChange={chooseCompany}
-          onBranchChange={chooseBranch}
+          onCompanyChange={modal.chooseCompany}
+          onBranchChange={modal.chooseBranch}
           onProfileTypeChange={state.setProfileType}
           onStageChange={(stageId) => state.setField("stageId", stageId)}
           onSourceChange={(sourceId) => {
@@ -339,12 +149,12 @@ export function CreateLeadsModal({
           onTagsBlur={() => state.touch("tagIds")}
         />
 
-        {corporate ? (
+        {modal.corporate ? (
           <>
             <LeadCompanySection
               form={form}
               errors={errors}
-              options={companyOptions}
+              options={modal.companyOptions}
               disabled={isSubmitting}
               onSelectCompany={state.selectCompany}
               onFieldChange={state.setField}
@@ -356,7 +166,7 @@ export function CreateLeadsModal({
             <LeadContactsSection
               form={form}
               errors={errors}
-              options={companyOptions}
+              options={modal.companyOptions}
               disabled={isSubmitting}
               onContactChange={state.updateContact}
               onPrimaryChange={state.setContactPrimary}
@@ -381,7 +191,7 @@ export function CreateLeadsModal({
           />
         )}
 
-        {!existingCompany && (
+        {!modal.existingCompany && (
           <LeadAddressSection
             address={form.address}
             errors={errors}
@@ -400,10 +210,10 @@ export function CreateLeadsModal({
           onBlur={state.touch}
         />
 
-        {customFields.definitions.length > 0 && (
+        {modal.customFields.definitions.length > 0 && (
           <CrmCustomFieldsFormSection
-            definitions={customFields.definitions}
-            requiredFieldKeys={customFields.requiredFieldKeys}
+            definitions={modal.customFields.definitions}
+            requiredFieldKeys={modal.customFields.requiredFieldKeys}
             values={form.customFields}
             errors={errors}
             disabled={isSubmitting}
@@ -414,11 +224,11 @@ export function CreateLeadsModal({
       </FormModal>
       {leadTags.canManage && (
         <CreateTagModal
-          open={createTagModalOpen}
-          initialName={createTagInitialName}
+          open={modal.createTag.open}
+          initialName={modal.createTag.initialName}
           existingTags={leadTags.items}
-          onSuccess={handleTagCreated}
-          onClose={() => setCreateTagModalOpen(false)}
+          onSuccess={modal.handleTagCreated}
+          onClose={modal.closeCreateTag}
         />
       )}
     </>

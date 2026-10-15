@@ -2501,10 +2501,15 @@ projection and has no list filter, so the four presets cannot all become one
 server query today. The count on a pill can therefore exceed what the filtered
 page shows.
 
+**Interim, 2026-10-16:** the client-side filtering is gone. New and Qualified
+now set the Basic search's server `stageFlag` filter. Rated 3 stars and Overdue
+activity are figures only, with no toggle, so no control narrows just the loaded
+rows.
+
 **Settle with:** an `activityBucket` (or `hasOverdueActivity`) filter on
-`POST /leads/search` and `/leads/board`, after which the presets become
-server-side filters (`stageFlag`, `rating`, overdue) and the list's `total`
-matches the pill. See [the KPI route](../api/crm-leads.md#post-leadskpis--the-kpi-strip-2026-10-14).
+`POST /leads/search` and `/leads/board`. A Basic `rating` field would also be
+needed. After that, the two figure-only presets can become server-side toggles
+too. See [the KPI route](../api/crm-leads.md#post-leadskpis--the-kpi-strip-2026-10-14).
 
 **Related, Q133:** the inline primary-phone editors now send the lead's whole
 list with only the first number replaced (`lead-phone-patch.ts`), so a lead's

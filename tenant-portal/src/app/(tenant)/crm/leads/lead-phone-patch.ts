@@ -1,5 +1,5 @@
-// The inline "primary phone" editors on the board card, the quick-edit modal
-// and the table cell edit ONE number: the first mobile of the person the lead
+// The inline "primary phone" editors on the board card and the table cell
+// edit ONE number: the first mobile of the person the lead
 // is about -- the individual, or a corporate lead's primary contact. They send
 // `primaryPhone` on `PATCH /api/tenant/crm/v1/leads/:id`, which replaces only
 // that number and keeps every other one (docs/api/crm-leads.md). Rebuilding

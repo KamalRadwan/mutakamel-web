@@ -1,7 +1,7 @@
 import { isUUIDv7 } from "@/lib/uuid";
 import type { CrmFilterLeaf, CrmSearchRequestBody } from "../shared/search/filter-tree";
 
-export type LeadTextSearchField = "lead" | "customer" | "email" | "phone";
+type LeadTextSearchField = "lead" | "customer" | "email" | "phone";
 export type LeadSearchFieldId =
   | LeadTextSearchField
   | "tag"

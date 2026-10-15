@@ -939,6 +939,7 @@ export const ar = {
     // الإجراءات الإضافية. اللون وحده لا يحمل معنى هنا، فلكل علامة مقابل نصي.
     card: {
       more: "إجراءات إضافية لـ {name}",
+      stageAge: "{age} في المرحلة",
       open: "فتح",
       cardColor: "لون البطاقة",
       colorNone: "بدون لون",
@@ -1003,6 +1004,21 @@ export const ar = {
       moveFailed: "تعذّر نقل العميل المحتمل.",
       createAmbiguousRefreshed: "نتيجة الإنشاء غير مؤكدة. حُدّثت الصفحة الأولى دون عوامل تصفية؛ راجعها قبل إعادة الإرسال.",
       createAmbiguousStale: "نتيجة الإنشاء غير مؤكدة وتعذّر تحديث القائمة غير المصفّاة. أعد التحميل قبل المحاولة مجددًا."
+    }
+  },
+  crmLeadBoard: {
+    activityFilter: "تصفية {stage} حسب النشاط",
+    activityFilterItem: "{state}: {count}",
+    expandCard: "عرض تفاصيل {name}",
+    collapseCard: "إخفاء تفاصيل {name}",
+    phones: "أرقام الهاتف",
+    contacts: "جهات الاتصال ({shown} من {total})",
+    quickAdd: {
+      open: "إضافة سريعة",
+      title: "إضافة سريعة إلى {stage}",
+      openFullForm: "فتح النموذج الكامل",
+      selectCompany: "اختر شركة",
+      contactPhones: "هواتف جهة الاتصال"
     }
   },
   crmOpportunities: {
@@ -1116,6 +1132,22 @@ export const ar = {
     capabilitiesUnavailable: "تعذّر تحميل صلاحيات الإجراءات، لذلك أُخفيت إجراءات نقل الفرص وتعديلها. اللوحة المعروضة كاملة.",
     loadMoreFailed: "تعذّر تحميل المزيد من البطاقات. البطاقات المعروضة صحيحة."
   },
+  crmLeadViews: {
+    changeStage: "تغيير مرحلة {name}",
+    phoneInput: "الهاتف الأساسي لـ {name}",
+    editPhone: "تعديل الهاتف الأساسي لـ {name}",
+    exportSelected: "تصدير المحدد ({count})",
+    exportFailed: "تعذّر على المتصفح إنشاء الملف.",
+    taxNumber: "الرقم الضريبي {value}",
+    commercialRegistration: "السجل التجاري {value}",
+    opportunities: "الفرص: {count}",
+    documentCountsShort: {
+      opportunities: "فرص",
+      quotations: "عروض",
+      salesOrders: "أوامر",
+      invoices: "فواتير"
+    }
+  },
   crmAcquisitionSources: {
     subtitle: "إدارة قائمة مصادر الاستقطاب الثنائية اللغة المعتمدة من CRM.",
     add: "إضافة مصدر",
@@ -1154,6 +1186,47 @@ export const ar = {
     iconExtensionMismatch: "امتداد الملف لا يطابق نوع الصورة.",
     iconForbidden: "لا تملك صلاحية إدارة مصادر الاستقطاب.",
     iconFailed: "تعذّر رفع الأيقونة."
+  },
+  crmLeadWorkspace: {
+    kpis: {
+      label: "مؤشرات مسار العملاء المحتملين",
+      total: "الإجمالي",
+      new: "جديد",
+      newToday: "+{count} اليوم",
+      hot: "تقييم ثلاث نجوم",
+      overdue: "نشاط متأخر",
+      qualified: "مؤهَّل"
+    },
+    bulk: {
+      selection: "العملاء المحددون: {count}",
+      clear: "إلغاء التحديد",
+      moveStage: "نقل المرحلة",
+      setRating: "تعيين التقييم",
+      delete: "حذف",
+      moveTitle: "نقل العملاء المحددين",
+      ratingTitle: "تقييم العملاء المحددين",
+      deleteTitle: "حذف العملاء المحددين",
+      scope: "العملاء المحددون: {count}.",
+      deleteScope: "العملاء المحددون: {count}. لا يمكن التراجع عن الحذف.",
+      confirmMove: "نقل",
+      confirmRating: "حفظ التقييم"
+    },
+    duplicates: {
+      companyMatch: "توجد شركة باسم \"{name}\" مسجلة بالفعل في الدليل.",
+      useCompany: "استخدام الشركة الموجودة",
+      title: "قد يكون هذا العميل مسجلاً بالفعل في الدليل:",
+      otherBranch: "سجل في فرع آخر",
+      matchedOn: "تطابق في {reasons}",
+      existingLeads: "عملاء محتملون قائمون: {count}",
+      restricted: "بعض التفاصيل خارج صلاحيتك",
+      reasons: {
+        TAX_NUMBER: "الرقم الضريبي",
+        COMMERCIAL_REGISTRATION: "السجل التجاري",
+        PHONE: "الهاتف",
+        EMAIL: "البريد الإلكتروني",
+        NAME: "الاسم"
+      }
+    }
   },
   crmTags: {
     subtitle: "سمِّ الوسوم التي يصنّف بها فريقك العملاء المتوقعين والعملاء والفرص، وحدّد ألوانها.",

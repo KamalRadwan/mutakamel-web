@@ -13,6 +13,7 @@
 // no other overlap.
 
 import { isCardColor, type CardColor } from "@/design-system";
+import { countryIsoFromName } from "@/lib/geo/country-data";
 import { isUUIDv7 } from "@/lib/uuid";
 
 const LEAD_ACTIVITY_BUCKETS = ["OVERDUE", "TODAY", "FUTURE"] as const;
@@ -122,6 +123,25 @@ export function leadOwnerInitials(owner: LeadOwner): string {
   return [owner.firstName, owner.lastName]
     .map((part) => Array.from(part.trim())[0] ?? "")
     .join("");
+}
+
+/** Avatar initials for a lead or contact display name, by code point. */
+export function leadNameInitials(name: string): string {
+  const words = name.trim().split(/\s+/u).filter(Boolean);
+  if (words.length === 1) return Array.from(words[0]).slice(0, 2).join("").toUpperCase();
+  return words.slice(0, 2).map((word) => Array.from(word)[0] ?? "").join("").toUpperCase();
+}
+
+/**
+ * The ISO code behind a stored country, which is either already a code or a
+ * country name in either language. An unknown value has none: the row shows
+ * no flag rather than a guessed one.
+ */
+export function leadCountryIso(country: string | null | undefined): string | null {
+  const trimmed = country?.trim() ?? "";
+  if (!trimmed) return null;
+  if (/^[A-Z]{2}$/iu.test(trimmed)) return trimmed.toUpperCase();
+  return countryIsoFromName(trimmed);
 }
 
 /**

@@ -132,6 +132,7 @@ export * from "./views/board/BoardView";
 export * from "./views/board/MoveToMenu";
 export * from "./views/board/types";
 export * from "./views/calendar/CalendarView";
+export * from "./views/board/useCollapsedColumns";
 export * from "./views/calendar/calendar-range";
 export * from "./views/calendar/types";
 export * from "./views/card/CardView";

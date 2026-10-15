@@ -266,11 +266,11 @@ MASTER-PLAN task 3.39.
 | File | Lines | Split into |
 | --- | ---: | --- |
 | `crm/opportunities/hooks/usePipelineWorkspace.ts` | ~1,080 | Response parsing/validation · board projection and stage-move mutation · the workspace state machine. It is three hooks wearing one name |
-| `crm/leads/hooks/useLeads.ts` | ~730 | Lead + capabilities parsing · list/filter state · the create/update/delete mutations |
+| ~~`crm/leads/hooks/useLeads.ts`~~ | — | **Done (2026-10-16).** Row, stage and capabilities parsing moved to `crm/leads/lead-list-contract.ts`; list/filter state and its debounced read to `hooks/useLeadList.ts`; the branch's stages and capabilities (read once per branch, not per page) to `hooks/useLeadStagesAndCapabilities.ts`; create, delete and stage moves to `hooks/useLeadMutations.ts`; card, inline and bulk field writes to `hooks/useLeadCardWrites.ts`. `useLeads` composes them and keeps the screen's surface |
 | `crm/customer-profiles/hooks/useCustomerProfiles.ts` | ~440 | Parsing out of the hook, as above |
 | `crm/opportunities/components/opportunities-workspace.tsx` | ~330 | Column definitions out of the component, the way the other list screens already do it |
 | ~~`crm/custom-fields/hooks/useCrmCustomFields.ts`~~ | — | **Done in Phase 8 (8.19).** Parsing and constants moved to `crm/custom-fields/custom-field-contract.ts`, matching the `<entity>-contract.ts` shape the other catalogue screens use; the hook keeps state and mutations |
-| ~~`crm/lead-stages/hooks/useLeadStages.ts`~~ | — | **Done in Phase 8 (8.17).** The four mutations moved to `hooks/useLeadStageMutations.ts`; the hook keeps list, filter and dialog state |
+| ~~`crm/lead-stages/hooks/useLeadStages.ts`~~ | — | **Done in Phase 8 (8.17).** The mutations moved to `hooks/useLeadStageMutations.ts`, which composes `hooks/useLeadStageOrdering.ts` (reorder and set-default) and shares its request options and error helpers through `hooks/lead-stage-requests.ts`; `useLeadStages` keeps list, filter and dialog state |
 | `core/organization/components/OrganizationLevelWorkspace.tsx` | ~310 | Marginal. Split when next edited, not as its own task |
 
 These are scheduled **with the phase that next touches the file** — Phase 8 for

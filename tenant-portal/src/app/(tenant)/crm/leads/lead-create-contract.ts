@@ -109,6 +109,21 @@ export interface CreateLeadForm {
   customFields: Record<string, unknown>;
 }
 
+export interface QuickCreateLeadDraft {
+  leadProfileType: CrmProfileType;
+  stageId: string;
+  acquisitionSourceId: string;
+  firstName: string;
+  lastName: string;
+  phones: string[];
+  existingCompanyPartyId: string;
+  companyName: string;
+  companyPhones: string[];
+  contactFirstName: string;
+  contactLastName: string;
+  contactPhones: string[];
+}
+
 const EMPTY_LEAD_ADDRESS: LeadAddressForm = {
   country: "",
   city: "",

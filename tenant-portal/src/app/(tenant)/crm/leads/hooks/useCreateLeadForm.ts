@@ -13,7 +13,9 @@ import {
   type LeadAddressForm,
   type LeadContactForm,
   type CrmProfileType,
+  type QuickCreateLeadDraft,
 } from "../lead-create-contract";
+import { applyQuickCreateDraft } from "../lead-quick-create-draft";
 import {
   validateCreateLead,
   type LeadCreateMessages,
@@ -87,6 +89,9 @@ export function useCreateLeadForm(
   // the line write it in an effect after mount, which would make a form the
   // user never touched look dirty and raise a false discard warning.
   defaultHonorificTitle = "",
+  // What the board's quick-add card had typed when its user asked for the
+  // full form. Part of the pristine snapshot for the same reason as above.
+  initialDraft?: QuickCreateLeadDraft | null,
 ) {
   const validate = useCallback(
     (candidate: CreateLeadForm) =>
@@ -96,7 +101,7 @@ export function useCreateLeadForm(
   const createInitial = useCallback(
     () => {
       const pristine = emptyCreateLeadForm(nextContactKey());
-      return {
+      const base: CreateLeadForm = {
         ...pristine,
         honorificTitle: defaultHonorificTitle,
         contacts: pristine.contacts.map((contact) => ({
@@ -105,8 +110,9 @@ export function useCreateLeadForm(
         })),
         ...(initialStageId ? { stageId: initialStageId } : {}),
       };
+      return initialDraft ? applyQuickCreateDraft(base, initialDraft) : base;
     },
-    [defaultHonorificTitle, initialStageId],
+    [defaultHonorificTitle, initialDraft, initialStageId],
   );
   const { form, errors, allErrors, isDirty, setForm, setField, touch, revealAll, reset } =
     useCrmCreateForm({ createInitial, validate, fingerprint });

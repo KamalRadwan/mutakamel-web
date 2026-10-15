@@ -95,7 +95,7 @@ export function bulkLeadFields(patch: BulkLeadFieldsPatch): BulkLeadFieldsPatch 
 
 /* ── KPIs ─────────────────────────────────────────────────────────────── */
 
-export interface LeadKpiStageCounts {
+interface LeadKpiStageCounts {
   stageId: string;
   total: number;
   hot: number;
@@ -148,14 +148,14 @@ export function parseLeadKpisResponse(value: unknown): LeadKpis {
 
 /* ── Duplicate check ──────────────────────────────────────────────────── */
 
-export const LEAD_DUPLICATE_MATCH_TYPES = [
+const LEAD_DUPLICATE_MATCH_TYPES = [
   "TAX_NUMBER",
   "COMMERCIAL_REGISTRATION",
   "PHONE",
   "EMAIL",
   "NAME",
 ] as const;
-export type LeadDuplicateMatchType = (typeof LEAD_DUPLICATE_MATCH_TYPES)[number];
+type LeadDuplicateMatchType = (typeof LEAD_DUPLICATE_MATCH_TYPES)[number];
 
 export interface LeadDuplicateCheckRequest {
   branchId: string;

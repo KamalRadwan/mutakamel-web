@@ -18,11 +18,15 @@ function phoneForms(phone: string, fallbackCallingCode = ""): {
   if (!parsed) return { full: phone, digits: "" };
   const { callingCode, nationalNumber } = parsed;
   const resolvedCallingCode = callingCode || fallbackCallingCode;
-  const normalizedNationalNumber = callingCode || !resolvedCallingCode
+  const full = `${callingCode}${nationalNumber}`;
+  // WhatsApp and Telegram address an international number. A local number with
+  // no country to supply its calling code has none, so it gets no chat links.
+  if (!resolvedCallingCode) return { full, digits: "" };
+  const normalizedNationalNumber = callingCode
     ? nationalNumber
     : nationalNumber.replace(/^0+/u, "");
   return {
-    full: `${callingCode}${nationalNumber}`,
+    full,
     digits: `${resolvedCallingCode.replace("+", "")}${normalizedNationalNumber}`,
   };
 }

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { crmCapabilityAllowsOwner as capabilityAllowsOwner } from "../../shared/crm-capabilities";
 import {
-  capabilityAllowsOwner,
-  mergeLeadCardResponse,
+  leadCardFields,
   parseLeadResponse,
   parseLeadCapabilitiesResponse,
   parseLeadStagesResponse,
   parseLeadsResponse,
-} from "./useLeads";
+} from "../lead-list-contract";
 
 const lead = {
   id: "01900100-0000-7000-8000-000000000001",
@@ -119,29 +119,12 @@ describe("Leads API contracts", () => {
     ).toMatchObject({ rating: 0, cardColor: null, owner: null, nextActivity: null });
   });
 
-  it("preserves list-only company contact data after a rating update", () => {
-    const previous = parseLeadResponse({ ...lead, ...cardFields }, lead.branchId);
-    const responseWithoutListEnrichments = {
-      ...lead,
-      ...cardFields,
-      rating: 3,
-      primaryContact: undefined,
-      primaryContactName: undefined,
-    };
+  it("adopts only the card fields a write owns", () => {
+    const confirmed = parseLeadResponse({ ...lead, ...cardFields, rating: 3 }, lead.branchId);
 
-    expect(
-      mergeLeadCardResponse(
-        previous,
-        { rating: 3 },
-        responseWithoutListEnrichments,
-        lead.branchId,
-      ),
-    ).toMatchObject({
-      rating: 3,
-      primaryContact: lead.primaryContact,
-      primaryContactName: previous.primaryContactName,
-      phones: previous.phones,
-    });
+    expect(leadCardFields({ rating: 3 }, confirmed)).toEqual({ rating: 3 });
+    expect(leadCardFields({ cardColor: null }, confirmed)).toEqual({ cardColor: "TEAL" });
+    expect(leadCardFields({}, confirmed)).toEqual({});
   });
 
   it("rejects a board-card field of the wrong shape rather than rendering a default over it", () => {
