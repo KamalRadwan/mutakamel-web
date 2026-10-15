@@ -14,6 +14,7 @@ export function LeadIndividualContactCard({ lead, canEdit, onSaved, onReconcile 
   const edit = useLeadContactsEdit(lead, onSaved, onReconcile, canEdit);
   return <>
     <LeadContactReadCard name={lead.displayName} jobTitle={null} email={lead.email}
+      country={lead.address?.country ?? undefined}
       phones={lead.phones.length > 0 ? lead.phones : lead.primaryMobile ? [lead.primaryMobile] : []}
       onEdit={canEdit ? edit.startEdit : undefined} />
     <FormModal size="card" density="compact" open={Boolean(edit.form)} onOpenChange={(open) => { if (!open) edit.cancel(); }}

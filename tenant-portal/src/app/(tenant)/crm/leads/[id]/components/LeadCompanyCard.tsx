@@ -9,7 +9,7 @@ import type { LeadDetail } from "../../lead-contract";
 import type { LeadCompanyEdit } from "../hooks/useLeadCompanyEdit";
 import { useLeadCompanyModal } from "../hooks/useLeadCompanyModal";
 import { LeadCompanyEditModal } from "./LeadCompanyEditModal";
-import { LeadCompanyPhoneRow } from "./LeadCompanyPhoneRow";
+import { LeadPhoneActionsRow } from "../../components/LeadPhoneActionsRow";
 
 /** Company facts stay readable; editing owns a separate, prefilled modal. */
 export function LeadCompanyCard({ lead, edit, readOnly }: {
@@ -30,7 +30,8 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
       alignTop: true,
       value: lead.phones.length > 0 ? (
         <span className="flex flex-col gap-1">
-          {lead.phones.map((phone, index) => <LeadCompanyPhoneRow key={`${phone}-${index}`} phone={phone} />)}
+          {lead.phones.map((phone, index) => <LeadPhoneActionsRow key={`${phone}-${index}`} phone={phone}
+            country={lead.address?.country ?? undefined} />)}
         </span>
       ) : <EmptyValue label={t.detail.notRecorded} />,
     },

@@ -7,7 +7,7 @@ import type { LeadDetail } from "../../lead-contract";
 import { LEAD_CONTACT_EDIT_LIMITS } from "../lead-contacts-edit-contract";
 import type { LeadContactsEdit } from "../hooks/useLeadContactsEdit";
 import { LeadContactFields } from "./LeadContactList";
-import { LeadCompanyPhoneRow } from "./LeadCompanyPhoneRow";
+import { LeadPhoneActionsRow } from "../../components/LeadPhoneActionsRow";
 
 export function LeadIndividualContactFields({ lead, edit, disabled }: {
   lead: LeadDetail;
@@ -46,7 +46,7 @@ export function LeadIndividualContactFields({ lead, edit, disabled }: {
           onRemove={edit.removePhone} onBlur={() => {}} />
       ) : phones.length > 0 ? (
         <div className="flex min-w-0 flex-col gap-1">
-          {phones.map((phone) => <LeadCompanyPhoneRow key={phone} phone={phone} />)}
+          {phones.map((phone) => <LeadPhoneActionsRow key={phone} phone={phone} country={lead.address?.country ?? undefined} />)}
         </div>
       ) : null,
     },

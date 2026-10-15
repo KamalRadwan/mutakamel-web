@@ -30,6 +30,7 @@ vi.mock("@/components/audit/EntityHistoryCard", () => ({ EntityHistoryCard: () =
 vi.mock("./LeadRelatedNav", () => ({ LeadRelatedNav: () => null }));
 vi.mock("./LeadDetailSidePanel", () => ({ LeadDetailSidePanel: () => <section aria-label="Lead side panel" /> }));
 vi.mock("./LeadConvertModal", () => ({ LeadConvertModal: () => null }));
+vi.mock("./LeadDetailHero", () => ({ LeadDetailHero: () => null }));
 // Keep stateful children so reconciliation is exercised without their API hooks.
 vi.mock("./LeadCompanyCard", () => ({
   LeadCompanyCard: ({ lead }: { lead: LeadDetail }) => <input aria-label="Company draft" defaultValue={lead.displayName} />,
@@ -58,7 +59,7 @@ const lead: LeadDetail = {
 
 function setLead(value: LeadDetail) {
   vi.mocked(useLeadDetail).mockReturnValue({
-    lead: value, stages: [], stageCatalogue: [], isLoading: false, isNotFound: false, isForbidden: false,
+    lead: value, card: null, setCard: vi.fn(), stages: [], stageCatalogue: [], isLoading: false, isNotFound: false, isForbidden: false,
     error: null, stagesDegraded: false, setLead: vi.fn(), reload: vi.fn(),
   });
 }

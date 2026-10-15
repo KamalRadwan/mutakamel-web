@@ -5,25 +5,28 @@ import { Pencil } from "lucide-react";
 import { Badge, Button, Card, CardContent } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { LeadContact } from "../../lead-contract";
-import { LeadCompanyPhoneRow } from "./LeadCompanyPhoneRow";
+import { LeadPhoneActionsRow } from "../../components/LeadPhoneActionsRow";
 
-export function LeadContactList({ contacts, onEdit }: {
+export function LeadContactList({ contacts, country, onEdit }: {
   contacts: LeadContact[];
+  /** The lead's country, which completes a national number for WhatsApp and Telegram. */
+  country?: string;
   onEdit?: (contact: LeadContact) => void;
 }) {
   return contacts.map((contact) => (
     <LeadContactReadCard key={contact.partyId} name={contact.displayName}
-      jobTitle={contact.jobTitle} phones={contact.phones} email={contact.email}
+      jobTitle={contact.jobTitle} phones={contact.phones} email={contact.email} country={country}
       isPrimary={contact.isPrimary} onEdit={onEdit ? () => onEdit(contact) : undefined} />
   ));
 }
 
 /** Only the full name and three ways to identify/reach this person, never company data. */
-export function LeadContactReadCard({ name, jobTitle, phones, email, isPrimary, onEdit }: {
+export function LeadContactReadCard({ name, jobTitle, phones, email, country, isPrimary, onEdit }: {
   name: string;
   jobTitle: string | null;
   phones: string[];
   email: string | null;
+  country?: string;
   isPrimary?: boolean;
   onEdit?: () => void;
 }) {
@@ -46,7 +49,7 @@ export function LeadContactReadCard({ name, jobTitle, phones, email, isPrimary, 
           { label: t.crmLeadConvert.contactJobTitle, value: jobTitle },
           { label: t.crmLeads.phone, value: phones.length > 0 ? (
             <div className="flex min-w-0 flex-col gap-1">
-              {phones.map((phone) => <LeadCompanyPhoneRow key={phone} phone={phone} />)}
+              {phones.map((phone) => <LeadPhoneActionsRow key={phone} phone={phone} country={country} />)}
             </div>
           ) : null },
           { label: t.crmLeads.email, value: email ? (

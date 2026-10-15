@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import { parseLeadStageCatalogueResponse } from "../../../lead-stages/lead-stage-contract";
 import type { LeadStageItem } from "../../../lead-stages/lead-stage-contract";
 import { leadPath, parseLeadDetailResponse, type LeadDetail } from "../../lead-contract";
+import { parseLeadDetailCard, type LeadDetailCard } from "../lead-detail-card-contract";
 
 const DETAIL_RESPONSE_LIMIT_BYTES = 512 * 1024;
 const STAGES_RESPONSE_LIMIT_BYTES = 256 * 1024;
@@ -29,6 +30,7 @@ function isAbortError(error: unknown): boolean {
  */
 export function useLeadDetail(leadId: string) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
+  const [card, setCard] = useState<LeadDetailCard | null>(null);
   const [stages, setStages] = useState<LeadStageItem[]>([]);
   const [stagesDegraded, setStagesDegraded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,11 +75,13 @@ export function useLeadDetail(leadId: string) {
 
         const nextStages = readStages(stagesSettled);
         setLead(parseLeadDetailResponse(leadSettled.value.data));
+        setCard(readCard(leadSettled.value.data));
         setStages(nextStages ?? []);
         setStagesDegraded(nextStages === null);
       } catch (caught) {
         if (isAbortError(caught)) return;
         setLead(null);
+        setCard(null);
         setStages([]);
         setStagesDegraded(false);
         setError(normalizeApiError(caught));
@@ -100,9 +104,12 @@ export function useLeadDetail(leadId: string) {
     setReloadToken((current) => current + 1);
   }, []);
 
+  const activeStages = useMemo(() => stages.filter(({ isActive }) => isActive), [stages]);
+
   return {
     lead,
-    stages: stages.filter(({ isActive }) => isActive),
+    card,
+    stages: activeStages,
     stageCatalogue: stages,
     stagesDegraded,
     isLoading,
@@ -111,7 +118,18 @@ export function useLeadDetail(leadId: string) {
     isForbidden: error?.status === 403,
     reload,
     setLead,
+    setCard,
   };
+}
+
+// The card fields are decoration beside a lead that parsed: a value of the
+// wrong shape hides the rating and colour controls rather than the record.
+function readCard(payload: unknown): LeadDetailCard | null {
+  try {
+    return parseLeadDetailCard(payload);
+  } catch {
+    return null;
+  }
 }
 
 function readStages(

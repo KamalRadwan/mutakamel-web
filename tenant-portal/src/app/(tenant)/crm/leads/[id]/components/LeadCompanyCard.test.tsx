@@ -207,12 +207,12 @@ describe("LeadCompanyCard", () => {
     expect(screen.queryByText("Dina Ali")).toBeNull();
   });
 
-  it("normalizes international presentation but withholds international links for local numbers", () => {
+  it("normalizes international presentation and completes local numbers with the lead's country", () => {
     renderCard({ subject: { ...lead, phones: ["00201050049899", "01050049899"] } });
     expect(screen.getByText("+201050049899")).toBeTruthy();
-    expect(screen.getByLabelText("Call 01050049899")).toBeTruthy();
-    expect(screen.queryByLabelText("Message 01050049899 on WhatsApp")).toBeNull();
-    expect(screen.queryByLabelText("Message 01050049899 on Telegram")).toBeNull();
+    expect(screen.getByLabelText("Call 01050049899")).toHaveAttribute("href", "tel:01050049899");
+    expect(screen.getByLabelText("Message 01050049899 on WhatsApp")).toHaveAttribute("href", "https://wa.me/201050049899");
+    expect(screen.getByLabelText("Message 01050049899 on Telegram")).toHaveAttribute("href", "https://t.me/+201050049899");
   });
 
   it("withholds editing without capability", () => {

@@ -33,6 +33,7 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
         <CardContent className="grid grid-cols-1 items-start gap-2 p-2 sm:grid-cols-2">
           {lead.leadProfileType === "CORPORATE" ? (
             lead.contacts.length > 0 ? <LeadContactList contacts={lead.contacts}
+              country={lead.address?.country ?? undefined}
               onEdit={editable ? edit.openContact : undefined} /> : (
               <p className="col-span-full text-xs text-muted-foreground">{t.crmLeadDetail.contactsEmpty}</p>
             )
