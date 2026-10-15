@@ -2489,3 +2489,26 @@ by a real PostgreSQL regression test.
 platform completing the matching current Trade schema/package adoption. Run
 the authenticated CRUD, bilingual/theme, keyboard and screen-reader acceptance
 matrix against that environment. See [Category verification](../api/trade-categories.md#tree-navigation-and-verification).
+
+## Q140 — KPI presets filter only the loaded rows
+
+Found **2026-10-14**, wiring the Leads KPI strip to
+`POST /api/tenant/crm/v1/leads/kpis`. The strip's figures now describe every
+lead the search selects, but clicking a preset (`New`, `Hot 3★`, `Overdue`,
+`Qualified`) still filters the rows already loaded on the client. `rating` is
+a filter-tree field, but the overdue bucket is derived from Core's activity
+projection and has no list filter, so the four presets cannot all become one
+server query today. The count on a pill can therefore exceed what the filtered
+page shows.
+
+**Settle with:** an `activityBucket` (or `hasOverdueActivity`) filter on
+`POST /leads/search` and `/leads/board`, after which the presets become
+server-side filters (`stageFlag`, `rating`, overdue) and the list's `total`
+matches the pill. See [the KPI route](../api/crm-leads.md#post-leadskpis--the-kpi-strip-2026-10-14).
+
+**Related, Q133:** the inline primary-phone editors now send the lead's whole
+list with only the first number replaced (`lead-phone-patch.ts`), so a lead's
+other numbers survive an edit. An individual's `phones` write still syncs
+`MOBILE` methods only, so a `PHONE`-typed number on a person is re-sent as a
+`MOBILE` value; Q133's settlement covers it.
+

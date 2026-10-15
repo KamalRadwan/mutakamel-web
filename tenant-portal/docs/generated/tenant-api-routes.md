@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-10-11T01:32:52.580Z**
+Generated at: **2026-10-14T06:45:54.251Z**
 
-Frontend revision: `52ce61ba74fa+dirty`
+Frontend revision: `27ba4028e003+dirty`
 
-Backend revision: `805710806ce9+dirty`
+Backend revision: `e003cf3d1ace+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -18,10 +18,10 @@ canonical Gateway path mappings.
 | App | Routes |
 | --- | ---: |
 | core | 228 |
-| crm | 164 |
+| crm | 171 |
 | trade | 248 |
 | webphone | 20 |
-| **Total** | **660** |
+| **Total** | **667** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -348,9 +348,15 @@ Machine-readable source:
 | crm | DELETE | `/api/tenant/crm/v1/leads/:id/tags/:tagId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.by.id.tags.by.tag.id.delete` |
 | crm | POST | `/api/tenant/crm/v1/leads/board` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.board.post` |
 | crm | POST | `/api/tenant/crm/v1/leads/board/stages/:stageId` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.board.stages.by.stage.id.post` |
+| crm | POST | `/api/tenant/crm/v1/leads/bulk-delete` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.bulk.delete.post` |
+| crm | POST | `/api/tenant/crm/v1/leads/bulk-stage` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.bulk.stage.post` |
+| crm | POST | `/api/tenant/crm/v1/leads/bulk-update` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.leads.bulk.update.post` |
 | crm | GET | `/api/tenant/crm/v1/leads/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.capabilities.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.get` |
 | crm | GET | `/api/tenant/crm/v1/leads/company-options/:companyPartyId/contacts` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.leads.company.options.contacts.get` |
+| crm | POST | `/api/tenant/crm/v1/leads/document-counts` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.document.counts.post` |
+| crm | POST | `/api/tenant/crm/v1/leads/duplicate-check` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.duplicate.check.post` |
+| crm | POST | `/api/tenant/crm/v1/leads/kpis` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.kpis.post` |
 | crm | POST | `/api/tenant/crm/v1/leads/search` | TENANT_PORTAL | AUTHENTICATED | no | `crm.leads.search.post` |
 | crm | GET | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.notes.get` |
 | crm | POST | `/api/tenant/crm/v1/notes` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.notes.post` |
@@ -368,6 +374,7 @@ Machine-readable source:
 | crm | POST | `/api/tenant/crm/v1/opportunities/:id/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.tags.post` |
 | crm | DELETE | `/api/tenant/crm/v1/opportunities/:id/tags/:tagId` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunities.by.id.tags.by.tag.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/opportunities/capabilities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunities.capabilities.get` |
+| crm | POST | `/api/tenant/crm/v1/opportunities/counts-by-party` | TENANT_PORTAL | AUTHENTICATED | no | `crm.opportunities.counts.by.party.post` |
 | crm | POST | `/api/tenant/crm/v1/opportunities/search` | TENANT_PORTAL | AUTHENTICATED | no | `crm.opportunities.search.post` |
 | crm | GET | `/api/tenant/crm/v1/opportunity-stages` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.opportunity.stages.get` |
 | crm | POST | `/api/tenant/crm/v1/opportunity-stages` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.opportunity.stages.post` |

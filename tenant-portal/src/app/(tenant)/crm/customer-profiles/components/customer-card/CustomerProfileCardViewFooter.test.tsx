@@ -80,8 +80,8 @@ describe("CustomerProfileCardViewFooter", () => {
       <CustomerProfileCardViewFooter
         item={mockCustomer}
         sourceName="Website"
-        counts={{ quotations: 2, salesOrders: 1, invoices: 4 }}
-        countVisibility={{ quotations: true, salesOrders: true, invoices: true }}
+        counts={{ opportunities: null, quotations: 2, salesOrders: 1, invoices: 4 }}
+        countVisibility={{ opportunities: false, quotations: true, salesOrders: true, invoices: true }}
         onRatingChange={vi.fn()}
         onOpenActivities={vi.fn()}
         labels={labels}

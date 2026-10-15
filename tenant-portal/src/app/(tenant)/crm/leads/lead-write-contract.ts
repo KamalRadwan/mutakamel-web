@@ -61,6 +61,14 @@ export interface UpdateLeadRequest {
   honorificTitle?: string | null;
   primaryMobile?: string | null;
   phones?: string[];
+  /**
+   * The inline editors' one-number write: replaces only the first mobile of
+   * the person the lead is about (the individual, or a corporate lead's
+   * primary contact) and keeps every other number. Cannot be combined with
+   * `phones`, `primaryMobile`, `companyPhones` or `contacts`
+   * (`422 LEAD_PRIMARY_PHONE_CONFLICT`).
+   */
+  primaryPhone?: string;
   email?: string | null;
 
   // Corporate

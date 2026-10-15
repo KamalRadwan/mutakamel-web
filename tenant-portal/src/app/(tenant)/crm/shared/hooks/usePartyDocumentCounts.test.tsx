@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   post: vi.fn(),
+  permissions: ["trade.quotations.read"] as string[],
   scope: {
     ready: true as const,
     headers: {
@@ -17,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/context/AuthContext", () => ({
   useTenantAuth: () => ({
-    user: { permissions: ["trade.quotations.read"] },
+    user: { permissions: mocks.permissions },
   }),
 }));
 
@@ -42,6 +43,7 @@ const partyIds = Array.from({ length: 101 }, (_, index) =>
 const parties = partyIds.map((partyId) => ({ partyId }));
 
 beforeEach(() => {
+  mocks.permissions = ["trade.quotations.read"];
   mocks.post.mockReset();
   mocks.post.mockImplementation(
     async (_path: string, body: { partyIds: string[] }) => ({
@@ -62,6 +64,7 @@ describe("usePartyDocumentCounts", () => {
 
     await waitFor(() => expect(result.current.countsByParty.size).toBe(101));
     expect(result.current.countsByParty.get(partyIds[100]!)).toEqual({
+      opportunities: null,
       quotations: 1,
       salesOrders: null,
       invoices: null,
@@ -73,5 +76,26 @@ describe("usePartyDocumentCounts", () => {
     expect(
       mocks.post.mock.calls.flatMap(([, body]) => body.partyIds),
     ).toEqual(partyIds);
+  });
+
+  it("counts opportunities from CRM with the branch in the body and no scope headers, under a scoped grant", async () => {
+    mocks.permissions = ["crm.opportunities.read.own"];
+    const few = parties.slice(0, 2);
+    const { result } = renderHook(() =>
+      usePartyDocumentCounts(few, BRANCH_ID, true),
+    );
+
+    await waitFor(() => expect(result.current.countsByParty.get(partyIds[0]!)?.opportunities).toBe(1));
+    expect(result.current.visible).toEqual({
+      opportunities: true,
+      quotations: false,
+      salesOrders: false,
+      invoices: false,
+    });
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    const [path, body, config] = mocks.post.mock.calls[0]!;
+    expect(path).toBe("/api/tenant/crm/v1/opportunities/counts-by-party");
+    expect(body).toEqual({ branchId: BRANCH_ID, partyIds: partyIds.slice(0, 2) });
+    expect(config.headers).toBeUndefined();
   });
 });

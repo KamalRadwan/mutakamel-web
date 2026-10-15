@@ -82,8 +82,15 @@ Source inspected:
 | POST | `/leads/:id/stage` | `crm.leads.by.id.stage.post` | WRITE_SENSITIVE | `crm.leads.update` (scoped) |
 | POST | `/leads/:id/convert` | `crm.leads.by.id.convert.post` | WRITE_SENSITIVE | `crm.leads.convert` (scoped) |
 | DELETE | `/leads/:id` | `crm.leads.by.id.delete` | WRITE_SENSITIVE | `crm.leads.delete` (scoped) |
+| POST | `/leads/kpis` | `crm.leads.kpis.post` | AUTHENTICATED, non-idempotent | `crm.leads.read` (scoped) |
+| POST | `/leads/document-counts` | `crm.leads.document.counts.post` | AUTHENTICATED, non-idempotent | `crm.leads.read` (scoped) |
+| POST | `/leads/duplicate-check` | `crm.leads.duplicate.check.post` | AUTHENTICATED, non-idempotent | `crm.leads.create` (scoped) |
+| POST | `/leads/bulk-stage` | `crm.leads.bulk.stage.post` | WRITE_SENSITIVE, non-idempotent | `crm.leads.update` (scoped) |
+| POST | `/leads/bulk-update` | `crm.leads.bulk.update.post` | WRITE_SENSITIVE, non-idempotent | `crm.leads.update` (scoped) |
+| POST | `/leads/bulk-delete` | `crm.leads.bulk.delete.post` | WRITE_SENSITIVE, non-idempotent | `crm.leads.delete` (scoped) |
 
-Branch guards: `@RequireBranchAccess('body')` on create, search and both Board reads,
+Branch guards: `@RequireBranchAccess('body')` on create, search, both Board reads,
+KPIs, the duplicate check and the three bulk routes,
 `@RequireBranchAccess('query')` on the list and both option routes,
 `@RequireRecordBranchAccess('LEAD')` on every `:id` route.
 
@@ -127,12 +134,74 @@ column's More button does not reload another stage. Both routes accept the same
 basic/advanced filter body as `/leads/search`; the server adds each lane's
 stage constraint after scoped access.
 
-Board cards include identity/type, stage, owner, rating, colour, next activity,
-primary-contact name and tags. Each tag is `{ id, name, backgroundColor,
+Board cards include identity/type, stage, `stageEnteredAt`, owner, rating,
+colour, next activity, primary-contact name and tags. `stageEnteredAt` (on every
+lead shape since 2026-10-14) is when the lead entered its current stage; the
+stage-age badges on board and card count from it, never from `updatedAt`. Each tag is `{ id, name, backgroundColor,
 textColor }` — the colour pair is upper-case `#RRGGBB` or both `null`
 (2026-09-24, [catalogues](crm-catalogues.md#tags)). They omit address, primary-contact details,
 email and phone aggregates. Card and Table remain global paginated list/search
 reads and become stage-filtered only when the user selects a stage.
+
+## POST /leads/kpis — the KPI strip (2026-10-14)
+
+Body: the `POST /leads/search` body (`buildLeadBoardRequest` builds it; the
+backend ignores `sort`, `page` and `limit`). Response
+`{ totalLeads, newStageLeads, newTodayLeads, hotLeads, overdueActivityLeads,
+qualifiedLeads, byStage: [{ stageId, total, hot, overdue }] }` over **every**
+lead the filters and scoped read access select — not the loaded page. "Today"
+and "overdue" are civil dates in the tenant zone, the rule
+`nextActivity.bucket` follows. `useLeadKpis` reads it after every search and
+data revision; `LeadKpiStrip` falls back to counting the loaded rows while it
+loads or if it fails. Parser: `parseLeadKpisResponse`
+(`lead-bulk-contract.ts`).
+
+The preset pills still filter the **loaded** rows on the client: rating and
+the overdue bucket have no server filter on the list, so a preset narrows what
+is on screen while its count describes the whole pipeline — see
+[Q140](../build/OPEN-QUESTIONS.md#q140--kpi-presets-filter-only-the-loaded-rows).
+
+## POST /leads/document-counts — Card view counters (2026-10-14)
+
+Body `{ branchId, partyIds: UUIDv7[1..100] }`. Response
+`{ countsByPartyId: { [partyId]: { opportunities, quotations, salesOrders,
+invoices } } }` — all four `OPP · PQ · SO · IN` counters in **one** request per
+100 cards, replacing the four `counts-by-party` calls the Card view used to
+make. Each counter is `null` when the user may not see it (scoped
+`crm.opportunities.read`; `trade.quotations.read`, `trade.sales_orders.read`,
+`trade.invoices.read` in the branch) or when the tenant has no Trade; the card
+renders `—` for `null`, never `0`. `useLeadDocumentCounts` reads it and
+derives each kind's visibility from whether any card got a number;
+`parseLeadDocumentCountsResponse` (`lead-bulk-contract.ts`) requires one entry
+per requested Party.
+
+## POST /leads/duplicate-check — create form (2026-10-14)
+
+Body `{ branchId, name?, phones?[≤10], email?, taxNumber?,
+commercialRegistrationNumber?, excludePartyId? }` — a POST because the probes
+are personal data. At least one probe, else `422 LEAD_DUPLICATE_CHECK_EMPTY`.
+Response `{ matches: [{ partyId, displayName|null, partyType, matchTypes[],
+leads[], restricted }] }`, at most 20, exact matches only (registration
+numbers, normalized phone, lower-cased email, case-insensitive name) under the
+Directory's `duplicate_scope`. `displayName` is `null` for a Party of another
+branch and `leads` holds only leads the user may read; `restricted` says that
+something was withheld. `useLeadDuplicateCheck` sends it 500 ms after typing
+stops, skips it when the form reuses an existing company, and swallows
+failures — the warning never blocks saving. `CreateLeadsModal` lists the
+matches under the existing company-name suggestion.
+
+## Bulk actions — POST /leads/bulk-stage · bulk-update · bulk-delete (2026-10-14)
+
+Body `{ branchId, leadIds: UUIDv7[1..100] }` plus `stageId` (bulk-stage) or at
+least one of `rating`, `ownerUserId`, `cardColor` (`null` clears),
+`acquisitionSourceId` (`null` clears) (bulk-update). Responses
+`{ stageId, updatedIds, unchangedIds }`, `{ updatedIds, unchangedIds }`,
+`{ deletedIds }`. Each request is **all or nothing**: the first refused lead —
+`404 LEAD_NOT_FOUND`, `403 CRM_SCOPED_PERMISSION_DENIED`,
+`409 LEAD_ALREADY_CONVERTED` — rolls the batch back and is named in
+`details.leadId`. `useLeads` pre-filters the selection by the capabilities it
+read, sends one request per 100 ids (`leadIdBatches`), and refetches the list
+whatever the outcome. The bar asks for a second click before deleting.
 
 ## GET /leads/capabilities
 
@@ -360,6 +429,17 @@ permits refresh, never another write. See the
 [modal behavior](../design/detail-screens.md#lead-conversion).
 
 ## PATCH /leads/:id · DELETE /leads/:id
+
+**Inline primary-phone edits** (board card, quick-edit modal, table cell, and
+the individual path of the board inline editor) send `{ primaryPhone }`
+through `leadPrimaryPhonePatch` (`lead-phone-patch.ts`, 2026-10-14). The
+backend replaces only the first mobile of the person the lead is about — the
+individual, or a corporate lead's primary contact — and keeps every other
+number; `leadEditablePrimaryPhone` shows that same number. Clearing an
+individual's number sends the remaining `phones` list; a contact's number is
+never cleared from a card. `primaryPhone` cannot travel with `phones`,
+`primaryMobile`, `companyPhones` or `contacts` (`422 LEAD_PRIMARY_PHONE_CONFLICT`),
+and a corporate lead without a contact answers `422 LEAD_PRIMARY_CONTACT_REQUIRED`.
 
 Update returns `200` with the updated lead (`404`, `409`, `422`).
 Delete is a **soft delete**, returns **`204` with no body** (`404`, `409`).

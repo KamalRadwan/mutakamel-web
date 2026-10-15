@@ -28,6 +28,7 @@ Source inspected:
 | GET | `/api/tenant/crm/v1/opportunities` | `crm.opportunities.read` (scoped) | query |
 | POST | `/api/tenant/crm/v1/opportunities/search` | `crm.opportunities.read` (scoped) | body |
 | GET | `/api/tenant/crm/v1/opportunities/capabilities` | **none** — branch membership | query |
+| POST | `/api/tenant/crm/v1/opportunities/counts-by-party` | `crm.opportunities.read` (scoped) | body |
 | GET | `/api/tenant/crm/v1/opportunities/:id/tags` | `crm.opportunities.read` (scoped) | record |
 | POST | `/api/tenant/crm/v1/opportunities/:id/tags` | `crm.opportunities.update` (scoped) | record |
 | DELETE | `/api/tenant/crm/v1/opportunities/:id/tags/:tagId` | `crm.opportunities.update` (scoped) | record |
@@ -37,6 +38,15 @@ Source inspected:
 | PUT | `/api/tenant/crm/v1/opportunities/:id/pipeline` | `crm.opportunities.update` (scoped) | record |
 | GET | `/api/tenant/crm/v1/opportunities/:id/stage-history` | `crm.opportunities.read` (scoped) | record |
 | DELETE | `/api/tenant/crm/v1/opportunities/:id` | `crm.opportunities.delete` (scoped) | record |
+
+`POST /opportunities/counts-by-party` (2026-10-14) is the `OPP` counter on Lead
+and Customer cards: body `{ branchId, partyIds: UUIDv7[1..100] }`, response
+`{ items: [{ partyId, count }] }` in request order, zero-filled, counting live
+opportunities of the branch by `customer_party_id` inside scoped read access.
+It is the fourth kind in `crm/shared/party-document-counts-contract.ts`
+(`opportunities`) beside Trade's three — same response shape, but the branch
+goes in the body and no BRANCH_REQUIRED scope headers are sent. A card shows
+`—`, never a guessed `0`, when the count is not permitted, not loaded or failed.
 
 Pipelines and stages:
 

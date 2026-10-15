@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from controller DTO source)
 
-Last source verification: **2026-09-27**
+Last source verification: **2026-10-14**
 
-Classes: **46** · Fields: **315**
+Classes: **47** · Fields: **318**
 
 ## How to read this
 
@@ -132,6 +132,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `honorificTitle` | string | no | max 40 |
 | `primaryMobile` | string | no | max 32 |
 | `phones` | array | no | max 10 items, each item max 32 |
+| `primaryPhone` | string | no | non-empty, max 32 |
 | `email` | email | no | max 180 |
 | `companyName` | string | no | non-empty, max 180 |
 | `companyPhones` | array | no | max 10 items, each item max 32 |
@@ -321,6 +322,13 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities/dto/opportunity
 | `stageId` | UUIDv7 | no | — |
 | `reason` | string | no | non-empty, max 1000 |
 | `lostReason` | string | no | non-empty, max 1000 |
+
+### `OpportunityPartyCountsDto`
+
+| Field | Type | Required | Constraints |
+| --- | --- | --- | --- |
+| `branchId` | UUIDv7 | **yes** | — |
+| `partyIds` | UUIDv7[] | **yes** | transformed, max 100 items, unique items |
 
 ## Opportunity board
 

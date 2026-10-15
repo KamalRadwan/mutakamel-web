@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from `throw new *Exception` sites and exception factories)
 
-Last source verification: **2026-09-27**
+Last source verification: **2026-10-14**
 
-Codes: **325** across **35** areas
+Codes: **330** across **35** areas
 
 ## Scope
 
@@ -32,12 +32,14 @@ Add an area to `SCOPES` in the generator when a new screen ships.
 
 ## Leads
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 18 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 23 codes
 
 | Error code | HTTP |
 | --- | --- |
+| `CRM_SCOPED_PERMISSION_DENIED` | 403 |
 | `CUSTOM_FIELD_LIMIT_EXCEEDED` | 422 |
 | `LEAD_ALREADY_CONVERTED` | 409 |
+| `LEAD_BULK_UPDATE_EMPTY` | 422 |
 | `LEAD_COMPANY_NAME_REQUIRED` | 422 |
 | `LEAD_CONTACT_NAME_REQUIRED` | 422 |
 | `LEAD_CONTACT_PRIMARY_INVALID` | 422 |
@@ -49,9 +51,12 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 18 codes
 | `LEAD_CONVERSION_REQUIRED` | 422 |
 | `LEAD_CORPORATE_FIELDS_FORBIDDEN` | 422 |
 | `LEAD_DISPLAY_NAME_REQUIRED` | 422 |
+| `LEAD_DUPLICATE_CHECK_EMPTY` | 422 |
 | `LEAD_EXISTING_COMPANY_FIELDS_FORBIDDEN` | 422 |
 | `LEAD_EXISTING_COMPANY_INVALID` | 422 |
 | `LEAD_EXISTING_COMPANY_OUTSIDE_BRANCH` | 403 |
+| `LEAD_PRIMARY_CONTACT_REQUIRED` | 422 |
+| `LEAD_PRIMARY_PHONE_CONFLICT` | 422 |
 | `LEAD_STAGE_NOT_FOUND` | 404 |
 | `PARTY_DUPLICATE_CONTACT_METHOD` | 422 |
 

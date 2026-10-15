@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { hasPermission } from "@/design-system";
 import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { isUUIDv7 } from "@/lib/uuid";
@@ -9,13 +10,16 @@ import {
   PARTY_DOCUMENT_COUNT_KINDS,
   PARTY_DOCUMENT_COUNT_PATHS,
   PARTY_DOCUMENT_COUNT_PERMISSIONS,
+  PARTY_DOCUMENT_COUNT_SCOPED,
   parsePartyDocumentCountsResponse,
+  partyDocumentCountsRequestBody,
   type PartyDocumentCountKind,
   type PartyDocumentCounts,
   type PartyDocumentCountVisibility,
 } from "../party-document-counts-contract";
 
 const EMPTY_COUNTS: PartyDocumentCounts = {
+  opportunities: null,
   quotations: null,
   salesOrders: null,
   invoices: null,
@@ -44,7 +48,11 @@ export function usePartyDocumentCounts(
   const visible = Object.fromEntries(
     PARTY_DOCUMENT_COUNT_KINDS.map((kind) => [
       kind,
-      permissions.includes(PARTY_DOCUMENT_COUNT_PERMISSIONS[kind]),
+      hasPermission(
+        permissions,
+        PARTY_DOCUMENT_COUNT_PERMISSIONS[kind],
+        PARTY_DOCUMENT_COUNT_SCOPED[kind],
+      ),
     ]),
   ) as PartyDocumentCountVisibility;
   const permissionKey = PARTY_DOCUMENT_COUNT_KINDS.map((kind) =>
@@ -69,6 +77,7 @@ export function usePartyDocumentCounts(
       return () => controller.abort();
     }
     const requestHeaders = scopeHeaders;
+    const requestBranchId = branchId;
 
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
@@ -95,11 +104,12 @@ export function usePartyDocumentCounts(
             );
             const response = await axiosClient.post<unknown>(
               PARTY_DOCUMENT_COUNT_PATHS[kind],
-              { partyIds: batch },
+              partyDocumentCountsRequestBody(kind, requestBranchId, batch),
               {
                 signal: controller.signal,
                 cache: "no-store",
-                headers: requestHeaders,
+                // Trade's rows are BRANCH_REQUIRED; the CRM row reads the body.
+                ...(kind === "opportunities" ? {} : { headers: requestHeaders }),
                 maxResponseBytes: 64 * 1024,
                 skipAutoIdempotency: true,
                 replayAfterRefresh: true,

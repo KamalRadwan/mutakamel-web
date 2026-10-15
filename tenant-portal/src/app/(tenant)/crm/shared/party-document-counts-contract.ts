@@ -1,6 +1,7 @@
 import { isUUIDv7 } from "@/lib/uuid";
 
 export const PARTY_DOCUMENT_COUNT_KINDS = [
+  "opportunities",
   "quotations",
   "salesOrders",
   "invoices",
@@ -23,6 +24,8 @@ export const PARTY_DOCUMENT_COUNT_PERMISSIONS: Record<
   PartyDocumentCountKind,
   string
 > = {
+  // CRM grants are scoped (`.own/.team/.all`); Trade's are plain.
+  opportunities: "crm.opportunities.read",
   quotations: "trade.quotations.read",
   salesOrders: "trade.sales_orders.read",
   invoices: "trade.invoices.read",
@@ -32,10 +35,33 @@ export const PARTY_DOCUMENT_COUNT_PATHS: Record<
   PartyDocumentCountKind,
   string
 > = {
+  // crm-app OpportunitiesController.countsByParty — the same `{ items: [{ partyId, count }] }`
+  // shape as Trade's, but the branch travels in the body (`@RequireBranchAccess('body')`)
+  // instead of the BRANCH_REQUIRED scope headers.
+  opportunities: "/api/tenant/crm/v1/opportunities/counts-by-party",
   quotations: "/api/tenant/trade/v1/quotations/counts-by-party",
   salesOrders: "/api/tenant/trade/v1/sales-orders/counts-by-party",
   invoices: "/api/tenant/trade/v1/invoices/counts-by-party",
 };
+
+/** Kinds whose permission is a scoped CRM grant. */
+export const PARTY_DOCUMENT_COUNT_SCOPED: Record<PartyDocumentCountKind, boolean> = {
+  opportunities: true,
+  quotations: false,
+  salesOrders: false,
+  invoices: false,
+};
+
+/** The request body each kind's route expects for one batch of Party ids. */
+export function partyDocumentCountsRequestBody(
+  kind: PartyDocumentCountKind,
+  branchId: string,
+  partyIds: readonly string[],
+): { partyIds: string[]; branchId?: string } {
+  return kind === "opportunities"
+    ? { branchId, partyIds: [...partyIds] }
+    : { partyIds: [...partyIds] };
+}
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
