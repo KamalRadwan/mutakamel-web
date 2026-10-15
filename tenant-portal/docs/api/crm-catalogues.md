@@ -65,6 +65,12 @@ All rules re-verified against that service on **2026-09-18**. The lead-stages
 table reorders by dragging a row's grip, while the three protected rows carry
 no grip.
 
+Frontend: `crm/lead-stages/hooks/useLeadStageOrdering.ts` owns the reorder and
+set-default writes (composed by `useLeadStageMutations`), and the paths and
+request options both use live in `hooks/lead-stage-requests.ts`. Reorder keeps
+auto-idempotency on because the Gateway declares that route `idempotent: true`;
+set-default is sent non-replayable.
+
 Consequences for the UI:
 
 - Always render in `sortOrder`. Never alphabetize.

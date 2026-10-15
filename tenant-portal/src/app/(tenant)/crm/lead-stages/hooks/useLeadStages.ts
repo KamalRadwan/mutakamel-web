@@ -12,14 +12,13 @@ import {
   type LeadStageItem,
   type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
+import { LEAD_STAGES_PATH } from "./lead-stage-requests";
 import { useLeadStageMutations } from "./useLeadStageMutations";
 
 export type { LeadStageItem } from "../lead-stage-contract";
 
-const CATALOGUE_PATH = "/api/tenant/crm/v1/lead-stages";
-
 async function readCatalogue(signal?: AbortSignal): Promise<LeadStageItem[]> {
-  const response = await axiosClient.get<unknown>(CATALOGUE_PATH, {
+  const response = await axiosClient.get<unknown>(LEAD_STAGES_PATH, {
     signal,
     cache: "no-store",
     maxResponseBytes: 256 * 1024,

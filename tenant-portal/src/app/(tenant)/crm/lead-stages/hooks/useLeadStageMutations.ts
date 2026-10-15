@@ -2,36 +2,23 @@
 
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useI18n } from "@/i18n/I18nContext";
-import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { axiosClient } from "@/lib/api/axiosClient";
 import {
   buildCreateLeadStageRequest,
-  buildLeadStageReorderRequest,
   buildUpdateLeadStageRequest,
-  canBeDefaultLeadStage,
   isProtectedLeadStage,
-  parseLeadStageCatalogueResponse,
   parseLeadStageResponse,
   type CreateLeadStageFormData,
   type LeadStageItem,
   type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
-
-const CATALOGUE_PATH = "/api/tenant/crm/v1/lead-stages";
-const REORDER_PATH = `${CATALOGUE_PATH}/reorder`;
-const NON_REPLAYABLE_MUTATION = {
-  nonReplayable: true,
-  skipAutoIdempotency: true,
-  cache: "no-store",
-  maxResponseBytes: 256 * 1024,
-} as const;
-// Reorder is the one write here the Gateway declares `idempotent: true`
-// (crm.lead.stages.reorder.patch), and it answers IDEM_MISSING without the
-// key — so auto-idempotency stays on and the replay of a retried drop is the
-// server's job, not a second reordering.
-const REPLAYABLE_MUTATION = {
-  cache: "no-store",
-  maxResponseBytes: 256 * 1024,
-} as const;
+import {
+  LEAD_STAGES_PATH,
+  NON_REPLAYABLE_MUTATION,
+  isAmbiguousLeadStageMutation,
+  leadStageErrorMessage,
+} from "./lead-stage-requests";
+import { useLeadStageOrdering } from "./useLeadStageOrdering";
 
 /**
  * What the mutations need from the catalogue they change.
@@ -51,7 +38,8 @@ export interface LeadStageCataloguePort {
 }
 
 /**
- * Create, update, delete and set-default for lead stages.
+ * Create, update and delete for lead stages; reorder and set-default are
+ * `useLeadStageOrdering`, composed in here so the screen sees one surface.
  *
  * Split out of `useLeadStages` here rather than as its own task: that hook is
  * the "~310 lines, marginal, split when next edited" entry in
@@ -66,11 +54,10 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isReordering, setIsReordering] = useState(false);
-  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const ordering = useLeadStageOrdering(catalogue);
 
   const create = async (form: CreateLeadStageFormData): Promise<boolean> => {
     if (isCreating) return false;
@@ -82,14 +69,14 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     try {
       payload = buildCreateLeadStageRequest(form);
     } catch (caught) {
-      setCreateError(errorMessage(caught, t.crmLeadStages.createInvalid));
+      setCreateError(leadStageErrorMessage(caught, t.crmLeadStages.createInvalid));
       return false;
     }
     setIsCreating(true);
     setCreateError(null);
     try {
       const response = await axiosClient.post<unknown>(
-        CATALOGUE_PATH,
+        LEAD_STAGES_PATH,
         payload,
         NON_REPLAYABLE_MUTATION,
       );
@@ -115,7 +102,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
       onCreated();
       return true;
     } catch (caught) {
-      if (isAmbiguousMutationError(caught)) {
+      if (isAmbiguousLeadStageMutation(caught)) {
         const reloaded = await reconcile();
         onCreated();
         notify(
@@ -124,7 +111,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
             : t.crmLeadStages.createAmbiguousStale,
         );
       } else {
-        setCreateError(errorMessage(caught, t.crmLeadStages.createFailed));
+        setCreateError(leadStageErrorMessage(caught, t.crmLeadStages.createFailed));
       }
       return false;
     } finally {
@@ -158,7 +145,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     setEditError(null);
     try {
       const response = await axiosClient.patch<unknown>(
-        `${CATALOGUE_PATH}/${encodeURIComponent(target.id)}`,
+        `${LEAD_STAGES_PATH}/${encodeURIComponent(target.id)}`,
         payload,
         NON_REPLAYABLE_MUTATION,
       );
@@ -178,7 +165,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
       }
       return true;
     } catch (caught) {
-      if (isAmbiguousMutationError(caught)) {
+      if (isAmbiguousLeadStageMutation(caught)) {
         notify(
           (await reconcile())
             ? t.crmLeadStages.editAmbiguousReloaded
@@ -186,7 +173,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
         );
         return true;
       }
-      setEditError(errorMessage(caught, t.crmLeadStages.editFailed));
+      setEditError(leadStageErrorMessage(caught, t.crmLeadStages.editFailed));
       return false;
     } finally {
       setIsUpdating(false);
@@ -208,7 +195,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     setDeleteError(null);
     try {
       await axiosClient.delete(
-        `${CATALOGUE_PATH}/${encodeURIComponent(target.id)}`,
+        `${LEAD_STAGES_PATH}/${encodeURIComponent(target.id)}`,
         NON_REPLAYABLE_MUTATION,
       );
       setItems((current) =>
@@ -218,7 +205,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
       );
       return true;
     } catch (caught) {
-      if (isAmbiguousMutationError(caught)) {
+      if (isAmbiguousLeadStageMutation(caught)) {
         notify(
           (await reconcile())
             ? t.crmLeadStages.deleteAmbiguousReloaded
@@ -226,108 +213,10 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
         );
         return true;
       }
-      setDeleteError(errorMessage(caught, t.crmLeadStages.deleteFailed));
+      setDeleteError(leadStageErrorMessage(caught, t.crmLeadStages.deleteFailed));
       return false;
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  /**
-   * `PATCH /lead-stages/reorder` — the drop, and the earlier/later buttons.
-   *
-   * The body is the COMPLETE order, every non-deleted stage exactly once:
-   * `sortOrder` is a field the server owns and there is no per-stage rank to
-   * PATCH — sending individual updates races and can leave two stages sharing a
-   * rank (docs/api/crm-catalogues.md).
-   */
-  const reorder = async (
-    stages: readonly LeadStageItem[],
-    orderedIds: string[],
-  ): Promise<void> => {
-    if (isReordering) return;
-    if (!canManage) {
-      notify(t.crmLeadStages.manageForbidden);
-      return;
-    }
-    let payload: ReturnType<typeof buildLeadStageReorderRequest>;
-    try {
-      payload = buildLeadStageReorderRequest(stages, orderedIds);
-    } catch {
-      notify(t.crmLeadStages.reorderInvalid);
-      return;
-    }
-    const previous = [...stages];
-    setIsReordering(true);
-    // Optimistic: the row lands where it was dropped, re-ranked exactly the way
-    // the endpoint renumbers — dense and one-based.
-    setItems(
-      payload.orderedIds.map((id, index) => ({
-        ...previous.find((stage) => stage.id === id)!,
-        sortOrder: index + 1,
-      })),
-    );
-    try {
-      const response = await axiosClient.patch<unknown>(
-        REORDER_PATH,
-        payload,
-        REPLAYABLE_MUTATION,
-      );
-      setItems(parseLeadStageCatalogueResponse(response.data));
-    } catch (caught) {
-      // Roll back AND say why: a silent revert leaves the user watching their
-      // own change undo itself (docs/design/states.md, state 8).
-      setItems(previous);
-      notify(errorMessage(caught, t.crmLeadStages.reorderFailed));
-      await reconcile();
-    } finally {
-      setIsReordering(false);
-    }
-  };
-
-  const setDefault = async (stage: LeadStageItem): Promise<void> => {
-    // Terminal anchors can never be the default and an inactive stage cannot
-    // either. The service repeats this rule authoritatively.
-    if (
-      !canBeDefaultLeadStage(stage) ||
-      stage.isDefault ||
-      settingDefaultId
-    ) {
-      return;
-    }
-    if (!canManage) {
-      notify(t.crmLeadStages.manageForbidden);
-      return;
-    }
-    setSettingDefaultId(stage.id);
-    try {
-      const response = await axiosClient.post<unknown>(
-        `${CATALOGUE_PATH}/${encodeURIComponent(stage.id)}/default`,
-        undefined,
-        NON_REPLAYABLE_MUTATION,
-      );
-      try {
-        const updated = parseLeadStageResponse(response.data);
-        // Exactly one stage is default, so the flag moves rather than toggling.
-        setItems((current) =>
-          current.map((candidate) =>
-            candidate.id === updated.id
-              ? { ...updated, isDefault: true }
-              : { ...candidate, isDefault: false },
-          ),
-        );
-      } catch {
-        notify(
-          (await reconcile())
-            ? t.crmLeadStages.defaultInvalidResponseReloaded
-            : t.crmLeadStages.defaultInvalidResponseStale,
-        );
-      }
-    } catch (caught) {
-      await reconcile();
-      notify(errorMessage(caught, t.crmLeadStages.defaultFailed));
-    } finally {
-      setSettingDefaultId(null);
     }
   };
 
@@ -335,8 +224,7 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     isCreating,
     isDeleting,
     isUpdating,
-    isReordering,
-    settingDefaultId,
+    ...ordering,
     createError,
     deleteError,
     editError,
@@ -346,17 +234,5 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     create,
     update,
     remove,
-    reorder,
-    setDefault,
   };
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function isAmbiguousMutationError(error: unknown): boolean {
-  return (
-    !(error instanceof TenantApiClientError) || error.response.status >= 500
-  );
 }
