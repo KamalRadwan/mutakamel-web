@@ -9,7 +9,7 @@ Contact detail/write contract re-verified: **2026-09-07** (scoped update below).
 Basic search GET/POST, semantic text scopes, Tag, owner filtering and pagination
 re-verified: **2026-09-16**.
 
-Board/Card/Table projections and Card bulk document counts verified: **2026-09-16**.
+Board/Card/Table projections verified: **2026-10-15** (board lanes now carry the list row). Card bulk document counts verified: **2026-09-16**.
 
 Related quotation/sales-order count scope re-verified: **2026-09-14**.
 
@@ -127,7 +127,9 @@ branch filter. An empty page is not proof that no leads exist.
 
 ## POST /leads/board · /leads/board/stages/:stageId
 
-Board uses a separate lightweight projection. The initial route returns every
+Board lanes carry the same row `POST /leads/search` returns (2026-10-15), so a
+card is complete as delivered and the board never issues a follow-up search to
+fill it. The initial route returns every
 active stage in `sortOrder`, each with its own page of exactly 50 cards, total
 and `hasNext`. The stage route returns the requested next page only, so the
 column's More button does not reload another stage. Both routes accept the same
@@ -139,9 +141,10 @@ colour, next activity, primary-contact name and tags. `stageEnteredAt` (on every
 lead shape since 2026-10-14) is when the lead entered its current stage; the
 stage-age badges on board and card count from it, never from `updatedAt`. Each tag is `{ id, name, backgroundColor,
 textColor }` — the colour pair is upper-case `#RRGGBB` or both `null`
-(2026-09-24, [catalogues](crm-catalogues.md#tags)). They omit address, primary-contact details,
-email and phone aggregates. Card and Table remain global paginated list/search
-reads and become stage-filtered only when the user selects a stage.
+(2026-09-24, [catalogues](crm-catalogues.md#tags)). They also carry the address,
+primary-contact details, email and phone aggregates of the list row. Card and
+Table remain global paginated list/search reads and become stage-filtered only
+when the user selects a stage.
 
 ## POST /leads/kpis — the KPI strip (2026-10-14)
 
@@ -632,8 +635,8 @@ described in [the activity template](../design/patterns.md#the-activity-template
 - Board axis is the **tenant lead-stage catalogue**, ordered by `sortOrder` —
   fetch from `/lead-stages`. Never hardcode stage names or assume a count.
 - Board data comes from `POST /leads/board`, 50 records per stage. More calls
-  `/leads/board/stages/:stageId` for that stage only. Card/Table use the richer
-  list/search response and normal global pagination.
+  `/leads/board/stages/:stageId` for that stage only. Card/Table use the same
+  list/search row with normal global pagination.
 - Card View has no row selection: it renders neither per-card checkboxes nor a
   Select All toolbar. Table selection remains available.
 - Lead cards show an explicit Individual/Company badge and matching icon. The

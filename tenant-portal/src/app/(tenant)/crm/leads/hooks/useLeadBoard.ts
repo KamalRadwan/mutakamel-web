@@ -106,6 +106,7 @@ export function useLeadBoard({
   const [loadingStageIds, setLoadingStageIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const requestEpochRef = useRef(0);
+  const hasLoadedRef = useRef(false);
   const loadMoreRef = useRef<Set<string>>(new Set());
 
   const requestBody = useCallback(
@@ -160,6 +161,7 @@ export function useLeadBoard({
       return false;
     }
 
+    hasLoadedRef.current = true;
     setIsLoading(true);
     setError(null);
     try {
@@ -169,7 +171,9 @@ export function useLeadBoard({
         {
           signal,
           cache: "no-store",
-          maxResponseBytes: 2 * 1024 * 1024,
+          // Every lane is up to 50 full list rows, so the board gets the list
+          // page's 1 MiB budget once per stage rather than one fixed cap.
+          maxResponseBytes: Math.max(1, stages.length) * 1024 * 1024,
           skipAutoIdempotency: true,
           replayAfterRefresh: true,
         },
@@ -189,9 +193,11 @@ export function useLeadBoard({
 
   useEffect(() => {
     const controller = new AbortController();
+    // The debounce coalesces the bursts of dependency changes after the board
+    // is up; the first load has nothing to coalesce and would only wait.
     const timer = window.setTimeout(() => {
       if (!controller.signal.aborted) void reload(controller.signal);
-    }, 250);
+    }, hasLoadedRef.current ? 250 : 0);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
