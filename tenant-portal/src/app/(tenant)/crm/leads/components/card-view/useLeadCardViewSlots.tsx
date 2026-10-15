@@ -1,8 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Eye } from "lucide-react";
-import { Button, cardColorBorder, iconSize, type CardColor } from "@/design-system";
+import { cardColorBorder, type CardColor } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
@@ -26,7 +25,6 @@ export interface LeadCardViewSlotsOptions {
   canUpdate: (lead: LeadItem) => boolean;
   canDelete: (lead: LeadItem) => boolean;
   onOpen: (lead: LeadItem) => void;
-  onOpenQuickModal?: (lead: LeadItem) => void;
   onDelete: (lead: LeadItem) => void;
   onMoveStage: (lead: LeadItem, stageId: string) => void;
   onCardChange: (leadId: string, patch: LeadCardPatch, lead: LeadItem) => void;
@@ -48,7 +46,6 @@ export function useLeadCardViewSlots({
   canUpdate,
   canDelete,
   onOpen,
-  onOpenQuickModal,
   onDelete,
   onMoveStage,
   onCardChange,
@@ -57,7 +54,6 @@ export function useLeadCardViewSlots({
   documentCountVisibility,
 }: LeadCardViewSlotsOptions): LeadCardViewSlots {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
   const card = t.crmLeads.card;
   const now = useLeadCardViewClock();
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
@@ -86,44 +82,27 @@ export function useLeadCardViewSlots({
       <LeadCardViewBody lead={lead} stage={stageById.get(lead.stageId)} now={now} />
     ),
 
-    renderActions: (lead) => {
-      const peekLabel = isAr
-        ? `معاينة سريعة 360°: ${lead.leadName}`
-        : `Quick 360° Peek: ${lead.leadName}`;
-      return (
-        <div className="flex items-center gap-0.5">
-          {onOpenQuickModal && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              aria-label={peekLabel}
-              title={peekLabel}
-              onClick={() => onOpenQuickModal(lead)}
-            >
-              <Eye className={iconSize({ size: "sm" })} aria-hidden="true" />
-            </Button>
-          )}
-          <LeadCardMenu
-            cardColor={lead.cardColor}
-            onOpen={() => onOpen(lead)}
-            {...permittedMenuActions(lead)}
-            moveTargets={moveTargets(lead)}
-            onMove={(stageId) => onMoveStage(lead, stageId)}
-            labels={{
-              trigger: formatTemplate(card.more, { name: lead.leadName }),
-              open: card.open,
-              delete: t.common.delete,
-              moveTo: t.views.moveTo,
-              cardColor: card.cardColor,
-              colorNone: card.colorNone,
-              colorNames: card.colors,
-              selected: card.colorSelected,
-            }}
-          />
-        </div>
-      );
-    },
+    renderActions: (lead) => (
+      <div className="flex items-center gap-0.5">
+        <LeadCardMenu
+          cardColor={lead.cardColor}
+          onOpen={() => onOpen(lead)}
+          {...permittedMenuActions(lead)}
+          moveTargets={moveTargets(lead)}
+          onMove={(stageId) => onMoveStage(lead, stageId)}
+          labels={{
+            trigger: formatTemplate(card.more, { name: lead.leadName }),
+            open: card.open,
+            delete: t.common.delete,
+            moveTo: t.views.moveTo,
+            cardColor: card.cardColor,
+            colorNone: card.colorNone,
+            colorNames: card.colors,
+            selected: card.colorSelected,
+          }}
+        />
+      </div>
+    ),
 
     renderFooter: (lead) => (
       <LeadCardViewFooter

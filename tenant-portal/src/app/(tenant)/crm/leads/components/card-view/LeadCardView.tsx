@@ -30,7 +30,6 @@ export interface LeadCardViewProps {
   documentCountsByParty: ReadonlyMap<string, LeadDocumentCounts>;
   documentCountVisibility: LeadDocumentCountVisibility;
   onOpenLead: (lead: LeadItem) => void;
-  onOpenQuickModal?: (lead: LeadItem) => void;
   onOpenActivities: (lead: LeadItem) => void;
   onDeleteLead: (lead: LeadItem) => void;
   onMoveStage: (lead: LeadItem, stageId: string) => void;
@@ -53,7 +52,6 @@ export function LeadCardView({
   documentCountsByParty,
   documentCountVisibility,
   onOpenLead,
-  onOpenQuickModal,
   onOpenActivities,
   onDeleteLead,
   onMoveStage,
@@ -67,7 +65,6 @@ export function LeadCardView({
     canUpdate,
     canDelete,
     onOpen: onOpenLead,
-    onOpenQuickModal,
     onDelete: onDeleteLead,
     onMoveStage,
     onCardChange,

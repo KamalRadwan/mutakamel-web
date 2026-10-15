@@ -23,7 +23,6 @@ export interface LeadTableViewProps {
   onPageChange: (page: number) => void;
   sort?: SortState;
   onSortChange: (sort: SortState) => void;
-  onOpenQuickModal?: (lead: LeadItem) => void;
   onOpenActivities: (lead: LeadItem) => void;
   onDeleteLead: (lead: LeadItem) => void;
   onMoveStage: (lead: LeadItem, stageId: string) => void;
@@ -44,7 +43,6 @@ export function LeadTableView({
   onPageChange,
   sort,
   onSortChange,
-  onOpenQuickModal,
   onOpenActivities,
   onDeleteLead,
   onMoveStage,
@@ -58,7 +56,6 @@ export function LeadTableView({
     stages,
     canUpdate,
     canDelete,
-    onOpenQuickModal,
     onDelete: onDeleteLead,
     onMoveStage,
     onRatingChange: (lead, rating) => onCardChange(lead.id, { rating }, lead),

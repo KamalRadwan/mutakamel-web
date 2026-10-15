@@ -25,7 +25,6 @@ export interface LeadBoardViewProps {
   error: string | null;
   onRetry: () => void;
   onOpenLead: (lead: LeadItem) => void;
-  onOpenQuickModal?: (lead: LeadItem) => void;
   onOpenActivities: (lead: LeadItem) => void;
   onDeleteLead: (lead: LeadItem) => void;
   onMoveStage: (leadId: string, toStageId: string, lead?: LeadItem) => void;

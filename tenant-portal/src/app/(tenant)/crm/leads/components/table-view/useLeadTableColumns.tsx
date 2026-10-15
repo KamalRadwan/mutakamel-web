@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Button, cn, iconSize, type ColumnDef } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedValue } from "@/lib/format/localized";
@@ -21,7 +21,6 @@ export interface LeadTableColumnOptions {
   stages: readonly LeadStage[];
   canUpdate: (lead: LeadItem) => boolean;
   canDelete: (lead: LeadItem) => boolean;
-  onOpenQuickModal?: (lead: LeadItem) => void;
   onDelete: (lead: LeadItem) => void;
   onMoveStage: (lead: LeadItem, stageId: string) => void;
   onRatingChange: (lead: LeadItem, rating: number) => void;
@@ -33,7 +32,6 @@ export function useLeadTableColumns({
   stages,
   canUpdate,
   canDelete,
-  onOpenQuickModal,
   onDelete,
   onMoveStage,
   onRatingChange,
@@ -41,7 +39,6 @@ export function useLeadTableColumns({
   phoneEditor,
 }: LeadTableColumnOptions): ColumnDef<LeadItem>[] {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   const moveTargets = stages.filter((stage) => stage.flag !== TERMINAL_STAGE_FLAG);
   const unavailable = <span className="text-muted-foreground">{t.crmLeads.unavailable}</span>;
@@ -133,23 +130,8 @@ export function useLeadTableColumns({
       sticky: "end",
       width: "5rem",
       cell: (lead) => {
-        const peekLabel = isAr
-          ? `معاينة سريعة 360°: ${lead.leadName}`
-          : `Quick 360° Peek: ${lead.leadName}`;
         return (
           <div className="inline-flex items-center justify-end gap-0.5">
-            {onOpenQuickModal && (
-              <Button
-                variant="ghost"
-                size="xs"
-                className="w-7 px-0"
-                onClick={() => onOpenQuickModal(lead)}
-                title={peekLabel}
-                aria-label={peekLabel}
-              >
-                <Eye className={iconSize({ size: "sm" })} aria-hidden="true" />
-              </Button>
-            )}
             {canDelete(lead) && (
               <Button
                 variant="ghost"
