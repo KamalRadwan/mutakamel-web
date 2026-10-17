@@ -1,12 +1,13 @@
 "use client";
 
-import { LogOut, User } from "lucide-react";
+import { ChevronDown, LogOut, User } from "lucide-react";
 import Link from "next/link";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { DENSITY_OPTIONS, useDensity, type Density } from "../theme/DensityProvider";
 import { Avatar, AvatarFallback } from "../primitives/Avatar";
+import { Button } from "../primitives/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,18 +38,29 @@ export function UserMenu() {
 
   if (!user) return null;
 
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           aria-label={t.common.profile}
-          className="relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="h-7 gap-1.5 rounded-full border border-white/20 bg-white/10 ps-1 pe-2.5 text-white hover:bg-white/20 hover:text-white"
         >
-          <Avatar className="size-7">
-            <AvatarFallback>{initials(user.firstName, user.lastName)}</AvatarFallback>
+          <Avatar className="size-5">
+            <AvatarFallback className="bg-gradient-to-br from-sky-400 to-indigo-500 text-2xs font-bold text-white">
+              {initials(user.firstName, user.lastName)}
+            </AvatarFallback>
           </Avatar>
-        </button>
+          {fullName && (
+            <span className="max-w-40 truncate text-xs font-semibold text-white">
+              {fullName}
+            </span>
+          )}
+          <ChevronDown className="size-3 shrink-0 text-white/70" aria-hidden="true" />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col gap-0.5">

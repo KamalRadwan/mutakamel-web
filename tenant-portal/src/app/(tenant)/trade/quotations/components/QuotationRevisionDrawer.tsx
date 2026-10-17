@@ -22,13 +22,14 @@ export interface QuotationRevisionDrawerProps {
  */
 export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisionDrawerProps) {
   const { t } = useI18n();
+  const td = t.tradeDocuments;
 
   return (
     <FormDrawer
       open={state.isOpen}
       onOpenChange={(open) => (open ? state.open() : state.close())}
-      title={t.tradeDocuments.quotations.revisionTitle}
-      description={t.tradeDocuments.quotations.revisionDescription}
+      title={td.quotations.revisionTitle}
+      description={td.quotations.revisionDescription}
       isDirty={state.validUntil !== "" || state.lineDraft.lines.some((line) => line.itemId !== "")}
       isSubmitting={state.write.isWriting}
       submitDisabled={!state.canSubmit}
@@ -42,13 +43,59 @@ export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisi
         discardCancel: t.common.cancel,
       }}
     >
-      <Field label={t.tradeDocuments.validUntil} required>
-        <Input size="sm" placeholder={t.tradeDocuments.validUntil}
-          type="date"
-          value={state.validUntil}
-          onChange={(event) => state.setValidUntil(event.target.value)}
-        />
-      </Field>
+      <div className="dossier-card dossier-card-indigo space-y-3">
+        <Field label={td.validUntil} required>
+          <Input
+            size="sm"
+            placeholder={td.validUntil}
+            type="date"
+            value={state.validUntil}
+            onChange={(event) => state.setValidUntil(event.target.value)}
+          />
+        </Field>
+      </div>
+
+      <div className="dossier-card dossier-card-violet space-y-3">
+        <p className="text-xs font-semibold text-foreground">
+          {td.executive.structuredTermsTitle}
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label={td.executive.paymentTermCodeLabel}>
+            <Input
+              size="sm"
+              value={state.paymentTermCode}
+              onChange={(e) => state.setPaymentTermCode(e.target.value)}
+              placeholder="NET_30"
+            />
+          </Field>
+          <Field label={td.executive.incotermCodeLabel}>
+            <Input
+              size="sm"
+              value={state.incotermCode}
+              onChange={(e) => state.setIncotermCode(e.target.value)}
+              placeholder="EXW"
+            />
+          </Field>
+          <Field label={td.executive.deliveryDaysLabel}>
+            <Input
+              size="sm"
+              inputMode="numeric"
+              value={state.deliveryDays}
+              onChange={(e) => state.setDeliveryDays(e.target.value)}
+              placeholder="14"
+            />
+          </Field>
+          <Field label={td.executive.warrantyMonthsLabel}>
+            <Input
+              size="sm"
+              inputMode="numeric"
+              value={state.warrantyMonths}
+              onChange={(e) => state.setWarrantyMonths(e.target.value)}
+              placeholder="12"
+            />
+          </Field>
+        </div>
+      </div>
 
       <TradeLineEditor
         state={state.lineDraft}
@@ -58,3 +105,4 @@ export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisi
     </FormDrawer>
   );
 }
+

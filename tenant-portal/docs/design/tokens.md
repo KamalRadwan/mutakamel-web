@@ -323,32 +323,43 @@ item's accessible name and in its text, so the hue is reinforcement. A calendar
 chip or a board card takes its tone from this table and **never from its
 type**.
 
-### Non-outcome values → never a hue
+### Structured category & entity palettes (`--swatch-*`) vs generic enums
 
-These are **categories**, not states. They take `ink` and are distinguished by
-their label and, where useful, an icon:
+Generic configuration enums that have no visual icon vocabulary stay neutral (`ink`):
 
 `CrmProfileTypeEnum` (`INDIVIDUAL`, `CORPORATE`) ·
-`CrmActivityTypeEnum` (all 7) ·
 `CrmActivityDirectionEnum` (all 3) ·
 `CrmCustomFieldTypeEnum` (all 11) ·
 `CrmCustomFieldOwnerTypeEnum` (all 5) ·
 `CrmReminderChannelEnum` (all 3) ·
 `PipelineAccessModeEnum` (both) ·
-Core's activity type (all 7, `ACTIVITY_TYPES` — a type is told apart by its
-[glyph](icons.md#activity-types) and its label) ·
 Core's `ActivityDirectionEnum` (all 3).
 
-`CrmPriorityEnum` and Core's `ActivityPriorityEnum` are the deliberate
-exceptions: `URGENT` and `HIGH` take `caution`; `MEDIUM` / `NORMAL` and `LOW`
-take `ink`. Priority genuinely is an attention signal.
+By contrast, **Activity Types (`ACTIVITY_TYPES`)** and **Target Entity Types (`ACTIVITY_TARGET_TYPES`)** use the design system's theme-adaptive `--swatch-*` surface palettes (`src/design-system/lib/swatch-palette.ts`), always paired with their canonical [icon](icons.md#activity-types) and translated text label:
+
+| Domain | Value | Swatch Hue | Token Stem |
+| --- | --- | --- | --- |
+| `ActivityType` | `TODO` | `indigo` | `swatch-indigo` |
+| `ActivityType` | `CALL` | `green` | `swatch-green` |
+| `ActivityType` | `MEETING` | `purple` | `swatch-purple` |
+| `ActivityType` | `EMAIL` | `blue` | `swatch-blue` |
+| `ActivityType` | `VISIT` | `amber` | `swatch-amber` |
+| `ActivityType` | `FOLLOW_UP` | `teal` | `swatch-teal` |
+| `ActivityType` | `OTHER` | `pink` | `swatch-pink` |
+| `ActivityTargetType` | `LEAD` | `indigo` | `swatch-indigo` |
+| `ActivityTargetType` | `CUSTOMER_PROFILE` | `green` | `swatch-green` |
+| `ActivityTargetType` | `OPPORTUNITY` | `purple` | `swatch-purple` |
+| `ActivityTargetType` | `PARTY` | `teal` | `swatch-teal` |
+| `ActivityTargetType` | `QUOTATION` | `amber` | `swatch-amber` |
+| `ActivityTargetType` | `SALES_ORDER` | `blue` | `swatch-blue` |
+
+**Segmented Status & Priority pill tracks** (`semanticSegmentPillClasses` and `semanticSegmentDotClasses` in `src/design-system/lib/swatch-palette.ts`) use the semantic outcome roles (`info`, `warning`, `success`, `destructive`) plus `swatch-purple` (`IN_PROGRESS`) and `swatch-slate` (`LOW` priority):
+- **Status (`ActivityStatusEnum`)**: `PLANNED` → `info` · `IN_PROGRESS` → `purple` (`swatch-purple`) · `DONE` → `success` · `CANCELLED` → `destructive` (while read-only table/list `StatusBadge` keeps `PLANNED` and `IN_PROGRESS` as `ink + motion`).
+- **Priority (`ActivityPriorityEnum` / `CrmPriorityEnum`)**: `LOW` → `slate` (`swatch-slate`) · `NORMAL` → `info` · `HIGH` → `warning` · `URGENT` → `destructive`.
 
 ### "In progress" is ink plus motion
 
-An in-progress state renders as an `ink` tint with a **pulsing dot** and, for
-a pending row, `border-dashed`. Motion carries the state without spending a
-hue, and it survives colorblindness in a way a fifth color never would. See
-[motion.md](motion.md#the-pending-dot).
+In read-only `StatusBadge` cells, an in-progress state renders as an `ink` tint with a **pulsing dot** and, for a pending row, `border-dashed`. Motion carries the state without spending a hue, and it survives colorblindness in a way a fifth color never would. See [motion.md](motion.md#the-pending-dot).
 
 ## The theme flip
 
@@ -382,32 +393,39 @@ semantic tokens (`bg-card`, `text-muted-foreground`) or the role names
 (`bg-brand-600`); the codemod renames existing call sites at its own pace. Once
 a family has zero references, delete its override block.
 
-## Card swatches — the one unsemantic colour set
+## Swatch tokens — card marks and colorful category surface palettes
 
 Eleven marks plus "none": `--swatch-red` · `orange` · `amber` · `yellow` ·
 `green` · `teal` · `blue` · `indigo` · `purple` · `pink` · `slate`, declared on
 `:root`, overridden in `.dark`, and bridged as `--color-swatch-*` so
-`border-swatch-*` and `bg-swatch-*` exist. The values live in
-`src/app/globals.css` and are not duplicated here.
+`border-swatch-*`, `bg-swatch-*`, `text-swatch-*`, and `ring-swatch-*` exist.
+See [DESIGN-SYSTEM.md § Colorful Swatch & Semantic Surface Palettes](DESIGN-SYSTEM.md#colorful-swatch--semantic-surface-palettes)
+for the complete Light and Dark OKLCH/Hex table.
 
-**They exist because the theme flip above is right.** A user-chosen card colour
-is a private filing mark — its meaning lives in the head of whoever set it — so
-no role ramp can supply one, and the flip deliberately collapses Tailwind's 22
-families onto four hues. That is correct for `bg-red-500` and fatal for a
-picker whose whole point is eleven colours a person can tell apart.
+**They exist because the theme flip above is right.** Both user-chosen card
+marks and structured multi-item categories (7 activity types, 6 target entity
+types) need up to eleven distinguishable hues that survive light and dark mode,
+whereas the theme flip deliberately collapses Tailwind's 22 families onto four
+outcome ramps.
 
-Four rules keep them from becoming a second palette:
+Four rules keep them disciplined:
 
-- **Consumed for a card border and for the swatch that picks it, nothing else.**
-  The class strings live in one file, `src/design-system/views/card-color.ts`,
-  and are written out rather than built from the colour name — Tailwind extracts
-  classes by scanning source text, so an interpolated `bg-swatch-…` generates no
-  CSS at all and every swatch renders transparent.
-- **No ramp steps.** One value per theme, so there is nothing to choose wrongly,
-  and no numeric suffix for the census's raw-palette regex to catch.
-- **Never the sole carrier of meaning.** The picker names every swatch in words,
-  the chosen one is marked by a ring rather than by hue, and the border only
-  restates a colour the user assigned themself.
+- **Consumed only through two design-system modules**:
+  1. `src/design-system/views/card-color.ts` — for board/card border marks and
+     their picker squares.
+  2. `src/design-system/lib/swatch-palette.ts` — for structured category surface
+     palettes (`SWATCH_SURFACE_PALETTES`, exposing `tileActive`, `tileIdle`,
+     `iconBoxActive`, `iconBoxIdle`, `iconText`, `badge`, `pillActive`,
+     `accentBorder`, `sectionCard`, and `dot`).
+  Every class string is written out statically in those files because Tailwind v4
+  extracts classes by scanning source text; dynamic string interpolation (`bg-swatch-${hue}`)
+  would generate no CSS at all.
+- **No ramp steps.** One calibrated value per theme (with alpha modifiers `/5`,
+  `/10`, `/15`, `/20`, `/25`, `/30`, `/40` for tinted surfaces and rings), so
+  there is no numeric suffix for the census's raw-palette regex to catch.
+- **Never the sole carrier of meaning.** Card swatches are named in words and
+  marked by a ring when selected; category tiles, icon boxes, and badges always
+  sit beside their canonical icon and translated text label.
 - **Hue-spread, not luminance-spread**, each at 92% of the in-gamut chroma
   ceiling for its lightness. `scripts/design/contrast.mjs` parses both theme
   blocks and computes all 22 pairs against that theme's `--card` at the 3:1

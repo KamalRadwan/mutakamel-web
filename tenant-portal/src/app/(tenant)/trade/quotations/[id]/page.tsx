@@ -1,6 +1,13 @@
 "use client";
 
+import * as React from "react";
 import { use } from "react";
+import {
+  ArrowRightLeft,
+  Building2,
+  CreditCard,
+  FileCheck2,
+} from "lucide-react";
 import {
   Button,
   DetailHeader,
@@ -10,6 +17,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   ErrorState,
+  IdentifierText,
+  Money,
   NotFoundState,
   ReasonDialog,
 } from "@/design-system";
@@ -29,6 +38,7 @@ import {
   TRADE_REASON_CODE_MAX_LENGTH,
   partyDisplayName,
 } from "../../documents/trade-document-contract";
+import { ConvertQuotationDrawer } from "../components/ConvertQuotationDrawer";
 import { QuotationLinesPanel } from "../components/QuotationLinesPanel";
 import { QuotationRevisionDrawer } from "../components/QuotationRevisionDrawer";
 import { QuotationRevisionsPanel } from "../components/QuotationRevisionsPanel";
@@ -36,18 +46,25 @@ import { useTradeDraftReference } from "../../documents/hooks/useTradeDraftRefer
 import { useQuotationScreen } from "../hooks/useQuotationScreen";
 import { QUOTATIONS_PATH, QUOTATION_PERMISSIONS } from "../quotation-contract";
 
-export default function QuotationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function QuotationDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
   const { t } = useI18n();
+  const td = t.tradeDocuments;
   const screen = useQuotationScreen(id);
   const { detail, actions, revision, pdf } = screen;
   const quotation = detail.document;
+  const [convertOpen, setConvertOpen] = React.useState(false);
+
   const editReference = useTradeDraftReference(
     QUOTATIONS_PATH,
     id,
     quotation?.version ?? null,
     quotation?.draftReference ?? null,
-    t.tradeDocuments.quotations.editTitle,
+    td.quotations.editTitle,
     detail.scope.headers,
     async () => {
       await detail.reload();
@@ -66,14 +83,37 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
     return (
       <TradeGate require={QUOTATION_PERMISSIONS.read}>
         <NotFoundState
-          title={t.tradeDocuments.quotations.notFoundTitle}
-          description={t.tradeDocuments.quotations.notFoundDescription}
-          backLabel={t.tradeDocuments.quotations.back}
+          title={td.quotations.notFoundTitle}
+          description={td.quotations.notFoundDescription}
+          backLabel={td.quotations.back}
           backHref={TENANT_ROUTES.tradeQuotations}
         />
       </TradeGate>
     );
   }
+
+  const canConvert =
+    quotation?.lifecycleStatus === "ACCEPTED" &&
+    detail.scope.canWrite(QUOTATION_PERMISSIONS.convert);
+
+  const stageSteps = [
+    {
+      status: "DRAFT",
+      label: t.statusValues["TradeQuotationStatus.DRAFT"] ?? "DRAFT",
+    },
+    {
+      status: "SENT",
+      label: t.statusValues["TradeQuotationStatus.SENT"] ?? "SENT",
+    },
+    {
+      status: "ACCEPTED",
+      label: t.statusValues["TradeQuotationStatus.ACCEPTED"] ?? "ACCEPTED",
+    },
+    {
+      status: "CONVERTED",
+      label: t.statusValues["TradeQuotationStatus.CONVERTED"] ?? "CONVERTED",
+    },
+  ];
 
   return (
     <TradeGate require={QUOTATION_PERMISSIONS.read}>
@@ -81,7 +121,7 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
         {detail.isLoading || !quotation ? (
           detail.loadError ? (
             <ErrorState
-              title={t.tradeDocuments.quotations.loadFailed}
+              title={td.quotations.loadFailed}
               description={detail.loadError.code ?? undefined}
               onRetry={() => void detail.reload()}
               retryLabel={t.common.retry}
@@ -92,7 +132,11 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
         ) : (
           <>
             <DetailHeader
-              title={quotation.documentNumber ?? quotation.draftReference ?? quotation.id}
+              title={
+                quotation.documentNumber ??
+                quotation.draftReference ??
+                quotation.id
+              }
               subtitle={partyDisplayName(quotation.partySnapshot) ?? undefined}
               status={
                 <TradeStatusBadge
@@ -100,46 +144,71 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
                   value={quotation.lifecycleStatus}
                 />
               }
-              backLabel={t.tradeDocuments.quotations.back}
+              backLabel={td.quotations.back}
               backHref={TENANT_ROUTES.tradeQuotations}
               primaryAction={
                 screen.advance
                   ? {
                       label:
                         screen.advance === "send"
-                          ? t.tradeDocuments.quotations.send
-                          : t.tradeDocuments.quotations.accept,
+                          ? td.quotations.send
+                          : td.quotations.accept,
                       onClick: () => void actions.run(screen.advance ?? "send"),
                       disabled: actions.pending !== null,
                     }
-                  : undefined
+                  : canConvert
+                    ? {
+                        label: td.executive.convertQuotation,
+                        onClick: () => setConvertOpen(true),
+                      }
+                    : undefined
               }
               secondaryActions={
                 <>
                   {screen.canRevise ? (
-                    <Button size="sm" variant="outline" onClick={editReference.open}>
-                      {t.tradeDocuments.quotations.editTitle}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={editReference.open}
+                    >
+                      {td.quotations.editTitle}
                     </Button>
                   ) : null}
                   {screen.canRevise ? (
                     <Button size="sm" variant="outline" onClick={revision.open}>
-                      {t.tradeDocuments.quotations.newRevision}
+                      {td.quotations.newRevision}
+                    </Button>
+                  ) : null}
+                  {canConvert ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setConvertOpen(true)}
+                    >
+                      <ArrowRightLeft className="me-1.5 h-3.5 w-3.5" aria-hidden />
+                      {td.executive.convertQuotation}
                     </Button>
                   ) : null}
                   {screen.canReject || screen.canCancel ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost">{t.common.actions}</Button>
+                        <Button size="sm" variant="ghost">
+                          {t.common.actions}
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {screen.canReject ? (
-                          <DropdownMenuItem onSelect={() => actions.requestReason("reject")}>
-                            {t.tradeDocuments.quotations.reject}
+                          <DropdownMenuItem
+                            onSelect={() => actions.requestReason("reject")}
+                          >
+                            {td.quotations.reject}
                           </DropdownMenuItem>
                         ) : null}
                         {screen.canCancel ? (
-                          <DropdownMenuItem onSelect={() => actions.requestReason("cancel")}>
-                            {t.tradeDocuments.quotations.cancel}
+                          <DropdownMenuItem
+                            onSelect={() => actions.requestReason("cancel")}
+                          >
+                            {td.quotations.cancel}
                           </DropdownMenuItem>
                         ) : null}
                       </DropdownMenuContent>
@@ -149,25 +218,151 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               }
             />
 
-            {/* One panel per write path. Each renders nothing until its own
-                write ends ambiguously, and a lifecycle transition, a new
-                revision and a PDF render are three different operations with
-                three different idempotency keys. */}
+            <div className="dossier-stage-bar">
+              <span className="dossier-stage-label">
+                {td.executive.lifecycleTrack}
+              </span>
+              <div className="dossier-stage-track">
+                {stageSteps.map((step, idx) => {
+                  const activeIdx = stageSteps.findIndex(
+                    (s) => s.status === quotation.lifecycleStatus,
+                  );
+                  const stateClass =
+                    step.status === quotation.lifecycleStatus
+                      ? "active"
+                      : activeIdx > idx
+                        ? "done"
+                        : "";
+                  return (
+                    <div
+                      key={step.status}
+                      className={`dossier-stage-cell ${stateClass}`}
+                    >
+                      <span className="dossier-stage-dot" aria-hidden />
+                      <span>{step.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <TradeWriteOutcome write={actions.write} />
             <TradeWriteOutcome write={revision.write} />
             <TradeWriteOutcome write={pdf.write} />
             <TradeWriteOutcome write={editReference.write} />
 
+            <div className="dossier-grid">
+              <div className="dossier-col">
+                <div className="dossier-card dossier-card-indigo">
+                  <div className="dossier-card-header">
+                    <div className="dossier-card-title">
+                      <span
+                        className="dossier-icon-pill dossier-ip-indigo"
+                        aria-hidden
+                      >
+                        <Building2 className="h-4 w-4" />
+                      </span>
+                      <span>{td.executive.dossierOverview}</span>
+                    </div>
+                    <span className="dossier-tag dossier-tag-indigo">
+                      <IdentifierText>{`v${quotation.version}`}</IdentifierText>
+                    </span>
+                  </div>
+                  <div className="dossier-fields-grid">
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">{td.documentNumber}</span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {quotation.documentNumber ?? td.notRecorded}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">{td.draftReference}</span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {quotation.draftReference ?? td.notRecorded}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">{td.customer}</span>
+                      <span className="dossier-val">
+                        {partyDisplayName(quotation.partySnapshot) ??
+                          td.notRecorded}
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">{td.businessDate}</span>
+                      <span className="dossier-val">
+                        <IdentifierText>{quotation.businessDate}</IdentifierText>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dossier-col">
+                <div className="dossier-card dossier-card-emerald">
+                  <div className="dossier-card-header">
+                    <div className="dossier-card-title">
+                      <span
+                        className="dossier-icon-pill dossier-ip-emerald"
+                        aria-hidden
+                      >
+                        <CreditCard className="h-4 w-4" />
+                      </span>
+                      <span>{td.executive.financialSummary}</span>
+                    </div>
+                    <span className="dossier-tag dossier-tag-emerald">
+                      <IdentifierText>{quotation.currencyCode}</IdentifierText>
+                    </span>
+                  </div>
+                  <div className="dossier-fields-grid">
+                    <div className="dossier-field-box dossier-span-all">
+                      <span className="dossier-lbl">{td.grandTotal}</span>
+                      <span className="dossier-val text-base">
+                        <Money
+                          value={quotation.grandTotal}
+                          currency={quotation.currencyCode}
+                          minimumFractionDigits={2}
+                          maximumFractionDigits={8}
+                        />
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">{td.quotations.revisions}</span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {String(quotation.revisions.length)}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">
+                        {td.executive.linesCount}
+                      </span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {String(quotation.currentLines.length)}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <DetailSection
-              title={t.tradeDocuments.identity}
-              emptyValueLabel={t.tradeDocuments.notRecorded}
+              title={td.identity}
+              emptyValueLabel={td.notRecorded}
               fields={[
-                { label: t.tradeDocuments.documentNumber, value: quotation.documentNumber },
-                { label: t.tradeDocuments.draftReference, value: quotation.draftReference },
-                { label: t.tradeDocuments.currency, value: quotation.currencyCode },
-                { label: t.tradeDocuments.businessDate, value: quotation.businessDate },
+                { label: td.documentNumber, value: quotation.documentNumber },
+                { label: td.draftReference, value: quotation.draftReference },
+                { label: td.currency, value: quotation.currencyCode },
+                { label: td.businessDate, value: quotation.businessDate },
                 {
-                  label: t.tradeDocuments.version,
+                  label: td.version,
                   value: String(quotation.version),
                 },
               ]}
@@ -176,26 +371,61 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
             <QuotationRevisionsPanel quotation={quotation} />
             <QuotationLinesPanel quotation={quotation} />
 
-            {screen.isAwaitingConversion ? (
+            {screen.isAwaitingConversion && !canConvert ? (
               <TradeEvidenceBlocked
-                title={t.tradeDocuments.quotations.convertBlockedTitle}
-                description={t.tradeDocuments.quotations.convertBlockedDescription}
+                title={td.quotations.convertBlockedTitle}
+                description={td.quotations.convertBlockedDescription}
               />
+            ) : null}
+
+            {screen.currentRevision &&
+            Object.keys(screen.currentRevision.termsSnapshot).length > 0 ? (
+              <div className="dossier-card dossier-card-violet">
+                <div className="dossier-card-header">
+                  <div className="dossier-card-title">
+                    <span
+                      className="dossier-icon-pill dossier-ip-violet"
+                      aria-hidden
+                    >
+                      <FileCheck2 className="h-4 w-4" />
+                    </span>
+                    <span>{td.executive.structuredTermsTitle}</span>
+                  </div>
+                </div>
+                <div className="rounded-md bg-muted/40 p-3 text-xs">
+                  <IdentifierText>
+                    {JSON.stringify(screen.currentRevision.termsSnapshot)}
+                  </IdentifierText>
+                </div>
+              </div>
             ) : null}
 
             <TradePdfPanel
               state={pdf}
               canRender={screen.currentRevision !== null}
               onRender={screen.renderPdf}
-              unavailableReason={t.tradeDocuments.quotations.noLines}
+              unavailableReason={td.quotations.noLines}
             />
 
-            <QuotationRevisionDrawer state={revision} currencyCode={quotation.currencyCode} />
+            <QuotationRevisionDrawer
+              state={revision}
+              currencyCode={quotation.currencyCode}
+            />
+
+            <ConvertQuotationDrawer
+              open={convertOpen}
+              onOpenChange={setConvertOpen}
+              quotation={quotation}
+              headers={detail.scope.headers}
+              onConverted={async () => {
+                await detail.reload();
+              }}
+            />
 
             <TradeDraftReferenceDrawer
               state={editReference}
-              title={t.tradeDocuments.quotations.editTitle}
-              description={t.tradeDocuments.quotations.editDescription}
+              title={td.quotations.editTitle}
+              description={td.quotations.editDescription}
             />
 
             <ReasonDialog
@@ -203,8 +433,8 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
               onOpenChange={(open) => (open ? undefined : actions.closeReason())}
               title={
                 actions.openReason === "reject"
-                  ? t.tradeDocuments.quotations.rejectTitle
-                  : t.tradeDocuments.quotations.cancelTitle
+                  ? td.quotations.rejectTitle
+                  : td.quotations.cancelTitle
               }
               reasonRequired
               destructive
@@ -214,15 +444,12 @@ export default function QuotationDetailPage({ params }: { params: Promise<{ id: 
                 void actions.run(actions.openReason ?? "cancel", reason.trim())
               }
               labels={{
-                reason: t.tradeDocuments.reasonCode,
-                reasonHint: t.tradeDocuments.reasonCodeHint,
-                // The confirm names the transition rather than saying
-                // "confirm": a dialog that can reject or cancel must not use
-                // one word for both.
+                reason: td.reasonCode,
+                reasonHint: td.reasonCodeHint,
                 confirm:
                   actions.openReason === "reject"
-                    ? t.tradeDocuments.quotations.reject
-                    : t.tradeDocuments.quotations.cancel,
+                    ? td.quotations.reject
+                    : td.quotations.cancel,
                 cancel: t.common.cancel,
               }}
             />

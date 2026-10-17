@@ -111,6 +111,7 @@ export default function ImportRunsPage() {
   const content = (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeAutomation.importsTitle}
         description={t.tradeAutomation.importsSubtitle}
         secondaryActions={
@@ -178,6 +179,7 @@ export default function ImportRunsPage() {
       />
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

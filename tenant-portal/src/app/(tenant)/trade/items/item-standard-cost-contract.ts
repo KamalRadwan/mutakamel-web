@@ -1,5 +1,5 @@
 import type { TradePath } from "@/lib/api/envelope";
-import { isRowVersion, isUuidV7, record } from "../trade-validation";
+import { formatTradeDecimal, isRowVersion, isUuidV7, record } from "../trade-validation";
 import { isItemDecimalString, itemPath } from "./item-contract";
 
 export const STANDARD_COST_VIEW_PERMISSION = "trade.pricing.view_cost";
@@ -23,7 +23,7 @@ export function buildStandardCostRequest(raw: string, currencyCode: string | nul
     throw new Error("STANDARD_COST_FORM_VALUE");
   }
   if (standardCost && !currencyCode) throw new Error("STANDARD_COST_CURRENCY_REQUIRED");
-  return { standardCost: standardCost || null };
+  return { standardCost: standardCost ? formatTradeDecimal(standardCost) : null };
 }
 
 export function parseStandardCostResponse(payload: unknown): ItemStandardCost {
@@ -44,7 +44,8 @@ export function parseStandardCostResponse(payload: unknown): ItemStandardCost {
   return {
     itemId: cost.itemId,
     companyProfileId: cost.companyProfileId,
-    standardCost: (cost.standardCost as string | null | undefined) ?? null,
+    standardCost:
+      typeof cost.standardCost === "string" ? formatTradeDecimal(cost.standardCost) : null,
     currencyCode: typeof cost.currencyCode === "string" ? cost.currencyCode : null,
     version: cost.version,
   };

@@ -12,6 +12,7 @@ import { Input } from "./Input";
 import { MultiSelect } from "./MultiSelect";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./Select";
 import { Textarea } from "./Textarea";
+import { TooltipProvider } from "./Tooltip";
 
 afterEach(cleanup);
 
@@ -87,6 +88,37 @@ describe("Field", () => {
     const input = screen.getByLabelText("Branch");
     expect(input).not.toHaveAttribute("aria-readonly");
     expect(input).toHaveProperty("readOnly", false);
+  });
+
+  // docs/design/primitives.md#field-hint-placement — a dense modal moves the
+  // hint beside the label instead of spending a row under every control.
+  it("moves the hint into a labelled tooltip trigger, but keeps it wired to aria-describedby", () => {
+    render(
+      <TooltipProvider>
+        <Field label="Code" hint="Stored uppercase." hintPlacement="tooltip" showLabel>
+          <Input />
+        </Field>
+      </TooltipProvider>,
+    );
+    const input = screen.getByLabelText("Code");
+    const describedBy = input.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+
+    const hintNode = document.getElementById(describedBy!);
+    expect(hintNode).toHaveTextContent("Stored uppercase.");
+    expect(hintNode).toHaveClass("sr-only");
+
+    expect(screen.getByRole("button", { name: "Stored uppercase." })).toBeInTheDocument();
+  });
+
+  it("keeps the hint visible below the control by default", () => {
+    render(
+      <Field label="Code" hint="Stored uppercase." showLabel>
+        <Input />
+      </Field>,
+    );
+    expect(screen.getByText("Stored uppercase.")).not.toHaveClass("sr-only");
+    expect(screen.queryByRole("button", { name: "Stored uppercase." })).toBeNull();
   });
 });
 

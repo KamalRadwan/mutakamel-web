@@ -1,9 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { FormDrawer } from "@/design-system";
+import { Warehouse } from "lucide-react";
+import {
+  Badge,
+  cn,
+  FormModal,
+  SWATCH_SURFACE_PALETTES,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { EMPTY_NODE_FORM, type NodeFormValues } from "../../inventory-contract";
+import {
+  EMPTY_NODE_FORM,
+  INVENTORY_NODES_MANAGE_PERMISSION,
+  parseBranchIdsPreview,
+  type NodeFormValues,
+} from "../../inventory-contract";
 import { NodeFormFields } from "./NodeFormFields";
 
 interface CreateNodeModalProps {
@@ -24,9 +35,16 @@ export function CreateNodeModal({
   const { t } = useI18n();
   const [values, setValues] = useState<NodeFormValues>(EMPTY_NODE_FORM);
   const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_NODE_FORM);
+  const branchPreview = parseBranchIdsPreview(values.branchIds);
+  const readyCount = [
+    values.code.trim().length > 0,
+    values.name.trim().length > 0,
+    values.timezone.trim().length > 0,
+    branchPreview.validIds.length > 0 && branchPreview.invalidEntries.length === 0,
+  ].filter(Boolean).length;
 
   return (
-    <FormDrawer
+    <FormModal
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
@@ -34,8 +52,29 @@ export function CreateNodeModal({
           onClose();
         }
       }}
+      size="wide"
       title={t.tradeInventory.nodeCreateTitle}
       description={t.tradeInventory.nodeCreateDescription}
+      headerIcon={
+        <div
+          className={cn(
+            "flex size-9 items-center justify-center rounded-lg border",
+            SWATCH_SURFACE_PALETTES.indigo.iconBoxIdle,
+          )}
+        >
+          <Warehouse className="size-4" aria-hidden="true" />
+        </div>
+      }
+      headerAside={
+        <Badge tone={readyCount === 4 ? "positive" : "brand"}>
+          {`${readyCount}/4`}
+        </Badge>
+      }
+      footerLeading={
+        <span className="font-mono text-2xs text-muted-foreground">
+          COMPANY • {INVENTORY_NODES_MANAGE_PERMISSION}
+        </span>
+      }
       isDirty={isDirty}
       isSubmitting={isSubmitting}
       onSubmit={() => {
@@ -51,6 +90,8 @@ export function CreateNodeModal({
         discardDescription: t.common.discardDescription,
         discardConfirm: t.common.discardConfirm,
         discardCancel: t.common.cancel,
+        sections: t.tradeInventory.nodeCreateTitle,
+        sectionInvalid: t.common.cancel,
       }}
     >
       <NodeFormFields
@@ -59,6 +100,6 @@ export function CreateNodeModal({
         isSubmitting={isSubmitting}
         isEdit={false}
       />
-    </FormDrawer>
+    </FormModal>
   );
 }

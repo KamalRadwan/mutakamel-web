@@ -60,11 +60,15 @@ Three consequences run through every decision below:
 
 ### 1. Four hues — and a stage is never one of them
 
-Every color in this app is `brand` (cobalt), `positive` (green), `caution`
-(amber), `negative` (warm vermilion), or `ink` (the cold-blue neutral ramp).
-There is no fifth hue. Those five names are this portal's; the values behind
+Every outcome and core surface in this app uses `brand` (cobalt), `positive`
+(green), `caution` (amber), `negative` (warm vermilion), or `ink` (the
+cold-blue neutral ramp). Those five names are this portal's; the values behind
 them are the admin portal's `action` / `success` / `warn` / `danger` / `ink`,
-declared here under both spellings.
+declared here under both spellings. Alongside them, eleven theme-adaptive
+`--swatch-*` tokens (`indigo`, `green`, `purple`, `blue`, `amber`, `teal`,
+`pink`, `red`, `orange`, `yellow`, `slate`) power user-picked card marks
+(`card-color.ts`) and structured category/activity-type/entity surface palettes
+(`swatch-palette.ts`), always paired with icons and text labels.
 
 The critical corollary, and the law most specific to this product: **pipeline
 and lifecycle stages are not colors.** `LeadStageFlagEnum` has 8 values.
@@ -73,7 +77,7 @@ distinguishable under colorblindness at badge size — attempting it is what
 produces the confetti-colored CRM look.
 
 Stage is communicated by **position, label, and progress**. Only *outcome*
-takes a hue:
+takes a stage hue:
 
 | Outcome | Role | Wire values |
 | --- | --- | --- |
@@ -82,8 +86,9 @@ takes a hue:
 | Paused / needs attention | `caution` | `ON_HOLD`, `NURTURING`, `PENDING` |
 | Failed / ended badly | `negative` | `LOST`, `DISQUALIFIED`, `BLACKLISTED` |
 
-See [tokens.md](tokens.md#status-mapping) for the complete enum-to-role table.
-It is exhaustive; do not extend it by guessing.
+See [tokens.md](tokens.md#status-mapping) and
+[DESIGN-SYSTEM.md § Colorful Swatch & Semantic Surface Palettes](DESIGN-SYSTEM.md#colorful-swatch--semantic-surface-palettes)
+for the complete enum-to-role and category-to-swatch tables.
 
 ### 2. One superfamily, two scripts
 
@@ -128,7 +133,7 @@ it from direction rather than hardcoding — see [theming.md](theming.md#rtl).
 | --- | --- |
 | **Everything, in one file — start here** | **[DESIGN-SYSTEM.md](DESIGN-SYSTEM.md)** |
 | Third-party UI/UX audit — 17 gaps to refactor | [SKILL-AUDIT.md](SKILL-AUDIT.md) |
-| Color roles, OKLCH ramps, semantic tokens, status mapping | [tokens.md](tokens.md) |
+| Color roles, OKLCH ramps, semantic tokens, status & swatch mapping | [tokens.md](tokens.md) |
 | Font pairing, type scale, weights, Arabic lift, numerals | [typography.md](typography.md) |
 | Radius, spacing, control heights, row density, elevation | [geometry.md](geometry.md) |
 | Animation budget and permitted keyframes | [motion.md](motion.md) |
@@ -149,16 +154,17 @@ it from direction rather than hardcoding — see [theming.md](theming.md#rtl).
 
 ```text
 src/design-system/
-  index.ts          public barrel — feature code imports ONLY from here
+  index.ts             public barrel — feature code imports ONLY from here
   lib/
-    cn.ts           className merge
-    variants.ts     shared CVA fragments: focusRing, controlSize, surface
-    icons.ts        iconSize, mirrorInRtl — see icons.md
-  primitives/       see primitives.md
-  patterns/         see patterns.md
-  views/            board / card / table — see views.md
-  shell/            AppShell, GlobalNav, PageActionBar, NavSheet, nav-config
-  feedback/         ToastProvider, useToast, AppToast
+    cn.ts              className merge
+    variants.ts        shared CVA fragments: focusRing, controlSize, surface
+    icons.ts           iconSize, mirrorInRtl — see icons.md
+    swatch-palette.ts  11-hue SwatchSurfacePalette & segmented pill tokens
+  primitives/          see primitives.md
+  patterns/            see patterns.md
+  views/               board / card / table / card-color.ts — see views.md
+  shell/               AppShell, GlobalNav, PageActionBar, NavSheet, nav-config
+  feedback/            ToastProvider, useToast, AppToast
 ```
 
 `src/app/globals.css` is the token source of truth. Feature code imports from

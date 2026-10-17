@@ -32,6 +32,9 @@ function locate(route: string, sections: NavSection[] = NAV_SECTIONS): NavLocati
 describe("useNavLocation", () => {
   it.each([
     ["/crm/leads", "crm", "leads"],
+    ["/crm/pipelines", "crmSetup", "pipelines"],
+    ["/crm/opportunity-stages", "crmSetup", "opportunityStages"],
+    ["/crm/outbound-emails", "crmSetup", "outboundEmails"],
     ["/trade/items", "tradeFoundation", "tradeItems"],
     ["/core/users", "coreIdentity", "coreUsers"],
   ] as const)("resolves %s to its section and item", (route, section, item) => {
@@ -44,7 +47,12 @@ describe("useNavLocation", () => {
   // belongs to — otherwise the bar goes blank the moment anyone opens a record.
   it("resolves a detail route to its list's entry", () => {
     expect(locate("/crm/leads/018f-not-a-real-id").itemId).toBe("leads");
+    expect(locate("/crm/pipelines/018f-not-a-real-id").itemId).toBe("pipelines");
+    expect(locate("/crm/opportunity-stages/018f-not-a-real-id").itemId).toBe("opportunityStages");
+    expect(locate("/crm/outbound-emails/018f-not-a-real-id").itemId).toBe("outboundEmails");
     expect(locate("/trade/items/018f/history").itemId).toBe("tradeItems");
+    expect(locate("/trade/price-book-versions/018f-version").itemId).toBe("tradePriceBooks");
+    expect(locate("/trade/decisions/018f-decision").itemId).toBe("tradeInventoryDecisions");
   });
 
   it("marks only the exact Leads list route as a primary page", () => {

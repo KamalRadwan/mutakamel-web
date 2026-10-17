@@ -172,3 +172,79 @@ function parsePurchaseOrderLine(payload: unknown): PurchaseOrderLine {
 export function purchaseOrderTotals(order: PurchaseOrder): Record<string, unknown> {
   return jsonObject(order.totalsSnapshot);
 }
+
+export interface CreatePurchaseOrderLinePayload {
+  clientLineId: string;
+  itemId: string;
+  uomId: string;
+  quantity: string;
+  expectedDate?: string;
+  receivingNodeId?: string;
+  financial: {
+    discountTotal: string;
+    chargeTotal: string;
+    taxTotal: string;
+    lineTotal: string;
+    taxSnapshot: Record<string, unknown>;
+  };
+}
+
+export interface CreatePurchaseOrderRequest {
+  supplierPartyId: string;
+  supplierAccountId: string;
+  currencyCode: string;
+  receivingNodeId: string;
+  draftReference?: string;
+  lines: CreatePurchaseOrderLinePayload[];
+  totals: {
+    subtotal: string;
+    discountTotal: string;
+    chargeTotal: string;
+    taxTotal: string;
+    roundingTotal: string;
+    grandTotal: string;
+    amountPaid: string;
+    amountDue: string;
+  };
+  terms: Record<string, unknown>;
+}
+
+export function buildCreatePurchaseOrder(input: {
+  supplierPartyId: string;
+  supplierAccountId: string;
+  currencyCode: string;
+  receivingNodeId: string;
+  draftReference?: string;
+  lines: CreatePurchaseOrderLinePayload[];
+  totals: CreatePurchaseOrderRequest["totals"];
+  terms?: Record<string, unknown>;
+}): CreatePurchaseOrderRequest {
+  const code = input.currencyCode.trim().toUpperCase();
+  if (
+    !isUUIDv7(input.supplierPartyId.trim()) ||
+    !isUUIDv7(input.supplierAccountId.trim())
+  ) {
+    throw new Error("PURCHASE_ORDER_FORM_SUPPLIER");
+  }
+  if (!isUUIDv7(input.receivingNodeId.trim())) {
+    throw new Error("PURCHASE_ORDER_FORM_RECEIVING_NODE");
+  }
+  if (!/^[A-Z]{3}$/u.test(code)) {
+    throw new Error("PURCHASE_ORDER_FORM_CURRENCY");
+  }
+  const ref = input.draftReference?.trim() ?? "";
+  return {
+    supplierPartyId: input.supplierPartyId.trim(),
+    supplierAccountId: input.supplierAccountId.trim(),
+    currencyCode: code,
+    receivingNodeId: input.receivingNodeId.trim(),
+    ...(ref ? { draftReference: ref.slice(0, 80) } : {}),
+    lines: input.lines,
+    totals: input.totals,
+    terms:
+      input.terms && Object.keys(input.terms).length > 0
+        ? input.terms
+        : { paymentTermsCode: "NET_30", incoterm: "DDP" },
+  };
+}
+

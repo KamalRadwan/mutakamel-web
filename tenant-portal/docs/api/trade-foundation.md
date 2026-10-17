@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-09-27** (Items scope and search rechecked)
+Last source verification: **2026-10-17** ([Item image](#item-image--3-routes) routes and the `image` summary on Item reads; 2026-10-13: UOM source evidence removed from `CreateUomDto`, `UpdateUomDto` and both UOM read projections)
 
 Owning app: **trade-app**
 
@@ -13,16 +13,17 @@ Canonical prefixes: `/api/tenant/trade/v1/items`, `.../uoms`,
 Upstream: `/api/v1/trade/*` (global prefix `api`, URI versioning, default `1` —
 `trade-app/src/main.ts`)
 
-Portal status: **built** — MASTER-PLAN Phase 10 landed on 2026-08-31. All 45
+Portal status: **built** — MASTER-PLAN Phase 10 landed on 2026-08-31; the
+three Item image routes on 2026-10-17. All 48
 routes are called from `src/app/(tenant)/trade/{items,uoms,channels,commercial-accounts,configuration}`.
 What building them turned up is in
 [Corrections and additions from building Phase 10](#corrections-and-additions-from-building-phase-10--2026-08-31).
 
-**45 routes.** Items 15 · UOM master 4 · UOM catalogue 1 · Channels 6 ·
-Commercial accounts 10 · Configuration 9.
+**48 routes.** Items 15 · Item image 3 · UOM master 4 · UOM catalogue 1 ·
+Channels 6 · Commercial accounts 10 · Configuration 9.
 
 Use the generated [trade-reference.md](trade-reference.md) as the canonical
-cross-family route total; this hand-maintained page owns only the 45 foundation
+cross-family route total; this hand-maintained page owns only the 48 foundation
 routes above.
 
 Source inspected:
@@ -544,6 +545,82 @@ cell lists two, the portal must branch on the pair, not the code.
 
 ---
 
+## Item image — 3 routes
+
+Source verified **2026-10-17** against
+`trade-app/src/modules/catalog/item-image.controller.ts`, `item-image.service.ts`,
+`item-image.processor.ts`, `item-image-summary.ts`, `dto/item-image.dto.ts`,
+`packages/common/src/constants/item-image-policy.ts` and the Gateway rows
+`trading.items.by.id.image.put|delete` and
+`trading.items.by.id.images.by.id.rendition.get`. Normative design: backend
+`docs/LLD/trade-app/en/07_Modules/10_MVP/02b_item_images.md` (§5, §12, §13, §19).
+
+| Method | Canonical path | Permission | Scope target | Body / query |
+| --- | --- | --- | --- | --- |
+| PUT | `/api/tenant/trade/v1/items/:id/image` | `trade.catalog_master.manage` | `TENANT` | multipart, one `file` part, no other fields · `If-Match` · `x-idempotency-key` |
+| DELETE | `/api/tenant/trade/v1/items/:id/image` | `trade.catalog_master.manage` | `TENANT` | — · `If-Match` · `x-idempotency-key` |
+| GET | `/api/tenant/trade/v1/items/:id/images/:imageId/:rendition` | `trade.items.read` | `OPERATING_CONTEXT` | `:rendition` is `thumb` or `print`; binary, no envelope |
+
+All three are gated on **`trade.catalog`**. `PUT` is the only `PUT` in Trade,
+so `trade-api.ts` has a `tradePut` that takes a `FormData` and nothing else.
+
+**Responses.** `PUT` answers `ItemImageReceiptDto` `{ itemId, itemVersion,
+image, replaced }` and `DELETE` answers `ItemImageRemovalReceiptDto`
+`{ itemId, itemVersion, removed }` (`removed: false` is a successful no-op).
+Both sit in the normal Trade envelope with `ETag` = `itemVersion`, which is
+the next `If-Match` for **any** Item identity write: an image change bumps the
+Item version. Item list, search and detail rows carry `image:
+ItemImageSummaryDto | null` = `{ id, sequence, thumb { mimeType, widthPx,
+heightPx, sha256 }, print { mimeType, widthPx, heightPx }, hasAlpha,
+createdAt }`; create and update receipts omit it. No URL is returned: the
+portal builds `.../items/:id/images/:imageId/thumb` itself
+(`itemImageRenditionSrc`). The bytes are `Cache-Control: private,
+max-age=31536000, immutable` and a replaced image has a new `imageId`, so the
+plain same-origin `<img>` (through `Avatar`) is safe to cache.
+
+**Limits** (`TRADE_ITEM_IMAGE_LIMITS`): PNG, JPEG or still WebP · ≤ 10 MiB ·
+≤ 25,000,000 pixels · both edges ≥ 32 px. The portal pre-checks MIME and size
+in `ImageUploadTile`, then decodes with `createImageBitmap` for the edges and a
+non-blocking under-300 px print hint; the server re-checks everything.
+
+**Idempotency.** One key per user attempt (`useItemImageCommands`): retrying
+the same file on the same Item resends the same key, so a lost response or a
+`503` replays the original receipt. A new file, another Item,
+`STALE_VERSION` or `IDEMPOTENCY.MISMATCH` starts a new key.
+
+**Create flow.** The image cannot exist before the Item. New Item posts the
+Item, then `PUT`s the image with the returned `version` as `If-Match`. If that
+upload fails the Item stays created and the modal shows **Item saved. The image
+was not uploaded.** with **Retry upload** against the saved Item — it never
+posts the Item again; closing keeps the Item and drops the file.
+
+**Edit flow.** The Item detail header (96 px) and the Edit Item dialog (68 px)
+replace, view (`print` rendition) and remove (after a confirm). The receipt's
+`itemVersion` and `image` are applied in place, so unsaved identity edits stay
+on screen and their next save sends the current `If-Match`. A `409
+STALE_VERSION` keeps the picked file, reloads the Item and asks for a new
+confirmation.
+
+### Errors
+
+| `code` | Status | Portal copy (`t.trade.itemImage.*`) |
+| --- | --- | --- |
+| `TRADE.CATALOG.ITEM_IMAGE_REQUIRED` | 400 | `required` — also any multer part/field violation |
+| `TRADE.CATALOG.ITEM_IMAGE_INVALID` | 415 | by `details.reason[0]` (a one-item string array, read as `fieldErrors.reason`): `TYPE_NOT_ALLOWED` → `typeNotAllowed`, `EXTENSION_MISMATCH` / `CONTENT_MISMATCH` → `contentMismatch`, `DECODE_FAILED` → `decodeFailed`, `ANIMATED_OR_MULTIPAGE` → `animated`, `TOO_SMALL` → `tooSmall`, `TOO_DETAILED` → `tooDetailed`; anything else → `invalid` |
+| `TRADE.CATALOG.ITEM_IMAGE_TOO_LARGE` | 413 | `tooLarge` — also a multer size overflow |
+| `TRADE.CATALOG.ITEM_IMAGE_NOT_FOUND` | 404 | `notFound` |
+| `TRADE.CATALOG.ITEM_IMAGE_STORAGE_UNAVAILABLE` | 503 | `storageUnavailable` — retry reuses the key |
+| `TRADE.CATALOG.ITEM_IMAGE_PRINT_BUDGET_EXCEEDED` | 422 | `printBudget` — print paths only |
+| `TRADE.CATALOG.ITEM_NOT_FOUND` | 404 | `t.trade.itemNotFoundDescription` |
+| `TRADE.CONCURRENCY.STALE_VERSION` | 409 | `staleVersion` (412 is treated the same) |
+| `TRADE.AUTH.TARGET_DENIED` | 403 | `targetDenied` |
+| `TRADE.CONCURRENCY.IF_MATCH_REQUIRED`, `TRADE.IDEMPOTENCY.*`, `TRADE.VALIDATION_FAILED` | 400/409/422 | the shared `t.trade.error*` sentences |
+
+`TOO_DETAILED` is emitted by `item-image.processor.ts` but is not yet in
+`TRADE_ITEM_IMAGE_INVALID_REASONS` (trade-app-common 0.0.6 is immutable).
+
+---
+
 ## UOM master — 4 routes
 
 | Method | Canonical path | Permission | Scope target | Body / query |
@@ -559,9 +636,8 @@ fingerprint schema (`trade.uom.create.v1`, `trade.uom.update.v1`) and a
 
 | DTO | Fields |
 | --- | --- |
-| `CreateUomDto` | `code` (1–32, `^[A-Za-z][A-Za-z0-9._-]*$`), `displayName` (1–160), `localizedNames` (object, **required**), `sourceEvidence` (**required**) |
-| `UomSourceEvidenceDto` | `sourceKind` (1–80, **required**), `reference?` (≤ 240), `note?` (≤ 500) |
-| `UpdateUomDto` | `displayName?`, `localizedNames?`, `sourceEvidence?`, `status?` — every field uses `@ValidateIf(value !== undefined)`, so **`null` is a 400**, not a clear |
+| `CreateUomDto` | `code` (1–32, `^[A-Za-z][A-Za-z0-9._-]*$`), `displayName` (1–160), `localizedNames` (object, **required**) |
+| `UpdateUomDto` | `displayName?`, `localizedNames?`, `status?` — every field uses `@ValidateIf(value !== undefined)`, so **`null` is a 400**, not a clear |
 | `UomListQueryDto` | `page`, `limit` (≤ 100, default 50), `status?`, `search?` (≤ 32, `^[A-Za-z0-9._-]+$`, matched as a **prefix**) |
 
 `UomStatus`: **`ACTIVE`** · **`RETIRED`**. A UOM is retired by `PATCH`ing
@@ -597,7 +673,7 @@ tenant without items would see none. `CreateItemModal` reads every page of
 `search?` (≤ 36, `^[0-9a-fA-F-]+$` — **matches an id fragment, not a name**).
 
 Each row carries `id`, `code`, `displayName`, `localizedNames`,
-`sourceEvidence`, `version`, `isBaseUom`, `isDefaultSalesUom`,
+`version`, `isBaseUom`, `isDefaultSalesUom`,
 `isDefaultPurchaseUom`, `canSell`, `canPurchase`, `sourceItemCount` (a JS
 number — a count, not money) and a literal
 `source: "AUTHORIZED_TRADE_UOM_MASTER"`.

@@ -72,6 +72,26 @@ export function isNullableTradeDecimalString(value: unknown): value is string | 
   return value === null || value === undefined || isTradeDecimalString(value);
 }
 
+/**
+ * Formats a Trade decimal string (`numeric(24,8)`) so that:
+ * - Integers (e.g. `"6000"`) or values with only 0/1 significant fractional
+ *   digits after stripping trailing zeros (e.g. `"6000.00000000"`, `"6000.5"`)
+ *   render with 2 decimal places (`"6000.00"`, `"6000.50"`).
+ * - Values with more than 2 significant fractional digits (e.g. `"6000.458011"`,
+ *   `"6000.45801100"`) keep all significant fractional digits (`"6000.458011"`).
+ */
+export function formatTradeDecimal(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const match = /^([+-]?\d+)(?:\.(\d+))?$/u.exec(trimmed);
+  if (!match) return trimmed;
+  const intPart = match[1]!;
+  const strippedFrac = (match[2] ?? "").replace(/0+$/u, "");
+  const fracPart = strippedFrac.length <= 2 ? strippedFrac.padEnd(2, "0") : strippedFrac;
+  return `${intPart}.${fracPart}`;
+}
+
 /** A `jsonb` object column — `restrictions`, `terms`, `saleConstraints`, `valueSchema`. */
 export function isJsonObject(value: unknown): value is Record<string, unknown> {
   return record(value) !== null;

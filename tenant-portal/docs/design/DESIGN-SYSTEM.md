@@ -261,6 +261,67 @@ progress**. Only outcome takes a hue:
 
 Full enum→role table: [tokens.md](tokens.md#status-mapping).
 
+## Colorful Swatch & Semantic Surface Palettes
+
+While pipeline stages remain position-and-outcome encoded, **user-picked card marks** (`src/design-system/views/card-color.ts`) and **structured category, activity-type, and entity surfaces** (`src/design-system/lib/swatch-palette.ts`) use the eleven theme-adaptive `--swatch-*` tokens declared in `src/app/globals.css`. Every swatch is calibrated separately for `:root` (on white `--card`) and `.dark` (on `ink-950` `--card`) so every hue clears **≥ 3.0:1** non-text contrast in both themes (`pnpm design:contrast`).
+
+### The 11 `--swatch-*` tokens (Light & Dark)
+
+| Swatch token | Tailwind utility stem | Light (`:root`) OKLCH | Light Hex | Dark (`.dark`) OKLCH | Dark Hex |
+| --- | --- | --- | --- | --- | --- |
+| `--swatch-indigo` | `*-swatch-indigo` | `oklch(0.515 0.23 277)` | `#5048e7` | `oklch(0.7 0.151 285)` | `#968ff8` |
+| `--swatch-green` | `*-swatch-green` | `oklch(0.585 0.128 162)` | `#019364` | `oklch(0.78 0.208 148)` | `#35da63` |
+| `--swatch-purple` | `*-swatch-purple` | `oklch(0.545 0.242 293)` | `#7d3eec` | `oklch(0.72 0.211 318)` | `#d971f8` |
+| `--swatch-blue` | `*-swatch-blue` | `oklch(0.575 0.136 242)` | `#0280c1` | `oklch(0.72 0.144 245)` | `#49acf8` |
+| `--swatch-amber` | `*-swatch-amber` | `oklch(0.62 0.139 65)` | `#be7100` | `oklch(0.78 0.15 78)` | `#ebaa2d` |
+| `--swatch-teal` | `*-swatch-teal` | `oklch(0.585 0.103 185)` | `#018f84` | `oklch(0.78 0.124 190)` | `#35d0c9` |
+| `--swatch-pink` | `*-swatch-pink` | `oklch(0.565 0.215 16)` | `#d61948` | `oklch(0.75 0.158 355)` | `#f980b3` |
+| `--swatch-red` | `*-swatch-red` | `oklch(0.55 0.206 27)` | `#cf2224` | `oklch(0.74 0.146 27)` | `#f98378` |
+| `--swatch-orange` | `*-swatch-orange` | `oklch(0.6 0.171 45)` | `#cf5502` | `oklch(0.78 0.137 55)` | `#fa9e5c` |
+| `--swatch-yellow` | `*-swatch-yellow` | `oklch(0.6 0.121 110)` | `#85861d` | `oklch(0.78 0.157 110)` | `#bebf2e` |
+| `--swatch-slate` | `*-swatch-slate` | `oklch(0.5 0.03 240)` | `#546673` | `oklch(0.72 0.03 240)` | `#94a8b6` |
+
+### The 10 surface roles (`SwatchSurfacePalette`)
+
+Exported from `src/design-system/lib/swatch-palette.ts` via `@/design-system`. Every class string is statically written out so Tailwind v4 extracts it without dynamic string interpolation:
+
+| Surface Role | Class Recipe (`<hue>`) | Primary Use |
+| --- | --- | --- |
+| `tileActive` | `border-swatch-<hue> bg-swatch-<hue>/10 text-swatch-<hue> ring-2 ring-swatch-<hue>/20` | Selected tile in a category/type grid (`ActivityTypePicker`) |
+| `tileIdle` | `border-border bg-card text-foreground hover:border-swatch-<hue>/40 hover:bg-swatch-<hue>/5` | Unselected tile in a category/type grid |
+| `iconBoxActive` | `border-swatch-<hue> bg-swatch-<hue> text-primary-foreground` | Solid swatch icon container inside an active tile |
+| `iconBoxIdle` | `border-transparent bg-swatch-<hue>/15 text-swatch-<hue>` | Tinted 15% icon box in activity rows, modal headers, and detail hero cards |
+| `iconText` | `text-swatch-<hue>` | Standalone colored category icon or accent label |
+| `badge` | `border-swatch-<hue>/30 bg-swatch-<hue>/15 text-swatch-<hue>` | Category pill badge (`rounded-sm border px-2 py-0.5 text-2xs font-medium`) |
+| `pillActive` | `border-swatch-<hue> bg-swatch-<hue>/15 text-swatch-<hue> ring-2 ring-swatch-<hue>/20` | Active pill in a segmented category selector (e.g. Target Entity Type pills) |
+| `accentBorder` | `border-s-swatch-<hue>` | Logical inline-start `border-s-4` accent bar on detail hero cards |
+| `sectionCard` | `border-swatch-<hue>/25 bg-swatch-<hue>/5` | Tinted callout/section card |
+| `dot` | `bg-swatch-<hue>` | `6px`–`8px` solid indicator dot |
+
+### Canonical Category, Status & Priority Color Mappings
+
+Every swatch surface is **always** paired with its semantic icon and translated label so color reinforces visual scanning without ever acting as the sole signal:
+
+1. **Activity Types (`ACTIVITY_TYPES`)**:
+   - `TODO` (Task) → `indigo` (`SquareCheck`)
+   - `CALL` (Call) → `green` (`Phone`)
+   - `MEETING` (Meeting) → `purple` (`Users`)
+   - `EMAIL` (Email) → `blue` (`Mail`)
+   - `VISIT` (Site Visit) → `amber` (`MapPin`)
+   - `FOLLOW_UP` (Follow-up) → `teal` (`Clock`)
+   - `OTHER` (Other) → `pink` (`Circle`)
+2. **Target Entity Types (`ACTIVITY_TARGET_TYPES`)**:
+   - `LEAD` → `indigo`
+   - `CUSTOMER_PROFILE` → `green`
+   - `OPPORTUNITY` → `purple`
+   - `PARTY` → `teal`
+   - `QUOTATION` → `amber`
+   - `SALES_ORDER` → `blue`
+3. **Segmented Status & Priority Pills (`semanticSegmentPillClasses` / `semanticSegmentDotClasses`)**:
+   - **Status**: `PLANNED` → `info` (`border-info/40 bg-card text-info-subtle-foreground shadow-2xs`, dot `bg-info-vivid`) · `IN_PROGRESS` → `purple` (`border-swatch-purple/40 bg-card text-swatch-purple shadow-2xs`, dot `bg-swatch-purple`) · `DONE` → `success` (dot `bg-success-vivid`) · `CANCELLED` → `destructive` (dot `bg-destructive-vivid`).
+   - **Priority**: `LOW` → `slate` (`border-swatch-slate/40 bg-card text-foreground shadow-2xs`, dot `bg-swatch-slate`) · `NORMAL` → `info` · `HIGH` → `warning` · `URGENT` → `destructive`.
+   - **Idle segment pill**: `border-transparent bg-transparent text-muted-foreground hover:bg-card/60 hover:text-foreground` inside a `rounded-lg border border-border bg-muted/50 p-1` track.
+
 ---
 
 # 2 · Typography
@@ -926,6 +987,19 @@ header/footer and body, `CardTitle` at `text-lg`/600 and `CardDescription` at
 `text-sm`. Below `lg` the rail stacks above. Definition lists are two columns:
 label `text-xs` muted, value `text-xs`/400. Full spec:
 [detail-screens.md](detail-screens.md).
+
+### 7.4.1 Dossier 360° Quick-Edit Modal (`DOSSIER_MODAL_TOKENS`)
+
+Centered 360° Dossier Quick-Edit Modal (`max-w-[1380px]`, zero `<aside>`, auto-scroll-to-top on open/navigate) exported from `src/design-system/patterns/dossier-modal/dossier-modal-tokens.ts` and `src/app/globals.css` (Section 9):
+
+- **Header**: Gradient avatar badge (`CORPORATE` indigo/blue, `INDIVIDUAL` violet/pink, `CONVERTED` emerald/teal), profile & status pills, interactive 1–5 star rating pill, 8-color swatch dots, 4 colorful linked document KPI pills (`Opportunities`, `Quotations`, `Sales Orders`, `Invoices`), `Convert Lead` CTA, `Full Page` link, and clean subtitle (`Code · Source · Owner · Stage Age` — zero hardcoded debug metadata).
+- **8-Stage Interactive Pipeline Stepper**: Displays all pipeline stages (`NEW` → `CONVERTED`) with past (`✓`), current (`●`), disqualified (`✕`), and converted (`🏆`) visual states.
+- **2-Column Colorful Bento Grid (`7fr / 5fr`)**:
+  - **Left Column**:
+    - Corporate mode (`leadProfileType === "CORPORATE"`): **Company & Legal Details** (`indigo` top border, explicit `Edit` / `Save` / `Cancel` mode, split `Country Code + Local Number` phone editor with `+ Add Phone`, cascading `Country → Governorate → City/Area` address editor, and tenant custom fields) + **Company Contacts** (`emerald` top border, primary & secondary contacts with inline Add/Edit/Delete/Set Primary).
+    - Individual mode (`leadProfileType === "INDIVIDUAL"`): **Individual Personal & Direct Contact Details** (`violet` top border — never renders Company Details or Company Contacts cards).
+    - Both modes: **Qualification, Need, Source & Assignment** (`amber` top border — interactive salesperson picker, source picker, tags editor, expected need & qualification overview).
+  - **Right Column**: **Activities, Notes, Audit History & Attachments** (`cyan` top border — 4 tabs with live badge counts, inline `+ Quick Note` composer, `+ Log / Schedule Activity` modal trigger, Mark Done, Reschedule, and Delete actions).
 
 ---
 

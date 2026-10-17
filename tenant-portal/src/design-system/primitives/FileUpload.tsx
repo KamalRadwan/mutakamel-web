@@ -5,6 +5,7 @@ import { AlertTriangle, Paperclip, Upload, X } from "lucide-react";
 import { formatTemplate } from "@/lib/format/template";
 import { cn } from "../lib/cn";
 import { iconSize } from "../lib/icons";
+import { screenUploadFiles } from "../lib/upload-screening";
 import { focusRing } from "../lib/variants";
 import { Button } from "./Button";
 import { Progress } from "./Progress";
@@ -104,31 +105,14 @@ export function FileUpload({
 
   function admit(incoming: FileList | null) {
     if (!incoming || disabled) return;
-    const candidates = Array.from(incoming);
-    const accepted: File[] = [];
-    const rejected: string[] = [];
-
-    for (const file of candidates) {
-      if (!accept.includes(file.type)) {
-        rejected.push(formatTemplate(labels.wrongType, { name: file.name }));
-        continue;
-      }
-      if (file.size > maxSizeBytes) {
-        rejected.push(
-          formatTemplate(labels.tooLarge, {
-            name: file.name,
-            size: formatBytes(file.size),
-            max: formatBytes(maxSizeBytes),
-          }),
-        );
-        continue;
-      }
-      if (maxFiles !== undefined && files.length + accepted.length >= maxFiles) {
-        rejected.push(formatTemplate(labels.tooMany, { max: maxFiles }));
-        continue;
-      }
-      accepted.push(file);
-    }
+    const { accepted, rejected } = screenUploadFiles(Array.from(incoming), {
+      accept,
+      maxSizeBytes,
+      maxFiles,
+      queuedCount: files.length,
+      formatBytes,
+      labels,
+    });
 
     if (accepted.length > 0) onFilesAdded(accepted);
     if (rejected.length > 0) onReject?.(rejected);

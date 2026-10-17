@@ -80,6 +80,11 @@ export interface LeadItem {
   primaryContactName: string;
   tags: CrmTag[];
   primaryMobile?: string;
+  firstName?: string;
+  lastName?: string;
+  companyWebsite?: string;
+  acquisitionSourceId?: string;
+  contactsCount?: number;
   city?: string;
   taxNumber?: string;
   commercialRegistrationNumber?: string;
@@ -91,6 +96,8 @@ export interface LeadItem {
    * The stage-age badge counts from it; `updatedAt` moves on any edit.
    */
   stageEnteredAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LeadsPage {
@@ -216,6 +223,18 @@ export function parseLeadResponse(value: unknown, expectedBranchId: string): Lea
     primaryContactName: text(lead.primaryContactName),
     tags: parseCrmTags(lead.tags, INVALID_LEADS),
     primaryMobile: optionalText(lead.primaryMobile),
+    firstName: optionalText(lead.firstName),
+    lastName: optionalText(lead.lastName),
+    companyWebsite: optionalText(lead.companyWebsite),
+    acquisitionSourceId: isUUIDv7(lead.acquisitionSourceId)
+      ? lead.acquisitionSourceId
+      : isUUIDv7(source?.id)
+        ? source.id
+        : undefined,
+    contactsCount:
+      typeof lead.contactsCount === "number" && Number.isSafeInteger(lead.contactsCount)
+        ? lead.contactsCount
+        : undefined,
     city: optionalText(address?.city),
     taxNumber: optionalText(party?.taxNumber),
     commercialRegistrationNumber: optionalText(party?.commercialRegistrationNumber),
@@ -223,6 +242,8 @@ export function parseLeadResponse(value: unknown, expectedBranchId: string): Lea
     expectedNeed: optionalText(lead.expectedNeed),
     description: optionalText(lead.description),
     stageEnteredAt: optionalText(lead.stageEnteredAt),
+    createdAt: optionalText(lead.createdAt),
+    updatedAt: optionalText(lead.updatedAt),
   };
 }
 

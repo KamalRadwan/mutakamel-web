@@ -30,8 +30,12 @@ import { useAvailableWidgets } from "../hooks/useAvailableWidgets";
 import { useDashboardDetail, type DashboardMutationResult } from "../hooks/useDashboardDetail";
 import { useDashboardLayout } from "../hooks/useDashboardLayout";
 import { useDashboardShares } from "../hooks/useDashboardShares";
-import { useDashboardSwitcher } from "../hooks/useDashboardSwitcher";
+import {
+  STANDARD_TEMPLATE_LABELS,
+  useDashboardSwitcher,
+} from "../hooks/useDashboardSwitcher";
 import { useWidgetDrilldown } from "../hooks/useWidgetDrilldown";
+import type { DashboardTemplateKey } from "../../dashboard-contract";
 import { AddWidgetDrawer } from "./AddWidgetDrawer";
 import { DashboardEditDrawer } from "./DashboardEditDrawer";
 import { DashboardFilterBar } from "./DashboardFilterBar";
@@ -40,8 +44,16 @@ import { DrilldownSheet } from "./DrilldownSheet";
 import { ShareDrawer } from "./ShareDrawer";
 import { WidgetTile } from "./WidgetTile";
 
-export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
-  const { t } = useI18n();
+export function DashboardWorkspace({
+  dashboardId,
+  hideHeader = false,
+  onSelectDashboard,
+}: {
+  dashboardId: string;
+  hideHeader?: boolean;
+  onSelectDashboard?: (nextDashboardId: string) => void;
+}) {
+  const { t, lang } = useI18n();
   const toast = useToast();
   const router = useRouter();
   const { user } = useTenantAuth();
@@ -82,8 +94,8 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
   if (isLoading && detail === null) {
     return (
       <div className="flex flex-col gap-3">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-32 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
     );
@@ -112,6 +124,44 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
   const widgetCount = detail.placements.length;
   const hiddenCount = detail.unavailablePlacements.length;
 
+  const hasCurrentInSwitcher = switcher.items.some((item) => item.id === dashboardId);
+  const switcherOptions = hasCurrentInSwitcher
+    ? switcher.items
+    : [{ id: dashboardId, name: detail.name }, ...switcher.items];
+
+  const navigateToDashboard = (targetId: string) => {
+    if (targetId === dashboardId) return;
+    if (onSelectDashboard) {
+      onSelectDashboard(targetId);
+    } else {
+      router.push(`${TENANT_ROUTES.crmDashboards}/${targetId}`);
+    }
+  };
+
+  const allSwitcherOptions = [
+    ...switcherOptions.map((item) => ({ value: item.id, label: item.name })),
+    ...switcher.unprovisionedTemplates.map((templateKey) => ({
+      value: `template:${templateKey}`,
+      label:
+        lang === "ar"
+          ? STANDARD_TEMPLATE_LABELS[templateKey].ar
+          : STANDARD_TEMPLATE_LABELS[templateKey].en,
+    })),
+  ];
+
+  const handleSwitcherChange = (next: string) => {
+    if (next.startsWith("template:")) {
+      const templateKey = next.slice("template:".length) as DashboardTemplateKey;
+      void switcher.ensureTemplateDashboard(templateKey).then((provisionedId) => {
+        if (provisionedId) {
+          navigateToDashboard(provisionedId);
+        }
+      });
+      return;
+    }
+    navigateToDashboard(next);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <DetailHeader
@@ -119,29 +169,21 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
         subtitle={detail.description ?? undefined}
         backHref={TENANT_ROUTES.crmDashboards}
         backLabel={t.crmDashboards.backToList}
+        className={hideHeader ? "sr-only" : undefined}
         secondaryActions={
           <>
-            {switcher.items.length > 1 ? (
-              <Select
-                value={dashboardId}
-                onValueChange={(next) => {
-                  if (next !== dashboardId) {
-                    router.push(`${TENANT_ROUTES.crmDashboards}/${next}`);
-                  }
-                }}
-              >
-                <SelectTrigger size="sm" aria-label={t.crmDashboards.switchDashboard} className="w-56">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {switcher.items.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
+            <Select value={dashboardId} onValueChange={handleSwitcherChange}>
+              <SelectTrigger size="sm" aria-label={t.crmDashboards.switchDashboard} className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {allSwitcherOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button size="sm"
               variant="outline"
               onClick={() => void detailState.reload()}
@@ -191,6 +233,11 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
         branchIds={user?.accessibleBranches ?? []}
         currencyCodes={availableCurrencies}
         disabled={isRunning}
+        dashboardSwitcher={{
+          value: dashboardId,
+          options: allSwitcherOptions,
+          onChange: handleSwitcherChange,
+        }}
       />
 
       {/* Partial failure, named per widget — 3 of 9, not "the dashboard
@@ -258,28 +305,47 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {detail.placements.map((placement) => (
-            <WidgetTile
-              key={placement.id}
-              widget={placement.widget}
-              result={run?.widgets[placement.widgetId]}
-              placementId={placement.id}
-              isRemoving={layout.pendingPlacementId === placement.id}
-              onDrilldown={(widget, pointKey, label) =>
-                drilldown.open(widget, pointKey, label, selection)
-              }
-              onRemove={
-                layout.isEditing
-                  ? (placementId) => {
-                      void layout
-                        .removePlacement(placementId)
-                        .then((result) => report(result, t.crmDashboards.widgetRemoved));
-                    }
-                  : undefined
-              }
-            />
-          ))}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+          {detail.placements.map((placement) => {
+            const colSpan =
+              placement.width <= 3
+                ? "sm:col-span-1 lg:col-span-3"
+                : placement.width === 4
+                  ? "sm:col-span-2 lg:col-span-4"
+                  : placement.width === 5
+                    ? "sm:col-span-2 lg:col-span-5"
+                    : placement.width === 6
+                      ? "sm:col-span-2 lg:col-span-6"
+                      : placement.width === 7
+                        ? "sm:col-span-2 lg:col-span-7"
+                        : placement.width === 8
+                          ? "sm:col-span-2 lg:col-span-8"
+                          : placement.width === 9
+                            ? "sm:col-span-2 lg:col-span-9"
+                            : "sm:col-span-2 lg:col-span-12";
+            return (
+              <div key={placement.id} className={colSpan}>
+                <WidgetTile
+                  widget={placement.widget}
+                  result={run?.widgets[placement.widgetId]}
+                  placementId={placement.id}
+                  isRemoving={layout.pendingPlacementId === placement.id}
+                  onDrilldown={(widget, pointKey, label) =>
+                    drilldown.open(widget, pointKey, label, selection)
+                  }
+                  onRemove={
+                    layout.isEditing
+                      ? (placementId) => {
+                          void layout
+                            .removePlacement(placementId)
+                            .then((result) => report(result, t.crmDashboards.widgetRemoved));
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../../trade-api";
-import { parseTradeArray } from "../../../trade-advanced-validation";
+import { isUuidV7, parseTradeArray } from "../../../trade-advanced-validation";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import { INVENTORY_READ_PERMISSION, invalidResponse } from "../../inventory-contract";
 import {
@@ -27,6 +27,7 @@ export function useInventorySerials() {
   const [items, setItems] = useState<InventorySerial[]>([]);
   const [stateFilter, setStateFilter] = useState<SerialState | undefined>(undefined);
   const [search, setSearch] = useState("");
+  const [itemIdFilter, setItemIdFilter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -36,6 +37,8 @@ export function useInventorySerials() {
     scope.isTenantOwner,
     INVENTORY_READ_PERMISSION,
   );
+
+  const validItemId = isUuidV7(itemIdFilter.trim()) ? itemIdFilter.trim() : undefined;
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -48,11 +51,16 @@ export function useInventorySerials() {
       try {
         // `serialKey` is an EXACT match filter on the query DTO, not a search:
         // there is no partial-match parameter anywhere on this route.
-        const response = await tradeGet(serialsListPath(stateFilter, search.trim() || undefined), {
-          signal,
-          headers: scope.headers,
-          maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-        });
+        const response = await tradeGet(
+          serialsListPath(stateFilter, search.trim() || undefined, {
+            itemId: validItemId,
+          }),
+          {
+            signal,
+            headers: scope.headers,
+            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+          },
+        );
         setItems(parseTradeArray(response.data, parseInventorySerial, invalidResponse));
         setHasLoaded(true);
       } catch (error) {
@@ -62,7 +70,7 @@ export function useInventorySerials() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [scope.isResolved, scope.headers, stateFilter, search],
+    [scope.isResolved, scope.headers, stateFilter, search, validItemId],
   );
 
   useEffect(() => {
@@ -84,11 +92,13 @@ export function useInventorySerials() {
     items,
     stateFilter,
     search,
+    itemIdFilter,
     isLoading: isLoading && !hasLoaded,
     isRefreshing: isLoading,
     queryError,
     setStateFilter,
     setSearch,
+    setItemIdFilter,
     reload: () => load(),
   };
 }
@@ -96,3 +106,4 @@ export function useInventorySerials() {
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
+

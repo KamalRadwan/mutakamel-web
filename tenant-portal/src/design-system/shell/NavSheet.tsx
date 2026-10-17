@@ -73,10 +73,11 @@ export function NavSheet({
                     href={item.href}
                     aria-current={isActive ? "page" : undefined}
                     className={cn(
-                      "relative flex items-center gap-2 rounded-xs px-2 py-1.5 text-sm text-sidebar-foreground",
+                      "relative flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-sidebar-foreground transition-colors",
                       "before:absolute before:inset-y-1 before:start-0 before:w-0.5 before:rounded-full before:bg-transparent",
                       "hover:bg-accent",
-                      isActive && "font-medium text-foreground before:bg-sidebar-active",
+                      isActive &&
+                        "bg-info-subtle font-medium text-info-subtle-foreground before:bg-sidebar-active hover:bg-info-subtle",
                     )}
                   >
                     <Icon className="size-4 shrink-0" aria-hidden="true" />

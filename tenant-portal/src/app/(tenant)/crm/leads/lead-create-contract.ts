@@ -41,6 +41,7 @@ export const LEAD_CREATE_LIMITS = {
   addressMedium: 120,
   addressLong: 160,
   postalCode: 40,
+  companyWebsite: 255,
 } as const;
 
 export interface LeadContactForm {
@@ -82,6 +83,7 @@ export interface CreateLeadForm {
    * undirtied and the close guard stays quiet about changes nobody made.
    */
   branchId: string;
+  ownerUserId?: string;
   leadProfileType: CrmProfileType;
   stageId: string;
   acquisitionSourceId: string;
@@ -95,6 +97,8 @@ export interface CreateLeadForm {
   taxNumber: string;
   commercialRegistrationNumber: string;
   companyPhones: string[];
+  companyEmail?: string;
+  companyWebsite?: string;
   contacts: LeadContactForm[];
   honorificTitle: string;
   firstName: string;
@@ -155,6 +159,7 @@ export function emptyLeadContact(key: string): LeadContactForm {
 export function emptyCreateLeadForm(contactKey: string): CreateLeadForm {
   return {
     branchId: "",
+    ownerUserId: "",
     // INDIVIDUAL is the default because it is the SMALLER of the two shapes:
     // it asks for one person and nothing else, while CORPORATE additionally
     // demands a company name and at least one contact person — both of them
@@ -171,6 +176,8 @@ export function emptyCreateLeadForm(contactKey: string): CreateLeadForm {
     taxNumber: "",
     commercialRegistrationNumber: "",
     companyPhones: [""],
+    companyEmail: "",
+    companyWebsite: "",
     contacts: [emptyLeadContact(contactKey)],
     honorificTitle: "",
     firstName: "",
@@ -392,6 +399,7 @@ export function buildCreateLeadRequest(
     leadProfileType: form.leadProfileType,
     ...optional("stageId", form.stageId),
     ...optional("acquisitionSourceId", form.acquisitionSourceId),
+    ...optional("ownerUserId", form.ownerUserId ?? ""),
     ...optional("description", form.description),
     ...optional("interestSummary", form.interestSummary),
     ...optional("expectedNeed", form.expectedNeed),
@@ -424,6 +432,8 @@ export function buildCreateLeadRequest(
       optional("legalName", form.legalName),
       optional("taxNumber", form.taxNumber),
       optional("commercialRegistrationNumber", form.commercialRegistrationNumber),
+      optional("companyEmail", form.companyEmail ?? ""),
+      optional("companyWebsite", form.companyWebsite ?? ""),
     );
     const companyPhones = filledPhones(form.companyPhones);
     if (companyPhones.length > 0) request.companyPhones = companyPhones;

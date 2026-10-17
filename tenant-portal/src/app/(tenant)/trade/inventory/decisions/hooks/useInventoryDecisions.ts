@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../../trade-api";
-import { parseTradeArray } from "../../../trade-advanced-validation";
+import { isUuidV7, parseTradeArray } from "../../../trade-advanced-validation";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import { INVENTORY_READ_PERMISSION, invalidResponse } from "../../inventory-contract";
 import {
@@ -31,6 +31,7 @@ export function useInventoryDecisions() {
 
   const [items, setItems] = useState<InventoryDecision[]>([]);
   const [policyKind, setPolicyKind] = useState<InventoryPolicyKind | undefined>(undefined);
+  const [aggregateIdFilter, setAggregateIdFilter] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -41,6 +42,10 @@ export function useInventoryDecisions() {
     INVENTORY_READ_PERMISSION,
   );
 
+  const validAggregateId = isUuidV7(aggregateIdFilter.trim())
+    ? aggregateIdFilter.trim()
+    : undefined;
+
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
       if (!scope.isResolved) {
@@ -50,11 +55,14 @@ export function useInventoryDecisions() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const response = await tradeGet(inventoryDecisionsListPath(policyKind), {
-          signal,
-          headers: scope.headers,
-          maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-        });
+        const response = await tradeGet(
+          inventoryDecisionsListPath(policyKind, validAggregateId),
+          {
+            signal,
+            headers: scope.headers,
+            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+          },
+        );
         setItems(parseTradeArray(response.data, parseInventoryDecision, invalidResponse));
         setHasLoaded(true);
       } catch (error) {
@@ -64,7 +72,7 @@ export function useInventoryDecisions() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [scope.isResolved, scope.headers, policyKind],
+    [scope.isResolved, scope.headers, policyKind, validAggregateId],
   );
 
   useEffect(() => {
@@ -85,10 +93,12 @@ export function useInventoryDecisions() {
     selectBranch,
     items,
     policyKind,
+    aggregateIdFilter,
     isLoading: isLoading && !hasLoaded,
     isRefreshing: isLoading,
     queryError,
     setPolicyKind,
+    setAggregateIdFilter,
     reload: () => load(),
   };
 }
@@ -96,3 +106,4 @@ export function useInventoryDecisions() {
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
+

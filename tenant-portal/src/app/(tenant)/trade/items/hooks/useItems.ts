@@ -32,6 +32,9 @@ import {
   type ItemKind,
   type ItemStatus,
 } from "../item-contract";
+import { parseCreatedItemRef, type ItemImageChange } from "../item-image-contract";
+import { useCreateItemImage } from "./useCreateItemImage";
+import type { ItemImageTarget } from "./useItemImageCommands";
 
 const LIST_RESPONSE_LIMIT_BYTES = 800_000;
 
@@ -71,7 +74,9 @@ export function useItems() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Item | null>(null);
   const [editLoadingId, setEditLoadingId] = useState<string | null>(null);
+  const [editRevision, setEditRevision] = useState(0);
   const [movingId, setMovingId] = useState<string | null>(null);
+  const createImage = useCreateItemImage();
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -125,21 +130,36 @@ export function useItems() {
     [t],
   );
 
+  /**
+   * `image`, when given, is uploaded only after the Item exists (LLD 02b §19
+   * create flow). A failed upload never undoes the Item: New Item stays open
+   * on "Item saved. The image was not uploaded." and this returns `false`.
+   */
   const create = useCallback(
-    async (values: ItemFormValues): Promise<boolean> => {
+    async (values: ItemFormValues, image: File | null = null): Promise<boolean> => {
       if (!canManage || isSubmitting) return false;
       setIsSubmitting(true);
       setFormError(null);
       try {
         const request = buildCreateItemRequest(values);
+        let receipt: unknown = null;
         // TENANT target: no scope headers at all, whatever the selector says.
-        const outcome = await runWrite(() => tradePost(ITEMS_PATH, request, {}), {
-          failureTitle: t.trade.itemCreateFailed,
-          describe,
-        });
+        const outcome = await runWrite(
+          async () => {
+            const result = await tradePost(ITEMS_PATH, request, {});
+            receipt = result.data;
+            return result;
+          },
+          { failureTitle: t.trade.itemCreateFailed, describe },
+        );
         if (!outcome.ok) return false;
-        setCreateOpen(false);
-        toast.success(t.trade.savedTitle, replayMessage(outcome.replayed, t));
+        const uploaded = image
+          ? await createImage.uploadAfterCreate(createdTarget(receipt), image)
+          : true;
+        if (uploaded) {
+          setCreateOpen(false);
+          toast.success(t.trade.savedTitle, replayMessage(outcome.replayed, t));
+        }
         // Creation writes only the tenant identity; a company-profile read
         // cannot include it yet. Let the changed query load the master page.
         if (context.companyId || page !== 1 || search || kindFilter || statusFilter) {
@@ -151,7 +171,7 @@ export function useItems() {
         } else {
           await load();
         }
-        return true;
+        return uploaded;
       } catch (error) {
         setFormError(formMessage(error, t));
         return false;
@@ -159,8 +179,30 @@ export function useItems() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, runWrite, describe, toast, t, load, context.companyId, selectCompany, page, search, kindFilter, statusFilter],
+    [canManage, isSubmitting, runWrite, describe, toast, t, load, context.companyId, selectCompany, page, search, kindFilter, statusFilter, createImage],
   );
+
+  /** Uploads to the Item New Item already saved; never creates another. */
+  const retryCreateImage = useCallback(
+    async (image: File): Promise<boolean> => {
+      if (!(await createImage.retry(image))) return false;
+      setCreateOpen(false);
+      toast.success(t.trade.savedTitle, t.trade.itemImage.updated);
+      await load();
+      return true;
+    },
+    [createImage, toast, t, load],
+  );
+
+  /** A receipt's new version and image, so the row and the open editor stay current. */
+  const applyImageChange = useCallback((change: ItemImageChange) => {
+    const patch = (item: Item): Item =>
+      item.id === change.itemId
+        ? { ...item, version: change.itemVersion, image: change.image }
+        : item;
+    setItems((current) => current.map(patch));
+    setEditing((current) => (current ? patch(current) : current));
+  }, []);
 
   const update = useCallback(
     async (values: ItemFormValues): Promise<boolean> => {
@@ -252,6 +294,7 @@ export function useItems() {
   };
   const openCreate = () => {
     setFormError(null);
+    createImage.reset();
     setCreateOpen(true);
   };
   const openEdit = useCallback(async (item: Item): Promise<void> => {
@@ -273,6 +316,26 @@ export function useItems() {
       setEditLoadingId(null);
     }
   }, [canManage, editLoadingId, isSubmitting, t, toast]);
+
+  /**
+   * After a stale image write in the editor: the server's Item replaces the
+   * open one and the editor remounts on it, so no field the user did not
+   * touch is sent back over someone else's change.
+   */
+  const reloadEditing = useCallback(async (): Promise<void> => {
+    if (!editing) return;
+    try {
+      const result = await tradeGet(itemPath(editing.id), {
+        headers: {},
+        maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+      });
+      setEditing(parseItemDetailResponse(result.data));
+      setEditRevision((current) => current + 1);
+    } catch (thrown) {
+      toast.errorFromApi(t.trade.itemLoadFailed, normalizeApiError(thrown));
+    }
+    await load();
+  }, [editing, load, t, toast]);
 
   return {
     t,
@@ -302,6 +365,7 @@ export function useItems() {
     formError,
     createOpen,
     editing,
+    editRevision,
     editLoadingId,
     setPage,
     setKindFilter: (next: ItemKind | undefined) => {
@@ -318,8 +382,9 @@ export function useItems() {
     },
     openCreate,
     closeCreate: () => {
-      if (isSubmitting) return;
+      if (isSubmitting || createImage.isUploading) return;
       setFormError(null);
+      createImage.reset();
       setCreateOpen(false);
     },
     openEdit,
@@ -329,6 +394,16 @@ export function useItems() {
       setEditing(null);
     },
     create,
+    createImage: {
+      failed: createImage.failed,
+      canRetry: createImage.canRetry,
+      isUploading: createImage.isUploading,
+      error: createImage.error,
+      status: createImage.status,
+      retry: retryCreateImage,
+    },
+    applyImageChange,
+    reloadEditing,
     update,
     moveToStatus,
     reload,
@@ -356,6 +431,15 @@ function formMessage(error: unknown, t: Dictionary): string {
   if (reason === "ITEM_FORM_COMBO") return t.trade.itemFormComboComponents;
   if (reason === "ITEM_FORM_OPTIONAL_PRODUCTS") return t.trade.itemFormOptionalProducts;
   return t.trade.itemCreateFailed;
+}
+
+function createdTarget(receipt: unknown): ItemImageTarget | null {
+  try {
+    const created = parseCreatedItemRef(receipt);
+    return { itemId: created.id, version: created.version };
+  } catch {
+    return null;
+  }
 }
 
 function isAbortError(error: unknown): boolean {

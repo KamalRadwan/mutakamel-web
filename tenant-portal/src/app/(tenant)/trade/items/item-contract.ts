@@ -1,6 +1,7 @@
 import type { TradePath } from "@/lib/api/envelope";
 import { categoryAssignment, parseItemCategorySummary, type CategoryIntent, type ItemCategorySummary } from "../categories/category-contract";
 import {
+  formatTradeDecimal,
   isJsonObject,
   isLocalizedNames,
   isNonEmptyString,
@@ -13,6 +14,9 @@ import {
   record,
   type TradePage,
 } from "../trade-validation";
+import { parseItemImageSummary, type ItemImageSummary } from "./item-image-contract";
+
+export { formatTradeDecimal };
 
 // docs/api/trade-foundation.md#items--15-routes, verified against
 // trade-app/src/modules/catalog/catalog.controller.ts, catalog.service.ts,
@@ -109,6 +113,8 @@ export interface Item {
   version: number;
   updatedAt: string;
   eligibility: ItemEligibility | null;
+  /** The current image (LLD 02b §5); absent on create and update receipts. */
+  image: ItemImageSummary | null;
 }
 
 export interface ComboComponentFormValue {
@@ -194,8 +200,8 @@ export function toItemForm(item: Item): ItemFormValues {
     barcode: item.barcode ?? "",
     notes: item.notes ?? "",
     ownerUserId: item.ownerUserId ?? "",
-    weightKg: item.weightKg ?? "",
-    volumeM3: item.volumeM3 ?? "",
+    weightKg: item.weightKg ? formatTradeDecimal(item.weightKg) : "",
+    volumeM3: item.volumeM3 ? formatTradeDecimal(item.volumeM3) : "",
     quotationDescription: item.quotationDescription ?? "",
     salesOrderDescription: item.salesOrderDescription ?? "",
     receiptDescription: item.receiptDescription ?? "",
@@ -203,7 +209,7 @@ export function toItemForm(item: Item): ItemFormValues {
     comboComponents: item.comboComponents.map((component) => ({
       key: `combo-${component.sortOrder}-${component.componentItemId}`,
       itemId: component.componentItemId,
-      quantity: component.quantity,
+      quantity: formatTradeDecimal(component.quantity),
     })),
     optionalProducts: item.optionalProducts.map((product) => ({
       key: `optional-${product.sortOrder}-${product.optionalProductItemId}`,
@@ -519,8 +525,16 @@ export function buildUpdateItemRequest(current: Item, values: ItemFormValues): U
     ["barcode", nullableText(values.barcode), current.barcode],
     ["notes", nullableText(values.notes), current.notes],
     ["ownerUserId", nullableText(values.ownerUserId), current.ownerUserId],
-    ["weightKg", nullableText(values.weightKg), current.weightKg],
-    ["volumeM3", nullableText(values.volumeM3), current.volumeM3],
+    [
+      "weightKg",
+      values.weightKg.trim() ? formatTradeDecimal(values.weightKg) : null,
+      current.weightKg ? formatTradeDecimal(current.weightKg) : null,
+    ],
+    [
+      "volumeM3",
+      values.volumeM3.trim() ? formatTradeDecimal(values.volumeM3) : null,
+      current.volumeM3 ? formatTradeDecimal(current.volumeM3) : null,
+    ],
     ["quotationDescription", nullableText(values.quotationDescription), current.quotationDescription],
     ["salesOrderDescription", nullableText(values.salesOrderDescription), current.salesOrderDescription],
     ["receiptDescription", nullableText(values.receiptDescription), current.receiptDescription],
@@ -530,10 +544,13 @@ export function buildUpdateItemRequest(current: Item, values: ItemFormValues): U
     if (next !== previous) request[field] = next;
   }
 
-  const comboComponents = buildComboComponents(values);
+  const comboComponents = buildComboComponents(values)?.map((component) => ({
+    ...component,
+    quantity: formatTradeDecimal(component.quantity),
+  }));
   const currentComboOrder = current.comboComponents.map((component, sortOrder) => ({
     componentItemId: component.componentItemId,
-    quantity: component.quantity,
+    quantity: formatTradeDecimal(component.quantity),
     sortOrder,
   }));
   if (comboComponents && JSON.stringify(comboComponents) !== JSON.stringify(currentComboOrder)) {
@@ -690,6 +707,7 @@ export function parseItemResponse(payload: unknown): Item {
     version: item.version,
     updatedAt: item.updatedAt,
     eligibility: parseEligibility(item.eligibility),
+    image: parseItemImageSummary(item.image),
   };
 }
 
@@ -704,6 +722,66 @@ export function parseItemDetailResponse(payload: unknown): Item {
 
 export function parseItemsResponse(payload: unknown): TradePage<Item> {
   return parseTradePage(payload, parseItemResponse, invalidResponse);
+}
+
+export interface VariantAttributeRow {
+  id: string;
+  name: string;
+  value: string;
+}
+
+export function serializeVariantRows(rows: VariantAttributeRow[]): {
+  json: string;
+  invalid: boolean;
+  count: number;
+} {
+  const identity: Record<string, string> = {};
+  let invalid = false;
+  for (const row of rows) {
+    const name = row.name.trim();
+    const value = row.value.trim();
+    if (!name && !value) continue;
+    if (!name || Object.hasOwn(identity, name)) {
+      invalid = true;
+      continue;
+    }
+    identity[name] = value;
+  }
+  const keysCount = Object.keys(identity).length;
+  return {
+    json: keysCount > 0 ? JSON.stringify(identity, null, 2) : "",
+    invalid,
+    count: keysCount,
+  };
+}
+
+export function parseVariantIdentityToRows(
+  raw: string,
+  firstId = 1,
+): { rows: VariantAttributeRow[]; nextRowId: number } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { rows: [], nextRowId: firstId };
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    const asRecord = record(parsed);
+    if (!asRecord) return { rows: [], nextRowId: firstId };
+    const entries = Object.entries(asRecord);
+    return {
+      rows: entries.map(([name, value], index) => ({
+        id: `attribute-${firstId + index}`,
+        name,
+        value:
+          value === null || value === undefined
+            ? ""
+            : typeof value === "object"
+              ? JSON.stringify(value)
+              : String(value),
+      })),
+      nextRowId: firstId + entries.length,
+    };
+  } catch {
+    return { rows: [], nextRowId: firstId };
+  }
 }
 
 function invalidResponse(): never {

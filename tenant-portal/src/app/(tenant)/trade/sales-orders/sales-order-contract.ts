@@ -208,3 +208,65 @@ function timestamp(value: unknown): string {
 export function salesOrderTotals(order: SalesOrder): Record<string, unknown> {
   return jsonObject(order.totalsSnapshot);
 }
+
+export interface CreateSalesOrderLinePayload {
+  clientLineId: string;
+  itemId: string;
+  uomId: string;
+  quantity: string;
+  financial: {
+    discountTotal: string;
+    chargeTotal: string;
+    taxTotal: string;
+    lineTotal: string;
+    taxSnapshot: Record<string, unknown>;
+  };
+}
+
+export interface CreateSalesOrderRequest {
+  partyId: string;
+  currencyCode: string;
+  draftReference?: string;
+  lines: CreateSalesOrderLinePayload[];
+  totals: {
+    subtotal: string;
+    discountTotal: string;
+    chargeTotal: string;
+    taxTotal: string;
+    roundingTotal: string;
+    grandTotal: string;
+    amountPaid: string;
+    amountDue: string;
+  };
+  terms: Record<string, unknown>;
+}
+
+export function buildCreateSalesOrder(input: {
+  partyId: string;
+  currencyCode: string;
+  draftReference?: string;
+  lines: CreateSalesOrderLinePayload[];
+  totals: CreateSalesOrderRequest["totals"];
+  terms?: Record<string, unknown>;
+}): CreateSalesOrderRequest {
+  const code = input.currencyCode.trim().toUpperCase();
+  if (!isUUIDv7(input.partyId.trim())) {
+    throw new Error("SALES_ORDER_FORM_CUSTOMER");
+  }
+  if (!/^[A-Z]{3}$/u.test(code)) {
+    throw new Error("SALES_ORDER_FORM_CURRENCY");
+  }
+  const ref = input.draftReference?.trim() ?? "";
+  return {
+    partyId: input.partyId.trim(),
+    currencyCode: code,
+    ...(ref ? { draftReference: ref.slice(0, 80) } : {}),
+    lines: input.lines,
+    totals: input.totals,
+    terms:
+      input.terms && Object.keys(input.terms).length > 0
+        ? input.terms
+        : { paymentTermCode: "NET_30", fulfillmentMode: "STOCK_FIRST" },
+  };
+}
+

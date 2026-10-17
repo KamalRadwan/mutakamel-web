@@ -80,7 +80,67 @@ export const WORKFLOW_KINDS = [
 ] as const;
 
 export const GOVERNANCE_SCOPE_TARGETS = ["TENANT", "COMPANY", "BRANCH"] as const;
-type GovernanceScopeTarget = (typeof GOVERNANCE_SCOPE_TARGETS)[number];
+export type GovernanceScopeTarget = (typeof GOVERNANCE_SCOPE_TARGETS)[number];
+
+export const POLICY_OPERATORS = [
+  "EQ",
+  "NEQ",
+  "GT",
+  "GTE",
+  "LT",
+  "LTE",
+  "IN",
+  "CONTAINS",
+] as const;
+export type PolicyOperator = (typeof POLICY_OPERATORS)[number];
+
+export const POLICY_OUTCOMES = [
+  "ALLOW",
+  "DENY",
+  "REQUIRE_APPROVAL",
+  "HOLD",
+] as const;
+export type PolicyOutcome = (typeof POLICY_OUTCOMES)[number];
+
+export const WORKFLOW_ACTIONS = [
+  "SUBMIT",
+  "APPROVE",
+  "REJECT",
+  "WITHDRAW",
+  "CONFIRM",
+  "CANCEL",
+  "HOLD",
+  "RELEASE",
+  "RETRY",
+] as const;
+export type WorkflowActionVerb = (typeof WORKFLOW_ACTIONS)[number];
+
+export interface PolicyFactDefinition {
+  key: string;
+  valueType: "string" | "number" | "boolean" | "string[]";
+  operators: readonly PolicyOperator[];
+  exampleValue: string;
+}
+
+export const POLICY_FACT_REGISTRY: readonly PolicyFactDefinition[] = [
+  { key: "document.type", valueType: "string", operators: ["EQ", "NEQ", "IN"], exampleValue: '"SALES_ORDER"' },
+  { key: "document.totalAmount", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "50000" },
+  { key: "document.requestedDiscountPercent", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "15" },
+  { key: "document.currencyCode", valueType: "string", operators: ["EQ", "NEQ", "IN"], exampleValue: '"SAR"' },
+  { key: "document.hasManualPriceOverride", valueType: "boolean", operators: ["EQ", "NEQ"], exampleValue: "true" },
+  { key: "document.lineCount", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "25" },
+  { key: "account.creditLimit", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "100000" },
+  { key: "account.currentExposure", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "85000" },
+  { key: "account.overdueBalance", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "10000" },
+  { key: "account.overdueDays", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "30" },
+  { key: "account.creditUtilizationRatio", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "0.85" },
+  { key: "pricing.minimumMarginPercent", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "12" },
+  { key: "pricing.actualMarginPercent", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "8" },
+  { key: "pricing.belowMinimumAllowedPrice", valueType: "boolean", operators: ["EQ", "NEQ"], exampleValue: "true" },
+  { key: "inventory.availableQuantity", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "0" },
+  { key: "inventory.projectedOnHand", valueType: "number", operators: ["EQ", "NEQ", "GT", "GTE", "LT", "LTE"], exampleValue: "-1" },
+  { key: "actor.roles", valueType: "string[]", operators: ["CONTAINS"], exampleValue: '"SALES_MANAGER"' },
+] as const;
 
 /** The nine ladder verbs. `rollback` is the only 201; the rest answer 200. */
 export const GOVERNANCE_ACTIONS = [
@@ -117,6 +177,16 @@ export interface GovernedVersion {
   effectiveFrom: string;
   effectiveTo: string | null;
   approvedAt: string | null;
+  content?: Record<string, unknown> | null;
+  testCases?: unknown[] | null;
+  createdByUserId?: string | null;
+  submittedByUserId?: string | null;
+  approvedByUserId?: string | null;
+  publishedByUserId?: string | null;
+  restoredFromVersionId?: string | null;
+  restorationReason?: string | null;
+  rejectionReason?: string | null;
+  retirementReason?: string | null;
 }
 
 export interface GovernedDefinition {
@@ -272,6 +342,269 @@ export function buildCreateVersionRequest(values: VersionFormValues): {
     : request;
 }
 
+/**
+ * `UpdateGovernedVersionDto` (`PATCH /policy-versions/:id` and `PATCH /workflow-versions/:id`).
+ * Editable only while the version is in `DRAFT` or `REJECTED`.
+ */
+export function buildUpdateVersionRequest(values: VersionFormValues): {
+  content?: Record<string, unknown>;
+  testCases?: unknown[];
+  effectiveFrom?: string;
+  effectiveTo?: string | null;
+} {
+  return {
+    content: parseJsonObject(values.content),
+    testCases: parseTestCases(values.testCases),
+    effectiveFrom: isoInstant(values.effectiveFrom),
+    effectiveTo: values.effectiveTo.trim().length > 0 ? isoInstant(values.effectiveTo) : null,
+  };
+}
+
+export interface PolicyVisualRuleDraft {
+  code: string;
+  priority: string;
+  fact: string;
+  operator: PolicyOperator;
+  value: string;
+  outcome: PolicyOutcome;
+  reasonCode: string;
+}
+
+export interface PolicyVisualTestCaseDraft {
+  code: string;
+  factsJson: string;
+  expectedOutcome: PolicyOutcome;
+  expectedRuleCode: string;
+}
+
+export const EMPTY_POLICY_VISUAL_RULE: PolicyVisualRuleDraft = {
+  code: "RULE_01",
+  priority: "100",
+  fact: "document.totalAmount",
+  operator: "GT",
+  value: "50000",
+  outcome: "REQUIRE_APPROVAL",
+  reasonCode: "HIGH_VALUE_APPROVAL",
+};
+
+export const EMPTY_POLICY_VISUAL_TEST: PolicyVisualTestCaseDraft = {
+  code: "TC_01",
+  factsJson: '{"document.totalAmount": 75000}',
+  expectedOutcome: "REQUIRE_APPROVAL",
+  expectedRuleCode: "RULE_01",
+};
+
+export function serializePolicyVisualDraft(
+  defaultOutcome: PolicyOutcome,
+  rules: PolicyVisualRuleDraft[],
+  testCases: PolicyVisualTestCaseDraft[],
+): { content: string; testCases: string } {
+  const compiledRules = rules.map((r) => {
+    const factMeta = POLICY_FACT_REGISTRY.find((f) => f.key === r.fact);
+    let parsedVal: unknown = r.value.trim();
+    if (factMeta?.valueType === "number") {
+      const n = Number(r.value.trim());
+      parsedVal = Number.isFinite(n) ? n : 0;
+    } else if (factMeta?.valueType === "boolean") {
+      parsedVal = r.value.trim().toLowerCase() === "true";
+    } else if (r.operator === "IN") {
+      parsedVal = r.value
+        .split(",")
+        .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean);
+    } else {
+      parsedVal = r.value.trim().replace(/^["']|["']$/g, "");
+    }
+    return {
+      code: r.code.trim().toUpperCase() || "RULE_01",
+      priority: Number.isSafeInteger(Number(r.priority)) ? Number(r.priority) : 100,
+      when: {
+        all: [
+          {
+            fact: r.fact,
+            operator: r.operator,
+            value: parsedVal,
+          },
+        ],
+      },
+      outcome: r.outcome,
+      reasonCode: r.reasonCode.trim().toUpperCase() || "POLICY_RULE_MATCHED",
+    };
+  });
+
+  const compiledTests = testCases.map((tc) => {
+    let factsObj: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(tc.factsJson);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        factsObj = parsed as Record<string, unknown>;
+      }
+    } catch {
+      factsObj = {};
+    }
+    return {
+      code: tc.code.trim().toUpperCase() || "TC_01",
+      facts: factsObj,
+      expectedOutcome: tc.expectedOutcome,
+      ...(tc.expectedRuleCode.trim()
+        ? { expectedRuleCode: tc.expectedRuleCode.trim().toUpperCase() }
+        : {}),
+    };
+  });
+
+  return {
+    content: JSON.stringify({ defaultOutcome, rules: compiledRules }, null, 2),
+    testCases: JSON.stringify(compiledTests, null, 2),
+  };
+}
+
+export interface WorkflowVisualTransitionDraft {
+  code: string;
+  from: string;
+  action: WorkflowActionVerb;
+  to: string;
+  requiresApproval: boolean;
+}
+
+export interface WorkflowVisualTestCaseDraft {
+  code: string;
+  startState: string;
+  actionsCsv: string;
+  expectedState: string;
+}
+
+export const EMPTY_WORKFLOW_VISUAL_TRANSITION: WorkflowVisualTransitionDraft = {
+  code: "TR_SUBMIT",
+  from: "DRAFT",
+  action: "SUBMIT",
+  to: "PENDING_APPROVAL",
+  requiresApproval: true,
+};
+
+export const EMPTY_WORKFLOW_VISUAL_TEST: WorkflowVisualTestCaseDraft = {
+  code: "TC_HAPPY_PATH",
+  startState: "DRAFT",
+  actionsCsv: "SUBMIT, APPROVE, CONFIRM",
+  expectedState: "CONFIRMED",
+};
+
+export interface WorkflowGraphValidationReport {
+  valid: boolean;
+  unreachableStates: string[];
+  terminalOutgoingTransitions: string[];
+  duplicateTransitionKeys: string[];
+}
+
+export function validateWorkflowGraphClient(
+  statesCsv: string,
+  initialState: string,
+  terminalStatesCsv: string,
+  transitions: WorkflowVisualTransitionDraft[],
+): WorkflowGraphValidationReport {
+  const states = statesCsv
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const init = initialState.trim().toUpperCase();
+  const terminals = new Set(
+    terminalStatesCsv
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean),
+  );
+
+  const reachable = new Set<string>();
+  const queue: string[] = init ? [init] : [];
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    if (reachable.has(curr)) continue;
+    reachable.add(curr);
+    for (const tr of transitions) {
+      if (tr.from.trim().toUpperCase() === curr) {
+        const next = tr.to.trim().toUpperCase();
+        if (next && !reachable.has(next)) {
+          queue.push(next);
+        }
+      }
+    }
+  }
+
+  const unreachableStates = states.filter((st) => !reachable.has(st));
+  const terminalOutgoingTransitions: string[] = [];
+  const seenKeys = new Set<string>();
+  const duplicateTransitionKeys: string[] = [];
+
+  for (const tr of transitions) {
+    const from = tr.from.trim().toUpperCase();
+    const action = tr.action;
+    if (terminals.has(from)) {
+      terminalOutgoingTransitions.push(`${tr.code || from} (${from} -> ${tr.to.trim().toUpperCase()})`);
+    }
+    const key = `${from}:${action}`;
+    if (seenKeys.has(key)) {
+      duplicateTransitionKeys.push(key);
+    }
+    seenKeys.add(key);
+  }
+
+  return {
+    valid:
+      unreachableStates.length === 0 &&
+      terminalOutgoingTransitions.length === 0 &&
+      duplicateTransitionKeys.length === 0,
+    unreachableStates,
+    terminalOutgoingTransitions,
+    duplicateTransitionKeys,
+  };
+}
+
+export function serializeWorkflowVisualDraft(
+  statesCsv: string,
+  initialState: string,
+  terminalStatesCsv: string,
+  transitions: WorkflowVisualTransitionDraft[],
+  testCases: WorkflowVisualTestCaseDraft[],
+): { content: string; testCases: string } {
+  const states = statesCsv
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const terminalStates = terminalStatesCsv
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const compiledTransitions = transitions.map((tr) => ({
+    code: tr.code.trim().toUpperCase() || "TR_01",
+    from: tr.from.trim().toUpperCase(),
+    action: tr.action,
+    to: tr.to.trim().toUpperCase(),
+    requiresApproval: tr.requiresApproval,
+  }));
+  const compiledTests = testCases.map((tc) => ({
+    code: tc.code.trim().toUpperCase() || "TC_01",
+    startState: tc.startState.trim().toUpperCase() || initialState.trim().toUpperCase(),
+    actions: tc.actionsCsv
+      .split(",")
+      .map((a) => a.trim().toUpperCase())
+      .filter(Boolean),
+    expectedState: tc.expectedState.trim().toUpperCase(),
+  }));
+
+  return {
+    content: JSON.stringify(
+      {
+        states,
+        initialState: initialState.trim().toUpperCase(),
+        terminalStates,
+        transitions: compiledTransitions,
+      },
+      null,
+      2,
+    ),
+    testCases: JSON.stringify(compiledTests, null, 2),
+  };
+}
+
 /** `GovernanceActionDto` — both fields optional, on all nine actions. */
 export function buildGovernanceActionRequest(reason: string): { reason?: string } {
   const trimmed = reason.trim();
@@ -332,6 +665,7 @@ function parseGovernedVersion(payload: unknown): GovernedVersion {
   ) {
     invalidGovernanceResponse();
   }
+  const contentObj = record(row.content);
   return {
     id: row.id,
     versionNumber: row.versionNumber,
@@ -341,6 +675,18 @@ function parseGovernedVersion(payload: unknown): GovernedVersion {
     effectiveFrom: row.effectiveFrom,
     effectiveTo: isTimestamp(row.effectiveTo) ? row.effectiveTo : null,
     approvedAt: isTimestamp(row.approvedAt) ? row.approvedAt : null,
+    ...(contentObj ? { content: contentObj } : {}),
+    ...(Array.isArray(row.testCases) ? { testCases: row.testCases } : {}),
+    ...(typeof row.createdByUserId === "string" ? { createdByUserId: row.createdByUserId } : {}),
+    ...(typeof row.submittedByUserId === "string" ? { submittedByUserId: row.submittedByUserId } : {}),
+    ...(typeof row.approvedByUserId === "string" ? { approvedByUserId: row.approvedByUserId } : {}),
+    ...(typeof row.publishedByUserId === "string" ? { publishedByUserId: row.publishedByUserId } : {}),
+    ...(typeof row.restoredFromVersionId === "string"
+      ? { restoredFromVersionId: row.restoredFromVersionId }
+      : {}),
+    ...(typeof row.restorationReason === "string" ? { restorationReason: row.restorationReason } : {}),
+    ...(typeof row.rejectionReason === "string" ? { rejectionReason: row.rejectionReason } : {}),
+    ...(typeof row.retirementReason === "string" ? { retirementReason: row.retirementReason } : {}),
   };
 }
 
@@ -354,31 +700,75 @@ export interface DecisionReceipt {
   explanation: string | null;
   evaluatedAt: string;
   correlationId: string | null;
+  inputFingerprint?: string | null;
+  inputs?: Record<string, unknown> | null;
+  matchedRules?: unknown[] | null;
+  explanations?: string[] | null;
 }
 
 export function parseDecisionReceipt(payload: unknown): DecisionReceipt {
   const row = record(payload);
   const result = row ? record(row.result) : null;
+  const resolvedId = row && isUuidV7(row.id) ? row.id : row && isUuidV7(row.decisionId) ? row.decisionId : null;
+  const resolvedAggregateType =
+    row && isNonEmptyString(row.aggregateType, 64)
+      ? row.aggregateType
+      : row && isNonEmptyString(row.subjectType, 64)
+        ? row.subjectType
+        : null;
+  const resolvedScopeTarget =
+    row && isNonEmptyString(row.scopeTarget, 16) ? row.scopeTarget : "COMPANY";
+  const resolvedEvaluatedAt =
+    row && isTimestamp(row.evaluatedAt)
+      ? row.evaluatedAt
+      : row && isTimestamp(row.createdAt)
+        ? row.createdAt
+        : null;
+
   if (
     !row ||
-    !isUuidV7(row.id) ||
+    !resolvedId ||
     !isNonEmptyString(row.decisionType, 40) ||
-    !isNonEmptyString(row.aggregateType, 64) ||
-    !isNonEmptyString(row.scopeTarget, 16) ||
-    !isTimestamp(row.evaluatedAt)
+    !resolvedAggregateType ||
+    !resolvedEvaluatedAt
   ) {
     invalidGovernanceResponse();
   }
+  const resolvedAggregateId = isUuidV7(row.aggregateId)
+    ? row.aggregateId
+    : isUuidV7(row.subjectId)
+      ? row.subjectId
+      : "";
+  const resolvedOutcome =
+    result && typeof result.outcome === "string"
+      ? result.outcome
+      : typeof row.outcome === "string"
+        ? row.outcome
+        : null;
+  const explanationsList = Array.isArray(row.explanations)
+    ? row.explanations.filter((item): item is string => typeof item === "string")
+    : undefined;
+  const inputsObj = record(row.inputs);
+
   return {
-    id: row.id,
+    id: resolvedId,
     decisionType: row.decisionType,
-    aggregateType: row.aggregateType,
-    aggregateId: isUuidV7(row.aggregateId) ? row.aggregateId : "",
-    scopeTarget: row.scopeTarget,
-    outcome: result && typeof result.outcome === "string" ? result.outcome : null,
-    explanation: typeof row.explanation === "string" ? row.explanation : null,
-    evaluatedAt: row.evaluatedAt,
+    aggregateType: resolvedAggregateType,
+    aggregateId: resolvedAggregateId,
+    scopeTarget: resolvedScopeTarget,
+    outcome: resolvedOutcome,
+    explanation:
+      typeof row.explanation === "string"
+        ? row.explanation
+        : explanationsList && explanationsList.length > 0
+          ? explanationsList.join(" • ")
+          : null,
+    evaluatedAt: resolvedEvaluatedAt,
     correlationId: typeof row.correlationId === "string" ? row.correlationId : null,
+    ...(typeof row.inputFingerprint === "string" ? { inputFingerprint: row.inputFingerprint } : {}),
+    ...(inputsObj ? { inputs: inputsObj } : {}),
+    ...(Array.isArray(row.matchedRules) ? { matchedRules: row.matchedRules } : {}),
+    ...(explanationsList ? { explanations: explanationsList } : {}),
   };
 }
 

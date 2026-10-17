@@ -5,6 +5,7 @@
 
 export * from "./lib/cn";
 export * from "./lib/icons";
+export * from "./lib/swatch-palette";
 export * from "./lib/variants";
 export * from "./lib/useBlurValidation";
 
@@ -35,6 +36,7 @@ export * from "./primitives/FileUpload";
 export * from "./primitives/ContactChannelIcon";
 export * from "./primitives/HoverCard";
 export * from "./primitives/IdentifierText";
+export * from "./primitives/ImageUploadTile";
 export * from "./primitives/Input";
 export * from "./primitives/Label";
 export * from "./primitives/Money";
@@ -91,6 +93,7 @@ export * from "./patterns/degraded-banner/DegradedBanner";
 export * from "./patterns/deletion-blocker/DeletionBlockerDialog";
 export * from "./patterns/detail-header/DetailHeader";
 export * from "./patterns/detail-section/DetailSection";
+export * from "./patterns/dossier-modal/dossier-modal-tokens";
 export * from "./patterns/edit-drawer/EditDrawer";
 export * from "./patterns/empty-state/EmptyState";
 export * from "./patterns/error-state/ErrorState";
@@ -131,8 +134,8 @@ export * from "./views/board/ColumnSegmentBar";
 export * from "./views/board/BoardView";
 export * from "./views/board/MoveToMenu";
 export * from "./views/board/types";
-export * from "./views/calendar/CalendarView";
 export * from "./views/board/useCollapsedColumns";
+export * from "./views/calendar/CalendarView";
 export * from "./views/calendar/calendar-range";
 export * from "./views/calendar/types";
 export * from "./views/card/CardView";

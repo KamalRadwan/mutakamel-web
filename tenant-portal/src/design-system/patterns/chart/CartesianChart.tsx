@@ -39,6 +39,8 @@ export interface CartesianSeries {
    * docs/design/tokens.md#charts.
    */
   role: ChartRole;
+  /** Optional CSS variable token fill when stacking or separating multi-series lines/bars. */
+  fill?: string;
 }
 
 export interface CartesianChartProps {
@@ -130,14 +132,15 @@ function CartesianChart({ variant, ...props }: CartesianChartProps & { variant: 
             />
           )}
 
-          {ordered.map((item) =>
-            variant === "line" ? (
+          {ordered.map((item) => {
+            const color = item.fill ?? STATUS_FILL[item.role];
+            return variant === "line" ? (
               <Line
                 key={item.key}
                 type="monotone"
                 dataKey={item.key}
                 name={item.label}
-                stroke={STATUS_FILL[item.role]}
+                stroke={color}
                 strokeWidth={2}
                 dot={false}
                 {...CHART_ANIMATION}
@@ -149,9 +152,9 @@ function CartesianChart({ variant, ...props }: CartesianChartProps & { variant: 
                 dataKey={item.key}
                 name={item.label}
                 stackId={stacked ? "stack" : undefined}
-                stroke={STATUS_FILL[item.role]}
-                fill={STATUS_FILL[item.role]}
-                fillOpacity={0.18}
+                stroke={color}
+                fill={color}
+                fillOpacity={0.22}
                 strokeWidth={2}
                 {...CHART_ANIMATION}
               />
@@ -161,12 +164,12 @@ function CartesianChart({ variant, ...props }: CartesianChartProps & { variant: 
                 dataKey={item.key}
                 name={item.label}
                 stackId={stacked ? "stack" : undefined}
-                fill={STATUS_FILL[item.role]}
-                radius={2}
+                fill={color}
+                radius={[3, 3, 0, 0]}
                 {...CHART_ANIMATION}
               />
-            ),
-          )}
+            );
+          })}
         </Chart>
       </ResponsiveContainer>
     </ChartFrame>

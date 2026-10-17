@@ -24,8 +24,14 @@ export function ThemeToggle() {
     NEXT_THEME[theme] === "light" ? t.common.switchToLight : NEXT_THEME[theme] === "dark" ? t.common.switchToDark : t.common.switchToSystem;
 
   return (
-    <Button variant="ghost" size="sm" onClick={() => setTheme(NEXT_THEME[theme])} aria-label={nextLabel}>
-      <Icon className="size-4" aria-hidden="true" />
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setTheme(NEXT_THEME[theme])}
+      aria-label={nextLabel}
+      className="h-6 px-1.5 text-white/90 hover:bg-white/15 hover:text-white"
+    >
+      <Icon className="size-3.5" aria-hidden="true" />
     </Button>
   );
 }

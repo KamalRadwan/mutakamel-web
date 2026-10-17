@@ -233,6 +233,7 @@ export default function PurchaseQuotationDetailPage({
               columns={1}
             >
               <DataTable
+                density="compact"
                 columns={columns}
                 rows={quotation.lines}
                 rowKey={(line) => line.id}

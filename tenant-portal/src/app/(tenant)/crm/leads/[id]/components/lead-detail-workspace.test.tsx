@@ -14,19 +14,29 @@ vi.mock("../../../shared/hooks/useCrmErrorText", () => ({ useCrmErrorText: () =>
 vi.mock("../hooks/useLeadDetail", () => ({ useLeadDetail: vi.fn() }));
 vi.mock("../../hooks/useLeadCapabilities", () => ({ useLeadCapabilities: () => ({ capabilities: {} }) }));
 vi.mock("../../../shared/hooks/useCrmAcquisitionSources", () => ({ useCrmAcquisitionSources: () => ({ items: [] }) }));
+vi.mock("../hooks/useLeadCardEdit", () => ({ useLeadCardEdit: () => ({ saving: false, save: vi.fn() }) }));
 vi.mock("../hooks/useLeadCompanyEdit", () => ({ useLeadCompanyEdit: () => ({}) }));
 vi.mock("../hooks/useLeadConvert", () => ({ useLeadConvert: () => ({}) }));
 vi.mock("../hooks/useLeadStageMove", () => ({ useLeadStageMove: () => ({}) }));
-vi.mock("@/design-system", () => ({
-  Button: () => null, ConfirmActionModal: () => null, DegradedBanner: () => null,
-  DetailHeader: vi.fn(() => null), ErrorState: () => null, NotFoundState: () => null,
-  PageActions: () => null, Skeleton: () => null, StageBar: () => null, StatusBadge: () => null,
-}));
+vi.mock("@/design-system", async () => {
+  const tokens = await import("@/design-system/patterns/dossier-modal/dossier-modal-tokens");
+  const cnMod = await import("@/design-system/lib/cn");
+  const cardColorMod = await import("@/design-system/views/card-color");
+  return {
+    ...tokens,
+    ...cnMod,
+    ...cardColorMod,
+    Button: () => null, ConfirmActionModal: () => null, DegradedBanner: () => null,
+    DetailHeader: vi.fn(() => null), ErrorState: () => null, NotFoundState: () => null,
+    PageActions: () => null, Skeleton: () => null, StageBar: () => null, StatusBadge: () => null,
+  };
+});
 vi.mock("../../../shared/components/CrmScopeGate", () => ({ CrmScopeGate: () => null }));
 vi.mock("../../../shared/components/CustomFieldsCard", () => ({ CustomFieldsCard: () => null }));
 vi.mock("../../../shared/components/RecordAttachmentsSection", () => ({ RecordAttachmentsSection: () => null }));
 vi.mock("../../../shared/components/RecordNotesSection", () => ({ RecordNotesSection: () => <section aria-label="Standalone notes" /> }));
-vi.mock("@/components/audit/EntityHistoryCard", () => ({ EntityHistoryCard: () => null }));
+vi.mock("@/components/activities/RecordActivitiesPanel", () => ({ RecordActivitiesPanel: () => <section aria-label="Inline activities" /> }));
+vi.mock("@/components/audit/EntityHistoryCard", () => ({ EntityHistoryCard: () => <section aria-label="Inline audit history" /> }));
 vi.mock("./LeadRelatedNav", () => ({ LeadRelatedNav: () => null }));
 vi.mock("./LeadDetailSidePanel", () => ({ LeadDetailSidePanel: () => <section aria-label="Lead side panel" /> }));
 vi.mock("./LeadConvertModal", () => ({ LeadConvertModal: () => null }));
@@ -100,4 +110,21 @@ describe("LeadDetailWorkspace card identity", () => {
     }
     expect(errors).not.toHaveBeenCalled();
   });
+
+  it("renders No Color as the first card color dot, omits Party ID and fake source from subtitle, and switches inline Dossier tabs", () => {
+    setLead(lead);
+    render(<LeadDetailWorkspace leadId={lead.id} />);
+    const colorGroup = screen.getByRole("group", { name: en.crmLeads.card.cardColor });
+    const colorButtons = colorGroup.querySelectorAll("button");
+    expect(colorButtons).toHaveLength(6);
+    expect(colorButtons[0]).toHaveAttribute("aria-label", en.crmLeads.card.colorNone);
+    expect(screen.queryByText(/Party ID/i)).toBeNull();
+    expect(screen.queryByText(/Website Inquiry/i)).toBeNull();
+
+    // Default tab is Activities; clicking Notes mounts RecordNotesSection inline
+    expect(screen.getByRole("region", { name: "Inline activities" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: en.crmLeadDetail.notes }));
+    expect(screen.getByRole("region", { name: "Standalone notes" })).toBeInTheDocument();
+  });
 });
+

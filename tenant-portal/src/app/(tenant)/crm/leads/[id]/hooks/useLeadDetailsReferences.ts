@@ -5,6 +5,7 @@ import { readOwnerOptions } from "./readLeadOwnerOptions";
 import { useTenantAuth } from "@/context/AuthContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { readCoreData } from "@/lib/api/envelope";
+import { isUUIDv7 } from "@/lib/uuid";
 import { parseCrmTags, type CrmTag } from "../../../shared/tag-contract";
 import { leadPath, type LeadDetail } from "../../lead-contract";
 import { parseLeadDetailsUser, type LeadDetailsUser } from "../lead-details-edit-contract";
@@ -26,7 +27,8 @@ export function useLeadDetailsReferences(lead: LeadDetail, editing: boolean, all
   useEffect(() => {
     if (!canReadUsers) return;
     const controller = new AbortController();
-    const ids = [...new Set([lead.ownerUserId, lead.createdByUserId])].filter((id): id is string => Boolean(id && id !== actor?.id));
+    const ids = [...new Set([lead.ownerUserId, lead.createdByUserId])].filter((id): id is string => Boolean(id && isUUIDv7(id) && id !== actor?.id));
+    if (ids.length === 0) return;
     void Promise.allSettled(ids.map((id) => readCoreData(`${USERS_PATH}/${encodeURIComponent(id)}`, { signal: controller.signal, cache: "no-store" }).then(parseLeadDetailsUser)))
       .then((results) => {
         if (controller.signal.aborted) return;
@@ -37,7 +39,7 @@ export function useLeadDetailsReferences(lead: LeadDetail, editing: boolean, all
   }, [actor?.id, canReadUsers, lead.ownerUserId, lead.createdByUserId]);
 
   useEffect(() => {
-    if (!editing || !canReadUsers) return;
+    if (!editing || !canReadUsers || !isUUIDv7(lead.branchId)) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
@@ -52,6 +54,12 @@ export function useLeadDetailsReferences(lead: LeadDetail, editing: boolean, all
   }, [canReadUsers, editing, lead.branchId]);
 
   useEffect(() => {
+    if (!isUUIDv7(lead.id)) {
+      setTags([]);
+      setTagsLoading(false);
+      setTagsUnavailable(false);
+      return;
+    }
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;

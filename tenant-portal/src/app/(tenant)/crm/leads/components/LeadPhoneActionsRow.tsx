@@ -36,10 +36,12 @@ export function LeadPhoneActionsRow({
   phone,
   country,
   actionsOnly = false,
+  badge,
 }: {
   phone: string;
   country?: string;
   actionsOnly?: boolean;
+  badge?: string;
 }) {
   const { t, lang } = useI18n();
   const countryIso = country
@@ -47,62 +49,116 @@ export function LeadPhoneActionsRow({
         ? country.trim().toUpperCase()
         : countryIsoFromName(country))
     : null;
-  const fallbackCallingCode = countryIso
-    ? getCountryOptions(lang).find(({ isoCode }) => isoCode === countryIso)?.callingCode
+  const countryOption = countryIso
+    ? getCountryOptions(lang).find(({ isoCode }) => isoCode === countryIso)
     : undefined;
+  const fallbackCallingCode = countryOption?.callingCode;
   const { full, digits } = phoneForms(phone, fallbackCallingCode);
+
+  if (actionsOnly) {
+    return (
+      <div
+        className="flex min-w-0 items-center gap-0.5"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Button variant="ghost" size="xs" className="w-(--size-control-xs) shrink-0 px-1" asChild>
+          <a
+            href={`tel:${full}`}
+            aria-label={formatTemplate(t.crmLeadDetail.callNumber, { value: full })}
+            title={t.crmLeadDetail.callAction}
+          >
+            <ContactChannelIcon channel="call" />
+          </a>
+        </Button>
+        {digits && (
+          <>
+            <Button variant="ghost" size="xs" className="w-(--size-control-xs) shrink-0 px-1" asChild>
+              <a
+                href={`https://wa.me/${digits}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={formatTemplate(t.crmLeadDetail.whatsappNumber, { value: full })}
+                title={t.crmLeadDetail.whatsappAction}
+              >
+                <ContactChannelIcon channel="whatsapp" />
+              </a>
+            </Button>
+            <Button variant="ghost" size="xs" className="w-(--size-control-xs) shrink-0 px-1" asChild>
+              <a
+                href={`https://t.me/+${digits}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={formatTemplate(t.crmLeadDetail.telegramNumber, { value: full })}
+                title={t.crmLeadDetail.telegramAction}
+              >
+                <ContactChannelIcon channel="telegram" />
+              </a>
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
-      className="flex min-w-0 items-center gap-0.5"
+      className="dossier-phone-item-view flex min-w-0 flex-wrap items-center justify-between gap-2"
       onClick={(event) => event.stopPropagation()}
     >
-      {!actionsOnly && (
-        <>
+      <div className="flex min-w-0 items-center gap-1.5">
+        {countryOption?.flag ? (
+          <span className="shrink-0 text-sm leading-none" aria-hidden="true">
+            {countryOption.flag}
+          </span>
+        ) : (
           <Phone
-            className={cn(iconSize({ size: "sm" }), "me-1 shrink-0 text-muted-foreground")}
+            className={cn(iconSize({ size: "sm" }), "shrink-0 text-emerald-600 dark:text-emerald-400")}
             aria-hidden="true"
           />
-          <span className="min-w-0 flex-1 truncate text-xs text-foreground" dir="ltr" title={full}>
-            {full}
-          </span>
-        </>
-      )}
-      <Button variant="ghost" size="xs" className="w-(--size-control-xs) shrink-0 px-1" asChild>
+        )}
+        <span className="dossier-phone-num min-w-0 truncate" dir="ltr" title={full}>
+          {full}
+        </span>
+        {badge && <span className="dossier-phone-tag shrink-0">{badge}</span>}
+      </div>
+      <div className="dossier-ch-group flex flex-wrap items-center gap-1.5">
         <a
           href={`tel:${full}`}
           aria-label={formatTemplate(t.crmLeadDetail.callNumber, { value: full })}
           title={t.crmLeadDetail.callAction}
+          className="dossier-comm-btn dossier-comm-call"
         >
           <ContactChannelIcon channel="call" />
+          <span>{t.crmLeadDetail.callAction}</span>
         </a>
-      </Button>
-      {digits && (
-        <>
-          <Button variant="ghost" size="xs" className="w-(--size-control-xs) shrink-0 px-1" asChild>
+        {digits && (
+          <>
             <a
               href={`https://wa.me/${digits}`}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={formatTemplate(t.crmLeadDetail.whatsappNumber, { value: full })}
               title={t.crmLeadDetail.whatsappAction}
+              className="dossier-comm-btn dossier-comm-wa"
             >
               <ContactChannelIcon channel="whatsapp" />
+              <span>{t.crmLeadDetail.whatsappAction}</span>
             </a>
-          </Button>
-          <Button variant="ghost" size="xs" className="w-(--size-control-xs) shrink-0 px-1" asChild>
             <a
               href={`https://t.me/+${digits}`}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={formatTemplate(t.crmLeadDetail.telegramNumber, { value: full })}
               title={t.crmLeadDetail.telegramAction}
+              className="dossier-comm-btn dossier-comm-tg"
             >
               <ContactChannelIcon channel="telegram" />
+              <span>{t.crmLeadDetail.telegramAction}</span>
             </a>
-          </Button>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
+

@@ -162,6 +162,17 @@ describe("CRM customer-profile contract", () => {
     ).toThrow("Invalid CRM customer-profiles response.");
   });
 
+  it("normalizes legacy ACTIVE status and accepts bare-domain companyWebsite values", () => {
+    const parsed = parseCustomerProfileResponse({
+      ...profile,
+      status: "ACTIVE",
+      companyWebsite: "www.acme.test",
+    });
+
+    expect(parsed.status).toBe("ACTIVE_CUSTOMER");
+    expect(parsed.companyWebsite).toBe("www.acme.test");
+  });
+
   it("rejects untrusted party images and non-http company websites", () => {
     expect(() =>
       parseCustomerProfileResponse({

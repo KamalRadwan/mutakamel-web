@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Target } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import {
-  Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -12,129 +11,180 @@ import {
   cn,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import type { CrmFormErrors } from "../../../shared/hooks/useCrmCreateForm";
 import { LEAD_CREATE_LIMITS, type CreateLeadForm } from "../../lead-create-contract";
-import type { LeadCreateErrors } from "../../lead-create-validation";
+import { LeadFieldGuide } from "./LeadFieldGuide";
 
-type QualificationField = "description" | "interestSummary" | "expectedNeed";
+export type LeadQualificationField =
+  | "description"
+  | "interestSummary"
+  | "expectedNeed";
 
 export interface LeadQualificationSectionProps {
   form: CreateLeadForm;
-  errors: LeadCreateErrors;
+  errors: CrmFormErrors;
   disabled: boolean;
-  onChange: (key: QualificationField, value: string) => void;
+  defaultOpen?: boolean;
+  onChange: (key: LeadQualificationField, value: string) => void;
   onBlur: (path: string) => void;
 }
 
 /**
- * The three free-text columns `crm_leads` keeps in its own row.
+ * Section 04 — Qualification Narrative & Internal Notes (Violet Theme).
  *
- * Interest and expected need sit side by side because they are read together —
- * what the lead wants against what they will need. Each still caps at
- * `max-w-prose`, so the two-column row shortens the line length rather than
- * stretching it: the rule is 65 characters per line, not one field per row —
- * docs/design/typography.md#prose-is-capped-at-65-characters. The description
- * is the long one and keeps the full width below them.
+ * Collapsible card for Interest Summary (4000 chars), Expected Need (4000 chars),
+ * and Internal Notes (2000 chars). Auto-expands whenever any of its fields has
+ * a validation error.
  */
 export function LeadQualificationSection({
   form,
   errors,
   disabled,
+  defaultOpen = false,
   onChange,
   onBlur,
 }: LeadQualificationSectionProps) {
   const { t } = useI18n();
+  const limits = LEAD_CREATE_LIMITS;
+  const [open, setOpen] = useState(defaultOpen);
 
-  const hasErrors = Object.keys(errors).some(
-    (key) => key === "description" || key === "interestSummary" || key === "expectedNeed",
+  const hasError = Boolean(
+    errors.description || errors.interestSummary || errors.expectedNeed,
   );
-  const [open, setOpen] = useState(false);
-  const sectionOpen = open || hasErrors;
-
-  const paired: Array<{ key: QualificationField; label: string; max: number }> = [
-    {
-      key: "interestSummary",
-      label: t.crmLeads.create.interestSummary,
-      max: LEAD_CREATE_LIMITS.interestSummary,
-    },
-    {
-      key: "expectedNeed",
-      label: t.crmLeads.create.expectedNeed,
-      max: LEAD_CREATE_LIMITS.expectedNeed,
-    },
-  ];
-
-  const field = ({ key, label, max }: { key: QualificationField; label: string; max: number }) => (
-    <Field key={key} label={label} error={errors[key]} showLabel className="w-full">
-      <Textarea
-        placeholder={label}
-        rows={2}
-        value={form[key]}
-        maxLength={max}
-        disabled={disabled}
-        onChange={(event) => onChange(key, event.target.value)}
-        onBlur={() => onBlur(key)}
-      />
-    </Field>
-  );
+  const isOpen = open || hasError;
 
   return (
-    <Collapsible
-      open={sectionOpen}
-      onOpenChange={(next) => setOpen(hasErrors ? true : next)}
+    <section
       data-form-section="qualification"
-      className="scroll-mt-4 overflow-hidden rounded-lg border border-border bg-card"
+      className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-card shadow-xs transition-colors dark:border-violet-400/20"
     >
-      <CollapsibleTrigger asChild>
-        <Button
-          type="button"
-          tabIndex={0}
-          variant="ghost"
-          size="sm"
-          className="h-auto w-full justify-between rounded-none px-3 py-2 text-start font-normal"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
-              <Target className="size-4" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h4
-                  className="truncate text-sm font-semibold leading-tight text-foreground outline-none"
-                >
-                  {t.crmLeads.create.sections.qualification}
-                </h4>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  · {t.crmLeads.create.optionalBadge}
-                </span>
+      {/* Top 3px Violet-Indigo accent bar */}
+      <div
+        aria-hidden="true"
+        className="h-1 w-full bg-linear-to-r from-violet-500 via-indigo-500 to-purple-500"
+      />
+
+      <Collapsible open={isOpen} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            tabIndex={0}
+            className="flex w-full cursor-pointer items-center justify-between gap-3 border-b border-border/60 bg-violet-500/[0.03] px-4 py-3 text-start transition-colors hover:bg-violet-500/[0.06] dark:bg-violet-500/[0.06]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-violet-500/25 bg-violet-500/10 text-violet-600 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300">
+                <Sparkles className="size-4" aria-hidden="true" />
               </div>
-              <p className="mt-0.5 truncate text-xs leading-normal text-muted-foreground">
-                {t.crmLeads.create.qualificationCollapsibleSubtitle}
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-foreground">
+                    {t.crmLeads.create.sections.qualification}
+                  </span>
+                  <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+                    {t.crmLeads.create.optionalBadge}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t.crmLeads.create.qualificationCollapsibleSubtitle}
+                </p>
+              </div>
+            </div>
+
+            <ChevronDown
+              className={cn(
+                "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                isOpen && "rotate-180",
+              )}
+              aria-hidden="true"
+            />
+          </button>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+            {/* Interest Summary */}
+            <div className="relative">
+              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {form.interestSummary.length}/{limits.interestSummary}
+                </span>
+                <LeadFieldGuide field="interestSummary" />
+              </div>
+              <Field
+                label={t.crmLeads.create.interestSummary}
+                error={errors.interestSummary}
+                showLabel
+              >
+                <Textarea
+                  rows={3}
+                  placeholder={t.crmLeads.create.interestSummary}
+                  value={form.interestSummary}
+                  maxLength={limits.interestSummary}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onChange("interestSummary", event.target.value)
+                  }
+                  onBlur={() => onBlur("interestSummary")}
+                />
+              </Field>
+            </div>
+
+            {/* Expected Need */}
+            <div className="relative">
+              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {form.expectedNeed.length}/{limits.expectedNeed}
+                </span>
+                <LeadFieldGuide field="expectedNeed" />
+              </div>
+              <Field
+                label={t.crmLeads.create.expectedNeed}
+                error={errors.expectedNeed}
+                showLabel
+              >
+                <Textarea
+                  rows={3}
+                  placeholder={t.crmLeads.create.expectedNeed}
+                  value={form.expectedNeed}
+                  maxLength={limits.expectedNeed}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onChange("expectedNeed", event.target.value)
+                  }
+                  onBlur={() => onBlur("expectedNeed")}
+                />
+              </Field>
+            </div>
+
+            {/* Internal Qualification Notes (full width) */}
+            <div className="relative md:col-span-2">
+              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {form.description.length}/{limits.description}
+                </span>
+                <LeadFieldGuide field="description" />
+              </div>
+              <Field
+                label={t.crmLeads.create.description}
+                error={errors.description}
+                showLabel
+              >
+                <Textarea
+                  rows={3}
+                  placeholder={t.crmLeads.create.description}
+                  value={form.description}
+                  maxLength={limits.description}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onChange("description", event.target.value)
+                  }
+                  onBlur={() => onBlur("description")}
+                />
+              </Field>
             </div>
           </div>
-
-          <ChevronRight
-            className={cn(
-              "size-4 shrink-0 text-muted-foreground transition-transform duration-200 rtl:-scale-x-100",
-              sectionOpen && "rotate-90",
-            )}
-            aria-hidden="true"
-          />
-        </Button>
-      </CollapsibleTrigger>
-
-      <CollapsibleContent className="border-t border-border p-3">
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          {paired.map(field)}
-          <div className="md:col-span-2">
-            {field({
-              key: "description",
-              label: t.crmLeads.create.description,
-              max: LEAD_CREATE_LIMITS.description,
-            })}
-          </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+        </CollapsibleContent>
+      </Collapsible>
+    </section>
   );
 }

@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import { parseWidgetResult, type WidgetResult } from "./dashboard-run-contract";
 import {
   formatMetricValue,
+  isInverseMetricKey,
   primarySeries,
+  scalarDelta,
   seriesRole,
+  widgetAccentHue,
   widgetRenderMode,
   widgetTableModel,
 } from "./widget-view";
@@ -34,12 +37,19 @@ describe("Widget render mode", () => {
       widgetRenderMode("METRIC_CARD", result({ shape: "SCALAR", value: 42, series: [] })),
     ).toBe("SCALAR");
     expect(widgetRenderMode("METRIC_CARD", result({ shape: "SCALAR" }))).toBe("TABLE");
+    expect(
+      widgetRenderMode(
+        "SEMI_CIRCLE_GAUGE",
+        result({ shape: "SCALAR", value: 28.5, target: 25, series: [] }),
+      ),
+    ).toBe("GAUGE");
   });
 
   it("charts a single series and tables a multi-series one whose roles would collide", () => {
     const oneSeries = result({ series: [series("crm.leads.by_source.count", "Leads", [["a", 1]])] });
     expect(widgetRenderMode("BAR", oneSeries)).toBe("BAR");
     expect(widgetRenderMode("DONUT", oneSeries)).toBe("DONUT");
+    expect(widgetRenderMode("FUNNEL", oneSeries)).toBe("FUNNEL");
     expect(widgetRenderMode("LINE", oneSeries)).toBe("LINE");
     expect(widgetRenderMode("AREA", oneSeries)).toBe("AREA");
 
@@ -52,9 +62,16 @@ describe("Widget render mode", () => {
     });
     expect(widgetRenderMode("COLUMN", wonLost)).toBe("BAR");
 
-    // Two series that both resolve to `brand` would be drawn in one colour and
-    // read as one line — tokens.md forbids inventing an identity palette, so
-    // the table carries them instead.
+    // Stacked bar charts encode branch/stage series with distinct swatch fills.
+    const stackedBranches = result({
+      series: [
+        series("crm.opportunities.by_stage.estimated_value_by_branch:b1", "Riyadh", [["s1", 100]], "MONEY"),
+        series("crm.opportunities.by_stage.estimated_value_by_branch:b2", "Jeddah", [["s1", 80]], "MONEY"),
+      ],
+    });
+    expect(widgetRenderMode("STACKED_BAR", stackedBranches)).toBe("STACKED_BAR");
+
+    // Two series on LINE_AREA that both resolve to `brand` fall back to TABLE.
     const sameRole = result({
       series: [
         series("crm.opportunities.created.count.trend", "Count", [["w1", 3]]),
@@ -71,7 +88,37 @@ describe("Widget render mode", () => {
     }
   });
 
-  it("tables a typed P2 result, which carries no series at all", () => {
+  it("renders XY bubble/scatter and activity intensity heatmaps when backed by their canonical shapes", () => {
+    const xyResult = result({
+      shape: "XY",
+      series: [
+        {
+          key: "crm.opportunities.value_probability",
+          label: "Deals",
+          unit: "MONEY",
+          axis: "LEFT",
+          points: [{ key: "o1", label: "Deal 1", value: 50000, secondaryValue: 75, meta: {} }],
+        },
+      ],
+    });
+    expect(widgetRenderMode("BUBBLE", xyResult)).toBe("SCATTER");
+    expect(widgetRenderMode("SCATTER", xyResult)).toBe("SCATTER");
+
+    const heatmapResult = result({
+      series: [series("crm.activities.intensity", "Intensity", [["1:9", 12]])],
+    });
+    expect(widgetRenderMode("HEATMAP", heatmapResult)).toBe("HEATMAP");
+
+    const multiHourHeatmap = result({
+      series: [
+        series("crm.activities.intensity:08:00", "08:00", [["Mon", 4], ["Tue", 7]]),
+        series("crm.activities.intensity:10:00", "10:00", [["Mon", 9], ["Tue", 12]]),
+      ],
+    });
+    expect(widgetRenderMode("HEATMAP", multiHourHeatmap)).toBe("HEATMAP");
+  });
+
+  it("renders typed P2 histogram, alert list, and activity feed visually while still building a table", () => {
     const typed = result({
       shape: "BINNED_DISTRIBUTION",
       series: [],
@@ -83,10 +130,31 @@ describe("Widget render mode", () => {
         bins: [{ key: "b1", label: "0 - 100", order: 1, kind: "STANDARD", count: 9 }],
       },
     });
-    expect(widgetRenderMode("HISTOGRAM", typed)).toBe("TABLE");
+    expect(widgetRenderMode("HISTOGRAM", typed)).toBe("HISTOGRAM");
     const model = widgetTableModel(typed, HEADERS);
     expect(model.rows).toHaveLength(1);
     expect(model.rows[0].cells[0]).toEqual({ kind: "text", text: "0 - 100" });
+
+    const alertTyped = result({
+      shape: "ROWS",
+      series: [],
+      result: {
+        shape: "ROWS",
+        rowKind: "ALERT",
+        rows: [{ id: "r1", title: "Overdue task", severity: "critical", occurredAt: "2026-08-31T09:00:00.000Z" }],
+      },
+    });
+    expect(widgetRenderMode("ALERT_LIST", alertTyped)).toBe("ALERT_LIST");
+
+    const feedTyped = result({
+      shape: "EVENT_STREAM",
+      series: [],
+      result: {
+        shape: "EVENT_STREAM",
+        events: [{ id: "e1", eventType: "CALL", title: "Discovery call", occurredAt: "2026-08-31T09:00:00.000Z" }],
+      },
+    });
+    expect(widgetRenderMode("ACTIVITY_FEED", feedTyped)).toBe("ACTIVITY_FEED");
   });
 
   it("always builds a table, including for the widgets it also charts", () => {
@@ -112,7 +180,7 @@ describe("Widget render mode", () => {
   });
 });
 
-describe("Series roles", () => {
+describe("Series roles, accent hues, and scalar deltas", () => {
   it("derives an outcome role from the metric key, and brand for everything else", () => {
     expect(seriesRole("crm.opportunities.won.count.trend")).toBe("positive");
     expect(seriesRole("crm.opportunities.lost.count.trend")).toBe("negative");
@@ -121,6 +189,24 @@ describe("Series roles", () => {
     expect(seriesRole("crm.leads.untouched.count")).toBe("caution");
     expect(seriesRole("crm.opportunities.missing_owner.count")).toBe("caution");
     expect(seriesRole("crm.leads.by_source.count")).toBe("brand");
+  });
+
+  it("computes period-over-period delta and flips tone for inverse problem metrics", () => {
+    const growth = result({ shape: "SCALAR", value: 120, previousValue: 100 });
+    expect(scalarDelta(growth, false)).toEqual({
+      deltaPercent: 20,
+      sign: "up",
+      tone: "positive",
+    });
+    expect(scalarDelta(growth, true)).toEqual({
+      deltaPercent: 20,
+      sign: "up",
+      tone: "negative",
+    });
+    expect(isInverseMetricKey("crm.tasks.overdue.count")).toBe(true);
+    expect(isInverseMetricKey("crm.leads.created.count")).toBe(false);
+    expect(widgetAccentHue("METRIC_CARD", "crm.tasks.overdue.count")).toBe("red");
+    expect(widgetAccentHue("METRIC_CARD", "crm.opportunities.pipeline.estimated_value")).toBe("green");
   });
 });
 

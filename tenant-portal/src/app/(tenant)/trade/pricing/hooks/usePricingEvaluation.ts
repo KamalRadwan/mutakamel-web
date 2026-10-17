@@ -32,6 +32,14 @@ export interface EvaluateFormValues {
   partyId: string;
 }
 
+export interface PinnedEvaluationItem {
+  id: string;
+  inputs: EvaluateFormValues;
+  decision: PricingDecisionResult;
+}
+
+export type EvaluationTab = "waterfall" | "candidates" | "comparison" | "receipt";
+
 const EMPTY_EVALUATE_FORM: EvaluateFormValues = {
   purpose: "SALES",
   itemId: "",
@@ -42,27 +50,33 @@ const EMPTY_EVALUATE_FORM: EvaluateFormValues = {
   partyId: "",
 };
 
-/**
- * `POST /pricing/evaluate` is a **read**, not a write.
- *
- * The Gateway classes it `READ_HEAVY`, the handler takes no
- * `x-idempotency-key`, and it answers 200. The transport still attaches a key
- * to every POST, which the server simply ignores here.
- *
- * The failure that matters most: `TRADE.PRICE.NO_ELIGIBLE_PRICE` is a **404**
- * meaning "no price applies", not "this route is missing", so it renders as an
- * answer rather than as a not-found page.
- */
+function readInitialEvaluateForm(): EvaluateFormValues {
+  if (typeof window === "undefined") return EMPTY_EVALUATE_FORM;
+  const params = new URLSearchParams(window.location.search);
+  const purposeParam = params.get("purpose");
+  const purpose: PriceBookPurpose = purposeParam === "PURCHASE" ? "PURCHASE" : "SALES";
+  return {
+    purpose,
+    itemId: params.get("itemId") ?? "",
+    uomId: params.get("uomId") ?? "",
+    quantity: params.get("quantity") ?? "",
+    currencyCode: params.get("currencyCode") ?? "",
+    priceBookId: params.get("priceBookId") ?? "",
+    partyId: params.get("partyId") ?? "",
+  };
+}
+
 export function usePricingEvaluation() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
-  // COMPANY_OR_BRANCH: a branch header narrows it, and both are legal.
   const scope = useTradeScope("BRANCH", branchId);
 
-  const [values, setValues] = useState<EvaluateFormValues>(EMPTY_EVALUATE_FORM);
+  const [values, setValues] = useState<EvaluateFormValues>(readInitialEvaluateForm);
   const [result, setResult] = useState<PricingDecisionResult | null>(null);
+  const [activeTab, setActiveTab] = useState<EvaluationTab>("waterfall");
+  const [pinnedEvaluations, setPinnedEvaluations] = useState<PinnedEvaluationItem[]>([]);
   const [noPrice, setNoPrice] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -92,7 +106,8 @@ export function usePricingEvaluation() {
         headers: scope.headers,
         maxResponseBytes: EVALUATE_RESPONSE_LIMIT_BYTES,
       });
-      setResult(parsePricingDecision(response.data));
+      const parsed = parsePricingDecision(response.data);
+      setResult(parsed);
     } catch (error) {
       const normalized = normalizeApiError(error);
       setResult(null);
@@ -106,6 +121,39 @@ export function usePricingEvaluation() {
     }
   }, [isEvaluating, values, scope.headers, toast, t]);
 
+  const pinCurrentResult = useCallback(() => {
+    if (!result) return;
+    setPinnedEvaluations((current) => {
+      if (current.some((item) => item.id === result.decisionId)) return current;
+      return [
+        {
+          id: result.decisionId,
+          inputs: { ...values },
+          decision: result,
+        },
+        ...current,
+      ].slice(0, 8);
+    });
+  }, [result, values]);
+
+  const clearPinnedEvaluations = useCallback(() => {
+    setPinnedEvaluations([]);
+  }, []);
+
+  const applyPreset = useCallback((preset: "retail" | "wholesale" | "vip") => {
+    setValues((current) => ({
+      ...current,
+      purpose: "SALES",
+      currencyCode: current.currencyCode.trim() || "SAR",
+      quantity:
+        preset === "retail"
+          ? "10.00"
+          : preset === "wholesale"
+            ? "100.00"
+            : "500.00",
+    }));
+  }, []);
+
   return {
     t,
     lang,
@@ -116,6 +164,12 @@ export function usePricingEvaluation() {
     selectBranch,
     values,
     result,
+    activeTab,
+    setActiveTab,
+    pinnedEvaluations,
+    pinCurrentResult,
+    clearPinnedEvaluations,
+    applyPreset,
     noPrice,
     isEvaluating,
     queryError,
@@ -152,8 +206,6 @@ function buildEvaluateRequest(values: EvaluateFormValues): Record<string, string
     quantity,
     currencyCode,
   };
-  // `forbidNonWhitelisted` is on, so an empty optional is omitted rather than
-  // sent as "".
   const priceBookId = values.priceBookId.trim();
   if (priceBookId.length > 0) {
     if (!isUUIDv7(priceBookId)) throw new Error("PRICING_FORM_ENTRY_ID");

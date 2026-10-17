@@ -8,6 +8,7 @@ import { tradeGet } from "../../trade-api";
 import { useTradeScopeRequest } from "../../useTradeScope";
 import { record } from "../../trade-validation";
 import { ITEM_NOT_FOUND_CODE, itemPath, parseItemDetailResponse, type Item } from "../item-contract";
+import type { ItemImageChange } from "../item-image-contract";
 import {
   parseBranchProfileResponse,
   parseCompanyProfileResponse,
@@ -34,7 +35,9 @@ export interface ItemDetail {
  */
 export function useItemDetail(id: string) {
   const { t, lang } = useI18n();
-  const { headers } = useTradeScopeRequest("OPERATING_CONTEXT");
+  const operating = useTradeScopeRequest("OPERATING_CONTEXT");
+  const companyBranch = useTradeScopeRequest("COMPANY_OR_BRANCH");
+  const headers = Object.keys(operating.headers).length > 0 ? operating.headers : companyBranch.headers;
   const [detail, setDetail] = useState<ItemDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -84,10 +87,21 @@ export function useItemDetail(id: string) {
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
+  // An image change bumps the Item version. Applying the receipt in place,
+  // rather than reloading, keeps unsaved identity edits on screen while their
+  // next save still sends the current `If-Match` (LLD 02b §19 Edit flow).
+  const applyImageChange = useCallback((change: ItemImageChange) => {
+    setDetail((current) =>
+      current && current.item.id === change.itemId
+        ? { ...current, item: { ...current.item, version: change.itemVersion, image: change.image } }
+        : current,
+    );
+  }, []);
+
   const isGone =
     isMalformedId ||
     error?.status === 404 ||
     (error?.status === 422 && error.code === ITEM_NOT_FOUND_CODE);
 
-  return { t, lang, detail, isLoading, error, isGone, reload };
+  return { t, lang, detail, isLoading, error, isGone, reload, applyImageChange };
 }

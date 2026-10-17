@@ -59,6 +59,7 @@ export const TENANT_ROUTES = {
   crmOutboundEmails: "/crm/outbound-emails",
   crmSettings: "/crm/settings",
   // Phase 9 — CRM dashboards and widgets, docs/api/crm-dashboards.md.
+  crmDashboard: "/crm/dashboard",
   crmDashboards: "/crm/dashboards",
   // A static segment under the dashboards list, so Next resolves it before
   // `/crm/dashboards/[id]`; the seven prebuilt reports share one screen
@@ -118,6 +119,7 @@ const CRM_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.crmActivities,
   TENANT_ROUTES.crmOutboundEmails,
   TENANT_ROUTES.crmSettings,
+  TENANT_ROUTES.crmDashboard,
   TENANT_ROUTES.crmDashboards,
   TENANT_ROUTES.crmDashboardReports,
   TENANT_ROUTES.crmWidgets,
@@ -167,6 +169,10 @@ const CRM_ENTRY_ROUTES = [
   // is the opposite: `widgets` is not a scoped resource, so it is exact.
   {
     href: TENANT_ROUTES.crmDashboards,
+    requirements: [{ permission: "crm.dashboards.read", acceptsScopedPermission: true }],
+  },
+  {
+    href: TENANT_ROUTES.crmDashboard,
     requirements: [{ permission: "crm.dashboards.read", acceptsScopedPermission: true }],
   },
   {

@@ -166,14 +166,60 @@ describe("the page action bar", () => {
     ]);
   });
 
+  it("starts the Customers bar with + New Customer and omits Records / Customers", () => {
+    pathname = "/crm/customer-profiles";
+    const { bar } = renderShell(
+      <PageHeader
+        title="Customers"
+        primaryAction={{
+          label: en.crmCustomerProfileActions.createAction,
+          icon: <span aria-hidden="true">+</span>,
+          onClick: vi.fn(),
+        }}
+        secondaryActions={<Button variant="outline">Branch</Button>}
+      />,
+      "crm",
+    );
+
+    expect(within(bar).queryByText(en.nav.navMenuRecords)).toBeNull();
+    expect(within(bar).queryByRole("link", { name: en.nav.customerProfiles })).toBeNull();
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "+New Customer",
+      "Branch",
+    ]);
+  });
+
+  it("puts the primary action first and omits the location chip on the opportunities list", () => {
+    pathname = "/crm/opportunities";
+    const { bar } = renderShell(
+      <PageHeader
+        title="Opportunities"
+        primaryAction={{
+          label: en.crmOpportunityDetail.createAction,
+          icon: <span aria-hidden="true">+</span>,
+          onClick: vi.fn(),
+        }}
+        secondaryActions={<Button variant="outline">Branch</Button>}
+      />,
+      "crm",
+    );
+
+    expect(within(bar).queryByText(en.nav.navMenuRecords)).toBeNull();
+    expect(within(bar).queryByRole("link", { name: en.nav.opportunities })).toBeNull();
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "+New Opportunity",
+      "Branch",
+    ]);
+  });
+
   // What the sidebar used to say by marking a row. Routes that are not
   // explicitly promoted still need the persistent answer to "where am I".
   it("names an ordinary current location from the nav map", () => {
-    pathname = "/crm/opportunities";
-    const { bar } = renderShell(<PageHeader title="Opportunities" />);
+    pathname = "/crm/pipelines";
+    const { bar } = renderShell(<PageHeader title="Pipelines" />, "crm");
 
-    expect(bar).toHaveTextContent(en.nav.navMenuRecords);
-    expect(bar).toHaveTextContent(en.nav.opportunities);
+    expect(bar).toHaveTextContent(en.nav.navMenuSettings);
+    expect(bar).toHaveTextContent(en.nav.pipelines);
   });
 
   it("names the location of a detail route by its list entry", () => {
@@ -202,7 +248,7 @@ describe("the global nav", () => {
       en.nav.customerProfiles,
       en.nav.opportunities,
     ]);
-    expect(within(nav).getByText(en.nav.navMenuSetup)).toBeInTheDocument();
+    expect(within(nav).getByText(en.nav.navMenuSettings)).toBeInTheDocument();
     expect(within(nav).queryByText(en.nav.navMenuDashboards)).toBeNull();
 
     expect(screen.getByRole("link", { name: en.nav.brandHome })).toHaveAttribute("href", "/");

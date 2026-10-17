@@ -54,18 +54,29 @@ const NONE: NavLocation = {
  * The boundary check matters as much: `/crm/leads` must not claim
  * `/crm/leads-archive`, so a prefix only counts when the next character is `/`.
  */
+function normalizeNavPathname(pathname: string): string {
+  if (pathname.startsWith("/trade/price-book-versions/")) {
+    return pathname.replace("/trade/price-book-versions/", "/trade/price-books/");
+  }
+  if (pathname.startsWith("/trade/decisions/")) {
+    return pathname.replace("/trade/decisions/", "/trade/inventory/decisions/");
+  }
+  return pathname;
+}
+
 export function useNavLocation(sections: NavSection[]): NavLocation {
   const pathname = usePathname();
 
   return useMemo(() => {
+    const resolvedPath = normalizeNavPathname(pathname);
     let best = NONE;
     let bestLength = -1;
 
     for (const section of sections) {
       for (const item of section.items) {
         const matches =
-          pathname === item.href ||
-          (pathname.startsWith(item.href) && pathname.charAt(item.href.length) === "/");
+          resolvedPath === item.href ||
+          (resolvedPath.startsWith(item.href) && resolvedPath.charAt(item.href.length) === "/");
         if (!matches || item.href.length <= bestLength) continue;
         bestLength = item.href.length;
         best = {

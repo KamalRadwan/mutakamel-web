@@ -1,5 +1,6 @@
 import type { TradePath } from "@/lib/api/envelope";
 import {
+  formatTradeDecimal,
   isJsonObject,
   isNullableUuidV7,
   isRowVersion,
@@ -148,7 +149,7 @@ export function toCompanyProfileForm(profile: ItemCompanyProfile): CompanyProfil
     trackInventory: profile.trackInventory,
     trackingMode: isTrackingMode(profile.trackingMode) ? profile.trackingMode : "NONE",
     taxClassificationKey: profile.taxClassificationKey ?? "",
-    salesPrice: profile.salesPrice ?? "",
+    salesPrice: profile.salesPrice ? formatTradeDecimal(profile.salesPrice) : "",
     currencyCode: profile.currencyCode ?? "",
     salesTaxId: profile.salesTaxId ?? "",
     purchaseTaxId: profile.purchaseTaxId ?? "",
@@ -240,6 +241,7 @@ export function buildCompanyProfileRequest(values: CompanyProfileFormValues) {
   }
   const salesPrice = values.salesPrice.trim();
   if (salesPrice && !isItemDecimalString(salesPrice)) throw new Error("PROFILE_FORM_PRICE");
+  const normalizedSalesPrice = salesPrice ? formatTradeDecimal(salesPrice) : null;
   const currencyCode = values.currencyCode.trim().toUpperCase();
   if (currencyCode && !/^[A-Z]{3}$/u.test(currencyCode)) throw new Error("PROFILE_FORM_CURRENCY");
   if (salesPrice && !currencyCode) throw new Error("PROFILE_FORM_CURRENCY");
@@ -251,7 +253,7 @@ export function buildCompanyProfileRequest(values: CompanyProfileFormValues) {
     canPos: values.canPos,
     trackInventory: values.trackInventory,
     trackingMode: values.trackingMode,
-    salesPrice: salesPrice || null,
+    salesPrice: normalizedSalesPrice,
     currencyCode: currencyCode || null,
     salesTaxId,
     purchaseTaxId,
@@ -340,7 +342,8 @@ export function parseCompanyProfileResponse(payload: unknown): ItemCompanyProfil
     trackingMode: profile.trackingMode,
     taxClassificationKey:
       typeof profile.taxClassificationKey === "string" ? profile.taxClassificationKey : null,
-    salesPrice: typeof profile.salesPrice === "string" ? profile.salesPrice : null,
+    salesPrice:
+      typeof profile.salesPrice === "string" ? formatTradeDecimal(profile.salesPrice) : null,
     currencyCode: typeof profile.currencyCode === "string" ? profile.currencyCode : null,
     salesTaxId: (profile.salesTaxId as string | null | undefined) ?? null,
     purchaseTaxId: (profile.purchaseTaxId as string | null | undefined) ?? null,

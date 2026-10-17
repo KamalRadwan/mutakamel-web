@@ -17,6 +17,7 @@ const DASHBOARD_ID = "01900300-0000-7000-8000-000000000001";
 
 describe("Phase 9 route admission", () => {
   it("admits every screen this phase builds", () => {
+    expect(isSupportedCrmPath(TENANT_ROUTES.crmDashboard)).toBe(true);
     expect(isSupportedCrmPath(TENANT_ROUTES.crmDashboards)).toBe(true);
     expect(isSupportedCrmPath(TENANT_ROUTES.crmDashboardReports)).toBe(true);
     expect(isSupportedCrmPath(TENANT_ROUTES.crmWidgets)).toBe(true);
@@ -26,7 +27,7 @@ describe("Phase 9 route admission", () => {
 
   it("still refuses a second segment below a detail screen", () => {
     expect(isSupportedCrmPath(`${TENANT_ROUTES.crmDashboards}/${DASHBOARD_ID}/widgets`)).toBe(false);
-    expect(isSupportedCrmPath("/crm/dashboard")).toBe(false);
+    expect(isSupportedCrmPath("/crm/dashboard/extra")).toBe(false);
   });
 
   it("accepts the scoped dashboards grant, which is the only form the tenant seeds", () => {
@@ -59,14 +60,19 @@ describe("Phase 9 route admission", () => {
     );
   });
 
-  it("puts all three screens in one sidebar section, gated the same way", () => {
-    const section = NAV_SECTIONS.find((candidate) => candidate.id === "crmAnalytics");
-    expect(section?.items.map((item) => item.href)).toEqual([
+  it("exposes Dashboard in the first CRM nav and the remaining dashboard screens in Settings", () => {
+    const crmItems = NAV_SECTIONS.filter((candidate) => candidate.app === "crm").flatMap(
+      (section) => section.items,
+    );
+    const analyticsItems = crmItems.filter((item) =>
+      ["crmDashboardReports", "crmDashboards", "crmWidgets"].includes(item.id),
+    );
+    expect(analyticsItems.map((item) => item.href)).toEqual([
+      TENANT_ROUTES.crmDashboard,
       TENANT_ROUTES.crmDashboards,
-      TENANT_ROUTES.crmDashboardReports,
       TENANT_ROUTES.crmWidgets,
     ]);
     const permissions = ["crm.dashboards.read.own"];
-    expect(section?.items.filter((item) => item.hasAccess(permissions))).toHaveLength(2);
+    expect(analyticsItems.filter((item) => item.hasAccess(permissions))).toHaveLength(2);
   });
 });

@@ -18,6 +18,8 @@ export interface OpportunityForm {
   description: string;
   expectedCloseDate: string;
   probabilityPercent: string;
+  ownerUserId?: string;
+  tagIds?: string[];
   /**
    * Keyed by `fieldKey`. `saveCustomFieldValues` runs with
    * `CrmFieldRequirementOperationEnum.CREATE` here too, so a definition marked
@@ -39,6 +41,8 @@ export const EMPTY_OPPORTUNITY_FORM: OpportunityForm = {
   description: "",
   expectedCloseDate: "",
   probabilityPercent: "",
+  ownerUserId: "",
+  tagIds: [],
   customFields: {},
 };
 
@@ -100,6 +104,7 @@ export interface CreateOpportunityRequest {
   description?: string;
   expectedCloseDate?: string;
   probabilityPercent?: number;
+  ownerUserId?: string;
   customFields?: Record<string, unknown>;
 }
 
@@ -120,6 +125,7 @@ export function buildCreateOpportunityRequest(
   const currencyCode = form.currencyCode.trim().toUpperCase();
   const description = form.description.trim();
   const expectedCloseDate = form.expectedCloseDate.trim();
+  const ownerUserId = (form.ownerUserId ?? "").trim();
 
   if (importance !== undefined) request.importance = importance;
   if (amount !== undefined) request.amount = amount;
@@ -129,6 +135,7 @@ export function buildCreateOpportunityRequest(
   if (currencyCode.length === 3) request.currencyCode = currencyCode;
   if (description.length > 0) request.description = description;
   if (expectedCloseDate.length > 0) request.expectedCloseDate = expectedCloseDate;
+  if (ownerUserId.length > 0) request.ownerUserId = ownerUserId;
 
   const customFields = Object.entries(form.customFields).filter(([, value]) => {
     if (value === undefined || value === null) return false;
@@ -196,7 +203,10 @@ export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
 }
 
 /** Every `OpportunityForm` key the PATCH builder diffs, i.e. the string ones. */
-type OpportunityTextField = Exclude<keyof OpportunityForm, "customFields">;
+type OpportunityTextField = Exclude<
+  keyof OpportunityForm,
+  "customFields" | "ownerUserId" | "tagIds"
+>;
 
 /** Only the changed keys, so a concurrent edit to another field survives. */
 export function buildUpdateOpportunityRequest(

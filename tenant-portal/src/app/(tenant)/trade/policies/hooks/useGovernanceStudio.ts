@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { isTradeReplay, tradeGet, tradeIfMatch, tradePost } from "../../trade-api";
+import { isTradeReplay, tradeGet, tradeIfMatch, tradePatch, tradePost } from "../../trade-api";
 import { hasTradePermission, useTradeScope } from "../../trade-advanced-scope";
 import {
   GOVERNANCE_ACTION_PERMISSION,
@@ -16,9 +16,11 @@ import {
   buildCreateDefinitionRequest,
   buildCreateVersionRequest,
   buildGovernanceActionRequest,
+  buildUpdateVersionRequest,
   governanceActionPath,
   governanceCreatePath,
   governanceListPath,
+  governanceVersionPath,
   governanceVersionsPath,
   parseGovernanceListResponse,
   type DefinitionFormValues,
@@ -34,22 +36,13 @@ import { governanceFormMessage, governanceMessage } from "../governance-messages
 const LIST_RESPONSE_LIMIT_BYTES = 1_000_000;
 const ROW_RESPONSE_LIMIT_BYTES = 400_000;
 
-/**
- * One hook for both governed families.
- *
- * `/trade/workflows` imports this rather than restating it because the backend
- * does the same: `PolicyStudioController` serves policies and workflows from a
- * single service through one `GovernanceAdapter`, with identical DTOs,
- * identical `trade.policy.*` permissions and an identical nine-verb ladder.
- * The `family` argument is the adapter switch, and it is the only difference.
- */
+export type GovernanceViewMode = "bento" | "table" | "split";
+
 export function useGovernanceStudio(family: GovernanceFamily) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
-  // OPERATING_CONTEXT: a branch header resolves BRANCH, a company header
-  // COMPANY, and neither resolves TENANT — all three are legal here.
   const scope = useTradeScope("BRANCH", branchId);
 
   const [items, setItems] = useState<GovernedDefinition[]>([]);
@@ -57,11 +50,19 @@ export function useGovernanceStudio(family: GovernanceFamily) {
   const [page, setPage] = useState(1);
   const [kind, setKind] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<DefinitionStatus | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<GovernanceViewMode>("bento");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [versionFor, setVersionFor] = useState<GovernedDefinition | null>(null);
+  const [editingVersionFor, setEditingVersionFor] = useState<{
+    definition: GovernedDefinition;
+    version: GovernedVersion;
+  } | null>(null);
   const [ladderFor, setLadderFor] = useState<GovernedDefinition | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -97,6 +98,11 @@ export function useGovernanceStudio(family: GovernanceFamily) {
         setItems(parsed.items);
         setTotal(parsed.total);
         setHasLoaded(true);
+        if (parsed.items.length > 0) {
+          setSelectedId((prev) =>
+            prev && parsed.items.some((d) => d.id === prev) ? prev : parsed.items[0].id,
+          );
+        }
       } catch (error) {
         if (isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
@@ -187,6 +193,45 @@ export function useGovernanceStudio(family: GovernanceFamily) {
     [canManage, versionFor, isSubmitting, family, scope.headers, toast, t, load],
   );
 
+  const updateVersion = useCallback(
+    async (values: VersionFormValues): Promise<boolean> => {
+      if (!canManage || !editingVersionFor || isSubmitting) return false;
+      setIsSubmitting(true);
+      setFormError(null);
+      try {
+        const response = await tradePatch(
+          governanceVersionPath(family, editingVersionFor.version.id),
+          buildUpdateVersionRequest(values),
+          {
+            headers: {
+              ...scope.headers,
+              "If-Match": tradeIfMatch(editingVersionFor.version.version),
+            },
+            maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES,
+          },
+        );
+        setEditingVersionFor(null);
+        toast.success(
+          t.tradeCommon.savedTitle,
+          isTradeReplay(response.headers)
+            ? t.tradeCommon.replayedDescription
+            : t.tradeGovernance.versionUpdated,
+        );
+        await load();
+        return true;
+      } catch (error) {
+        const normalized = normalizeApiError(error);
+        if (normalized.status === 403) return false;
+        if (toast.outcomeFromApi(normalized)) return false;
+        setFormError(governanceMessage(normalized, t) ?? governanceFormMessage(error, t));
+        return false;
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [canManage, editingVersionFor, isSubmitting, family, scope.headers, toast, t, load],
+  );
+
   const runAction = useCallback(
     async (version: GovernedVersion, action: GovernanceAction, reason: string): Promise<void> => {
       if (!canRun(action) || pendingAction) return;
@@ -217,6 +262,22 @@ export function useGovernanceStudio(family: GovernanceFamily) {
     [canRun, pendingAction, family, scope.headers, toast, t, load],
   );
 
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (d) =>
+        d.code.toLowerCase().includes(q) ||
+        d.kind.toLowerCase().includes(q) ||
+        d.scopeTarget.toLowerCase().includes(q),
+    );
+  }, [items, search]);
+
+  const selectedDefinition = useMemo(
+    () => filteredItems.find((d) => d.id === selectedId) ?? filteredItems[0] ?? null,
+    [filteredItems, selectedId],
+  );
+
   return {
     t,
     lang,
@@ -227,7 +288,15 @@ export function useGovernanceStudio(family: GovernanceFamily) {
     branchIds,
     branchId,
     selectBranch,
-    items,
+    items: filteredItems,
+    allItems: items,
+    selectedDefinition,
+    selectedId,
+    setSelectedId,
+    viewMode,
+    setViewMode,
+    search,
+    setSearch,
     pageInfo: { page, limit: GOVERNANCE_PAGE_SIZE, total },
     kind,
     status,
@@ -236,6 +305,7 @@ export function useGovernanceStudio(family: GovernanceFamily) {
     queryError,
     createOpen,
     versionFor,
+    editingVersionFor,
     ladderFor: ladderFor
       ? (items.find((entry) => entry.id === ladderFor.id) ?? ladderFor)
       : null,
@@ -267,6 +337,14 @@ export function useGovernanceStudio(family: GovernanceFamily) {
       if (isSubmitting) return;
       setVersionFor(null);
     },
+    openEditVersion: (definition: GovernedDefinition, version: GovernedVersion) => {
+      setFormError(null);
+      setEditingVersionFor({ definition, version });
+    },
+    closeEditVersion: () => {
+      if (isSubmitting) return;
+      setEditingVersionFor(null);
+    },
     openLadder: (definition: GovernedDefinition) => setLadderFor(definition),
     closeLadder: () => {
       if (pendingAction) return;
@@ -274,6 +352,7 @@ export function useGovernanceStudio(family: GovernanceFamily) {
     },
     createDefinition,
     createVersion,
+    updateVersion,
     runAction,
     reload: () => load(),
   };

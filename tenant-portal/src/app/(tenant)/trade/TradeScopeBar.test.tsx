@@ -88,4 +88,10 @@ describe("TradeScopeBar item master", () => {
     await screen.findByRole("option", { name: COMPANY });
     expect(screen.queryByRole("option", { name: en.trade.scopeItemMaster })).toBeNull();
   });
+
+  it("hides single-option UUID selectors when hideWhenSingleScope is enabled", () => {
+    i18n.mockReturnValue({ lang: "en", dir: "ltr", t: en });
+    render(<TradeScopeProvider><TradeScopeBar allowItemMaster hideWhenSingleScope /></TradeScopeProvider>);
+    expect(screen.queryByRole("group", { name: en.trade.scopeTitle })).toBeNull();
+  });
 });

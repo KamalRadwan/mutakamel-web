@@ -10,8 +10,6 @@ import {
   ErrorState,
   PageHeader,
   Skeleton,
-  SubNav,
-  TRADE_FOUNDATION_NAV_ITEMS,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useTenantAuth } from "@/context/AuthContext";
@@ -57,11 +55,9 @@ export default function TradeIndexPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t.trade.homeTitle} description={t.trade.homeSubtitle} />
+      <PageHeader className="sr-only" title={t.trade.homeTitle} description={t.trade.homeSubtitle} />
 
-      <TradeScopeBar />
-
-      <SubNav items={TRADE_FOUNDATION_NAV_ITEMS} />
+      <TradeScopeBar hideWhenSingleScope />
 
       {/* Shaped like the card grid it replaces, not a spinner over a blank page. */}
       {entitlement.status === "checking" ? (

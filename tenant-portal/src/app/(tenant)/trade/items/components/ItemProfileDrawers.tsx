@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { Building2, Globe, MapPin } from "lucide-react";
 import {
+  Badge,
   Combobox,
   DegradedBanner,
   Field,
-  FormDrawer,
+  FormModal,
+  IdentifierText,
   Input,
   Select,
   SelectContent,
@@ -14,11 +17,13 @@ import {
   SelectValue,
   Switch,
   Textarea,
+  TooltipProvider,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useCatalogUoms } from "../hooks/useCatalogUoms";
 import { useItemReferenceData } from "../hooks/useItemReferenceData";
 import type { CatalogUomPurpose } from "../../uoms/uom-contract";
+import { formatTradeDecimal, isItemDecimalString } from "../item-contract";
 import type { ItemTaxOption } from "../item-reference-data-contract";
 import {
   EMPTY_BRANCH_PROFILE_FORM,
@@ -47,6 +52,8 @@ function useDrawerLabels() {
     discardDescription: t.common.discardDescription,
     discardConfirm: t.common.discardConfirm,
     discardCancel: t.common.cancel,
+    sections: t.trade.itemFormSections,
+    sectionInvalid: t.trade.itemFormHasErrors,
   };
 }
 
@@ -76,8 +83,10 @@ function UomField({
 
   if (isUnavailable) {
     return (
-      <Field label={label} hint={t.trade.errorMissingCompany}>
-        <Input size="sm" placeholder={label}
+      <Field label={label} showLabel hint={t.trade.errorMissingCompany} hintPlacement="tooltip">
+        <Input
+          size="sm"
+          placeholder={label}
           dir="ltr"
           className="font-mono"
           value={value}
@@ -89,7 +98,7 @@ function UomField({
   }
 
   return (
-    <Field label={label}>
+    <Field label={label} showLabel>
       <Select
         value={value || NO_UOM}
         onValueChange={(next) => onChange(next === NO_UOM ? "" : next)}
@@ -99,7 +108,7 @@ function UomField({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={NO_UOM}>{t.trade.statusAny}</SelectItem>
+          <SelectItem value={NO_UOM}>{t.trade.trackingMode_NONE}</SelectItem>
           {options.map((option) => (
             <SelectItem key={option.id} value={option.id}>
               {option.code} — {option.displayName}
@@ -131,7 +140,7 @@ function TaxField({
   const { t } = useI18n();
   const selected = taxes.find((tax) => tax.id === value);
   return (
-    <Field label={label} hint={t.trade.itemTaxStoredById}>
+    <Field label={label} showLabel hint={t.trade.itemTaxStoredById} hintPlacement="tooltip">
       <Combobox
         value={value || undefined}
         selectedLabel={selected ? `${selected.code} — ${selected.name}` : value || undefined}
@@ -139,7 +148,7 @@ function TaxField({
         options={taxes.map((tax) => ({
           value: tax.id,
           label: `${tax.code} — ${tax.name}`,
-          description: `${tax.rate}%`,
+          description: `${formatTradeDecimal(tax.rate)}%`,
         }))}
         onSearch={onSearch}
         loading={loading}
@@ -184,9 +193,15 @@ export function CompanyProfileDrawer({
   const change = (patch: Partial<CompanyProfileFormValues>) =>
     setValues((current) => ({ ...current, ...patch }));
 
+  const activeCapabilitiesCount = [
+    values.canSell,
+    values.canPurchase,
+    values.canPos,
+    values.trackInventory,
+  ].filter(Boolean).length;
 
   return (
-    <FormDrawer
+    <FormModal
       open={open}
       onOpenChange={(next) => {
         if (!next) onClose();
@@ -196,157 +211,319 @@ export function CompanyProfileDrawer({
       // validation message, so it rides in the description rather than the
       // error slot.
       description={t.trade.upsertWarning}
+      size="wide"
+      headerIcon={
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-info-subtle text-info-subtle-foreground">
+          <Building2 className="size-4" aria-hidden />
+        </div>
+      }
+      titleBadge={
+        <div className="flex items-center gap-1.5">
+          <Badge tone="brand">{t.trade[`itemKind_${itemKind as "PRODUCT" | "SERVICE" | "COMBO"}`] ?? itemKind}</Badge>
+          {profile ? (
+            <Badge tone="positive">
+              <IdentifierText>{`v${profile.version}`}</IdentifierText>
+            </Badge>
+          ) : null}
+        </div>
+      }
+      bodyClassName="bg-muted/40 p-4 sm:p-5"
       isDirty={JSON.stringify(values) !== JSON.stringify(initial)}
       isSubmitting={isSubmitting}
       onSubmit={() => void onSubmit(values)}
       error={error ?? undefined}
       labels={labels}
     >
-      <div className="flex flex-col gap-4">
-        <Field label={t.trade.canSell}>
-          <Switch
-            checked={values.canSell}
-            onCheckedChange={(checked) => change({
-              canSell: checked,
-              ...(!checked ? { canPos: false } : {}),
-            })}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.canPurchase}>
-          <Switch
-            checked={values.canPurchase}
-            onCheckedChange={(checked) => change({ canPurchase: checked })}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.canPos} hint={t.trade.canPosHint}>
-          <Switch
-            checked={values.canPos}
-            onCheckedChange={(checked) => change({ canPos: checked })}
-            disabled={isSubmitting || !values.canSell}
-          />
-        </Field>
-        <Field label={t.trade.trackInventory} hint={!productInventory ? t.trade.itemInventoryProductOnly : undefined}>
-          <Switch
-            checked={values.trackInventory}
-            onCheckedChange={(checked) => change({
-              trackInventory: checked,
-              ...(!checked ? { trackingMode: "NONE" } : {}),
-            })}
-            disabled={isSubmitting || !productInventory}
-          />
-        </Field>
-        <Field
-          label={t.trade.trackingMode}
-          hint={productInventory && !values.trackInventory ? t.trade.itemTrackingRequiresInventory : undefined}
-          required
-        >
-          <Select
-            value={values.trackingMode}
-            onValueChange={(next) => change({ trackingMode: next as ItemTrackingMode })}
-            disabled={isSubmitting || !productInventory || !values.trackInventory}
-          >
-            <SelectTrigger size="sm" aria-label={t.trade.trackingMode}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ITEM_TRACKING_MODES.map((mode) => (
-                <SelectItem key={mode} value={mode}>
-                  {t.trade[`trackingMode_${mode}`]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-        <UomField
-          label={t.trade.defaultSalesUom}
-          value={values.defaultSalesUomId}
-          purpose="SALES"
-          isSubmitting={isSubmitting}
-          onChange={(next) => change({ defaultSalesUomId: next })}
-        />
-        <UomField
-          label={t.trade.defaultPurchaseUom}
-          value={values.defaultPurchaseUomId}
-          purpose="PURCHASE"
-          isSubmitting={isSubmitting}
-          onChange={(next) => change({ defaultPurchaseUomId: next })}
-        />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t.trade.itemSalesPrice} hint={t.trade.itemNonNegativeDecimal}>
-            <Input
-              size="sm"
-              dir="ltr"
-              inputMode="decimal"
-              value={values.salesPrice}
-              onChange={(event) => change({
-                salesPrice: event.target.value,
-                ...(!values.currencyCode && reference.companyCurrencyCode
-                  ? { currencyCode: reference.companyCurrencyCode }
-                  : {}),
-              })}
-              disabled={isSubmitting}
-            />
-          </Field>
-          <Field label={t.trade.itemCurrencyCode} hint={t.trade.itemCurrencyHint}>
-            <Input
-              size="sm"
-              dir="ltr"
-              value={values.currencyCode}
-              placeholder={reference.companyCurrencyCode ?? undefined}
-              onChange={(event) => change({ currencyCode: event.target.value.toUpperCase() })}
-              maxLength={3}
-              disabled={isSubmitting}
-            />
-          </Field>
-          <TaxField
-            label={t.trade.itemSalesTax}
-            value={values.salesTaxId}
-            taxes={reference.taxes}
-            loading={reference.isLoading}
-            disabled={isSubmitting}
-            onSearch={reference.search}
-            onChange={(salesTaxId) => change({ salesTaxId })}
-          />
-          <TaxField
-            label={t.trade.itemPurchaseTax}
-            value={values.purchaseTaxId}
-            taxes={reference.taxes}
-            loading={reference.isLoading}
-            disabled={isSubmitting}
-            onSearch={reference.search}
-            onChange={(purchaseTaxId) => change({ purchaseTaxId })}
-          />
+      <TooltipProvider>
+        <div className="flex flex-col gap-3">
+          {/* Card 1: Commercial Eligibility & Inventory Tracking */}
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3.5 shadow-2xs">
+            <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
+              <span className="text-xs font-semibold tracking-tight text-foreground">
+                {t.trade.companyProfileTitle}
+              </span>
+              <Badge tone={activeCapabilitiesCount > 0 ? "positive" : "neutral"}>
+                {`${activeCapabilitiesCount} / 4`}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+              <div
+                className={`rounded-lg border p-2.5 transition-colors ${
+                  values.canSell
+                    ? "border-border bg-success-subtle text-success-subtle-foreground"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                <Field label={t.trade.canSell} showLabel>
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <Switch
+                      checked={values.canSell}
+                      onCheckedChange={(checked) =>
+                        change({
+                          canSell: checked,
+                          ...(!checked ? { canPos: false } : {}),
+                        })
+                      }
+                      disabled={isSubmitting}
+                    />
+                    <span className="text-xs font-medium">
+                      {values.canSell ? t.common.active : t.common.inactive}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              <div
+                className={`rounded-lg border p-2.5 transition-colors ${
+                  values.canPurchase
+                    ? "border-border bg-success-subtle text-success-subtle-foreground"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                <Field label={t.trade.canPurchase} showLabel>
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <Switch
+                      checked={values.canPurchase}
+                      onCheckedChange={(checked) => change({ canPurchase: checked })}
+                      disabled={isSubmitting}
+                    />
+                    <span className="text-xs font-medium">
+                      {values.canPurchase ? t.common.active : t.common.inactive}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              <div
+                className={`rounded-lg border p-2.5 transition-colors ${
+                  values.canPos
+                    ? "border-border bg-info-subtle text-info-subtle-foreground"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                <Field label={t.trade.canPos} showLabel hint={t.trade.canPosHint} hintPlacement="tooltip">
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <Switch
+                      checked={values.canPos}
+                      onCheckedChange={(checked) => change({ canPos: checked })}
+                      disabled={isSubmitting || !values.canSell}
+                    />
+                    <span className="text-xs font-medium">
+                      {values.canPos ? t.common.active : t.common.inactive}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+
+              <div
+                className={`rounded-lg border p-2.5 transition-colors ${
+                  values.trackInventory
+                    ? "border-border bg-warning-subtle text-warning-subtle-foreground"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                <Field
+                  label={t.trade.trackInventory}
+                  showLabel
+                  hint={!productInventory ? t.trade.itemInventoryProductOnly : undefined}
+                  hintPlacement="tooltip"
+                >
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <Switch
+                      checked={values.trackInventory}
+                      onCheckedChange={(checked) =>
+                        change({
+                          trackInventory: checked,
+                          ...(!checked ? { trackingMode: "NONE" } : {}),
+                        })
+                      }
+                      disabled={isSubmitting || !productInventory}
+                    />
+                    <span className="text-xs font-medium">
+                      {values.trackInventory ? t.common.active : t.common.inactive}
+                    </span>
+                  </div>
+                </Field>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:items-start">
+              <Field
+                label={t.trade.trackingMode}
+                showLabel
+                hint={
+                  productInventory && !values.trackInventory
+                    ? t.trade.itemTrackingRequiresInventory
+                    : undefined
+                }
+                hintPlacement="tooltip"
+                required
+              >
+                <Select
+                  value={values.trackingMode}
+                  onValueChange={(next) => change({ trackingMode: next as ItemTrackingMode })}
+                  disabled={isSubmitting || !productInventory || !values.trackInventory}
+                >
+                  <SelectTrigger size="sm" aria-label={t.trade.trackingMode}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ITEM_TRACKING_MODES.map((mode) => (
+                      <SelectItem key={mode} value={mode}>
+                        {t.trade[`trackingMode_${mode}`]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <UomField
+                label={t.trade.defaultSalesUom}
+                value={values.defaultSalesUomId}
+                purpose="SALES"
+                isSubmitting={isSubmitting}
+                onChange={(next) => change({ defaultSalesUomId: next })}
+              />
+
+              <UomField
+                label={t.trade.defaultPurchaseUom}
+                value={values.defaultPurchaseUomId}
+                purpose="PURCHASE"
+                isSubmitting={isSubmitting}
+                onChange={(next) => change({ defaultPurchaseUomId: next })}
+              />
+            </div>
+          </div>
+
+          {/* Card 2: Pricing, Taxes & Accounting Keys */}
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3.5 shadow-2xs">
+            <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2">
+              <span className="text-xs font-semibold tracking-tight text-foreground">
+                {t.trade.itemSalesPrice} & {t.trade.taxClassificationKey}
+              </span>
+              {reference.companyCurrencyCode ? (
+                <Badge tone="brand">
+                  <IdentifierText>{reference.companyCurrencyCode}</IdentifierText>
+                </Badge>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:items-start">
+              <Field
+                label={t.trade.itemSalesPrice}
+                showLabel
+                hint={t.trade.itemNonNegativeDecimal}
+                hintPlacement="tooltip"
+              >
+                <Input
+                  size="sm"
+                  dir="ltr"
+                  className="font-mono tabular-nums"
+                  placeholder="0.00"
+                  inputMode="decimal"
+                  value={values.salesPrice}
+                  onChange={(event) =>
+                    change({
+                      salesPrice: event.target.value,
+                      ...(!values.currencyCode && reference.companyCurrencyCode
+                        ? { currencyCode: reference.companyCurrencyCode }
+                        : {}),
+                    })
+                  }
+                  onBlur={() => {
+                    if (values.salesPrice.trim() && isItemDecimalString(values.salesPrice.trim())) {
+                      change({ salesPrice: formatTradeDecimal(values.salesPrice) });
+                    }
+                  }}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field
+                label={t.trade.itemCurrencyCode}
+                showLabel
+                hint={t.trade.itemCurrencyHint}
+                hintPlacement="tooltip"
+              >
+                <Input
+                  size="sm"
+                  dir="ltr"
+                  className="font-mono"
+                  value={values.currencyCode}
+                  placeholder={reference.companyCurrencyCode ?? undefined}
+                  onChange={(event) => change({ currencyCode: event.target.value.toUpperCase() })}
+                  maxLength={3}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <TaxField
+                label={t.trade.itemSalesTax}
+                value={values.salesTaxId}
+                taxes={reference.taxes}
+                loading={reference.isLoading}
+                disabled={isSubmitting}
+                onSearch={reference.search}
+                onChange={(salesTaxId) => change({ salesTaxId })}
+              />
+
+              <TaxField
+                label={t.trade.itemPurchaseTax}
+                value={values.purchaseTaxId}
+                taxes={reference.taxes}
+                loading={reference.isLoading}
+                disabled={isSubmitting}
+                onSearch={reference.search}
+                onChange={(purchaseTaxId) => change({ purchaseTaxId })}
+              />
+            </div>
+
+            {reference.error ? <DegradedBanner message={t.trade.itemReferenceDataUnavailable} /> : null}
+
+            <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+              <Field label={t.trade.taxClassificationKey} showLabel>
+                <Input
+                  size="sm"
+                  placeholder={t.trade.taxClassificationKey}
+                  value={values.taxClassificationKey}
+                  onChange={(event) => change({ taxClassificationKey: event.target.value })}
+                  maxLength={80}
+                  disabled={isSubmitting}
+                />
+              </Field>
+
+              <Field label={t.trade.accountingMappingKey} showLabel>
+                <Input
+                  size="sm"
+                  placeholder={t.trade.accountingMappingKey}
+                  value={values.accountingMappingKey}
+                  onChange={(event) => change({ accountingMappingKey: event.target.value })}
+                  maxLength={80}
+                  disabled={isSubmitting}
+                />
+              </Field>
+            </div>
+
+            <Field
+              label={t.trade.capabilitySet}
+              showLabel
+              hint={t.trade.capabilitySetHint}
+              hintPlacement="tooltip"
+            >
+              <Textarea
+                placeholder={t.trade.capabilitySet}
+                dir="ltr"
+                className="font-mono"
+                value={values.capabilitySet}
+                onChange={(event) => change({ capabilitySet: event.target.value })}
+                disabled={isSubmitting}
+              />
+            </Field>
+          </div>
         </div>
-        {reference.error ? <DegradedBanner message={t.trade.itemReferenceDataUnavailable} /> : null}
-        <Field label={t.trade.taxClassificationKey}>
-          <Input size="sm" placeholder={t.trade.taxClassificationKey}
-            value={values.taxClassificationKey}
-            onChange={(event) => change({ taxClassificationKey: event.target.value })}
-            maxLength={80}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.accountingMappingKey}>
-          <Input size="sm" placeholder={t.trade.accountingMappingKey}
-            value={values.accountingMappingKey}
-            onChange={(event) => change({ accountingMappingKey: event.target.value })}
-            maxLength={80}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.capabilitySet} hint={t.trade.capabilitySetHint}>
-          <Textarea placeholder={t.trade.capabilitySet}
-            dir="ltr"
-            className="font-mono"
-            value={values.capabilitySet}
-            onChange={(event) => change({ capabilitySet: event.target.value })}
-            disabled={isSubmitting}
-          />
-        </Field>
-      </div>
-    </FormDrawer>
+      </TooltipProvider>
+    </FormModal>
   );
 }
 
@@ -373,55 +550,97 @@ export function BranchProfileDrawer({
     setValues((current) => ({ ...current, ...patch }));
 
   return (
-    <FormDrawer
+    <FormModal
       open={open}
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
       title={t.trade.branchProfileTitle}
       description={t.trade.upsertWarning}
+      size="card"
+      headerIcon={
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-success-subtle text-success-subtle-foreground">
+          <MapPin className="size-4" aria-hidden />
+        </div>
+      }
+      titleBadge={
+        <Badge tone={values.isAssorted ? "positive" : "neutral"}>
+          {values.isAssorted ? t.common.active : t.common.inactive}
+        </Badge>
+      }
+      bodyClassName="bg-muted/40 p-4 sm:p-5"
       isDirty={JSON.stringify(values) !== JSON.stringify(initial)}
       isSubmitting={isSubmitting}
       onSubmit={() => void onSubmit(values)}
       error={error ?? undefined}
       labels={labels}
     >
-      <div className="flex flex-col gap-4">
-        <Field label={t.trade.isAssorted}>
-          <Switch
-            checked={values.isAssorted}
-            onCheckedChange={(checked) => change({ isAssorted: checked })}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.defaultFulfillmentNode}>
-          <Input size="sm" placeholder={t.trade.defaultFulfillmentNode}
-            dir="ltr"
-            className="font-mono"
-            value={values.defaultFulfillmentNodeId}
-            onChange={(event) => change({ defaultFulfillmentNodeId: event.target.value })}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.replenishmentPolicyKey}>
-          <Input size="sm" placeholder={t.trade.replenishmentPolicyKey}
-            value={values.replenishmentPolicyKey}
-            onChange={(event) => change({ replenishmentPolicyKey: event.target.value })}
-            maxLength={80}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.restrictions} hint={t.trade.restrictionsHint}>
-          <Textarea placeholder={t.trade.restrictions}
-            dir="ltr"
-            className="font-mono"
-            value={values.restrictions}
-            onChange={(event) => change({ restrictions: event.target.value })}
-            disabled={isSubmitting}
-          />
-        </Field>
-      </div>
-    </FormDrawer>
+      <TooltipProvider>
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3.5 shadow-2xs">
+          <div
+            className={`rounded-lg border p-3 transition-colors ${
+              values.isAssorted
+                ? "border-border bg-success-subtle text-success-subtle-foreground"
+                : "border-border bg-muted/30"
+            }`}
+          >
+            <Field label={t.trade.isAssorted} showLabel>
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <Switch
+                  checked={values.isAssorted}
+                  onCheckedChange={(checked) => change({ isAssorted: checked })}
+                  disabled={isSubmitting}
+                />
+                <span className="text-xs font-medium">
+                  {values.isAssorted ? t.common.active : t.common.inactive}
+                </span>
+              </div>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
+            <Field label={t.trade.defaultFulfillmentNode} showLabel>
+              <Input
+                size="sm"
+                placeholder={t.trade.defaultFulfillmentNode}
+                dir="ltr"
+                className="font-mono"
+                value={values.defaultFulfillmentNodeId}
+                onChange={(event) => change({ defaultFulfillmentNodeId: event.target.value })}
+                disabled={isSubmitting}
+              />
+            </Field>
+
+            <Field label={t.trade.replenishmentPolicyKey} showLabel>
+              <Input
+                size="sm"
+                placeholder={t.trade.replenishmentPolicyKey}
+                value={values.replenishmentPolicyKey}
+                onChange={(event) => change({ replenishmentPolicyKey: event.target.value })}
+                maxLength={80}
+                disabled={isSubmitting}
+              />
+            </Field>
+          </div>
+
+          <Field
+            label={t.trade.restrictions}
+            showLabel
+            hint={t.trade.restrictionsHint}
+            hintPlacement="tooltip"
+          >
+            <Textarea
+              placeholder={t.trade.restrictions}
+              dir="ltr"
+              className="font-mono"
+              value={values.restrictions}
+              onChange={(event) => change({ restrictions: event.target.value })}
+              disabled={isSubmitting}
+            />
+          </Field>
+        </div>
+      </TooltipProvider>
+    </FormModal>
   );
 }
 
@@ -448,52 +667,92 @@ export function ListingDrawer({
     setValues((current) => ({ ...current, ...patch }));
 
   return (
-    <FormDrawer
+    <FormModal
       open={open}
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
       title={listing ? t.trade.listingEditTitle : t.trade.listingCreateTitle}
       description={t.trade.upsertWarning}
+      size="card"
+      headerIcon={
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-info-subtle text-info-subtle-foreground">
+          <Globe className="size-4" aria-hidden />
+        </div>
+      }
+      titleBadge={
+        values.publicationStatus ? (
+          <Badge tone={values.publicationStatus === "PUBLISHED" ? "positive" : "brand"}>
+            <IdentifierText>{values.publicationStatus}</IdentifierText>
+          </Badge>
+        ) : undefined
+      }
+      bodyClassName="bg-muted/40 p-4 sm:p-5"
       isDirty={JSON.stringify(values) !== JSON.stringify(initial)}
       isSubmitting={isSubmitting}
       onSubmit={() => void onSubmit(values)}
       error={error ?? undefined}
       labels={labels}
     >
-      <div className="flex flex-col gap-4">
-        {/* The channel is part of the PATCH path, not its body, so it is
-            information on edit rather than an editable field. */}
-        <Field label={t.trade.listingChannel} readOnly={listing !== null} required={listing === null}>
-          <Input size="sm" placeholder={t.trade.listingChannel}
-            dir="ltr"
-            className="font-mono"
-            value={values.channelId}
-            onChange={(event) => change({ channelId: event.target.value })}
-            disabled={isSubmitting}
-            readOnly={listing !== null}
-            required={listing === null}
-          />
-        </Field>
-        <Field label={t.trade.publicationStatus} hint={t.trade.publicationStatusHint}>
-          <Input size="sm" placeholder={t.trade.publicationStatus}
-            dir="ltr"
-            value={values.publicationStatus}
-            onChange={(event) => change({ publicationStatus: event.target.value.toUpperCase() })}
-            maxLength={PUBLICATION_STATUS_MAX_LENGTH}
-            disabled={isSubmitting}
-          />
-        </Field>
-        <Field label={t.trade.saleConstraints} hint={t.trade.saleConstraintsHint}>
-          <Textarea placeholder={t.trade.saleConstraints}
-            dir="ltr"
-            className="font-mono"
-            value={values.saleConstraints}
-            onChange={(event) => change({ saleConstraints: event.target.value })}
-            disabled={isSubmitting}
-          />
-        </Field>
-      </div>
-    </FormDrawer>
+      <TooltipProvider>
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3.5 shadow-2xs">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-start">
+            {/* The channel is part of the PATCH path, not its body, so it is
+                information on edit rather than an editable field. */}
+            <Field
+              label={t.trade.listingChannel}
+              showLabel
+              readOnly={listing !== null}
+              required={listing === null}
+            >
+              <Input
+                size="sm"
+                placeholder={t.trade.listingChannel}
+                dir="ltr"
+                className="font-mono"
+                value={values.channelId}
+                onChange={(event) => change({ channelId: event.target.value })}
+                disabled={isSubmitting}
+                readOnly={listing !== null}
+                required={listing === null}
+              />
+            </Field>
+
+            <Field
+              label={t.trade.publicationStatus}
+              showLabel
+              hint={t.trade.publicationStatusHint}
+              hintPlacement="tooltip"
+            >
+              <Input
+                size="sm"
+                placeholder={t.trade.publicationStatus}
+                dir="ltr"
+                value={values.publicationStatus}
+                onChange={(event) => change({ publicationStatus: event.target.value.toUpperCase() })}
+                maxLength={PUBLICATION_STATUS_MAX_LENGTH}
+                disabled={isSubmitting}
+              />
+            </Field>
+          </div>
+
+          <Field
+            label={t.trade.saleConstraints}
+            showLabel
+            hint={t.trade.saleConstraintsHint}
+            hintPlacement="tooltip"
+          >
+            <Textarea
+              placeholder={t.trade.saleConstraints}
+              dir="ltr"
+              className="font-mono"
+              value={values.saleConstraints}
+              onChange={(event) => change({ saleConstraints: event.target.value })}
+              disabled={isSubmitting}
+            />
+          </Field>
+        </div>
+      </TooltipProvider>
+    </FormModal>
   );
 }

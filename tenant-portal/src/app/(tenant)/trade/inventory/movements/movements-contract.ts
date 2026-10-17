@@ -48,6 +48,9 @@ export interface OpeningBalanceFormValues {
   quantity: string;
   itemProfileVersion: string;
   businessEffectiveAt: string;
+  lotKey?: string;
+  serialKeys?: string;
+  expiresAt?: string;
 }
 
 export const EMPTY_OPENING_BALANCE_FORM: OpeningBalanceFormValues = {
@@ -57,6 +60,9 @@ export const EMPTY_OPENING_BALANCE_FORM: OpeningBalanceFormValues = {
   quantity: "",
   itemProfileVersion: "1",
   businessEffectiveAt: "",
+  lotKey: "",
+  serialKeys: "",
+  expiresAt: "",
 };
 
 export interface ReservationFormValues {
@@ -68,6 +74,9 @@ export interface ReservationFormValues {
   sourceLineId: string;
   sourceDocumentVersion: string;
   sourceLineVersion: string;
+  expiresAt?: string;
+  lotKey?: string;
+  serialKeys?: string;
 }
 
 export const EMPTY_RESERVATION_FORM: ReservationFormValues = {
@@ -79,6 +88,9 @@ export const EMPTY_RESERVATION_FORM: ReservationFormValues = {
   sourceLineId: "",
   sourceDocumentVersion: "1",
   sourceLineVersion: "1",
+  expiresAt: "",
+  lotKey: "",
+  serialKeys: "",
 };
 
 export interface MovementLineValues {
@@ -86,6 +98,10 @@ export interface MovementLineValues {
   sourceLineVersion: string;
   uomId: string;
   quantity: string;
+  reservationId?: string;
+  lotKey?: string;
+  serialKeys?: string;
+  expiresAt?: string;
 }
 
 export const EMPTY_MOVEMENT_LINE: MovementLineValues = {
@@ -111,6 +127,30 @@ export const EMPTY_MOVEMENT_FORM: MovementFormValues = {
   businessEffectiveAt: "",
   lines: [EMPTY_MOVEMENT_LINE],
 };
+
+export interface SessionMovementEntry {
+  id: string;
+  kind: MovementKind;
+  status: "DRAFT" | "POSTED" | "REVERSED" | "ACTIVE" | "RELEASED";
+  nodeId: string;
+  summary: string;
+  version: number;
+  recordedAt: string;
+}
+
+export const RELEASE_REASON_PRESETS = [
+  "CUSTOMER_CANCELLED",
+  "CUSTOMER_QTY_REDUCTION",
+  "ORDER_EXPIRED",
+  "ALLOCATION_REBALANCE",
+] as const;
+
+export const REVERSAL_REASON_PRESETS = [
+  "DAMAGED_SHIPMENT_RETURN",
+  "WRONG_ITEM_DISPATCHED",
+  "DATA_ENTRY_CORRECTION",
+  "QUALITY_HOLD_REJECTED",
+] as const;
 
 function requireUuid(value: string, reason: string): string {
   const trimmed = value.trim();
@@ -141,7 +181,30 @@ function requireIsoInstant(value: string): string {
   return parsed.toISOString();
 }
 
+function buildOptionalTracking(
+  lotKey?: string,
+  serialKeys?: string,
+  expiresAt?: string,
+): Record<string, unknown> | undefined {
+  const lot = lotKey?.trim() ?? "";
+  const serials = (serialKeys ?? "")
+    .split(/[\s,]+/u)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  const exp = expiresAt?.trim() ? requireIsoInstant(expiresAt) : undefined;
+  if (lot.length > 120 || serials.some((s) => s.length > 120)) {
+    throw new Error("INVENTORY_FORM_TRACKING");
+  }
+  if (!lot && serials.length === 0 && !exp) return undefined;
+  const tracking: Record<string, unknown> = {};
+  if (lot) tracking.lotKey = lot;
+  if (serials.length > 0) tracking.serialKeys = serials;
+  if (exp) tracking.expiresAt = exp;
+  return tracking;
+}
+
 export function buildOpeningBalanceRequest(values: OpeningBalanceFormValues) {
+  const tracking = buildOptionalTracking(values.lotKey, values.serialKeys, values.expiresAt);
   return {
     nodeId: requireUuid(values.nodeId, "INVENTORY_FORM_NODE"),
     itemId: requireUuid(values.itemId, "INVENTORY_FORM_ITEM"),
@@ -150,10 +213,15 @@ export function buildOpeningBalanceRequest(values: OpeningBalanceFormValues) {
     itemProfileVersion: requireVersion(values.itemProfileVersion),
     businessEffectiveAt: requireIsoInstant(values.businessEffectiveAt),
     operationKey: generateUUIDv7(),
+    ...(tracking ? { tracking } : {}),
   };
 }
 
 export function buildReservationRequest(values: ReservationFormValues) {
+  const tracking = buildOptionalTracking(values.lotKey, values.serialKeys);
+  const expiresAt = values.expiresAt?.trim()
+    ? requireIsoInstant(values.expiresAt)
+    : undefined;
   return {
     nodeId: requireUuid(values.nodeId, "INVENTORY_FORM_NODE"),
     itemId: requireUuid(values.itemId, "INVENTORY_FORM_ITEM"),
@@ -164,6 +232,8 @@ export function buildReservationRequest(values: ReservationFormValues) {
     sourceDocumentVersion: requireVersion(values.sourceDocumentVersion),
     sourceLineVersion: requireVersion(values.sourceLineVersion),
     intentKey: generateUUIDv7(),
+    ...(expiresAt ? { expiresAt } : {}),
+    ...(tracking ? { tracking } : {}),
   };
 }
 
@@ -187,12 +257,21 @@ function buildLines(
   if (values.lines.length < 1 || values.lines.length > MOVEMENT_LINES_MAX) {
     throw new Error("INVENTORY_FORM_LINES");
   }
-  return values.lines.map((line) => ({
-    [lineIdKey]: requireUuid(line.sourceLineId, "INVENTORY_FORM_LINES"),
-    sourceLineVersion: requireVersion(line.sourceLineVersion),
-    uomId: requireUuid(line.uomId, "INVENTORY_FORM_UOM"),
-    quantity: requirePositiveDecimal(line.quantity),
-  }));
+  return values.lines.map((line) => {
+    const tracking = buildOptionalTracking(line.lotKey, line.serialKeys, line.expiresAt);
+    const reservationId =
+      lineIdKey === "salesOrderLineId" && line.reservationId?.trim()
+        ? requireUuid(line.reservationId, "INVENTORY_FORM_LINES")
+        : undefined;
+    return {
+      [lineIdKey]: requireUuid(line.sourceLineId, "INVENTORY_FORM_LINES"),
+      sourceLineVersion: requireVersion(line.sourceLineVersion),
+      uomId: requireUuid(line.uomId, "INVENTORY_FORM_UOM"),
+      quantity: requirePositiveDecimal(line.quantity),
+      ...(reservationId ? { reservationId } : {}),
+      ...(tracking ? { tracking } : {}),
+    };
+  });
 }
 
 export function buildReceiptRequest(values: MovementFormValues) {

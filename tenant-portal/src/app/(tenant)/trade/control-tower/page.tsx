@@ -109,6 +109,7 @@ export default function ControlTowerPage() {
   const content = (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeControlTower.title}
         description={t.tradeControlTower.subtitle}
         secondaryActions={
@@ -187,6 +188,7 @@ export default function ControlTowerPage() {
       />
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

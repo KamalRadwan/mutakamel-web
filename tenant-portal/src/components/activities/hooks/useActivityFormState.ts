@@ -4,9 +4,12 @@ import { useCallback, useState } from "react";
 import type { ActivityCreateStatus, ActivityTargetSelection } from "../activity-contract";
 import {
   rebaseActivityForm,
+  withActivityDatePreset,
+  withActivityDurationMinutes,
   withActivityStart,
   withActivityStatus,
   withActivityType,
+  type ActivityDatePreset,
   type ActivityFormValues,
 } from "../activity-form";
 import { validateActivityForm, type ActivityFormErrors, type ActivityFormField } from "../activity-form-rules";
@@ -24,6 +27,8 @@ export interface ActivityFormState {
   setField: (key: ActivityTextField, value: string) => void;
   setType: (type: string) => void;
   setStart: (patch: { startDate?: string; startTime?: string }) => void;
+  setDatePreset: (preset: ActivityDatePreset) => void;
+  setDurationMinutes: (minutes: number) => void;
   setStatus: (status: ActivityCreateStatus) => void;
   setTarget: (target: ActivityTargetSelection | null) => void;
   setAssignee: (id: string | null, label: string | null) => void;
@@ -83,6 +88,8 @@ export function useActivityFormState(
     setField: (key, value) => transform((values) => ({ ...values, [key]: value })),
     setType: (type) => transform((values) => withActivityType(values, type, deriveEnd)),
     setStart: (patch) => transform((values) => withActivityStart(values, patch)),
+    setDatePreset: (preset) => transform((values) => withActivityDatePreset(values, preset)),
+    setDurationMinutes: (minutes) => transform((values) => withActivityDurationMinutes(values, minutes)),
     setStatus: (status) => transform((values) => withActivityStatus(values, status)),
     // Who may hold the activity depends on the record, so a new record resets the assignee.
     setTarget: (target) => transform((values) => ({ ...values, target, assigneeUserId: null, assigneeLabel: null })),

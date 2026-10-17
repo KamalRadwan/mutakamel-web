@@ -194,15 +194,20 @@ function partyImageUrl(value: unknown): string | null {
 function companyWebsite(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
   if (typeof value !== "string" || value.length > 2_048) invalidResponse();
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const candidate = /^[a-z][a-z0-9+.-]*:/iu.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
   try {
-    const url = new URL(value);
+    const url = new URL(candidate);
     if (url.protocol !== "https:" && url.protocol !== "http:") {
       invalidResponse();
     }
   } catch {
     invalidResponse();
   }
-  return value;
+  return trimmed;
 }
 
 function parseOwner(value: unknown): CustomerProfileOwner | null {
@@ -329,9 +334,12 @@ export function parseCustomerProfileResponse(
   const branchId = requiredUuidV7(source, "branchId");
   if (expectedBranchId && branchId !== expectedBranchId) invalidResponse();
 
+  const normalizedStatus =
+    source.status === "ACTIVE" ? "ACTIVE_CUSTOMER" : source.status;
+
   if (
     !isMember(CUSTOMER_PROFILE_TYPES, source.profileType) ||
-    !isMember(CUSTOMER_PROFILE_STATUSES, source.status)
+    !isMember(CUSTOMER_PROFILE_STATUSES, normalizedStatus)
   ) {
     invalidResponse();
   }
@@ -357,7 +365,7 @@ export function parseCustomerProfileResponse(
     partyId: requiredUuidV7(source, "partyId"),
     displayName: requiredText(source, "displayName", 180),
     profileType: source.profileType,
-    status: source.status,
+    status: normalizedStatus,
     companyName: nullableText(source, "companyName", 180),
     imageUrl: partyImageUrl(party?.imageUrl),
     phone: phones[0] ?? primaryMobile ?? companyPhone,

@@ -69,10 +69,22 @@ export interface FormModalProps {
   sectionVariant?: "default" | "stepper";
   /** Optional title / header element above the section navigation (e.g. "LEAD DETAILS"). */
   sidebarHeader?: React.ReactNode;
+  /** Optional icon badge rendered at the inline start of the header band. */
+  headerIcon?: React.ReactNode;
+  /** Optional inline badge(s) rendered right beside the DialogTitle. */
+  titleBadge?: React.ReactNode;
   /** Rendered in the header band, before the close button — a status chip, a scope note. */
   headerAside?: React.ReactNode;
+  /** Optional class override for the scrollable body container (e.g. "bg-muted/40"). */
+  bodyClassName?: string;
+  /** Optional persistent side rail rendered beside the main scrollable body (e.g. Current Open Activities rail). */
+  asideSlot?: React.ReactNode;
   /** Rendered at the footer's inline start, opposite Cancel and Submit. */
   footerLeading?: React.ReactNode;
+  /** Optional icon rendered inside the primary submit button. */
+  submitIcon?: React.ReactNode;
+  /** Optional class override for the primary submit button (e.g. green completion style). */
+  submitClassName?: string;
   labels: FormModalLabels;
   children: React.ReactNode;
 }
@@ -94,8 +106,14 @@ export function FormModal({
   sections,
   sectionVariant = "default",
   sidebarHeader,
+  headerIcon,
+  titleBadge,
   headerAside,
+  bodyClassName,
+  asideSlot,
   footerLeading,
+  submitIcon,
+  submitClassName,
   labels,
   children,
 }: FormModalProps) {
@@ -204,8 +222,8 @@ export function FormModal({
             size === "full"
               ? undefined
               : cn(
-                  "flex max-h-[85dvh] w-[calc(100%-2rem)] flex-col gap-0 p-0",
-                  size === "wide" && "max-w-[960px]",
+                  "flex max-h-[94dvh] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden rounded-lg p-0 sm:p-0",
+                  size === "wide" && (asideSlot ? "max-w-[1180px]" : "max-w-[940px]"),
                 )
           }
           closeLabel={labels.close}
@@ -221,19 +239,44 @@ export function FormModal({
           <form noValidate onSubmit={shell.handleSubmit} className="flex min-h-0 flex-1 flex-col">
             {/* pe-14 clears DialogContent's own close button, which is
                 positioned against the content box rather than this band. */}
-            <div className={cn("flex shrink-0 items-start justify-between border-b border-border", density === "compact" ? "gap-2 px-3 py-2 pe-14" : "gap-3 px-4 py-3 pe-14 sm:px-5")}>
-              <div className="flex min-w-0 flex-col gap-1">
-                <DialogTitle className={density === "compact" ? "text-sm" : undefined}>{title}</DialogTitle>
-                {description && (
-                  <DialogDescription className={cn(density === "compact" ? "text-xs" : "text-sm", proseMeasure)}>
-                    {description}
-                  </DialogDescription>
-                )}
+            <div
+              className={cn(
+                "flex shrink-0 flex-wrap items-center justify-between border-b border-border bg-card",
+                density === "compact"
+                  ? "gap-2 px-3 py-2 pe-12"
+                  : "gap-3 px-4 py-3 pe-14 sm:ps-5 sm:pe-14",
+              )}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3.5">
+                {headerIcon && <div className="shrink-0">{headerIcon}</div>}
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DialogTitle className={density === "compact" ? "text-sm" : "text-base"}>
+                      {title}
+                    </DialogTitle>
+                    {titleBadge}
+                  </div>
+                  {description && (
+                    <DialogDescription
+                      className={cn(
+                        density === "compact" || headerIcon || titleBadge ? "text-xs" : "text-sm",
+                        !titleBadge && !headerIcon && proseMeasure,
+                      )}
+                    >
+                      {description}
+                    </DialogDescription>
+                  )}
+                </div>
               </div>
               {headerAside && <div className="shrink-0">{headerAside}</div>}
             </div>
 
-            <div className="flex min-h-0 flex-1">
+            <div className={cn("flex min-h-0 flex-1", asideSlot && "flex-col md:flex-row")}>
+              {asideSlot && (
+                <aside className="flex max-h-64 w-full shrink-0 flex-col overflow-y-auto border-b border-border bg-muted/35 md:max-h-none md:w-[345px] md:border-b-0 md:border-e lg:w-[355px]">
+                  {asideSlot}
+                </aside>
+              )}
               {size === "full" && sections && sections.length > 0 && (
                 <nav
                   aria-label={labels.sections}
@@ -380,17 +423,18 @@ export function FormModal({
                   // has any overflow to scroll. Max-content rows preserve each
                   // section's natural height and make this element the single
                   // scroll owner while the header and footer stay fixed.
-                  "relative grid min-h-0 min-w-0 flex-1 auto-rows-max content-start overflow-y-auto scroll-smooth",
+                  "relative grid min-h-0 min-w-0 flex-1 auto-rows-max content-start overflow-y-auto scroll-smooth bg-card",
                   density === "compact"
                     ? "gap-2 px-3 py-2"
                     : "gap-4 px-4 py-3.5 sm:px-5",
+                  bodyClassName,
                 )}
               >
                 {children}
               </div>
             </div>
 
-            <div className={cn("flex shrink-0 flex-col gap-2 border-t border-border", density === "compact" ? "px-3 py-2" : "px-4 py-2.5 sm:px-5")}>
+            <div className={cn("flex shrink-0 flex-col gap-2 border-t border-border bg-card", density === "compact" ? "px-3 py-2" : "px-4 py-2.5 sm:px-5")}>
               <FormErrorSummary error={error} />
               <div className="flex flex-wrap items-center gap-2">
                 {footerLeading && (
@@ -415,7 +459,9 @@ export function FormModal({
                       variant="primary"
                       loading={isSubmitting}
                       disabled={submitDisabled}
+                      className={submitClassName}
                     >
+                      {submitIcon}
                       {labels.submit}
                     </Button>
                   )}

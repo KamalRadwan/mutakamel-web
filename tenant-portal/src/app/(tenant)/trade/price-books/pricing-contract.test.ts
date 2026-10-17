@@ -5,6 +5,9 @@ import {
   POLICY_PUBLISH_PERMISSION,
   PRICING_MANAGE_PERMISSION,
   buildCreatePriceBookRequest,
+  companyDefaultPriceBookPath,
+  companyDefaultPriceBookUpsertPath,
+  parseCompanyDefaultPriceBook,
   parsePriceBookVersionDetail,
   parsePriceBooksResponse,
   parsePricingDecision,
@@ -13,7 +16,11 @@ import {
   priceBookVersionsPath,
   priceBooksListPath,
 } from "./pricing-contract";
-import { buildCreateVersionRequest, EMPTY_PRICE_ENTRY_DRAFT } from "./version-draft";
+import {
+  buildCreateVersionRequest,
+  detectVersionDraftConflicts,
+  EMPTY_PRICE_ENTRY_DRAFT,
+} from "./version-draft";
 
 const bookId = "01902001-3000-7000-8000-000000000001";
 const versionId = "01902001-3000-7000-8000-000000000002";
@@ -21,6 +28,7 @@ const itemId = "01902001-3000-7000-8000-000000000003";
 const uomId = "01902001-3000-7000-8000-000000000004";
 const entryId = "01902001-3000-7000-8000-000000000005";
 const decisionId = "01902001-3000-7000-8000-000000000006";
+const branchId = "01902001-3000-7000-8000-000000000007";
 
 describe("Trade pricing contract", () => {
   it("builds every path from a canonical prefix", () => {
@@ -35,6 +43,12 @@ describe("Trade pricing contract", () => {
       `/api/tenant/trade/v1/price-book-versions/${versionId}/publish`,
     );
     expect(PRICING_EVALUATE_PATH).toBe("/api/tenant/trade/v1/pricing/evaluate");
+    expect(companyDefaultPriceBookPath("SALES", "sar")).toBe(
+      "/api/tenant/trade/v1/configuration/company-default-price-books/SALES/SAR",
+    );
+    expect(companyDefaultPriceBookUpsertPath("PURCHASE", "usd")).toBe(
+      "/api/tenant/trade/v1/configuration/company-default-price-books/PURCHASE/USD/upsert",
+    );
   });
 
   it("publishes with the Policy Studio grant, not the pricing one", () => {
@@ -83,6 +97,96 @@ describe("Trade pricing contract", () => {
         promotions: [],
       }),
     ).toThrow("PRICING_FORM_ENTRIES");
+  });
+
+  it("includes optional promotion scope selectors only when non-empty", () => {
+    const request = buildCreateVersionRequest({
+      effectiveFrom: "2026-09-01T00:00:00.000Z",
+      effectiveTo: "",
+      entries: [
+        { ...EMPTY_PRICE_ENTRY_DRAFT, itemId, uomId, currencyCode: "SAR", unitPrice: "15.00" },
+      ],
+      promotions: [
+        {
+          code: "RAMADAN_10",
+          name: "Ramadan Offer",
+          benefitType: "PERCENTAGE",
+          discountValue: "10",
+          priority: "100",
+          stackGroup: "DEFAULT",
+          exclusive: false,
+          branchId,
+          minimumQuantity: "5",
+          maximumQuantity: "50",
+        },
+      ],
+    });
+    expect(request.promotions[0].branchId).toBe(branchId);
+    expect(request.promotions[0].minimumQuantity).toBe("5");
+    expect(request.promotions[0].maximumQuantity).toBe("50");
+    expect(request.promotions[0]).not.toHaveProperty("partyId");
+  });
+
+  it("detects pre-flight conflicts across overlapping quantity tiers, floor > unit, and currency mismatch", () => {
+    const report = detectVersionDraftConflicts(
+      {
+        effectiveFrom: "2026-09-01T00:00:00.000Z",
+        effectiveTo: "",
+        entries: [
+          {
+            ...EMPTY_PRICE_ENTRY_DRAFT,
+            itemId,
+            uomId,
+            currencyCode: "SAR",
+            minimumQuantity: "1",
+            maximumQuantity: "10",
+            unitPrice: "100.00",
+            minimumAllowedPrice: "120.00",
+          },
+          {
+            ...EMPTY_PRICE_ENTRY_DRAFT,
+            itemId,
+            uomId,
+            currencyCode: "USD",
+            minimumQuantity: "5",
+            maximumQuantity: "20",
+            unitPrice: "90.00",
+            minimumAllowedPrice: "80.00",
+          },
+        ],
+        promotions: [
+          {
+            code: "OVER_100",
+            name: "Invalid Pct",
+            benefitType: "PERCENTAGE",
+            discountValue: "125",
+            priority: "100",
+            stackGroup: "DEFAULT",
+            exclusive: false,
+          },
+        ],
+      },
+      "SAR",
+    );
+    expect(report.hasConflicts).toBe(true);
+    expect(report.overlappingTierPairs).toHaveLength(1);
+    expect(report.currencyMismatchIndices).toEqual([1]);
+    expect(report.floorAboveUnitIndices).toEqual([0]);
+    expect(report.percentageOver100PromotionIndices).toEqual([0]);
+  });
+
+  it("parses company default price book binding", () => {
+    const binding = parseCompanyDefaultPriceBook({
+      purpose: "SALES",
+      currencyCode: "SAR",
+      priceBookId: bookId,
+      version: 2,
+      updatedAt: "2026-09-01T00:00:00.000Z",
+    });
+    expect(binding.purpose).toBe("SALES");
+    expect(binding.currencyCode).toBe("SAR");
+    expect(binding.priceBookId).toBe(bookId);
+    expect(binding.version).toBe(2);
   });
 
   it("refuses a promotion code the DTO pattern rejects", () => {
@@ -194,3 +298,4 @@ describe("Trade pricing contract", () => {
     expect(decision.matchedPromotions[0].discountAmount).toBe("1.05");
   });
 });
+

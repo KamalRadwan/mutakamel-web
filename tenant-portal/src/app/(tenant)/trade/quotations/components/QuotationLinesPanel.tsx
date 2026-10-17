@@ -68,6 +68,7 @@ export function QuotationLinesPanel({ quotation }: { quotation: QuotationDetail 
       columns={1}
     >
       <DataTable
+        density="compact"
         columns={columns}
         rows={quotation.currentLines}
         rowKey={(line) => line.id}

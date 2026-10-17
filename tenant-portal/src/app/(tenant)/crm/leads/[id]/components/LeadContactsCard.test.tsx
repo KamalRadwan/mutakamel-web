@@ -105,12 +105,16 @@ describe("LeadContactsCard", () => {
     }
   });
 
-  it("opens only the selected contact in a modal, with identity gated by Directory permissions", () => {
+  it("opens only the selected contact in a modal, hides the original read card while editing, and gates identity by Directory permissions", () => {
     renderCard();
     openEditor();
+    // Original card for Dina Ali is hidden while editing; Omar Adel remains in the card list
+    expect(screen.queryByRole("button", { name: en.crmLeadDetail.editContact + ": Dina Ali", hidden: true })).toBeNull();
+    expect(screen.getByRole("button", { name: en.crmLeadDetail.editContact + ": Omar Adel", hidden: true })).toBeTruthy();
     const modal = within(screen.getByRole("dialog"));
     expect(modal.getByText(en.crmLeadDetail.contactIdentityPermission)).toBeTruthy();
     expect(modal.getByRole("button", { name: en.crmLeadConvert.contactJobTitle })).toBeTruthy();
+    expect(modal.getByLabelText<HTMLSelectElement>(en.crmLeadDetail.honorificTitle).tagName).toBe("SELECT");
     expect(modal.getByLabelText<HTMLInputElement>(en.crmLeadDetail.fullName).value).toBe("Dina Ali");
     expect(modal.getByLabelText(en.crmLeadDetail.fullName)).toHaveAttribute("readonly");
     expect(modal.queryByDisplayValue("Omar Adel")).toBeNull();
@@ -149,5 +153,20 @@ describe("LeadContactsCard", () => {
     expect(screen.queryAllByRole("button", { name: /^Edit contact:/ })).toHaveLength(0);
     if (lead.contacts.length === 0) expect(screen.getByText(en.crmLeadDetail.contactsEmpty)).toBeTruthy();
     expect(runIdempotentWrite).not.toHaveBeenCalled();
+  });
+
+  it("supports inline Add Contact form with Honorific dropdown, Job Title picker, and validation", () => {
+    renderCard(corporate, true);
+    expect(screen.getByRole("button", { name: /Set Primary/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.addContact }));
+    expect(screen.getByLabelText<HTMLSelectElement>(en.crmLeadDetail.honorificTitle).tagName).toBe("SELECT");
+    expect(screen.getByRole("button", { name: en.crmLeadConvert.contactJobTitle })).toBeTruthy();
+    // Saving with empty name shows required validation error without calling API
+    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    expect(screen.getByText(en.crmLeads.create.errors.required)).toBeTruthy();
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+    // Cancel closes the inline Add Contact form
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    expect(screen.queryByText(en.crmLeads.create.errors.required)).toBeNull();
   });
 });

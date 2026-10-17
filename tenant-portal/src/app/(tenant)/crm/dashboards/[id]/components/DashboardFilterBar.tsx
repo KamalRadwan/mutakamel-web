@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { Building2, LayoutDashboard, MapPin } from "lucide-react";
 import {
   Label,
   Select,
@@ -8,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/design-system";
+import { useOrgNodeOptions } from "@/app/(tenant)/core/hooks/useCoreOptions";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   COMPARE_MODES,
@@ -21,35 +24,145 @@ interface DashboardFilterBarProps {
   branchIds: readonly string[];
   currencyCodes: readonly string[];
   disabled: boolean;
+  dashboardSwitcher?: {
+    value: string;
+    options: ReadonlyArray<{ value: string; label: string }>;
+    onChange: (nextValue: string) => void;
+  };
 }
 
 const ANY = "__any__";
 
-/**
- * The four run filters this screen can offer honestly.
- *
- * `DashboardFiltersDto` also carries `ownerUserId`, `pipelineId`, `dateFrom`,
- * `dateTo`, `staleDays`, `closingWindowDays` and `limit`. Owner and pipeline
- * are omitted because neither picker has a source reachable from this screen —
- * fabricating a UUID field for them would be a control nobody can use. The
- * currency list is not invented either: it is exactly what the last run
- * reported through its `CURRENCIES:` warnings (Q102).
- */
 export function DashboardFilterBar({
   selection,
   onChange,
   branchIds,
   currencyCodes,
   disabled,
+  dashboardSwitcher,
 }: DashboardFilterBarProps) {
   const { t } = useI18n();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+
+  const companies = useOrgNodeOptions("companies");
+  const effectiveCompanyId =
+    selectedCompanyId ??
+    (companies.options.length === 1 ? companies.options[0].value : null);
+
+  const branches = useOrgNodeOptions("branches", {
+    parentId: effectiveCompanyId ?? undefined,
+  });
+
+  const branchOptions = useMemo(() => {
+    const accessibleSet = new Set(branchIds);
+    const loaded = branches.options.filter(
+      (option) => accessibleSet.size === 0 || accessibleSet.has(option.value),
+    );
+    if (loaded.length > 0) return loaded;
+    return branches.options;
+  }, [branchIds, branches.options]);
+
+  const currencyList = useMemo(() => {
+    if (currencyCodes.length > 0) return currencyCodes;
+    return ["EGP", "SAR", "USD"];
+  }, [currencyCodes]);
+
+  const gridColsClass = dashboardSwitcher
+    ? "grid grid-cols-1 gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-6"
+    : "grid grid-cols-1 gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-5";
 
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-sm border border-border bg-card p-2.5">
-      <div className="flex min-w-40 flex-col gap-1">
+    <div className={gridColsClass}>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="dashboard-company">{t.crmDashboards.company}</Label>
+        <Select
+          value={effectiveCompanyId ?? ANY}
+          disabled={disabled}
+          onValueChange={(next) => {
+            const nextCompanyId = next === ANY ? null : next;
+            setSelectedCompanyId(nextCompanyId);
+            if (selection.branchId !== null) {
+              onChange({ ...selection, branchId: null });
+            }
+          }}
+        >
+          <SelectTrigger size="sm" id="dashboard-company">
+            <span className="flex min-w-0 items-center gap-1.5 truncate">
+              <Building2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <SelectValue />
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {companies.options.length > 1 || companies.options.length === 0 ? (
+              <SelectItem value={ANY}>{t.crmDashboards.allCompanies}</SelectItem>
+            ) : null}
+            {companies.options.map((company) => (
+              <SelectItem key={company.value} value={company.value}>
+                {company.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="dashboard-branch">{t.crmDashboards.branch}</Label>
+        <Select
+          value={selection.branchId ?? ANY}
+          disabled={disabled}
+          onValueChange={(next) =>
+            onChange({ ...selection, branchId: next === ANY ? null : next })
+          }
+        >
+          <SelectTrigger size="sm" id="dashboard-branch">
+            <span className="flex min-w-0 items-center gap-1.5 truncate">
+              <MapPin className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <SelectValue />
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>{t.crmDashboards.allBranches}</SelectItem>
+            {branchOptions.map((branch) => (
+              <SelectItem key={branch.value} value={branch.value}>
+                {branch.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {dashboardSwitcher ? (
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="dashboard-switcher-select">{t.crmDashboards.switchDashboard}</Label>
+          <Select
+            value={dashboardSwitcher.value}
+            disabled={disabled}
+            onValueChange={dashboardSwitcher.onChange}
+          >
+            <SelectTrigger size="sm" id="dashboard-switcher-select">
+              <span className="flex min-w-0 items-center gap-1.5 truncate">
+                <LayoutDashboard
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <SelectValue />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {dashboardSwitcher.options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-1">
         <Label htmlFor="dashboard-date-preset">{t.crmDashboards.datePreset}</Label>
         <Select
-          value={selection.datePreset ?? ANY}
+          value={selection.datePreset ?? "CURRENT_MONTH"}
           disabled={disabled}
           onValueChange={(next) =>
             onChange({
@@ -72,10 +185,10 @@ export function DashboardFilterBar({
         </Select>
       </div>
 
-      <div className="flex min-w-40 flex-col gap-1">
+      <div className="flex flex-col gap-1">
         <Label htmlFor="dashboard-compare">{t.crmDashboards.compare}</Label>
         <Select
-          value={selection.compare ?? ANY}
+          value={selection.compare ?? "PREVIOUS_PERIOD"}
           disabled={disabled}
           onValueChange={(next) =>
             onChange({
@@ -98,59 +211,28 @@ export function DashboardFilterBar({
         </Select>
       </div>
 
-      {branchIds.length > 0 ? (
-        <div className="flex min-w-52 flex-col gap-1">
-          <Label htmlFor="dashboard-branch">{t.crmDashboards.branch}</Label>
-          <Select
-            value={selection.branchId ?? ANY}
-            disabled={disabled}
-            onValueChange={(next) =>
-              onChange({ ...selection, branchId: next === ANY ? null : next })
-            }
-          >
-            {/* Branch ids, not names: `/auth/me` returns `accessibleBranches`
-                as bare identifiers and no branch-name source is reachable
-                from CRM. Same treatment as `TenantBranchSelect`, which every
-                other CRM workspace uses. */}
-            <SelectTrigger size="sm" id="dashboard-branch" dir="ltr" className="font-mono">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>{t.crmDashboards.allBranches}</SelectItem>
-              {branchIds.map((branchId) => (
-                <SelectItem key={branchId} value={branchId}>
-                  {branchId}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      {currencyCodes.length > 0 ? (
-        <div className="flex min-w-36 flex-col gap-1">
-          <Label htmlFor="dashboard-currency">{t.crmDashboards.currency}</Label>
-          <Select
-            value={selection.currencyCode ?? ANY}
-            disabled={disabled}
-            onValueChange={(next) =>
-              onChange({ ...selection, currencyCode: next === ANY ? null : next })
-            }
-          >
-            <SelectTrigger size="sm" id="dashboard-currency">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>{t.crmDashboards.allCurrencies}</SelectItem>
-              {currencyCodes.map((code) => (
-                <SelectItem key={code} value={code}>
-                  {code}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="dashboard-currency">{t.crmDashboards.currency}</Label>
+        <Select
+          value={selection.currencyCode ?? "EGP"}
+          disabled={disabled}
+          onValueChange={(next) =>
+            onChange({ ...selection, currencyCode: next === ANY ? null : next })
+          }
+        >
+          <SelectTrigger size="sm" id="dashboard-currency">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>{t.crmDashboards.allCurrencies}</SelectItem>
+            {currencyList.map((code) => (
+              <SelectItem key={code} value={code}>
+                {code}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

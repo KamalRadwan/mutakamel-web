@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-10-14T06:45:54.251Z**
+Generated at: **2026-10-17T03:04:55.398Z**
 
-Frontend revision: `27ba4028e003+dirty`
+Frontend revision: `dcaedbb1562a+dirty`
 
-Backend revision: `e003cf3d1ace+dirty`
+Backend revision: `0d665ae5d9b6+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -19,9 +19,9 @@ canonical Gateway path mappings.
 | --- | ---: |
 | core | 228 |
 | crm | 171 |
-| trade | 248 |
+| trade | 251 |
 | webphone | 20 |
-| **Total** | **667** |
+| **Total** | **670** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -574,6 +574,9 @@ Machine-readable source:
 | trade | PATCH | `/api/tenant/trade/v1/items/:id/channel-listings/:channelId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.channel.listings.by-channel-id.patch` |
 | trade | PATCH | `/api/tenant/trade/v1/items/:id/company-profile` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.company.profile.patch` |
 | trade | POST | `/api/tenant/trade/v1/items/:id/company-profile` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.company.profile.post` |
+| trade | DELETE | `/api/tenant/trade/v1/items/:id/image` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by.id.image.delete` |
+| trade | PUT | `/api/tenant/trade/v1/items/:id/image` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by.id.image.put` |
+| trade | GET | `/api/tenant/trade/v1/items/:id/images/:imageId/:rendition` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.items.by.id.images.by.id.rendition.get` |
 | trade | GET | `/api/tenant/trade/v1/items/:id/standard-cost` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.items.by-id.standard.cost.get` |
 | trade | PATCH | `/api/tenant/trade/v1/items/:id/standard-cost` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.items.by-id.standard.cost.patch` |
 | trade | GET | `/api/tenant/trade/v1/items/reference-data` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.items.reference.data.get` |

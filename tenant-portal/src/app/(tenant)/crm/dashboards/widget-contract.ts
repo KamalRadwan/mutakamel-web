@@ -244,7 +244,6 @@ export function parseWidgetDefinition(payload: unknown): WidgetDefinition {
     !isUUIDv7(source.ownerUserId) ||
     !nonEmptyString(source.name) ||
     !isVisualization(source.visualizationType) ||
-    !timestamp(source.createdAt) ||
     !timestamp(source.updatedAt) ||
     !finiteNumber(source.revision)
   ) {
@@ -260,7 +259,7 @@ export function parseWidgetDefinition(payload: unknown): WidgetDefinition {
     displaySpec: record(source.displaySpec) ?? {},
     schemaVersion: finiteNumber(source.schemaVersion) ? source.schemaVersion : 1,
     revision: source.revision,
-    createdAt: source.createdAt,
+    createdAt: timestamp(source.createdAt) ? source.createdAt : source.updatedAt,
     updatedAt: source.updatedAt,
     accessLevel: isAccessLevel(source.accessLevel) ? source.accessLevel : "VIEW",
     isShared: source.isShared === true,

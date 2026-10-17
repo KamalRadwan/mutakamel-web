@@ -10,7 +10,6 @@ import {
   FilterBar,
   PageHeader,
   PermissionGate,
-  SubNav,
   type ColumnDef,
   type FilterValues,
 } from "@/design-system";
@@ -19,7 +18,6 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { tradeStatusLabel } from "../trade-advanced-validation";
-import { TRADE_WEBHOOK_NAV_ITEMS } from "./webhooks-nav";
 import {
   WEBHOOK_MANAGE_PERMISSION,
   WEBHOOK_SUBSCRIPTION_STATUSES,
@@ -107,6 +105,7 @@ export default function WebhookSubscriptionsPage() {
   const content = (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeAutomation.subscriptionsTitle}
         description={t.tradeAutomation.subscriptionsSubtitle}
         primaryAction={
@@ -122,6 +121,11 @@ export default function WebhookSubscriptionsPage() {
               onChange={selectBranch}
               disabled={isRefreshing}
             />
+            <Button asChild size="sm" variant="outline">
+              <Link href={TENANT_ROUTES.tradeWebhookDeliveries}>
+                {t.tradeAutomation.deliveriesTitle}
+              </Link>
+            </Button>
             <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
               <RefreshCw
                 className={isRefreshing ? "size-4 animate-spin" : "size-4"}
@@ -132,8 +136,6 @@ export default function WebhookSubscriptionsPage() {
           </>
         }
       />
-
-      <SubNav items={TRADE_WEBHOOK_NAV_ITEMS} />
 
       {/* Not a fault: no route returns the signing secret, so the portal has
           nothing to show the caller after a rotation. */}
@@ -173,6 +175,7 @@ export default function WebhookSubscriptionsPage() {
       />
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

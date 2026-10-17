@@ -79,6 +79,7 @@ export default function PurchaseQuotationsPage() {
     <TradeGate require={PURCHASE_QUOTATION_PERMISSIONS.read}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={t.tradeDocuments.purchaseQuotations.title}
           description={t.tradeDocuments.purchaseQuotations.subtitle}
           primaryAction={
@@ -107,6 +108,7 @@ export default function PurchaseQuotationsPage() {
               onChange={list.setStatus}
             />
             <DataTable
+              density="compact"
               columns={columns}
               rows={list.items}
               isLoading={list.isLoading}

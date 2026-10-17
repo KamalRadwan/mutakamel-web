@@ -73,20 +73,22 @@ export function AppSwitcher({ apps, activeApp, onSelect }: AppSwitcherProps) {
       variant="ghost"
       size="sm"
       aria-label={t.nav.appSwitcher}
-      className="justify-between gap-2 text-foreground"
+      className="h-7 justify-between gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 text-xs font-semibold text-white hover:bg-white/18 hover:text-white"
     >
-      <span className="flex min-w-0 items-center gap-2">
-        <ActiveIcon className="size-4 shrink-0" aria-hidden="true" />
-        <span className="hidden truncate font-medium sm:inline">{label(active)}</span>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="flex size-4.5 shrink-0 items-center justify-center rounded-xs bg-gradient-to-br from-cyan-400 to-blue-600 text-white">
+          <ActiveIcon className="size-3 shrink-0" aria-hidden="true" />
+        </span>
+        <span className="hidden truncate font-semibold sm:inline">{label(active)}</span>
       </span>
-      <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <ChevronsUpDown className="size-3.5 shrink-0 text-white/60" aria-hidden="true" />
     </Button>
   );
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="bottom" className="w-(--size-brand)">
+      <DropdownMenuContent align="start" side="bottom" className="w-56">
         <DropdownMenuLabel>{t.nav.appSwitcher}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup value={activeApp} onValueChange={handleSelect}>

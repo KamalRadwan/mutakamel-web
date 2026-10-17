@@ -6,13 +6,16 @@ import {
   DegradedBanner,
   IdentifierText,
   Money,
+  Progress,
   StatCard,
+  swatchSurfacePalette,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  type SwatchHue,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatNumber } from "@/lib/format/number";
@@ -30,14 +33,64 @@ const INSTANT_COLUMNS = new Set(["updatedAt", "createdAt", "dueAt"]);
 /** Columns whose value is a server enum, not tenant text. */
 const ENUM_COLUMNS = new Set(["status", "type"]);
 
+function prebuiltHue(key: string): SwatchHue {
+  if (
+    key === "overdueWork" ||
+    key === "overdueTasks" ||
+    key === "staleDeals" ||
+    key === "staleOpportunities"
+  ) {
+    return "red";
+  }
+  if (
+    key.startsWith("missing") ||
+    key === "duplicateSignals" ||
+    key === "dataCleanupItems" ||
+    key === "untouchedLeads"
+  ) {
+    return "amber";
+  }
+  if (
+    key === "pipelineValue" ||
+    key === "wonValue" ||
+    key === "conversionRate" ||
+    key === "sourceToValue"
+  ) {
+    return "green";
+  }
+  if (
+    key === "activeDeals" ||
+    key === "stageDistribution" ||
+    key === "multiPipelineComparison"
+  ) {
+    return "indigo";
+  }
+  if (
+    key === "activityMix" ||
+    key === "calendarUtilization" ||
+    key === "reminderSummary" ||
+    key === "repWorkload"
+  ) {
+    return "purple";
+  }
+  if (key === "leadSources" || key === "currencyBreakdown") {
+    return "teal";
+  }
+  return "blue";
+}
+
 export function PrebuiltWidgetCard({ spec, value }: PrebuiltWidgetCardProps) {
   const { t, lang } = useI18n();
   const title = t.crmDashboardReports.widgets[spec.key] ?? spec.key;
+  const palette = swatchSurfacePalette(prebuiltHue(spec.key));
 
   return (
-    <Card className="flex flex-col gap-2 p-3">
-      <h3 className="text-sm font-medium text-foreground">{title}</h3>
-      {renderValue()}
+    <Card className="flex flex-col overflow-hidden p-0">
+      <div className={`h-1 w-full ${palette.dot}`} aria-hidden="true" />
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <h3 className="text-sm font-medium text-foreground">{title}</h3>
+        {renderValue()}
+      </div>
     </Card>
   );
 
@@ -50,12 +103,17 @@ export function PrebuiltWidgetCard({ spec, value }: PrebuiltWidgetCardProps) {
     }
     if (value.kind === "CONVERSION") {
       return (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1.5">
           <StatCard
             label={t.crmDashboardReports.conversionRate}
             // `rate` is a ratio in 0..1 — `converted / total` — so this is the
             // one place `style: "percent"` is correct on this screen.
             value={formatNumber(value.rate, lang, { style: "percent", maximumFractionDigits: 1 })}
+          />
+          <Progress
+            value={Math.round(value.rate * 100)}
+            max={100}
+            label={t.crmDashboardReports.conversionRate}
           />
           <p className="text-2xs text-muted-foreground">
             {formatTemplate(t.crmDashboardReports.convertedOf, {

@@ -61,6 +61,8 @@ const SECTION_BY_PREFIX: ReadonlyArray<[string, LeadCreateSectionId]> = [
   ["taxNumber", "company"],
   ["commercialRegistrationNumber", "company"],
   ["companyPhones", "company"],
+  ["companyEmail", "company"],
+  ["companyWebsite", "company"],
   ["firstName", "person"],
   ["lastName", "person"],
   ["honorificTitle", "person"],
@@ -168,6 +170,12 @@ export function validateCreateLead(
         limits.commercialRegistrationNumber,
       );
       bag.phones("companyPhones", form.companyPhones);
+      if (form.companyEmail) {
+        bag.email("companyEmail", form.companyEmail, limits.email);
+      }
+      if (form.companyWebsite) {
+        bag.maxLength("companyWebsite", form.companyWebsite, limits.companyWebsite);
+      }
     }
   } else {
     // The lead's name is composed from these, so the first name is the part

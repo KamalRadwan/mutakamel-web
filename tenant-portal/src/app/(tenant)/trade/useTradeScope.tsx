@@ -272,11 +272,21 @@ export interface TradeScopeRequest {
  * every render. This memoizes on the three ids, which are the only inputs.
  */
 export function useTradeScopeRequest(target: TradeScopeTarget): TradeScopeRequest {
-  const { context } = useTradeScope();
+  const { context, companyIds, branchIds } = useTradeScope();
   return useMemo(() => {
-    const resolution = resolveTradeScope(target, context);
+    const effectiveContext: TradeOperatingContext =
+      target === "COMPANY" || target === "BRANCH" || target === "COMPANY_OR_BRANCH"
+        ? {
+            companyId: context.companyId ?? (companyIds.length === 1 ? companyIds[0] : null),
+            branchId:
+              context.branchId ??
+              (target === "BRANCH" && branchIds.length === 1 ? branchIds[0] : null),
+            channelId: context.channelId,
+          }
+        : context;
+    const resolution = resolveTradeScope(target, effectiveContext);
     return resolution.ok
       ? { headers: resolution.headers, gap: null }
       : { headers: {}, gap: resolution.gap };
-  }, [target, context]);
+  }, [target, context, companyIds, branchIds]);
 }

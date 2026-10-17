@@ -46,6 +46,7 @@ export function useInventoryPeriods() {
 
   const [items, setItems] = useState<InventoryPeriod[]>([]);
   const [statusFilter, setStatusFilter] = useState<PeriodStatus | undefined>(undefined);
+  const [effectiveAtFilter, setEffectiveAtFilter] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -75,7 +76,7 @@ export function useInventoryPeriods() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const response = await tradeGet(periodsListPath(statusFilter), {
+        const response = await tradeGet(periodsListPath(statusFilter, effectiveAtFilter), {
           signal,
           headers: scope.headers,
           maxResponseBytes: PERIODS_RESPONSE_LIMIT_BYTES,
@@ -89,7 +90,7 @@ export function useInventoryPeriods() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [scope.isResolved, scope.headers, statusFilter],
+    [scope.isResolved, scope.headers, statusFilter, effectiveAtFilter],
   );
 
   useEffect(() => {
@@ -174,6 +175,7 @@ export function useInventoryPeriods() {
     selectBranch,
     items,
     statusFilter,
+    effectiveAtFilter,
     isLoading: isLoading && !hasLoaded,
     isRefreshing: isLoading,
     queryError,
@@ -183,6 +185,7 @@ export function useInventoryPeriods() {
     pending,
     transition,
     setStatusFilter,
+    setEffectiveAtFilter,
     openCreate: () => {
       setFormError(null);
       setCreateOpen(true);

@@ -56,7 +56,7 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
         <div
           ref={rootRef}
           className={cn(
-            "flex h-7 w-96 min-w-64 max-w-full items-center gap-0.5 rounded-md border border-input bg-card ps-1.5 text-foreground",
+            "flex h-7 w-[444px] min-w-64 max-w-full items-center gap-0.5 rounded-md border border-input bg-card ps-1.5 text-foreground",
             "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
             props.disabled && "opacity-50",
           )}

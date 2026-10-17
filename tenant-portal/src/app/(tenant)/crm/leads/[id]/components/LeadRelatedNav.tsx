@@ -22,6 +22,13 @@ const ICONS: Record<LeadRelatedKind, typeof Target> = {
   invoices: Receipt,
 };
 
+const KPI_PILL_TONES: Record<LeadRelatedKind, string> = {
+  opportunities: "dossier-kpi-pill dossier-kpi-opp",
+  quotations: "dossier-kpi-pill dossier-kpi-quo",
+  salesOrders: "dossier-kpi-pill dossier-kpi-ord",
+  invoices: "dossier-kpi-pill dossier-kpi-inv",
+};
+
 export interface LeadRelatedNavProps {
   leadId: string;
   /** The lead's own party — what a trade document is filed against. */
@@ -59,7 +66,7 @@ export function LeadRelatedNav({ leadId, partyId, branchId }: LeadRelatedNavProp
   return (
     // A group, and named as one: four links in a row with no name between them
     // and the screen's own actions is a list a screen reader cannot summarise.
-    <nav aria-label={copy.groupLabel} className="flex items-center gap-1">
+    <nav aria-label={copy.groupLabel} className="flex flex-wrap items-center gap-2">
       {visible.map((kind) => {
         const Icon = ICONS[kind];
         const count = counts[kind];
@@ -67,7 +74,10 @@ export function LeadRelatedNav({ leadId, partyId, branchId }: LeadRelatedNavProp
           <Link
             key={kind}
             href={LEAD_RELATED_ROUTES[kind]}
-            className={cn(buttonVariantClasses("ghost", "sm"), "gap-1.5")}
+            className={cn(
+              buttonVariantClasses("ghost", "sm"),
+              KPI_PILL_TONES[kind],
+            )}
             // The label carries the count as a word, because the badge beside
             // the icon is a number with no noun attached to it.
             aria-label={
@@ -80,8 +90,8 @@ export function LeadRelatedNav({ leadId, partyId, branchId }: LeadRelatedNavProp
             {/* The name hides on a narrow bar; the icon and the count do not.
                 Four labels plus the location text and the screen's actions do
                 not fit a 1366px laptop, which is the width this is built for. */}
-            <span className="hidden truncate xl:inline">{copy.labels[kind]}</span>
-            <Badge tone="neutral" aria-hidden="true">
+            <span className="hidden truncate sm:inline">{copy.labels[kind]}</span>
+            <Badge tone="neutral" className="dossier-kpi-num" aria-hidden="true">
               {count === null ? (isLoading ? "…" : "—") : String(count)}
             </Badge>
           </Link>

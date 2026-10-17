@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { cn } from "../../lib/cn";
 import { Button } from "../../primitives/Button";
 import {
   Dialog,
@@ -26,12 +27,27 @@ export interface ReasonDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  /** Optional icon badge rendered beside the dialog title. */
+  headerIcon?: ReactNode;
+  /** Optional summary card rendered above the reason field. */
+  summarySlot?: ReactNode;
+  /** Optional quick-reason template pills rendered above the textarea. */
+  templatesLabel?: string;
+  templates?: readonly string[];
+  /** Whether to show the visible label above the textarea. */
+  showLabel?: boolean;
   /** When true the confirm stays disabled until a non-blank reason is typed. */
   reasonRequired?: boolean;
   /** Mirrors the backend column bound — pass the real one, do not accept the default blindly. */
   maxLength?: number;
   /** Styles confirm as destructive. The caller decides; the pattern does not guess from the title. */
   destructive?: boolean;
+  /** Optional footer note rendered at the inline start of the footer bar. */
+  footerLeading?: ReactNode;
+  /** Optional icon rendered inside the confirm button. */
+  confirmIcon?: ReactNode;
+  /** Optional class override for the confirm button. */
+  confirmClassName?: string;
   onConfirm: (reason: string) => void;
   loading?: boolean;
   /** A rejection that is not field-level — rendered in-body, never as a toast. */
@@ -41,21 +57,22 @@ export interface ReasonDialogProps {
 
 const DEFAULT_MAX_LENGTH = 1000;
 
-// Promoted from the opportunities TerminalMoveDialog: a confirmation that has
-// to collect a reason, which ConfirmActionModal has no slot for. A non-alert
-// Dialog rather than AlertDialog for the same reason — AlertDialog is a
-// two-button destructive confirm and cannot host an input.
-//
-// Escape, backdrop and the close button stay blocked while submitting,
-// matching ConfirmActionModal's guard.
 export function ReasonDialog({
   open,
   onOpenChange,
   title,
   description,
+  headerIcon,
+  summarySlot,
+  templatesLabel,
+  templates,
+  showLabel = false,
   reasonRequired = false,
   maxLength = DEFAULT_MAX_LENGTH,
   destructive = false,
+  footerLeading,
+  confirmIcon,
+  confirmClassName,
   onConfirm,
   loading,
   error,
@@ -68,23 +85,27 @@ export function ReasonDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : dismiss())}>
-      <DialogContent className="p-3 sm:p-3.5"
+      <DialogContent
+        className="p-4 sm:p-5"
         showCloseButton={!loading}
         aria-busy={loading || undefined}
         onEscapeKeyDown={(event) => (loading ? event.preventDefault() : undefined)}
         onPointerDownOutside={(event) => (loading ? event.preventDefault() : undefined)}
       >
-        {/* The typed reason lives in the body, which Radix unmounts with the
-            portal on close. A reopened dialog therefore starts empty by
-            construction — no reset effect, and no path (parent-driven close,
-            Escape, success) that can leave the previous attempt's text
-            attached to a different action. */}
         <ReasonDialogBody
           title={title}
           description={description}
+          headerIcon={headerIcon}
+          summarySlot={summarySlot}
+          templatesLabel={templatesLabel}
+          templates={templates}
+          showLabel={showLabel}
           reasonRequired={reasonRequired}
           maxLength={maxLength}
           destructive={destructive}
+          footerLeading={footerLeading}
+          confirmIcon={confirmIcon}
+          confirmClassName={confirmClassName}
           onConfirm={onConfirm}
           onDismiss={dismiss}
           loading={loading}
@@ -107,9 +128,17 @@ interface ReasonDialogBodyProps
 function ReasonDialogBody({
   title,
   description,
+  headerIcon,
+  summarySlot,
+  templatesLabel,
+  templates,
+  showLabel,
   reasonRequired,
   maxLength,
   destructive,
+  footerLeading,
+  confirmIcon,
+  confirmClassName,
   onConfirm,
   onDismiss,
   loading,
@@ -122,17 +151,57 @@ function ReasonDialogBody({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{title}</DialogTitle>
-        {description && <DialogDescription>{description}</DialogDescription>}
+        <div className="flex items-start gap-3">
+          {headerIcon && <div className="shrink-0">{headerIcon}</div>}
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <DialogTitle>{title}</DialogTitle>
+            {description && <DialogDescription>{description}</DialogDescription>}
+          </div>
+        </div>
       </DialogHeader>
 
-      <Field label={labels.reason} hint={labels.reasonHint} required={reasonRequired}>
+      {summarySlot}
+
+      {templates && templates.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          {templatesLabel && (
+            <span className="text-xs font-semibold text-muted-foreground">{templatesLabel}</span>
+          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {templates.map((template) => {
+              const active = reason.trim() === template;
+              return (
+                <Button
+                  key={template}
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  disabled={loading}
+                  onClick={() => setReason(template)}
+                  className={cn(
+                    "h-auto rounded-full px-2.5 py-1 text-xs font-medium whitespace-normal text-start",
+                    active &&
+                      (destructive
+                        ? "border-destructive bg-destructive text-primary-foreground hover:bg-destructive/90"
+                        : "border-success bg-success text-primary-foreground hover:bg-success/90"),
+                  )}
+                >
+                  {template}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <Field label={labels.reason} hint={labels.reasonHint} required={reasonRequired} showLabel={showLabel}>
         <Textarea
           value={reason}
           maxLength={maxLength}
           onChange={(event) => setReason(event.target.value)}
           placeholder={labels.reasonPlaceholder}
           disabled={loading}
+          rows={3}
         />
       </Field>
 
@@ -148,20 +217,26 @@ function ReasonDialogBody({
         </p>
       )}
 
-      <DialogFooter>
-        <Button size="sm" variant="outline" onClick={onDismiss} disabled={loading}>
-          {labels.cancel}
-        </Button>
-        <Button
-          size="sm"
-          variant={destructive ? "destructive" : "primary"}
-          onClick={() => onConfirm(reason)}
-          loading={loading}
-          disabled={reasonRequired && blank}
-        >
-          {labels.confirm}
-        </Button>
+      <DialogFooter className={cn(footerLeading && "sm:items-center sm:justify-between border-t border-border pt-3")}>
+        {footerLeading && <div className="text-xs text-muted-foreground">{footerLeading}</div>}
+        <div className="flex items-center justify-end gap-2">
+          <Button size="sm" variant="outline" onClick={onDismiss} disabled={loading}>
+            {labels.cancel}
+          </Button>
+          <Button
+            size="sm"
+            variant={destructive ? "destructive" : "primary"}
+            className={confirmClassName}
+            onClick={() => onConfirm(reason)}
+            loading={loading}
+            disabled={reasonRequired && blank}
+          >
+            {confirmIcon}
+            {labels.confirm}
+          </Button>
+        </div>
       </DialogFooter>
     </>
   );
 }
+

@@ -95,3 +95,115 @@ function optionalDate(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   return isTradeDate(value) ? value : tradeInvalidResponse();
 }
+
+export type ContractFinancialMode = "FINANCIAL" | "NON_FINANCIAL";
+
+export interface ContractClauseInputPayload {
+  clientClauseId: string;
+  title: string;
+  body: string;
+}
+
+export interface ContractDraftContentRequest {
+  partyId: string;
+  currencyCode: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  reference?: string;
+  notes?: string;
+  termsSnapshot: Record<string, unknown>;
+  financialTerms: {
+    mode: ContractFinancialMode;
+    sourceEvidence: Record<string, unknown>;
+    totalsSnapshot: {
+      subtotal: string;
+      discountTotal: string;
+      chargeTotal: string;
+      taxTotal: string;
+      roundingTotal: string;
+      grandTotal: string;
+      amountPaid: string;
+      amountDue: string;
+    };
+  };
+  clauses: ContractClauseInputPayload[];
+}
+
+export function buildContractDraftContent(input: {
+  partyId: string;
+  currencyCode: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  reference?: string;
+  notes?: string;
+  mode: ContractFinancialMode;
+  totalsSnapshot: ContractDraftContentRequest["financialTerms"]["totalsSnapshot"];
+  clauses: ContractClauseInputPayload[];
+  termsSnapshot?: Record<string, unknown>;
+  sourceEvidence?: Record<string, unknown>;
+}): ContractDraftContentRequest {
+  const code = input.currencyCode.trim().toUpperCase();
+  if (!isUUIDv7(input.partyId.trim())) {
+    throw new Error("CONTRACT_FORM_PARTY");
+  }
+  if (!/^[A-Z]{3}$/u.test(code)) {
+    throw new Error("CONTRACT_FORM_CURRENCY");
+  }
+  if (input.clauses.length === 0) {
+    throw new Error("CONTRACT_FORM_CLAUSES_EMPTY");
+  }
+  const from = input.effectiveFrom?.trim() ?? "";
+  const to = input.effectiveTo?.trim() ?? "";
+  if (from && to && to < from) {
+    throw new Error("CONTRACT_FORM_EFFECTIVE_WINDOW");
+  }
+  const ref = input.reference?.trim() ?? "";
+  const notes = input.notes?.trim() ?? "";
+
+  const zeroTotals = {
+    subtotal: "0",
+    discountTotal: "0",
+    chargeTotal: "0",
+    taxTotal: "0",
+    roundingTotal: "0",
+    grandTotal: "0",
+    amountPaid: "0",
+    amountDue: "0",
+  };
+
+  const totalsSnapshot =
+    input.mode === "NON_FINANCIAL"
+      ? zeroTotals
+      : {
+          ...input.totalsSnapshot,
+          amountPaid: "0",
+          amountDue: input.totalsSnapshot.grandTotal,
+        };
+
+  return {
+    partyId: input.partyId.trim(),
+    currencyCode: code,
+    ...(from ? { effectiveFrom: from } : {}),
+    ...(to ? { effectiveTo: to } : {}),
+    ...(ref ? { reference: ref.slice(0, 120) } : {}),
+    ...(notes ? { notes: notes.slice(0, 8000) } : {}),
+    termsSnapshot:
+      input.termsSnapshot && Object.keys(input.termsSnapshot).length > 0
+        ? input.termsSnapshot
+        : { governingLawCountry: "SA", terminationNoticeDays: 30 },
+    financialTerms: {
+      mode: input.mode,
+      sourceEvidence:
+        input.sourceEvidence && Object.keys(input.sourceEvidence).length > 0
+          ? input.sourceEvidence
+          : { origin: "DIRECT_CONTRACT_DRAFT", currencyCode: code },
+      totalsSnapshot,
+    },
+    clauses: input.clauses.map((c) => ({
+      clientClauseId: c.clientClauseId,
+      title: c.title.trim().slice(0, 500),
+      body: c.body.trim().slice(0, 20000),
+    })),
+  };
+}
+

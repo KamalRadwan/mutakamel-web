@@ -98,19 +98,20 @@ export default function TradeDashboardsPage() {
         <span className="flex items-center justify-end gap-1">
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
+            className="w-7 px-0"
             aria-label={t.tradeAnalytics.toggleFavorite}
             disabled={pendingId !== null}
             onClick={() => void toggleFavorite(dashboard)}
           >
             <Star
-              className={dashboard.isFavorite ? "size-4 fill-current" : "size-4"}
+              className={dashboard.isFavorite ? "size-3.5 fill-current" : "size-3.5"}
               aria-hidden="true"
             />
           </Button>
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
             aria-label={t.tradeAnalytics.setDefault}
             disabled={pendingId !== null || dashboard.isDefault}
             onClick={() => void setDefault(dashboard)}
@@ -119,23 +120,25 @@ export default function TradeDashboardsPage() {
           </Button>
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
+            className="w-7 px-0"
             aria-label={t.tradeAnalytics.duplicate}
             disabled={pendingId !== null}
             onClick={() => void duplicate(dashboard)}
           >
-            <Copy className="size-4" aria-hidden="true" />
+            <Copy className="size-3.5" aria-hidden="true" />
           </Button>
           {dashboard.accessLevel === "OWNER" ? (
             <Button
               variant="ghost"
-              size="sm"
+              size="xs"
+              className="w-7 px-0"
               aria-label={t.common.delete}
               disabled={pendingId !== null}
               loading={pendingId === dashboard.id}
               onClick={() => void remove(dashboard)}
             >
-              <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+              <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
             </Button>
           ) : null}
         </span>
@@ -146,6 +149,7 @@ export default function TradeDashboardsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeAnalytics.dashboardsTitle}
         description={t.tradeAnalytics.dashboardsSubtitle}
         primaryAction={{ label: t.tradeAnalytics.dashboardCreate, onClick: openCreate }}
@@ -214,6 +218,7 @@ export default function TradeDashboardsPage() {
       ) : null}
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

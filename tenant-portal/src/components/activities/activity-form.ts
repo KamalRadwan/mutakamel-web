@@ -233,3 +233,81 @@ export function rebaseActivityForm(
     keys.map((key) => [key, JSON.stringify(values[key]) === JSON.stringify(seed[key]) ? fresh[key] : values[key]]),
   ) as unknown as ActivityFormValues;
 }
+
+export type ActivityDatePreset = "todayEvening" | "tomorrowMorning" | "inTwoDays" | "nextWeek";
+
+export function withActivityDatePreset(
+  values: ActivityFormValues,
+  preset: ActivityDatePreset,
+  now: Date = new Date(),
+): ActivityFormValues {
+  const target = new Date(now);
+  target.setSeconds(0, 0);
+  if (preset === "todayEvening") {
+    target.setHours(20, 0, 0, 0);
+    if (target.getTime() <= now.getTime()) {
+      const fallback = nextHalfHour();
+      return moveStart(values, fallback);
+    }
+  } else if (preset === "tomorrowMorning") {
+    target.setDate(target.getDate() + 1);
+    target.setHours(10, 0, 0, 0);
+  } else if (preset === "inTwoDays") {
+    target.setDate(target.getDate() + 2);
+    target.setHours(10, 0, 0, 0);
+  } else {
+    target.setDate(target.getDate() + 7);
+    target.setHours(10, 0, 0, 0);
+  }
+  return moveStart(values, target);
+}
+
+export function withActivityDurationMinutes(values: ActivityFormValues, minutes: number): ActivityFormValues {
+  const start = activityFormStart(values);
+  if (!start) return values;
+  const end = new Date(start.getTime() + minutes * MINUTE_MS);
+  return { ...values, ...withInstant("end", end) };
+}
+
+export function activityFormDurationMinutes(values: ActivityFormValues): number | null {
+  const start = activityFormStart(values);
+  const end = activityFormEnd(values);
+  if (!start || !end || end.getTime() <= start.getTime()) return null;
+  return Math.round((end.getTime() - start.getTime()) / MINUTE_MS);
+}
+
+export function isActivityFieldModified(
+  values: ActivityFormValues,
+  seed: ActivityFormValues | undefined,
+  field: "type" | "subject" | "start" | "end" | "assigneeUserId" | "priority" | "direction" | "location" | "meetingUrl" | "description",
+): boolean {
+  if (!seed) return false;
+  if (field === "start") {
+    return values.startDate !== seed.startDate || values.startTime !== seed.startTime;
+  }
+  if (field === "end") {
+    return values.endDate !== seed.endDate || values.endTime !== seed.endTime;
+  }
+  return values[field] !== seed[field];
+}
+
+export function countModifiedActivityFields(
+  values: ActivityFormValues,
+  seed: ActivityFormValues | undefined,
+): number {
+  if (!seed) return 0;
+  const fields = [
+    "type",
+    "subject",
+    "start",
+    "end",
+    "assigneeUserId",
+    "priority",
+    "direction",
+    "location",
+    "meetingUrl",
+    "description",
+  ] as const;
+  return fields.filter((field) => isActivityFieldModified(values, seed, field)).length;
+}
+

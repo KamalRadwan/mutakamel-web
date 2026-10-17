@@ -96,23 +96,25 @@ export default function TradeWidgetsPage() {
         <span className="flex items-center justify-end gap-1">
           <Button
             variant="ghost"
-            size="sm"
+            size="xs"
+            className="w-7 px-0"
             aria-label={t.tradeAnalytics.clone}
             disabled={pendingId !== null}
             onClick={() => void clone(widget)}
           >
-            <Copy className="size-4" aria-hidden="true" />
+            <Copy className="size-3.5" aria-hidden="true" />
           </Button>
           {widget.accessLevel === "OWNER" ? (
             <Button
               variant="ghost"
-              size="sm"
+              size="xs"
+              className="w-7 px-0"
               aria-label={t.common.delete}
               disabled={pendingId !== null}
               loading={pendingId === widget.id}
               onClick={() => void remove(widget)}
             >
-              <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+              <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
             </Button>
           ) : null}
         </span>
@@ -123,6 +125,7 @@ export default function TradeWidgetsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeAnalytics.widgetsTitle}
         description={t.tradeAnalytics.widgetsSubtitle}
         primaryAction={{ label: t.tradeAnalytics.widgetCreate, onClick: openCreate }}
@@ -167,6 +170,7 @@ export default function TradeWidgetsPage() {
       />
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

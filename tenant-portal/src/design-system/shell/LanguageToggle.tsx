@@ -12,8 +12,14 @@ export function LanguageToggle() {
   const { t, toggleLang } = useI18n();
 
   return (
-    <Button variant="ghost" size="sm" onClick={toggleLang} aria-label={t.common.langSwitch}>
-      <Globe className="size-4" aria-hidden="true" />
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={toggleLang}
+      aria-label={t.common.langSwitch}
+      className="h-6 gap-1 px-1.5 text-xs text-white/90 hover:bg-white/15 hover:text-white"
+    >
+      <Globe className="size-3.5" aria-hidden="true" />
       <span className="hidden sm:inline">{t.common.langSwitch}</span>
     </Button>
   );

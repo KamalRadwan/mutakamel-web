@@ -9,7 +9,6 @@ import {
   FilterBar,
   PageHeader,
   PermissionGate,
-  SubNav,
   type ColumnDef,
   type FilterValues,
 } from "@/design-system";
@@ -18,7 +17,6 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { tradeStatusLabel } from "../../trade-advanced-validation";
-import { TRADE_WEBHOOK_NAV_ITEMS } from "../webhooks-nav";
 import {
   WEBHOOK_DELIVERY_STATUSES,
   WEBHOOK_MANAGE_PERMISSION,
@@ -99,6 +97,7 @@ export default function WebhookDeliveriesPage() {
   const content = (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeAutomation.deliveriesTitle}
         description={t.tradeAutomation.deliveriesSubtitle}
         secondaryActions={
@@ -109,6 +108,11 @@ export default function WebhookDeliveriesPage() {
               onChange={selectBranch}
               disabled={isRefreshing}
             />
+            <Button asChild size="sm" variant="outline">
+              <Link href={TENANT_ROUTES.tradeWebhooks}>
+                {t.tradeAutomation.subscriptionsTitle}
+              </Link>
+            </Button>
             <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
               <RefreshCw
                 className={isRefreshing ? "size-4 animate-spin" : "size-4"}
@@ -119,8 +123,6 @@ export default function WebhookDeliveriesPage() {
           </>
         }
       />
-
-      <SubNav items={TRADE_WEBHOOK_NAV_ITEMS} />
 
       <FilterBar
         filters={[
@@ -152,6 +154,7 @@ export default function WebhookDeliveriesPage() {
       />
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

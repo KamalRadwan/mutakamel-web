@@ -156,13 +156,15 @@ export function parseCustomerProfileDetailResponse(
   payload: unknown,
 ): CustomerProfileDetail {
   const profile = record(payload);
+  const normalizedStatus =
+    profile?.status === "ACTIVE" ? "ACTIVE_CUSTOMER" : profile?.status;
   if (
     !profile ||
     !isUUIDv7(profile.id) ||
     !isUUIDv7(profile.branchId) ||
     !isUUIDv7(profile.partyId) ||
     !isMember(PROFILE_TYPES, profile.profileType) ||
-    !isMember(CUSTOMER_STATUSES, profile.status) ||
+    !isMember(CUSTOMER_STATUSES, normalizedStatus) ||
     typeof profile.displayName !== "string" ||
     profile.displayName.length === 0 ||
     typeof profile.createdAt !== "string" ||
@@ -178,7 +180,7 @@ export function parseCustomerProfileDetailResponse(
     branchId: profile.branchId,
     partyId: profile.partyId,
     profileType: profile.profileType,
-    status: profile.status,
+    status: normalizedStatus,
     displayName: profile.displayName,
     companyName: nullableText(profile.companyName),
     companyEmail: nullableText(profile.companyEmail),

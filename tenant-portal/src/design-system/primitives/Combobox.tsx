@@ -45,6 +45,8 @@ export interface ComboboxProps extends ControlSizeProps {
   invalid?: boolean;
   onBlur?: () => void;
   id?: string;
+  /** Optional leading icon or avatar rendered inside the trigger button before the label. */
+  leadingSlot?: React.ReactNode;
   /** When true, renders description inline beside label on the same line rather than below it. */
   inlineDescription?: boolean;
   /** Custom class names for the popover panel (e.g. `w-80 min-w-80`). */
@@ -83,6 +85,7 @@ export function Combobox({
   onBlur,
   id,
   size = "sm",
+  leadingSlot,
   inlineDescription = false,
   popoverClassName,
   className,
@@ -203,7 +206,10 @@ export function Combobox({
               clearable && "pe-8",
             )}
           >
-            <span className="truncate">{value ? (selectedLabel ?? value) : placeholder}</span>
+            <span className="flex min-w-0 items-center gap-2 truncate">
+              {leadingSlot}
+              <span className="truncate">{value ? (selectedLabel ?? value) : placeholder}</span>
+            </span>
             <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Button>
         </PopoverTrigger>

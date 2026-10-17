@@ -10,6 +10,7 @@ export interface ActivityOutcome {
   open: boolean;
   /** Kept after close, so the dialog's copy does not change while it fades out. */
   mode: ActivityOutcomeMode;
+  activity: Activity | null;
   loading: boolean;
   error: string | undefined;
   start: (mode: ActivityOutcomeMode, activity: Activity) => void;
@@ -42,6 +43,7 @@ export function useActivityOutcome(
   return {
     open: state.open,
     mode: state.mode,
+    activity: state.activity,
     loading,
     error: state.open ? commands.error ?? undefined : undefined,
     start: (mode, activity) => {

@@ -7,15 +7,15 @@
 
 Status: **verified** (Gateway exposure and transport policy only)
 
-Last source verification: **2026-10-14**
+Last source verification: **2026-10-17**
 
-Generated at: **2026-10-14T05:44:56.372Z**
+Generated at: **2026-10-17T03:04:55.398Z**
 
-Backend revision: `e003cf3d1ace+dirty`
+Backend revision: `0d665ae5d9b6+dirty`
 
 Owning app: **trade-app**
 
-Routes: **248**
+Routes: **251**
 
 ## What this page is
 
@@ -178,6 +178,9 @@ browser code.
 | PATCH | `/api/tenant/trade/v1/items/:id/channel-listings/:channelId` | `trading.items.by-id.channel.listings.by-channel-id.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/trade/v1/items/:id/company-profile` | `trading.items.by-id.company.profile.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/items/:id/company-profile` | `trading.items.by-id.company.profile.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| DELETE | `/api/tenant/trade/v1/items/:id/image` | `trading.items.by.id.image.delete` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| PUT | `/api/tenant/trade/v1/items/:id/image` | `trading.items.by.id.image.put` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| GET | `/api/tenant/trade/v1/items/:id/images/:imageId/:rendition` | `trading.items.by.id.images.by.id.rendition.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/items/:id/standard-cost` | `trading.items.by-id.standard.cost.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/trade/v1/items/:id/standard-cost` | `trading.items.by-id.standard.cost.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/items/reference-data` | `trading.items.reference.data.get` | AUTHENTICATED | yes | TENANT_PORTAL |

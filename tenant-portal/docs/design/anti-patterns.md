@@ -62,15 +62,19 @@ legibility depend on what happens to be scrolling behind it.
 
 **Census gate.**
 
-### 4. Hue-coded controls
+### 4. Arbitrary hue-coded view switchers and pipeline stages
 
-The current leads view switcher tints its active button **purple, emerald or
-amber** depending on which of the three views is selected. Three hues, one
-control, no meaning.
+The pre-rebuild leads view switcher tinted its active button **purple, emerald or
+amber** depending on which of the three views was selected — three hues, one
+view-mode toggle, no meaning.
 
-Color encodes *outcome*, never *identity* or *category*. Nav items do not each
-get a hue. Tabs do not each get a hue. Stages never get a hue — see
-[tokens.md](tokens.md#status-mapping).
+View switchers, navigation items, and tabs do not each get a random hue, and
+**pipeline stages never get a hue** — see [tokens.md](tokens.md#status-mapping).
+When structured categories (such as the 7 `ActivityType` tiles or 6
+`ActivityTargetType` pills) or segmented status/priority controls use color,
+they must consume the calibrated `--swatch-*` and semantic surface palettes from
+`src/design-system/lib/swatch-palette.ts` and always pair the hue with an icon
+and translated text label — never raw Tailwind palette utilities.
 
 ### 5. Everything bold
 

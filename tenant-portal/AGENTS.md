@@ -75,9 +75,12 @@ had to ask a human is a bug in the documentation.
 
 - **Always follow the Tenant Portal design system**: Adhere strictly to the design system in `src/design-system/` and documentation under `docs/design/`. Feature code imports **only** from the `@/design-system` barrel, never a deep path or ad-hoc custom styles.
 - **UI/UX Intelligence (`ui-ux-pro-max`)**: Always consult and use the `ui-ux-pro-max` skill for UI and UX guidelines, accessibility standards, color palettes, and interaction patterns BEFORE starting any UI or UX design.
-- Four color roles: `brand`, `positive`, `caution`, `negative`, plus the `ink`
-  neutral ramp. **A pipeline stage is never a color** — see
-  `docs/design/tokens.md`.
+- Four outcome color roles (`brand`, `positive`, `caution`, `negative`) plus the
+  `ink` neutral ramp, and the eleven theme-adaptive `--swatch-*` tokens
+  (`src/design-system/lib/swatch-palette.ts` and `views/card-color.ts`) for card
+  marks and structured category/activity-type/entity surfaces. **A pipeline
+  stage is never a color** — see `docs/design/tokens.md` and
+  `docs/design/DESIGN-SYSTEM.md`.
 - Three font weights: 400 / 500 / 600. Table body cells are 400.
 - At most one filled `primary` button per screen, in `PageHeader`.
 - **Logical properties only.** `ms-`/`me-`/`ps-`/`pe-`/`start-`/`end-`/

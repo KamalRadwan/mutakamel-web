@@ -148,8 +148,13 @@ function limitQuery(extra: Record<string, string | undefined>): string {
   return query.toString();
 }
 
-export function periodsListPath(status?: PeriodStatus): TradePath {
-  return `${INVENTORY_PERIODS_PATH}?${limitQuery({ status })}` as TradePath;
+export function periodsListPath(status?: PeriodStatus, effectiveAt?: string): TradePath {
+  const trimmedEffective = effectiveAt?.trim();
+  const isoEffective =
+    trimmedEffective && !Number.isNaN(new Date(trimmedEffective).getTime())
+      ? new Date(trimmedEffective).toISOString()
+      : undefined;
+  return `${INVENTORY_PERIODS_PATH}?${limitQuery({ status, effectiveAt: isoEffective })}` as TradePath;
 }
 
 export function periodActionPath(id: string, action: "close" | "reopen"): TradePath {
@@ -157,8 +162,20 @@ export function periodActionPath(id: string, action: "close" | "reopen"): TradeP
   return `${INVENTORY_PERIODS_PATH}/${encodeURIComponent(id)}/${action}` as TradePath;
 }
 
-export function uomConversionsListPath(status?: UomConversionStatus): TradePath {
-  return `${INVENTORY_UOM_CONVERSIONS_PATH}?${limitQuery({ status })}` as TradePath;
+export function uomConversionsListPath(
+  status?: UomConversionStatus,
+  filters?: { itemCompanyProfileId?: string; fromUomId?: string; toUomId?: string },
+): TradePath {
+  const itemCompanyProfileId = filters?.itemCompanyProfileId?.trim();
+  const fromUomId = filters?.fromUomId?.trim();
+  const toUomId = filters?.toUomId?.trim();
+  return `${INVENTORY_UOM_CONVERSIONS_PATH}?${limitQuery({
+    status,
+    itemCompanyProfileId:
+      itemCompanyProfileId && isUuidV7(itemCompanyProfileId) ? itemCompanyProfileId : undefined,
+    fromUomId: fromUomId && isUuidV7(fromUomId) ? fromUomId : undefined,
+    toUomId: toUomId && isUuidV7(toUomId) ? toUomId : undefined,
+  })}` as TradePath;
 }
 
 export function uomConversionActionPath(id: string, action: "publish" | "retire"): TradePath {
@@ -166,8 +183,20 @@ export function uomConversionActionPath(id: string, action: "publish" | "retire"
   return `${INVENTORY_UOM_CONVERSIONS_PATH}/${encodeURIComponent(id)}/${action}` as TradePath;
 }
 
-export function serialsListPath(state?: SerialState, serialKey?: string): TradePath {
-  return `${INVENTORY_SERIALS_PATH}?${limitQuery({ state, serialKey })}` as TradePath;
+export function serialsListPath(
+  state?: SerialState,
+  serialKey?: string,
+  filters?: { itemId?: string; itemCompanyProfileId?: string },
+): TradePath {
+  const itemId = filters?.itemId?.trim();
+  const itemCompanyProfileId = filters?.itemCompanyProfileId?.trim();
+  return `${INVENTORY_SERIALS_PATH}?${limitQuery({
+    state,
+    serialKey: serialKey?.trim() || undefined,
+    itemId: itemId && isUuidV7(itemId) ? itemId : undefined,
+    itemCompanyProfileId:
+      itemCompanyProfileId && isUuidV7(itemCompanyProfileId) ? itemCompanyProfileId : undefined,
+  })}` as TradePath;
 }
 
 export function serialPath(id: string): TradePath {
@@ -175,8 +204,15 @@ export function serialPath(id: string): TradePath {
   return `${INVENTORY_SERIALS_PATH}/${encodeURIComponent(id)}` as TradePath;
 }
 
-export function inventoryDecisionsListPath(policyKind?: InventoryPolicyKind): TradePath {
-  return `${INVENTORY_DECISIONS_PATH}?${limitQuery({ policyKind })}` as TradePath;
+export function inventoryDecisionsListPath(
+  policyKind?: InventoryPolicyKind,
+  aggregateId?: string,
+): TradePath {
+  const trimmedAgg = aggregateId?.trim();
+  return `${INVENTORY_DECISIONS_PATH}?${limitQuery({
+    policyKind,
+    aggregateId: trimmedAgg && isUuidV7(trimmedAgg) ? trimmedAgg : undefined,
+  })}` as TradePath;
 }
 
 export function inventoryDecisionPath(id: string): TradePath {
@@ -394,3 +430,70 @@ export function isSerialState(value: unknown): value is SerialState {
 export function isInventoryPolicyKind(value: unknown): value is InventoryPolicyKind {
   return isMemberOf(value, INVENTORY_POLICY_KINDS);
 }
+
+export const PERIOD_REASON_PRESETS = [
+  "MONTH_END_CLOSE",
+  "QUARTER_AUDIT_LOCK",
+  "PHYSICAL_COUNT_FREEZE",
+  "AUDIT_ADJUSTMENT_REOPEN",
+] as const;
+
+export const CONVERSION_REASON_PRESETS = [
+  "INITIAL_CATALOG_PUBLISH",
+  "SUPPLIER_PACK_CHANGE",
+  "WAREHOUSE_REPACK_SPEC",
+  "OBSOLETE_PACK_RETIRED",
+] as const;
+
+export const PERIOD_BACKDATE_PRESETS = [0, 3, 7, 14, 30] as const;
+
+export function computePeriodDays(startsOn: string, endsOn: string): number | null {
+  if (!ISO_DATE.test(startsOn) || !ISO_DATE.test(endsOn) || endsOn < startsOn) return null;
+  const startMs = Date.parse(`${startsOn}T00:00:00Z`);
+  const endMs = Date.parse(`${endsOn}T00:00:00Z`);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return null;
+  return Math.round((endMs - startMs) / 86_400_000) + 1;
+}
+
+function gcd(a: number, b: number): number {
+  let x = Math.abs(Math.trunc(a));
+  let y = Math.abs(Math.trunc(b));
+  while (y !== 0) {
+    const temp = y;
+    y = x % y;
+    x = temp;
+  }
+  return x || 1;
+}
+
+export function suggestIntegerFraction(
+  rawDecimal: string,
+): { numerator: string; denominator: string } | null {
+  const trimmed = rawDecimal.trim();
+  const match = /^([0-9]{1,8})\.([0-9]{1,6})$/u.exec(trimmed);
+  if (!match) return null;
+  const whole = Number(match[1]);
+  const fracDigits = match[2];
+  const scale = 10 ** fracDigits.length;
+  const rawNum = whole * scale + Number(fracDigits);
+  if (!Number.isSafeInteger(rawNum) || rawNum <= 0) return null;
+  const divisor = gcd(rawNum, scale);
+  return {
+    numerator: String(rawNum / divisor),
+    denominator: String(scale / divisor),
+  };
+}
+
+export function convertQuantityPreview(
+  inputQty: number,
+  factorNumerator: string,
+  factorDenominator: string,
+): string {
+  const num = Number(factorNumerator);
+  const den = Number(factorDenominator);
+  if (!Number.isFinite(inputQty) || !Number.isFinite(num) || !Number.isFinite(den) || den <= 0) {
+    return "0.0000";
+  }
+  return ((inputQty * num) / den).toFixed(4);
+}
+

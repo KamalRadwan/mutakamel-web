@@ -25,24 +25,32 @@ export type CustomerProfileSectionId =
   | "person"
   | "company"
   | "contacts"
+  | "address"
   | "notes"
   | "customFields";
 
 const SECTION_BY_PREFIX: ReadonlyArray<readonly [string, CustomerProfileSectionId]> = [
   ["contacts", "contacts"],
   ["customFields", "customFields"],
+  ["address", "address"],
+  ["tagIds", "classification"],
+  ["acquisitionSourceId", "classification"],
   ["honorificTitle", "person"],
   ["firstName", "person"],
   ["lastName", "person"],
   ["email", "person"],
   ["phones", "person"],
+  ["existingCompanyPartyId", "company"],
   ["companyName", "company"],
+  ["legalName", "company"],
   ["taxNumber", "company"],
   ["commercialRegistrationNumber", "company"],
   ["companyEmail", "company"],
   ["companyWebsite", "company"],
   ["companyPhones", "company"],
   ["description", "notes"],
+  ["interestSummary", "notes"],
+  ["expectedNeed", "notes"],
 ];
 
 export function sectionOfCustomerProfileError(key: string): CustomerProfileSectionId | null {
@@ -63,6 +71,10 @@ function validateContact(
   limits: typeof CUSTOMER_PROFILE_CREATE_LIMITS,
 ): void {
   const prefix = `contacts.${index}`;
+  if (contact.contactPartyId?.trim()) {
+    bag.maxLength(`${prefix}.jobTitle`, contact.jobTitle, limits.jobTitle);
+    return;
+  }
   // A contact row is optional here — unlike a lead, a corporate profile may be
   // created with none. A row with any content but no name is the error case:
   // the builder drops nameless rows, so without this the other values would
@@ -102,6 +114,7 @@ export function validateCreateCustomerProfile(
     if (bag.required("companyName", form.companyName)) {
       bag.maxLength("companyName", form.companyName, limits.companyName);
     }
+    bag.maxLength("legalName", form.legalName ?? "", limits.legalName);
     bag.maxLength("taxNumber", form.taxNumber, limits.taxNumber);
     bag.maxLength(
       "commercialRegistrationNumber",

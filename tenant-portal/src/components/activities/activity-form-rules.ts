@@ -55,7 +55,7 @@ function startChanged(values: ActivityFormValues, seed: ActivityFormValues): boo
  * table's `^https?://[^[:space:]]+$`, which — unlike `IsUrl` — is
  * case-sensitive about the scheme, so `HTTPS://` is refused here as it is there.
  */
-function isHttpUrl(value: string): boolean {
+export function isHttpUrl(value: string): boolean {
   if (!/^https?:\/\/\S+$/u.test(value)) return false;
   try {
     // `require_tld` is on by default in class-validator, so a bare host is refused.

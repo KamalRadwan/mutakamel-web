@@ -137,6 +137,34 @@ to the pattern, not an oversight of this implementation.
 persistent, programmatically-associated target for the input. See
 [patterns.md](patterns.md#where-a-result-belongs).
 
+### Field hint placement
+
+```tsx
+<Field label={t.trade.uomCode} hint={t.trade.uomCodeHint} hintPlacement="tooltip" showLabel>
+  <Input />
+</Field>
+```
+
+`hintPlacement` defaults to `"below"` — the hint renders as a paragraph under
+the control, exactly as above. `"tooltip"` moves it into an `Info`-icon
+`Tooltip` trigger beside the label instead, for a dense, multi-field modal
+where a paragraph per field would cost more vertical space than the form can
+spare — see the UOM create modal, `UomFormFields.tsx`.
+
+Either way, `aria-describedby` still wires the input to the hint text: the
+paragraph never leaves the DOM, `"tooltip"` only adds `sr-only` to it. A screen
+reader announces the hint on focusing the control regardless of which mode is
+active; the icon is for sighted pointer/keyboard users, with its own
+`aria-label` carrying the same text, per **Icon-only buttons** above.
+
+Because the trigger is a real `Tooltip`, an ancestor `TooltipProvider` is
+required — the app provides one at the root (`app/layout.tsx`), but a test
+that renders a `hintPlacement="tooltip"` field in isolation must wrap it in
+one too (see `Field.test.tsx`).
+
+Reach for `"tooltip"` only when the field also sets `showLabel` — a tooltip
+trigger beside an `sr-only` label has nothing visible to sit next to.
+
 ### The control claims the field, the field does not push at the control
 
 `Field` publishes its id and ARIA state through **context**
@@ -230,7 +258,10 @@ Tinted background + matching foreground + 1px border. `text-xs`, weight 500,
 ## Dialog / AlertDialog / Sheet
 
 - `Dialog` — general modal. `DialogContent` takes `showCloseButton`
-  (default `true`).
+  (default `true`). When a custom sticky header band owns the close affordance
+  (as in `FormModal`, `ReasonDialog`, and `ActivityModal`), pass
+  `showCloseButton={false}` on `DialogContent` and render `<DialogCloseButton label={...} disabled={...} />`
+  inside the header flex row — a `32×32px` bordered icon button (`rounded-md border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground`).
 - `AlertDialog` — destructive confirmation **only**. No dismiss-by-backdrop, no
   `Esc`-to-confirm. Used for terminal stage moves and deletes.
 - `Sheet` — side panel over Radix `Dialog`. Its `side` prop is **logical**
@@ -239,11 +270,12 @@ Tinted background + matching foreground + 1px border. `text-xs`, weight 500,
 
 Scrim is `bg-ink-950/50` plus the **one** permitted `backdrop-blur-sm`.
 
-Max width: `sm` 384 · `md` 448 · `lg` 512 · `xl` 576 · `2xl` 672. Between those
-and full there is nothing — a 900px centred dialog is a page pretending not to
-be one, so the choice is a `Sheet`, a route, or `full`.
+Max width: `sm` 384 · `md` 448 · `lg` 512 · `xl` 576 · `2xl` 672 · `wide` 960.
+`wide` (`max-w-[60rem]`) exists specifically for split-workbench modals such as
+`ActivityModal` when an inline agenda column (`asideSlot`, `320px`) sits beside
+the form column (`640px`).
 
-`size="full"` is the sixth step and the only one that is not a centred card: it
+`size="full"` is the seventh step and the only one that is not a centred card: it
 is `inset-5`, the viewport less 20px on every side. It brings **no padding of
 its own** and lays its children out in a column, because a surface that size
 wants a header and a footer that reach its own edges. Reach for it only when
@@ -251,14 +283,13 @@ the record genuinely fills it — see
 [patterns.md § FormModal](patterns.md#formmodal) for the bar. Everything else
 about it is unchanged: same scrim, same close button, same dismissal keys.
 
-The five card steps are the ones that carry `grid`, `gap-4` and `p-6`, and that
+The centred card steps carry `grid`, `gap-4` and `p-6` by default, and that
 layout is a default rather than a guarantee: a consumer whose own header, body
 and footer bands already own their padding overrides all three through
 `className`, and tailwind-merge resolves them because `grid`/`flex`, the gap
-and the padding are each a last-wins group. `FormModal size="card"` is the one
-that does it — a `2xl` turned into the same flex column `full` is. That is a
-layout override on a card step, not a new size: a dialog wider than `2xl` and
-narrower than `full` still does not exist.
+and the padding are each a last-wins group. `FormModal` (`size="card"` or
+`size="wide"`) turns the card into the same flex column `full` is, with an
+optional `asideSlot` split workbench at `wide`.
 
 ## Select
 
@@ -318,6 +349,7 @@ with the rest of Phase 1's primitives.
 | `CopyButton` | `Button` | `aria-live` confirmation for UUIDs and correlation ids |
 | `Money` · `DateTime` | plain + `Intl` | Correctness primitives — a decimal string is never `Number()`d |
 | **`FileUpload`** | plain `<label>` + `<input type=file>` | See below |
+| **`ImageUploadTile`** | `Button` + `<input type=file>` | See below |
 | **`CommandPalette`** | `cmdk` + `Dialog` | See below |
 | **`RichTextEditor`** | `contenteditable` | See below |
 
@@ -406,6 +438,12 @@ row is **pinned and never filtered**. A search that finds nothing is exactly
 when that row is the answer, and making the user clear the box to reach it
 would be backwards.
 
+`leadingSlot` renders an optional inline badge or chip at the logical start of
+the `Combobox` trigger/search shell (for example, `ActivityTargetPicker`
+places the active target entity type badge — `LEAD`, `CUSTOMER_PROFILE`,
+`OPPORTUNITY`, `PARTY`, `QUOTATION`, `SALES_ORDER` — directly inside the unified
+search input beside the query text).
+
 ### FileUpload
 
 Drag-and-drop plus click, with the MIME allowlist and the size cap enforced
@@ -435,6 +473,29 @@ of the visible drop zone. It opens the same native input and reuses the MIME,
 size and count checks, rejection callbacks and queued upload states. The
 default remains `"dropzone"`; `disabled` blocks both picker admission and queue
 removal in either variant. The caller supplies the localized button label.
+
+The MIME, size and count checks live in `design-system/lib/upload-screening.ts`
+(`screenUploadFiles`), shared with `ImageUploadTile`, so the two can never
+disagree about what they admit.
+
+### ImageUploadTile
+
+Added **2026-10-17** for the Trade Item image (backend LLD
+`trade-app/.../02b_item_images.md` §19). A square tile that **is** the picker:
+click, Enter or Space opens the native dialog, and an image dropped on it is
+admitted the same way. One file at a time; extra dropped files are ignored, not
+rejected. Checks come from the same `screenUploadFiles` as `FileUpload`, and
+rejections return as translated strings through `onReject`.
+
+The tile is a `Button`, not a `<label>`: it has its own accessible name
+(`label`, e.g. "Add item image" / "Change item image") and its face is an image
+or an icon, which as label content would become the input's name. The caller
+renders the face as `children` (a preview, a thumbnail through `Avatar`, or the
+kind icon) and any decorative badge. `busy` sets `aria-busy`; `describedBy`
+points at the caller's polite status line. A ref exposes `openPicker()` for a
+separate "Replace image" control. There is no upload progress for the same
+reason as `FileUpload` (D14): render the indeterminate `Progress` beside it.
+No crop step exists yet — the LLD's `ImageCropDialog` is not built.
 
 ### CommandPalette
 

@@ -55,10 +55,129 @@ export const FILTERABLE_DOCUMENT_TYPES = [
   "POS_SALE",
 ] as const;
 
-type CreatableDocumentType = (typeof CREATABLE_DOCUMENT_TYPES)[number];
+export type CreatableDocumentType = (typeof CREATABLE_DOCUMENT_TYPES)[number];
 
 export const DOCUMENT_PROFILE_SCOPE_TARGETS = ["TENANT", "COMPANY", "BRANCH"] as const;
-type DocumentProfileScopeTarget = (typeof DOCUMENT_PROFILE_SCOPE_TARGETS)[number];
+export const DOCUMENT_PROFILE_ALLOWED_SCOPES = ["TENANT", "COMPANY"] as const;
+export type DocumentProfileScopeTarget = (typeof DOCUMENT_PROFILE_SCOPE_TARGETS)[number];
+
+export const SERVER_OWNED_FIELDS = ["status", "totals", "version", "audit", "taxes"] as const;
+export const MANDATORY_COMPILED_CASE_CODES = [
+  "MINIMAL_VALID",
+  "MISSING_REQUIRED_REJECTED",
+  "SERVER_OWNED_REJECTED",
+  "REGISTRY_COMPATIBLE",
+] as const;
+
+export interface DocumentProfileRegistryEntry {
+  headerFields: readonly string[];
+  mandatoryHeaderFields: readonly string[];
+  lineFields: readonly string[];
+  mandatoryLineFields: readonly string[];
+  components: readonly string[];
+  evidence: readonly string[];
+}
+
+export const DOCUMENT_PROFILE_REGISTRIES: Record<CreatableDocumentType, DocumentProfileRegistryEntry> = {
+  QUOTATION: {
+    headerFields: ["partyId", "currencyCode", "validUntil", "priceBookId", "notes"],
+    mandatoryHeaderFields: ["partyId", "currencyCode"],
+    lineFields: ["lines.itemId", "lines.uomId", "lines.quantity", "lines.unitPrice", "lines.discountPercent"],
+    mandatoryLineFields: ["lines.itemId", "lines.uomId", "lines.quantity"],
+    components: ["PARTY_HEADER", "COMMERCIAL_TERMS", "LINE_GRID", "TOTAL_SUMMARY"],
+    evidence: ["CUSTOMER_RFQ", "APPROVAL_NOTE", "MARGIN_JUSTIFICATION"],
+  },
+  SALES_ORDER: {
+    headerFields: ["partyId", "currencyCode", "nodeId", "priceBookId", "notes"],
+    mandatoryHeaderFields: ["partyId", "currencyCode", "nodeId"],
+    lineFields: ["lines.itemId", "lines.uomId", "lines.quantity", "lines.unitPrice", "lines.discountPercent"],
+    mandatoryLineFields: ["lines.itemId", "lines.uomId", "lines.quantity"],
+    components: ["PARTY_HEADER", "FULFILLMENT_BAR", "LINE_GRID", "TOTAL_SUMMARY"],
+    evidence: ["CUSTOMER_PO", "CREDIT_OVERRIDE_REASON", "DELIVERY_INSTRUCTIONS"],
+  },
+  PURCHASE_ORDER: {
+    headerFields: ["partyId", "currencyCode", "nodeId", "expectedAt", "notes"],
+    mandatoryHeaderFields: ["partyId", "currencyCode", "nodeId"],
+    lineFields: ["lines.itemId", "lines.uomId", "lines.quantity", "lines.unitPrice"],
+    mandatoryLineFields: ["lines.itemId", "lines.uomId", "lines.quantity"],
+    components: ["SUPPLIER_HEADER", "RECEIVING_BAR", "LINE_GRID", "TOTAL_SUMMARY"],
+    evidence: ["SUPPLIER_QUOTE", "PURCHASE_REQUISITION", "CAPEX_APPROVAL"],
+  },
+};
+
+export interface DocumentProfileFieldConfig {
+  code: string;
+  required: boolean;
+  visible: boolean;
+  mandatory: boolean;
+  section: "header" | "line";
+}
+
+export interface DocumentProfileComponentConfig {
+  code: string;
+  order: number;
+  visible: boolean;
+}
+
+export interface DocumentProfileEvidenceConfig {
+  code: string;
+  required: boolean;
+}
+
+export interface DocumentProfileVisualConfig {
+  fields: DocumentProfileFieldConfig[];
+  components: DocumentProfileComponentConfig[];
+  evidence: DocumentProfileEvidenceConfig[];
+}
+
+export function buildDefaultVisualProfileConfig(
+  documentType: CreatableDocumentType,
+): DocumentProfileVisualConfig {
+  const reg = DOCUMENT_PROFILE_REGISTRIES[documentType] ?? DOCUMENT_PROFILE_REGISTRIES.QUOTATION;
+  const fields: DocumentProfileFieldConfig[] = [
+    ...reg.headerFields.map((code) => {
+      const mandatory = reg.mandatoryHeaderFields.includes(code);
+      return { code, required: mandatory, visible: true, mandatory, section: "header" as const };
+    }),
+    ...reg.lineFields.map((code) => {
+      const mandatory = reg.mandatoryLineFields.includes(code);
+      return { code, required: mandatory, visible: true, mandatory, section: "line" as const };
+    }),
+  ];
+  const components: DocumentProfileComponentConfig[] = reg.components.map((code, idx) => ({
+    code,
+    order: idx + 1,
+    visible: true,
+  }));
+  const evidence: DocumentProfileEvidenceConfig[] = reg.evidence.map((code, idx) => ({
+    code,
+    required: idx === 0,
+  }));
+  return { fields, components, evidence };
+}
+
+export function serializeVisualProfileContent(config: DocumentProfileVisualConfig): string {
+  return JSON.stringify(
+    {
+      fields: config.fields.map((f) => ({
+        code: f.code,
+        required: f.mandatory ? true : f.required,
+        visible: f.mandatory ? true : f.visible,
+      })),
+      components: config.components.map((c) => ({
+        code: c.code,
+        order: c.order,
+        visible: c.visible,
+      })),
+      evidence: config.evidence.map((e) => ({
+        code: e.code,
+        required: e.required,
+      })),
+    },
+    null,
+    2,
+  );
+}
 
 export interface DocumentProfileVersion {
   id: string;
@@ -68,6 +187,12 @@ export interface DocumentProfileVersion {
   effectiveFrom: string;
   effectiveTo: string | null;
   version: number;
+  content?: Record<string, unknown> | null;
+  authorUserId?: string | null;
+  publishedByUserId?: string | null;
+  restoredFromVersionId?: string | null;
+  restorationReason?: string | null;
+  publishedAt?: string | null;
 }
 
 export interface DocumentProfile {
@@ -76,6 +201,8 @@ export interface DocumentProfile {
   documentType: string;
   scopeTarget: string;
   version: number;
+  currentPublishedVersionId?: string | null;
+  pointerVersion?: number;
   versions: DocumentProfileVersion[];
 }
 
@@ -126,6 +253,8 @@ export interface DocumentProfileVersionFormValues {
   requiredCases: string;
   effectiveFrom: string;
   effectiveTo: string;
+  restoredFromVersionId?: string;
+  restorationReason?: string;
 }
 
 export const EMPTY_DOCUMENT_PROFILE_VERSION_FORM: DocumentProfileVersionFormValues = {
@@ -133,6 +262,8 @@ export const EMPTY_DOCUMENT_PROFILE_VERSION_FORM: DocumentProfileVersionFormValu
   requiredCases: "[]",
   effectiveFrom: "",
   effectiveTo: "",
+  restoredFromVersionId: "",
+  restorationReason: "",
 };
 
 export function buildCreateDocumentProfileRequest(values: DocumentProfileFormValues) {
@@ -169,6 +300,8 @@ export function buildCreateDocumentProfileVersionRequest(
   requiredCases: unknown[];
   effectiveFrom: string;
   effectiveTo?: string;
+  restoredFromVersionId?: string;
+  restorationReason?: string;
 } {
   let requiredCases: unknown;
   try {
@@ -179,14 +312,30 @@ export function buildCreateDocumentProfileVersionRequest(
   if (!Array.isArray(requiredCases) || requiredCases.length > REQUIRED_CASES_MAX) {
     throw new Error("DOCUMENT_PROFILE_FORM_CASES");
   }
-  const request = {
+  const restoredFrom = values.restoredFromVersionId?.trim();
+  const restorationReason = values.restorationReason?.trim();
+  const request: {
+    content: Record<string, unknown>;
+    requiredCases: unknown[];
+    effectiveFrom: string;
+    effectiveTo?: string;
+    restoredFromVersionId?: string;
+    restorationReason?: string;
+  } = {
     content: jsonObject(values.content),
     requiredCases,
     effectiveFrom: isoInstant(values.effectiveFrom),
   };
-  return values.effectiveTo.trim().length > 0
-    ? { ...request, effectiveTo: isoInstant(values.effectiveTo) }
-    : request;
+  if (values.effectiveTo.trim().length > 0) {
+    request.effectiveTo = isoInstant(values.effectiveTo);
+  }
+  if (restoredFrom && isUuidV7(restoredFrom)) {
+    request.restoredFromVersionId = restoredFrom;
+  }
+  if (restorationReason && restorationReason.length > 0 && restorationReason.length <= 240) {
+    request.restorationReason = restorationReason;
+  }
+  return request;
 }
 
 /**
@@ -229,6 +378,12 @@ function parseDocumentProfile(payload: unknown): DocumentProfile {
     documentType: row.documentType,
     scopeTarget: row.scopeTarget,
     version: row.version,
+    ...(isUuidV7(row.currentPublishedVersionId)
+      ? { currentPublishedVersionId: row.currentPublishedVersionId }
+      : {}),
+    ...(isBoundedInteger(row.pointerVersion, 0, Number.MAX_SAFE_INTEGER)
+      ? { pointerVersion: row.pointerVersion }
+      : {}),
     versions: Array.isArray(row.versions) ? row.versions.map(parseDocumentProfileVersion) : [],
   };
 }
@@ -246,6 +401,7 @@ function parseDocumentProfileVersion(payload: unknown): DocumentProfileVersion {
   ) {
     invalidDocumentProfileResponse();
   }
+  const contentObj = record(row.content);
   return {
     id: row.id,
     profileVersion: row.profileVersion,
@@ -254,6 +410,14 @@ function parseDocumentProfileVersion(payload: unknown): DocumentProfileVersion {
     effectiveFrom: row.effectiveFrom,
     effectiveTo: isTimestamp(row.effectiveTo) ? row.effectiveTo : null,
     version: row.version,
+    ...(contentObj ? { content: contentObj } : {}),
+    ...(typeof row.authorUserId === "string" ? { authorUserId: row.authorUserId } : {}),
+    ...(typeof row.publishedByUserId === "string" ? { publishedByUserId: row.publishedByUserId } : {}),
+    ...(typeof row.restoredFromVersionId === "string"
+      ? { restoredFromVersionId: row.restoredFromVersionId }
+      : {}),
+    ...(typeof row.restorationReason === "string" ? { restorationReason: row.restorationReason } : {}),
+    ...(isTimestamp(row.publishedAt) ? { publishedAt: row.publishedAt } : {}),
   };
 }
 

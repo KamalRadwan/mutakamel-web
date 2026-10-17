@@ -10,6 +10,7 @@ import {
   buildCreateDefinitionRequest,
   buildCreateVersionRequest,
   buildGovernanceActionRequest,
+  buildUpdateVersionRequest,
   decisionPath,
   governanceActionPath,
   governanceListPath,
@@ -17,7 +18,16 @@ import {
   governanceVersionsPath,
   parseDecisionReceipt,
   parseGovernanceListResponse,
+  serializePolicyVisualDraft,
+  serializeWorkflowVisualDraft,
+  validateWorkflowGraphClient,
 } from "./governance-contract";
+import {
+  DOCUMENT_PROFILE_ALLOWED_SCOPES,
+  buildCreateDocumentProfileVersionRequest,
+  buildDefaultVisualProfileConfig,
+  serializeVisualProfileContent,
+} from "../document-profiles/document-profile-contract";
 
 const definitionId = "01902001-3000-7000-8000-000000000001";
 const versionId = "01902001-3000-7000-8000-000000000002";
@@ -109,6 +119,101 @@ describe("Trade governance ladder", () => {
     ).toThrow("GOVERNANCE_FORM_CONTENT");
   });
 
+  it("builds PATCH update version payloads and supports explicit null effectiveTo", () => {
+    const patch = buildUpdateVersionRequest({
+      content: '{"rules":[{"code":"R1"}]}',
+      testCases: '[{"name":"case1"}]',
+      effectiveFrom: "2026-09-01T00:00:00.000Z",
+      effectiveTo: "",
+    });
+    expect(patch.effectiveTo).toBeNull();
+    expect(patch.content).toEqual({ rules: [{ code: "R1" }] });
+  });
+
+  it("serializes visual policy and workflow builders into registry-compliant JSON and validates graphs", () => {
+    const policyDraft = serializePolicyVisualDraft(
+      "ALLOW",
+      [
+        {
+          code: "MARGIN_FLOOR",
+          priority: "100",
+          fact: "document.marginPercent",
+          operator: "LT",
+          value: "10",
+          outcome: "REQUIRE_APPROVAL",
+          reasonCode: "MARGIN_BELOW_TARGET",
+        },
+      ],
+      [
+        {
+          code: "TC_LOW_MARGIN",
+          factsJson: '{"document.marginPercent": 8}',
+          expectedOutcome: "REQUIRE_APPROVAL",
+          expectedRuleCode: "MARGIN_FLOOR",
+        },
+      ],
+    );
+    const parsedPolicyContent = JSON.parse(policyDraft.content);
+    expect(parsedPolicyContent.defaultOutcome).toBe("ALLOW");
+    expect(parsedPolicyContent.rules[0].priority).toBe(100);
+
+    const transitions = [
+      {
+        code: "ISSUE",
+        from: "DRAFT",
+        action: "SUBMIT" as const,
+        to: "ISSUED",
+        requiresApproval: true,
+      },
+    ];
+    const graphValidation = validateWorkflowGraphClient(
+      "DRAFT, ISSUED, ORPHAN",
+      "DRAFT",
+      "ISSUED, ORPHAN",
+      transitions,
+    );
+    expect(graphValidation.unreachableStates).toEqual(["ORPHAN"]);
+    const serializedWf = serializeWorkflowVisualDraft(
+      "DRAFT, ISSUED",
+      "DRAFT",
+      "ISSUED",
+      transitions,
+      [
+        {
+          code: "TC_ISSUE_QUOTE",
+          startState: "DRAFT",
+          actionsCsv: "SUBMIT",
+          expectedState: "ISSUED",
+        },
+      ],
+    );
+    expect(JSON.parse(serializedWf.content).initialState).toBe("DRAFT");
+  });
+
+  it("serializes document profile visual schema with mandatory locks and lineage", () => {
+    expect(DOCUMENT_PROFILE_ALLOWED_SCOPES).toEqual(["TENANT", "COMPANY"]);
+    const config = buildDefaultVisualProfileConfig("QUOTATION");
+    // Try to uncheck a mandatory field and verify serializer enforces required=true & visible=true
+    config.fields[0].required = false;
+    config.fields[0].visible = false;
+    const contentJson = serializeVisualProfileContent(config);
+    const parsed = JSON.parse(contentJson);
+    expect(parsed.fields[0].code).toBe("partyId");
+    expect(parsed.fields[0].required).toBe(true);
+    expect(parsed.fields[0].visible).toBe(true);
+
+    const versionReq = buildCreateDocumentProfileVersionRequest({
+      content: contentJson,
+      requiredCases: "[]",
+      effectiveFrom: "2026-09-01T00:00:00.000Z",
+      effectiveTo: "",
+      restoredFromVersionId: versionId,
+      restorationReason: "Restore clean quotation layout",
+    });
+    expect(versionReq.restoredFromVersionId).toBe(versionId);
+    expect(versionReq.restorationReason).toBe("Restore clean quotation layout");
+  });
+
   it("omits an empty reason rather than sending an empty string", () => {
     expect(buildGovernanceActionRequest("  ")).toEqual({});
     expect(buildGovernanceActionRequest("needed")).toEqual({ reason: "needed" });
@@ -171,3 +276,4 @@ describe("Trade governance ladder", () => {
     expect(receipt.scopeTarget).toBe("BRANCH");
   });
 });
+

@@ -48,4 +48,25 @@ describe("Lead details card", () => {
     expect(screen.getAllByRole("textbox")).toHaveLength(3);
     for (const field of screen.getAllByRole("textbox")) expect(field).toHaveAttribute("readonly");
   });
+  it("supports starting in clean View Mode and toggling into Edit Mode on demand", () => {
+    render(
+      <LeadIdentityCards
+        lead={lead}
+        sources={[]}
+        canEdit
+        viewModeByDefault
+        allowedOwnerIds={null}
+        onSaved={vi.fn()}
+        onReconcile={vi.fn()}
+      />,
+    );
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+    expect(screen.getByText("Summary")).toBeVisible();
+    expect(screen.getByText("Existing note")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: en.crmTags.edit }));
+    expect(screen.getByRole("textbox", { name: en.crmLeadDetail.interestSummary })).toHaveValue("Summary");
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+  });
 });
+

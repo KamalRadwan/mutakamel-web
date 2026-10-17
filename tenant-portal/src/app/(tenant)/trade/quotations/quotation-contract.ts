@@ -280,3 +280,81 @@ export function buildCreateQuotation(
   if (reference) request.draftReference = reference.slice(0, 80);
   return request;
 }
+
+export interface ConvertQuotationLineEvidence {
+  clientLineId: string;
+  itemId?: string;
+  uomId: string;
+  quantity: string;
+  financial: {
+    discountTotal: string;
+    chargeTotal: string;
+    taxTotal: string;
+    lineTotal: string;
+    taxSnapshot: Record<string, unknown>;
+  };
+}
+
+export interface ConvertQuotationRequest {
+  lines: ConvertQuotationLineEvidence[];
+  totals: {
+    subtotal: string;
+    discountTotal: string;
+    chargeTotal: string;
+    taxTotal: string;
+    roundingTotal: string;
+    grandTotal: string;
+    amountPaid: string;
+    amountDue: string;
+  };
+  terms: Record<string, unknown>;
+}
+
+export function buildConvertQuotationToSalesOrder(
+  quotation: QuotationDetail,
+  taxCode = "VAT-0",
+): ConvertQuotationRequest {
+  const acceptedRev =
+    quotation.revisions.find((r) => r.id === quotation.acceptedRevisionId) ??
+    quotation.revisions.find((r) => r.id === quotation.currentRevisionId) ??
+    null;
+
+  const terms =
+    acceptedRev && Object.keys(acceptedRev.termsSnapshot).length > 0
+      ? acceptedRev.termsSnapshot
+      : { paymentTermCode: "NET_30", incotermCode: "EXW" };
+
+  const grandTotal = acceptedRev?.grandTotal ?? quotation.grandTotal ?? "0";
+
+  return {
+    lines: quotation.currentLines.map((line) => ({
+      clientLineId: line.clientLineId,
+      uomId: line.uomId,
+      quantity: line.quantity,
+      financial: {
+        discountTotal: "0",
+        chargeTotal: "0",
+        taxTotal: "0",
+        lineTotal: line.lineTotal,
+        taxSnapshot: {
+          taxCode,
+          category: "ZERO",
+          rateBps: 0,
+          currencyCode: quotation.currencyCode,
+        },
+      },
+    })),
+    totals: {
+      subtotal: grandTotal,
+      discountTotal: "0",
+      chargeTotal: "0",
+      taxTotal: "0",
+      roundingTotal: "0",
+      grandTotal,
+      amountPaid: "0",
+      amountDue: grandTotal,
+    },
+    terms,
+  };
+}
+

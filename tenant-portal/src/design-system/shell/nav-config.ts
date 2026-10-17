@@ -139,6 +139,8 @@ export interface NavSection {
    * screens of which nodes is one, and the account section had no label at all.
    */
   menuLabelKey: string;
+  /** Leading icon rendered on the desktop section trigger in GlobalNav. */
+  icon?: LucideIcon;
   items: NavItem[];
 }
 
@@ -151,6 +153,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "workspace",
     labelKey: null,
     menuLabelKey: "navMenuOverview",
+    icon: Compass,
     items: [
       {
         id: "home",
@@ -187,15 +190,14 @@ export const NAV_SECTIONS: NavSection[] = [
     globalNavDisplay: "items",
     labelKey: "crm",
     menuLabelKey: "navMenuRecords",
+    icon: Users2,
     items: [
-      // Core's activity hub filtered to CRM records — the Core item's glyph,
-      // one glyph per concept. Admitted by Core `activities.read`, not a CRM grant.
       {
-        id: "crmActivities",
-        labelKey: "crmActivities",
-        href: TENANT_ROUTES.crmActivities,
-        icon: ListChecks,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmActivities),
+        id: "crmDashboardReports",
+        labelKey: "crmDashboard",
+        href: TENANT_ROUTES.crmDashboard,
+        icon: LayoutDashboard,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboard),
       },
       {
         id: "leads",
@@ -210,6 +212,7 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: "customerProfiles",
         href: TENANT_ROUTES.crmCustomerProfiles,
         icon: Users,
+        primaryPage: true,
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmCustomerProfiles),
       },
       {
@@ -217,43 +220,8 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: "opportunities",
         href: TENANT_ROUTES.crmOpportunities,
         icon: TrendingUp,
+        primaryPage: true,
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmOpportunities),
-      },
-    ],
-  },
-  // CRM analytics (Phase 9). Its own section rather than three more rows under
-  // `crm`: the three screens share a `SubNav`, and the dashboards list, the
-  // prebuilt reports and the widget library are one workspace with three
-  // entrances. Admission mirrors CRM_ENTRY_ROUTES exactly — dashboards accept
-  // the scoped `crm.dashboards.read.*`, widgets need the static
-  // `crm.widgets.read`.
-  {
-    id: "crmAnalytics",
-    app: "crm",
-    labelKey: "crmDashboardBuilder",
-    menuLabelKey: "navMenuDashboards",
-    items: [
-      {
-        id: "crmDashboards",
-        labelKey: "crmDashboardBuilder",
-        href: TENANT_ROUTES.crmDashboards,
-        icon: LayoutDashboard,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboards),
-      },
-      {
-        id: "crmDashboardReports",
-        labelKey: "presetDashboards",
-        href: TENANT_ROUTES.crmDashboardReports,
-        icon: FileSearch,
-        hasAccess: (permissions) =>
-          canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboardReports),
-      },
-      {
-        id: "crmWidgets",
-        labelKey: "crmWidgetLibrary",
-        href: TENANT_ROUTES.crmWidgets,
-        icon: SquareStack,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmWidgets),
       },
     ],
   },
@@ -261,7 +229,8 @@ export const NAV_SECTIONS: NavSection[] = [
     id: "crmSetup",
     app: "crm",
     labelKey: "crmSetup",
-    menuLabelKey: "navMenuSetup",
+    menuLabelKey: "navMenuSettings",
+    icon: Settings,
     items: [
       {
         id: "leadStages",
@@ -269,6 +238,21 @@ export const NAV_SECTIONS: NavSection[] = [
         href: TENANT_ROUTES.crmLeadStages,
         icon: ListOrdered,
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmLeadStages),
+      },
+      {
+        id: "pipelines",
+        labelKey: "pipelines",
+        href: TENANT_ROUTES.crmPipelines,
+        icon: Workflow,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmPipelines),
+      },
+      {
+        id: "opportunityStages",
+        labelKey: "opportunityStages",
+        href: TENANT_ROUTES.crmOpportunityStages,
+        icon: Rows3,
+        hasAccess: (permissions) =>
+          canAccessCrmRoute(permissions, TENANT_ROUTES.crmOpportunityStages),
       },
       {
         id: "acquisitionSources",
@@ -292,6 +276,13 @@ export const NAV_SECTIONS: NavSection[] = [
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmCustomFields),
       },
       {
+        id: "outboundEmails",
+        labelKey: "outboundEmails",
+        href: TENANT_ROUTES.crmOutboundEmails,
+        icon: Mail,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmOutboundEmails),
+      },
+      {
         id: "crmSettings",
         labelKey: "crmSettings",
         href: TENANT_ROUTES.crmSettings,
@@ -304,6 +295,37 @@ export const NAV_SECTIONS: NavSection[] = [
         href: TENANT_ROUTES.crmStaticCatalogue,
         icon: Database,
         hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmStaticCatalogue),
+      },
+      {
+        id: "crmDashboards",
+        labelKey: "crmDashboardBuilder",
+        href: TENANT_ROUTES.crmDashboards,
+        icon: LayoutDashboard,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboards),
+      },
+      {
+        id: "crmWidgets",
+        labelKey: "crmWidgetLibrary",
+        href: TENANT_ROUTES.crmWidgets,
+        icon: SquareStack,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmWidgets),
+      },
+    ],
+  },
+  {
+    id: "crmActivities",
+    app: "crm",
+    globalNavDisplay: "items",
+    labelKey: "crmActivities",
+    menuLabelKey: "crmActivities",
+    icon: ListChecks,
+    items: [
+      {
+        id: "crmActivities",
+        labelKey: "crmActivities",
+        href: TENANT_ROUTES.crmActivities,
+        icon: ListChecks,
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmActivities),
       },
     ],
   },
@@ -319,6 +341,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "trade",
     labelKey: "tradeFoundation",
     menuLabelKey: "navMenuFoundation",
+    icon: Package,
     items: [
       {
         id: "tradeItems",
@@ -380,6 +403,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "trade",
     labelKey: "tradeDocuments",
     menuLabelKey: "navMenuDocuments",
+    icon: FileText,
     items: [
       {
         id: "tradeQuotations",
@@ -441,6 +465,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "trade",
     labelKey: "tradeInventoryNodes",
     menuLabelKey: "navMenuInventory",
+    icon: Boxes,
     items: [
       {
         id: "tradeInventoryAvailability",
@@ -505,6 +530,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "trade",
     labelKey: "policyStudio",
     menuLabelKey: "navMenuGovernance",
+    icon: ShieldCheck,
     items: [
       {
         id: "tradePriceBooks",
@@ -550,6 +576,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "trade",
     labelKey: "importsWebhooks",
     menuLabelKey: "navMenuAutomation",
+    icon: RadioTower,
     items: [
       {
         id: "tradeExtensions",
@@ -596,6 +623,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "trade",
     labelKey: "tradeDashboard",
     menuLabelKey: "navMenuDashboards",
+    icon: ChartNoAxesColumn,
     items: [
       {
         id: "tradeDashboards",
@@ -618,6 +646,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "workspace",
     labelKey: "staff",
     menuLabelKey: "navMenuStaff",
+    icon: Users,
     items: [
       {
         id: "coreOrganization",
@@ -683,6 +712,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "workspace",
     labelKey: "operationsAndContent",
     menuLabelKey: "navMenuOperations",
+    icon: LayoutTemplate,
     items: [
       {
         id: "coreDirectory",
@@ -757,6 +787,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "workspace",
     labelKey: "coreSettings",
     menuLabelKey: "navMenuSettings",
+    icon: Settings,
     items: [
       {
         id: "coreSettingsHub",
@@ -822,6 +853,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "workspace",
     labelKey: "coreBillingSection",
     menuLabelKey: "navMenuBilling",
+    icon: CreditCard,
     items: [
       {
         id: "coreBilling",
@@ -862,6 +894,7 @@ export const NAV_SECTIONS: NavSection[] = [
     app: "workspace",
     labelKey: null,
     menuLabelKey: "navMenuAccount",
+    icon: CircleUser,
     items: [
       {
         id: "coreNotifications",
@@ -976,11 +1009,3 @@ export const CORE_TEMPLATE_NAV_ITEMS: NavItem[] = operationsItems(
   "coreTemplateAssets",
   "coreTemplateAssignments",
 );
-
-/** The `SubNav` every Trade foundation screen renders. */
-export const TRADE_FOUNDATION_NAV_ITEMS: NavItem[] =
-  NAV_SECTIONS.find((section) => section.id === "tradeFoundation")?.items ?? [];
-
-/** The `SubNav` every Trade commercial-document screen renders. */
-export const TRADE_DOCUMENT_NAV_ITEMS: NavItem[] =
-  NAV_SECTIONS.find((section) => section.id === "tradeDocuments")?.items ?? [];

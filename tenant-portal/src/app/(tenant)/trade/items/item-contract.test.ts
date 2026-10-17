@@ -5,6 +5,7 @@ import {
   buildItemSearchRequest,
   buildUpdateItemRequest,
   EMPTY_ITEM_FORM,
+  formatTradeDecimal,
   parseItemDetailResponse,
   parseItemResponse,
   toItemForm,
@@ -51,6 +52,7 @@ const stored: Item = {
   version: 2,
   updatedAt: "2026-08-31T09:00:00.000Z",
   eligibility: null,
+  image: null,
 };
 
 describe("buildCreateItemRequest", () => {
@@ -302,6 +304,18 @@ describe("protected standard cost and reference data", () => {
       currencyCode: "EGP",
       version: 3,
     })).toMatchObject({ standardCost: "12.50", currencyCode: "EGP", version: 3 });
+  });
+
+  it("formats integer and zero-padded decimals to 2 decimal places while preserving >2 significant fractional digits", () => {
+    expect(formatTradeDecimal("6000")).toBe("6000.00");
+    expect(formatTradeDecimal("6000.00")).toBe("6000.00");
+    expect(formatTradeDecimal("6000.00000000")).toBe("6000.00");
+    expect(formatTradeDecimal("6000.5")).toBe("6000.50");
+    expect(formatTradeDecimal("6000.458011")).toBe("6000.458011");
+    expect(formatTradeDecimal("6000.45801100")).toBe("6000.458011");
+    expect(buildStandardCostRequest("6000", "EGP")).toEqual({ standardCost: "6000.00" });
+    expect(buildStandardCostRequest("6000.00000000", "EGP")).toEqual({ standardCost: "6000.00" });
+    expect(buildStandardCostRequest("6000.458011", "EGP")).toEqual({ standardCost: "6000.458011" });
   });
 
   it("parses owner and tax references while preserving their ids", () => {

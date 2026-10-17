@@ -141,21 +141,46 @@ function TaxSnapshotDetails({
 }) {
   if (snapshot === null) return emptyLabel;
 
+  const taxCode =
+    typeof snapshot.taxCode === "string"
+      ? snapshot.taxCode
+      : typeof snapshot.code === "string"
+        ? snapshot.code
+        : null;
+  const rateBps =
+    typeof snapshot.rateBps === "number"
+      ? `${(snapshot.rateBps / 100).toFixed(2)}%`
+      : typeof snapshot.ratePercent === "number"
+        ? `${snapshot.ratePercent}%`
+        : null;
+
   return (
-    <details className="min-w-36">
-      <summary
-        aria-label={accessibleLabel}
-        className="cursor-pointer rounded-sm py-1 text-xs text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {label}
-      </summary>
-      <pre
-        aria-label={accessibleLabel}
-        dir="ltr"
-        className="mt-1 max-h-40 max-w-80 overflow-auto whitespace-pre-wrap break-words rounded-sm bg-muted p-2 font-mono text-xs text-foreground"
-      >
-        {JSON.stringify(snapshot, null, 2)}
-      </pre>
-    </details>
+    <div className="min-w-36 space-y-1">
+      {taxCode || rateBps ? (
+        <div className="flex flex-wrap items-center gap-1">
+          {taxCode ? (
+            <span className="dossier-tag dossier-tag-indigo">{taxCode}</span>
+          ) : null}
+          {rateBps ? (
+            <span className="dossier-tag dossier-tag-emerald">{rateBps}</span>
+          ) : null}
+        </div>
+      ) : null}
+      <details>
+        <summary
+          aria-label={accessibleLabel}
+          className="cursor-pointer rounded-sm py-1 text-xs text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {label}
+        </summary>
+        <pre
+          aria-label={accessibleLabel}
+          dir="ltr"
+          className="mt-1 max-h-40 max-w-80 overflow-auto whitespace-pre-wrap break-words rounded-sm bg-muted p-2 font-mono text-xs text-foreground"
+        >
+          {JSON.stringify(snapshot, null, 2)}
+        </pre>
+      </details>
+    </div>
   );
 }

@@ -191,6 +191,7 @@ export function ActivitiesWorkspace({ scope }: ActivitiesWorkspaceProps) {
         <ActivityOutcomeDialog
           open={outcome.open}
           mode={outcome.mode}
+          activity={outcome.activity}
           onClose={outcome.close}
           onConfirm={(text) => void outcome.confirm(text)}
           loading={outcome.loading}

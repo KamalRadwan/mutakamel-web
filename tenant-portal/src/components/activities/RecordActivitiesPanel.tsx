@@ -98,6 +98,7 @@ export function RecordActivitiesPanel({ target, readOnly, onChanged }: RecordAct
       <ActivityOutcomeDialog
         open={panel.outcome.open}
         mode={panel.outcome.mode}
+        activity={panel.outcome.activity}
         onClose={panel.outcome.close}
         onConfirm={(text) => void panel.outcome.confirm(text)}
         loading={panel.outcome.loading}

@@ -22,21 +22,46 @@
 //     entirely. The two are never sent together.
 
 import type { CrmProfileType } from "../leads/lead-contract";
+import type { LeadAddressForm } from "../leads/lead-create-contract";
+
+export function emptyCustomerAddress(): LeadAddressForm {
+  return {
+    street1: "",
+    street2: "",
+    buildingNo: "",
+    floor: "",
+    apartment: "",
+    city: "",
+    state: "",
+    postalCode: "",
+    country: "",
+    landmark: "",
+  };
+}
 
 export const CUSTOMER_PROFILE_CREATE_LIMITS = {
   companyName: 180,
+  legalName: 180,
   firstName: 80,
   lastName: 80,
   honorificTitle: 40,
   jobTitle: 120,
   email: 180,
   website: 180,
+  companyWebsite: 180,
   phone: 32,
   phones: 10,
   taxNumber: 64,
   commercialRegistrationNumber: 64,
   contacts: 20,
+  tags: 50,
+  addressShort: 40,
+  addressMedium: 120,
+  addressLong: 240,
+  postalCode: 20,
   description: 2000,
+  interestSummary: 4000,
+  expectedNeed: 4000,
 } as const;
 
 /** `CustomerStatusEnum`. Written raw — there is no catalogue and no state machine. */
@@ -52,6 +77,8 @@ export type CustomerProfileCreateStatus = (typeof CUSTOMER_PROFILE_STATUSES)[num
 export interface CustomerContactRowForm {
   /** Stable row identity for React; never sent. */
   key: string;
+  /** Optional directory person Party ID when linking an existing company contact. */
+  contactPartyId?: string;
   /** Held only for a person reused from the directory, whose name is theirs. */
   fullName: string;
   firstName: string;
@@ -64,9 +91,12 @@ export interface CustomerContactRowForm {
 }
 
 export interface CreateCustomerProfileForm {
+  branchId?: string;
   profileType: CrmProfileType;
   status: CustomerProfileCreateStatus;
+  ownerUserId: string;
   acquisitionSourceId: string;
+  tagIds: string[];
   /** INDIVIDUAL only — these reach the PERSON party through `primaryContact`. */
   honorificTitle: string;
   firstName: string;
@@ -74,14 +104,19 @@ export interface CreateCustomerProfileForm {
   email: string;
   phones: string[];
   /** CORPORATE only. */
+  existingCompanyPartyId: string;
   companyName: string;
+  legalName: string;
   taxNumber: string;
   commercialRegistrationNumber: string;
   companyEmail: string;
   companyWebsite: string;
   companyPhones: string[];
   contacts: CustomerContactRowForm[];
+  address: LeadAddressForm;
   description: string;
+  interestSummary: string;
+  expectedNeed: string;
   /** Keyed by `fieldKey`. Values are already the JS type the definition declares. */
   customFields: Record<string, unknown>;
 }
@@ -89,6 +124,7 @@ export interface CreateCustomerProfileForm {
 export function emptyCustomerContactRow(key: string): CustomerContactRowForm {
   return {
     key,
+    contactPartyId: "",
     fullName: "",
     firstName: "",
     lastName: "",
@@ -106,26 +142,37 @@ export function emptyCreateCustomerProfileForm(contactKey: string): CreateCustom
     // The column default, restated so the form shows what the server would
     // have chosen rather than an empty picker.
     status: "PROSPECT",
+    ownerUserId: "",
     acquisitionSourceId: "",
+    tagIds: [],
     honorificTitle: "",
     firstName: "",
     lastName: "",
     email: "",
     phones: [""],
+    existingCompanyPartyId: "",
     companyName: "",
+    legalName: "",
     taxNumber: "",
     commercialRegistrationNumber: "",
     companyEmail: "",
     companyWebsite: "",
     companyPhones: [""],
     contacts: [emptyCustomerContactRow(contactKey)],
+    address: emptyCustomerAddress(),
     description: "",
+    interestSummary: "",
+    expectedNeed: "",
     customFields: {},
   };
 }
 
 export function isCorporateCustomerProfile(form: CreateCustomerProfileForm): boolean {
   return form.profileType === "CORPORATE";
+}
+
+export function usesExistingCustomerCompany(form: CreateCustomerProfileForm): boolean {
+  return isCorporateCustomerProfile(form) && form.existingCompanyPartyId.trim().length > 0;
 }
 
 function filledPhones(phones: readonly string[]): string[] {
@@ -138,6 +185,7 @@ function optional<T extends string>(key: T, value: string): Partial<Record<T, st
 }
 
 interface CustomerContactRequest {
+  contactPartyId?: string;
   /** Omitted for the individual's own record: CRM builds it from the name parts. */
   fullName?: string;
   /** Only meaningful on an individual profile, where it names the PERSON party. */
@@ -156,6 +204,7 @@ export interface CreateCustomerProfileFullRequest {
   /** Never sent from this form; CRM composes it. Kept for callers that do. */
   displayName?: string;
   status?: CustomerProfileCreateStatus;
+  ownerUserId?: string;
   acquisitionSourceId?: string;
   companyName?: string;
   taxNumber?: string;
@@ -173,9 +222,14 @@ function buildContact(
   contact: CustomerContactRowForm,
   isPrimary: boolean,
 ): CustomerContactRequest {
-  // No `fullName`: CRM composes it from the parts below.
   const request: CustomerContactRequest = {};
   if (isPrimary) request.isPrimary = true;
+  if (contact.contactPartyId?.trim()) {
+    request.contactPartyId = contact.contactPartyId.trim();
+    Object.assign(request, optional("jobTitle", contact.jobTitle));
+    return request;
+  }
+  // No `fullName`: CRM composes it from the parts below.
   Object.assign(
     request,
     optional("firstName", contact.firstName),
@@ -212,6 +266,7 @@ export function buildCreateCustomerProfileFullRequest(
     branchId,
     profileType: form.profileType,
     status: form.status,
+    ...optional("ownerUserId", form.ownerUserId ?? ""),
     ...optional("acquisitionSourceId", form.acquisitionSourceId),
     ...optional("description", form.description),
   };
@@ -239,7 +294,9 @@ export function buildCreateCustomerProfileFullRequest(
     // omitted rather than sent as `[]` — which would ALSO discard
     // `primaryContact`, and is the shape that silently no-ops.
     const named = form.contacts.filter(
-      (contact) => contact.firstName.trim().length > 0,
+      (contact) =>
+        (contact.contactPartyId?.trim().length ?? 0) > 0 ||
+        contact.firstName.trim().length > 0,
     );
     if (named.length > 0) {
       const primaryIndex = Math.max(

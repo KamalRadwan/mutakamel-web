@@ -115,11 +115,12 @@ export function tradeErrorCode(payload: unknown): string | null {
   return typeof code === "string" ? code : null;
 }
 
-// No "PUT": zero of Trade's 231 Gateway routes use it. A transport method for
-// a verb the contract does not have is the same mistake as an invented DTO
-// field — it offers a capability that does not exist.
+// One "PUT" exists: `trading.items.by.id.image.put`, the Item image upload
+// (LLD 02b §5). It is a multipart body, never JSON. Do not add a verb the
+// Gateway contract does not have — that is the same mistake as an invented DTO
+// field: it offers a capability that does not exist.
 async function send(
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: TradePath,
   body: unknown,
   config?: TenantApiRequestConfig,
@@ -132,7 +133,9 @@ async function send(
         ? await axiosClient.delete<unknown>(path, init)
         : method === "POST"
           ? await axiosClient.post<unknown>(path, body, init)
-          : await axiosClient.patch<unknown>(path, body, init);
+          : method === "PUT"
+            ? await axiosClient.put<unknown>(path, body, init)
+            : await axiosClient.patch<unknown>(path, body, init);
   return {
     data: tradeEnvelopeData(response.data),
     headers: response.headers,
@@ -150,6 +153,15 @@ export function tradePost(
   config?: TenantApiRequestConfig,
 ): Promise<TradeResult> {
   return send("POST", path, body, config);
+}
+
+/** The Item image upload only: a `FormData` with its one `file` part. */
+export function tradePut(
+  path: TradePath,
+  body: FormData,
+  config?: TenantApiRequestConfig,
+): Promise<TradeResult> {
+  return send("PUT", path, body, config);
 }
 
 export function tradePatch(

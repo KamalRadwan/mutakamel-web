@@ -308,3 +308,57 @@ export function parseInventoryAvailability(payload: unknown): InventoryAvailabil
 export function invalidResponse(): never {
   throw new Error("Invalid Trade inventory response.");
 }
+
+export const COMMON_TIMEZONES = [
+  "Asia/Riyadh",
+  "Asia/Dubai",
+  "Asia/Kuwait",
+  "Asia/Bahrain",
+  "Asia/Qatar",
+  "Africa/Cairo",
+  "UTC",
+] as const;
+
+export type NodeTypeValue = NodeType;
+export type NodeStatusValue = NodeStatus;
+
+export function parseBranchIdsPreview(raw: string): {
+  validIds: string[];
+  invalidEntries: string[];
+} {
+  const entries = raw
+    .split(/[\s,]+/u)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  const validIds: string[] = [];
+  const invalidEntries: string[] = [];
+  for (const entry of entries) {
+    if (isUuidV7(entry)) {
+      if (!validIds.includes(entry)) validIds.push(entry);
+    } else {
+      invalidEntries.push(entry);
+    }
+  }
+  return { validIds, invalidEntries };
+}
+
+export function computeStockComposition(availability: InventoryAvailability): {
+  onHand: number;
+  reserved: number;
+  available: number;
+  availablePct: number;
+  reservedPct: number;
+  health: "healthy" | "low" | "depleted";
+} {
+  const onHand = Math.max(0, Number(availability.onHandQuantity) || 0);
+  const reserved = Math.max(0, Number(availability.reservedQuantity) || 0);
+  const available = Number(availability.availableQuantity) || 0;
+  const total = onHand > 0 ? onHand : Math.max(0, reserved + Math.max(0, available));
+  const availablePct =
+    total > 0 ? Math.min(100, Math.max(0, Math.round((Math.max(0, available) / total) * 100))) : 0;
+  const reservedPct = total > 0 ? Math.min(100, Math.max(0, 100 - availablePct)) : 0;
+  const health: "healthy" | "low" | "depleted" =
+    available <= 0 ? "depleted" : availablePct <= 25 ? "low" : "healthy";
+  return { onHand, reserved, available, availablePct, reservedPct, health };
+}
+

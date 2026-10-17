@@ -169,6 +169,7 @@ and every route would pay for glyphs it does not render.
 | Warning, needs attention | `AlertTriangle` | `caution` |
 | Success | `CheckCircle2` | `positive` |
 | Information, read-only notice | `Info` | `ink` |
+| Field hint, beside a label | `Info` | `ink` |
 | Blocked, no permission | `ShieldAlert` | `ink` |
 | Not found | `SearchX` | `ink` |
 | Offline / connection lost | `WifiOff` | `caution` |
@@ -177,6 +178,14 @@ and every route would pay for glyphs it does not render.
 `AlertTriangle` appears twice on purpose. The glyph says "something needs your
 attention"; the **role colour** says how badly. Giving warning and error
 different glyphs makes the pair harder to scan, not easier.
+
+`Info` also appears twice for the same reason, read the other way: a field
+hint *is* an information notice, just anchored to one control instead of a
+whole screen. There is no separate "help" glyph — `CircleHelp` is reserved for
+the onboarding checklist's *unchecked* status (`first-run-checklist.tsx`),
+a distinct meaning, not a synonym. See
+[primitives.md#field-hint-placement](primitives.md#field-hint-placement) for
+the `Field` prop that renders it.
 
 ### Objects
 
@@ -204,24 +213,29 @@ stroke colour and a stroke width.
 
 ### Activity types
 
-Added **2026-09-24**. The glyph of each Core activity type is the one Core's
-own catalogue declares — the `icon` of `GET /api/tenant/core/v1/activity-types`,
-set in `ActivitiesService` (`src/tenant/activities/activities.service.ts`) — so
-a type looks the same wherever it is drawn, and a new type arrives with its
-glyph named.
+Added **2026-09-24**, updated **2026-10-15** with theme-adaptive swatch palettes.
+The glyph of each Core activity type is the one Core's own catalogue declares —
+the `icon` of `GET /api/tenant/core/v1/activity-types`, set in
+`ActivitiesService` (`src/tenant/activities/activities.service.ts`) — paired
+with a dedicated `--swatch-*` surface palette from
+`src/design-system/lib/swatch-palette.ts` so each type is immediately
+recognizable across 7-tile type pickers, agenda rows, modal header icon boxes,
+and detail hero cards.
 
-| Type | Icon | Catalogue `icon` |
-| --- | --- | --- |
-| `TODO` | `SquareCheck` | `check-square` — lucide's earlier name for the same glyph |
-| `CALL` | `Phone` | `phone` |
-| `MEETING` | `Users` | `users` |
-| `EMAIL` | `Mail` | `mail` |
-| `VISIT` | `MapPin` | `map-pin` |
-| `FOLLOW_UP` | `Clock` | `clock` |
-| `OTHER` | `Circle` | `circle` |
+| Type | Icon | Catalogue `icon` | Swatch Hue (`SwatchSurfacePalette`) |
+| --- | --- | --- | --- |
+| `TODO` | `SquareCheck` | `check-square` — lucide's earlier name for the same glyph | `indigo` (`--swatch-indigo`) |
+| `CALL` | `Phone` | `phone` | `green` (`--swatch-green`) |
+| `MEETING` | `Users` | `users` | `purple` (`--swatch-purple`) |
+| `EMAIL` | `Mail` | `mail` | `blue` (`--swatch-blue`) |
+| `VISIT` | `MapPin` | `map-pin` | `amber` (`--swatch-amber`) |
+| `FOLLOW_UP` | `Clock` | `clock` | `teal` (`--swatch-teal`) |
+| `OTHER` | `Circle` | `circle` | `pink` (`--swatch-pink`) |
 
-A type is a **category**, so its glyph is always ink and always beside its
-label — never a hue ([tokens.md](tokens.md#non-outcome-values--never-a-hue)).
+Every activity type glyph is **always** rendered beside its translated text
+label (or carries an explicit `aria-label` in compact icon containers) so its
+`--swatch-*` hue is visual reinforcement rather than the sole signal
+([tokens.md](tokens.md#structured-category--entity-palettes---swatch--vs-generic-enums)).
 `Users`, `MapPin` and `Clock` are the glyphs the Objects table already gives a
 team, a location and a time, which is the same concept each time rather than a
 second meaning. `Phone` is the activity **type**; the green call mark in

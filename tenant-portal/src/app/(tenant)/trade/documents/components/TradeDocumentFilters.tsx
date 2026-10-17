@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Field,
+  PageActions,
   Select,
   SelectContent,
   SelectItem,
@@ -37,25 +37,23 @@ export function TradeDocumentFilters({ kind, value, onChange }: TradeDocumentFil
   const { t } = useI18n();
 
   return (
-    <div className="max-w-xs">
-      <Field label={t.common.status}>
-        <Select
-          value={value === "" ? ANY_STATUS : value}
-          onValueChange={(next) => onChange(next === ANY_STATUS ? "" : next)}
-        >
-          <SelectTrigger size="sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ANY_STATUS}>{t.tradeDocuments.statusAny}</SelectItem>
-            {tradeStatusValues(kind).map((status) => (
-              <SelectItem key={status} value={status}>
-                {t.statusValues[`${kind}.${status}`] ?? status}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
-    </div>
+    <PageActions slot="actions">
+      <Select
+        value={value === "" ? ANY_STATUS : value}
+        onValueChange={(next) => onChange(next === ANY_STATUS ? "" : next)}
+      >
+        <SelectTrigger size="sm" aria-label={t.common.status} className="w-44">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY_STATUS}>{t.tradeDocuments.statusAny}</SelectItem>
+          {tradeStatusValues(kind).map((status) => (
+            <SelectItem key={status} value={status}>
+              {t.statusValues[`${kind}.${status}`] ?? status}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </PageActions>
   );
 }

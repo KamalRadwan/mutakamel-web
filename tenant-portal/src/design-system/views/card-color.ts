@@ -1,4 +1,6 @@
-// The user-chosen card colour, and the only place its class strings exist.
+// The user-chosen card colour, and the place its card-border class strings live.
+// (For structured category/type/entity surface palettes built on the same
+// eleven `--swatch-*` tokens, see `src/design-system/lib/swatch-palette.ts`.)
 //
 // Eleven marks plus "none". They are NOT a status: a board card's colour is a
 // private filing mark whose meaning lives in the head of whoever set it, so no

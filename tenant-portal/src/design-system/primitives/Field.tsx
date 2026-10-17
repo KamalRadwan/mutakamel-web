@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useId } from "react";
+import { Info } from "lucide-react";
 import { cn } from "../lib/cn";
+import { iconSize } from "../lib/icons";
 import { proseMeasure } from "../lib/variants";
+import { Button } from "./Button";
 import { FieldControlProvider } from "./field-control";
 import { Label } from "./Label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./Tooltip";
 
 export interface FieldProps {
   label: string;
@@ -19,6 +23,15 @@ export interface FieldProps {
   readOnly?: boolean;
   /** When true, renders the label visibly above the field rather than sr-only. */
   showLabel?: boolean;
+  /**
+   * Where `hint` appears. "below" (default) renders it as a paragraph under
+   * the control. "tooltip" moves it into an `Info`-icon trigger beside the
+   * label instead — the paragraph stays in the DOM for `aria-describedby`
+   * but becomes screen-reader-only. Reach for "tooltip" in a dense,
+   * multi-field modal; pair it with `showLabel` — see
+   * docs/design/primitives.md#field-hint-placement.
+   */
+  hintPlacement?: "below" | "tooltip";
   className?: string;
   /**
    * Exactly one design-system control, at any depth. It claims the label by
@@ -41,6 +54,7 @@ export function Field({
   required,
   readOnly,
   showLabel = false,
+  hintPlacement = "below",
   className,
   children,
 }: FieldProps) {
@@ -78,18 +92,39 @@ export function Field({
 
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label
-        htmlFor={controlId}
-        className={showLabel ? "text-xs" : "sr-only"}
-      >
-        {label}
-        {required && (
-          <span aria-hidden="true" className="text-destructive">
-            {" "}
-            *
-          </span>
+      <div className={cn("flex items-center gap-1", showLabel && "min-h-4")}>
+        <Label
+          htmlFor={controlId}
+          className={showLabel ? "text-xs" : "sr-only"}
+        >
+          {label}
+          {required && (
+            <span aria-hidden="true" className="text-destructive">
+              {" "}
+              *
+            </span>
+          )}
+        </Label>
+        {hintPlacement === "tooltip" && showHint && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="size-4! shrink-0 p-0! text-muted-foreground"
+                aria-label={hint}
+                // A dialog's auto-focus lands here; open on keyboard focus only, not programmatic focus.
+                onFocus={(event) => {
+                  if (!event.currentTarget.matches(":focus-visible")) event.preventDefault();
+                }}
+              >
+                <Info className={iconSize({ size: "xs" })} aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{hint}</TooltipContent>
+          </Tooltip>
         )}
-      </Label>
+      </div>
       {/*
         readOnly reaches the control BOTH ways on purpose: the native attribute
         is what makes `readOnlySurface`'s read-only:* variants render and what
@@ -112,7 +147,14 @@ export function Field({
         {children}
       </FieldControlProvider>
       {showHint && (
-        <p id={hintId} className={cn("text-xs text-muted-foreground", proseMeasure)}>
+        <p
+          id={hintId}
+          className={cn(
+            "text-xs text-muted-foreground",
+            proseMeasure,
+            hintPlacement === "tooltip" && "sr-only",
+          )}
+        >
           {hint}
         </p>
       )}

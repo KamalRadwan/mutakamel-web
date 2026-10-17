@@ -29,16 +29,48 @@ export interface NavMenuProps {
 // here. The marker keeps its own token because it is the one colour on the bar
 // that is neither text nor surface.
 const TRIGGER =
-  "relative flex h-full items-center gap-1 px-3 text-sm text-muted-foreground " +
-  "after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-transparent " +
-  "hover:bg-accent";
+  "relative my-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-transparent px-2 text-xs font-medium text-white/85 transition-colors xl:px-2.5 xl:text-sm " +
+  "after:pointer-events-none after:absolute after:inset-x-1.5 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-transparent " +
+  "hover:bg-white/10 hover:text-white";
 
-const TRIGGER_ACTIVE = "font-medium text-foreground after:bg-nav-active";
+const TRIGGER_ACTIVE =
+  "border-[#38bdf8]/50 bg-[#38bdf8]/22 font-semibold text-white hover:bg-[#38bdf8]/28 hover:text-white after:bg-nav-active after:shadow-[0_0_8px_#38bdf8]";
+
+const ICON_BADGE_PALETTE: Record<string, string> = {
+  // CRM items & sections
+  crmDashboardReports: "bg-purple-500/20 text-purple-300",
+  leads: "bg-sky-500/25 text-sky-300",
+  customerProfiles: "bg-emerald-500/20 text-emerald-300",
+  opportunities: "bg-amber-500/20 text-amber-300",
+  crmSetup: "bg-rose-500/20 text-rose-300",
+  crmActivities: "bg-teal-500/20 text-teal-300",
+  // Workspace sections
+  workspace: "bg-purple-500/20 text-purple-300",
+  coreIdentity: "bg-sky-500/25 text-sky-300",
+  coreOperations: "bg-emerald-500/20 text-emerald-300",
+  coreSettings: "bg-rose-500/20 text-rose-300",
+  coreBilling: "bg-amber-500/20 text-amber-300",
+  account: "bg-teal-500/20 text-teal-300",
+  // Trade sections
+  tradeFoundation: "bg-sky-500/25 text-sky-300",
+  tradeDocuments: "bg-emerald-500/20 text-emerald-300",
+  tradeInventory: "bg-amber-500/20 text-amber-300",
+  tradeGovernance: "bg-rose-500/20 text-rose-300",
+  tradeAutomation: "bg-teal-500/20 text-teal-300",
+  tradeAnalytics: "bg-purple-500/20 text-purple-300",
+};
+
+function iconBadgeClass(key: string): string {
+  return (
+    ICON_BADGE_PALETTE[key] ??
+    "bg-sky-500/20 text-sky-300"
+  );
+}
 
 /**
  * One nav section as a menu in the global nav.
  *
- * **Why a menu and not a row of links.** The three apps carry 30, 11 and 30
+ * **Why a menu and not a row of links.** The three apps carry 30, 14 and 30
  * items. A horizontal bar can hold roughly six labels beside the brand zone,
  * the app switcher and the account controls, so the only structure that fits a
  * 1366px screen is one trigger per section — the grouping the sidebar already
@@ -72,7 +104,14 @@ export function NavMenu({ section, activeItemId }: NavMenuProps) {
               aria-current={itemIsActive ? "page" : undefined}
               className={cn(TRIGGER, itemIsActive && TRIGGER_ACTIVE, focusRing)}
             >
-              <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+              <span
+                className={cn(
+                  "flex size-5 shrink-0 items-center justify-center rounded-xs",
+                  iconBadgeClass(item.id),
+                )}
+              >
+                <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+              </span>
               <span className="whitespace-nowrap">{label(item)}</span>
             </Link>
           );
@@ -90,33 +129,68 @@ export function NavMenu({ section, activeItemId }: NavMenuProps) {
         aria-current={only.id === activeItemId ? "page" : undefined}
         className={cn(TRIGGER, isActive && TRIGGER_ACTIVE, focusRing)}
       >
-        <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+        <span
+          className={cn(
+            "flex size-5 shrink-0 items-center justify-center rounded-xs",
+            iconBadgeClass(only.id in ICON_BADGE_PALETTE ? only.id : section.id),
+          )}
+        >
+          <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+        </span>
         <span className="whitespace-nowrap">{label(only)}</span>
       </Link>
     );
   }
 
+  const SectionIcon = section.icon ?? section.items[0]?.icon;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className={cn(TRIGGER, isActive && TRIGGER_ACTIVE, focusRing)}>
+        {SectionIcon && (
+          <span
+            className={cn(
+              "flex size-5 shrink-0 items-center justify-center rounded-xs",
+              iconBadgeClass(section.id),
+            )}
+          >
+            <SectionIcon className="size-3.5 shrink-0" aria-hidden="true" />
+          </span>
+        )}
         <span className="whitespace-nowrap">
           {t.nav[section.menuLabelKey as keyof typeof t.nav]}
         </span>
         {/* A disclosure chevron is direction-neutral: it must NOT mirror under
             RTL — docs/design/icons.md. */}
-        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <ChevronDown
+          className={cn(
+            "size-3 shrink-0 text-white/60",
+            isActive && "text-sky-300",
+          )}
+          aria-hidden="true"
+        />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="bottom" className="min-w-56">
         {section.items.map((item) => {
           const Icon = item.icon;
+          const itemIsActive = item.id === activeItemId;
           return (
             <DropdownMenuItem key={item.id} asChild>
               <Link
                 href={item.href}
-                aria-current={item.id === activeItemId ? "page" : undefined}
-                className={cn(item.id === activeItemId && "font-medium text-foreground")}
+                aria-current={itemIsActive ? "page" : undefined}
+                className={cn(
+                  itemIsActive &&
+                    "bg-selected font-medium text-selected-foreground focus:bg-selected focus:text-selected-foreground",
+                )}
               >
-                <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+                <Icon
+                  className={cn(
+                    "size-3.5 shrink-0 text-muted-foreground",
+                    itemIsActive && "text-selected-foreground",
+                  )}
+                  aria-hidden="true"
+                />
                 <span className="truncate">{label(item)}</span>
               </Link>
             </DropdownMenuItem>

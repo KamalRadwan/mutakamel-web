@@ -18,6 +18,7 @@ vi.mock("@/design-system", async (importOriginal) => ({
 
 vi.mock("../../TradeScopeBar", () => ({ TradeScopeBar: () => null }));
 vi.mock("./ItemIdentityDetails", () => ({ ItemIdentityDetails: () => <div>Identity</div> }));
+vi.mock("./ItemImageManager", () => ({ ItemImageManager: () => null }));
 vi.mock("./ItemStandardCostSection", () => ({
   ItemStandardCostSection: (props: unknown) => {
     standardCost(props);

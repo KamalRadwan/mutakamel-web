@@ -8,18 +8,19 @@ import { useI18n } from "@/i18n/I18nContext";
 import type { LeadDetail } from "../../lead-contract";
 import type { LeadDetailCapabilities } from "../../hooks/useLeadCapabilities";
 import { RecordAttachmentsSection } from "../../../shared/components/RecordAttachmentsSection";
-import { useLeadSidePanel } from "../hooks/useLeadSidePanel";
+import { useLeadSidePanel, type LeadPanel } from "../hooks/useLeadSidePanel";
 
 interface LeadDetailSidePanelProps {
   lead: LeadDetail;
   capabilities: Pick<LeadDetailCapabilities, "attachmentsCreate" | "attachmentsDelete">;
   readOnly: boolean;
   historyValueLabels?: EntityHistoryCardProps['valueLabels'];
+  initialTab?: LeadPanel;
 }
 
-export function LeadDetailSidePanel({ lead, capabilities, readOnly, historyValueLabels }: LeadDetailSidePanelProps) {
+export function LeadDetailSidePanel({ lead, capabilities, readOnly, historyValueLabels, initialTab }: LeadDetailSidePanelProps) {
   const { t, dir } = useI18n();
-  const panel = useLeadSidePanel();
+  const panel = useLeadSidePanel(initialTab);
   const tabs = [
     { value: "history", label: t.audit.historyTitle, Icon: History },
     { value: "activities", label: t.activities.title, Icon: ListTodo },

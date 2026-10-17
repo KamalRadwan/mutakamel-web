@@ -486,18 +486,22 @@ verified contract exposes those fields. See
 
 `ActivityList<T>` is the API-free card template for open work. Import it from
 `@/design-system`. Pass rows with `id`, `subject`, `dueAt`, plus
-`describe(row)` for localized type/priority/date/action labels and priority
-tone. The template renders wrapped subjects, a labelled priority badge,
-type/date and one overflow menu. Loading, error and empty states live in the
-same template.
+`describe(row)` for localized type/priority/date/action labels, priority
+tone, category `typeIcon` + `iconContainerClassName` (`iconBoxIdle` from
+`SWATCH_SURFACE_PALETTES`), `dueTone` (`"overdue" | "today" | "upcoming"`), and
+`dueStateBadge`. The template renders a `32×32px` colored category icon box,
+wrapped subjects, a labelled priority badge, due-state pill + schedule row,
+and either an overflow menu or inline quick actions (`inlineQuickActions`).
+Loading, error and empty states (or a custom `emptySlot`) live in the same
+template.
 
-Two opt-in additions, both backward compatible (updated 2026-09-24):
+Three opt-in capabilities, all backward compatible (updated 2026-10-15):
 
 - **`onOpen(row)`** makes each row's subject and schedule one activation
   surface — a `Button` named by the subject (`aria-labelledby`) and described
   by the schedule (`aria-describedby`), so a screen reader hears the activity
   first rather than one run-on string. It is a Tab stop and answers Enter and
-  Space. The priority badge and the overflow menu stay outside it, so no
+  Space. The priority badge and action controls stay outside it, so no
   control is ever nested inside another. Without `onOpen` the row is text.
 - **Per-row admission.** `canEditItem(row)`, `canCompleteItem(row)` and
   `canDiscardItem(row)` answer "may the actor do this to THIS activity" — the
@@ -505,6 +509,11 @@ Two opt-in additions, both backward compatible (updated 2026-09-24):
   precedence over `canEdit` / `canComplete` / `canDiscard`. A menu entry exists
   only when both its handler (`onEdit`, `onComplete`, `onDiscard`) and its
   permission do, and a row with no entry has no menu at all.
+- **`inlineQuickActions` & `emptySlot`.** When `inlineQuickActions` is true
+  (used in the `ActivityModal` split-workbench agenda column), each card
+  renders direct `26×26px` `Check`, `Pencil`, and `X` icon buttons on the card
+  edge instead of a dropdown menu, and `emptySlot` supplies a rich bordered
+  empty-state card with an operational tip pill.
 
 Permissions, queries, confirmation, modal state, optimistic version and
 idempotency stay outside the template. `pendingId` disables every row's menu
@@ -514,7 +523,9 @@ and `RecordActivitiesPanel` (below) are its callers.
 
 ## The activity template
 
-Added **2026-09-24**. `src/components/activities/` is the ONE activity module
+Added **2026-09-24**, redesigned **2026-10-15** with the colorful split-workbench
+and theme-adaptive `--swatch-*` palette (`src/design-system/lib/swatch-palette.ts`).
+`src/components/activities/` is the ONE activity module
 of the portal — wire contract, parsers, form model, commands and the modal —
 used by the Activities workspace (CRM and Core), the Leads, Customers and
 Opportunities screens, every record side panel, and later Trade. It lives in
@@ -524,8 +535,10 @@ Opportunities screens, every record side panel, and later Trade. It lives in
 
 ### ActivityModal — create, view and edit
 
-One `FormModal size="card"` whose props change with the screen, so moving
-between view and edit never remounts the dialog:
+One `FormModal` (`size="wide"` at `960px` when `agenda` is active on a fixed
+record; `size="card"` at `672px` for standalone create, view, and edit) whose
+props change with the screen, so moving between view and edit never remounts
+the dialog:
 
 ```ts
 type ActivityModalRequest =
@@ -544,15 +557,22 @@ interface ActivityModalProps {
 }
 ```
 
-| Screen | Title / description | Body | Footer |
+| Screen | Surface & Header | Body | Footer |
 | --- | --- | --- | --- |
-| Create | "Activities · {record}" when the record is fixed, otherwise "Activities" | the record's open activities when `agenda` and a fixed record, then the compact form | "Save activity" (primary) · "Save and add another" · Cancel |
-| View | the subject / type · record, with the status badge | `ActivityDetails` | "Mark as done" (primary) · Cancel activity · Start or Move back to scheduled · Edit · Close |
-| Edit | "Edit activity" / "For {record}", with the status badge | the form, without the status control or the record picker | "Save changes" (primary) · Cancel |
+| Create (with `agenda` + fixed record) | `size="wide"` (`960px` split workbench); header icon box tinted by selected `ActivityType` swatch + entity chip subtitle (`Lead · Name · Branch`) | `320px` `asideSlot` (`ActivityModalAgenda`: live open count badge, `Overdue` / `Due Today` / `Upcoming` summary pills, scrollable `ActivityList` with `inlineQuickActions`) + `640px` form column | "Save activity" (primary) · "Save & add another" · Cancel |
+| Create (standalone) | `size="card"` (`672px`); header icon box tinted by selected `ActivityType` swatch | Unified Target Entity pill strip (`LEAD`, `CUSTOMER_PROFILE`, `OPPORTUNITY`, `PARTY`, `QUOTATION`, `SALES_ORDER` in swatch pills) + `Combobox` with `leadingSlot`, then the form | "Save activity" (primary) · "Save & add another" · Cancel |
+| View | `size="card"` (`672px`); header icon box + `StatusBadge` + version pill (`v{n}`) | `ActivityDetails` hero card with logical `border-s-4` swatch accent border, 2×2 metadata tiles, notes card, outcome/cancel callout, and audit timeline strip | "Complete Activity" (`bg-success`) · "Cancel Activity" (destructive outline) · Start / Move back to scheduled · Edit · Close |
+| Edit | `size="card"` (`672px`); header icon box + amber `Editing · v{n}` badge + locked target entity chip | The form, with read-only status pill in the Schedule card and locked target entity | "Save changes" (primary) · Cancel |
 
-- **The type drives the form.** Seven icon + label tiles pick it. TODO,
-  FOLLOW_UP and OTHER are *due* at one moment; CALL, MEETING and VISIT *start*
-  and may end (30, 60 and 60 minutes by default); MEETING and VISIT take a
+- **The type drives the form and the surface palette.** Seven colorful icon +
+  label tiles (`grid-cols-4 sm:grid-cols-7`) pick the `ActivityType`, each
+  backed by `SWATCH_SURFACE_PALETTES` (`TODO` → `indigo`, `CALL` → `green`,
+  `MEETING` → `purple`, `EMAIL` → `blue`, `VISIT` → `amber`, `FOLLOW_UP` →
+  `teal`, `OTHER` → `pink`). Selecting a tile updates its icon container to
+  `iconBoxActive` (solid swatch fill) and dynamically updates the modal header
+  icon box and visible type-trait fields. TODO, FOLLOW_UP and OTHER are *due* at
+  one moment; CALL, MEETING and VISIT *start* and may end (30, 60 and 60 minutes
+  by default) with a live duration pill (`1h`, `30m`); MEETING and VISIT take a
   location, CALL and MEETING a meeting link, CALL and EMAIL a direction. A
   field the type hides is never sent on create. On edit, changing the type
   clears what the new type does not carry; a value the type never showed — one
@@ -561,6 +581,12 @@ interface ActivityModalProps {
   cannot show. Start and end are a `DatePicker` plus a time input in
   the viewer's own zone, turned into instants with local `Date` constructors —
   never by slicing an ISO string. Moving the start carries the end with it.
+- **Segmented Status & Priority pill tracks.** Priority (`LOW`, `NORMAL`, `HIGH`,
+  `URGENT`) and Create Status (`PLANNED`, `IN_PROGRESS`, `DONE`) render as
+  accessible `radiogroup` pill tracks (`rounded-md border border-border bg-muted/40 p-1`)
+  using `semanticSegmentPillClasses` and `semanticSegmentDotClasses` (`slate`,
+  `info`, `warning`, `success`, `destructive`). Choosing `DONE` on create
+  reveals a green-tinted `Outcome / Call Summary` section card (`SWATCH_SURFACE_PALETTES.green.sectionCard`).
 - **A new activity** starts at the next half hour (or the calendar slot that
   was clicked), Scheduled, priority Normal. The status control exists on create
   only, and only when there is a choice: In progress needs `activities.update`,
@@ -570,13 +596,15 @@ interface ActivityModalProps {
 - **"Save and add another"** submits the real form, so the first invalid field
   still takes focus; it keeps the type, record, assignee and status, clears
   the rest and stays open.
-- **The record picker** — a create with no fixed record — is a record-type
-  `Select` limited by `scope`, then a `Combobox` over `GET activities/targets`:
-  only records the actor could book on right now, narrowed by `branchId`,
-  searched 300 ms after typing stops, every search aborting the one before.
-  **The assignee** is a `Combobox` over `GET activities/assignees` once a record
-  is chosen, for an actor holding `activities.assign`; otherwise the default
-  reads back — "Me" on create, the current assignee on edit.
+- **The record picker** — a create with no fixed record — is a colorful target-type
+  pill strip (`activityTargetTypeBadgeClasses`) limited by `scope`, paired with a
+  unified `Combobox` (`leadingSlot` showing the active target type badge) over
+  `GET activities/targets`: only records the actor could book on right now,
+  narrowed by `branchId`, searched 300 ms after typing stops, every search
+  aborting the one before. **The assignee** is a `Combobox` over
+  `GET activities/assignees` once a record is chosen, for an actor holding
+  `activities.assign`; otherwise the default reads back — "Me" on create, the
+  current assignee on edit.
 - **Validation mirrors Core** — required title and record, lengths, an end
   after the start and at most 14 days later, an http(s) link, a scheduled start
   in the future, a completed start no more than 5 minutes ahead — and speaks
@@ -627,33 +655,37 @@ interface ActivityModalProps {
   Core answers with it instead of creating the activity twice. A write that
   applied but whose reply cannot be read never offers Save again, and calls
   `onChanged(null)` so the screens behind read it for themselves.
-- **The view** shows the type, priority and direction, when (date and time
-  range, marked Overdue or Due today while open), the related record (a portal
-  link for leads, customers and opportunities — the server's `route` is never
-  followed), the assignee, location, a "Join meeting" link (http(s) only,
-  `target="_blank" rel="noopener noreferrer"`), notes, the outcome or the
-  cancellation reason, and when it was created, updated, completed or
-  cancelled.
+- **The view (`ActivityDetails`)** renders a colorful hero card with a logical
+  inline-start `border-s-4` accent border (`palette.accentBorder`), a `40×40px`
+  tinted category icon box (`palette.iconBoxIdle`), type badge, priority badge,
+  direction badge, and due-state pill, followed by a 2×2 metadata grid (When +
+  duration, Related record link, Assignee avatar + name, Location / "Join
+  meeting" button), a Notes card, a semantic emerald/destructive Outcome or
+  Cancellation Reason callout card when present, and a compact audit timeline
+  footer (`Created`, `Last updated`, `Completed` / `Cancelled`).
 
 ### ActivityOutcomeDialog
 
-Ends an activity through `ReasonDialog`. **Complete**: "Complete this
-activity", an optional Outcome (≤ 2000), confirm "Mark as done". **Cancel**:
-destructive, "Cancel this activity", an optional Reason (≤ 2000), confirm
-"Cancel activity". Nothing is deleted — a cancelled activity stays on its
-record.
+Ends an activity through `ReasonDialog`. **Complete**: green check icon badge,
+"Complete Activity", activity summary card (`summarySlot`), 3 quick-insert
+outcome template chips (`templates`), an optional Outcome (`≤ 2000` characters,
+live counter), confirm "Mark as Done" (`bg-success text-success-foreground`).
+**Cancel**: destructive alert icon badge, "Cancel Activity", activity summary
+card + warning strip, 3 quick-insert cancellation reason chips, an optional
+Reason (`≤ 2000` characters), confirm "Cancel Activity" (`destructive`). Nothing
+is deleted — a cancelled activity stays on its record.
 
-It is presentational — `{ open, mode, onClose, onConfirm(text), loading?,
-error? }` — and its host runs the write through `useActivityCommands`, usually
-via `useActivityOutcome`. `useActivityCommands` holds one write at a time: while
-a write is in flight or its outcome is unknown, `busy` is true, the unresolved
-write's activity is `pendingActivityId`, and no other write starts — every host
-disables its menus and drags on `busy`, and the hook refuses a press that lands
-before that render — so a later write can never take an unresolved one's place
-and lose its key. A refusal stays inside the dialog so the typed note
-survives it; every other answer closes it, and an unknown outcome is shown by
-the host in-body with its key. Mount it beside the host's own dialog, never
-inside it.
+It is presentational — `{ open, mode, activity?, targetLabel?, onClose,
+onConfirm(text), loading?, error? }` — and its host runs the write through
+`useActivityCommands`, usually via `useActivityOutcome`. `useActivityCommands`
+holds one write at a time: while a write is in flight or its outcome is unknown,
+`busy` is true, the unresolved write's activity is `pendingActivityId`, and no
+other write starts — every host disables its menus and drags on `busy`, and the
+hook refuses a press that lands before that render — so a later write can never
+take an unresolved one's place and lose its key. A refusal stays inside the
+dialog so the typed note survives it; every other answer closes it, and an
+unknown outcome is shown by the host in-body with its key. Mount it beside the
+host's own dialog, never inside it.
 
 ### RecordActivitiesPanel
 
@@ -942,10 +974,17 @@ and inset 16px from each viewport edge on narrow screens,
 with that size's own `grid`, `gap-4` and `p-6` overridden away so the header,
 body and footer bands own their padding exactly as they do at `full`. Nothing
 else forks — one dirty guard, one error summary, one focus rule, one shell.
-`wide` uses the same centred-card behaviour at a 960px cap for a concise
-multi-column form that needs more horizontal room but still has no section
-index; it is not a substitute for `full` when a long record needs navigable
-sections.
+`wide` uses the same centred-card behaviour at a 960px cap (`max-w-[60rem]`)
+for a concise multi-column form or a split-workbench modal with `asideSlot`
+(such as `ActivityModal` with its `320px` `ActivityModalAgenda` pane beside the
+`640px` form column); it is not a substitute for `full` when a long record
+needs navigable sections.
+
+Optional header and footer slots (`headerBadge`, `asideSlot`, `submitIcon`,
+`submitClassName`, `footerStart`, `secondaryAction`, `footerActions`) allow
+rich workbench modals like `ActivityModal` to render a colored category icon
+box + subtitle chip in the sticky header, a split aside pane in the body, and
+semantic submit styling without duplicating `useFormShell`.
 
 **The bar for `full`**, and both halves are required:
 
@@ -1206,8 +1245,16 @@ caller has nowhere to send the user.
 `ConfirmActionModal` has no slot for an input, and `AlertDialog` cannot host
 one. `ReasonDialog` is the promotion of the opportunities `TerminalMoveDialog`
 to a pattern: `reasonRequired` gates the confirm on a non-blank value,
-`maxLength` mirrors the backend column bound, and `destructive` picks the
-confirm variant — the pattern never infers destructiveness from the title.
+`maxLength` mirrors the backend column bound (with an inline live character
+counter `${count} / ${maxLength}`), and `destructive` picks the confirm variant
+— the pattern never infers destructiveness from the title.
+
+Optional slots (`headerIcon`, `summarySlot`, `templates` quick-insert pills,
+`reasonPlaceholder`, `footerLeading`, `confirmIcon`, `confirmClassName`) let
+callers such as `ActivityOutcomeDialog` present a summary card of the target
+record, one-click quick-template chips that append into the textarea, and a
+semantic confirm button (`bg-success text-success-foreground` for Complete,
+`destructive` for Cancel) within the same accessible dialog shell.
 
 The typed reason lives in the dialog body, which Radix unmounts with the
 portal, so a reopened dialog starts empty by construction rather than by a

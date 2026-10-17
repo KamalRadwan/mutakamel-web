@@ -109,7 +109,10 @@ export function useInventoryNode(id: string) {
         const normalized = normalizeApiError(error);
         if (normalized.status === 403) return false;
         if (toast.outcomeFromApi(normalized)) return false;
-        if (normalized.status === 409) {
+        if (
+          normalized.status === 409 &&
+          normalized.code !== "TRADE.INVENTORY.NODE_IN_USE"
+        ) {
           setConflictOpen(true);
           return false;
         }

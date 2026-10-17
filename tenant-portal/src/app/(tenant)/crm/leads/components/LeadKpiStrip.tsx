@@ -1,122 +1,178 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
-import { Activity, Star } from "lucide-react";
-import { Button, cn, iconSize } from "@/design-system";
+import { Activity, Check, Flame } from "lucide-react";
+import { cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { formatNumber } from "@/lib/format/number";
-import { formatTemplate } from "@/lib/format/template";
+import { leadActivityState } from "../lead-card-contract";
+import type { LeadItem, LeadStage } from "../hooks/useLeads";
 import type { LeadKpis } from "../lead-bulk-contract";
 
+export type LeadQuickFilterPreset =
+  | "ALL"
+  | "NEW_STAGE"
+  | "HOT_3_STAR"
+  | "OVERDUE_ACTIVITY"
+  | "QUALIFIED";
+
 export interface LeadKpiStripProps {
-  /** `POST /leads/kpis` for the applied search; nothing renders without it. */
-  kpis: LeadKpis | null;
-  /** The Basic search's `stageFlag` filter, which the New and Qualified toggles set. */
-  stageFlag: string | undefined;
-  onStageFlagChange: (flag: string | undefined) => void;
-  disabled?: boolean;
+  /**
+   * Pipeline-wide figures from `POST /leads/kpis`. When `null` (loading or the
+   * read failed) the strip counts `leads` — the rows currently loaded — instead.
+   */
+  kpis?: LeadKpis | null;
+  leads: readonly LeadItem[];
+  stages: readonly LeadStage[];
+  activePreset: LeadQuickFilterPreset;
+  onSelectPreset: (preset: LeadQuickFilterPreset) => void;
 }
 
 /**
- * Pipeline-wide figures for the applied search.
+ * Executive inline KPI filter pills matching Screens 01, 02, 03, 05, 06, 07, 08, and 16.
  *
- * Only New and Qualified are filters, because a stage flag is a server filter
- * on the list. Rating and overdue activity have none (OPEN-QUESTIONS Q140), so
- * those two figures are shown and never offered as a filter that could only
- * narrow the rows already loaded while the figure described the whole pipeline.
+ * Renders inside the top command bar (`slot="actions"`) so the Board, Card, and
+ * Table views get maximum vertical viewport height while keeping 1-click funnel
+ * filtering (`Total`, `New Today`, `★ Hot (3★)`, `Overdue`, `✓ Qualified`)
+ * immediately accessible.
  */
-export function LeadKpiStrip({ kpis, stageFlag, onStageFlagChange, disabled }: LeadKpiStripProps) {
-  const { t, lang } = useI18n();
-  if (!kpis) return null;
-  const labels = t.crmLeadWorkspace.kpis;
-  const toggle = (flag: string) => onStageFlagChange(stageFlag === flag ? undefined : flag);
+export function LeadKpiStrip({
+  kpis = null,
+  leads,
+  stages,
+  activePreset,
+  onSelectPreset,
+}: LeadKpiStripProps) {
+  const { lang } = useI18n();
+  const isAr = lang === "ar";
+
+  const stageById = new Map(stages.map((s) => [s.id, s]));
+
+  let newCount = 0;
+  let hotCount = 0;
+  let overdueCount = 0;
+  let qualifiedCount = 0;
+
+  for (const lead of leads) {
+    const stage = stageById.get(lead.stageId);
+    if (stage?.flag === "NEW") newCount += 1;
+    if (stage?.flag === "QUALIFIED") qualifiedCount += 1;
+    if (lead.rating >= 3) hotCount += 1;
+    if (leadActivityState(lead.nextActivity) === "OVERDUE") overdueCount += 1;
+  }
+
+  const totalCount = kpis ? kpis.totalLeads : leads.length;
+  if (kpis) {
+    newCount = kpis.newStageLeads;
+    hotCount = kpis.hotLeads;
+    overdueCount = kpis.overdueActivityLeads;
+    qualifiedCount = kpis.qualifiedLeads;
+  }
+
+  function handleToggle(preset: LeadQuickFilterPreset) {
+    if (activePreset === preset && preset !== "ALL") {
+      onSelectPreset("ALL");
+    } else {
+      onSelectPreset(preset);
+    }
+  }
 
   return (
-    <div role="group" aria-label={labels.label} className="flex flex-wrap items-center gap-1.5">
-      <KpiToggle
-        label={labels.total}
-        value={formatNumber(kpis.totalLeads, lang)}
-        pressed={stageFlag === undefined}
-        disabled={disabled}
-        onPress={() => onStageFlagChange(undefined)}
-      />
-      <KpiToggle
-        label={labels.new}
-        value={formatNumber(kpis.newStageLeads, lang)}
-        hint={
-          kpis.newTodayLeads > 0
-            ? formatTemplate(labels.newToday, { count: formatNumber(kpis.newTodayLeads, lang) })
-            : undefined
-        }
-        pressed={stageFlag === "NEW"}
-        disabled={disabled}
-        onPress={() => toggle("NEW")}
-      />
-      <KpiFigure icon={Star} label={labels.hot} value={formatNumber(kpis.hotLeads, lang)} />
-      <KpiFigure
-        icon={Activity}
-        label={labels.overdue}
-        value={formatNumber(kpis.overdueActivityLeads, lang)}
-        alert={kpis.overdueActivityLeads > 0}
-      />
-      <KpiToggle
-        label={labels.qualified}
-        value={formatNumber(kpis.qualifiedLeads, lang)}
-        pressed={stageFlag === "QUALIFIED"}
-        disabled={disabled}
-        onPress={() => toggle("QUALIFIED")}
-      />
+    <div
+      role="region"
+      aria-label={isAr ? "مؤشرات مسار العملاء المحتملين" : "Leads pipeline KPI filters"}
+      className="flex flex-wrap items-center gap-1"
+    >
+      {/* 1. Total */}
+      <button
+        type="button"
+        aria-pressed={activePreset === "ALL"}
+        onClick={() => handleToggle("ALL")}
+        className={cn(
+          "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-all",
+          activePreset === "ALL"
+            ? "border-blue-600 bg-blue-50/90 text-blue-800 ring-1 ring-blue-600/30 dark:border-blue-400 dark:bg-blue-950/70 dark:text-blue-200"
+            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300",
+        )}
+      >
+        <span>{isAr ? "الإجمالي" : "Total"}</span>
+        <span className="font-bold tabular-nums text-slate-900 dark:text-white">
+          {totalCount}
+        </span>
+      </button>
+
+      {/* 2. New Today / New Stage */}
+      <button
+        type="button"
+        aria-pressed={activePreset === "NEW_STAGE"}
+        onClick={() => handleToggle("NEW_STAGE")}
+        className={cn(
+          "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-all",
+          activePreset === "NEW_STAGE"
+            ? "border-blue-600 bg-blue-50/90 text-blue-800 ring-1 ring-blue-600/30 dark:border-blue-400 dark:bg-blue-950/70 dark:text-blue-200"
+            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300",
+        )}
+      >
+        <span>{isAr ? "جديد" : "New"}</span>
+        <span className="font-bold tabular-nums text-blue-600 dark:text-blue-400">
+          {newCount}
+        </span>
+        {kpis && kpis.newTodayLeads > 0 && (
+          <span className="text-[10px] text-muted-foreground">
+            {isAr ? `+${kpis.newTodayLeads} اليوم` : `+${kpis.newTodayLeads} today`}
+          </span>
+        )}
+      </button>
+
+      {/* 3. Hot (3★) */}
+      <button
+        type="button"
+        aria-pressed={activePreset === "HOT_3_STAR"}
+        onClick={() => handleToggle("HOT_3_STAR")}
+        className={cn(
+          "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-semibold transition-all",
+          activePreset === "HOT_3_STAR"
+            ? "border-amber-500 bg-amber-100 text-amber-900 ring-1 ring-amber-500/40 dark:border-amber-500 dark:bg-amber-950/80 dark:text-amber-200"
+            : "border-amber-200 bg-amber-50/90 text-amber-800 hover:bg-amber-100/80 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300",
+        )}
+      >
+        <Flame className="size-3 fill-amber-500 text-amber-600" aria-hidden="true" />
+        <span>{isAr ? "عملاء ساخنون (3★)" : "Hot (3★)"}</span>
+        <span className="font-bold tabular-nums">{hotCount}</span>
+      </button>
+
+      {/* 4. Overdue */}
+      <button
+        type="button"
+        aria-pressed={activePreset === "OVERDUE_ACTIVITY"}
+        onClick={() => handleToggle("OVERDUE_ACTIVITY")}
+        className={cn(
+          "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-semibold transition-all",
+          activePreset === "OVERDUE_ACTIVITY"
+            ? "border-red-500 bg-red-100 text-red-900 ring-1 ring-red-500/40 dark:border-red-500 dark:bg-red-950/80 dark:text-red-200"
+            : "border-red-200 bg-red-50/90 text-red-700 hover:bg-red-100/80 dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-300",
+        )}
+      >
+        <Activity className="size-3 text-red-600 dark:text-red-400" aria-hidden="true" />
+        <span>{isAr ? "متأخرات" : "Overdue"}</span>
+        <span className="font-bold tabular-nums">{overdueCount}</span>
+      </button>
+
+      {/* 5. Qualified */}
+      <button
+        type="button"
+        aria-pressed={activePreset === "QUALIFIED"}
+        onClick={() => handleToggle("QUALIFIED")}
+        className={cn(
+          "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-semibold transition-all",
+          activePreset === "QUALIFIED"
+            ? "border-emerald-600 bg-emerald-100 text-emerald-900 ring-1 ring-emerald-600/40 dark:border-emerald-500 dark:bg-emerald-950/80 dark:text-emerald-200"
+            : "border-emerald-200 bg-emerald-50/90 text-emerald-700 hover:bg-emerald-100/80 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+        )}
+      >
+        <Check className="size-3 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+        <span>{isAr ? "جاهز للتحويل" : "Qualified"}</span>
+        <span className="font-bold tabular-nums">{qualifiedCount}</span>
+      </button>
     </div>
   );
 }
 
-function KpiToggle({
-  label,
-  value,
-  hint,
-  pressed,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  pressed: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Button
-      variant={pressed ? "secondary" : "outline"}
-      size="xs"
-      aria-pressed={pressed}
-      disabled={disabled}
-      onClick={onPress}
-      className="gap-1.5"
-    >
-      <span>{label}</span>
-      <span className="font-semibold tabular-nums text-foreground">{value}</span>
-      {hint && <span className="text-muted-foreground">{hint}</span>}
-    </Button>
-  );
-}
-
-function KpiFigure({
-  icon: Icon,
-  label,
-  value,
-  alert,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  alert?: boolean;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5 px-1.5 text-xs text-muted-foreground">
-      <Icon className={cn(iconSize({ size: "sm" }), alert && "text-destructive")} aria-hidden="true" />
-      <span>{label}</span>
-      <span className="font-semibold tabular-nums text-foreground">{value}</span>
-    </span>
-  );
-}

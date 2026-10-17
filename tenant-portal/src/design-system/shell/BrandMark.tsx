@@ -30,26 +30,28 @@ export function BrandMark() {
   // The product's own name until the tenant's arrives — never an empty block
   // while the branding request is in flight.
   const name = appName ?? t.common.appName;
+  const monogram = name.trim().charAt(0).toUpperCase() || "M";
 
   return (
     <Link
       href="/"
       aria-label={t.nav.brandHome}
       className={cn(
-        // The fixed zone is a DESKTOP promise. Below `xl` the section menus are
-        // gone anyway, and 250px of a 375px phone would leave the switcher and
-        // the four account controls about 125px to share — so it shrinks to fit
-        // its own contents and lets the tenant name truncate.
-        "flex h-full w-auto max-w-40 shrink-0 items-center gap-2 border-e border-border px-3 xl:w-(--size-brand) xl:max-w-none",
-        // Plain semantic names: this only ever renders inside GlobalNav, whose
-        // `nav-surface` points them at the on-chrome values.
-        "text-sm font-medium text-foreground hover:bg-accent",
+        "flex h-full w-auto max-w-36 shrink-0 items-center gap-2 px-2.5 sm:max-w-44 lg:max-w-52 lg:px-3",
+        "text-sm font-semibold tracking-tight text-white hover:bg-white/10 hover:text-white",
         focusRing,
       )}
     >
-      {logoUrl && (
+      {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- a same-origin Core route streaming tenant-owned bytes under the session cookie; next/image would add an optimizer hop and needs a remote pattern for a path that is already capped server-side.
-        <img src={logoUrl} alt="" className="h-6 w-auto max-w-24 shrink-0 object-contain" />
+        <img src={logoUrl} alt="" className="h-5 w-auto max-w-20 shrink-0 object-contain" />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-violet-600 text-2xs font-bold text-white shadow-[0_2px_6px_rgba(59,130,246,0.4)]"
+        >
+          {monogram}
+        </span>
       )}
       <span className="truncate">{name}</span>
     </Link>

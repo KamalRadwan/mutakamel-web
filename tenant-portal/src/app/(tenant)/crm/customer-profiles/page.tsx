@@ -2,25 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import {
-  BoardView,
   Button,
-  CardView,
   ConfirmActionModal,
   DegradedBanner,
   EmptyState,
+  PageActions,
   PageHeader,
   PermissionGate,
-  StageBar,
-  TableView,
-  PageActions,
   ViewSwitcher,
   useWorkspaceState,
   type BoardCardMove,
-  type BoardColumnDef,
-  type MoveToTarget,
-  type WorkspaceViewLabels,
 } from "@/design-system";
 import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
 import { ActivityModal } from "@/components/activities/ActivityModal";
@@ -28,42 +21,44 @@ import type { ActivityTargetSelection } from "@/components/activities/activity-c
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
+import { crmCapabilityAllowsOwner } from "../shared/crm-capabilities";
+import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
+import { useCrmCreateCustomFields } from "../shared/hooks/useCrmCreateCustomFields";
+import { useCrmFieldMessages } from "../shared/hooks/useCrmFieldMessages";
+import { usePartyDocumentCounts } from "../shared/hooks/usePartyDocumentCounts";
+import type { CustomerProfileCardPatch } from "./customer-profile-card-contract";
+import {
+  customerProfileSearchValuesOf,
+  customerProfileSearchWithField,
+} from "./customer-profile-search-contract";
+import { CreateCustomerProfileModal } from "./components/CreateCustomerProfileModal";
+import {
+  CustomerExecutiveBoardView,
+  type QuickCreateCustomerDraft,
+} from "./components/CustomerExecutiveBoardView";
+import { CustomerExecutiveCardView } from "./components/CustomerExecutiveCardView";
+import { CustomerExecutiveTableView } from "./components/CustomerExecutiveTableView";
+import { CustomerProfileBulkActionsBar } from "./components/CustomerProfileBulkActionsBar";
+import { CustomerProfileSearchBar } from "./components/CustomerProfileSearchBar";
+import { CustomerProfileStatusFunnelBar } from "./components/CustomerProfileStatusFunnelBar";
+import { CustomerQuickEditModal } from "./components/CustomerQuickEditModal";
+import { useCreateCustomerProfile } from "./hooks/useCreateCustomerProfile";
+import { useCustomerProfileBoard } from "./hooks/useCustomerProfileBoard";
+import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
 import {
   type CustomerProfileItem,
   type CustomerProfileStatus,
   useCustomerProfiles,
 } from "./hooks/useCustomerProfiles";
-import { CreateCustomerProfileModal } from "./components/CreateCustomerProfileModal";
-import { CustomerProfileSearchBar } from "./components/CustomerProfileSearchBar";
-import { useCustomerProfileColumns } from "./components/useCustomerProfileColumns";
 import { useCustomerProfilesCapabilities } from "./hooks/useCustomerProfilesCapabilities";
-import { useCreateCustomerProfile } from "./hooks/useCreateCustomerProfile";
 import { useDeleteCustomerProfile } from "./hooks/useDeleteCustomerProfile";
-import { useCrmCreateCustomFields } from "../shared/hooks/useCrmCreateCustomFields";
-import { useCrmFieldMessages } from "../shared/hooks/useCrmFieldMessages";
-import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
-import { useCustomerProfileCardSlots } from "./components/useCustomerProfileCardSlots";
 import { useUpdateCustomerProfileCard } from "./hooks/useUpdateCustomerProfileCard";
-import { usePartyDocumentCounts } from "../shared/hooks/usePartyDocumentCounts";
-import type { CustomerProfileCardPatch } from "./customer-profile-card-contract";
-import { crmCapabilityAllowsOwner } from "../shared/crm-capabilities";
-import { useCrmAcquisitionSources } from "../shared/hooks/useCrmAcquisitionSources";
-import { crmActivitySegments } from "../shared/crm-activity-tone";
-import {
-  CUSTOMER_PROFILE_BOARD_STATUSES,
-  useCustomerProfileBoard,
-} from "./hooks/useCustomerProfileBoard";
-import {
-  customerProfileSearchValuesOf,
-  customerProfileSearchWithField,
-} from "./customer-profile-search-contract";
 
-const BOARD_STATUS_ORDER: readonly CustomerProfileStatus[] =
-  CUSTOMER_PROFILE_BOARD_STATUSES;
 const TERMINAL_STATUS: CustomerProfileStatus = "BLACKLISTED";
 
 export default function CustomerProfilesPage() {
   const { t } = useI18n();
+  const router = useRouter();
   const {
     items,
     branchIds,
@@ -102,8 +97,6 @@ export default function CustomerProfilesPage() {
     [capabilities.delete],
   );
 
-  const router = useRouter();
-
   const applyPage = useCallback(
     (target: number) => {
       if (target > (pagination?.page ?? 1)) nextPage();
@@ -136,12 +129,15 @@ export default function CustomerProfilesPage() {
     sort,
     revision: dataRevision,
   });
-  const applyBoardCardFields = board.applyCardFields;
+
+  const activeItemsSource = view === "board" ? board.items : items;
   const { displayItems, handleCardMove } = useCustomerProfileBoardMove(
-    board.items,
+    activeItemsSource,
     reload,
     canUpdateProfile,
   );
+
+  const applyBoardCardFields = board.applyCardFields;
   const applyCardFields = useCallback(
     (profileId: string, patch: CustomerProfileCardPatch) => {
       applyListCardFields(profileId, patch);
@@ -149,8 +145,7 @@ export default function CustomerProfilesPage() {
     },
     [applyBoardCardFields, applyListCardFields],
   );
-  // `reload` increments `dataRevision`, which refreshes the independently
-  // sourced Board as well as the Card/Table list without issuing two requests.
+
   const reconcileCards = useCallback(() => reload(), [reload]);
   const { updateCard } = useUpdateCustomerProfileCard({
     branchId,
@@ -158,18 +153,21 @@ export default function CustomerProfilesPage() {
     applyCardFields,
     reconcile: reconcileCards,
   });
+
   const documentCounts = usePartyDocumentCounts(
-    items,
+    displayItems,
     branchId,
-    view === "card",
+    Boolean(branchId) && (view === "card" || view === "board"),
   );
 
+  const [quickEditCustomer, setQuickEditCustomer] =
+    useState<CustomerProfileItem | null>(null);
   const [pendingTerminalMove, setPendingTerminalMove] = useState<{
     move: BoardCardMove;
     resolve: (confirmed: boolean) => void;
   } | null>(null);
-
-  const [activityCustomer, setActivityCustomer] = useState<ActivityTargetSelection | null>(null);
+  const [activityCustomer, setActivityCustomer] =
+    useState<ActivityTargetSelection | null>(null);
   const [selectedForDelete, setSelectedForDelete] = useState<{
     id: string;
     name: string;
@@ -182,76 +180,56 @@ export default function CustomerProfilesPage() {
     clearError: clearDeleteError,
   } = useDeleteCustomerProfile();
 
-  const moveTargets: MoveToTarget[] = useMemo(
+  const visibleItems = displayItems;
+
+  const selectedItems = useMemo(
     () =>
-      BOARD_STATUS_ORDER.map((status) => ({
-        id: status,
-        label: t.statusValues[`CustomerStatus.${status}`] ?? status,
-      })),
-    [t],
+      visibleItems.filter((item) =>
+        workspace.selection.selectedIds.has(item.id),
+      ),
+    [visibleItems, workspace.selection.selectedIds],
   );
 
-  const cardSlots = useCustomerProfileCardSlots({
-    canUpdate: canUpdateProfile,
-    canDelete: canDeleteProfile,
-    onOpen: (item) => openProfile(item),
-    onDelete: (item) => {
-      clearDeleteError();
-      setSelectedForDelete({ id: item.id, name: item.displayName });
-    },
-    onOpenActivities: (item) => openActivities(item),
-    onCardChange: (item, patch) => void updateCard(item, patch),
-    documentCountsByParty: documentCounts.countsByParty,
-    documentCountVisibility: documentCounts.visible,
-    moveTargets:
-      view === "board"
-        ? (item) => moveTargets.filter((target) => target.id !== item.status)
-        : undefined,
-    onMove: view === "board" ? (item, status) => {
-      const move: BoardCardMove = {
-        itemId: item.id,
-        fromColumnId: item.status,
-        toColumnId: status,
-        toIndex: 0,
-      };
-      if (status === TERMINAL_STATUS) {
+  const requestMoveCustomerStatus = useCallback(
+    (move: BoardCardMove) => {
+      const targetStatus = move.toColumnId as CustomerProfileStatus;
+      if (targetStatus === TERMINAL_STATUS) {
         setPendingTerminalMove({
           move,
           resolve: (confirmed) => {
             if (confirmed) {
               void handleCardMove(move);
+              setQuickEditCustomer((prev) =>
+                prev && prev.id === move.itemId
+                  ? { ...prev, status: targetStatus }
+                  : prev,
+              );
             }
           },
         });
       } else {
         void handleCardMove(move);
+        setQuickEditCustomer((prev) =>
+          prev && prev.id === move.itemId
+            ? { ...prev, status: targetStatus }
+            : prev,
+        );
       }
-    } : undefined,
-  });
+    },
+    [handleCardMove],
+  );
 
-  const boardColumns: BoardColumnDef[] = useMemo(
-    () =>
-      BOARD_STATUS_ORDER.map((status) => ({
-        id: status,
-        label: t.statusValues[`CustomerStatus.${status}`] ?? status,
-        count: board.totals.get(status) ?? 0,
-        outcomeRole:
-          status === "ACTIVE_CUSTOMER"
-            ? "positive"
-            : status === "BLACKLISTED"
-              ? "negative"
-              : status === "INACTIVE"
-                ? "caution"
-                : undefined,
-        segments: crmActivitySegments(
-          displayItems
-            .filter((item) => item.status === status)
-            .map((item) => ({ nextActivity: item.nextActivity })),
-          t.crmLeads.card.activityStates,
-        ),
-        segmentsLabel: t.crmLeads.card.activityBar,
-      })),
-    [board.totals, displayItems, t],
+  const handleMoveStatus = useCallback(
+    (item: CustomerProfileItem, status: CustomerProfileStatus) => {
+      if (item.status === status) return;
+      requestMoveCustomerStatus({
+        itemId: item.id,
+        fromColumnId: item.status,
+        toColumnId: status,
+        toIndex: 0,
+      });
+    },
+    [requestMoveCustomerStatus],
   );
 
   const sources = useCrmAcquisitionSources();
@@ -264,35 +242,76 @@ export default function CustomerProfilesPage() {
     (profileId) => router.push(`/crm/customer-profiles/${profileId}`),
     reload,
   );
-  const tableColumns = useCustomerProfileColumns({
-    canUpdate: canUpdateProfile,
-    canDelete: canDeleteProfile,
-    onDelete: (item) => {
+
+  const openCreateWithStatus = useCallback(
+    (status?: CustomerProfileStatus, draft?: QuickCreateCustomerDraft) => {
+      create.openModal();
+      if (status) {
+        create.setField("status", status);
+      }
+      if (draft) {
+        create.setProfileType(draft.profileType);
+        create.setField("status", draft.status);
+        if (draft.acquisitionSourceId) {
+          create.setField("acquisitionSourceId", draft.acquisitionSourceId);
+        }
+        if (draft.profileType === "INDIVIDUAL") {
+          create.setField("firstName", draft.firstName);
+          create.setField("lastName", draft.lastName);
+          draft.phones.forEach((ph, idx) => {
+            if (idx > 0) create.addPhone("phones");
+            create.setPhone("phones", idx, ph);
+          });
+        } else {
+          create.setField("companyName", draft.companyName);
+          draft.companyPhones.forEach((ph, idx) => {
+            if (idx > 0) create.addPhone("companyPhones");
+            create.setPhone("companyPhones", idx, ph);
+          });
+          const fullName = [
+            draft.contactFirstName.trim(),
+            draft.contactLastName.trim(),
+          ]
+            .filter(Boolean)
+            .join(" ");
+          create.updateContact(0, {
+            firstName: draft.contactFirstName,
+            lastName: draft.contactLastName,
+            fullName,
+          });
+          draft.contactPhones.forEach((ph, idx) => {
+            if (idx > 0) create.addContactPhone(0);
+            create.setContactPhone(0, idx, ph);
+          });
+        }
+      }
+    },
+    [create],
+  );
+
+  const openProfile = useCallback(
+    (item: CustomerProfileItem) => {
+      router.push(`/crm/customer-profiles/${encodeURIComponent(item.id)}`);
+    },
+    [router],
+  );
+
+  const openActivities = useCallback((item: CustomerProfileItem) => {
+    setActivityCustomer({
+      app: "CRM",
+      type: "CUSTOMER_PROFILE",
+      id: item.id,
+      label: item.displayName,
+    });
+  }, []);
+
+  const promptDeleteCustomer = useCallback(
+    (item: CustomerProfileItem) => {
       clearDeleteError();
       setSelectedForDelete({ id: item.id, name: item.displayName });
     },
-    onOpenActivities: (item) => openActivities(item),
-    onRatingChange: (item, rating) =>
-      void updateCard(item, { rating }),
-  });
-
-  const preconditionState = precondition ? <EmptyState title={precondition} /> : undefined;
-
-  const viewLabels: WorkspaceViewLabels = {
-    retry: t.common.retry,
-    errorTitle: t.crmCustomerProfiles.loadFailed,
-    emptyTitle: t.crmCustomerProfiles.empty,
-    selectAll: t.views.selectAll,
-    selectRow: t.views.selectItem,
-    sortAscending: t.views.sortAscending,
-    sortDescending: t.views.sortDescending,
-    notSorted: t.views.notSorted,
-    pagination: {
-      previous: t.common.previousPage,
-      next: t.common.nextPage,
-      summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-    },
-  };
+    [clearDeleteError],
+  );
 
   const pageInfo = {
     page: pagination?.page ?? 1,
@@ -300,18 +319,16 @@ export default function CustomerProfilesPage() {
     total: pagination?.total ?? 0,
   };
 
-  function openProfile(item: CustomerProfileItem) {
-    router.push(`/crm/customer-profiles/${encodeURIComponent(item.id)}`);
-  }
-
-  function openActivities(item: CustomerProfileItem) {
-    setActivityCustomer({ app: "CRM", type: "CUSTOMER_PROFILE", id: item.id, label: item.displayName });
-  }
+  const activeStatusFilter = useMemo<CustomerProfileStatus | null>(() => {
+    if (search.mode !== "basic") return null;
+    const raw = customerProfileSearchValuesOf(search, "status");
+    return (raw[0] as CustomerProfileStatus | undefined) ?? null;
+  }, [search]);
 
   return (
     <PermissionGate require="crm.customer_profiles.read" scoped>
-      <div className="flex h-full flex-col gap-4 overflow-hidden">
-        {/* Preserve the accessible heading; actions render in the shell's action bar. */}
+      <div className="flex h-full flex-col gap-3 overflow-hidden">
+        {/* Preserve the accessible heading; actions render in the shell's top action bar. */}
         <PageHeader
           className="sr-only"
           title={t.crm.customerProfilesAndCards}
@@ -319,29 +336,36 @@ export default function CustomerProfilesPage() {
             capabilities.create && branchId
               ? {
                   label: t.crmCustomerProfileActions.createAction,
-                  onClick: create.openModal,
+                  icon: <Plus className="size-4" aria-hidden="true" />,
+                  onClick: () => openCreateWithStatus(),
                 }
               : undefined
           }
           secondaryActions={
-            <>
+            <div className="flex flex-wrap items-center gap-2">
               <TenantBranchSelect
                 branchIds={branchIds}
                 branchId={branchId}
                 onChange={selectBranch}
                 disabled={isLoading}
               />
-              <Button size="sm" variant="outline" onClick={reload} disabled={isLoading}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={reload}
+                disabled={isLoading}
+              >
                 <RefreshCw
                   className={`size-4 ${isLoading ? "animate-spin" : ""}`}
                   aria-hidden="true"
                 />
                 {t.common.retry}
               </Button>
-            </>
+            </div>
           }
         />
 
+        {/* Search & Advanced Filter Tree Command Bar */}
         <CustomerProfileSearchBar
           value={search}
           onChange={setSearch}
@@ -352,136 +376,186 @@ export default function CustomerProfilesPage() {
           disabled={!branchId}
         />
 
-        <PageActions slot="view">
-          <ViewSwitcher
-            value={view}
-            onChange={setView}
-            available={["board", "card", "table"]}
-            labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
-          />
-          <ActivitiesWorkspaceLink type="CUSTOMER_PROFILE" />
-        </PageActions>
-
-        {capabilitiesError && (
-          <DegradedBanner message={t.crmCustomerProfiles.capabilitiesUnavailable} />
-        )}
-        {view === "board" && board.loadMoreError && (
-          <DegradedBanner message={t.crmCustomerProfiles.loadMoreFailed} />
-        )}
-
+        {/* Full-Width Status Funnel Ribbon for Card & Table Views */}
         {view !== "board" && search.mode === "basic" && (
-          <StageBar
-            label={t.common.status}
-            allLabel={t.crmCustomerProfiles.basicSearch.any}
-            steps={BOARD_STATUS_ORDER.map((status) => ({
-              id: status,
-              label: t.statusValues[`CustomerStatus.${status}`] ?? status,
-              tone:
-                status === "ACTIVE_CUSTOMER"
-                  ? "positive"
-                  : status === "BLACKLISTED"
-                    ? "negative"
-                    : undefined,
-            }))}
-            value={customerProfileSearchValuesOf(search, "status")}
-            onChange={(status: string | undefined) =>
+          <CustomerProfileStatusFunnelBar
+            statusTotals={board.totals}
+            items={items}
+            activeStatus={activeStatusFilter}
+            onSelect={(status) =>
               setSearch(
-                customerProfileSearchWithField(
-                  search,
-                  "status",
-                  status ?? "",
-                ),
+                customerProfileSearchWithField(search, "status", status ?? ""),
               )
             }
             disabled={!branchId}
           />
         )}
 
-        <div className="min-h-0 flex-1">
-          {view === "board" && (
-            <BoardView
-              columns={boardColumns}
-              columnOf={(item) => item.status}
-              items={displayItems}
-              itemKey={(item) => item.id}
-              renderCard={cardSlots.renderCard}
-              renderActions={cardSlots.renderActions}
-              renderFooter={cardSlots.renderFooter}
-              cardClassName={cardSlots.cardClassName}
-              canDrag={canUpdateProfile}
-              confirmMove={(move) =>
-                move.toColumnId === TERMINAL_STATUS
-                  ? new Promise<boolean>((resolve) => setPendingTerminalMove({ move, resolve }))
-                  : true
-              }
-              onCardMove={(move) => void handleCardMove(move)}
-              onActivate={openProfile}
-              onAddToColumn={
-                capabilities.create && branchId ? () => create.openModal() : undefined
-              }
-              isLoading={board.isLoading}
-              error={board.error}
-              onRetry={() => void board.reload()}
-              columnPage={(status) => ({
-                hasMore: board.lanes[status]?.hasMore ?? false,
-                isLoadingMore: board.loadingStatuses.has(status),
-              })}
-              onLoadMoreColumn={(status) => void board.loadMoreStatus(status)}
-              emptyState={preconditionState}
-              labels={{
-                ...viewLabels,
-                emptyColumn: t.crmCustomerProfiles.empty,
-                moveTo: t.views.moveTo,
-                collapseColumn: t.views.collapseColumn,
-                expandColumn: t.views.expandColumn,
-                addToColumn: t.crmCustomerProfileActions.createAction,
-                loadMore: t.crmLeads.loadMore,
-                loadingMore: t.crmLeads.loadingMore,
-              }}
-            />
-          )}
+        {/* Floating Dark Bottom Bulk Action Command Bar */}
+        {view !== "board" && selectedItems.length > 0 && (
+          <CustomerProfileBulkActionsBar
+            selectedItems={selectedItems}
+            totalAvailable={visibleItems.length}
+            branchId={branchId}
+            canUpdate={canUpdateProfile}
+            canDelete={canDeleteProfile}
+            onSelectAll={() =>
+              workspace.selection.onSelectionChange(
+                new Set(visibleItems.map((item) => item.id)),
+              )
+            }
+            onClearSelection={() =>
+              workspace.selection.onSelectionChange(new Set())
+            }
+            onScheduleActivity={openActivities}
+            onCompleted={() => {
+              workspace.selection.onSelectionChange(new Set());
+              void reload();
+            }}
+          />
+        )}
 
-          {view === "card" && (
-            <CardView
-              items={items}
-              itemKey={(item) => item.id}
-              renderCard={cardSlots.renderCardViewCard}
-              renderActions={cardSlots.renderActions}
-              renderFooter={cardSlots.renderCardViewFooter}
-              cardClassName={cardSlots.cardClassName}
-              density="compact"
-              onActivate={openProfile}
-              isLoading={isLoading}
-              error={loadError}
-              onRetry={reload}
-              page={pageInfo}
-              onPageChange={workspace.setPage}
-              sort={workspace.sort}
-              emptyState={preconditionState}
-              labels={{ ...viewLabels, sortBy: t.views.sortBy }}
-            />
-          )}
+        <PageActions slot="view">
+          <ViewSwitcher
+            value={view}
+            onChange={setView}
+            available={["board", "card", "table"]}
+            labels={{
+              board: t.views.board,
+              card: t.views.card,
+              table: t.views.table,
+            }}
+          />
+          <ActivitiesWorkspaceLink type="CUSTOMER_PROFILE" />
+        </PageActions>
 
-          {view === "table" && (
-            <TableView
-              columns={tableColumns}
-              density="compact"
-              items={items}
-              itemKey={(item) => item.id}
-              onActivate={openProfile}
-              selection={workspace.selection}
-              isLoading={isLoading}
-              error={loadError}
-              onRetry={reload}
-              page={pageInfo}
-              onPageChange={workspace.setPage}
-              sort={workspace.sort}
-              onSortChange={workspace.setSort}
-              emptyState={preconditionState}
-              labels={viewLabels}
-            />
+        {capabilitiesError && (
+          <DegradedBanner
+            message={t.crmCustomerProfiles.capabilitiesUnavailable}
+          />
+        )}
+        {view === "board" && board.loadMoreError && (
+          <DegradedBanner message={t.crmCustomerProfiles.loadMoreFailed} />
+        )}
+
+        {(loadError || (view === "board" && board.error)) && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+          >
+            <span>
+              {(view === "board" ? board.error?.message : undefined) ??
+                loadError?.message ??
+                t.crmCustomerProfiles.loadFailed}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                view === "board" ? void board.reload() : void reload()
+              }
+            >
+              {t.common.retry}
+            </Button>
+          </div>
+        )}
+
+        <div className="flex min-h-0 flex-1 flex-col">
+          {precondition ? (
+            <EmptyState title={precondition} />
+          ) : (
+            <>
+              {view === "board" && (
+                <CustomerExecutiveBoardView
+                  items={visibleItems}
+                  statusTotals={board.totals}
+                  lanes={board.lanes}
+                  loadingStatuses={board.loadingStatuses}
+                  onLoadMoreStatus={(status) => void board.loadMoreStatus(status)}
+                  branchId={branchId}
+                  sources={sources.items}
+                  canCreate={Boolean(capabilities.create && branchId)}
+                  canUpdate={canUpdateProfile}
+                  canDelete={canDeleteProfile}
+                  onOpen={openProfile}
+                  onOpenQuickModal={setQuickEditCustomer}
+                  onOpenFullCreate={openCreateWithStatus}
+                  onDelete={promptDeleteCustomer}
+                  onOpenActivities={openActivities}
+                  onCardChange={(item, patch) => void updateCard(item, patch)}
+                  onCardMove={requestMoveCustomerStatus}
+                  onRefreshBoard={() => void reload()}
+                  documentCountsByParty={documentCounts.countsByParty}
+                  documentCountVisibility={documentCounts.visible}
+                />
+              )}
+
+              {view === "card" && (
+                <CustomerExecutiveCardView
+                  items={visibleItems}
+                  selectedIds={workspace.selection.selectedIds}
+                  onSelectionChange={workspace.selection.onSelectionChange}
+                  canUpdate={canUpdateProfile}
+                  canDelete={canDeleteProfile}
+                  onOpen={openProfile}
+                  onOpenQuickModal={setQuickEditCustomer}
+                  onDelete={promptDeleteCustomer}
+                  onOpenActivities={openActivities}
+                  onCardChange={(item, patch) => void updateCard(item, patch)}
+                  onMoveStatus={handleMoveStatus}
+                  documentCountsByParty={documentCounts.countsByParty}
+                  documentCountVisibility={documentCounts.visible}
+                  page={pageInfo}
+                  onPageChange={workspace.setPage}
+                />
+              )}
+
+              {view === "table" && (
+                <CustomerExecutiveTableView
+                  items={visibleItems}
+                  selectedIds={workspace.selection.selectedIds}
+                  onSelectionChange={workspace.selection.onSelectionChange}
+                  sort={workspace.sort}
+                  onSortChange={workspace.setSort}
+                  canUpdate={canUpdateProfile}
+                  canDelete={canDeleteProfile}
+                  onOpen={openProfile}
+                  onOpenQuickModal={setQuickEditCustomer}
+                  onDelete={promptDeleteCustomer}
+                  onOpenActivities={openActivities}
+                  onCardChange={(item, patch) => void updateCard(item, patch)}
+                  onMoveStatus={handleMoveStatus}
+                  onRefresh={() => void reload()}
+                  page={pageInfo}
+                  onPageChange={workspace.setPage}
+                />
+              )}
+            </>
           )}
         </div>
+
+        {/* Centered 360° Quick-Edit & Inspector Modal (Screen 04 — zero <aside>) */}
+        <CustomerQuickEditModal
+          item={quickEditCustomer}
+          allItems={visibleItems}
+          canUpdate={canUpdateProfile}
+          canDelete={canDeleteProfile}
+          onClose={() => setQuickEditCustomer(null)}
+          onSelectCustomer={setQuickEditCustomer}
+          onOpenActivities={openActivities}
+          onCardChange={(item, patch) => {
+            void updateCard(item, patch);
+            setQuickEditCustomer((prev) =>
+              prev && prev.id === item.id ? { ...prev, ...patch } : prev,
+            );
+          }}
+          onMoveStatus={handleMoveStatus}
+          onDelete={(item) => {
+            setQuickEditCustomer(null);
+            promptDeleteCustomer(item);
+          }}
+          onSaved={() => void reload()}
+        />
 
         <CreateCustomerProfileModal
           create={create}
@@ -540,7 +614,11 @@ export default function CustomerProfilesPage() {
         <ActivityModal
           scope="CRM"
           branchId={branchId}
-          request={activityCustomer ? { kind: "create", target: activityCustomer, agenda: true } : null}
+          request={
+            activityCustomer
+              ? { kind: "create", target: activityCustomer, agenda: true }
+              : null
+          }
           onClose={() => setActivityCustomer(null)}
           onChanged={() => reload()}
         />

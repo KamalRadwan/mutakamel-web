@@ -37,6 +37,13 @@ export interface PromotionDraft {
   priority: string;
   stackGroup: string;
   exclusive: boolean;
+  itemId?: string;
+  uomId?: string;
+  branchId?: string;
+  channelId?: string;
+  partyId?: string;
+  minimumQuantity?: string;
+  maximumQuantity?: string;
 }
 
 export interface VersionDraft {
@@ -65,6 +72,13 @@ export const EMPTY_PROMOTION_DRAFT: PromotionDraft = {
   priority: "100",
   stackGroup: "DEFAULT",
   exclusive: false,
+  itemId: "",
+  uomId: "",
+  branchId: "",
+  channelId: "",
+  partyId: "",
+  minimumQuantity: "",
+  maximumQuantity: "",
 };
 
 export const EMPTY_VERSION_DRAFT: VersionDraft = {
@@ -115,6 +129,93 @@ interface PromotionBody {
   priority: number;
   stackGroup: string;
   exclusive: boolean;
+  itemId?: string;
+  uomId?: string;
+  branchId?: string;
+  channelId?: string;
+  partyId?: string;
+  minimumQuantity?: string;
+  maximumQuantity?: string;
+}
+
+export interface VersionDraftConflictReport {
+  hasConflicts: boolean;
+  overlappingTierPairs: Array<{ firstIndex: number; secondIndex: number; itemId: string; uomId: string }>;
+  currencyMismatchIndices: number[];
+  floorAboveUnitIndices: number[];
+  invalidQtyRangeIndices: number[];
+  percentageOver100PromotionIndices: number[];
+}
+
+export function detectVersionDraftConflicts(
+  draft: VersionDraft,
+  bookCurrencyCode?: string,
+): VersionDraftConflictReport {
+  const normalizedBookCurrency = bookCurrencyCode?.trim().toUpperCase();
+  const overlappingTierPairs: Array<{ firstIndex: number; secondIndex: number; itemId: string; uomId: string }> = [];
+  const currencyMismatchIndices: number[] = [];
+  const floorAboveUnitIndices: number[] = [];
+  const invalidQtyRangeIndices: number[] = [];
+  const percentageOver100PromotionIndices: number[] = [];
+
+  draft.entries.forEach((entry, idx) => {
+    const curr = entry.currencyCode.trim().toUpperCase();
+    if (normalizedBookCurrency && curr.length === 3 && curr !== normalizedBookCurrency) {
+      currencyMismatchIndices.push(idx);
+    }
+    const minQ = Number(entry.minimumQuantity.trim());
+    const maxQ = entry.maximumQuantity.trim().length > 0 ? Number(entry.maximumQuantity.trim()) : Infinity;
+    if (Number.isFinite(minQ) && Number.isFinite(maxQ) && minQ > maxQ) {
+      invalidQtyRangeIndices.push(idx);
+    }
+    const unit = Number(entry.unitPrice.trim());
+    const floor = entry.minimumAllowedPrice.trim().length > 0 ? Number(entry.minimumAllowedPrice.trim()) : null;
+    if (floor !== null && Number.isFinite(unit) && Number.isFinite(floor) && floor > unit) {
+      floorAboveUnitIndices.push(idx);
+    }
+  });
+
+  for (let i = 0; i < draft.entries.length; i++) {
+    for (let j = i + 1; j < draft.entries.length; j++) {
+      const a = draft.entries[i];
+      const b = draft.entries[j];
+      const itemA = a.itemId.trim();
+      const uomA = a.uomId.trim();
+      if (!itemA || !uomA) continue;
+      if (itemA === b.itemId.trim() && uomA === b.uomId.trim()) {
+        const minA = Number(a.minimumQuantity.trim()) || 0;
+        const maxA = a.maximumQuantity.trim().length > 0 ? Number(a.maximumQuantity.trim()) : Infinity;
+        const minB = Number(b.minimumQuantity.trim()) || 0;
+        const maxB = b.maximumQuantity.trim().length > 0 ? Number(b.maximumQuantity.trim()) : Infinity;
+        if (Math.max(minA, minB) <= Math.min(maxA, maxB)) {
+          overlappingTierPairs.push({ firstIndex: i, secondIndex: j, itemId: itemA, uomId: uomA });
+        }
+      }
+    }
+  }
+
+  draft.promotions.forEach((promo, idx) => {
+    if (promo.benefitType === "PERCENTAGE") {
+      const val = Number(promo.discountValue.trim());
+      if (Number.isFinite(val) && val > 100) {
+        percentageOver100PromotionIndices.push(idx);
+      }
+    }
+  });
+
+  return {
+    hasConflicts:
+      overlappingTierPairs.length > 0 ||
+      currencyMismatchIndices.length > 0 ||
+      floorAboveUnitIndices.length > 0 ||
+      invalidQtyRangeIndices.length > 0 ||
+      percentageOver100PromotionIndices.length > 0,
+    overlappingTierPairs,
+    currencyMismatchIndices,
+    floorAboveUnitIndices,
+    invalidQtyRangeIndices,
+    percentageOver100PromotionIndices,
+  };
 }
 
 export function buildCreateVersionRequest(draft: VersionDraft): {
@@ -166,7 +267,7 @@ export function buildCreateVersionRequest(draft: VersionDraft): {
     if (!PROMOTION_BENEFIT_TYPES.includes(promotion.benefitType)) {
       throw new Error("PRICING_FORM_PROMOTION_TYPE");
     }
-    return {
+    const body: PromotionBody = {
       code,
       name,
       benefitType: promotion.benefitType,
@@ -175,6 +276,22 @@ export function buildCreateVersionRequest(draft: VersionDraft): {
       stackGroup: promotion.stackGroup.trim() || "DEFAULT",
       exclusive: promotion.exclusive,
     };
+    const optionalUuidFields = ["itemId", "uomId", "branchId", "channelId", "partyId"] as const;
+    for (const key of optionalUuidFields) {
+      const rawVal = promotion[key]?.trim();
+      if (rawVal && rawVal.length > 0) {
+        if (!isUUIDv7(rawVal)) throw new Error("PRICING_FORM_ENTRY_ID");
+        body[key] = rawVal;
+      }
+    }
+    if (promotion.minimumQuantity && promotion.minimumQuantity.trim().length > 0) {
+      if (!isDecimalString(promotion.minimumQuantity.trim())) throw new Error("PRICING_FORM_AMOUNT");
+      body.minimumQuantity = promotion.minimumQuantity.trim();
+    }
+    if (promotion.maximumQuantity && promotion.maximumQuantity.trim().length > 0) {
+      body.maximumQuantity = positiveDecimal(promotion.maximumQuantity);
+    }
+    return body;
   });
 
   const request = {

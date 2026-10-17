@@ -17,30 +17,20 @@ export interface QuotationRevisionState {
   close: () => void;
   validUntil: string;
   setValidUntil: (value: string) => void;
+  paymentTermCode: string;
+  setPaymentTermCode: (value: string) => void;
+  incotermCode: string;
+  setIncotermCode: (value: string) => void;
+  deliveryDays: string;
+  setDeliveryDays: (value: string) => void;
+  warrantyMonths: string;
+  setWarrantyMonths: (value: string) => void;
   lineDraft: TradeLineDraftState;
   write: TradeWriteState;
   canSubmit: boolean;
   submit: () => Promise<void>;
 }
 
-/**
- * `POST /quotations/:id/revisions`.
- *
- * Three things the contract page does not say, all read out of
- * `createQuotationRevision`:
- *
- * - A revision can only be added while the quotation is **`DRAFT`**. There is
- *   no revising a sent quotation; the caller gets
- *   `TRADE.QUOTE.TRANSITION_NOT_ALLOWED`.
- * - The lines carry **no prices**. The service prices them itself and writes
- *   the revision's `grandTotal` from its own figures, so nothing computed in
- *   the browser is submitted here.
- * - `terms` **defaults to `{}`** in the DTO, and this omits it. That is the
- *   server's own default rather than a shape invented here — but it has a
- *   consequence: `assertQuotationConversionEvidence` requires the accepted
- *   revision's `termsSnapshot` to be **non-empty**, so a revision created here
- *   can never be converted to a sales order. Recorded as Q80.
- */
 export function useQuotationRevision(
   quotation: QuotationDetail | null,
   headers: Record<string, string>,
@@ -50,6 +40,10 @@ export function useQuotationRevision(
   const write = useTradeWrite();
   const [isOpen, setIsOpen] = useState(false);
   const [validUntil, setValidUntil] = useState("");
+  const [paymentTermCode, setPaymentTermCode] = useState("NET_30");
+  const [incotermCode, setIncotermCode] = useState("EXW");
+  const [deliveryDays, setDeliveryDays] = useState("14");
+  const [warrantyMonths, setWarrantyMonths] = useState("12");
 
   const lineDraft = useTradeLineDraft(
     headers,
@@ -71,8 +65,6 @@ export function useQuotationRevision(
         tradePost(
           tradeDocumentActionPath(QUOTATIONS_PATH, quotation.id, "revisions"),
           {
-            // `@IsISO8601({ strict: true })`; the service then keeps the date
-            // half only. A bare `yyyy-mm-dd` satisfies both.
             validUntil,
             lines: lineDraft.lines.map((line) => ({
               clientLineId: line.clientLineId,
@@ -80,6 +72,12 @@ export function useQuotationRevision(
               uomId: line.uomId,
               quantity: line.quantity,
             })),
+            terms: {
+              paymentTermCode: paymentTermCode.trim() || "NET_30",
+              incotermCode: incotermCode.trim() || "EXW",
+              deliveryDays: Number.parseInt(deliveryDays || "14", 10) || 14,
+              warrantyMonths: Number.parseInt(warrantyMonths || "12", 10) || 12,
+            },
           },
           {
             headers: { ...headers, ...idempotency, "if-match": tradeIfMatch(quotation.version) },
@@ -91,7 +89,20 @@ export function useQuotationRevision(
       setIsOpen(false);
       await onCreated();
     }
-  }, [quotation, linesReady, validUntil, write, t, lineDraft.lines, headers, onCreated]);
+  }, [
+    quotation,
+    linesReady,
+    validUntil,
+    paymentTermCode,
+    incotermCode,
+    deliveryDays,
+    warrantyMonths,
+    write,
+    t,
+    lineDraft.lines,
+    headers,
+    onCreated,
+  ]);
 
   return {
     isOpen,
@@ -102,9 +113,18 @@ export function useQuotationRevision(
     },
     validUntil,
     setValidUntil,
+    paymentTermCode,
+    setPaymentTermCode,
+    incotermCode,
+    setIncotermCode,
+    deliveryDays,
+    setDeliveryDays,
+    warrantyMonths,
+    setWarrantyMonths,
     lineDraft,
     write,
     canSubmit: linesReady && validUntil !== "" && !write.isWriting,
     submit,
   };
 }
+

@@ -36,7 +36,7 @@ const LIST_RESPONSE_LIMIT_BYTES = 400_000;
  * branch in the scope bar therefore changes WHICH listings exist, not just
  * which are shown.
  */
-export function useItemListings(itemId: string) {
+export function useItemListings(itemId: string, hasCompanyProfile = true) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
@@ -56,7 +56,10 @@ export function useItemListings(itemId: string) {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
-      if (gap) {
+      if (gap || !hasCompanyProfile) {
+        setListings([]);
+        setTotal(0);
+        setError(null);
         setIsLoading(false);
         return;
       }
@@ -73,12 +76,19 @@ export function useItemListings(itemId: string) {
         setTotal(parsed.total);
       } catch (thrown) {
         if (thrown instanceof DOMException && thrown.name === "AbortError") return;
-        setError(normalizeApiError(thrown));
+        const normalized = normalizeApiError(thrown);
+        if (normalized.status === 404) {
+          setListings([]);
+          setTotal(0);
+          setError(null);
+        } else {
+          setError(normalized);
+        }
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [itemId, page, headers, gap],
+    [itemId, page, headers, gap, hasCompanyProfile],
   );
 
   useEffect(() => {

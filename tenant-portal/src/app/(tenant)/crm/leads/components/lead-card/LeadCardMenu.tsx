@@ -20,7 +20,7 @@ import {
 // user reaches for after a mistake, so it leads rather than trails.
 const SWATCH_CHOICES: readonly (CardColor | null)[] = [null, ...CARD_COLORS];
 
-interface LeadCardMoveTarget {
+export interface LeadCardMoveTarget {
   id: string;
   label: string;
 }

@@ -4,20 +4,36 @@
 import type { LucideIcon } from "lucide-react";
 import { Circle, Clock, Mail, MapPin, Phone, Activity as ScheduledActivityGlyph, SquareCheck, Users } from "lucide-react";
 import type { TenantUserProfile } from "@/context/AuthContext";
-import { describeApiOutcome, formatApiErrorMessage, type BadgeProps } from "@/design-system";
+import {
+  describeApiOutcome,
+  FALLBACK_SWATCH_SURFACE_PALETTE,
+  formatApiErrorMessage,
+  semanticSegmentDotClasses,
+  semanticSegmentPillClasses,
+  SWATCH_SURFACE_PALETTES,
+  swatchSegmentPillClasses,
+  type BadgeProps,
+  type SemanticSegmentTone,
+  type SwatchHue,
+  type SwatchSurfacePalette,
+} from "@/design-system";
 import type { Dictionary } from "@/i18n/dictionaries/ar";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { wireLabel } from "@/lib/format/wire-label";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
+  ACTIVITY_PRIORITIES,
+  ACTIVITY_STATUSES,
   ACTIVITY_TARGET_APPS,
   ACTIVITY_TARGET_TYPES,
   ACTIVITY_TYPES,
   OPEN_ACTIVITY_STATUSES,
   type Activity,
   type ActivityCreateStatus,
+  type ActivityPriority,
   type ActivityScope,
+  type ActivityStatus,
   type ActivityTarget,
   type ActivityTargetApp,
   type ActivityTargetSelection,
@@ -25,11 +41,10 @@ import {
 } from "./activity-contract";
 
 // The glyph Core's own catalogue names for each type (the `icon` of
-// `GET activity-types`, docs/design/icons.md#activity-types), so a type looks
-// the same wherever it is drawn. A type is a category: told apart by glyph and
-// label, never by hue. `Activity` (the pulse line) stands for "scheduled
-// activity" as a whole, which is why it only appears as the fallback for a
-// type this build has never seen.
+// `GET activity-types`, docs/design/icons.md#activity-types), paired with its
+// theme-adaptive `--swatch-*` surface palette so a type looks consistent across
+// lists, modals, and detail cards. `Activity` (the pulse line) stands for
+// "scheduled activity" as a whole and acts as the fallback for unknown types.
 const ACTIVITY_TYPE_ICONS: Record<ActivityType, LucideIcon> = {
   TODO: SquareCheck,
   CALL: Phone,
@@ -253,3 +268,117 @@ export function activityErrorMessage(t: Dictionary, error: NormalizedApiError): 
   if (!translated) return formatApiErrorMessage(error, t) ?? t.activities.errors.generic;
   return error.correlationId ? `${translated} — ${t.errors.reference}: ${error.correlationId}` : translated;
 }
+
+export type ActivityTypePalette = SwatchSurfacePalette;
+
+export const ACTIVITY_TYPE_SWATCH_HUE: Record<ActivityType, SwatchHue> = {
+  TODO: "indigo",
+  CALL: "green",
+  MEETING: "purple",
+  EMAIL: "blue",
+  VISIT: "amber",
+  FOLLOW_UP: "teal",
+  OTHER: "pink",
+};
+
+export function activityTypePalette(type: string): ActivityTypePalette {
+  return isKnownActivityType(type)
+    ? SWATCH_SURFACE_PALETTES[ACTIVITY_TYPE_SWATCH_HUE[type]]
+    : FALLBACK_SWATCH_SURFACE_PALETTE;
+}
+
+function isKnownActivityStatus(status: string): status is ActivityStatus {
+  return (ACTIVITY_STATUSES as readonly string[]).includes(status);
+}
+
+function isKnownActivityPriority(priority: string): priority is ActivityPriority {
+  return (ACTIVITY_PRIORITIES as readonly string[]).includes(priority);
+}
+
+const ACTIVITY_STATUS_SEGMENT_TONE: Record<ActivityStatus, SemanticSegmentTone> = {
+  PLANNED: "info",
+  IN_PROGRESS: "purple",
+  DONE: "success",
+  CANCELLED: "destructive",
+};
+
+export function activityStatusPillClasses(status: string, selected: boolean): string {
+  const tone: SemanticSegmentTone = isKnownActivityStatus(status)
+    ? ACTIVITY_STATUS_SEGMENT_TONE[status]
+    : "primary";
+  return semanticSegmentPillClasses(tone, selected);
+}
+
+export function activityStatusDotClasses(status: string): string {
+  const tone: SemanticSegmentTone = isKnownActivityStatus(status)
+    ? ACTIVITY_STATUS_SEGMENT_TONE[status]
+    : "primary";
+  return semanticSegmentDotClasses(tone);
+}
+
+const ACTIVITY_PRIORITY_SEGMENT_TONE: Record<ActivityPriority, SemanticSegmentTone> = {
+  LOW: "slate",
+  NORMAL: "info",
+  HIGH: "warning",
+  URGENT: "destructive",
+};
+
+export function activityPriorityPillClasses(priority: string, selected: boolean): string {
+  const tone: SemanticSegmentTone = isKnownActivityPriority(priority)
+    ? ACTIVITY_PRIORITY_SEGMENT_TONE[priority]
+    : "primary";
+  return semanticSegmentPillClasses(tone, selected);
+}
+
+export function activityPriorityDotClasses(priority: string): string {
+  const tone: SemanticSegmentTone = isKnownActivityPriority(priority)
+    ? ACTIVITY_PRIORITY_SEGMENT_TONE[priority]
+    : "primary";
+  return semanticSegmentDotClasses(tone);
+}
+
+export const ACTIVITY_TARGET_SWATCH_HUE: Readonly<Record<string, SwatchHue>> = {
+  LEAD: "indigo",
+  CUSTOMER_PROFILE: "green",
+  OPPORTUNITY: "purple",
+  PARTY: "teal",
+  QUOTATION: "amber",
+  SALES_ORDER: "blue",
+};
+
+export function activityTargetTypeBadgeClasses(targetType: string, selected: boolean): string {
+  const hue = ACTIVITY_TARGET_SWATCH_HUE[targetType] ?? null;
+  return swatchSegmentPillClasses(hue, selected);
+}
+
+export interface OpenAgendaCounts {
+  total: number;
+  overdue: number;
+  today: number;
+  upcoming: number;
+}
+
+export function computeOpenAgendaCounts(
+  items: ReadonlyArray<Pick<Activity, "status" | "dueAt" | "endsAt">>,
+  now: number = Date.now(),
+): OpenAgendaCounts {
+  const counts: OpenAgendaCounts = { total: 0, overdue: 0, today: 0, upcoming: 0 };
+  for (const item of items) {
+    const bucket = activityDueState(item, now);
+    if (!bucket) continue;
+    counts.total += 1;
+    if (bucket === "OVERDUE") counts.overdue += 1;
+    else if (bucket === "TODAY") counts.today += 1;
+    else counts.upcoming += 1;
+  }
+  return counts;
+}
+
+export function activityDurationMinutes(dueAt: string, endsAt?: string | null): number | null {
+  if (!endsAt) return null;
+  const startMs = Date.parse(dueAt);
+  const endMs = Date.parse(endsAt);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return null;
+  return Math.round((endMs - startMs) / 60_000);
+}
+

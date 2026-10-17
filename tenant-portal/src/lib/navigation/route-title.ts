@@ -21,12 +21,23 @@ import { NAV_SECTIONS } from "@/design-system";
  * `/crm/leads` while `/crm/leads` itself still resolves exactly. `"/"` matches
  * only itself: the prefix test appends a slash, and no path begins `//`.
  */
+function normalizeRoutePathname(pathname: string): string {
+  if (pathname.startsWith("/trade/price-book-versions/")) {
+    return pathname.replace("/trade/price-book-versions/", "/trade/price-books/");
+  }
+  if (pathname.startsWith("/trade/decisions/")) {
+    return pathname.replace("/trade/decisions/", "/trade/inventory/decisions/");
+  }
+  return pathname;
+}
+
 export function routeTitleKey(pathname: string): string | null {
+  const resolvedPath = normalizeRoutePathname(pathname);
   let best: { href: string; labelKey: string } | null = null;
 
   for (const section of NAV_SECTIONS) {
     for (const item of section.items) {
-      const owns = pathname === item.href || pathname.startsWith(`${item.href}/`);
+      const owns = resolvedPath === item.href || resolvedPath.startsWith(`${item.href}/`);
       if (!owns) continue;
       if (!best || item.href.length > best.href.length) best = item;
     }

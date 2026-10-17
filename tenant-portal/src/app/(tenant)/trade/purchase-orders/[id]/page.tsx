@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import { Building2, CreditCard, ShieldCheck } from "lucide-react";
 import {
   Button,
   DetailHeader,
@@ -10,6 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   ErrorState,
+  IdentifierText,
+  Money,
   NotFoundState,
   ReasonDialog,
 } from "@/design-system";
@@ -40,9 +43,14 @@ import {
   purchaseOrderTotals,
 } from "../purchase-order-contract";
 
-export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function PurchaseOrderDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
   const { t } = useI18n();
+  const td = t.tradeDocuments;
   const screen = usePurchaseOrderScreen(id);
   const { detail, write, pdf, allowed } = screen;
   const order = detail.document;
@@ -51,7 +59,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     id,
     order?.version ?? null,
     order?.draftReference ?? null,
-    t.tradeDocuments.purchaseOrders.editTitle,
+    td.purchaseOrders.editTitle,
     detail.scope.headers,
     async () => {
       await detail.reload();
@@ -70,25 +78,39 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     return (
       <TradeGate require={PURCHASE_ORDER_PERMISSIONS.read}>
         <NotFoundState
-          title={t.tradeDocuments.purchaseOrders.notFoundTitle}
-          description={t.tradeDocuments.purchaseOrders.notFoundDescription}
-          backLabel={t.tradeDocuments.purchaseOrders.back}
+          title={td.purchaseOrders.notFoundTitle}
+          description={td.purchaseOrders.notFoundDescription}
+          backLabel={td.purchaseOrders.back}
           backHref={TENANT_ROUTES.tradePurchaseOrders}
         />
       </TradeGate>
     );
   }
 
-  // One filled action, computed from the ladder position. Submit advances a
-  // fresh draft, Approve advances a pending one for the checker, and Confirm
-  // advances an approved one — never two at once.
   const advance = allowed.submit
-    ? { label: t.tradeDocuments.purchaseOrders.submit, action: "submit" as const }
+    ? { label: td.purchaseOrders.submit, action: "submit" as const }
     : allowed.approve
-      ? { label: t.tradeDocuments.purchaseOrders.approve, action: "approve" as const }
+      ? { label: td.purchaseOrders.approve, action: "approve" as const }
       : allowed.confirm
-        ? { label: t.tradeDocuments.purchaseOrders.confirm, action: "confirm" as const }
+        ? { label: td.purchaseOrders.confirm, action: "confirm" as const }
         : null;
+
+  const stageSteps = [
+    {
+      status: "DRAFT",
+      label: t.statusValues["TradePurchaseOrderStatus.DRAFT"] ?? "DRAFT",
+    },
+    {
+      status: "CONFIRMED",
+      label:
+        t.statusValues["TradePurchaseOrderStatus.CONFIRMED"] ?? "CONFIRMED",
+    },
+    {
+      status: "CANCELLED",
+      label:
+        t.statusValues["TradePurchaseOrderStatus.CANCELLED"] ?? "CANCELLED",
+    },
+  ];
 
   return (
     <TradeGate require={PURCHASE_ORDER_PERMISSIONS.read}>
@@ -96,7 +118,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
         {detail.isLoading || !order ? (
           detail.loadError ? (
             <ErrorState
-              title={t.tradeDocuments.purchaseOrders.loadFailed}
+              title={td.purchaseOrders.loadFailed}
               description={detail.loadError.code ?? undefined}
               onRetry={() => void detail.reload()}
               retryLabel={t.common.retry}
@@ -110,9 +132,12 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
               title={order.documentNumber ?? order.draftReference ?? order.id}
               subtitle={partyDisplayName(order.partySnapshot) ?? undefined}
               status={
-                <TradeStatusBadge kind="TradeApprovalStatus" value={order.approvalStatus} />
+                <TradeStatusBadge
+                  kind="TradeApprovalStatus"
+                  value={order.approvalStatus}
+                />
               }
-              backLabel={t.tradeDocuments.purchaseOrders.back}
+              backLabel={td.purchaseOrders.back}
               backHref={TENANT_ROUTES.tradePurchaseOrders}
               primaryAction={
                 advance
@@ -127,29 +152,41 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 <>
                   {detail.scope.canWrite(PURCHASE_ORDER_PERMISSIONS.update) &&
                   order.lifecycleStatus === "DRAFT" ? (
-                    <Button size="sm" variant="outline" onClick={editReference.open}>
-                      {t.tradeDocuments.purchaseOrders.editTitle}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={editReference.open}
+                    >
+                      {td.purchaseOrders.editTitle}
                     </Button>
                   ) : null}
                   {allowed.withdraw || allowed.reject || allowed.cancel ? (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost">{t.common.actions}</Button>
+                        <Button size="sm" variant="ghost">
+                          {t.common.actions}
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {allowed.withdraw ? (
-                          <DropdownMenuItem onSelect={() => screen.requestAction("withdraw")}>
-                            {t.tradeDocuments.purchaseOrders.withdraw}
+                          <DropdownMenuItem
+                            onSelect={() => screen.requestAction("withdraw")}
+                          >
+                            {td.purchaseOrders.withdraw}
                           </DropdownMenuItem>
                         ) : null}
                         {allowed.reject ? (
-                          <DropdownMenuItem onSelect={() => screen.requestAction("reject")}>
-                            {t.tradeDocuments.purchaseOrders.reject}
+                          <DropdownMenuItem
+                            onSelect={() => screen.requestAction("reject")}
+                          >
+                            {td.purchaseOrders.reject}
                           </DropdownMenuItem>
                         ) : null}
                         {allowed.cancel ? (
-                          <DropdownMenuItem onSelect={() => screen.requestAction("cancel")}>
-                            {t.tradeDocuments.purchaseOrders.cancel}
+                          <DropdownMenuItem
+                            onSelect={() => screen.requestAction("cancel")}
+                          >
+                            {td.purchaseOrders.cancel}
                           </DropdownMenuItem>
                         ) : null}
                       </DropdownMenuContent>
@@ -159,44 +196,197 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
               }
             />
 
+            <div className="dossier-stage-bar">
+              <span className="dossier-stage-label">
+                {td.executive.lifecycleTrack}
+              </span>
+              <div className="dossier-stage-track">
+                {stageSteps.map((step, idx) => {
+                  const activeIdx = stageSteps.findIndex(
+                    (s) => s.status === order.lifecycleStatus,
+                  );
+                  const stateClass =
+                    step.status === order.lifecycleStatus
+                      ? "active"
+                      : activeIdx > idx
+                        ? "done"
+                        : "";
+                  return (
+                    <div
+                      key={step.status}
+                      className={`dossier-stage-cell ${stateClass}`}
+                    >
+                      <span className="dossier-stage-dot" aria-hidden />
+                      <span>{step.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <TradeWriteOutcome write={write} />
             <TradeWriteOutcome write={pdf.write} />
             <TradeWriteOutcome write={editReference.write} />
 
             <PurchaseOrderLadder order={order} />
 
+            <div className="dossier-grid">
+              <div className="dossier-col">
+                <div className="dossier-card dossier-card-indigo">
+                  <div className="dossier-card-header">
+                    <div className="dossier-card-title">
+                      <span
+                        className="dossier-icon-pill dossier-ip-indigo"
+                        aria-hidden
+                      >
+                        <Building2 className="h-4 w-4" />
+                      </span>
+                      <span>{td.executive.dossierOverview}</span>
+                    </div>
+                    <span className="dossier-tag dossier-tag-indigo">
+                      <IdentifierText>{`v${order.version}`}</IdentifierText>
+                    </span>
+                  </div>
+                  <div className="dossier-fields-grid">
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">{td.documentNumber}</span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {order.documentNumber ?? td.notRecorded}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">{td.supplier}</span>
+                      <span className="dossier-val">
+                        {partyDisplayName(order.partySnapshot) ?? td.notRecorded}
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">
+                        {td.purchaseOrders.supplierAccount}
+                      </span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {order.supplierAccountId ?? td.notRecorded}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">
+                        {td.purchaseOrders.receivingNode}
+                      </span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {order.receivingNodeId ?? td.notRecorded}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dossier-col">
+                <div className="dossier-card dossier-card-emerald">
+                  <div className="dossier-card-header">
+                    <div className="dossier-card-title">
+                      <span
+                        className="dossier-icon-pill dossier-ip-emerald"
+                        aria-hidden
+                      >
+                        <CreditCard className="h-4 w-4" />
+                      </span>
+                      <span>{td.executive.financialSummary}</span>
+                    </div>
+                    <span className="dossier-tag dossier-tag-emerald">
+                      <IdentifierText>{order.currencyCode}</IdentifierText>
+                    </span>
+                  </div>
+                  <div className="dossier-fields-grid">
+                    <div className="dossier-field-box dossier-span-all">
+                      <span className="dossier-lbl">{td.grandTotal}</span>
+                      <span className="dossier-val text-base">
+                        <Money
+                          value={order.grandTotal}
+                          currency={order.currencyCode}
+                          minimumFractionDigits={2}
+                          maximumFractionDigits={8}
+                        />
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">
+                        {td.executive.linesCount}
+                      </span>
+                      <span className="dossier-val">
+                        <IdentifierText>
+                          {String(order.lines.length)}
+                        </IdentifierText>
+                      </span>
+                    </div>
+                    <div className="dossier-field-box">
+                      <span className="dossier-lbl">
+                        {td.purchaseOrders.dispatchAxis}
+                      </span>
+                      <span className="dossier-val">
+                        <IdentifierText>{order.dispatchStatus}</IdentifierText>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="dossier-card dossier-card-violet">
+                  <div className="dossier-card-header">
+                    <div className="dossier-card-title">
+                      <span
+                        className="dossier-icon-pill dossier-ip-violet"
+                        aria-hidden
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                      </span>
+                      <span>{td.executive.makerCheckerTitle}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {order.approvalStatus === "PENDING"
+                      ? screen.isMaker
+                        ? td.purchaseOrders.checkerOnly
+                        : td.purchaseOrders.makerOnly
+                      : td.executive.makerCheckerDescription}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <DetailSection
-              title={t.tradeDocuments.identity}
-              // The maker–checker rule decides which half of the ladder this
-              // person sees, so it is stated rather than left to be discovered
-              // through a 409.
+              title={td.identity}
               description={
                 order.approvalStatus === "PENDING"
                   ? screen.isMaker
-                    ? t.tradeDocuments.purchaseOrders.checkerOnly
-                    : t.tradeDocuments.purchaseOrders.makerOnly
+                    ? td.purchaseOrders.checkerOnly
+                    : td.purchaseOrders.makerOnly
                   : undefined
               }
-              emptyValueLabel={t.tradeDocuments.notRecorded}
+              emptyValueLabel={td.notRecorded}
               fields={[
-                { label: t.tradeDocuments.documentNumber, value: order.documentNumber },
-                { label: t.tradeDocuments.draftReference, value: order.draftReference },
-                { label: t.tradeDocuments.currency, value: order.currencyCode },
-                { label: t.tradeDocuments.businessDate, value: order.businessDate },
+                { label: td.documentNumber, value: order.documentNumber },
+                { label: td.draftReference, value: order.draftReference },
+                { label: td.currency, value: order.currencyCode },
+                { label: td.businessDate, value: order.businessDate },
                 {
-                  label: t.tradeDocuments.purchaseOrders.supplierAccount,
+                  label: td.purchaseOrders.supplierAccount,
                   value: order.supplierAccountId,
                 },
                 {
-                  label: t.tradeDocuments.purchaseOrders.receivingNode,
+                  label: td.purchaseOrders.receivingNode,
                   value: order.receivingNodeId,
                 },
                 {
-                  label: t.tradeDocuments.purchaseOrders.dispatchAxis,
+                  label: td.purchaseOrders.dispatchAxis,
                   value: order.dispatchStatus,
                 },
                 {
-                  label: t.tradeDocuments.purchaseOrders.lifecycleAxis,
+                  label: td.purchaseOrders.lifecycleAxis,
                   value: (
                     <TradeStatusBadge
                       kind="TradePurchaseOrderStatus"
@@ -210,29 +400,29 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
             <TradeOrderLinesPanel
               lines={order.lines}
               currencyCode={order.currencyCode}
-              secondaryDescriptionLabel={t.tradeDocuments.receiptDescription}
+              secondaryDescriptionLabel={td.receiptDescription}
               secondaryDescription={(line) => line.receiptDescriptionSnapshot}
-              emptyTitle={t.tradeDocuments.orderLinesEmpty}
-              errorTitle={t.tradeDocuments.purchaseOrders.loadFailed}
+              emptyTitle={td.orderLinesEmpty}
+              errorTitle={td.purchaseOrders.loadFailed}
             />
 
             <TradeDocumentTotals
               totals={readTotalsSnapshot(purchaseOrderTotals(order))}
               currencyCode={order.currencyCode}
-              title={t.tradeDocuments.totals.grandTotal}
+              title={td.totals.grandTotal}
             />
 
             <TradePdfPanel
               state={pdf}
               canRender={order.totalsSnapshot !== null}
               onRender={screen.renderPdf}
-              unavailableReason={t.tradeDocuments.purchaseOrders.createBlockedDescription}
+              unavailableReason={td.purchaseOrders.createBlockedDescription}
             />
 
             <TradeDraftReferenceDrawer
               state={editReference}
-              title={t.tradeDocuments.purchaseOrders.editTitle}
-              description={t.tradeDocuments.purchaseOrders.editDescription}
+              title={td.purchaseOrders.editTitle}
+              description={td.purchaseOrders.editDescription}
             />
 
             <ReasonDialog
@@ -240,8 +430,8 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
               onOpenChange={(open) => (open ? undefined : screen.closeReason())}
               title={
                 screen.openReason === "reject"
-                  ? t.tradeDocuments.purchaseOrders.rejectTitle
-                  : t.tradeDocuments.purchaseOrders.cancelTitle
+                  ? td.purchaseOrders.rejectTitle
+                  : td.purchaseOrders.cancelTitle
               }
               reasonRequired
               destructive
@@ -251,12 +441,12 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 void screen.run(screen.openReason ?? "cancel", reason.trim())
               }
               labels={{
-                reason: t.tradeDocuments.reasonCode,
-                reasonHint: t.tradeDocuments.reasonCodeHint,
+                reason: td.reasonCode,
+                reasonHint: td.reasonCodeHint,
                 confirm:
                   screen.openReason === "reject"
-                    ? t.tradeDocuments.purchaseOrders.reject
-                    : t.tradeDocuments.purchaseOrders.cancel,
+                    ? td.purchaseOrders.reject
+                    : td.purchaseOrders.cancel,
                 cancel: t.common.cancel,
               }}
             />

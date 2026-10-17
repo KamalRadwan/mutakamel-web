@@ -46,7 +46,7 @@ vi.mock("../patterns/offline-banner/useConnectivity", () => ({
 
 const EXPECTED: Record<NavAppId, string[]> = {
   workspace: ["workspace", "coreIdentity", "coreOperations", "coreSettings", "coreBilling", "account"],
-  crm: ["crm", "crmAnalytics", "crmSetup"],
+  crm: ["crm", "crmSetup", "crmActivities"],
   trade: [
     "tradeFoundation",
     "tradeDocuments",

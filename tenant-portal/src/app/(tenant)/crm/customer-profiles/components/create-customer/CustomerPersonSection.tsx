@@ -1,15 +1,40 @@
 "use client";
 
-import { FormSection } from "@/design-system";
+import { useEffect, useRef } from "react";
+import {
+  CheckCircle2,
+  Mail,
+  Phone,
+  Plus,
+  Star,
+  Trash2,
+  User,
+  UserCheck,
+} from "lucide-react";
+import {
+  Button,
+  Field,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  cn,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { CrmContactLine } from "../../../shared/components/CrmContactLine";
+import { findHonorific, getHonorificOptions } from "@/lib/catalogues/contact-titles";
+import { formatTemplate } from "@/lib/format/template";
+import { LeadFieldGuide } from "../../../leads/components/create-lead/LeadFieldGuide";
+import { CRM_PHONE_LIST_MAX } from "../../../shared/components/CrmPhoneListField";
+import { CrmPhoneNumberInput } from "../../../shared/components/CrmPhoneNumberInput";
 import type { CrmFormErrors } from "../../../shared/hooks/useCrmCreateForm";
 import {
   CUSTOMER_PROFILE_CREATE_LIMITS,
   type CreateCustomerProfileForm,
 } from "../../customer-profile-create-contract";
 
-type PersonField = "honorificTitle" | "firstName" | "lastName" | "email";
+export type PersonField = "honorificTitle" | "firstName" | "lastName" | "email";
 
 export interface CustomerPersonSectionProps {
   form: CreateCustomerProfileForm;
@@ -22,15 +47,14 @@ export interface CustomerPersonSectionProps {
   onBlur: (path: string) => void;
 }
 
+const EMAIL_SIMPLE_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
- * The person an individual customer IS.
+ * Section 02 (Individual) — Personal Identity & Direct Contact Channels.
  *
- * Every value here travels inside `primaryContact`, because `CreateCustomerProfileDto`
- * has no top-level `email` or `phones` — the service reads them off that object
- * and writes them onto the PERSON party. Neither `fullName` nor `displayName`
- * is asked for: both are `@IsOptional()` now, and `resolvePersonName` composes
- * them from the honorific and the two name parts below — the same parts it
- * writes onto the party, so the list and the Directory cannot disagree.
+ * Matches `LeadPersonSection` 100%:
+ * - Row 1: Honorific Title (2 cols) + First Name with User icon (5 cols) + Last Name (5 cols)
+ * - Row 2: Direct Phone Numbers with E.164 picker (6 cols) + Email with Mail icon (6 cols)
  */
 export function CustomerPersonSection({
   form,
@@ -42,59 +66,342 @@ export function CustomerPersonSection({
   onPhoneRemove,
   onBlur,
 }: CustomerPersonSectionProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const limits = CUSTOMER_PROFILE_CREATE_LIMITS;
-  // `CrmContactLine` keys its messages by `<path>.<field>`; this form keys the
-  // person's own fields flat, so the few it shows are re-pointed here rather
-  // than the line growing a second addressing mode.
-  const personErrors = {
-    "person.honorificTitle": errors.honorificTitle,
-    "person.firstName": errors.firstName,
-    "person.lastName": errors.lastName,
-    "person.email": errors.email,
-    "person.phones.0": errors["phones.0"],
-    "person.phones.1": errors["phones.1"],
-    "person.phones.2": errors["phones.2"],
-  };
+  const honorifics = getHonorificOptions(lang);
+  const honorific = findHonorific(form.honorificTitle, lang);
+  const extraPhones = form.phones.slice(1);
+  const isEmailValid =
+    form.email.trim().length > 0 &&
+    !errors.email &&
+    EMAIL_SIMPLE_RE.test(form.email.trim());
+
+  // Seed default honorific once when blank
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    if (form.honorificTitle.trim().length > 0) return;
+    const [first] = honorifics;
+    if (first) queueMicrotask(() => onFieldChange("honorificTitle", first.label));
+  }, [form.honorificTitle, honorifics, onFieldChange]);
 
   return (
-    <FormSection id="person" title={t.crmCustomerProfiles.create.sections.person} columns={1}>
-      {/* The same line a contact gets, minus the job title: a customer who IS
-          a person has none. One template, so the individual and corporate
-          paths through this modal do not look like two different products. */}
-      <CrmContactLine
-        path="person"
-        contact={{
-          honorificTitle: form.honorificTitle,
-          fullName: "",
-          firstName: form.firstName,
-          lastName: form.lastName,
-          jobTitle: "",
-          email: form.email,
-          phones: form.phones,
-        }}
-        errors={personErrors}
-        disabled={disabled}
-        limits={{
-          name: limits.firstName,
-          jobTitle: limits.jobTitle,
-          email: limits.email,
-        }}
-        directoryNameLabel={t.crmLeads.contactName}
-        showJobTitle={false}
-        onFieldChange={(patch) => {
-          if (patch.honorificTitle !== undefined) {
-            onFieldChange("honorificTitle", patch.honorificTitle);
-          }
-          if (patch.firstName !== undefined) onFieldChange("firstName", patch.firstName);
-          if (patch.lastName !== undefined) onFieldChange("lastName", patch.lastName);
-          if (patch.email !== undefined) onFieldChange("email", patch.email);
-        }}
-        onPhoneChange={onPhoneChange}
-        onPhoneAdd={onPhoneAdd}
-        onPhoneRemove={onPhoneRemove}
-        onBlur={onBlur}
+    <section
+      id="person"
+      data-form-section="person"
+      className="relative overflow-hidden rounded-xl border border-sky-500/20 bg-card shadow-xs transition-colors dark:border-sky-400/20"
+    >
+      {/* Top 3px Sky-Blue to Emerald accent bar */}
+      <div
+        aria-hidden="true"
+        className="h-1 w-full bg-linear-to-r from-sky-500 via-cyan-500 to-emerald-500"
       />
-    </FormSection>
+
+      {/* Section Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-sky-500/[0.03] px-4 py-3 dark:bg-sky-500/[0.06]">
+        <div className="flex items-center gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-600 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300">
+            <UserCheck className="size-4" aria-hidden="true" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+                02
+              </span>
+              <h3
+                tabIndex={-1}
+                className="text-sm font-bold text-foreground outline-none"
+              >
+                {t.crmLeads.create.personalInformationTitle}
+              </h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t.crmLeads.create.contactDetailsSubtitle}
+            </p>
+          </div>
+        </div>
+
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-300">
+          <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+          {t.crmLeads.create.types.INDIVIDUAL} · B2C
+        </span>
+      </div>
+
+      {/* Section Body — Contact Card matching LeadContactRow design */}
+      <div className="@container p-4">
+        <div className="flex flex-col gap-3.5 rounded-xl border border-sky-500/35 bg-sky-500/[0.02] p-3.5 shadow-2xs transition-all dark:border-sky-400/35 dark:bg-sky-500/[0.05]">
+          {/* Contact Card Top Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex size-6 items-center justify-center rounded-md bg-sky-600 text-xs font-bold text-white">
+                #1
+              </span>
+              <span className="text-xs font-bold text-foreground">
+                {formatTemplate(t.crmLeads.create.contactHeading, { number: 1 })}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-300">
+                <Star className="size-3 fill-current" aria-hidden="true" />
+                {t.crmLeads.create.primaryContact}
+              </span>
+              <LeadFieldGuide field="firstName" />
+            </div>
+          </div>
+
+          {/* Row 1: Title (2 cols), First Name (5 cols), Last Name (5 cols) */}
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12 @min-[52rem]:grid-cols-12">
+            {/* Honorific Title (2 cols) */}
+            <div className="relative md:col-span-2 @min-[52rem]:col-span-2">
+              <div className="absolute end-0 top-0 z-10">
+                <LeadFieldGuide field="honorificTitle" align="start" />
+              </div>
+              <Field
+                label={t.crmLeads.create.titleField}
+                error={errors.honorificTitle}
+                showLabel
+              >
+                <Select
+                  value={honorific?.key ?? ""}
+                  disabled={disabled}
+                  onValueChange={(key) =>
+                    onFieldChange(
+                      "honorificTitle",
+                      honorifics.find((option) => option.key === key)?.label ?? "",
+                    )
+                  }
+                >
+                  <SelectTrigger size="sm">
+                    <SelectValue placeholder={t.crmLeads.create.titleField} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {honorifics.map((option) => (
+                      <SelectItem key={option.key} value={option.key}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            {/* First Name (5 cols) */}
+            <div className="relative md:col-span-5 @min-[52rem]:col-span-5">
+              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+                <span
+                  className={cn(
+                    "font-mono text-[10px]",
+                    form.firstName.length >= limits.firstName
+                      ? "font-semibold text-amber-600"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {form.firstName.length}/{limits.firstName}
+                </span>
+                <LeadFieldGuide field="firstName" />
+              </div>
+              <Field
+                label={t.crmLeads.create.firstName}
+                error={errors.firstName}
+                required
+                showLabel
+              >
+                <div className="relative flex items-center">
+                  <User
+                    className="pointer-events-none absolute start-2.5 size-3.5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    size="sm"
+                    placeholder={t.crmLeads.create.firstName}
+                    value={form.firstName}
+                    maxLength={limits.firstName}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      onFieldChange("firstName", event.target.value)
+                    }
+                    onBlur={() => onBlur("firstName")}
+                    className="ps-8"
+                  />
+                </div>
+              </Field>
+            </div>
+
+            {/* Last Name (5 cols) */}
+            <div className="relative md:col-span-5 @min-[52rem]:col-span-5">
+              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+                <span
+                  className={cn(
+                    "font-mono text-[10px]",
+                    form.lastName.length >= limits.lastName
+                      ? "font-semibold text-amber-600"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {form.lastName.length}/{limits.lastName}
+                </span>
+                <LeadFieldGuide field="lastName" />
+              </div>
+              <Field
+                label={t.crmLeads.create.lastName}
+                error={errors.lastName}
+                showLabel
+              >
+                <Input
+                  size="sm"
+                  placeholder={t.crmLeads.create.lastName}
+                  value={form.lastName}
+                  maxLength={limits.lastName}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onFieldChange("lastName", event.target.value)
+                  }
+                  onBlur={() => onBlur("lastName")}
+                />
+              </Field>
+            </div>
+          </div>
+
+          {/* Row 2: Phone (6 cols) & Email (6 cols) */}
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12 @min-[52rem]:grid-cols-12">
+            {/* Phone / Mobile Numbers (6 cols) */}
+            <div className="relative md:col-span-6 @min-[52rem]:col-span-6">
+              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+                  <Phone className="size-2.5" aria-hidden="true" />
+                  {form.phones.length}/{CRM_PHONE_LIST_MAX}
+                </span>
+                <LeadFieldGuide field="phones" />
+              </div>
+              <Field
+                label={t.crmLeads.phone}
+                error={errors["phones.0"]}
+                showLabel
+              >
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <CrmPhoneNumberInput
+                      value={form.phones[0] ?? ""}
+                      maxLength={limits.phone}
+                      label={t.crmLeads.phone}
+                      placeholder={
+                        t.crmShared.enterPhoneNumber ?? t.crmShared.phoneNumber
+                      }
+                      disabled={disabled}
+                      onChange={(next) => onPhoneChange(0, next)}
+                      onBlur={() => onBlur("phones.0")}
+                    />
+                    {form.phones.length < CRM_PHONE_LIST_MAX && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        aria-label={t.crmShared.addPhone}
+                        data-icon-button
+                        onClick={onPhoneAdd}
+                        className="size-7 shrink-0 rounded-full bg-emerald-600 p-0 text-white not-disabled:hover:bg-emerald-700"
+                      >
+                        <Plus className="size-3.5" aria-hidden="true" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {extraPhones.map((phone, offset) => {
+                    const index = offset + 1;
+                    const rowPath = `phones.${index}`;
+                    const rowError = errors[rowPath];
+                    return (
+                      <div key={rowPath} className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <CrmPhoneNumberInput
+                            value={phone}
+                            maxLength={limits.phone}
+                            label={formatTemplate(t.crmShared.phoneNumbered, {
+                              number: index + 1,
+                            })}
+                            placeholder={
+                              t.crmShared.enterPhoneNumber ??
+                              t.crmShared.phoneNumber
+                            }
+                            disabled={disabled}
+                            onChange={(next) => onPhoneChange(index, next)}
+                            onBlur={() => onBlur(rowPath)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={disabled}
+                            aria-label={formatTemplate(t.crmShared.removePhone, {
+                              number: index + 1,
+                            })}
+                            data-icon-button
+                            onClick={() => onPhoneRemove(index)}
+                            className="size-7 shrink-0 rounded-full p-0"
+                          >
+                            <Trash2
+                              className="size-3.5 text-destructive"
+                              aria-hidden="true"
+                            />
+                          </Button>
+                        </div>
+                        {rowError && (
+                          <p className="text-xs text-destructive">{rowError}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </Field>
+            </div>
+
+            {/* Email Address (6 cols) */}
+            <div className="relative md:col-span-6 @min-[52rem]:col-span-6">
+              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                {isEmailValid && (
+                  <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                    <CheckCircle2 className="size-2.5" aria-hidden="true" />
+                    Valid
+                  </span>
+                )}
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {form.email.length}/{limits.email}
+                </span>
+                <LeadFieldGuide field="email" />
+              </div>
+              <Field
+                label={t.crmLeads.email}
+                error={errors.email}
+                showLabel
+              >
+                <div className="relative flex items-center">
+                  <Mail
+                    className="pointer-events-none absolute start-2.5 size-3.5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    size="sm"
+                    type="email"
+                    dir="ltr"
+                    placeholder={t.crmLeads.email}
+                    value={form.email}
+                    maxLength={limits.email}
+                    disabled={disabled}
+                    onChange={(event) =>
+                      onFieldChange("email", event.target.value)
+                    }
+                    onBlur={() => onBlur("email")}
+                    className="ps-8"
+                  />
+                </div>
+              </Field>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

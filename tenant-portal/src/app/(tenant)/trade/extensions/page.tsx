@@ -122,6 +122,7 @@ export default function ExtensionProfilesPage() {
   const content = (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeAutomation.profilesTitle}
         description={t.tradeAutomation.profilesSubtitle}
         primaryAction={
@@ -209,6 +210,7 @@ export default function ExtensionProfilesPage() {
       />
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

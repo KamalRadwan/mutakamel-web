@@ -4,27 +4,27 @@ import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   EMPTY_ITEM_FORM,
+  serializeVariantRows,
   validateCreateItemForm,
   type CreateItemFormIssues,
   type ItemFormValues,
   type ItemKind,
+  type VariantAttributeRow,
 } from "../item-contract";
 import { useActiveUoms } from "./useActiveUoms";
+import { useItemImageFile } from "./useItemImageFile";
 
-export interface VariantAttributeRow {
-  id: string;
-  name: string;
-  value: string;
-}
+export type { VariantAttributeRow };
 
 type FieldErrors = Partial<Record<keyof CreateItemFormIssues, string>>;
-type VariantEditorMode = "builder" | "json";
 
 interface UseCreateItemFormOptions {
   isOpen: boolean;
   isSubmitting: boolean;
   onClose: () => void;
-  onSubmit: (values: ItemFormValues) => Promise<boolean>;
+  /** `image` is uploaded after the Item is created (LLD 02b §19 create flow). */
+  onSubmit: (values: ItemFormValues, image: File | null) => Promise<boolean>;
+  imageUpload: { retry: (image: File) => Promise<boolean> };
 }
 
 export function useCreateItemForm({
@@ -32,21 +32,22 @@ export function useCreateItemForm({
   isSubmitting,
   onClose,
   onSubmit,
+  imageUpload,
 }: UseCreateItemFormOptions) {
   const { t } = useI18n();
   const [values, setValues] = useState<ItemFormValues>(EMPTY_ITEM_FORM);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [advancedOpen, setAdvancedOpen] = useState(true);
-  const [variantMode, setVariantMode] = useState<VariantEditorMode>("builder");
   const [variantRows, setVariantRows] = useState<VariantAttributeRow[]>([]);
   const [nextRowId, setNextRowId] = useState(1);
   const uoms = useActiveUoms(isOpen);
+  const image = useItemImageFile();
 
   const reset = () => {
+    image.clear();
     setValues(EMPTY_ITEM_FORM);
     setErrors({});
     setAdvancedOpen(true);
-    setVariantMode("builder");
     setVariantRows([]);
     setNextRowId(1);
   };
@@ -64,11 +65,20 @@ export function useCreateItemForm({
     }
   };
 
-  const setItemKind = (itemKind: ItemKind) =>
-    change(
-      itemKind === "COMBO" ? { itemKind } : { itemKind, comboComponents: [] },
-      "comboComponents",
-    );
+  const setItemKind = (itemKind: ItemKind) => {
+    if (itemKind === "COMBO") {
+      change({ itemKind }, "comboComponents");
+      return;
+    }
+    if (itemKind === "SERVICE") {
+      change(
+        { itemKind, comboComponents: [], weightKg: "", volumeM3: "" },
+        "comboComponents",
+      );
+      return;
+    }
+    change({ itemKind, comboComponents: [] }, "comboComponents");
+  };
 
   const addVariantRow = () => {
     setVariantRows((current) => [
@@ -103,57 +113,83 @@ export function useCreateItemForm({
     updateVariantRows(variantRows.filter((row) => row.id !== rowId));
   };
 
-  const showJsonEditor = () => {
-    setVariantMode("json");
-    setErrors((current) => ({ ...current, variantIdentity: undefined }));
-  };
-
-  const showBuilder = () => {
-    const parsed = parseBuilderRows(values.variantIdentity, nextRowId);
-    if (!parsed) {
-      setErrors((current) => ({
-        ...current,
-        variantIdentity: t.trade.itemVariantBuilderUnsupported,
-      }));
-      return;
-    }
-    setVariantRows(parsed.rows);
-    setNextRowId(parsed.nextRowId);
-    setVariantMode("builder");
-    setErrors((current) => ({ ...current, variantIdentity: undefined }));
-  };
-
   const submit = async () => {
-    const issues = validateCreateItemForm(values);
+    const serialized = serializeVariantRows(variantRows);
+    const nextValues: ItemFormValues = {
+      ...values,
+      variantIdentity: serialized.json,
+    };
+    const issues = validateCreateItemForm(nextValues);
     const translated = translateIssues(issues, t);
-    if (variantMode === "builder" && serializeVariantRows(variantRows).invalid) {
+    if (serialized.invalid) {
       translated.variantIdentity = t.trade.itemVariantBuilderInvalid;
     }
     setErrors(translated);
     if (Object.values(translated).some(Boolean)) return;
 
-    const saved = await onSubmit(values);
+    const saved = await onSubmit(nextValues, image.pending?.file ?? null);
     if (saved) reset();
   };
+
+  // The Item already exists here: only the image is sent again, to it.
+  const retryImage = async () => {
+    if (!image.pending) return;
+    if (await imageUpload.retry(image.pending.file)) reset();
+  };
+
+  const basicErrorsCount = [
+    errors.canonicalCode,
+    errors.baseUomId,
+    errors.categoryId,
+    errors.localizedNames,
+  ].filter(Boolean).length;
+
+  const hasErrors = Object.values(errors).some(Boolean);
+
+  const isBasicDetailsComplete =
+    Boolean(values.canonicalCode.trim()) &&
+    Boolean(values.baseUomId.trim()) &&
+    Boolean(values.nameEn.trim() || values.nameAr.trim()) &&
+    values.category.kind !== "unresolved" &&
+    basicErrorsCount === 0;
+
+  const isReadyToCreate =
+    isBasicDetailsComplete &&
+    !hasErrors &&
+    (values.itemKind !== "COMBO" ||
+      (values.comboComponents.length > 0 &&
+        values.comboComponents.every(
+          (component) => Boolean(component.itemId.trim()) && Number(component.quantity) > 0,
+        )));
+
+  const populatedVariantCount = variantRows.filter(
+    (row) => row.name.trim().length > 0 || row.value.trim().length > 0,
+  ).length;
 
   return {
     values,
     errors,
+    hasErrors,
+    basicErrorsCount,
+    isBasicDetailsComplete,
+    isReadyToCreate,
+    populatedVariantCount,
     advancedOpen,
     setAdvancedOpen,
-    variantMode,
     variantRows,
     uoms,
     isDirty:
-      JSON.stringify(values) !== JSON.stringify(EMPTY_ITEM_FORM) || variantRows.length > 0,
+      JSON.stringify(values) !== JSON.stringify(EMPTY_ITEM_FORM) ||
+      variantRows.length > 0 ||
+      image.pending !== null,
+    image,
+    retryImage,
     isSubmitting,
     change,
     setItemKind,
     addVariantRow,
     updateVariantRow,
     removeVariantRow,
-    showJsonEditor,
-    showBuilder,
     submit,
     onOpenChange: (open: boolean) => {
       if (!open) {
@@ -188,48 +224,6 @@ function issueKeysForPatch(patch: Partial<ItemFormValues>): Set<keyof CreateItem
   if (changed.has("comboComponents") || changed.has("itemKind")) keys.add("comboComponents");
   if (changed.has("optionalProducts")) keys.add("optionalProducts");
   return keys;
-}
-
-function serializeVariantRows(rows: VariantAttributeRow[]): { json: string; invalid: boolean } {
-  const identity: Record<string, string> = {};
-  let invalid = false;
-  for (const row of rows) {
-    const name = row.name.trim();
-    const value = row.value.trim();
-    if (!name && !value) continue;
-    if (!name || Object.hasOwn(identity, name)) {
-      invalid = true;
-      continue;
-    }
-    identity[name] = value;
-  }
-  return {
-    json: Object.keys(identity).length > 0 ? JSON.stringify(identity, null, 2) : "",
-    invalid,
-  };
-}
-
-function parseBuilderRows(
-  raw: string,
-  firstId: number,
-): { rows: VariantAttributeRow[]; nextRowId: number } | null {
-  if (!raw.trim()) return { rows: [], nextRowId: firstId };
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-    const entries = Object.entries(parsed);
-    if (entries.some(([, value]) => typeof value !== "string")) return null;
-    return {
-      rows: entries.map(([name, value], index) => ({
-        id: `attribute-${firstId + index}`,
-        name,
-        value: value as string,
-      })),
-      nextRowId: firstId + entries.length,
-    };
-  } catch {
-    return null;
-  }
 }
 
 type Dictionary = ReturnType<typeof useI18n>["t"];

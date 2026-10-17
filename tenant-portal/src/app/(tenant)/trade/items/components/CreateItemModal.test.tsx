@@ -54,6 +54,10 @@ vi.mock("../hooks/useItemReferenceOptions", () => ({
   }),
 }));
 
+const IMAGE_UPLOAD = {
+  failed: false, canRetry: false, isUploading: false, error: null, status: "", retry: vi.fn(),
+};
+
 function renderModal(onSubmit = vi.fn().mockResolvedValue(false)) {
   return {
     onSubmit,
@@ -66,6 +70,7 @@ function renderModal(onSubmit = vi.fn().mockResolvedValue(false)) {
             error={null}
             onClose={vi.fn()}
             onSubmit={onSubmit}
+            imageUpload={IMAGE_UPLOAD}
           />
         </I18nProvider>
       </TooltipProvider>,
@@ -74,13 +79,13 @@ function renderModal(onSubmit = vi.fn().mockResolvedValue(false)) {
 }
 
 describe("CreateItemModal", () => {
-  it("renders a balanced wide card with a segmented type and advanced details", () => {
+  it("renders a full-width modal with 3-card item type selector, Avatar / Icon, and collapsible sections", () => {
     renderModal();
 
     expect(screen.getByRole("heading", { name: "Create item" })).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toHaveClass(
-      "max-w-[960px]",
-      "max-h-[85dvh]",
+      "max-w-[940px]",
+      "max-h-[94dvh]",
       "w-[calc(100%-2rem)]",
     );
     expect(screen.getByRole("group", { name: "Item type" })).toBeInTheDocument();
@@ -88,6 +93,8 @@ describe("CreateItemModal", () => {
       "data-state",
       "on",
     );
+    expect(screen.getByText("Avatar / Icon")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.trade.itemImage.add })).toBeEnabled();
     expect(screen.getByText("Type icon")).toBeInTheDocument();
     expect(screen.getByText("Generated from item type")).toBeInTheDocument();
     const advanced = screen.getByRole("button", { name: /Advanced details/ });
@@ -98,13 +105,18 @@ describe("CreateItemModal", () => {
     expect(screen.getByLabelText(/Choose a category/)).toBeInTheDocument();
   });
 
-  it("keeps the type icon derived from the selected segment", () => {
+  it("updates header badge, section title, and disables weight/volume when Service is selected", () => {
     renderModal();
     fireEvent.click(screen.getByRole("radio", { name: "Service" }));
     expect(screen.getByRole("radio", { name: "Service" })).toHaveAttribute(
       "data-state",
       "on",
     );
+    expect(screen.getByText("Service · Non-stockable")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Basic service details" })).toBeInTheDocument();
+
+    expect(screen.getByRole("textbox", { name: "Weight (kg)" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Volume (m³)" })).toBeDisabled();
   });
 
   it("separates required combo components from optional cross-sell products", () => {
@@ -112,26 +124,48 @@ describe("CreateItemModal", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Combo" }));
     expect(screen.getByText("Combo components")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Add component" }));
-    expect(screen.getByLabelText(/Quantity/)).toHaveValue("1");
+    expect(screen.getByLabelText(/Quantity/)).toHaveValue("1.00");
 
     fireEvent.click(screen.getByRole("button", { name: /Optional products/ }));
     fireEvent.click(screen.getByRole("button", { name: "Add optional product" }));
     expect(screen.getByText("Optional product 1")).toBeInTheDocument();
   });
 
-  it("builds variant JSON without exposing a separate upload or fake payload field", () => {
-    renderModal();
+  it("always shows variant attributes as Key-Value rows (never raw JSON) and serializes on submit", () => {
+    const { onSubmit } = renderModal();
     fireEvent.click(screen.getByRole("button", { name: "Add attribute" }));
     fireEvent.change(screen.getByLabelText("Attribute name 1"), {
       target: { value: "color" },
     });
     fireEvent.change(screen.getByLabelText("Value 1"), { target: { value: "black" } });
-    fireEvent.click(screen.getByRole("button", { name: "Edit JSON" }));
 
-    expect(screen.getByLabelText("Variant identity")).toHaveValue(
-      '{\n  "color": "black"\n}',
-    );
+    expect(screen.queryByRole("button", { name: /Edit JSON/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/upload/i)).not.toBeInTheDocument();
+
+    // Fill required fields and submit to verify Key-Value rows serialize to JSON
+    fireEvent.change(screen.getByPlaceholderText(en.trade.itemCodePlaceholder), {
+      target: { value: "SKU-100" },
+    });
+    fireEvent.change(screen.getByLabelText(en.trade.nameEn), {
+      target: { value: "Espresso Machine" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "No category" }));
+
+    // Open Base UOM combobox and choose EA
+    fireEvent.click(screen.getByRole("button", { name: en.trade.itemBaseUom }));
+    fireEvent.click(screen.getByRole("option", { name: /EA — Each/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canonicalCode: "SKU-100",
+        nameEn: "Espresso Machine",
+        baseUomId: ACTIVE_UOMS[0].id,
+        variantIdentity: '{\n  "color": "black"\n}',
+      }),
+      null,
+    );
   });
 
   it("shows inline errors and does not call the API for an invalid form", () => {
@@ -143,7 +177,9 @@ describe("CreateItemModal", () => {
     expect(screen.getByText(en.trade.itemFormNames)).toBeInTheDocument();
     expect(screen.getByText(en.trade.itemFormUom)).toBeInTheDocument();
     expect(screen.getByText(en.trade.itemFormCategory)).toBeInTheDocument();
-    expect(document.activeElement).toBe(screen.getByPlaceholderText("Item code *"));
+    expect(document.activeElement).toBe(
+      screen.getByPlaceholderText(en.trade.itemCodePlaceholder),
+    );
     fireEvent.click(screen.getByRole("button", { name: "No category" }));
     expect(screen.queryByText(en.trade.itemFormCategory)).not.toBeInTheDocument();
   });
@@ -163,6 +199,7 @@ describe("CreateItemModal", () => {
               error={null}
               onClose={() => setOpen(false)}
               onSubmit={vi.fn().mockResolvedValue(false)}
+              imageUpload={IMAGE_UPLOAD}
             />
           </I18nProvider>
         </TooltipProvider>

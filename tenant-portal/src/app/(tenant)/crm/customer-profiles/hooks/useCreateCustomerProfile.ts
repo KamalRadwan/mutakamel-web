@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { axiosClient } from "@/lib/api/axiosClient";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import type { CrmProfileType } from "../../leads/lead-contract";
+import type { LeadAddressForm } from "../../leads/lead-create-contract";
 import {
   createWriteAttempt,
   runIdempotentWrite,
@@ -29,6 +31,11 @@ export interface CreateCustomerProfileAmbiguity {
   attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
+}
+
+export interface SubmitCreateCustomerProfileOptions {
+  keepOpenAfterSuccess?: boolean;
+  initialRating?: number;
 }
 
 let contactKeySeed = 0;
@@ -104,7 +111,9 @@ export function useCreateCustomerProfile(
         return {
           ...current,
           profileType,
+          existingCompanyPartyId: "",
           companyName: "",
+          legalName: "",
           taxNumber: "",
           commercialRegistrationNumber: "",
           companyEmail: "",
@@ -113,6 +122,34 @@ export function useCreateCustomerProfile(
           contacts: [emptyCustomerContactRow(nextContactKey())],
         };
       });
+    },
+    [setForm],
+  );
+
+  const selectCompany = useCallback(
+    (existingCompanyPartyId: string, companyName: string) => {
+      setForm((current) => ({
+        ...current,
+        existingCompanyPartyId,
+        companyName,
+        contacts: current.contacts.map((contact) => ({
+          ...contact,
+          contactPartyId: "",
+        })),
+      }));
+    },
+    [setForm],
+  );
+
+  const setAddressField = useCallback(
+    <K extends keyof LeadAddressForm>(key: K, value: LeadAddressForm[K]) => {
+      setForm((current) => ({
+        ...current,
+        address: {
+          ...current.address,
+          [key]: value,
+        },
+      }));
     },
     [setForm],
   );
@@ -252,58 +289,91 @@ export function useCreateCustomerProfile(
     [patchContact],
   );
 
-  const submit = useCallback(async () => {
-    // Every field speaks now, including the ones never focused. Submit is not
-    // disabled while the form is invalid: a disabled button gives a keyboard
-    // user no way to ask what is wrong, so the press is what reveals it.
-    revealAll();
-    if (!branchId || isSubmitting || Object.keys(allErrors).length > 0) return;
-    const attempt = createWriteAttempt();
-    const body = buildCreateCustomerProfileFullRequest(form, branchId);
-
-    const send = async (): Promise<void> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        const outcome = await runIdempotentWrite({
-          attempt,
-          method: "post",
-          path: CUSTOMER_PROFILES_PATH,
-          body,
-          parse: parseCustomerProfileDetailResponse,
-          config: { maxResponseBytes: 512 * 1024 },
-        });
-        if (outcome.kind === "success") {
-          setAmbiguity(null);
-          setOpen(false);
-          reset();
-          onCreated(outcome.value.id);
-          return;
-        }
-        if (outcome.kind === "ambiguous") {
-          setAmbiguity({ attempt, error: outcome.error, replay: send });
-          return;
-        }
-        if (outcome.kind === "applied_unreadable") {
-          // The modal closes and the form is cleared, so there is nothing left
-          // to press Save on, and the panel carries the key a person can use to
-          // find the record.
-          setAmbiguity(null);
-          setError(null);
-          setOpen(false);
-          reset();
-          setAppliedUnreadable({ attempt, error: outcome.error });
-          onReconcile();
-          return;
-        }
-        setError(outcome.error);
-      } finally {
-        setIsSubmitting(false);
+  const submit = useCallback(
+    async (options?: SubmitCreateCustomerProfileOptions): Promise<boolean> => {
+      // Every field speaks now, including the ones never focused. Submit is not
+      // disabled while the form is invalid: a disabled button gives a keyboard
+      // user no way to ask what is wrong, so the press is what reveals it.
+      revealAll();
+      const effectiveBranchId = form.branchId || branchId;
+      if (!effectiveBranchId || isSubmitting || Object.keys(allErrors).length > 0) {
+        return false;
       }
-    };
+      const attempt = createWriteAttempt();
+      const body = buildCreateCustomerProfileFullRequest(form, effectiveBranchId);
+      const selectedTagIds = [...form.tagIds];
+      const initialRating = options?.initialRating ?? 0;
+      const keepOpenAfterSuccess = Boolean(options?.keepOpenAfterSuccess);
 
-    await send();
-  }, [allErrors, branchId, form, isSubmitting, onCreated, onReconcile, reset, revealAll]);
+      let succeeded = false;
+      const send = async (): Promise<void> => {
+        setIsSubmitting(true);
+        setError(null);
+        try {
+          const outcome = await runIdempotentWrite({
+            attempt,
+            method: "post",
+            path: CUSTOMER_PROFILES_PATH,
+            body,
+            parse: parseCustomerProfileDetailResponse,
+            config: { maxResponseBytes: 512 * 1024 },
+          });
+          if (outcome.kind === "success") {
+            const createdId = outcome.value.id;
+            // Best-effort follow-up writes for tags and initial rating
+            if (selectedTagIds.length > 0) {
+              void axiosClient
+                .post(`${CUSTOMER_PROFILES_PATH}/${createdId}/tags`, {
+                  tagIds: selectedTagIds,
+                })
+                .catch(() => undefined);
+            }
+            if (initialRating > 0) {
+              void axiosClient
+                .patch(`${CUSTOMER_PROFILES_PATH}/${createdId}`, {
+                  rating: initialRating,
+                })
+                .catch(() => undefined);
+            }
+
+            setAmbiguity(null);
+            reset();
+            succeeded = true;
+            if (keepOpenAfterSuccess) {
+              onReconcile();
+            } else {
+              setOpen(false);
+              onCreated(createdId);
+            }
+            return;
+          }
+          if (outcome.kind === "ambiguous") {
+            setAmbiguity({ attempt, error: outcome.error, replay: send });
+            return;
+          }
+          if (outcome.kind === "applied_unreadable") {
+            // The modal closes and the form is cleared, so there is nothing left
+            // to press Save on, and the panel carries the key a person can use to
+            // find the record.
+            setAmbiguity(null);
+            setError(null);
+            setOpen(false);
+            reset();
+            setAppliedUnreadable({ attempt, error: outcome.error });
+            onReconcile();
+            return;
+          }
+          setError(outcome.error);
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      await send();
+      return succeeded;
+    },
+    [allErrors, branchId, form, isSubmitting, onCreated, onReconcile, reset, revealAll],
+  );
 
   return {
     ...state,
@@ -327,6 +397,8 @@ export function useCreateCustomerProfile(
       setOpen(false);
     },
     setProfileType,
+    selectCompany,
+    setAddressField,
     setCustomField,
     setPhone,
     addPhone,

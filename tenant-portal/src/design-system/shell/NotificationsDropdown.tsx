@@ -106,18 +106,23 @@ export function NotificationsDropdown() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label={triggerLabel} className="relative">
-          {/* negative-400 in BOTH themes, which is the one ramp step that
-              works on either bar: the light bar is the chrome navy now, and
-              negative-600 measured 2.5:1 against it — a warning colour nobody
-              can see is worse than no colour. Not a `nav-surface` name because
-              a ramp step is not a semantic role that block can re-point. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={triggerLabel}
+          className="relative h-6 gap-1 px-1.5 text-white/90 hover:bg-white/15 hover:text-white"
+        >
           <Bell
-            className={cn("size-4", snapshot.unreadCount > 0 && "text-negative-400")}
+            className={cn("size-3.5", snapshot.unreadCount > 0 && "text-rose-400")}
             aria-hidden="true"
           />
           {snapshot.unreadCount > 0 && (
-            <span className="absolute end-1 top-1 size-1.5 rounded-full bg-negative-500" aria-hidden="true" />
+            <span
+              className="flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-semibold leading-none text-destructive-foreground"
+              aria-hidden="true"
+            >
+              {countFormatter.format(snapshot.unreadCount)}
+            </span>
           )}
         </Button>
       </DropdownMenuTrigger>

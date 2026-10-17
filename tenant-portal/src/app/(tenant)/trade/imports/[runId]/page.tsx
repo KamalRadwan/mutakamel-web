@@ -209,6 +209,7 @@ export default function ImportRunPage({
               clearAllLabel={t.filters.clearAll}
             />
             <DataTable
+              density="compact"
               columns={columns}
               rows={rows}
               isLoading={false}

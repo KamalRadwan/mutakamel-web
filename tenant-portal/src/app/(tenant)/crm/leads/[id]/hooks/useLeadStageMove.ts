@@ -45,6 +45,7 @@ export interface LeadStageMove {
   request: (stageId: string) => void;
   dismiss: () => void;
   confirm: () => void;
+  move: (stageId: string) => Promise<void>;
   isMoving: boolean;
   error: string | null;
   clearError: () => void;
@@ -121,6 +122,7 @@ export function useLeadStageMove(
       setPendingStageId(null);
       if (target) void move(target);
     },
+    move,
     isMoving,
     error,
     clearError: () => setError(null),

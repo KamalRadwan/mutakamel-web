@@ -2,75 +2,82 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
 import {
-  BoardView,
-  Button,
-  CardView,
   DegradedBanner,
   EmptyState,
+  ErrorState,
+  PageActions,
   PageHeader,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  StageBar,
-  TableView,
-  PageActions,
+  Skeleton,
   ViewSwitcher,
   useWorkspaceState,
-  resolveStatusRole,
-  type BoardColumnDef,
-  type MoveToTarget,
   type SortState,
-  type WorkspaceViewLabels,
 } from "@/design-system";
 import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
 import { ActivityModal } from "@/components/activities/ActivityModal";
 import type { ActivityTargetSelection } from "@/components/activities/activity-contract";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
-import { localizedName } from "@/lib/format/localized";
-import { formatTemplate } from "@/lib/format/template";
-import { CreateOpportunityModal } from "./CreateOpportunityModal";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
+import { localizedName, localizedValue } from "@/lib/format/localized";
 import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
-import { DeleteOpportunityDialog, type OpportunityDeleteItem } from "./DeleteOpportunityDialog";
-import { useOpportunityColumns } from "./useOpportunityColumns";
+import { CreateOpportunityModal } from "./CreateOpportunityModal";
+import {
+  DeleteOpportunityDialog,
+  type OpportunityDeleteItem,
+} from "./DeleteOpportunityDialog";
+import { OpportunityBulkActionsBar } from "./OpportunityBulkActionsBar";
+import {
+  OpportunityExecutiveBoardView,
+  type QuickCreateOpportunityDraft,
+} from "./OpportunityExecutiveBoardView";
+import { OpportunityExecutiveCardView } from "./OpportunityExecutiveCardView";
+import { OpportunityExecutiveTableView } from "./OpportunityExecutiveTableView";
+import {
+  OpportunityQuickEditModal,
+  type OpportunityQuickEditItem,
+} from "./OpportunityQuickEditModal";
 import { OpportunitySearchBar } from "./OpportunitySearchBar";
+import { OpportunityStageFunnelBar } from "./OpportunityStageFunnelBar";
 import { TerminalMoveDialog } from "./TerminalMoveDialog";
+import { useCreateOpportunity } from "../hooks/useCreateOpportunity";
 import { useDeleteOpportunity } from "../hooks/useDeleteOpportunity";
 import { useOpportunitiesList } from "../hooks/useOpportunitiesList";
-import { useOpportunityCards } from "../hooks/useOpportunityCards";
 import { useOpportunityDocumentCounts } from "../hooks/useOpportunityDocumentCounts";
-import { useCreateOpportunity } from "../hooks/useCreateOpportunity";
-import { opportunityActivitySegments } from "../../shared/crm-activity-tone";
-import { useOpportunityCardSlots } from "./useOpportunityCardSlots";
-import { useOpportunityCardViewSlots } from "./useOpportunityCardViewSlots";
+import {
+  buildStageMoveRequest,
+  opportunityCapabilityAllowsOwner,
+  usePipelineWorkspace,
+} from "../hooks/usePipelineWorkspace";
 import {
   addOpportunityBasicFilter,
   EMPTY_OPPORTUNITY_BASIC_SEARCH,
   type OpportunityBasicSearch,
 } from "../opportunity-basic-search-contract";
+import { opportunityPath } from "../opportunity-contract";
 import {
   opportunitySearchWithBasic,
   opportunitySearchWithMode,
 } from "../opportunity-search-contract";
-import {
-  opportunityCapabilityAllowsOwner,
-  usePipelineWorkspace,
-} from "../hooks/usePipelineWorkspace";
-import { formatOpportunityAmountSummary } from "../hooks/pipeline-types";
-
-const STAGE_BAR_TONE: Record<string, "positive" | "negative" | undefined> = {
-  WON: "positive",
-  LOST: "negative",
-};
 
 export function OpportunitiesWorkspace() {
   const { t, lang } = useI18n();
-  const [selectedForDelete, setSelectedForDelete] = useState<OpportunityDeleteItem | null>(null);
-  const { deleteOpportunity, isDeleting, error: deleteError, clearError } = useDeleteOpportunity();
+  const [selectedForDelete, setSelectedForDelete] =
+    useState<OpportunityDeleteItem | null>(null);
+  const {
+    deleteOpportunity,
+    isDeleting,
+    error: deleteError,
+    clearError,
+  } = useDeleteOpportunity();
 
   const router = useRouter();
   function applyPage(next: number) {
@@ -114,31 +121,32 @@ export function OpportunitiesWorkspace() {
     confirmTerminalMove,
     cancelTerminalMove,
     updateCard,
-    updateImportance,
     loadMoreStage,
   } = usePipelineWorkspace(view === "board");
 
   const list = useOpportunitiesList(
-    view === "table" ? branchId : null,
+    view === "table" || view === "card" ? branchId : null,
     selectedPipelineId,
     null,
     actorUserId,
   );
+
   const activeBasicSearch =
     list.search.mode === "basic"
       ? list.search.basic
       : EMPTY_OPPORTUNITY_BASIC_SEARCH;
-  const requestedStageId = activeBasicSearch.filters.find(
-    ({ field }) => field === "stage",
-  )?.value ?? null;
-  const requestedPipelineId = activeBasicSearch.filters.find(
-    ({ field }) => field === "pipeline",
-  )?.value ?? null;
+  const requestedStageId =
+    activeBasicSearch.filters.find(({ field }) => field === "stage")?.value ??
+    null;
+  const requestedPipelineId =
+    activeBasicSearch.filters.find(({ field }) => field === "pipeline")
+      ?.value ?? null;
   const stagePipeline = pipelines.find((pipeline) =>
     pipeline.stages.some((stage) => stage.id === requestedStageId),
   );
   const searchPipelineId = stagePipeline?.id ?? requestedPipelineId;
-  const stageId = selectedPipelineId === stagePipeline?.id ? requestedStageId : null;
+  const stageId =
+    selectedPipelineId === stagePipeline?.id ? requestedStageId : null;
 
   useEffect(() => {
     if (
@@ -149,13 +157,25 @@ export function OpportunitiesWorkspace() {
     ) {
       setSelectedPipelineId(searchPipelineId);
     }
-  }, [list.search.mode, pipelines, searchPipelineId, selectedPipelineId, setSelectedPipelineId]);
+  }, [
+    list.search.mode,
+    pipelines,
+    searchPipelineId,
+    selectedPipelineId,
+    setSelectedPipelineId,
+  ]);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [quickEditItem, setQuickEditItem] =
+    useState<OpportunityQuickEditItem | null>(null);
 
   function selectStage(nextStageId: string | undefined) {
     if (list.search.mode !== "basic") return;
     let basic: OpportunityBasicSearch = {
       ...list.search.basic,
-      filters: list.search.basic.filters.filter(({ field }) => field !== "stage"),
+      filters: list.search.basic.filters.filter(
+        ({ field }) => field !== "stage",
+      ),
     };
     if (nextStageId) {
       basic = addOpportunityBasicFilter(basic, {
@@ -171,18 +191,23 @@ export function OpportunitiesWorkspace() {
     }
     list.changeSearch(opportunitySearchWithBasic(list.search, basic));
     if (workspace.page !== 1) workspace.setPage(1);
+    setSelectedIds(new Set());
   }
 
   function selectPipeline(nextPipelineId: string) {
     setSelectedPipelineId(nextPipelineId);
+    setSelectedIds(new Set());
     if (list.search.mode !== "basic") return;
     const validStageIds = new Set(
-      pipelines.find(({ id }) => id === nextPipelineId)?.stages.map(({ id }) => id) ?? [],
+      pipelines
+        .find(({ id }) => id === nextPipelineId)
+        ?.stages.map(({ id }) => id) ?? [],
     );
     const withoutInvalidStage = {
       ...list.search.basic,
       filters: list.search.basic.filters.filter(
-        (filter) => filter.field !== "stage" || validStageIds.has(filter.value),
+        (filter) =>
+          filter.field !== "stage" || validStageIds.has(filter.value),
       ),
     };
     const basic = addOpportunityBasicFilter(withoutInvalidStage, {
@@ -194,6 +219,7 @@ export function OpportunitiesWorkspace() {
 
   function selectBranch(nextBranchId: string) {
     selectPipelineBranch(nextBranchId);
+    setSelectedIds(new Set());
     if (list.search.mode !== "basic") return;
     const basic: OpportunityBasicSearch = {
       ...list.search.basic,
@@ -203,15 +229,9 @@ export function OpportunitiesWorkspace() {
     };
     list.changeSearch(opportunitySearchWithBasic(list.search, basic));
   }
-  const cards = useOpportunityCards(
-    view === "card" ? selectedPipelineId : null,
-    view === "card" ? branchId : null,
-    stageId,
-    activeBasicSearch,
-    actorUserId,
-  );
+
   const documentCounts = useOpportunityDocumentCounts(
-    cards.items,
+    list.items,
     branchId,
     view === "card",
   );
@@ -224,6 +244,7 @@ export function OpportunitiesWorkspace() {
     if (nextView !== "table" && list.search.mode === "advanced") {
       list.changeSearch(opportunitySearchWithMode(list.search, "basic"));
     }
+    setSelectedIds(new Set());
     setView(nextView);
   }
 
@@ -249,55 +270,137 @@ export function OpportunitiesWorkspace() {
     createMessages,
     customFields.requiredFieldKeys,
     openOpportunity,
-    () => list.reload(),
+    () => {
+      void list.reload();
+      void fetchPipelines();
+    },
   );
 
-  const selectedPipeline = pipelines.find(({ id }) => id === selectedPipelineId) ?? null;
-  const stageById = useMemo(
-    () => new Map(pipelines.flatMap((pipeline) => pipeline.stages.map((stage) => [stage.id, stage]))),
-    [pipelines],
+  const selectedPipeline =
+    pipelines.find(({ id }) => id === selectedPipelineId) ?? null;
+
+  const canUpdateRow = useCallback(
+    (item: { ownerUserId?: string | null }) =>
+      opportunityCapabilityAllowsOwner(
+        capabilities?.update ?? null,
+        item.ownerUserId,
+      ),
+    [capabilities?.update],
   );
 
-  const [importances, setImportances] = useState<Record<string, number>>({});
-
-  const tableColumns = useOpportunityColumns({
-    stageById,
-    canUpdate: (item) =>
-      opportunityCapabilityAllowsOwner(capabilities?.update ?? null, item.ownerUserId),
-    canDelete: (item) =>
-      opportunityCapabilityAllowsOwner(capabilities?.delete ?? null, item.ownerUserId),
-    onDelete: (item) => {
-      clearError();
-      setSelectedForDelete(item);
-    },
-    onImportanceChange: (item, nextImportance) => {
-      setImportances((prev) => ({ ...prev, [item.id]: nextImportance }));
-      void updateImportance(item.id, nextImportance, item).then(async (updated) => {
-        if (updated) await list.reload();
-        setImportances((current) => {
-          const next = { ...current };
-          delete next[item.id];
-          return next;
-        });
-      });
-    },
-    onOpenActivities: (item) => openActivities(item),
-    importances,
-  });
+  const canDeleteRow = useCallback(
+    (item: { ownerUserId?: string | null }) =>
+      opportunityCapabilityAllowsOwner(
+        capabilities?.delete ?? null,
+        item.ownerUserId,
+      ),
+    [capabilities?.delete],
+  );
 
   async function handleDelete() {
     if (!selectedForDelete) return;
     if (await deleteOpportunity(selectedForDelete.id)) {
       setSelectedForDelete(null);
-      list.reload();
-      void cards.reload();
+      void list.reload();
       void fetchPipelines();
     }
   }
 
+  const handleStageMoveItem = useCallback(
+    async (
+      item: { id: string; stageId: string; title: string },
+      targetStageId: string,
+    ) => {
+      if (item.stageId === targetStageId) return;
+      const targetStage = selectedPipeline?.stages.find(
+        (s) => s.id === targetStageId,
+      );
+      if (!targetStage) return;
+
+      // For board view or terminal moves, delegate to moveCard when item is on board
+      if (
+        view === "board" ||
+        targetStage.flag === "WON" ||
+        targetStage.flag === "LOST"
+      ) {
+        moveCard(item.id, item.stageId, targetStageId);
+        return;
+      }
+
+      const attempt = createWriteAttempt();
+      const outcome = await runIdempotentWrite({
+        attempt,
+        method: "post",
+        path: `${opportunityPath(item.id)}/stage`,
+        body: buildStageMoveRequest(targetStageId, targetStage.flag),
+        parse: (payload) => payload,
+      });
+      if (
+        outcome.kind === "success" ||
+        outcome.kind === "applied_unreadable"
+      ) {
+        void list.reload();
+        void fetchPipelines();
+      }
+    },
+    [fetchPipelines, list, moveCard, selectedPipeline?.stages, view],
+  );
+
+  async function handleBulkMoveStage(targetStageId: string) {
+    const targetStage = selectedPipeline?.stages.find(
+      (s) => s.id === targetStageId,
+    );
+    if (!targetStage) return;
+    const rows = list.items.filter(
+      (i) => selectedIds.has(i.id) && canUpdateRow(i) && i.stageId !== targetStageId,
+    );
+    for (const row of rows) {
+      const attempt = createWriteAttempt();
+      await runIdempotentWrite({
+        attempt,
+        method: "post",
+        path: `${opportunityPath(row.id)}/stage`,
+        body: buildStageMoveRequest(targetStageId, targetStage.flag),
+        parse: (payload) => payload,
+      }).catch(() => undefined);
+    }
+    setSelectedIds(new Set());
+    await list.reload();
+    void fetchPipelines();
+  }
+
+  async function handleBulkSetImportance(importance: number) {
+    const rows = list.items.filter(
+      (i) => selectedIds.has(i.id) && canUpdateRow(i),
+    );
+    for (const row of rows) {
+      await updateCard(row.id, { importance }, row);
+    }
+    setSelectedIds(new Set());
+    await list.reload();
+    void fetchPipelines();
+  }
+
+  async function handleBulkDelete() {
+    const rows = list.items.filter(
+      (i) => selectedIds.has(i.id) && canDeleteRow(i),
+    );
+    for (const row of rows) {
+      await deleteOpportunity(row.id);
+    }
+    setSelectedIds(new Set());
+    await list.reload();
+    void fetchPipelines();
+  }
+
   function resolvePipelineEmptyState() {
     if (needsBranchSelection) {
-      return <EmptyState className="h-full" title={t.crmOpportunities.selectBranchFirst} />;
+      return (
+        <EmptyState
+          className="h-full"
+          title={t.crmOpportunities.selectBranchFirst}
+        />
+      );
     }
     if (hasNoPipelines) {
       return (
@@ -313,114 +416,66 @@ export function OpportunitiesWorkspace() {
 
   const pipelineEmptyState = resolvePipelineEmptyState();
 
-  const viewLabels: WorkspaceViewLabels = {
-    retry: t.common.retry,
-    errorTitle: t.crmOpportunities.loadFailed,
-    emptyTitle: t.crmOpportunities.empty,
-    selectAll: t.views.selectAll,
-    selectRow: t.views.selectItem,
-    sortAscending: t.views.sortAscending,
-    sortDescending: t.views.sortDescending,
-    notSorted: t.views.notSorted,
-    pagination: {
-      previous: t.common.previousPage,
-      next: t.common.nextPage,
-      summary: (from, to, total) => formatTemplate(t.common.showingOf, { from, to, total }),
-    },
-  };
-
-  const moveTargets: MoveToTarget[] = (selectedPipeline?.stages ?? []).map((stage) => ({
-    id: stage.id,
-    label: localizedName(stage, lang),
-  }));
-
-  const [activityOpportunity, setActivityOpportunity] = useState<ActivityTargetSelection | null>(null);
+  const [activityOpportunity, setActivityOpportunity] =
+    useState<ActivityTargetSelection | null>(null);
   function openActivities(item: { id: string; title: string }) {
-    setActivityOpportunity({ app: "CRM", type: "OPPORTUNITY", id: item.id, label: item.title });
-  }
-  const cardSlots = useOpportunityCardSlots({
-    canUpdate: canUpdateOpportunity,
-    canDelete: canDeleteOpportunity,
-    onOpen: (item) => openOpportunity(item.id),
-    onDelete: (item) => {
-      clearError();
-      setSelectedForDelete({ id: item.id, title: item.title });
-    },
-    onCardChange: (opportunityId, patch, item) => {
-      void updateCard(opportunityId, patch, item);
-    },
-    onOpenActivities: (item) => openActivities(item),
-    moveTargets: (item) => moveTargets.filter((target) => target.id !== item.stageId),
-    onMove: (item, targetStageId) => {
-      moveCard(item.id, item.stageId, targetStageId);
-    },
-  });
-
-  const cardViewSlots = useOpportunityCardViewSlots({
-    stageById,
-    canUpdate: (item) =>
-      opportunityCapabilityAllowsOwner(capabilities?.update ?? null, item.ownerUserId),
-    canDelete: (item) =>
-      opportunityCapabilityAllowsOwner(capabilities?.delete ?? null, item.ownerUserId),
-    onOpen: (item) => openOpportunity(item.id),
-    onDelete: (item) => {
-      clearError();
-      setSelectedForDelete({ id: item.id, title: item.title });
-    },
-    onCardChange: (item, patch) => {
-      void updateCard(item.id, patch, item).then((updated) => {
-        if (updated) void cards.reload();
-      });
-    },
-    onOpenActivities: (item) => openActivities(item),
-    documentCountsByParty: documentCounts.countsByParty,
-    documentCountVisibility: documentCounts.visible,
-  });
-
-  const boardColumns: BoardColumnDef[] = useMemo(() => {
-    if (!selectedPipeline) return [];
-    return selectedPipeline.stages.map((stage) => {
-      const lane = board?.stages.find((s) => s.stage.id === stage.id);
-      const role = resolveStatusRole("OpportunityStageFlag", stage.flag);
-      return {
-        id: stage.id,
-        label: localizedName(stage, lang),
-        count: lane?.summary.totalCount ?? lane?.items.length ?? 0,
-        amountLabel: lane
-          ? formatOpportunityAmountSummary(lane.summary.amountsByCurrency)
-          : undefined,
-        outcomeRole:
-          role === "positive" || role === "negative" || role === "caution" ? role : undefined,
-        segments: lane
-          ? opportunityActivitySegments(lane.activitySummary, t.crmLeads.card.activityStates)
-          : undefined,
-        segmentsLabel: t.crmLeads.card.activityBar,
-      };
+    setActivityOpportunity({
+      app: "CRM",
+      type: "OPPORTUNITY",
+      id: item.id,
+      label: item.title,
     });
-  }, [selectedPipeline, board, lang, t]);
+  }
 
   const boardItems = useMemo(
     () => (board?.stages ?? []).flatMap((lane) => lane.items),
     [board],
   );
 
+  const activeItemsForQuickModal: readonly OpportunityQuickEditItem[] =
+    view === "board" ? boardItems : list.items;
+
+  const listErrorText = list.error
+    ? list.error.message || t.crmOpportunities.loadFailed
+    : null;
+
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden">
+    <div className="flex h-full flex-col gap-3 overflow-hidden">
       {/* Preserve the accessible heading; actions render in the shell's action bar. */}
       <PageHeader
         className="sr-only"
         title={t.crmOpportunities.heading}
         primaryAction={
           capabilities?.create
-            ? { label: t.crmOpportunityDetail.createAction, onClick: () => create.openModal() }
+            ? {
+                label: t.crmOpportunityDetail.createAction,
+                icon: <Plus className="size-4" aria-hidden="true" />,
+                onClick: () =>
+                  create.openModal(null, undefined, selectedPipelineId),
+              }
             : undefined
         }
         secondaryActions={
           <>
-            <TenantBranchSelect branchIds={branchIds} branchId={branchId} onChange={selectBranch} disabled={isLoading || isMutating} />
-            <Select value={selectedPipelineId ?? ""} onValueChange={selectPipeline} disabled={pipelines.length === 0 || isLoading}>
+            <TenantBranchSelect
+              branchIds={branchIds}
+              branchId={branchId}
+              onChange={selectBranch}
+              disabled={isLoading || isMutating}
+            />
+            <Select
+              value={selectedPipelineId ?? ""}
+              onValueChange={selectPipeline}
+              disabled={pipelines.length === 0 || isLoading}
+            >
               <SelectTrigger size="sm" className="w-48">
-                <SelectValue placeholder={pipelines.length === 0 ? t.crmOpportunities.noPipeline : t.crmOpportunities.selectPipeline} />
+                <SelectValue
+                  placeholder={
+                    pipelines.length === 0
+                      ? t.crmOpportunities.noPipeline
+                      : t.crmOpportunities.selectPipeline
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {pipelines.map((pipeline) => (
@@ -449,138 +504,252 @@ export function OpportunitiesWorkspace() {
           value={view}
           onChange={changeView}
           available={["board", "card", "table"]}
-          labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
+          labels={{
+            board: t.views.board,
+            card: t.views.card,
+            table: t.views.table,
+          }}
         />
         <ActivitiesWorkspaceLink type="OPPORTUNITY" />
       </PageActions>
 
-      {capabilitiesUnavailable && <DegradedBanner message={t.crmOpportunities.capabilitiesUnavailable} />}
-      {view === "card" && cards.loadMoreError && (
-        <DegradedBanner message={t.crmOpportunities.loadMoreFailed} />
+      {capabilitiesUnavailable && (
+        <DegradedBanner message={t.crmOpportunities.capabilitiesUnavailable} />
       )}
 
       {error && (
-        <div role="alert" className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300">
+        <div
+          role="alert"
+          className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+        >
           {error}
         </div>
       )}
 
+      {/* Full-Width Executive Stage Funnel Bar for Card & Table Views */}
       {view !== "board" &&
         !(view === "table" && list.search.mode === "advanced") &&
         (selectedPipeline?.stages.length ?? 0) > 0 && (
-          <StageBar
-            label={t.crmOpportunities.stage}
-            allLabel={t.crmOpportunities.allStages}
-            steps={(selectedPipeline?.stages ?? []).map((stage) => ({
-              id: stage.id,
-              label: localizedName(stage, lang),
-              tone: STAGE_BAR_TONE[stage.flag],
-            }))}
-            value={stageId ?? undefined}
-            onChange={selectStage}
+          <OpportunityStageFunnelBar
+            stages={selectedPipeline?.stages ?? []}
+            items={list.items}
+            boardLanes={board?.stages}
+            totalCount={list.pageInfo.total}
+            selectedStageId={stageId ?? undefined}
+            onSelectStage={selectStage}
             disabled={!branchId}
           />
         )}
 
       <div className="min-h-0 flex-1">
         {view === "board" && (
-          <BoardView
-            columns={boardColumns}
-            columnOf={(item) => item.stageId}
-            items={boardItems}
-            itemKey={(item) => item.id}
-            renderCard={cardSlots.renderCard}
-            renderActions={cardSlots.renderActions}
-            renderFooter={cardSlots.renderFooter}
-            cardClassName={cardSlots.cardClassName}
-            canDrag={(item) =>
-              !isMutating && canUpdateOpportunity(item) && item.stageFlag !== "WON" && item.stageFlag !== "LOST"
-            }
-            onCardMove={(move) => {
-              moveCard(move.itemId, move.fromColumnId, move.toColumnId);
-            }}
-            onActivate={(item) => openOpportunity(item.id)}
-            onAddToColumn={capabilities?.create ? (stageId) => create.openModal(stageId) : undefined}
-            isLoading={isLoading}
-            error={loadError}
-            onRetry={() => void fetchPipelines()}
-            columnPage={(columnId) => {
-              const lane = board?.stages.find(({ stage }) => stage.id === columnId);
-              return {
-                hasMore: lane?.pageInfo.hasMore ?? false,
-                isLoadingMore: loadingStageId === columnId,
-              };
-            }}
-            onLoadMoreColumn={(columnId) => void loadMoreStage(columnId)}
-            emptyState={pipelineEmptyState}
-            labels={{
-              ...viewLabels,
-              emptyColumn: t.crmOpportunities.emptyColumn,
-              collapseColumn: t.views.collapseColumn,
-              expandColumn: t.views.expandColumn,
-              addToColumn: t.crmOpportunityDetail.createAction,
-              loadMore: t.crmOpportunities.loadMore,
-              loadingMore: t.crmOpportunities.loadingMore,
-            }}
-          />
+          <>
+            {pipelineEmptyState ? (
+              pipelineEmptyState
+            ) : isLoading ? (
+              <div className="flex h-full gap-3 overflow-x-auto pb-2">
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <Skeleton
+                    key={`board-col-skel-${idx}`}
+                    className="h-full w-80 shrink-0 rounded-xl"
+                  />
+                ))}
+              </div>
+            ) : loadError ? (
+              <ErrorState
+                title={t.crmOpportunities.loadFailed}
+                onRetry={() => void fetchPipelines()}
+                retryLabel={t.common.retry}
+              />
+            ) : (
+              <OpportunityExecutiveBoardView
+                pipeline={selectedPipeline}
+                board={board}
+                branchId={branchId}
+                isLoading={isLoading}
+                isMutating={isMutating}
+                loadingStageId={loadingStageId}
+                canCreate={Boolean(capabilities?.create)}
+                canUpdate={canUpdateOpportunity}
+                canDelete={canDeleteOpportunity}
+                onOpen={(item) => openOpportunity(item.id)}
+                onOpenQuickModal={(item) => setQuickEditItem(item)}
+                onOpenFullCreate={(
+                  initialStageId?: string,
+                  draft?: QuickCreateOpportunityDraft,
+                ) =>
+                  create.openModal(
+                    initialStageId ?? null,
+                    draft,
+                    selectedPipelineId,
+                  )
+                }
+                onDelete={(item) => {
+                  clearError();
+                  setSelectedForDelete({ id: item.id, title: item.title });
+                }}
+                onOpenActivities={(item) => openActivities(item)}
+                onCardChange={(opportunityId, patch, item) => {
+                  void updateCard(opportunityId, patch, item);
+                }}
+                onMoveCard={(cardId, sourceStageId, destStageId) => {
+                  moveCard(cardId, sourceStageId, destStageId);
+                }}
+                onLoadMoreStage={(colId) => void loadMoreStage(colId)}
+                onRefreshBoard={() => void fetchPipelines()}
+              />
+            )}
+          </>
         )}
 
         {view === "card" && (
-          <div className="flex h-full flex-col gap-3 overflow-y-auto">
-            <CardView
-              items={cards.items}
-              itemKey={(item) => item.id}
-              renderCard={cardViewSlots.renderCard}
-              renderActions={cardViewSlots.renderActions}
-              renderFooter={cardViewSlots.renderFooter}
-              cardClassName={cardViewSlots.cardClassName}
-              density="compact"
-              onActivate={(item) => openOpportunity(item.id)}
-              isLoading={cards.isLoading}
-              error={cards.error}
-              onRetry={() => void cards.reload()}
-              emptyState={pipelineEmptyState ?? <EmptyState title={t.crmOpportunities.empty} />}
-              labels={{ ...viewLabels, sortBy: t.views.sortBy }}
-            />
-            {cards.hasMore && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="self-center"
-                onClick={() => void cards.loadMore()}
-                disabled={cards.isLoadingMore}
-              >
-                {cards.isLoadingMore
-                  ? t.crmOpportunities.loadingMore
-                  : t.crmOpportunities.loadMore(cards.items.length, cards.totalCount)}
-              </Button>
+          <>
+            {pipelineEmptyState ? (
+              pipelineEmptyState
+            ) : (
+              <OpportunityExecutiveCardView
+                items={list.items}
+                stages={selectedPipeline?.stages ?? []}
+                branchId={branchId}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+                canUpdate={canUpdateRow}
+                canDelete={canDeleteRow}
+                isLoading={list.isLoading}
+                error={listErrorText}
+                onRetry={() => void list.reload()}
+                page={list.pageInfo}
+                onPageChange={workspace.setPage}
+                sort={workspace.sort ?? list.sort}
+                onSortChange={workspace.setSort}
+                documentCountsByParty={documentCounts.countsByParty}
+                documentCountVisibility={documentCounts.visible}
+                onOpenOpportunity={(item) => openOpportunity(item.id)}
+                onOpenQuickModal={(item) => setQuickEditItem(item)}
+                onOpenActivities={(item) => openActivities(item)}
+                onDeleteOpportunity={(item) => {
+                  clearError();
+                  setSelectedForDelete({ id: item.id, title: item.title });
+                }}
+                onMoveStage={(item, targetStageId) =>
+                  void handleStageMoveItem(item, targetStageId)
+                }
+                onCardChange={(opportunityId, patch, item) => {
+                  void updateCard(opportunityId, patch, item).then((updated) => {
+                    if (updated) void list.reload();
+                  });
+                }}
+                onBulkMoveStage={handleBulkMoveStage}
+              />
             )}
-          </div>
+          </>
         )}
 
         {view === "table" && (
-          <TableView
-            columns={tableColumns}
-            density="compact"
-            items={list.items}
-            itemKey={(item) => item.id}
-            selection={workspace.selection}
-            onActivate={(item) => openOpportunity(item.id)}
-            isLoading={list.isLoading}
-            error={list.error}
-            onRetry={() => list.reload()}
-            page={list.pageInfo}
-            onPageChange={workspace.setPage}
-            sort={workspace.sort ?? list.sort}
-            onSortChange={workspace.setSort}
-            emptyState={pipelineEmptyState}
-            labels={viewLabels}
-          />
+          <>
+            {pipelineEmptyState ? (
+              pipelineEmptyState
+            ) : (
+              <OpportunityExecutiveTableView
+                items={list.items}
+                stages={selectedPipeline?.stages ?? []}
+                branchId={branchId}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+                canUpdate={canUpdateRow}
+                canDelete={canDeleteRow}
+                isLoading={list.isLoading}
+                error={listErrorText}
+                onRetry={() => void list.reload()}
+                page={list.pageInfo}
+                onPageChange={workspace.setPage}
+                sort={workspace.sort ?? list.sort}
+                onSortChange={workspace.setSort}
+                onOpenQuickModal={(item) => setQuickEditItem(item)}
+                onOpenActivities={(item) => openActivities(item)}
+                onDeleteOpportunity={(item) => {
+                  clearError();
+                  setSelectedForDelete({ id: item.id, title: item.title });
+                }}
+                onMoveStage={(item, targetStageId) =>
+                  void handleStageMoveItem(item, targetStageId)
+                }
+                onCardChange={(opportunityId, patch, item) => {
+                  void updateCard(opportunityId, patch, item).then((updated) => {
+                    if (updated) void list.reload();
+                  });
+                }}
+              />
+            )}
+          </>
         )}
       </div>
 
+      {/* Floating Dark Bulk Actions Command Bar */}
+      {view !== "board" && (
+        <OpportunityBulkActionsBar
+          selectedIds={selectedIds}
+          stages={selectedPipeline?.stages ?? []}
+          canUpdateAny={list.items.some(
+            (i) => selectedIds.has(i.id) && canUpdateRow(i),
+          )}
+          canDeleteAny={list.items.some(
+            (i) => selectedIds.has(i.id) && canDeleteRow(i),
+          )}
+          onBulkMoveStage={handleBulkMoveStage}
+          onBulkSetImportance={handleBulkSetImportance}
+          onBulkDelete={handleBulkDelete}
+          onClearSelection={() => setSelectedIds(new Set())}
+          onOpenFirstSelectedModal={() => {
+            const first = list.items.find((i) => selectedIds.has(i.id));
+            if (first) setQuickEditItem(first);
+          }}
+          onOpenFirstSelectedActivities={() => {
+            const first = list.items.find((i) => selectedIds.has(i.id));
+            if (first) openActivities(first);
+          }}
+        />
+      )}
+
+      {/* Centered 360° Quick-Edit & Inspector Modal */}
+      <OpportunityQuickEditModal
+        item={quickEditItem}
+        allItems={activeItemsForQuickModal}
+        stages={selectedPipeline?.stages ?? []}
+        branchId={branchId}
+        canUpdate={canUpdateRow}
+        canDelete={canDeleteRow}
+        allowedOwnerIds={capabilities?.update?.ownerUserIds ?? null}
+        onClose={() => setQuickEditItem(null)}
+        onSelectOpportunity={(next) => setQuickEditItem(next)}
+        onOpenActivities={(item) => openActivities(item)}
+        onCardChange={(opportunityId, patch, item) => {
+          void updateCard(opportunityId, patch, item).then((updated) => {
+            if (updated) {
+              void list.reload();
+              void fetchPipelines();
+            }
+          });
+        }}
+        onMoveStage={(item, targetStageId) =>
+          void handleStageMoveItem(item, targetStageId)
+        }
+        onDelete={(item) => {
+          clearError();
+          setSelectedForDelete({ id: item.id, title: item.title });
+        }}
+        onSaved={() => {
+          void list.reload();
+          void fetchPipelines();
+        }}
+      />
+
       <TerminalMoveDialog
-        key={terminalMove ? `${terminalMove.cardId}:${terminalMove.destStageId}` : "closed"}
+        key={
+          terminalMove
+            ? `${terminalMove.cardId}:${terminalMove.destStageId}`
+            : "closed"
+        }
         isOpen={terminalMove !== null}
         onClose={cancelTerminalMove}
         opportunity={terminalMove?.opportunity ?? null}
@@ -608,12 +777,15 @@ export function OpportunitiesWorkspace() {
       <ActivityModal
         scope="CRM"
         branchId={branchId}
-        request={activityOpportunity ? { kind: "create", target: activityOpportunity, agenda: true } : null}
+        request={
+          activityOpportunity
+            ? { kind: "create", target: activityOpportunity, agenda: true }
+            : null
+        }
         onClose={() => setActivityOpportunity(null)}
         onChanged={() => {
           if (view === "board") void fetchPipelines();
-          if (view === "card") void cards.reload();
-          if (view === "table") void list.reload();
+          if (view === "card" || view === "table") void list.reload();
         }}
       />
     </div>

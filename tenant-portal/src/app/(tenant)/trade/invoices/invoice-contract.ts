@@ -39,6 +39,7 @@ export interface Invoice extends TradeFinalizedDocument {
 export interface InvoiceLine {
   id: string;
   clientLineId: string;
+  itemId?: string | null;
   uomId: string;
   quantity: string;
   unitPrice: string;
@@ -85,6 +86,7 @@ function parseLine(payload: unknown): InvoiceLine {
   return {
     id: line.id,
     clientLineId: line.clientLineId,
+    itemId: optionalUuid(line.itemId),
     uomId: line.uomId,
     quantity: line.quantity,
     unitPrice: line.unitPrice,
@@ -92,3 +94,82 @@ function parseLine(payload: unknown): InvoiceLine {
     descriptionSnapshot: nullableString(line.descriptionSnapshot, 500),
   };
 }
+
+export interface InvoiceDraftLinePayload {
+  clientLineId: string;
+  itemId: string;
+  uomId: string;
+  quantity: string;
+  unitPrice: string;
+  discountTotal: string;
+  chargeTotal: string;
+  taxTotal: string;
+  lineTotal: string;
+  priceSnapshot: Record<string, unknown>;
+  taxSnapshot: Record<string, unknown>;
+  description?: string;
+}
+
+export interface InvoiceDraftContentRequest {
+  partyId: string;
+  currencyCode: string;
+  dueDate?: string;
+  reference?: string;
+  notes?: string;
+  termsSnapshot: Record<string, unknown>;
+  totalsSnapshot: {
+    subtotal: string;
+    discountTotal: string;
+    chargeTotal: string;
+    taxTotal: string;
+    roundingTotal: string;
+    grandTotal: string;
+    amountPaid: string;
+    amountDue: string;
+  };
+  lines: InvoiceDraftLinePayload[];
+}
+
+export function buildInvoiceDraftContent(input: {
+  partyId: string;
+  currencyCode: string;
+  dueDate?: string;
+  reference?: string;
+  notes?: string;
+  termsSnapshot?: Record<string, unknown>;
+  totalsSnapshot: InvoiceDraftContentRequest["totalsSnapshot"];
+  lines: InvoiceDraftLinePayload[];
+}): InvoiceDraftContentRequest {
+  const code = input.currencyCode.trim().toUpperCase();
+  if (!isUUIDv7(input.partyId.trim())) {
+    throw new Error("INVOICE_FORM_CUSTOMER");
+  }
+  if (!/^[A-Z]{3}$/u.test(code)) {
+    throw new Error("INVOICE_FORM_CURRENCY");
+  }
+  if (input.lines.length === 0) {
+    throw new Error("INVOICE_FORM_LINES_EMPTY");
+  }
+  const due = input.dueDate?.trim() ?? "";
+  const ref = input.reference?.trim() ?? "";
+  const notes = input.notes?.trim() ?? "";
+
+  return {
+    partyId: input.partyId.trim(),
+    currencyCode: code,
+    ...(due ? { dueDate: due } : {}),
+    ...(ref ? { reference: ref.slice(0, 120) } : {}),
+    ...(notes ? { notes: notes.slice(0, 8000) } : {}),
+    termsSnapshot:
+      input.termsSnapshot && Object.keys(input.termsSnapshot).length > 0
+        ? input.termsSnapshot
+        : { paymentTermDays: 30, paymentMethodHint: "BANK_TRANSFER" },
+    totalsSnapshot: {
+      ...input.totalsSnapshot,
+      amountPaid: "0",
+      amountDue: input.totalsSnapshot.grandTotal,
+    },
+    lines: input.lines,
+  };
+}
+

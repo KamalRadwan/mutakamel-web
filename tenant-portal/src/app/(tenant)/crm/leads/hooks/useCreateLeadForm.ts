@@ -143,6 +143,8 @@ export function useCreateLeadForm(
         legalName: "",
         taxNumber: "",
         commercialRegistrationNumber: "",
+        companyEmail: "",
+        companyWebsite: "",
       };
     });
   }, [setForm]);

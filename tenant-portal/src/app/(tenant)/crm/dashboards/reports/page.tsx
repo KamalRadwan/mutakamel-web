@@ -22,8 +22,9 @@ import { PREBUILT_REPORTS, type PrebuiltReportKey } from "../prebuilt-contract";
 import { PrebuiltWidgetCard } from "./components/PrebuiltWidgetCard";
 import { usePrebuiltReport } from "./hooks/usePrebuiltReport";
 
-const CRM_ANALYTICS_ITEMS =
-  NAV_SECTIONS.find((section) => section.id === "crmAnalytics")?.items ?? [];
+const CRM_ANALYTICS_ITEMS = NAV_SECTIONS.flatMap((section) => section.items).filter((item) =>
+  ["crmDashboardReports", "crmDashboards", "crmWidgets"].includes(item.id),
+);
 
 export default function PrebuiltReportsPage() {
   const { t } = useI18n();

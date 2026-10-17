@@ -26,7 +26,7 @@ const EXPECTED: Record<NavAppId, string[]> = {
     "coreBilling",
     "account",
   ],
-  crm: ["crm", "crmAnalytics", "crmSetup"],
+  crm: ["crm", "crmSetup", "crmActivities"],
   trade: [
     "tradeFoundation",
     "tradeDocuments",

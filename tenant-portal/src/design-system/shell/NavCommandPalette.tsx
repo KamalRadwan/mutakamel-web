@@ -26,6 +26,14 @@ import { useNavTree } from "./useNavTree";
  * `keywords`, which is what lets an Arabic-speaking user who knows the English
  * product word still find the screen.
  */
+const OPEN_COMMAND_PALETTE_EVENT = "tenant:open-command-palette";
+
+export function openNavCommandPalette(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+  }
+}
+
 export function NavCommandPalette() {
   const [open, setOpen] = useState(false);
   const { t } = useI18n();
@@ -41,8 +49,15 @@ export function NavCommandPalette() {
       event.preventDefault();
       setOpen((current) => !current);
     }
+    function onOpenEvent() {
+      setOpen(true);
+    }
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenEvent);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpenEvent);
+    };
   }, []);
 
   const groups: CommandGroupDef[] = sections.map((section) => ({

@@ -25,27 +25,6 @@ export interface GlobalNavProps {
   activeItemId: string | null;
 }
 
-/**
- * The first bar: brand, app, and the active app's sections.
- *
- * ```text
- * [ logo · tenant  250px │ App ▾ │ Section ▾  Section ▾  … ]    [🌐 ☀ 🔔 │ 👤]
- * ```
- *
- * **Why the menus appear at `xl` and not `lg`.** The fixed costs are the 250px
- * brand zone, the app switcher and the account cluster — roughly 570px before a
- * single section is drawn. Trade's six triggers need about 600px. At 1280px
- * that fits with room to spare; at 1024px it does not, and the honest choices
- * there are a clipped row, a horizontal scrollbar inside a 35px bar, or the
- * sheet. The sheet shows every section with its full heading, so that is the
- * one this takes. It also matches what the old shell did at the same width,
- * where `lg`–`xl` defaulted the sidebar to its icon rail.
- *
- * The account controls keep the order they had in the topbar — language, theme,
- * notifications, separator, user — because WCAG's consistent-help expects the
- * same controls in the same order on every route, and moving them here would
- * have restarted that habit for no gain. See docs/design/accessibility.md.
- */
 export function GlobalNav({
   onMobileMenuOpen,
   apps,
@@ -57,42 +36,44 @@ export function GlobalNav({
   const { t } = useI18n();
 
   return (
-    // `nav-surface` (globals.css) re-points the semantic colour names for this
-    // subtree, so the controls below keep asking for `hover:bg-accent`,
-    // `bg-border` and `ring-ring` and get the on-chrome values. `text-foreground`
-    // is on the element itself and not left to inherit: <body> resolved its
-    // colour against the page's --foreground long before this bar existed, and
-    // an inherited computed colour does not re-resolve when a descendant
-    // re-declares the variable.
-    <header className="nav-surface flex h-(--size-topbar) shrink-0 items-stretch border-b border-border bg-nav pe-3 text-foreground print:hidden">
-      <BrandMark />
-      <div className="flex items-center gap-1 ps-2">
+    <header className="nav-surface flex h-(--size-topbar) shrink-0 items-center border-b-2 border-[#38bdf8] bg-gradient-to-r from-[#0f172a] via-[#1e1b4b] to-[#172554] pe-2.5 text-white shadow-[0_2px_8px_rgba(15,23,42,0.18)] dark:border-[#3b82f6] dark:from-[#0b1120] dark:via-[#131c38] dark:to-[#0f172a] print:hidden">
+      <div className="flex h-full shrink-0 items-center ps-1 lg:ps-0">
         <Button
           variant="ghost"
           size="sm"
-          className="xl:hidden"
+          className="h-7 w-7 px-0 text-white hover:bg-white/10 hover:text-white lg:hidden"
           onClick={onMobileMenuOpen}
           aria-label={t.nav.openNavigation}
         >
           <Menu className="size-4" aria-hidden="true" />
         </Button>
+        <BrandMark />
+      </div>
+      <span
+        aria-hidden="true"
+        className="hidden select-none text-xs text-white/30 sm:inline"
+      >
+        /
+      </span>
+      <div className="flex shrink-0 items-center gap-1.5 ps-1.5 sm:ps-2">
         {/* It scopes every menu that follows it, so it reads and tabs first. */}
         <AppSwitcher apps={apps} activeApp={activeApp} onSelect={onAppSelect} />
-        <Separator orientation="vertical" className="mx-1 hidden h-5 xl:block" />
+        <Separator orientation="vertical" className="mx-0.5 hidden h-4 bg-white/15 lg:block" />
       </div>
       <nav
         aria-label={t.nav.mainNavigation}
-        className="hidden min-w-0 items-stretch xl:flex"
+        className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto ps-1 lg:flex xl:gap-1.5"
       >
         {sections.map((section) => (
           <NavMenu key={section.id} section={section} activeItemId={activeItemId} />
         ))}
       </nav>
-      <div className="ms-auto flex items-center gap-1 ps-2">
-        <LanguageToggle />
-        <ThemeToggle />
-        <NotificationsDropdown />
-        <Separator orientation="vertical" className="mx-1 h-5" />
+      <div className="ms-auto flex shrink-0 items-center gap-2 ps-2">
+        <div className="flex items-center gap-0.5 rounded-md border border-white/15 bg-white/10 px-1 text-white">
+          <LanguageToggle />
+          <ThemeToggle />
+          <NotificationsDropdown />
+        </div>
         <UserMenu />
       </div>
     </header>

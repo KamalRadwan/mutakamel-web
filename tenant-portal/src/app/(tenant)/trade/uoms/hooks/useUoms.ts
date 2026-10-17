@@ -6,12 +6,19 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet, tradeIfMatch, tradePatch, tradePost } from "../../trade-api";
-import { canPerformTradeAction, TRADE_CONCURRENCY_CODES, TRADE_PERMISSIONS } from "../../trade-scope";
+import {
+  canPerformTradeAction,
+  TRADE_CONCURRENCY_CODES,
+  TRADE_PERMISSIONS,
+} from "../../trade-scope";
 import { useTradeScopeRequest } from "../../useTradeScope";
 import { useTradeWrite } from "../../useTradeWrite";
+import type { UomCreateEntryMode } from "../components/UomFormFields";
 import {
   buildCreateUomRequest,
   buildUpdateUomRequest,
+  catalogUomsPath,
+  parseCatalogUomsResponse,
   parseUomResponse,
   parseUomsResponse,
   UOMS_PATH,
@@ -21,6 +28,8 @@ import {
   UOM_RETIRE_REFERENCED_CODE,
   uomPath,
   uomsListPath,
+  type CatalogUomOption,
+  type CatalogUomPurpose,
   type Uom,
   type UomFormValues,
   type UomStatus,
@@ -55,10 +64,23 @@ export function useUoms() {
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isCodeTaken, setIsCodeTaken] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createInitialMode, setCreateInitialMode] =
+    useState<UomCreateEntryMode>("custom");
   const [editing, setEditing] = useState<Uom | null>(null);
   const [retiring, setRetiring] = useState<Uom | null>(null);
+  const [reactivating, setReactivating] = useState<Uom | null>(null);
+  const [retireBlocked, setRetireBlocked] = useState<Uom | null>(null);
   const [conflict, setConflict] = useState<Uom | null>(null);
+
+  // Operating Catalogue projection (`GET /catalog/uoms`)
+  const [operatingPurpose, setOperatingPurpose] =
+    useState<CatalogUomPurpose>("ANY");
+  const [operatingItems, setOperatingItems] = useState<CatalogUomOption[]>([]);
+  const [isOperatingLoading, setIsOperatingLoading] = useState(false);
+  const [operatingError, setOperatingError] =
+    useState<NormalizedApiError | null>(null);
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -71,11 +93,14 @@ export function useUoms() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const result = await tradeGet(uomsListPath(page, statusFilter, search.trim()), {
-          signal,
-          headers: readHeaders,
-          maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
-        });
+        const result = await tradeGet(
+          uomsListPath(page, statusFilter, search.trim()),
+          {
+            signal,
+            headers: readHeaders,
+            maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+          },
+        );
         const parsed = parseUomsResponse(result.data);
         setItems(parsed.items);
         setTotal(parsed.total);
@@ -90,6 +115,27 @@ export function useUoms() {
     [gap, page, statusFilter, search, readHeaders],
   );
 
+  const loadOperating = useCallback(
+    async (purpose: CatalogUomPurpose = operatingPurpose): Promise<void> => {
+      if (gap) return;
+      setIsOperatingLoading(true);
+      setOperatingError(null);
+      try {
+        const result = await tradeGet(catalogUomsPath(purpose), {
+          headers: readHeaders,
+          maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
+        });
+        setOperatingItems(parseCatalogUomsResponse(result.data));
+      } catch (error) {
+        if (isAbortError(error)) return;
+        setOperatingError(normalizeApiError(error));
+      } finally {
+        setIsOperatingLoading(false);
+      }
+    },
+    [gap, operatingPurpose, readHeaders],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -101,7 +147,8 @@ export function useUoms() {
   const describe = useCallback(
     (error: NormalizedApiError): string | undefined => {
       if (error.code === UOM_CODE_TAKEN_CODE) return t.trade.uomCodeTaken;
-      if (error.code === UOM_RETIRE_REFERENCED_CODE) return t.trade.uomRetireReferenced;
+      if (error.code === UOM_RETIRE_REFERENCED_CODE)
+        return t.trade.uomRetireReferenced;
       if (error.code === UOM_INVALID_CODE) return t.trade.uomInvalid;
       return undefined;
     },
@@ -109,27 +156,35 @@ export function useUoms() {
   );
 
   const isStale = useCallback(
-    (error: NormalizedApiError) => error.code === TRADE_CONCURRENCY_CODES.staleVersion,
+    (error: NormalizedApiError) =>
+      error.code === TRADE_CONCURRENCY_CODES.staleVersion,
     [],
   );
 
   /** Refetches the row so `ConflictDialog` can show both values, not just ours. */
-  const openConflict = useCallback(async (id: string): Promise<void> => {
-    try {
-      const result = await tradeGet(uomPath(id), { maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES });
-      setConflict(parseUomResponse(result.data));
-    } catch {
-      // A refetch that also fails leaves the dialog with our side only; the
-      // reload action still works and is the honest way out.
-      setConflict(null);
-    }
-  }, []);
+  const openConflict = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        const result = await tradeGet(uomPath(id), {
+          headers: readHeaders,
+          maxResponseBytes: ROW_RESPONSE_LIMIT_BYTES,
+        });
+        setConflict(parseUomResponse(result.data));
+      } catch {
+        // A refetch that also fails leaves the dialog with our side only; the
+        // reload action still works and is the honest way out.
+        setConflict(null);
+      }
+    },
+    [readHeaders],
+  );
 
   const create = useCallback(
     async (values: UomFormValues): Promise<boolean> => {
       if (!canManage || isSubmitting) return false;
       setIsSubmitting(true);
       setFormError(null);
+      setIsCodeTaken(false);
       try {
         const request = buildCreateUomRequest(values);
         // **No scope headers.** `POST /uoms` is Gateway `organizationScopeMode:
@@ -138,7 +193,13 @@ export function useUoms() {
           failureTitle: t.trade.uomCreateFailed,
           describe,
         });
-        if (!outcome.ok) return false;
+        if (!outcome.ok) {
+          if (outcome.error?.code === UOM_CODE_TAKEN_CODE) {
+            setIsCodeTaken(true);
+            setFormError(t.trade.uomCodeTaken);
+          }
+          return false;
+        }
         setCreateOpen(false);
         toast.success(t.trade.savedTitle, replayMessage(outcome.replayed, t));
         await load();
@@ -169,10 +230,19 @@ export function useUoms() {
             tradePatch(uomPath(editing.id), request, {
               headers: { "if-match": tradeIfMatch(editing.version) },
             }),
-          { failureTitle: t.trade.uomUpdateFailed, describe, isHandled: isStale },
+          {
+            failureTitle: t.trade.uomUpdateFailed,
+            describe,
+            isHandled: (err) =>
+              isStale(err) || err.code === UOM_RETIRE_REFERENCED_CODE,
+          },
         );
         if (!outcome.ok) {
-          if (outcome.error && isStale(outcome.error)) await openConflict(editing.id);
+          if (outcome.error && isStale(outcome.error)) {
+            await openConflict(editing.id);
+          } else if (outcome.error?.code === UOM_RETIRE_REFERENCED_CODE) {
+            setRetireBlocked(editing);
+          }
           return false;
         }
         setEditing(null);
@@ -186,28 +256,107 @@ export function useUoms() {
         setIsSubmitting(false);
       }
     },
-    [canManage, editing, isSubmitting, runWrite, describe, isStale, openConflict, toast, t, load],
+    [
+      canManage,
+      editing,
+      isSubmitting,
+      runWrite,
+      describe,
+      isStale,
+      openConflict,
+      toast,
+      t,
+      load,
+    ],
   );
 
   /** Retiring is a `PATCH` of `status`; trade-app publishes no retire route. */
   const retire = useCallback(async (): Promise<void> => {
     if (!canManage || !retiring || isSubmitting) return;
+    const target = retiring;
     setIsSubmitting(true);
     const outcome = await runWrite(
       () =>
         tradePatch(
-          uomPath(retiring.id),
+          uomPath(target.id),
           { status: "RETIRED" },
-          { headers: { "if-match": tradeIfMatch(retiring.version) } },
+          { headers: { "if-match": tradeIfMatch(target.version) } },
         ),
-      { failureTitle: t.trade.uomRetireFailed, describe, isHandled: isStale },
+      {
+        failureTitle: t.trade.uomRetireFailed,
+        describe,
+        isHandled: (err) =>
+          isStale(err) || err.code === UOM_RETIRE_REFERENCED_CODE,
+      },
     );
     setIsSubmitting(false);
-    if (!outcome.ok && outcome.error && isStale(outcome.error)) await openConflict(retiring.id);
     setRetiring(null);
-    if (outcome.ok) toast.success(t.trade.savedTitle, replayMessage(outcome.replayed, t));
+    if (!outcome.ok) {
+      if (outcome.error && isStale(outcome.error)) {
+        await openConflict(target.id);
+      } else if (outcome.error?.code === UOM_RETIRE_REFERENCED_CODE) {
+        setRetireBlocked(target);
+      }
+      return;
+    }
+    toast.success(t.trade.uomRetireSuccess, replayMessage(outcome.replayed, t));
     await load();
-  }, [canManage, retiring, isSubmitting, runWrite, describe, isStale, openConflict, toast, t, load]);
+  }, [
+    canManage,
+    retiring,
+    isSubmitting,
+    runWrite,
+    describe,
+    isStale,
+    openConflict,
+    toast,
+    t,
+    load,
+  ]);
+
+  /** Reactivating restores a `RETIRED` unit back to `ACTIVE`. */
+  const reactivate = useCallback(async (): Promise<void> => {
+    if (!canManage || !reactivating || isSubmitting) return;
+    const target = reactivating;
+    setIsSubmitting(true);
+    const outcome = await runWrite(
+      () =>
+        tradePatch(
+          uomPath(target.id),
+          { status: "ACTIVE" },
+          { headers: { "if-match": tradeIfMatch(target.version) } },
+        ),
+      {
+        failureTitle: t.trade.uomUpdateFailed,
+        describe,
+        isHandled: isStale,
+      },
+    );
+    setIsSubmitting(false);
+    setReactivating(null);
+    if (!outcome.ok) {
+      if (outcome.error && isStale(outcome.error)) {
+        await openConflict(target.id);
+      }
+      return;
+    }
+    toast.success(
+      t.trade.uomReactivateSuccess,
+      replayMessage(outcome.replayed, t),
+    );
+    await load();
+  }, [
+    canManage,
+    reactivating,
+    isSubmitting,
+    runWrite,
+    describe,
+    isStale,
+    openConflict,
+    toast,
+    t,
+    load,
+  ]);
 
   return {
     t,
@@ -223,10 +372,18 @@ export function useUoms() {
     isSubmitting,
     queryError,
     formError,
+    isCodeTaken,
     createOpen,
+    createInitialMode,
     editing,
     retiring,
+    reactivating,
+    retireBlocked,
     conflict,
+    operatingPurpose,
+    operatingItems,
+    isOperatingLoading,
+    operatingError,
     setPage,
     setStatusFilter: (next: UomStatus | undefined) => {
       setPage(1);
@@ -236,13 +393,21 @@ export function useUoms() {
       setPage(1);
       setSearch(next);
     },
-    openCreate: () => {
+    setOperatingPurpose: (purpose: CatalogUomPurpose) => {
+      setOperatingPurpose(purpose);
+      void loadOperating(purpose);
+    },
+    loadOperating,
+    openCreate: (mode: UomCreateEntryMode = "custom") => {
       setFormError(null);
+      setIsCodeTaken(false);
+      setCreateInitialMode(mode);
       setCreateOpen(true);
     },
     closeCreate: () => {
       if (isSubmitting) return;
       setFormError(null);
+      setIsCodeTaken(false);
       setCreateOpen(false);
     },
     openEdit: (uom: Uom) => {
@@ -259,6 +424,12 @@ export function useUoms() {
       if (isSubmitting) return;
       setRetiring(null);
     },
+    openReactivate: (uom: Uom) => setReactivating(uom),
+    closeReactivate: () => {
+      if (isSubmitting) return;
+      setReactivating(null);
+    },
+    dismissRetireBlocked: () => setRetireBlocked(null),
     dismissConflict: () => setConflict(null),
     resolveConflict: () => {
       setConflict(null);
@@ -268,6 +439,7 @@ export function useUoms() {
     create,
     update,
     retire,
+    reactivate,
     reload: () => load(),
   };
 }
@@ -288,7 +460,6 @@ function formMessage(error: unknown, t: Dictionary): string {
   if (reason === "UOM_FORM_CODE") return t.trade.uomFormCode;
   if (reason === "UOM_FORM_DISPLAY_NAME") return t.trade.uomFormDisplayName;
   if (reason === "UOM_FORM_NAMES") return t.trade.uomFormNames;
-  if (reason === "UOM_FORM_EVIDENCE") return t.trade.uomFormEvidence;
   return t.trade.uomCreateFailed;
 }
 

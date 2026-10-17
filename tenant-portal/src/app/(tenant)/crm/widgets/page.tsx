@@ -24,8 +24,9 @@ import { WidgetFormDrawer } from "./components/WidgetFormDrawer";
 import { useWidgetColumns } from "./components/useWidgetColumns";
 import { useWidgets, type WidgetWriteResult } from "./hooks/useWidgets";
 
-const CRM_ANALYTICS_ITEMS =
-  NAV_SECTIONS.find((section) => section.id === "crmAnalytics")?.items ?? [];
+const CRM_ANALYTICS_ITEMS = NAV_SECTIONS.flatMap((section) => section.items).filter((item) =>
+  ["crmDashboardReports", "crmDashboards", "crmWidgets"].includes(item.id),
+);
 
 export default function WidgetsPage() {
   const { t } = useI18n();

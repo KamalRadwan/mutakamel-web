@@ -106,7 +106,7 @@ function DialogCloseButton({ label }: { label?: string }) {
   return (
     <DialogPrimitive.Close
       className={cn(
-        "absolute end-4 top-4 rounded-md text-muted-foreground opacity-70 hover:opacity-100 disabled:pointer-events-none",
+        "absolute end-4 top-3.5 inline-flex size-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none",
         focusRing,
       )}
     >

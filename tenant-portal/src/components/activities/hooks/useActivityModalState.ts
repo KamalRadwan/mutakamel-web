@@ -3,7 +3,13 @@
 import { useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useAccessMode } from "@/hooks/useAccessMode";
-import type { Activity } from "../activity-contract";
+import {
+  ACTIVITY_TARGET_APPS,
+  type Activity,
+  type ActivityTargetApp,
+  type ActivityTargetSelection,
+  type ActivityType,
+} from "../activity-contract";
 import { activityToForm, createActivityForm, nextActivityForm } from "../activity-form";
 import { buildCreateActivityBody, buildUpdateActivityBody } from "../activity-form-rules";
 import {
@@ -12,6 +18,7 @@ import {
   canAssignActivities,
   canCreateActivities,
   isOpenActivityStatus,
+  primaryActivityTarget,
   type ActivityAction,
 } from "../activity-presentation";
 import type { ActivityModalProps, ActivityModalRequest } from "../ActivityModal";
@@ -71,6 +78,22 @@ function newer(fresh: Activity | null, snapshot: Activity | null): Activity | nu
   return fresh.version >= snapshot.version ? fresh : snapshot;
 }
 
+function isTargetApp(value: string): value is ActivityTargetApp {
+  return (ACTIVITY_TARGET_APPS as readonly string[]).includes(value);
+}
+
+function activityTargetSelection(activity: Activity | null): ActivityTargetSelection | null {
+  if (!activity) return null;
+  const target = primaryActivityTarget(activity);
+  if (!target || !isTargetApp(target.targetApp)) return null;
+  return {
+    app: target.targetApp,
+    type: target.targetType,
+    id: target.targetId,
+    label: target.label,
+  };
+}
+
 /**
  * Why the form on screen cannot be saved, when it cannot. The form then stays
  * readable but locked, and says so: a Save that is simply not there reads as a
@@ -97,13 +120,17 @@ export function useActivityModalState({ request, open, onClose, onChanged }: Act
   const gone = detail.error?.status === 404;
   const writable = canMutate && !gone;
 
-  const fixedTarget = request.kind === "create" ? request.target ?? null : null;
-  const agenda = useRecordActivities(request.kind === "create" && request.agenda ? fixedTarget : null, open);
+  const fixedTarget =
+    request.kind === "create"
+      ? request.target ?? null
+      : activityTargetSelection(current ?? request.activity);
   const createForm = useActivityFormState(() => createActivityForm({
     type: request.kind === "create" ? request.defaults?.type : undefined,
     start: request.kind === "create" ? request.defaults?.start : undefined,
     target: fixedTarget,
   }), { mode: "create" });
+  const agendaTarget = fixedTarget ?? createForm.values.target;
+  const agenda = useRecordActivities(agendaTarget, open);
   const editForm = useActivityFormState(
     () => (request.kind === "edit" ? activityToForm(request.activity) : createActivityForm({})),
     { mode: "edit", activityStatus: current?.status },
@@ -196,9 +223,14 @@ export function useActivityModalState({ request, open, onClose, onChanged }: Act
       : canUpdate ? null
       : "notPermitted";
 
+  const actorName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.email || null
+    : null;
+
   return {
     open,
     screen: machine.screen,
+    editFromView: machine.editFromView,
     current,
     fixedTarget,
     commands,
@@ -207,9 +239,10 @@ export function useActivityModalState({ request, open, onClose, onChanged }: Act
     createForm,
     editForm,
     // A refused read is not an empty agenda — 403 is not an empty state — so the strip is left out.
-    agenda: request.kind === "create" && request.agenda && fixedTarget && agenda.readable && !agenda.denied ? agenda : null,
+    agenda: agenda.readable && !agenda.denied ? agenda : null,
     outcome,
     actorId: user?.id ?? null,
+    actorName,
     createStatuses: activityCreateStatuses(user),
     formBlock,
     can: {
@@ -232,7 +265,7 @@ export function useActivityModalState({ request, open, onClose, onChanged }: Act
       if (commands.pendingKind) return;
       commands.clearError();
       if (machine.screen === "edit" && machine.editFromView) setMachine((state) => ({ ...state, screen: "view" }));
-      else if (machine.screen === "view" && request.kind === "create") setMachine(initialMachine(request));
+      else if ((machine.screen === "view" || machine.screen === "edit") && request.kind === "create") setMachine(initialMachine(request));
       else {
         // Closed on an unknown outcome: the screens behind read again, which
         // is what shows whether it landed.
@@ -246,6 +279,17 @@ export function useActivityModalState({ request, open, onClose, onChanged }: Act
       editForm.reset(activityToForm(current));
       setEditBase(current);
       setMachine((state) => ({ ...state, screen: "edit", editFromView: true }));
+    },
+    editActivity: (activity: Activity) => {
+      commands.clearError();
+      editForm.reset(activityToForm(activity));
+      setEditBase(activity);
+      setMachine({ screen: "edit", activity, editFromView: false });
+    },
+    startCreate: (type?: ActivityType) => {
+      commands.clearError();
+      if (type) createForm.setType(type);
+      setMachine((state) => ({ ...state, screen: "create", editFromView: false }));
     },
     changeStatus: async (status: "PLANNED" | "IN_PROGRESS") => {
       if (current) settle("row", await commands.setStatus(current, status), false);

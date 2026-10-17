@@ -105,6 +105,7 @@ export default function ImportMappingsPage() {
   const content = (
     <div className="flex flex-col gap-4">
       <PageHeader
+        className="sr-only"
         title={t.tradeAutomation.mappingsTitle}
         description={t.tradeAutomation.mappingsSubtitle}
         primaryAction={
@@ -159,6 +160,7 @@ export default function ImportMappingsPage() {
       />
 
       <DataTable
+        density="compact"
         columns={columns}
         rows={items}
         isLoading={isLoading}

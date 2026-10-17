@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, Pencil } from "lucide-react";
+import { Building2, Mail, Pencil } from "lucide-react";
 import { Button, Card, CardContent, CardHeader, CardTitle, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { Language } from "@/i18n/useLanguage";
@@ -11,80 +11,206 @@ import { useLeadCompanyModal } from "../hooks/useLeadCompanyModal";
 import { LeadCompanyEditModal } from "./LeadCompanyEditModal";
 import { LeadPhoneActionsRow } from "../../components/LeadPhoneActionsRow";
 
-/** Company facts stay readable; editing owns a separate, prefilled modal. */
+function formatFullLegalAddress(address: LeadDetail["address"]): string | null {
+  if (!address) return null;
+  const parts = [
+    address.street,
+    address.buildingNo ? `Bldg ${address.buildingNo}` : null,
+    address.floor ? `Floor ${address.floor}` : null,
+    address.apartment,
+    address.area,
+    address.city,
+    address.country,
+    address.landmark ? `Landmark: ${address.landmark}` : null,
+    address.postalCode ? `Postal Code: ${address.postalCode}` : null,
+  ].filter((part): part is string => Boolean(part && part.trim().length > 0));
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * Corporate Company Details Card (Dossier 360° Section 1).
+ * In View Mode: displays the highlighted Emerald-Cyan Company Phones box and 2-column boxed field grid.
+ * In Edit Mode: transforms in-place into the Inline Company & Split Phones Editor (hiding the view card).
+ */
 export function LeadCompanyCard({ lead, edit, readOnly }: {
   lead: LeadDetail;
   edit: LeadCompanyEdit;
   readOnly: boolean;
 }) {
   const { t, lang } = useI18n();
+  const isAr = lang === "ar";
   const modal = useLeadCompanyModal(lead, edit, readOnly);
   const read = (value: string | null, dir?: "ltr") => (
     <ReadValue value={value} dir={dir} emptyLabel={t.detail.notRecorded} />
   );
-  const fields: Array<{ label: string; value: React.ReactNode; alignTop?: boolean; labelClassName?: string }> = [
+  const fullLegalAddress = formatFullLegalAddress(lead.address);
+
+  // When editing, hide the original View Mode card in-place and render the Inline Editor card
+  if (modal.form) {
+    return <LeadCompanyEditModal state={modal} edit={edit} readOnly={readOnly} />;
+  }
+
+  const fields: Array<{
+    label: string;
+    value: React.ReactNode;
+    alignTop?: boolean;
+    labelClassName?: string;
+    fullWidth?: boolean;
+  }> = [
     { label: t.crmLeads.companyName, value: read(lead.companyName) },
-    { label: t.crmLeads.create.taxNumber, value: read(lead.taxNumber, "ltr") },
-    {
-      label: t.crmLeadDetail.companyPhones,
-      alignTop: true,
-      value: lead.phones.length > 0 ? (
-        <span className="flex flex-col gap-1">
-          {lead.phones.map((phone, index) => <LeadPhoneActionsRow key={`${phone}-${index}`} phone={phone}
-            country={lead.address?.country ?? undefined} />)}
-        </span>
-      ) : <EmptyValue label={t.detail.notRecorded} />,
-    },
-    {
-      label: t.crmLeads.create.commercialRegistrationNumber,
-      labelClassName: "whitespace-nowrap",
-      value: read(lead.commercialRegistrationNumber, "ltr"),
-    },
     {
       label: t.crmLeadDetail.companyEmail,
       value: (
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5">
           {read(lead.companyEmail, "ltr")}
           {lead.companyEmail && (
             <Button variant="ghost" size="xs" asChild>
               <a href={`mailto:${lead.companyEmail}`} aria-label={t.crmLeadDetail.sendEmail} title={t.crmLeadDetail.sendEmail}>
-                <Mail className="size-3.5" aria-hidden="true" />
+                <Mail className="size-3.5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
               </a>
             </Button>
           )}
         </span>
       ),
     },
-    { label: t.crmLeadDetail.companyWebsite, value: read(lead.companyWebsite, "ltr") },
-    { label: t.crmLeadDetail.location, value: <LeadCompanyLocation address={lead.address} lang={lang} emptyLabel={t.detail.notRecorded} /> },
+    { label: t.crmLeads.create.taxNumber, value: read(lead.taxNumber, "ltr") },
+    {
+      label: t.crmLeads.create.commercialRegistrationNumber,
+      labelClassName: "whitespace-nowrap",
+      value: read(lead.commercialRegistrationNumber, "ltr"),
+    },
+    {
+      label: t.crmLeadDetail.companyWebsite,
+      value: lead.companyWebsite ? (
+        <a
+          href={lead.companyWebsite.startsWith("http") ? lead.companyWebsite : `https://${lead.companyWebsite}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          dir="ltr"
+          className="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400"
+        >
+          {lead.companyWebsite} ↗
+        </a>
+      ) : (
+        <EmptyValue label={t.detail.notRecorded} />
+      ),
+    },
+    {
+      label: t.crmLeadDetail.location,
+      value: <LeadCompanyLocation address={lead.address} lang={lang} emptyLabel={t.detail.notRecorded} />,
+    },
+    {
+      label: isAr
+        ? "العنوان القانوني الكامل (الشارع، المبنى، الدور، الوحدة، علامة مميزة، الرمز البريدي)"
+        : "Full Legal Address (Street, Building, Floor, Apartment, Landmark, Postal Code)",
+      fullWidth: true,
+      value: read(fullLegalAddress),
+    },
   ];
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex-row items-center justify-between gap-1.5 p-2">
-          <CardTitle className="text-sm">{t.crmLeadDetail.companyTitle}</CardTitle>
-          {!readOnly && (
-            <Button variant="ghost" size="xs" className="text-warning-vivid"
-              aria-label={t.crmLeadDetail.editCompany} title={t.crmLeadDetail.editCompany}
-              disabled={edit.savingKey !== null} onClick={modal.open}>
-              <Pencil className="size-3.5" aria-hidden="true" />
-            </Button>
+    <Card className="dossier-card dossier-card-indigo">
+      <CardHeader className="dossier-card-head flex-row items-center justify-between gap-2">
+        <div className="dossier-card-title">
+          <span className="dossier-icon-pill dossier-ip-indigo" aria-hidden="true">
+            <Building2 className="size-3.5" aria-hidden="true" />
+          </span>
+          <CardTitle className="text-xs font-extrabold tracking-wider uppercase">
+            {t.crmLeadDetail.companyTitle}
+          </CardTitle>
+          <span className="dossier-badge dossier-badge-corporate">
+            {t.crmCustomerProfiles.profileTypes.CORPORATE}
+          </span>
+        </div>
+        {!readOnly ? (
+          <button
+            type="button"
+            className="dossier-btn-action"
+            aria-label={t.crmLeadDetail.editCompany}
+            title={t.crmLeadDetail.editCompany}
+            disabled={edit.savingKey !== null}
+            onClick={modal.open}
+          >
+            <Pencil className="size-3" aria-hidden="true" />
+            <span>{t.crmLeadDetail.editCompany}</span>
+          </button>
+        ) : (
+          <span className="dossier-badge dossier-badge-converted">
+            🔒 {isAr ? "للقراءة فقط" : "Read-Only"}
+          </span>
+        )}
+      </CardHeader>
+      <CardContent className="dossier-card-body">
+        {/* Highlighted Emerald-Cyan Company Phones Box (View Mode) */}
+        <div className="dossier-phone-box-view">
+          <div className="dossier-phone-box-head">
+            <span className="dossier-phone-box-label">
+              📞 {t.crmLeadDetail.companyPhones}
+            </span>
+            {!readOnly && (
+              <button
+                type="button"
+                disabled={edit.savingKey !== null}
+                onClick={modal.open}
+                className="dossier-btn-action dossier-btn-action-emerald"
+              >
+                <Pencil className="size-3" aria-hidden="true" />
+                <span>
+                  {isAr ? "تعديل الأرقام (كود + رقم)" : "Edit Phones (Code + Number)"}
+                </span>
+              </button>
+            )}
+          </div>
+          {lead.phones.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              {lead.phones.map((phone, index) => (
+                <LeadPhoneActionsRow
+                  key={`${phone}-${index}`}
+                  phone={phone}
+                  country={lead.address?.country ?? undefined}
+                  badge={
+                    index === 0
+                      ? isAr
+                        ? "الرقم الأساسي"
+                        : "Primary Phone"
+                      : isAr
+                        ? "فرعي"
+                        : "Secondary"
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyValue label={t.detail.notRecorded} />
           )}
-        </CardHeader>
-        <CardContent className="p-2">
-          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-1 sm:grid-cols-[max-content_minmax(0,1fr)_max-content_minmax(0,1fr)]">
-            {fields.map((field) => (
-              <div key={field.label} className={cn("col-span-2 grid grid-cols-subgrid items-center", field.alignTop && "items-start")}>
-                <dt className={cn("flex min-h-(--size-control-xs) items-center text-xs text-muted-foreground", field.labelClassName)}>{field.label}</dt>
-                <dd className="min-w-0 text-xs text-foreground">{field.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </CardContent>
-      </Card>
-      <LeadCompanyEditModal state={modal} edit={edit} readOnly={readOnly} />
-    </>
+        </div>
+
+        {/* 2-Column Boxed Company Fields Grid */}
+        <dl className="dossier-grid-2 grid grid-cols-[max-content_minmax(0,1fr)] gap-2.5 sm:grid-cols-[max-content_minmax(0,1fr)_max-content_minmax(0,1fr)]">
+          {fields.map((field) => (
+            <div
+              key={field.label}
+              className={cn(
+                "dossier-field-box flex flex-col justify-center",
+                field.fullWidth && "dossier-span-all",
+              )}
+            >
+              <dt
+                className={cn(
+                  "dossier-field-label text-xs text-muted-foreground",
+                  field.labelClassName,
+                )}
+              >
+                {field.label}
+              </dt>
+              <dd className="dossier-field-val min-w-0 text-xs font-bold text-foreground">
+                {field.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -114,3 +240,4 @@ function LeadCompanyLocation({ address, lang, emptyLabel }: {
     </span>
   );
 }
+

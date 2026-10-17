@@ -24,8 +24,9 @@ import { useDashboardColumns } from "./components/useDashboardColumns";
 import { useDashboards, type DashboardWriteResult } from "./hooks/useDashboards";
 import type { DashboardSummary } from "./dashboard-contract";
 
-const CRM_ANALYTICS_ITEMS =
-  NAV_SECTIONS.find((section) => section.id === "crmAnalytics")?.items ?? [];
+const CRM_ANALYTICS_ITEMS = NAV_SECTIONS.flatMap((section) => section.items).filter((item) =>
+  ["crmDashboardReports", "crmDashboards", "crmWidgets"].includes(item.id),
+);
 
 export default function DashboardsPage() {
   const { t } = useI18n();

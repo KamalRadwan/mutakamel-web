@@ -26,7 +26,13 @@ const CLEAR_VALUE = "__all__";
  * company rather than failing, and a channel is never required by any route on
  * the foundation pages.
  */
-export function TradeScopeBar({ allowItemMaster = false }: { allowItemMaster?: boolean }) {
+export function TradeScopeBar({
+  allowItemMaster = false,
+  hideWhenSingleScope = false,
+}: {
+  allowItemMaster?: boolean;
+  hideWhenSingleScope?: boolean;
+}) {
   const { t } = useI18n();
   const {
     context,
@@ -39,65 +45,77 @@ export function TradeScopeBar({ allowItemMaster = false }: { allowItemMaster?: b
     selectChannel,
   } = useTradeScope();
 
+  const showCompany = !hideWhenSingleScope || companyIds.length > 1;
+  const showBranch = !hideWhenSingleScope || branchIds.length > 1;
+  const showChannel = !hideWhenSingleScope || channels.length > 0;
+
+  if (!showCompany && !showBranch && !showChannel) return null;
+
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.trade.scopeTitle}>
-      <Select
-        value={context.companyId ?? (allowItemMaster ? CLEAR_VALUE : "")}
-        onValueChange={(next) => selectCompany(next === CLEAR_VALUE ? null : next)}
-      >
-        <SelectTrigger
-          size="sm"
-          dir={context.companyId ? "ltr" : undefined}
-          aria-label={t.trade.scopeCompany}
-          className={context.companyId ? "w-56 font-mono" : "w-56"}
+      {showCompany ? (
+        <Select
+          value={context.companyId ?? (allowItemMaster ? CLEAR_VALUE : "")}
+          onValueChange={(next) => selectCompany(next === CLEAR_VALUE ? null : next)}
         >
-          <SelectValue placeholder={t.trade.scopeSelectCompany} />
-        </SelectTrigger>
-        <SelectContent>
-          {allowItemMaster && <SelectItem value={CLEAR_VALUE}>{t.trade.scopeItemMaster}</SelectItem>}
-          {companyIds.map((id) => (
-            <SelectItem key={id} value={id}>
-              {id}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <SelectTrigger
+            size="sm"
+            dir={context.companyId ? "ltr" : undefined}
+            aria-label={t.trade.scopeCompany}
+            className={context.companyId ? "w-56 font-mono" : "w-56"}
+          >
+            <SelectValue placeholder={t.trade.scopeSelectCompany} />
+          </SelectTrigger>
+          <SelectContent>
+            {allowItemMaster && <SelectItem value={CLEAR_VALUE}>{t.trade.scopeItemMaster}</SelectItem>}
+            {companyIds.map((id) => (
+              <SelectItem key={id} value={id}>
+                {id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
 
-      <Select
-        value={context.branchId ?? CLEAR_VALUE}
-        onValueChange={(next) => selectBranch(next === CLEAR_VALUE ? null : next)}
-        disabled={!context.companyId || branchIds.length === 0}
-      >
-        <SelectTrigger size="sm" dir="ltr" aria-label={t.trade.scopeBranch} className="w-56 font-mono">
-          <SelectValue placeholder={t.trade.scopeAllBranches} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={CLEAR_VALUE}>{t.trade.scopeAllBranches}</SelectItem>
-          {branchIds.map((id) => (
-            <SelectItem key={id} value={id}>
-              {id}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {showBranch ? (
+        <Select
+          value={context.branchId ?? CLEAR_VALUE}
+          onValueChange={(next) => selectBranch(next === CLEAR_VALUE ? null : next)}
+          disabled={!context.companyId || branchIds.length === 0}
+        >
+          <SelectTrigger size="sm" dir="ltr" aria-label={t.trade.scopeBranch} className="w-56 font-mono">
+            <SelectValue placeholder={t.trade.scopeAllBranches} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={CLEAR_VALUE}>{t.trade.scopeAllBranches}</SelectItem>
+            {branchIds.map((id) => (
+              <SelectItem key={id} value={id}>
+                {id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
 
-      <Select
-        value={context.channelId ?? CLEAR_VALUE}
-        onValueChange={(next) => selectChannel(next === CLEAR_VALUE ? null : next)}
-        disabled={!context.companyId || isLoadingChannels || channels.length === 0}
-      >
-        <SelectTrigger size="sm" aria-label={t.trade.scopeChannel} className="w-56">
-          <SelectValue placeholder={t.trade.scopeNoChannel} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={CLEAR_VALUE}>{t.trade.scopeNoChannel}</SelectItem>
-          {channels.map((channel) => (
-            <SelectItem key={channel.id} value={channel.id}>
-              {channel.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {showChannel ? (
+        <Select
+          value={context.channelId ?? CLEAR_VALUE}
+          onValueChange={(next) => selectChannel(next === CLEAR_VALUE ? null : next)}
+          disabled={!context.companyId || isLoadingChannels || channels.length === 0}
+        >
+          <SelectTrigger size="sm" aria-label={t.trade.scopeChannel} className="w-56">
+            <SelectValue placeholder={t.trade.scopeNoChannel} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={CLEAR_VALUE}>{t.trade.scopeNoChannel}</SelectItem>
+            {channels.map((channel) => (
+              <SelectItem key={channel.id} value={channel.id}>
+                {channel.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
     </div>
   );
 }

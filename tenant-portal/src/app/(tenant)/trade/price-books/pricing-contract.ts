@@ -34,6 +34,7 @@ export const PRICING_EVALUATE_PATH = "/api/tenant/trade/v1/pricing/evaluate";
 
 export const PRICING_READ_PERMISSION = "trade.pricing.read";
 export const PRICING_MANAGE_PERMISSION = "trade.pricing.manage";
+export const CONFIGURATION_MANAGE_PERMISSION = "trade.configuration.manage";
 /**
  * Publishing a price-book version needs a **Policy Studio** grant, not
  * `trade.pricing.manage`. Two of Trade's three publish actions are behind it.
@@ -47,6 +48,7 @@ export const PROMOTIONS_MAX = 500;
 export const PROMOTION_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 export const CURRENCY_CODE_PATTERN = /^[A-Z]{3}$/u;
 
+export const COMMON_CURRENCY_PRESETS = ["SAR", "AED", "USD", "EUR", "EGP", "KWD"] as const;
 export const PRICE_BOOK_PURPOSES = ["SALES", "PURCHASE"] as const;
 export const PROMOTION_BENEFIT_TYPES = ["PERCENTAGE", "FIXED_AMOUNT"] as const;
 export type PriceBookPurpose = (typeof PRICE_BOOK_PURPOSES)[number];
@@ -56,7 +58,7 @@ export type PromotionBenefitType = (typeof PROMOTION_BENEFIT_TYPES)[number];
 // `GovernedVersionStatus` the policy ladder uses; it is rendered through
 // `t.tradeStatus`, which holds every value, and is not narrowed here.
 
-interface PriceBookVersionSummary {
+export interface PriceBookVersionSummary {
   id: string;
   versionNumber: number;
   status: string;
@@ -68,12 +70,21 @@ interface PriceBookVersionSummary {
 export interface PriceBook {
   id: string;
   code: string;
+  name?: string | null;
   purpose: string;
   currencyCode: string;
   /** A free string with no enum anywhere in source — rendered as it arrives. */
   status: string;
   version: number;
   versions: PriceBookVersionSummary[];
+}
+
+export interface CompanyDefaultPriceBook {
+  purpose: PriceBookPurpose;
+  currencyCode: string;
+  priceBookId: string;
+  version: number;
+  updatedAt?: string | null;
 }
 
 export interface PriceEntry {
@@ -97,28 +108,67 @@ export interface PromotionRow {
   priority: number;
   stackGroup: string;
   exclusive: boolean;
+  benefitType?: string | null;
+  discountValue?: string | null;
 }
 
 export interface PriceBookVersionDetail {
   book: { id: string; code: string; purpose: string; currencyCode: string; status: string; version: number };
-  version: PriceBookVersionSummary & { checksum: string };
+  version: PriceBookVersionSummary & { checksum: string; createdByUserId?: string | null };
   entries: PriceEntry[];
   promotions: PromotionRow[];
   /** Null until a `test` run has been recorded against this checksum. */
   latestTestEvidence: { passed: boolean; testedAt: string } | null;
 }
 
+export interface PricingDecisionComponent {
+  type: string;
+  code: string;
+  amount: string;
+}
+
+export interface PricingRejectedPromotion {
+  promotionId?: string;
+  code: string;
+  reason: string;
+}
+
+export interface PricingRejectedCandidate {
+  entryId: string;
+  reason: string;
+}
+
 export interface PricingDecisionResult {
   outcome: string;
+  decisionType?: string;
   unitPrice: string;
   baselineUnitPrice: string;
   currencyCode: string;
   priceBookId: string;
   priceBookVersionId: string;
+  priceBookVersion?: number;
+  checksum?: string;
+  matchedEntryId?: string;
   minimumAllowedPrice: string | null;
   /** The receipt id — the only way to reach `GET /decisions/:id`. */
   decisionId: string;
-  matchedPromotions: Array<{ code: string; discountAmount: string }>;
+  matchedPromotions: Array<{
+    promotionId?: string;
+    code: string;
+    name?: string;
+    benefitType?: string;
+    discountValue?: string;
+    discountAmount: string;
+    priority?: number;
+    stackGroup?: string;
+    exclusive?: boolean;
+  }>;
+  rejectedPromotions?: PricingRejectedPromotion[];
+  components?: PricingDecisionComponent[];
+  rejectedCandidates?: PricingRejectedCandidate[];
+  inputFingerprint?: string;
+  evaluatedAt?: string;
+  taxFinal?: boolean;
 }
 
 export function priceBookVersionsPath(id: string): TradePath {
@@ -135,6 +185,22 @@ export function priceBookVersionActionPath(id: string, action: "test" | "publish
   return `${priceBookVersionPath(id)}/${action}` as TradePath;
 }
 
+export function companyDefaultPriceBookPath(
+  purpose: PriceBookPurpose | string,
+  currencyCode: string,
+): TradePath {
+  const normalized = currencyCode.trim().toUpperCase();
+  if (!CURRENCY_CODE_PATTERN.test(normalized)) throw new Error("PRICING_FORM_CURRENCY");
+  return `/api/tenant/trade/v1/configuration/company-default-price-books/${purpose}/${normalized}` as TradePath;
+}
+
+export function companyDefaultPriceBookUpsertPath(
+  purpose: PriceBookPurpose | string,
+  currencyCode: string,
+): TradePath {
+  return `${companyDefaultPriceBookPath(purpose, currencyCode)}/upsert` as TradePath;
+}
+
 export function priceBooksListPath(
   page: number,
   purpose?: PriceBookPurpose,
@@ -148,12 +214,14 @@ export function priceBooksListPath(
 
 export interface PriceBookFormValues {
   code: string;
+  name?: string;
   purpose: PriceBookPurpose;
   currencyCode: string;
 }
 
 export const EMPTY_PRICE_BOOK_FORM: PriceBookFormValues = {
   code: "",
+  name: "",
   purpose: "SALES",
   currencyCode: "",
 };
@@ -161,11 +229,34 @@ export const EMPTY_PRICE_BOOK_FORM: PriceBookFormValues = {
 export function buildCreatePriceBookRequest(values: PriceBookFormValues) {
   const code = values.code.trim();
   const currencyCode = values.currencyCode.trim().toUpperCase();
+  const name = values.name?.trim();
   if (code.length === 0 || code.length > PRICE_BOOK_CODE_MAX_LENGTH) {
     throw new Error("PRICING_FORM_CODE");
   }
   if (!CURRENCY_CODE_PATTERN.test(currencyCode)) throw new Error("PRICING_FORM_CURRENCY");
-  return { code, purpose: values.purpose, currencyCode };
+  return name && name.length > 0
+    ? { code, name, purpose: values.purpose, currencyCode }
+    : { code, purpose: values.purpose, currencyCode };
+}
+
+export function parseCompanyDefaultPriceBook(payload: unknown): CompanyDefaultPriceBook {
+  const row = record(payload);
+  if (
+    !row ||
+    !isPriceBookPurpose(row.purpose) ||
+    !isNonEmptyString(row.currencyCode, 3) ||
+    !isUuidV7(row.priceBookId) ||
+    !isBoundedInteger(row.version, 0, Number.MAX_SAFE_INTEGER)
+  ) {
+    invalidPricingResponse();
+  }
+  return {
+    purpose: row.purpose,
+    currencyCode: row.currencyCode,
+    priceBookId: row.priceBookId,
+    version: row.version,
+    updatedAt: isTimestamp(row.updatedAt) ? row.updatedAt : null,
+  };
 }
 
 export function parsePriceBooksResponse(payload: unknown): TradeOffsetPage<PriceBook> {
@@ -210,6 +301,7 @@ function parsePriceBook(payload: unknown): PriceBook {
   return {
     id: row.id,
     code: row.code,
+    ...(typeof row.name === "string" ? { name: row.name } : {}),
     purpose: row.purpose,
     currencyCode: row.currencyCode,
     status: row.status,
@@ -245,7 +337,11 @@ export function parsePriceBookVersionDetail(payload: unknown): PriceBookVersionD
       status: typeof book.status === "string" ? book.status : "",
       version: isBoundedInteger(book.version, 0, Number.MAX_SAFE_INTEGER) ? book.version : 0,
     },
-    version: { ...parseVersionSummary(version), checksum: version.checksum },
+    version: {
+      ...parseVersionSummary(version),
+      checksum: version.checksum,
+      ...(typeof version.createdByUserId === "string" ? { createdByUserId: version.createdByUserId } : {}),
+    },
     entries: body.entries.map(parsePriceEntry),
     promotions: body.promotions.map(parsePromotionRow),
     latestTestEvidence:
@@ -307,6 +403,8 @@ function parsePromotionRow(payload: unknown): PromotionRow {
     priority: row.priority,
     stackGroup: typeof row.stackGroup === "string" ? row.stackGroup : "DEFAULT",
     exclusive: row.exclusive,
+    ...(typeof row.benefitType === "string" ? { benefitType: row.benefitType } : {}),
+    ...(typeof row.discountValue === "string" ? { discountValue: row.discountValue } : {}),
   };
 }
 
@@ -325,13 +423,55 @@ export function parsePricingDecision(payload: unknown): PricingDecisionResult {
   ) {
     invalidPricingResponse();
   }
+  const components = Array.isArray(row.components)
+    ? row.components.flatMap((entry) => {
+        const comp = record(entry);
+        return comp &&
+          typeof comp.type === "string" &&
+          typeof comp.code === "string" &&
+          typeof comp.amount === "string"
+          ? [{ type: comp.type, code: comp.code, amount: comp.amount }]
+          : [];
+      })
+    : undefined;
+
+  const rejectedPromotions = Array.isArray(row.rejectedPromotions)
+    ? row.rejectedPromotions.flatMap((entry) => {
+        const rej = record(entry);
+        return rej && typeof rej.code === "string" && typeof rej.reason === "string"
+          ? [
+              {
+                ...(typeof rej.promotionId === "string" ? { promotionId: rej.promotionId } : {}),
+                code: rej.code,
+                reason: rej.reason,
+              },
+            ]
+          : [];
+      })
+    : undefined;
+
+  const rejectedCandidates = Array.isArray(row.rejectedCandidates)
+    ? row.rejectedCandidates.flatMap((entry) => {
+        const cand = record(entry);
+        return cand && typeof cand.entryId === "string" && typeof cand.reason === "string"
+          ? [{ entryId: cand.entryId, reason: cand.reason }]
+          : [];
+      })
+    : undefined;
+
   return {
     outcome: row.outcome,
+    ...(typeof row.decisionType === "string" ? { decisionType: row.decisionType } : {}),
     unitPrice: row.unitPrice,
     baselineUnitPrice: row.baselineUnitPrice,
     currencyCode: row.currencyCode,
     priceBookId: row.priceBookId,
     priceBookVersionId: row.priceBookVersionId,
+    ...(isBoundedInteger(row.priceBookVersion, 0, Number.MAX_SAFE_INTEGER)
+      ? { priceBookVersion: row.priceBookVersion }
+      : {}),
+    ...(typeof row.checksum === "string" ? { checksum: row.checksum } : {}),
+    ...(typeof row.matchedEntryId === "string" ? { matchedEntryId: row.matchedEntryId } : {}),
     minimumAllowedPrice: (row.minimumAllowedPrice as string | null | undefined) ?? null,
     decisionId: row.decisionId,
     matchedPromotions: Array.isArray(row.matchedPromotions)
@@ -340,10 +480,40 @@ export function parsePricingDecision(payload: unknown): PricingDecisionResult {
           return promotion &&
             typeof promotion.code === "string" &&
             isDecimalString(promotion.discountAmount)
-            ? [{ code: promotion.code, discountAmount: promotion.discountAmount }]
+            ? [
+                {
+                  ...(typeof promotion.promotionId === "string"
+                    ? { promotionId: promotion.promotionId }
+                    : {}),
+                  code: promotion.code,
+                  ...(typeof promotion.name === "string" ? { name: promotion.name } : {}),
+                  ...(typeof promotion.benefitType === "string"
+                    ? { benefitType: promotion.benefitType }
+                    : {}),
+                  ...(typeof promotion.discountValue === "string"
+                    ? { discountValue: promotion.discountValue }
+                    : {}),
+                  discountAmount: promotion.discountAmount,
+                  ...(typeof promotion.priority === "number"
+                    ? { priority: promotion.priority }
+                    : {}),
+                  ...(typeof promotion.stackGroup === "string"
+                    ? { stackGroup: promotion.stackGroup }
+                    : {}),
+                  ...(typeof promotion.exclusive === "boolean"
+                    ? { exclusive: promotion.exclusive }
+                    : {}),
+                },
+              ]
             : [];
         })
       : [],
+    ...(components ? { components } : {}),
+    ...(rejectedPromotions ? { rejectedPromotions } : {}),
+    ...(rejectedCandidates ? { rejectedCandidates } : {}),
+    ...(typeof row.inputFingerprint === "string" ? { inputFingerprint: row.inputFingerprint } : {}),
+    ...(typeof row.evaluatedAt === "string" ? { evaluatedAt: row.evaluatedAt } : {}),
+    ...(typeof row.taxFinal === "boolean" ? { taxFinal: row.taxFinal } : {}),
   };
 }
 

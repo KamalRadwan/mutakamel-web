@@ -90,16 +90,45 @@ export function useCreateOpportunity(
     [errors],
   );
 
-  const openModal = useCallback((initialStageId?: string | null) => {
-    reset();
-    setCustomerLabel("");
-    setError(null);
-    setAmbiguity(null);
-    if (initialStageId) {
-      setForm((prev) => ({ ...prev, stageId: initialStageId }));
-    }
-    setOpen(true);
-  }, [reset, setForm]);
+  const openModal = useCallback(
+    (
+      initialStageId?: string | null,
+      initialDraft?: Partial<OpportunityForm>,
+      defaultPipelineId?: string | null,
+    ) => {
+      reset();
+      setCustomerLabel("");
+      setError(null);
+      setAmbiguity(null);
+      const fallbackPipeline =
+        defaultPipelineId ||
+        pipelines.find((p) => p.isDefault)?.id ||
+        pipelines[0]?.id ||
+        "";
+      const targetPipelineId = initialDraft?.pipelineId || fallbackPipeline;
+      const targetPipeline = pipelines.find((p) => p.id === targetPipelineId);
+      const nonTerminal = (targetPipeline?.stages ?? []).filter(
+        (stage) => !TERMINAL_STAGE_FLAGS.includes(stage.flag),
+      );
+      const targetStageId =
+        initialDraft?.stageId ||
+        initialStageId ||
+        nonTerminal[0]?.id ||
+        "";
+
+      setForm((prev) => ({
+        ...prev,
+        currencyCode: "EGP",
+        importance: "2",
+        probabilityPercent: "50",
+        ...initialDraft,
+        pipelineId: targetPipelineId,
+        stageId: targetStageId,
+      }));
+      setOpen(true);
+    },
+    [pipelines, reset, setForm],
+  );
 
   const closeModal = useCallback(() => {
     reset();
@@ -112,9 +141,17 @@ export function useCreateOpportunity(
   // against the new one. It is cleared rather than left to be rejected.
   const selectPipeline = useCallback(
     (pipelineId: string) => {
-      setForm((current) => ({ ...current, pipelineId, stageId: "" }));
+      const targetPipeline = pipelines.find((p) => p.id === pipelineId);
+      const firstStage = (targetPipeline?.stages ?? []).find(
+        (stage) => !TERMINAL_STAGE_FLAGS.includes(stage.flag),
+      );
+      setForm((current) => ({
+        ...current,
+        pipelineId,
+        stageId: firstStage?.id ?? "",
+      }));
     },
-    [setForm],
+    [pipelines, setForm],
   );
 
   const setCustomField = useCallback(
@@ -135,68 +172,127 @@ export function useCreateOpportunity(
     [setForm],
   );
 
-  const submit = useCallback(async () => {
-    // Every field speaks now, including the ones never focused. Submit is not
-    // disabled while the form is invalid: a disabled button gives a keyboard
-    // user no way to ask what is wrong, so the press is what reveals it.
-    revealAll();
-    if (!branchId || isSubmitting || Object.keys(allErrors).length > 0) return;
-    let body;
-    try {
-      body = buildCreateOpportunityRequest(form, branchId);
-    } catch (caught) {
-      // The builder throws a code, not prose — `useCrmErrorText` owns the words.
-      setError({
-        status: 422,
-        code: caught instanceof Error ? caught.message : undefined,
+  const toggleTag = useCallback(
+    (tagId: string) => {
+      setForm((current) => {
+        const existing = current.tagIds ?? [];
+        const next = existing.includes(tagId)
+          ? existing.filter((id) => id !== tagId)
+          : [...existing, tagId];
+        return { ...current, tagIds: next };
       });
-      return;
-    }
-    const attempt = createWriteAttempt();
+    },
+    [setForm],
+  );
 
-    const send = async (): Promise<void> => {
-      setIsSubmitting(true);
-      setError(null);
-      try {
-        const outcome = await runIdempotentWrite({
-          attempt,
-          method: "post",
-          path: OPPORTUNITIES_PATH,
-          body,
-          parse: parseOpportunityDetailResponse,
-          config: { maxResponseBytes: 512 * 1024 },
-        });
-        if (outcome.kind === "success") {
-          setAmbiguity(null);
-          setOpen(false);
-          reset();
-          onCreated(outcome.value.id);
-          return;
-        }
-        if (outcome.kind === "ambiguous") {
-          setAmbiguity({ attempt, error: outcome.error, replay: send });
-          return;
-        }
-        if (outcome.kind === "applied_unreadable") {
-          // `POST /opportunities` is not idempotent across attempts: the deal
-          // exists, and a second Save makes two. The form is cleared so there
-          // is nothing left to press.
-          setAmbiguity(null);
-          setError(null);
-          setOpen(false);
-          reset();
-          setAppliedUnreadable({ attempt, error: outcome.error });
-          onReconcile();
-          return;
-        }
-        setError(outcome.error);
-      } finally {
-        setIsSubmitting(false);
+  const submit = useCallback(
+    async (options?: { keepOpenAfterSuccess?: boolean }): Promise<boolean> => {
+      // Every field speaks now, including the ones never focused. Submit is not
+      // disabled while the form is invalid: a disabled button gives a keyboard
+      // user no way to ask what is wrong, so the press is what reveals it.
+      revealAll();
+      if (!branchId || isSubmitting || Object.keys(allErrors).length > 0) {
+        return false;
       }
-    };
+      let body;
+      try {
+        body = buildCreateOpportunityRequest(form, branchId);
+      } catch (caught) {
+        // The builder throws a code, not prose — `useCrmErrorText` owns the words.
+        setError({
+          status: 422,
+          code: caught instanceof Error ? caught.message : undefined,
+        });
+        return false;
+      }
+      const attempt = createWriteAttempt();
+      const selectedTagIds = form.tagIds ?? [];
 
-    await send();
-  }, [allErrors, branchId, form, isSubmitting, onCreated, onReconcile, reset, revealAll]);
+      const send = async (): Promise<boolean> => {
+        setIsSubmitting(true);
+        setError(null);
+        try {
+          const outcome = await runIdempotentWrite({
+            attempt,
+            method: "post",
+            path: OPPORTUNITIES_PATH,
+            body,
+            parse: parseOpportunityDetailResponse,
+            config: { maxResponseBytes: 512 * 1024 },
+          });
+          if (outcome.kind === "success") {
+            if (selectedTagIds.length > 0) {
+              const tagAttempt = createWriteAttempt();
+              await runIdempotentWrite({
+                attempt: tagAttempt,
+                method: "post",
+                path: `${OPPORTUNITIES_PATH}/${encodeURIComponent(outcome.value.id)}/tags`,
+                body: { tagIds: selectedTagIds },
+                parse: (payload) => payload,
+              }).catch(() => undefined);
+            }
+            setAmbiguity(null);
+            if (options?.keepOpenAfterSuccess) {
+              const prevPipelineId = form.pipelineId;
+              const prevStageId = form.stageId;
+              reset();
+              setCustomerLabel("");
+              setForm((prev) => ({
+                ...prev,
+                pipelineId: prevPipelineId,
+                stageId: prevStageId,
+                currencyCode: "EGP",
+                importance: "2",
+                probabilityPercent: "50",
+              }));
+              onReconcile();
+            } else {
+              setOpen(false);
+              reset();
+              onCreated(outcome.value.id);
+            }
+            return true;
+          }
+          if (outcome.kind === "ambiguous") {
+            setAmbiguity({
+              attempt,
+              error: outcome.error,
+              replay: async () => {
+                await send();
+              },
+            });
+            return false;
+          }
+          if (outcome.kind === "applied_unreadable") {
+            setAmbiguity(null);
+            setError(null);
+            setOpen(false);
+            reset();
+            setAppliedUnreadable({ attempt, error: outcome.error });
+            onReconcile();
+            return true;
+          }
+          setError(outcome.error);
+          return false;
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      return send();
+    },
+    [
+      allErrors,
+      branchId,
+      form,
+      isSubmitting,
+      onCreated,
+      onReconcile,
+      reset,
+      revealAll,
+      setForm,
+    ],
+  );
 
   return {
     ...state,
@@ -216,6 +312,7 @@ export function useCreateOpportunity(
     selectPipeline,
     setCustomField,
     selectCustomer,
+    toggleTag,
     submit,
   };
 }
