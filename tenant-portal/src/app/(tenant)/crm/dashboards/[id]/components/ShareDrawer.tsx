@@ -8,6 +8,7 @@ import {
   Combobox,
   DatePicker,
   DateTime,
+  ErrorState,
   Field,
   FormDrawer,
   Select,
@@ -17,6 +18,7 @@ import {
   SelectValue,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   SHARE_ACCESS_LEVELS,
   type ShareAccessLevel,
@@ -32,13 +34,17 @@ interface ShareDrawerProps {
   isLoading: boolean;
   isSubmitting: boolean;
   error?: string;
+  sharesError?: NormalizedApiError | null;
+  targetSearchError?: NormalizedApiError | null;
   onSearchTargets: (query: string) => void;
+  onRetryShares: () => void;
+  onRetryTargetSearch: () => void;
   onShare: (input: {
     subjectType: ShareTarget["type"];
     subjectId: string;
     accessLevel: ShareAccessLevel;
     expiresAt: string;
-  }) => void;
+  }) => Promise<boolean>;
   onRevoke: (shareId: string) => void;
 }
 
@@ -50,7 +56,11 @@ export function ShareDrawer({
   isLoading,
   isSubmitting,
   error,
+  sharesError,
+  targetSearchError,
   onSearchTargets,
+  onRetryShares,
+  onRetryTargetSearch,
   onShare,
   onRevoke,
 }: ShareDrawerProps) {
@@ -72,16 +82,18 @@ export function ShareDrawer({
       submitDisabled={!selected}
       onSubmit={() => {
         if (!selected) return;
-        onShare({
+        void onShare({
           subjectType: selected.type,
           subjectId: selected.id,
           accessLevel,
           // A date-only pick becomes an instant; the server refuses a past one
           // with `422 CRM_SHARE_EXPIRY_INVALID`.
           expiresAt: expiresAt ? expiresAt.toISOString() : "",
+        }).then((succeeded) => {
+          if (!succeeded) return;
+          setSubjectId(undefined);
+          setExpiresAt(undefined);
         });
-        setSubjectId(undefined);
-        setExpiresAt(undefined);
       }}
       error={error}
       labels={{
@@ -110,6 +122,17 @@ export function ShareDrawer({
           emptyLabel={t.crmDashboards.shareTargetEmpty}
         />
       </Field>
+      {targetSearchError ? (
+        <div role="alert">
+          <ErrorState
+            title={t.crmDashboards.shareTargetSearchFailed}
+            description={t.crmDashboards.errors[targetSearchError.code ?? ""] ?? t.crmDashboards.actionFailed}
+            onRetry={onRetryTargetSearch}
+            retryLabel={t.common.retry}
+            className="py-4"
+          />
+        </div>
+      ) : null}
 
       <Field label={t.crmDashboards.shareAccessLevel}>
         <Select
@@ -141,7 +164,19 @@ export function ShareDrawer({
 
       <section className="flex flex-col gap-1.5">
         <h3 className="text-sm font-medium text-foreground">{t.crmDashboards.currentShares}</h3>
-        {shares.length === 0 ? (
+        {sharesError ? (
+          <div role="alert">
+            <ErrorState
+              title={t.crmDashboards.shareLoadFailed}
+              description={t.crmDashboards.errors[sharesError.code ?? ""] ?? t.crmDashboards.actionFailed}
+              onRetry={onRetryShares}
+              retryLabel={t.common.retry}
+              className="py-4"
+            />
+          </div>
+        ) : isLoading ? (
+          <p className="text-xs text-muted-foreground" role="status">{t.common.loading}</p>
+        ) : shares.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t.crmDashboards.noShares}</p>
         ) : (
           <ul className="flex flex-col gap-1.5">

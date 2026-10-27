@@ -5,6 +5,8 @@ Status: **Specification**
 Written: **2026-08-27** · Contract section rewritten: **2026-08-31** (Phase 2) ·
 Calendar view added: **2026-09-24**
 
+Lead owner/tag decision alignment source-reviewed: **2026-10-17** (DOCS-FE-001).
+
 Implementation: `src/design-system/views/`
 
 ## Rule
@@ -49,7 +51,7 @@ All three screens now implement all three views — Phase 4 is complete.
 
 | Screen | board | card | table | Notes |
 | --- | :--: | :--: | :--: | --- |
-| Leads | ✅ | ✅ | ✅ | `list` renamed to `table`, rebuilt on `DataTable` |
+| Leads | ✅ | ✅ | ✅ | v3 neutral board columns and menu-expanded cards; `list` renamed to `table`, rebuilt on `DataTable` |
 | Opportunities (Pipeline) | ✅ | ✅ | ✅ | Card and table built against their own purpose-built/generic endpoints — see [../api/crm-opportunities.md](../api/crm-opportunities.md) |
 | Customer Profiles | ✅ | ✅ | ✅ | Built as one three-view workspace with `ViewSwitcher` |
 
@@ -276,14 +278,16 @@ See [shell.md](shell.md#it-holds-the-screens-controls).
 
 Rules:
 
-- Icon-only buttons, 32px (`size="sm"`), each with `aria-label` **and** a
-  `Tooltip` carrying the translated name.
-- `role="radiogroup"`; the active button carries `aria-checked="true"`.
-- The active button is `bg-secondary text-secondary-foreground`. **Not a
-  colored fill.** The current leads implementation tints the active button
-  purple, emerald or amber depending on which view is selected — three hues for
-  one control, and one of the clearest examples of the problem this system
-  removes.
+- Segmented 33px container (`h-(--size-toolbar-control) rounded-lg border
+  border-line-control bg-surface-subtle p-0.5`, verified **2026-10-26** per
+  [specs/crm-leads-v3.md](specs/crm-leads-v3.md)) holding icon-only `w-7 h-full`
+  (`rounded-md`) radio items, each with `aria-label` **and** a `Tooltip`
+  carrying the translated name.
+- `role="radiogroup"`; the active item carries `aria-checked="true"`.
+- Every offered view shares one active treatment:
+  `bg-gradient-primary text-white rounded-md shadow-sm` (inactive items use
+  `text-muted-foreground hover:text-foreground`). Never tint the active segment
+  with per-view purple/emerald/amber hues (D10).
 - Arrow keys move between options; the group is one tab stop.
 
 ### A link after the switcher — `WorkspaceLink`
@@ -295,8 +299,9 @@ It opens the Activities workspace narrowed to that list's record type —
 `/crm/activities?targetApp=CRM&targetType=LEAD` (`CUSTOMER_PROFILE`,
 `OPPORTUNITY`), shown there as the removable "Related to: Leads" chip.
 
-- It wears the switcher's frame (bordered `bg-card`, 28px target) so the two
-  read as one cluster, but it is a **link, never a radio**: a radio promises
+- It wears the switcher's frame (33px `size-(--size-toolbar-control)` target,
+  `rounded-lg`, `border-line-control`, `bg-surface-subtle`; verified 2026-10-26)
+  so the two read as one cluster, but it is a **link, never a radio**: a radio promises
   another drawing of the same records, and this leaves for other records.
 - Icon `ListChecks` — the Activities glyph the nav uses (one glyph per concept).
   `aria-label` and `Tooltip` carry "Lead activities" / "أنشطة العملاء المحتملين"
@@ -460,22 +465,23 @@ only thing a board is for.
 The menu item is subject to the same capability gate as dragging, and a
 terminal destination confirms the same way.
 
-> **Leads: the alternative is on the detail screen, not on the card
-> (closed 2026-09-07).** The Leads card renders neither `BoardView`'s own
-> **Move to…** trigger nor a move section in its menu — the trigger went when
-> the card was redesigned to one overflow menu, and the section was removed
-> from that menu on request. For a day that left the board with the keyboard
-> path only and **not** conforming.
->
-> What closed it: the **pipeline bar on `/crm/leads/[id]` is the move**. It
-> calls the same `POST /leads/:id/stage` the drag calls, is gated by the same
-> `capabilities.update` check, refuses the same `CONVERTED` destination, and is
-> reachable with one pointer press or with the keyboard. A card opens its
-> record in one press, so the path from board to moved lead is two.
->
-> `BoardViewLabels.moveTo` is optional so a screen may own the control itself —
-> never so it may drop the capability. Leads owns it on the detail screen; a
-> screen that owns it nowhere is the configuration this rule forbids.
+**Leads (v3 structure source-reviewed 2026-10-26):** the board composes
+`LeadBoardCard`, `LeadBoardColumnHeader` (including `LeadBoardActivityBar`),
+`LeadBoardCollapsedRail` and `LeadBoardEmptyStage`. Expanded columns share the
+available width with a 235px minimum, neutral column surfaces and no coloured
+top border; horizontal scrolling starts when those minimum widths no longer fit.
+Cards have no time-in-stage text or face expand button. **Expand card** lives in
+`LeadCardMenu`, opening a read-only contact view with the same activity pill,
+rating stars and owner avatar. The column bar classifies only loaded leads:
+future / today / overdue / none, proportional to their loaded count; an empty
+column is one 100% grey NONE segment. Activity filters, quick add, hover-to-peek,
+stage paging, drag/drop and the floating quick-drop dock remain available under
+their existing gates. Card view and board cards offer **Move to…** through
+`LeadCardMenu` when the record's update capability allows it and its current
+stage is not `CONVERTED`. Targets exclude the current stage and `CONVERTED`;
+conversion uses the dedicated flow. Menu moves call `onMoveStage`. The detail
+pipeline bar remains another accessible move path; `BoardViewLabels.moveTo`
+is optional only when the screen supplies its own accessible move control.
 
 **Card content** is per-screen; see the table at the end of this file.
 
@@ -1069,14 +1075,22 @@ Save and Cancel stay visible, enabled when there are changes. Save sends changed
 fields only; Cancel resets the draft without closing editing. Neither mounting
 nor typing saves automatically. Clean forms follow fresh server values; unsaved
 drafts survive unrelated lead refreshes. An uncertain save blocks resubmission
-until the lead is re-read. Timestamps, creator and tags remain read-only, and
-missing capability or conversion still prevents edits. Preserve an assigned
+until the lead is re-read. Timestamps and creator remain read-only, and
+missing capability or conversion still prevents field edits. Preserve an assigned
 owner. Only an unassigned lead may suggest the current user in its open draft,
-and no assignment is saved on mount. Other owner names/options require
-`users.user.read`; the list is active users in the lead's branch, filtered by
-the CRM capability's owner boundary, with server validation remaining decisive.
+and no assignment is saved on mount. Reassignment options come from
+`GET /api/tenant/crm/v1/assignable-owners?resource=leads&action=update&branchId=...`
+(D-015), without `users.user.read`. CRM supplies active, branch-eligible users
+within the update scope; the portal follows every `nextCursor`, validates the
+pages and intersects options with the loaded capability's owner boundary.
+Full lead create uses `resource=leads&action=create`. These picker reads do not
+grant the separate Core permission needed to resolve creator/history names.
 Tags are read from the lead tags endpoint; a failed read is not an empty tag
-set. Notes here maps to the lead's `description`, not the separate notes ledger.
+set. Standalone tag attach/detach requires scoped `crm.leads.update` and is
+allowed by the backend on converted leads (D-024). **Planned — D-024:** remove
+the portal detail tag controls' dependency on the field editor's converted-lead
+lock; current `LeadIdentityCards` still uses `edit.editable` for tag writes.
+Notes here maps to the lead's `description`, not the separate notes ledger.
 The standalone Notes card is not mounted on this page; removing that UI does
 not delete, migrate or merge any existing notes-ledger entries.
 **End rail — updated 2026-09-07:** a full-width header has three equal icon-only

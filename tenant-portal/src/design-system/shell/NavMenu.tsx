@@ -19,51 +19,26 @@ export interface NavMenuProps {
   activeItemId: string | null;
 }
 
-// The active marker on both shapes below: a 2px logical bar along the BOTTOM
-// edge, which is the horizontal nav's equivalent of the sidebar's inset-start
-// bar. Not a filled chip — docs/design/anti-patterns.md#4-hue-coded-controls
-// and the sidebar rule it inherits.
-// Inactive is the muted role and active is the plain one, in both themes: on
-// the light chrome that reads as ink-400 against white rather than as two
-// shades of ink, and `nav-surface` is what makes the same two names mean that
-// here. The marker keeps its own token because it is the one colour on the bar
-// that is neither text nor surface.
-const TRIGGER =
-  "relative my-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-transparent px-2 text-xs font-medium text-white/85 transition-colors xl:px-2.5 xl:text-sm " +
-  "after:pointer-events-none after:absolute after:inset-x-1.5 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-transparent " +
-  "hover:bg-white/10 hover:text-white";
+// Inactive tabs render high-contrast `text-nav-foreground` (#E2E8F0) with a
+// 23×23 soft icon box (`bg-white/10`) that lightens on hover; active tabs use
+// the brand-to-sky gradient pill (`bg-gradient-primary`) with a luminous border
+// (`border-nav-tab-active-line`) and glow (`shadow-nav-active`).
+function navTabClass(active: boolean): string {
+  return cn(
+    "group relative flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 transition-colors xl:gap-1 xl:px-2",
+    active
+      ? "border-nav-tab-active-line bg-gradient-primary font-semibold text-white shadow-nav-active"
+      : "border-transparent font-medium text-nav-foreground hover:bg-white/10 hover:text-nav-foreground-strong",
+    focusRing,
+  );
+}
 
-const TRIGGER_ACTIVE =
-  "border-[#38bdf8]/50 bg-[#38bdf8]/22 font-semibold text-white hover:bg-[#38bdf8]/28 hover:text-white after:bg-nav-active after:shadow-[0_0_8px_#38bdf8]";
-
-const ICON_BADGE_PALETTE: Record<string, string> = {
-  // CRM items & sections
-  crmDashboardReports: "bg-purple-500/20 text-purple-300",
-  leads: "bg-sky-500/25 text-sky-300",
-  customerProfiles: "bg-emerald-500/20 text-emerald-300",
-  opportunities: "bg-amber-500/20 text-amber-300",
-  crmSetup: "bg-rose-500/20 text-rose-300",
-  crmActivities: "bg-teal-500/20 text-teal-300",
-  // Workspace sections
-  workspace: "bg-purple-500/20 text-purple-300",
-  coreIdentity: "bg-sky-500/25 text-sky-300",
-  coreOperations: "bg-emerald-500/20 text-emerald-300",
-  coreSettings: "bg-rose-500/20 text-rose-300",
-  coreBilling: "bg-amber-500/20 text-amber-300",
-  account: "bg-teal-500/20 text-teal-300",
-  // Trade sections
-  tradeFoundation: "bg-sky-500/25 text-sky-300",
-  tradeDocuments: "bg-emerald-500/20 text-emerald-300",
-  tradeInventory: "bg-amber-500/20 text-amber-300",
-  tradeGovernance: "bg-rose-500/20 text-rose-300",
-  tradeAutomation: "bg-teal-500/20 text-teal-300",
-  tradeAnalytics: "bg-purple-500/20 text-purple-300",
-};
-
-function iconBadgeClass(key: string): string {
-  return (
-    ICON_BADGE_PALETTE[key] ??
-    "bg-sky-500/20 text-sky-300"
+function navTabIconBoxClass(active: boolean): string {
+  return cn(
+    "flex size-[23px] shrink-0 items-center justify-center rounded-md transition-colors",
+    active
+      ? "bg-white/20 text-white"
+      : "bg-white/10 text-nav-foreground group-hover:bg-white/15 group-hover:text-nav-foreground-strong",
   );
 }
 
@@ -102,17 +77,12 @@ export function NavMenu({ section, activeItemId }: NavMenuProps) {
               key={item.id}
               href={item.href}
               aria-current={itemIsActive ? "page" : undefined}
-              className={cn(TRIGGER, itemIsActive && TRIGGER_ACTIVE, focusRing)}
+              className={navTabClass(itemIsActive)}
             >
-              <span
-                className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-xs",
-                  iconBadgeClass(item.id),
-                )}
-              >
+              <span className={navTabIconBoxClass(itemIsActive)}>
                 <Icon className="size-3.5 shrink-0" aria-hidden="true" />
               </span>
-              <span className="whitespace-nowrap">{label(item)}</span>
+              <span className="whitespace-nowrap text-tab">{label(item)}</span>
             </Link>
           );
         })}
@@ -123,21 +93,17 @@ export function NavMenu({ section, activeItemId }: NavMenuProps) {
   const only = section.items.length === 1 ? section.items[0] : undefined;
   if (only) {
     const Icon = only.icon;
+    const onlyIsActive = only.id === activeItemId;
     return (
       <Link
         href={only.href}
-        aria-current={only.id === activeItemId ? "page" : undefined}
-        className={cn(TRIGGER, isActive && TRIGGER_ACTIVE, focusRing)}
+        aria-current={onlyIsActive ? "page" : undefined}
+        className={navTabClass(isActive)}
       >
-        <span
-          className={cn(
-            "flex size-5 shrink-0 items-center justify-center rounded-xs",
-            iconBadgeClass(only.id in ICON_BADGE_PALETTE ? only.id : section.id),
-          )}
-        >
+        <span className={navTabIconBoxClass(isActive)}>
           <Icon className="size-3.5 shrink-0" aria-hidden="true" />
         </span>
-        <span className="whitespace-nowrap">{label(only)}</span>
+        <span className="whitespace-nowrap text-tab">{label(only)}</span>
       </Link>
     );
   }
@@ -146,26 +112,23 @@ export function NavMenu({ section, activeItemId }: NavMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className={cn(TRIGGER, isActive && TRIGGER_ACTIVE, focusRing)}>
+      <DropdownMenuTrigger className={navTabClass(isActive)}>
         {SectionIcon && (
-          <span
-            className={cn(
-              "flex size-5 shrink-0 items-center justify-center rounded-xs",
-              iconBadgeClass(section.id),
-            )}
-          >
+          <span className={navTabIconBoxClass(isActive)}>
             <SectionIcon className="size-3.5 shrink-0" aria-hidden="true" />
           </span>
         )}
-        <span className="whitespace-nowrap">
+        <span className="whitespace-nowrap text-tab">
           {t.nav[section.menuLabelKey as keyof typeof t.nav]}
         </span>
         {/* A disclosure chevron is direction-neutral: it must NOT mirror under
             RTL — docs/design/icons.md. */}
         <ChevronDown
           className={cn(
-            "size-3 shrink-0 text-white/60",
-            isActive && "text-sky-300",
+            "size-3.5 shrink-0 transition-colors",
+            isActive
+              ? "text-white/90"
+              : "text-nav-foreground/75 group-hover:text-nav-foreground-strong",
           )}
           aria-hidden="true"
         />

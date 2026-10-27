@@ -13,7 +13,7 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
       aria-hidden="true"
       className={cn(
         "relative overflow-hidden rounded-md bg-muted",
-        "before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.6s_infinite] before:bg-gradient-to-r before:from-transparent before:via-primary-foreground/40 before:to-transparent motion-reduce:before:animate-none dark:before:via-primary-foreground/10",
+        "before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.6s_infinite] before:bg-linear-to-r before:from-transparent before:via-primary-foreground/40 before:to-transparent motion-reduce:before:animate-none dark:before:via-primary-foreground/10",
         className,
       )}
       {...props}

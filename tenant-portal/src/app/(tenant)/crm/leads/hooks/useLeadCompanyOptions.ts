@@ -24,7 +24,7 @@ function isAbortError(error: unknown): boolean {
 /**
  * Existing corporate lead companies and their contact people — MASTER-PLAN 8.4.
  *
- *   GET /leads/company-options?branchId=
+ *   GET /leads/company-options?branchId=&search=&limit=50
  *   GET /leads/company-options/:companyPartyId/contacts?branchId=
  *
  * Both require `crm.leads.create`, so a user who may not create leads gets a
@@ -41,6 +41,8 @@ function isAbortError(error: unknown): boolean {
 export function useLeadCompanyOptions(branchId: string | null, enabled: boolean) {
   const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
   const [companies, setCompanies] = useState<LeadCompanyOption[]>([]);
+  const [companySearch, setCompanySearch] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState<LeadCompanyOption | null>(null);
   const [contacts, setContacts] = useState<LeadCompanyContactOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
@@ -59,39 +61,46 @@ export function useLeadCompanyOptions(branchId: string | null, enabled: boolean)
 
   useEffect(() => {
     const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     // Deferred to a microtask so no state is written synchronously during the
     // effect body — the same pattern every other loader in this module uses,
     // and what `react-hooks/set-state-in-effect` is guarding against.
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
+      setCompanies([]);
       if (!enabled || !isUUIDv7(branchId)) {
-        setCompanies([]);
+        setIsLoadingCompanies(false);
         return;
       }
       setIsLoadingCompanies(true);
       setError(null);
-      void (async () => {
-        try {
-          const response = await axiosClient.get<unknown>(
-            leadCompanyOptionsPath(branchId),
-            {
-              signal: controller.signal,
-              cache: "no-store",
-              maxResponseBytes: 512 * 1024,
-            },
-          );
-          setCompanies(parseLeadCompanyOptions(response.data));
-        } catch (caught) {
-          if (isAbortError(caught) || controller.signal.aborted) return;
-          setCompanies([]);
-          setError(normalizeApiError(caught));
-        } finally {
-          if (!controller.signal.aborted) setIsLoadingCompanies(false);
-        }
-      })();
+      timer = setTimeout(() => {
+        void (async () => {
+          try {
+            const response = await axiosClient.get<unknown>(
+              leadCompanyOptionsPath(branchId, companySearch),
+              {
+                signal: controller.signal,
+                cache: "no-store",
+                maxResponseBytes: 512 * 1024,
+              },
+            );
+            if (!controller.signal.aborted) setCompanies(parseLeadCompanyOptions(response.data));
+          } catch (caught) {
+            if (isAbortError(caught) || controller.signal.aborted) return;
+            setCompanies([]);
+            setError(normalizeApiError(caught));
+          } finally {
+            if (!controller.signal.aborted) setIsLoadingCompanies(false);
+          }
+        })();
+      }, 300);
     });
-    return () => controller.abort();
-  }, [branchId, enabled]);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [branchId, enabled, companySearch]);
 
   const selectCompany = useCallback(
     async (companyPartyId: string | null) => {
@@ -99,6 +108,7 @@ export function useLeadCompanyOptions(branchId: string | null, enabled: boolean)
       contactsEpochRef.current = epoch;
       contactsRequestRef.current?.abort();
       setSelectedCompanyId(companyPartyId);
+      setSelectedCompany(companies.find((company) => company.id === companyPartyId) ?? null);
       setContacts([]);
       if (!companyPartyId || !isUUIDv7(branchId)) {
         contactsRequestRef.current = null;
@@ -138,11 +148,13 @@ export function useLeadCompanyOptions(branchId: string | null, enabled: boolean)
         }
       }
     },
-    [branchId, scope],
+    [branchId, scope, companies],
   );
 
   return {
     companies,
+    selectedCompany,
+    searchCompanies: setCompanySearch,
     contacts,
     selectedCompanyId,
     isLoadingCompanies,
@@ -156,6 +168,8 @@ export function useLeadCompanyOptions(branchId: string | null, enabled: boolean)
       contactsRequestRef.current?.abort();
       contactsRequestRef.current = null;
       setSelectedCompanyId(null);
+      setSelectedCompany(null);
+      setCompanySearch("");
       setContacts([]);
       setError(null);
       // The aborted read's `finally` sees a stale epoch and leaves the flag

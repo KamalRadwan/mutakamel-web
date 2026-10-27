@@ -102,7 +102,7 @@ export const PhoneNumberInput = memo(function PhoneNumberInput({
   return (
     <div
       className={cn(
-        "flex items-center rounded-md border border-input bg-card h-(--size-control-sm) text-xs overflow-hidden transition-colors w-full min-w-0",
+        "flex items-center rounded-md border border-input bg-card h-(--size-control-sm) text-xs overflow-hidden transition-colors motion-reduce:transition-none w-full min-w-0",
         "focus-within:ring-2 focus-within:ring-ring focus-within:border-input",
         ariaInvalid && "border-destructive focus-within:ring-destructive",
         className,

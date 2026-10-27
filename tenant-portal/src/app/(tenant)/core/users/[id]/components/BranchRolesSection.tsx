@@ -17,14 +17,13 @@ import { formatTemplate } from "@/lib/format/template";
 import type {
   BranchRoleAssignment,
 } from "../../../contracts/role-assignment-contract";
-import type { RemoteOptions } from "../../../hooks/useCoreOptions";
+import type { useRoleGrantOptions } from "../../../hooks/useRoleGrantOptions";
 import type { useUserRoleGrants } from "../hooks/useUserRoleGrants";
 import { listTableLabels } from "./list-table-labels";
 
 interface BranchRolesSectionProps {
   panel: ReturnType<typeof useUserRoleGrants>;
-  roles: RemoteOptions;
-  branches: RemoteOptions;
+  grantOptions: ReturnType<typeof useRoleGrantOptions>;
   roleLabel: (id: string) => string;
   branchLabel: (id: string | null | undefined) => string;
 }
@@ -39,16 +38,17 @@ interface BranchRolesSectionProps {
  */
 export function BranchRolesSection({
   panel,
-  roles,
-  branches,
+  grantOptions,
   roleLabel,
   branchLabel,
 }: BranchRolesSectionProps) {
   const { t } = useI18n();
   const lang = useLanguage();
   const copy = t.coreIdentity;
-  const [newBranchId, setNewBranchId] = useState("");
-  const [newRoleId, setNewRoleId] = useState("");
+  const [selectedPair, setSelectedPair] = useState("");
+  const [selectedBranchId, selectedRoleId] = selectedPair.split(":");
+  const selected = grantOptions.choices.find((row) => `${row.branchId}:${row.roleId}` === selectedPair);
+  const editingDisabled = panel.isSubmitting || panel.isBranchLoading || !!panel.branchError || !grantOptions.isReady;
   const draft = panel.branchDraft;
 
   const pickerLabels = {
@@ -75,6 +75,7 @@ export function BranchRolesSection({
           variant="ghost"
           size="sm"
           onClick={() => panel.requestRemoval(row)}
+          disabled={editingDisabled}
           aria-label={`${t.common.delete}: ${roleLabel(row.roleId)}`}
         >
           <Trash2 className="size-4 text-destructive" aria-hidden="true" />
@@ -84,7 +85,8 @@ export function BranchRolesSection({
   ];
 
   function addRow() {
-    if (!newRoleId || !newBranchId) return;
+    if (!selected || editingDisabled) return;
+    const { roleId: newRoleId, branchId: newBranchId } = selected;
     if (draft === null) {
       void panel.addBranchRole({ branchId: newBranchId, roleId: newRoleId });
     } else if (
@@ -92,8 +94,7 @@ export function BranchRolesSection({
     ) {
       panel.setBranchDraft([...draft, { branchId: newBranchId, roleId: newRoleId }]);
     }
-    setNewRoleId("");
-    setNewBranchId("");
+    setSelectedPair("");
   }
 
   return (
@@ -111,34 +112,35 @@ export function BranchRolesSection({
         labels={listTableLabels(t, copy.grants.branchLoadFailed, copy.grants.branchEmpty)}
       />
 
+      {grantOptions.error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {copy.grants.optionsLoadFailed}
+          <Button variant="ghost" size="sm" onClick={grantOptions.retry}>{t.common.retry}</Button>
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1">
+          <label htmlFor="branch-role-pair" className="text-2xs text-muted-foreground">{copy.grants.assignablePair}</label>
           <Combobox
+            id="branch-role-pair"
             {...pickerLabels}
-            value={newRoleId || undefined}
-            selectedLabel={roles.labelFor(newRoleId)}
-            onValueChange={(next) => setNewRoleId(next ?? "")}
-            options={roles.options}
-            onSearch={roles.search}
-            loading={roles.isLoading}
+            value={selectedPair || undefined}
+            selectedLabel={selectedPair ? `${roleLabel(selectedRoleId ?? "")} — ${branchLabel(selectedBranchId)}` : undefined}
+            onValueChange={(next) => setSelectedPair(next ?? "")}
+            options={grantOptions.isReady ? grantOptions.options : []}
+            onSearch={grantOptions.search}
+            loading={grantOptions.isLoading}
             disabled={panel.isSubmitting}
-          />
-        </div>
-        <div className="min-w-48 flex-1">
-          <Combobox
-            {...pickerLabels}
-            value={newBranchId || undefined}
-            selectedLabel={branches.labelFor(newBranchId)}
-            onValueChange={(next) => setNewBranchId(next ?? "")}
-            options={branches.options}
-            onSearch={branches.search}
-            loading={branches.isLoading}
-            disabled={panel.isSubmitting}
+            errorContent={grantOptions.error ? copy.grants.optionsLoadFailed : undefined}
+            footer={grantOptions.hasMore && grantOptions.isReady ? (
+              <Button variant="ghost" size="sm" onClick={grantOptions.loadMore}>{copy.grants.moreOptions}</Button>
+            ) : undefined}
           />
         </div>
         <Button size="sm"
           variant="outline"
-          disabled={!newRoleId || !newBranchId || panel.isSubmitting}
+          disabled={!selected || editingDisabled}
           onClick={addRow}
         >
           <Plus className="size-4" aria-hidden="true" />
@@ -148,7 +150,7 @@ export function BranchRolesSection({
           <Button size="sm"
             variant="ghost"
             onClick={panel.startBranchReplace}
-            disabled={panel.isSubmitting || panel.branchRoles.length === 0}
+            disabled={editingDisabled || panel.branchRoles.length === 0}
           >
             {copy.memberships.replaceAll}
           </Button>
@@ -170,6 +172,7 @@ export function BranchRolesSection({
                   <Button
                     variant="ghost"
                     size="xs"
+                    disabled={editingDisabled}
                     onClick={() =>
                       panel.setBranchDraft(
                         draft.filter(
@@ -190,7 +193,7 @@ export function BranchRolesSection({
               variant="outline"
               size="sm"
               onClick={panel.reviewBranch}
-              disabled={panel.isSubmitting}
+              disabled={editingDisabled}
             >
               {copy.grants.review}
             </Button>
@@ -212,7 +215,7 @@ export function BranchRolesSection({
         })}
         confirmLabel={t.common.delete}
         cancelLabel={t.common.cancel}
-        onConfirm={() => void panel.removeBranchRole()}
+        onConfirm={() => { if (!editingDisabled) void panel.removeBranchRole(); }}
         loading={panel.isSubmitting}
       />
 
@@ -222,7 +225,7 @@ export function BranchRolesSection({
           if (!open) panel.closeBranchReview();
         }}
         diff={panel.branchDiff(describe)}
-        onConfirm={() => void panel.commitBranchRoles()}
+        onConfirm={() => { if (!editingDisabled) void panel.commitBranchRoles(); }}
         loading={panel.isSubmitting}
         formatCount={(count) => formatNumber(count, lang)}
         labels={{

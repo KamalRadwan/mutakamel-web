@@ -63,19 +63,6 @@ export const EXTENSION_VISIBILITY_CODES = ["INTERNAL", "USER", "EXTERNAL_SAFE"] 
 export const EXTENSION_DEFAULT_STRATEGIES = ["NONE", "LITERAL", "OWNER_DERIVED"] as const;
 export const EXTENSION_PROFILE_STATUSES = ["DRAFT", "ACTIVE", "RETIRED"] as const;
 
-/**
- * A **five-value subset** of the seven-value `GovernedVersionStatus`:
- * `APPROVAL_PENDING` and `SCHEDULED` are not filterable here even though the
- * enum contains them.
- */
-export const EXTENSION_VERSION_STATUSES = [
-  "DRAFT",
-  "TESTED",
-  "PUBLISHED",
-  "SUPERSEDED",
-  "RETIRED",
-] as const;
-
 export type ExtensionTargetCode = (typeof EXTENSION_TARGET_CODES)[number];
 type ExtensionScopeTarget = (typeof EXTENSION_SCOPE_TARGETS)[number];
 type ExtensionValueKind = (typeof EXTENSION_VALUE_KINDS)[number];
@@ -432,15 +419,14 @@ export function extensionMessage(
   t: Dictionary,
 ): string | undefined {
   switch (error.code) {
-    // One code, three statuses: 404 "no such definition", 409 "conflicting
-    // definition", 422 "invalid definition". The status is the only separator.
     case "TRADE.EXTENSION.DEFINITION_INVALID":
-      return error.status === 404
-        ? t.tradeAutomation.errorExtensionNotFound
-        : error.status === 409
-          ? t.tradeAutomation.errorExtensionConflict
-          : t.tradeAutomation.errorExtensionInvalid;
+      return t.tradeAutomation.errorExtensionInvalid;
+    case "TRADE.EXTENSION.DEFINITION_NOT_FOUND":
+      return t.tradeAutomation.errorExtensionNotFound;
+    case "TRADE.EXTENSION.DEFINITION_CONFLICT":
+      return t.tradeAutomation.errorExtensionConflict;
     case "TRADE.EXTENSION.PROFILE_INCOMPATIBLE":
+    case "TRADE.EXTENSION.PROFILE_CONFLICT":
       return t.tradeAutomation.errorExtensionIncompatible;
     case "TRADE.EXTENSION.VALUE_INVALID":
       return t.tradeAutomation.errorExtensionValueInvalid;

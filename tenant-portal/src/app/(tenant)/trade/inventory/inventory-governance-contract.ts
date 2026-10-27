@@ -12,10 +12,7 @@ import {
 import { REASON_CODE_MAX_LENGTH, invalidResponse } from "./inventory-contract";
 
 // Inventory governance — periods, UOM conversions, serials and decisions.
-// All four are COMPANY-scoped reads with the **limit-only** dialect: no
-// `page`, and the response is a BARE ARRAY (TypeORM `getMany()`), so there is
-// no `total` and "is there more?" cannot be answered. Sending `page` is a 400,
-// because the global pipe runs `forbidNonWhitelisted`.
+// All four are COMPANY-scoped reads returning { items, total, page, limit }.
 //
 // Source: trade-app/src/modules/inventory/inventory-governance.service.ts and
 // dto/inventory.dto.ts; entities in
@@ -27,7 +24,7 @@ export const INVENTORY_UOM_CONVERSIONS_PATH =
 const INVENTORY_SERIALS_PATH = "/api/tenant/trade/v1/inventory/serials";
 const INVENTORY_DECISIONS_PATH = "/api/tenant/trade/v1/inventory/decisions";
 
-/** `@Max(100)` on every limit-only query DTO; the DTO default is 50. */
+/** `@Max(100)` on every governance query DTO; the DTO default is 50. */
 export const INVENTORY_LIST_LIMIT = 50;
 
 export const PERIOD_STATUSES = ["OPEN", "CLOSED"] as const;
@@ -140,21 +137,21 @@ export const EMPTY_UOM_CONVERSION_FORM: UomConversionFormValues = {
   effectiveFrom: "",
 };
 
-function limitQuery(extra: Record<string, string | undefined>): string {
-  const query = new URLSearchParams({ limit: String(INVENTORY_LIST_LIMIT) });
+function pageQuery(page: number, extra: Record<string, string | undefined>): string {
+  const query = new URLSearchParams({ page: String(page), limit: String(INVENTORY_LIST_LIMIT) });
   for (const [key, value] of Object.entries(extra)) {
     if (value) query.set(key, value);
   }
   return query.toString();
 }
 
-export function periodsListPath(status?: PeriodStatus, effectiveAt?: string): TradePath {
+export function periodsListPath(status?: PeriodStatus, effectiveAt?: string, page = 1): TradePath {
   const trimmedEffective = effectiveAt?.trim();
   const isoEffective =
     trimmedEffective && !Number.isNaN(new Date(trimmedEffective).getTime())
       ? new Date(trimmedEffective).toISOString()
       : undefined;
-  return `${INVENTORY_PERIODS_PATH}?${limitQuery({ status, effectiveAt: isoEffective })}` as TradePath;
+  return `${INVENTORY_PERIODS_PATH}?${pageQuery(page, { status, effectiveAt: isoEffective })}` as TradePath;
 }
 
 export function periodActionPath(id: string, action: "close" | "reopen"): TradePath {
@@ -165,11 +162,12 @@ export function periodActionPath(id: string, action: "close" | "reopen"): TradeP
 export function uomConversionsListPath(
   status?: UomConversionStatus,
   filters?: { itemCompanyProfileId?: string; fromUomId?: string; toUomId?: string },
+  page = 1,
 ): TradePath {
   const itemCompanyProfileId = filters?.itemCompanyProfileId?.trim();
   const fromUomId = filters?.fromUomId?.trim();
   const toUomId = filters?.toUomId?.trim();
-  return `${INVENTORY_UOM_CONVERSIONS_PATH}?${limitQuery({
+  return `${INVENTORY_UOM_CONVERSIONS_PATH}?${pageQuery(page, {
     status,
     itemCompanyProfileId:
       itemCompanyProfileId && isUuidV7(itemCompanyProfileId) ? itemCompanyProfileId : undefined,
@@ -187,10 +185,11 @@ export function serialsListPath(
   state?: SerialState,
   serialKey?: string,
   filters?: { itemId?: string; itemCompanyProfileId?: string },
+  page = 1,
 ): TradePath {
   const itemId = filters?.itemId?.trim();
   const itemCompanyProfileId = filters?.itemCompanyProfileId?.trim();
-  return `${INVENTORY_SERIALS_PATH}?${limitQuery({
+  return `${INVENTORY_SERIALS_PATH}?${pageQuery(page, {
     state,
     serialKey: serialKey?.trim() || undefined,
     itemId: itemId && isUuidV7(itemId) ? itemId : undefined,
@@ -207,9 +206,10 @@ export function serialPath(id: string): TradePath {
 export function inventoryDecisionsListPath(
   policyKind?: InventoryPolicyKind,
   aggregateId?: string,
+  page = 1,
 ): TradePath {
   const trimmedAgg = aggregateId?.trim();
-  return `${INVENTORY_DECISIONS_PATH}?${limitQuery({
+  return `${INVENTORY_DECISIONS_PATH}?${pageQuery(page, {
     policyKind,
     aggregateId: trimmedAgg && isUuidV7(trimmedAgg) ? trimmedAgg : undefined,
   })}` as TradePath;
@@ -419,18 +419,6 @@ export function isPeriodStatus(value: unknown): value is PeriodStatus {
   return isMemberOf(value, PERIOD_STATUSES);
 }
 
-export function isUomConversionStatus(value: unknown): value is UomConversionStatus {
-  return isMemberOf(value, UOM_CONVERSION_STATUSES);
-}
-
-export function isSerialState(value: unknown): value is SerialState {
-  return isMemberOf(value, SERIAL_STATES);
-}
-
-export function isInventoryPolicyKind(value: unknown): value is InventoryPolicyKind {
-  return isMemberOf(value, INVENTORY_POLICY_KINDS);
-}
-
 export const PERIOD_REASON_PRESETS = [
   "MONTH_END_CLOSE",
   "QUARTER_AUDIT_LOCK",
@@ -455,33 +443,44 @@ export function computePeriodDays(startsOn: string, endsOn: string): number | nu
   return Math.round((endMs - startMs) / 86_400_000) + 1;
 }
 
-function gcd(a: number, b: number): number {
-  let x = Math.abs(Math.trunc(a));
-  let y = Math.abs(Math.trunc(b));
-  while (y !== 0) {
+function gcd(a: bigint, b: bigint): bigint {
+  let x = a;
+  let y = b;
+  while (y !== BigInt(0)) {
     const temp = y;
     y = x % y;
     x = temp;
   }
-  return x || 1;
+  return x;
 }
 
 export function suggestIntegerFraction(
-  rawDecimal: string,
+  rawNumerator: string,
+  rawDenominator: string,
 ): { numerator: string; denominator: string } | null {
-  const trimmed = rawDecimal.trim();
-  const match = /^([0-9]{1,8})\.([0-9]{1,6})$/u.exec(trimmed);
-  if (!match) return null;
-  const whole = Number(match[1]);
-  const fracDigits = match[2];
-  const scale = 10 ** fracDigits.length;
-  const rawNum = whole * scale + Number(fracDigits);
-  if (!Number.isSafeInteger(rawNum) || rawNum <= 0) return null;
-  const divisor = gcd(rawNum, scale);
-  return {
-    numerator: String(rawNum / divisor),
-    denominator: String(scale / divisor),
+  const numeratorText = rawNumerator.trim();
+  const denominatorText = rawDenominator.trim();
+  if (!numeratorText.includes(".") && !denominatorText.includes(".")) return null;
+  const decimal = /^([0-9]+)(?:\.([0-9]+))?$/u;
+  const numeratorMatch = decimal.exec(numeratorText);
+  const denominatorMatch = decimal.exec(denominatorText);
+  if (!numeratorMatch || !denominatorMatch) return null;
+  const numeratorDigits = numeratorMatch[2] ?? "";
+  const denominatorDigits = denominatorMatch[2] ?? "";
+  // Cross-multiply the two exact decimal fractions before reducing the ratio.
+  const numerator = BigInt(`${numeratorMatch[1]}${numeratorDigits}`)
+    * BigInt(10) ** BigInt(denominatorDigits.length);
+  const denominator = BigInt(`${denominatorMatch[1]}${denominatorDigits}`)
+    * BigInt(10) ** BigInt(numeratorDigits.length);
+  if (numerator <= BigInt(0) || denominator <= BigInt(0)) return null;
+  const divisor = gcd(numerator, denominator);
+  const suggestion = {
+    numerator: String(numerator / divisor),
+    denominator: String(denominator / divisor),
   };
+  // Suggestions must fit the same DTO format as a manually entered factor.
+  return POSITIVE_INTEGER_STRING.test(suggestion.numerator)
+    && POSITIVE_INTEGER_STRING.test(suggestion.denominator) ? suggestion : null;
 }
 
 export function convertQuantityPreview(

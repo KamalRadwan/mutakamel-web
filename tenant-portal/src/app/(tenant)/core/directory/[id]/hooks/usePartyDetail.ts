@@ -7,6 +7,7 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { can } from "@/lib/auth/permission-scope";
 import { deleteParty, fetchParty, updateParty } from "../../directory-api";
 import {
   ADDRESS_MANAGE_PERMISSION,
@@ -34,17 +35,19 @@ export function usePartyDetail(id: string) {
   const router = useRouter();
   const { user } = useTenantAuth();
   const permissions = user?.permissions ?? [];
+  const [party, setParty] = useState<Party | null>(null);
+  const target = party?.branchId ? { branchId: party.branchId } : { tenantWide: true };
 
   const grants = {
     canRead: permissions.includes(PARTY_READ_PERMISSION),
-    canManageParty: permissions.includes(PARTY_MANAGE_PERMISSION),
-    canManageContacts: permissions.includes(CONTACT_MANAGE_PERMISSION),
-    canManageAddresses: permissions.includes(ADDRESS_MANAGE_PERMISSION),
-    canManageRoles: permissions.includes(ROLE_MANAGE_PERMISSION),
-    canManageRelationships: permissions.includes(RELATIONSHIP_MANAGE_PERMISSION),
+    canManageParty: !!party && can(user, PARTY_MANAGE_PERMISSION, target),
+    canManageContacts: !!party && can(user, CONTACT_MANAGE_PERMISSION, target),
+    canManageAddresses: !!party && can(user, ADDRESS_MANAGE_PERMISSION, target),
+    // This form adds shared roles; Core checks both the party and role targets.
+    canManageRoles: !!party && can(user, ROLE_MANAGE_PERMISSION, { tenantWide: true }),
+    canManageRelationships: !!party && can(user, RELATIONSHIP_MANAGE_PERMISSION, target),
   };
 
-  const [party, setParty] = useState<Party | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMissing, setIsMissing] = useState(false);
   const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
@@ -157,6 +160,7 @@ export function usePartyDetail(id: string) {
     isDeleting,
     setParty,
     openEdit: () => {
+      if (!grants.canManageParty) return;
       setFormError(null);
       setIsEditOpen(true);
     },
@@ -165,7 +169,7 @@ export function usePartyDetail(id: string) {
       setFormError(null);
       setIsEditOpen(false);
     },
-    openDelete: () => setIsDeleteOpen(true),
+    openDelete: () => grants.canManageParty && setIsDeleteOpen(true),
     closeDelete: () => {
       if (isDeleting) return;
       setIsDeleteOpen(false);

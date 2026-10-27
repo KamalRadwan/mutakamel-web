@@ -61,6 +61,7 @@ import {
   useCommercialAccountLookups,
   type CommercialAccountLookupsData,
 } from "../hooks/useCommercialAccountLookups";
+import { useAccountPriceBooks } from "../hooks/useAccountPriceBooks";
 
 interface AccountDrawerProps {
   isSubmitting: boolean;
@@ -97,6 +98,7 @@ function AccountFields({
   const { t, lang } = useI18n();
   const copy = ACCOUNT_UI_COPY[lang];
   const [showAdvancedJson, setShowAdvancedJson] = useState(false);
+  const priceBooks = useAccountPriceBooks(values.accountRole);
 
   const isSupplier = values.accountRole === "SUPPLIER";
   const visualTerms = parseVisualTerms(values.terms);
@@ -316,7 +318,10 @@ function AccountFields({
           )}
         </Field>
 
-        <Field label={t.trade.accountPriceBook}>
+        <Field
+          label={t.trade.accountPriceBook}
+          hint={t.trade.accountPriceBookPurposeHint}
+        >
           <Input
             size="sm"
             placeholder={t.trade.accountPriceBook}
@@ -326,6 +331,26 @@ function AccountFields({
             onChange={(event) => onChange({ priceBookId: event.target.value })}
             disabled={isSubmitting}
           />
+          {priceBooks.unavailable && (
+            <p className="mt-1.5 text-xs text-muted-foreground">{t.trade.accountPriceBookLookupUnavailable}</p>
+          )}
+          {priceBooks.books.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              <span className="text-xs text-muted-foreground">{t.trade.accountPriceBookSuggestions}</span>
+              {priceBooks.books.slice(0, 4).map((book) => (
+                <Button
+                  key={book.id}
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={() => onChange({ priceBookId: book.id })}
+                >
+                  {book.code} ({book.currencyCode})
+                </Button>
+              ))}
+            </div>
+          )}
         </Field>
 
         <Field label={t.trade.accountCreditPolicy}>

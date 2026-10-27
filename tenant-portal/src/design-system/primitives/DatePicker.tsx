@@ -31,6 +31,12 @@ export interface DatePickerProps extends ControlSizeProps {
   onBlur?: () => void;
   language?: Language;
   id?: string;
+  /**
+   * Names the trigger when no `Field` label does — a picker standing in a row
+   * of filters. The visible date (or placeholder) is appended, so the name
+   * still contains what is on screen (WCAG 2.5.3).
+   */
+  ariaLabel?: string;
   className?: string;
 }
 
@@ -47,6 +53,7 @@ export function DatePicker({
   onBlur,
   language,
   id,
+  ariaLabel,
   size = "sm",
   className,
 }: DatePickerProps) {
@@ -76,6 +83,7 @@ export function DatePicker({
             id={controlId}
             disabled={disabled}
             onBlur={onBlur}
+            aria-label={ariaLabel ? `${ariaLabel}: ${label}` : undefined}
             aria-describedby={field?.describedBy}
             aria-invalid={isInvalid || undefined}
             aria-required={field?.required}

@@ -16,7 +16,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import type { NotificationChannel } from "../notification-contract";
 import { useNotificationPreferences } from "../hooks/useNotificationPreferences";
 
-const CHANNELS: readonly NotificationChannel[] = ["inApp", "push", "email"];
+const CHANNELS: readonly NotificationChannel[] = ["inApp"];
 
 export function NotificationPreferencesPanel() {
   const { t } = useI18n();
@@ -85,15 +85,15 @@ export function NotificationPreferencesPanel() {
                   </Label>
                   <Switch
                     id={`${preference.notificationType}-${channel}`}
-                    checked={channelValue(preference, channel)}
-                    onCheckedChange={(checked) => void toggle(preference, channel, checked)}
+                    checked={preference.inAppEnabled}
+                    onCheckedChange={(checked) => void toggle(preference, checked)}
                     // A channel the tenant has switched off entirely cannot be
                     // enabled per type, so the control says so rather than
                     // accepting a change the server will not honour.
                     disabled={
                       !canManage ||
                       pendingType === preference.notificationType ||
-                      isChannelDisabled(channelConfig, channel)
+                      isChannelDisabled(channelConfig)
                     }
                   />
                 </span>
@@ -106,22 +106,9 @@ export function NotificationPreferencesPanel() {
   );
 }
 
-function channelValue(
-  preference: { inAppEnabled: boolean; pushEnabled: boolean; emailEnabled: boolean },
-  channel: NotificationChannel,
-): boolean {
-  if (channel === "inApp") return preference.inAppEnabled;
-  if (channel === "push") return preference.pushEnabled;
-  return preference.emailEnabled;
-}
-
 function isChannelDisabled(
-  config: { enabled: boolean; inAppEnabled: boolean; pushEnabled: boolean; emailEnabled: boolean } | null,
-  channel: NotificationChannel,
+  config: { enabled: boolean; inAppEnabled: boolean } | null,
 ): boolean {
   if (config === null) return false;
-  if (!config.enabled) return true;
-  if (channel === "inApp") return !config.inAppEnabled;
-  if (channel === "push") return !config.pushEnabled;
-  return !config.emailEnabled;
+  return !config.enabled || !config.inAppEnabled;
 }

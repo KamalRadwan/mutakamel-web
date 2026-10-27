@@ -3,6 +3,7 @@ import { isUUIDv7 } from "@/lib/uuid";
 import { CrmErrorBag, type CrmFieldMessages } from "../../shared/crm-form-validation";
 import type { LeadContact, LeadDetail } from "../lead-contract";
 import type { UpdateLeadRequest } from "../lead-write-contract";
+import { LEAD_CONTACT_EDIT_LIMITS } from "./lead-contacts-edit-contract";
 
 // Core Directory UpdatePartyDto / UpdatePartyContactMethodDto, and CRM contact DTO.
 export const CONTACT_MODAL_LIMITS = { displayName: 200, name: 120, honorificTitle: 40, jobTitle: 120, value: 255, methods: 200 } as const;
@@ -19,6 +20,13 @@ export interface ContactModalForm {
   phones: Array<{ id: string | null; methodType: "PHONE" | "MOBILE"; value: string; isPrimary: boolean }>;
 }
 export type ContactModalField = Exclude<keyof ContactModalForm, "partyId" | "phones">;
+export interface NewLeadContactDraft {
+  honorificTitle: string; firstName: string; lastName: string; displayName: string;
+  jobTitle: string; email: string; phones: string[]; isPrimary: boolean;
+}
+export function emptyNewLeadContact(): NewLeadContactDraft {
+  return { honorificTitle: "", firstName: "", lastName: "", displayName: "", jobTitle: "", email: "", phones: [""], isPrimary: false };
+}
 export interface ContactCoreWrite { method: "patch" | "post" | "delete"; path: CorePath; body?: Record<string, unknown> }
 
 export class ContactWriteResponseError extends Error {}
@@ -142,7 +150,45 @@ export function buildSelectedContactLeadRequest(lead: LeadDetail, form: ContactM
   const primaryChanged = form.isPrimary !== baseline.isPrimary;
   if (!titleChanged && !primaryChanged) return {};
   if (primaryChanged && !form.isPrimary) throw new Error("Select another contact as primary.");
-  return { contacts: lead.contacts.map((contact) => ({ contactPartyId: contact.partyId,
+  return { contacts: lead.contacts.map((contact) => ({ ...linkedContactRequest(contact),
     jobTitle: contact.partyId === form.partyId && titleChanged ? form.jobTitle.trim() : contact.jobTitle ?? "",
     isPrimary: primaryChanged ? contact.partyId === form.partyId : contact.isPrimary })) };
+}
+
+function linkedContactRequest(contact: LeadContact) {
+  return { contactPartyId: contact.partyId, jobTitle: contact.jobTitle ?? "", isPrimary: contact.isPrimary };
+}
+
+function newContactFullName(draft: NewLeadContactDraft): string {
+  return draft.displayName.trim() || [draft.firstName.trim(), draft.lastName.trim()].filter(Boolean).join(" ");
+}
+
+export function validateNewLeadContact(draft: NewLeadContactDraft, messages: CrmFieldMessages & { invalid: string }): Record<string, string> {
+  const bag = new CrmErrorBag(messages);
+  const limits = LEAD_CONTACT_EDIT_LIMITS;
+  bag.required("displayName", newContactFullName(draft));
+  bag.maxLength("displayName", newContactFullName(draft), limits.displayName);
+  bag.maxLength("firstName", draft.firstName, limits.name);
+  bag.maxLength("lastName", draft.lastName, limits.name);
+  bag.maxLength("honorificTitle", draft.honorificTitle, limits.honorificTitle);
+  bag.maxLength("jobTitle", draft.jobTitle, limits.jobTitle);
+  bag.email("email", draft.email, limits.email);
+  bag.phones("phones", draft.phones);
+  if (draft.phones.filter((phone) => phone.trim()).length > limits.phones) bag.set("phones", messages.invalid);
+  return bag.errors;
+}
+
+/** Existing people are linked by ID; only the appended person carries identity
+ * fields. Response projection names must never enter this replacement DTO. */
+export function buildAddedContactLeadRequest(lead: LeadDetail, draft: NewLeadContactDraft): UpdateLeadRequest {
+  if (lead.contacts.length >= LEAD_CONTACT_EDIT_LIMITS.contacts) throw new Error("Contact limit reached.");
+  const isPrimary = lead.contacts.length === 0 || draft.isPrimary;
+  return { contacts: [
+    ...lead.contacts.map((contact) => ({ ...linkedContactRequest(contact), isPrimary: isPrimary ? false : contact.isPrimary })),
+    {
+      fullName: newContactFullName(draft), firstName: draft.firstName.trim(), lastName: draft.lastName.trim(),
+      honorificTitle: draft.honorificTitle.trim(), jobTitle: draft.jobTitle.trim(),
+      email: draft.email.trim() || undefined, phones: draft.phones.map((phone) => phone.trim()).filter(Boolean), isPrimary,
+    },
+  ] };
 }

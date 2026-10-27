@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useCan } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
@@ -40,7 +41,7 @@ export function useTemplateList() {
   const { user } = useTenantAuth();
   const permissions = user?.permissions ?? [];
   const canRead = permissions.includes(TEMPLATE_READ_PERMISSION);
-  const canCreate = permissions.includes(TEMPLATE_CREATE_PERMISSION);
+  const canCreate = useCan(TEMPLATE_CREATE_PERMISSION);
 
   const cursor = useTemplateCursor();
   const [items, setItems] = useState<TemplateListItem[]>([]);

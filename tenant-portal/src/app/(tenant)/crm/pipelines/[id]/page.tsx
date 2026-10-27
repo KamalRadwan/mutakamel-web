@@ -41,6 +41,7 @@ export default function PipelineDetailPage({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editError, setEditError] = useState<string | undefined>(undefined);
   const [isResetOpen, setIsResetOpen] = useState(false);
+  const [detachStageId, setDetachStageId] = useState<string | null>(null);
 
   function describeFailure(error: NormalizedApiError): string {
     return t.crmPipelines.errors[error.code ?? ""] ?? t.crmPipelines.actionFailed;
@@ -69,6 +70,7 @@ export default function PipelineDetailPage({
   }
 
   const { pipeline } = detail;
+  const detachStage = pipeline?.stages.find((stage) => stage.id === detachStageId);
 
   return (
     <PermissionGate require="crm.pipelines.read">
@@ -176,11 +178,7 @@ export default function PipelineDetailPage({
                   .attachStage(stageId)
                   .then((result) => report(result, t.crmPipelines.stageAttached));
               }}
-              onDetach={(pipelineStageId) => {
-                void detail
-                  .detachStage(pipelineStageId)
-                  .then((result) => report(result, t.crmPipelines.stageDetached));
-              }}
+              onDetach={setDetachStageId}
               onMove={(pipelineStageId, direction) => {
                 void detail
                   .moveStage(pipelineStageId, direction)
@@ -193,12 +191,33 @@ export default function PipelineDetailPage({
             <PipelineAssignmentsSection
               state={assignments}
               canManage={detail.canManage}
+              isDefault={pipeline.isDefault}
               onSave={() => {
+                if (pipeline.isDefault && assignments.accessMode !== "ALL") return;
                 void assignments
                   .save()
                   .then((result) =>
                     report(result, t.crmPipelines.assignmentsSaved),
                   );
+              }}
+            />
+
+            <ConfirmActionModal
+              open={detachStage !== undefined}
+              onOpenChange={(open) => { if (!open) setDetachStageId(null); }}
+              title={t.crmPipelines.detachStage}
+              description={formatTemplate(t.crmPipelines.detachStageDescription, {
+                name: detachStage ? localizedName(detachStage, lang) : "",
+              })}
+              confirmLabel={t.crmPipelines.detachStage}
+              cancelLabel={t.common.cancel}
+              loading={detail.pendingStageId !== null}
+              onConfirm={() => {
+                if (!detail.canManage || !detachStage || detail.pendingStageId !== null) return;
+                if (detachStage.flag === "NEW" || detachStage.flag === "WON" || detachStage.flag === "LOST") return;
+                void detail.detachStage(detachStage.id).then((result) => {
+                  if (report(result, t.crmPipelines.stageDetached)) setDetachStageId(null);
+                });
               }}
             />
 

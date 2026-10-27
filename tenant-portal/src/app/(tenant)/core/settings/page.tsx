@@ -17,7 +17,7 @@ export default function CoreSettingsHubPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title={t.coreSettings.hubTitle} description={t.coreSettings.hubSubtitle} />
+      <PageHeader className="sr-only" title={t.coreSettings.hubTitle} description={t.coreSettings.hubSubtitle} />
 
       <SubNav items={CORE_SETTINGS_NAV_ITEMS} />
 

@@ -38,21 +38,15 @@ import {
 const LIST_RESPONSE_LIMIT_BYTES = 400_000;
 const ROW_RESPONSE_LIMIT_BYTES = 40_000;
 
-/**
- * `GET /uoms` is Gateway `BRANCH_REQUIRED`: the company **and** branch headers
- * must both be present or the edge answers 400 `GW.REQUEST.INVALID` before
- * trade-app runs. The controller target is only `OPERATING_CONTEXT`, so the
- * stricter of the two policies is what the screen has to satisfy.
- */
-const READ_TARGET = "BRANCH" as const;
-
 export function useUoms() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
   const runWrite = useTradeWrite();
   const canManage = canPerformTradeAction(user, TRADE_PERMISSIONS.catalogMasterManage);
-  const { headers: readHeaders, gap } = useTradeScopeRequest(READ_TARGET);
+  const { headers: readHeaders } = useTradeScopeRequest("OPERATING_CONTEXT");
+  const { headers: operatingHeaders, gap: operatingScopeGap } =
+    useTradeScopeRequest("COMPANY_OR_BRANCH");
 
   const [items, setItems] = useState<Uom[]>([]);
   const [total, setTotal] = useState(0);
@@ -84,12 +78,6 @@ export function useUoms() {
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
-      // The scope is not a filter here — without both headers the request
-      // cannot legally be made, so the screen asks instead of firing a 400.
-      if (gap) {
-        setIsLoading(false);
-        return;
-      }
       setIsLoading(true);
       setQueryError(null);
       try {
@@ -112,17 +100,17 @@ export function useUoms() {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [gap, page, statusFilter, search, readHeaders],
+    [page, statusFilter, search, readHeaders],
   );
 
   const loadOperating = useCallback(
     async (purpose: CatalogUomPurpose = operatingPurpose): Promise<void> => {
-      if (gap) return;
+      if (operatingScopeGap) return;
       setIsOperatingLoading(true);
       setOperatingError(null);
       try {
         const result = await tradeGet(catalogUomsPath(purpose), {
-          headers: readHeaders,
+          headers: operatingHeaders,
           maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
         });
         setOperatingItems(parseCatalogUomsResponse(result.data));
@@ -133,7 +121,7 @@ export function useUoms() {
         setIsOperatingLoading(false);
       }
     },
-    [gap, operatingPurpose, readHeaders],
+    [operatingScopeGap, operatingPurpose, operatingHeaders],
   );
 
   useEffect(() => {
@@ -362,7 +350,7 @@ export function useUoms() {
     t,
     lang,
     canManage,
-    scopeGap: gap,
+    operatingScopeGap,
     items,
     pageInfo: { page, limit: UOM_PAGE_SIZE, total },
     statusFilter,

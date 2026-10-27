@@ -8,8 +8,8 @@ import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
   CUSTOMER_RELATED_KINDS,
-  CUSTOMER_RELATED_PERMISSIONS,
   CUSTOMER_OPPORTUNITY_SEARCH_PATH,
+  canReadCustomerRelated,
   customerInvoicesCountPath,
   customerOpportunitySearch,
   customerQuotationsCountPath,
@@ -49,7 +49,7 @@ export function useCustomerProfileRelatedCounts(
   const permitted = Object.fromEntries(
     CUSTOMER_RELATED_KINDS.map((kind) => [
       kind,
-      permissions.includes(CUSTOMER_RELATED_PERMISSIONS[kind]),
+      canReadCustomerRelated(permissions, kind),
     ]),
   ) as Record<CustomerRelatedKind, boolean>;
 
@@ -83,7 +83,7 @@ export function useCustomerProfileRelatedCounts(
           if (kind === "opportunities") {
             const response = await axiosClient.post<unknown>(
               CUSTOMER_OPPORTUNITY_SEARCH_PATH,
-              customerOpportunitySearch(customerProfileId!, branchId!),
+              customerOpportunitySearch(partyId!, branchId!),
               {
                 ...config,
                 skipAutoIdempotency: true,

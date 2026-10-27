@@ -527,7 +527,7 @@ export function CreateDatabaseServerWizard({
   return (
     <Card
       dir={dir}
-      className="mx-auto max-w-3xl p-3 sm:p-3.5 rounded-xl border border-border bg-card shadow-xs"
+      className="mx-auto max-w-3xl p-3 sm:p-3.5 rounded-xl border border-border bg-card"
     >
       <h2 className="text-sm sm:text-base font-semibold mb-3 pb-1.5 border-b border-border">{copy.title}</h2>
 
@@ -535,13 +535,13 @@ export function CreateDatabaseServerWizard({
       <ol aria-label={lang === "ar" ? "خطوات تسجيل خادم قاعدة البيانات" : "Database server registration steps"} className="mb-3 grid grid-cols-2 gap-2 text-xs">
         <li
           aria-current={step === 1 ? "step" : undefined}
-          className={`border-b-2 pb-1.5 ${step === 1 ? "border-primary font-bold text-foreground" : "border-border text-muted-foreground"}`}
+          className={`border-b-2 pb-1.5 ${step === 1 ? "border-primary font-semibold text-foreground" : "border-border text-muted-foreground"}`}
         >
           {copy.connectionStep}
         </li>
         <li
           aria-current={step === 2 ? "step" : undefined}
-          className={`border-b-2 pb-1.5 ${step === 2 ? "border-primary font-bold text-foreground" : "border-border text-muted-foreground"}`}
+          className={`border-b-2 pb-1.5 ${step === 2 ? "border-primary font-semibold text-foreground" : "border-border text-muted-foreground"}`}
         >
           {copy.accessStep}
         </li>

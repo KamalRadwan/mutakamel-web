@@ -41,7 +41,7 @@ describe("DataTable", () => {
         columns={columns}
         rows={[]}
         isLoading={false}
-        page={basePage}
+        page={{ page: 1, limit: 20, total: 0 }}
         onPageChange={vi.fn()}
         rowKey={(row) => row.id}
         labels={labels}
@@ -49,6 +49,37 @@ describe("DataTable", () => {
     );
     expect(screen.getByText("No results")).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+  });
+
+  it.each([false, true])("keeps earlier records reachable from an empty later page (custom empty: %s)", (customEmpty) => {
+    const onPageChange = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        rows={[]}
+        isLoading={false}
+        page={{ page: 2, limit: 20, total: 20 }}
+        onPageChange={onPageChange}
+        rowKey={(row) => row.id}
+        labels={labels}
+        emptyState={customEmpty ? <p>Custom empty</p> : undefined}
+      />,
+    );
+    expect(screen.getByText(customEmpty ? "Custom empty" : "No results")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(onPageChange).toHaveBeenCalledWith(1);
+  });
+
+  it("renders an unpaginated empty state without page controls", () => {
+    render(
+      <DataTable columns={columns} rows={[]} isLoading={false} rowKey={(row) => row.id} labels={labels} />,
+    );
+    expect(screen.getByText("No results")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
   });
 
   it("renders ErrorState with a working retry callback instead of the table", () => {

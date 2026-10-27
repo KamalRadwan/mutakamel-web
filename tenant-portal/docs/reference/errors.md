@@ -6,11 +6,111 @@ Last source verification: **2026-08-27**
 
 ## The catalogue
 
+### Trade channel list limit (2026-10-26)
+
+`ChannelPageLimitError` is a portal-local loading failure, not a backend HTTP
+code. Both channel administration and the operating-context provider map it
+to `trade.channelPageLimit` in Arabic and English. A complete-list walk stops
+after 20 pages of 100 rows; it reports an incomplete list instead of exposing
+partial rows or selector choices as a successful load.
+
+### Inventory serial selection (2026-10-26)
+
+`INVENTORY_FORM_SERIAL_SELECTION` is a local validation code, not a backend
+HTTP code. It maps to `tradeInventory.serialSelectionInvalid` in Arabic and
+English for duplicate, blank, reserved (`none`), overlong or count-mismatched
+serial inputs. The same validation covers movement tracking, reservation
+release subsets and reversal line subsets. Server eligibility remains governed
+by `TRADE.INVENTORY.TRACKING_REQUIRED` and the existing inventory error mapping.
+
+### Inventory unresolved writes (2026-10-24)
+
+`INVENTORY_UNRESOLVED_WRITE` is a portal-local guard, mapped directly to
+`tradeInventory.unresolvedWrite` in both dictionaries. It blocks another payload
+or scope while the mounted page retains an unresolved movement request. Retry
+the unchanged original operation to recover its response using the same keys.
+
+### Inventory single-serial validation (2026-10-24)
+
+`INVENTORY_FORM_SERIAL_UNIT` is a portal-local builder rejection, not an HTTP
+error code. It maps to `tradeInventory.serialUnitHint` in Arabic and English:
+one serial number with quantity 1, posting each serial separately. Forms show
+the same guidance next to the serial and locked quantity inputs. Invalid stock
+expiry dates use the existing `INVENTORY_FORM_DATE` validation message.
+
+### Email MFA (2026-10-23)
+
+The MFA screens map stable Core/Gateway codes to the bilingual `mfa.errors`
+dictionary. `AUTH_MFA_INVALID_CHALLENGE` (401) means invalid, expired, consumed
+or mismatched proof; it does not disclose the exact cause. `AUTH_MFA_THROTTLED`
+and Gateway 429s preserve the resend/verify delay from `Retry-After` or
+`details.retryAfterSeconds`. `AUTH_MFA_UNAVAILABLE` (503) fails closed.
+`CURRENT_PASSWORD_INVALID` (422) reports the profile password refusal.
+Local `INVALID_MFA_RESPONSE` and `INVALID_MFA_SETTINGS` denote failed runtime
+validation, never backend codes or raw user-facing prose. Local expiry and
+six-digit validation use `mfa.errors.expired` and `codeFormat`; unknown/lost
+verification replies use `ambiguous` and require restart without resubmission.
+
+### Partial authentication scope lists (2026-10-18)
+
+`authScopeNotice.branches`, `authScopeNotice.companies` and
+`authScopeNotice.teamMemberships` are Arabic/English client status messages,
+not backend error codes. The persistent banner identifies each `/auth/me`
+collection whose corresponding `accessScope` truncation flag is true. Missing
+or malformed scope projections use the existing local `INVALID_AUTH_PROFILE`
+validation failure.
+
+### CRM configuration feedback (2026-10-18)
+
+Settings, acquisition-source creation/deletion/reordering/icon upload and
+custom-field creation pass only HTTP status and stable code to `useCrmErrorText`.
+Server messages and field-error prose are excluded from these surfaces. Load
+failures retain their status for the permission boundary and table error state.
+The `crmSettings.loadFailed`, `saveFailed`, `manageForbidden` and
+`crmAcquisitionSources.createFailed`, `deleteFailed`, `createUncertain`,
+`createUncertainStale`, `deleteUncertain`, `deleteUncertainStale` dictionary keys
+provide Arabic/English client feedback, not backend error codes.
+Portal-local parser/builder codes are `INVALID_CRM_SETTINGS_RESPONSE`,
+`CRM_SETTINGS_RETENTION_INVALID`, `INVALID_CRM_ACQUISITION_SOURCES_RESPONSE`
+and `CRM_ACQUISITION_SOURCE_NAMES_INVALID`. Retention validation uses
+`crmSettings.retentionHelp`; source-name validation uses
+`crmAcquisitionSources.invalidNames`. Unknown parser failures use localized
+fallbacks, never their exception text.
+
+### Financial evidence client validation (2026-10-17)
+
+`tradeDocuments.lineEditor` contains local validation messages, not HTTP codes:
+`decimalInvalid` identifies missing, malformed, negative or out-of-range amounts;
+`quantityInvalid` requires a positive quantity; `taxRateInvalid` requires 0–100
+percent representable in integer basis points; `calculationInvalid` identifies
+discount or total calculation failures and overflow. The calculator returns the
+field and line index with each error. Draft submission is blocked, totals are
+hidden, and authored inputs remain available for correction. Both dictionaries
+provide the same keys; backend financial errors continue through the existing
+Trade outcome handling.
+
+### Client request deadline (2026-10-17)
+
+`CLIENT_REQUEST_TIMEOUT` is a portal-local outcome with local status 504,
+not a backend response code. `errors.requestTimedOut` and `errors.writeTimedOut`
+provide bilingual recovery messages. A timed-out mutation may have committed;
+its original `idempotencyKey` is retained by `normalizeApiError`. Refresh to
+reconcile, or explicitly retry the same body with that same key. The transport
+never automatically retries a deadline failure.
+
 **[error-codes.md](error-codes.md) lists all 95 error
 codes the built screens can receive**, with the HTTP status each is thrown
 with — generated from the `throw new *Exception` sites, so it cannot drift.
 
 This page is the *handling policy*; that page is the *vocabulary*.
+
+### Notification shell feedback (2026-10-17)
+
+`errors.notificationLoadFailed` is Arabic/English client feedback for an initial
+or subsequent REST reconciliation failure, including exhausted bounded retries.
+It retains the prior notification cache and offers Retry; an unsuccessful load
+never renders the empty-inbox message. This dictionary key is not a backend
+error code.
 
 ## The rule
 
@@ -122,6 +222,13 @@ Lint flags `toast.error` inside a `catch` that also references `403` or
 
 ## Validation errors
 
+Verified **2026-10-17**: the CRM client refusal `CRM_AMOUNT_SCALE_INVALID`
+identifies an opportunity amount exceeding its selected currency's decimal
+scale. Both dictionaries provide the sentence used by create/edit/conversion
+amount validation and by the request-builder refusal catalogue. Writes that
+cannot survive the numeric JSON round trip still refuse with
+`CRM_AMOUNT_OUT_OF_SAFE_RANGE`.
+
 `ValidationPipe` runs with `stopAtFirstError: false`, so **expect multiple
 field errors** and map all of them.
 
@@ -132,6 +239,17 @@ you are sending a UI-only property — check the request body.
 CRM and Trade **hide the rejected value**. You get the field path and a
 message, never the offending input echoed back, so do not try to display
 "you sent X".
+
+## Quotation conversion client validation
+
+Verified **2026-10-17**. These are local request-builder refusals, not backend
+error codes. Both dictionaries translate their messages under
+`tradeDocuments.quotationConversion`.
+
+| Local refusal | Message key | Meaning |
+| --- | --- | --- |
+| `QUOTATION_CONVERSION_SOURCE` | `sourceInvalid` | The current revision is not accepted, priced lines do not match its subtotal, or original non-empty terms are missing. Reload/check the accepted revision. |
+| `QUOTATION_CONVERSION_EVIDENCE` | `evidenceInvalid` | Missing/duplicate/foreign line evidence, invalid amounts or rate, discount above the line subtotal, or inconsistent tax treatment. Correct the evidence before review. |
 
 ## Ambiguous outcomes
 

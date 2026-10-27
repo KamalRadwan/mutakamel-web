@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient } from "@/lib/api/axiosClient";
+import { axiosClient, TenantApiClientError } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   createWriteAttempt,
   isAmbiguousWriteFailure,
@@ -20,15 +22,56 @@ import {
   leadIdBatches,
 } from "../lead-bulk-contract";
 import { buildLeadCardPatchBody } from "../lead-card-contract";
+import { LEADS_PATH, leadPath } from "../lead-contract";
 import { buildCreateLeadRequest, type CreateLeadForm } from "../lead-create-contract";
 import {
+  parseLeadCapabilitiesResponse,
   parseLeadResponse,
   type LeadCapabilities,
   type LeadItem,
   type LeadStage,
 } from "../lead-list-contract";
+import { readAssignableLeadOwners } from "../[id]/hooks/readLeadOwnerOptions";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 
-const LEADS_PATH = "/api/tenant/crm/v1/leads";
+/** Refresh assignment authority when the bulk bar opens; never reuse another branch's owners. */
+export function useLeadBulkOwnerOptions(branchId: string | null, enabled: boolean) {
+  const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
+  const request = useMemo(() => ({ branchId, enabled, scope }), [branchId, enabled, scope]);
+  const [loaded, setLoaded] = useState<{
+    request: typeof request;
+    owners: Array<{ id: string; firstName: string; lastName: string }>;
+    failed: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!branchId || !enabled || !scope.ready) return;
+    const controller = new AbortController();
+    void Promise.all([
+      readAssignableLeadOwners(branchId, "update", controller.signal, scope.headers),
+      axiosClient.get<unknown>(`${LEADS_PATH}/capabilities?${new URLSearchParams({ branchId })}`, {
+        signal: controller.signal, cache: "no-store", maxResponseBytes: 256 * 1024, headers: scope.headers,
+      }),
+    ]).then(([owners, response]) => {
+      const capability = parseLeadCapabilitiesResponse(response.data, branchId).update;
+      if (!controller.signal.aborted) setLoaded({
+        request,
+        owners: owners.filter((owner) => crmCapabilityAllowsOwner(capability, owner.id)),
+        failed: false,
+      });
+    }).catch(() => {
+      if (!controller.signal.aborted) setLoaded({ request, owners: [], failed: true });
+    });
+    return () => controller.abort();
+  }, [branchId, enabled, request, scope]);
+
+  const current = loaded?.request === request ? loaded : null;
+  return {
+    owners: current?.owners ?? [],
+    isLoading: enabled && scope.ready && current === null,
+    failed: enabled && (!scope.ready || current?.failed === true),
+  };
+}
 
 /**
  * The single-lead writes below are `idempotent: false` in the Gateway route
@@ -41,9 +84,10 @@ export const SINGLE_LEAD_WRITE_OPTIONS = {
   maxResponseBytes: 256 * 1024,
 } as const;
 
-export function leadPath(leadId: string): string {
-  return `${LEADS_PATH}/${encodeURIComponent(leadId)}`;
-}
+export type LeadWriteOutcome =
+  | { kind: "success" }
+  | { kind: "failed" | "ambiguous"; error: NormalizedApiError }
+  | { kind: "blocked"; message: string };
 
 /** What the write hooks share with the list they change. */
 export interface LeadWriteContext {
@@ -52,8 +96,8 @@ export interface LeadWriteContext {
   stages: readonly LeadStage[];
   capabilities: LeadCapabilities | null;
   setError: (message: string | null) => void;
-  /** The server message of a definite rejection, else `fallback`. */
-  report: (caught: unknown, fallback: string) => void;
+  /** Translated structured error, optionally identifying a refused bulk record. */
+  report: (caught: unknown, fallback: string, leadId?: string) => void;
   /** Reloads the list (from `page` when given) and refreshes the board and KPIs. */
   reconcile: (page?: number) => Promise<boolean>;
 }
@@ -73,6 +117,23 @@ export function eligibleLeads(
     );
 }
 
+/** Keep the refused record visible when the server rejects an atomic bulk batch. */
+export function reportBulkLeadError(
+  caught: unknown,
+  fallback: string,
+  report: LeadWriteContext["report"],
+): void {
+  const details = caught instanceof TenantApiClientError ? caught.response.data.details : null;
+  const leadId = details && typeof details === "object" && "leadId" in details
+    ? details.leadId
+    : null;
+  if (typeof leadId === "string" && leadId.length > 0) {
+    report(caught, fallback, leadId);
+    return;
+  }
+  report(caught, fallback);
+}
+
 interface LeadMutationOptions extends LeadWriteContext {
   currentPage: number;
   closeCreate: () => void;
@@ -84,9 +145,11 @@ interface LeadMutationOptions extends LeadWriteContext {
 /** Create, delete and stage moves — single-lead and bulk. */
 export function useLeadMutations(context: LeadMutationOptions) {
   const { t } = useI18n();
+  const errorText = useCrmErrorText();
   const messages = t.crmLeads.messages;
   const { branchId, items, stages, capabilities, setError, report, reconcile } = context;
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteInFlightRef = useRef(false);
   const [isMovePending, setIsMovePending] = useState(false);
   // Gates the next move synchronously; the state above only renders it.
   const moveInFlightRef = useRef(false);
@@ -109,7 +172,11 @@ export function useLeadMutations(context: LeadMutationOptions) {
     }
   };
 
-  const handleCreate = async (form: CreateLeadForm, initialRating?: number): Promise<boolean> => {
+  const handleCreate = async (
+    form: CreateLeadForm,
+    initialRating?: number,
+    onValidationError?: (error: NormalizedApiError) => void,
+  ): Promise<boolean> => {
     if (!branchId) {
       setError(messages.selectBranchToCreate);
       return false;
@@ -144,10 +211,11 @@ export function useLeadMutations(context: LeadMutationOptions) {
       return true;
     }
     if (outcome.kind === "failed") {
+      onValidationError?.(outcome.error);
       setError(
         outcome.error.code === "CRM_TAG_UNKNOWN"
           ? messages.tagUnknown
-          : outcome.error.message || messages.createFailed,
+          : errorText(outcome.error) ?? messages.createFailed,
       );
       return false;
     }
@@ -157,18 +225,20 @@ export function useLeadMutations(context: LeadMutationOptions) {
     context.closeCreate();
     context.resetSearch();
     const reloaded = await reconcile(1);
-    setError(reloaded ? messages.createAmbiguousRefreshed : messages.createAmbiguousStale);
+    const notice = reloaded ? messages.createAmbiguousRefreshed : messages.createAmbiguousStale;
+    setError(outcome.kind === "ambiguous" ? `${errorText(outcome.error)} ${notice}` : notice);
     return false;
   };
 
   const handleDelete = async () => {
     const target = context.selectedForDelete;
-    if (!target || isDeleting) return;
+    if (!target || deleteInFlightRef.current) return;
     if (!crmCapabilityAllowsOwner(capabilities?.delete, target.ownerUserId)) {
       setError(messages.deleteNotPermitted);
       context.setSelectedForDelete(null);
       return;
     }
+    deleteInFlightRef.current = true;
     setIsDeleting(true);
     setError(null);
     try {
@@ -183,15 +253,17 @@ export function useLeadMutations(context: LeadMutationOptions) {
       }
       report(caught, messages.deleteFailed);
     } finally {
+      deleteInFlightRef.current = false;
       setIsDeleting(false);
     }
   };
 
   /** One `POST /leads/bulk-delete` per 100 eligible leads, each batch all-or-nothing. */
   const bulkDeleteLeads = async (leadIds: readonly string[]): Promise<boolean> => {
-    if (!branchId || isDeleting) return false;
+    if (!branchId || deleteInFlightRef.current) return false;
     const eligible = eligibleLeads(items, leadIds, capabilities?.delete ?? null);
     if (eligible.length === 0) return false;
+    deleteInFlightRef.current = true;
     setIsDeleting(true);
     setError(null);
     try {
@@ -203,27 +275,28 @@ export function useLeadMutations(context: LeadMutationOptions) {
     } catch (caught) {
       // A refused batch rolls back but earlier batches stand: reload either way.
       await reconcile();
-      report(caught, messages.deleteFailed);
+      reportBulkLeadError(caught, messages.deleteFailed, report);
       return false;
     } finally {
+      deleteInFlightRef.current = false;
       setIsDeleting(false);
     }
   };
 
-  // A bulk batch refused part-way still leaves earlier batches applied, so a
-  // bulk move reloads on any failure; a single move only when the outcome is unknown.
-  const runMove = async (write: () => Promise<unknown>, reloadOnRefusal: boolean): Promise<boolean> => {
+  // Even a definite refusal can mean another user moved the lead first.
+  const runMove = async (write: () => Promise<unknown>, bulk: boolean): Promise<LeadWriteOutcome> => {
     moveInFlightRef.current = true;
     setIsMovePending(true);
     setError(null);
     try {
       await write();
       await reconcile();
-      return true;
+      return { kind: "success" };
     } catch (caught) {
-      if (reloadOnRefusal || isAmbiguousWriteFailure(caught)) await reconcile();
-      report(caught, messages.moveFailed);
-      return false;
+      await reconcile();
+      if (bulk) reportBulkLeadError(caught, messages.moveFailed, report);
+      else report(caught, messages.moveFailed);
+      return { kind: isAmbiguousWriteFailure(caught) ? "ambiguous" : "failed", error: normalizeApiError(caught) };
     } finally {
       moveInFlightRef.current = false;
       setIsMovePending(false);
@@ -231,27 +304,27 @@ export function useLeadMutations(context: LeadMutationOptions) {
   };
 
   /** `target` carries a lead the list does not hold, such as a board card. */
-  const moveLead = async (leadId: string, destinationStageId: string, target?: LeadItem) => {
-    if (moveInFlightRef.current) return;
+  const moveLead = async (leadId: string, destinationStageId: string, target?: LeadItem): Promise<LeadWriteOutcome> => {
+    if (moveInFlightRef.current) return { kind: "blocked", message: messages.moveFailed };
     if (!branchId) {
       setError(messages.selectBranchToMove);
-      return;
+      return { kind: "blocked", message: messages.selectBranchToMove };
     }
     const lead = target ?? items.find(({ id }) => id === leadId);
     if (!lead || !crmCapabilityAllowsOwner(capabilities?.update, lead.ownerUserId)) {
       setError(messages.moveNotPermitted);
-      return;
+      return { kind: "blocked", message: messages.moveNotPermitted };
     }
     if (isConverted(lead.stageId)) {
       setError(messages.convertedCannotMove);
-      return;
+      return { kind: "blocked", message: messages.convertedCannotMove };
     }
     if (!openStage(destinationStageId)) {
       setError(messages.stageUnavailable);
-      return;
+      return { kind: "blocked", message: messages.stageUnavailable };
     }
     // The 201 body is not read: the reload that follows is the confirmation.
-    await runMove(
+    return runMove(
       () => axiosClient.post<unknown>(`${leadPath(leadId)}/stage`, { stageId: destinationStageId }, SINGLE_LEAD_WRITE_OPTIONS),
       false,
     );
@@ -271,7 +344,7 @@ export function useLeadMutations(context: LeadMutationOptions) {
       (lead) => !isConverted(lead.stageId) && lead.stageId !== destinationStageId,
     );
     if (eligible.length === 0) return false;
-    return runMove(async () => {
+    const outcome = await runMove(async () => {
       for (const batch of leadIdBatches(eligible)) {
         await axiosClient.post<unknown>(
           LEADS_BULK_STAGE_PATH,
@@ -280,6 +353,7 @@ export function useLeadMutations(context: LeadMutationOptions) {
         );
       }
     }, true);
+    return outcome.kind === "success";
   };
 
   return {
@@ -291,4 +365,59 @@ export function useLeadMutations(context: LeadMutationOptions) {
     moveLead,
     bulkMoveStage,
   };
+}
+
+/** One write at a time across the selected-lead controls. */
+export function useLeadBulkControls({ isDeleting, owners, onBulkMoveStage, onBulkSetRating, onBulkAssignOwner }: {
+  isDeleting: boolean;
+  owners: readonly { id: string }[];
+  onBulkMoveStage: (stageId: string) => Promise<void>;
+  onBulkSetRating: (rating: number) => Promise<void>;
+  onBulkAssignOwner: (ownerUserId: string) => Promise<void>;
+}) {
+  const inFlight = useRef(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [stageSelect, setStageSelect] = useState("");
+  const [ratingSelect, setRatingSelect] = useState("");
+  async function handleMove(stageId: string) {
+    if (!stageId || inFlight.current || isDeleting) return;
+    inFlight.current = true;
+    setIsBusy(true);
+    try {
+      await onBulkMoveStage(stageId);
+    } finally {
+      setStageSelect("");
+      inFlight.current = false;
+      setIsBusy(false);
+    }
+  }
+
+  async function handleRating(value: string) {
+    if (!value || inFlight.current || isDeleting) return;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) return;
+    inFlight.current = true;
+    setIsBusy(true);
+    try {
+      await onBulkSetRating(parsed);
+    } finally {
+      setRatingSelect("");
+      inFlight.current = false;
+      setIsBusy(false);
+    }
+  }
+
+  async function handleOwner(ownerUserId: string) {
+    if (inFlight.current || isDeleting || !owners.some((owner) => owner.id === ownerUserId)) return;
+    inFlight.current = true;
+    setIsBusy(true);
+    try {
+      await onBulkAssignOwner(ownerUserId);
+    } finally {
+      inFlight.current = false;
+      setIsBusy(false);
+    }
+  }
+
+  return { isBusy, stageSelect, ratingSelect, handleMove, handleRating, handleOwner };
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet, tradeIfMatch, tradePatch, tradePost } from "../../../trade-api";
 import { parseTradeOffsetPage } from "../../../trade-advanced-validation";
@@ -36,7 +36,7 @@ export function useExtensionProfile(id: string) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchId } = useTenantBranchSelection(user);
+  const { branchId } = useTradeBranchSelection(user);
   const scope = useTradeScope("BRANCH", branchId);
 
   const [profile, setProfile] = useState<ExtensionProfileDetail | null>(null);

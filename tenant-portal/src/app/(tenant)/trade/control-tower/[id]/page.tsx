@@ -18,7 +18,7 @@ import {
 } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { formatDateTime } from "@/lib/format/date";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
@@ -51,7 +51,7 @@ export default function ControlTowerExceptionPage({
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchId } = useTenantBranchSelection(user);
+  const { branchId } = useTradeBranchSelection(user);
   const scope = useTradeScope("BRANCH", branchId);
 
   const [exception, setException] = useState<ControlTowerExceptionDetail | null>(null);

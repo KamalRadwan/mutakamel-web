@@ -1,6 +1,9 @@
 "use client";
 
+import { Search, X } from "lucide-react";
 import {
+  Button,
+  Input,
   PageActions,
   Select,
   SelectContent,
@@ -15,45 +18,75 @@ export interface TradeDocumentFiltersProps {
   kind: TradeStatusKind;
   value: string;
   onChange: (status: string) => void;
+  partyId?: string;
+  onPartyIdChange?: (partyId: string) => void;
 }
 
 /** The sentinel for "no status filter" — `Select` cannot carry an empty value. */
 const ANY_STATUS = "__any__";
 
 /**
- * The only filter a commercial-document list has.
- *
- * `DocumentListQueryDto` reads `page`, `limit`, `status` and `partyId` and
- * nothing else — no search, no sort, no date range on any of the six list
- * routes. `FilterBar` is deliberately not used here: it always renders a
- * search input, and a search box over a route with no search parameter is a
- * control that silently does nothing.
- *
- * `partyId` is a UUID rather than a name and there is no party picker in Phase
- * 11's scope, so it is not offered either — a raw-UUID text box is not a filter
- * a person can use.
+ * Filter bar for commercial-document lists (`status` and `partyId`).
  */
-export function TradeDocumentFilters({ kind, value, onChange }: TradeDocumentFiltersProps) {
+export function TradeDocumentFilters({
+  kind,
+  value,
+  onChange,
+  partyId = "",
+  onPartyIdChange,
+}: TradeDocumentFiltersProps) {
   const { t } = useI18n();
 
   return (
     <PageActions slot="actions">
-      <Select
-        value={value === "" ? ANY_STATUS : value}
-        onValueChange={(next) => onChange(next === ANY_STATUS ? "" : next)}
-      >
-        <SelectTrigger size="sm" aria-label={t.common.status} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY_STATUS}>{t.tradeDocuments.statusAny}</SelectItem>
-          {tradeStatusValues(kind).map((status) => (
-            <SelectItem key={status} value={status}>
-              {t.statusValues[`${kind}.${status}`] ?? status}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="flex flex-wrap items-center gap-2">
+        {onPartyIdChange && (
+          <div className="relative flex items-center">
+            <Search
+              className="pointer-events-none absolute start-2.5 size-3.5 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              type="search"
+              dir="ltr"
+              value={partyId}
+              onChange={(event) => onPartyIdChange(event.target.value)}
+              placeholder={t.common.search}
+              aria-label={t.common.search}
+              data-testid="trade-party-search-input"
+              className="h-8 w-64 ps-8 pe-7 font-mono text-xs"
+            />
+            {partyId && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => onPartyIdChange("")}
+                aria-label={t.crmOpportunities.basicSearch.clear}
+                className="absolute end-1.5 size-5 p-0 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </Button>
+            )}
+          </div>
+        )}
+        <Select
+          value={value === "" ? ANY_STATUS : value}
+          onValueChange={(next) => onChange(next === ANY_STATUS ? "" : next)}
+        >
+          <SelectTrigger size="sm" aria-label={t.common.status} className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY_STATUS}>{t.tradeDocuments.statusAny}</SelectItem>
+            {tradeStatusValues(kind).map((status) => (
+              <SelectItem key={status} value={status}>
+                {t.statusValues[`${kind}.${status}`] ?? status}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </PageActions>
   );
 }

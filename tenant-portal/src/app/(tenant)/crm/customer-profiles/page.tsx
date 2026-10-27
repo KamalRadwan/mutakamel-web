@@ -15,6 +15,7 @@ import {
   useWorkspaceState,
   type BoardCardMove,
 } from "@/design-system";
+import { useAccessMode } from "@/hooks/useAccessMode";
 import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
 import { ActivityModal } from "@/components/activities/ActivityModal";
 import type { ActivityTargetSelection } from "@/components/activities/activity-contract";
@@ -53,12 +54,17 @@ import {
 import { useCustomerProfilesCapabilities } from "./hooks/useCustomerProfilesCapabilities";
 import { useDeleteCustomerProfile } from "./hooks/useDeleteCustomerProfile";
 import { useUpdateCustomerProfileCard } from "./hooks/useUpdateCustomerProfileCard";
+import type { StatusUpdateResult } from "./hooks/useUpdateCustomerProfileStatus";
+import { CrmScopeGate } from "../shared/components/CrmScopeGate";
+import { useCrmErrorText } from "../shared/hooks/useCrmErrorText";
 
 const TERMINAL_STATUS: CustomerProfileStatus = "BLACKLISTED";
 
 export default function CustomerProfilesPage() {
   const { t } = useI18n();
+  const describeError = useCrmErrorText();
   const router = useRouter();
+  const { canMutate } = useAccessMode();
   const {
     items,
     branchIds,
@@ -88,13 +94,13 @@ export default function CustomerProfilesPage() {
 
   const canUpdateProfile = useCallback(
     (item: CustomerProfileItem) =>
-      crmCapabilityAllowsOwner(capabilities.update, item.ownerUserId),
-    [capabilities.update],
+      canMutate && crmCapabilityAllowsOwner(capabilities.update, item.ownerUserId),
+    [canMutate, capabilities.update],
   );
   const canDeleteProfile = useCallback(
     (item: CustomerProfileItem) =>
-      crmCapabilityAllowsOwner(capabilities.delete, item.ownerUserId),
-    [capabilities.delete],
+      canMutate && crmCapabilityAllowsOwner(capabilities.delete, item.ownerUserId),
+    [canMutate, capabilities.delete],
   );
 
   const applyPage = useCallback(
@@ -124,6 +130,7 @@ export default function CustomerProfilesPage() {
 
   const board = useCustomerProfileBoard({
     enabled: view === "board",
+    totalsEnabled: view !== "board" && appliedSearch.mode === "basic",
     branchId,
     search: appliedSearch,
     sort,
@@ -191,38 +198,34 @@ export default function CustomerProfilesPage() {
   );
 
   const requestMoveCustomerStatus = useCallback(
-    (move: BoardCardMove) => {
+    async (move: BoardCardMove): Promise<StatusUpdateResult | null> => {
       const targetStatus = move.toColumnId as CustomerProfileStatus;
+      const applyMove = async () => {
+        const result = await handleCardMove(move);
+        if (result.ok) {
+          setQuickEditCustomer((prev) =>
+            prev && prev.id === move.itemId
+              ? { ...prev, status: targetStatus }
+              : prev,
+          );
+        }
+        return result;
+      };
       if (targetStatus === TERMINAL_STATUS) {
-        setPendingTerminalMove({
-          move,
-          resolve: (confirmed) => {
-            if (confirmed) {
-              void handleCardMove(move);
-              setQuickEditCustomer((prev) =>
-                prev && prev.id === move.itemId
-                  ? { ...prev, status: targetStatus }
-                  : prev,
-              );
-            }
-          },
+        const confirmed = await new Promise<boolean>((resolve) => {
+          setPendingTerminalMove({ move, resolve });
         });
-      } else {
-        void handleCardMove(move);
-        setQuickEditCustomer((prev) =>
-          prev && prev.id === move.itemId
-            ? { ...prev, status: targetStatus }
-            : prev,
-        );
+        if (!confirmed) return null;
       }
+      return applyMove();
     },
     [handleCardMove],
   );
 
   const handleMoveStatus = useCallback(
     (item: CustomerProfileItem, status: CustomerProfileStatus) => {
-      if (item.status === status) return;
-      requestMoveCustomerStatus({
+      if (item.status === status) return Promise.resolve(null);
+      return requestMoveCustomerStatus({
         itemId: item.id,
         fromColumnId: item.status,
         toColumnId: status,
@@ -333,7 +336,7 @@ export default function CustomerProfilesPage() {
           className="sr-only"
           title={t.crm.customerProfilesAndCards}
           primaryAction={
-            capabilities.create && branchId
+            canMutate && capabilities.create && branchId
               ? {
                   label: t.crmCustomerProfileActions.createAction,
                   icon: <Plus className="size-4" aria-hidden="true" />,
@@ -380,7 +383,6 @@ export default function CustomerProfilesPage() {
         {view !== "board" && search.mode === "basic" && (
           <CustomerProfileStatusFunnelBar
             statusTotals={board.totals}
-            items={items}
             activeStatus={activeStatusFilter}
             onSelect={(status) =>
               setSearch(
@@ -394,6 +396,9 @@ export default function CustomerProfilesPage() {
         {/* Floating Dark Bottom Bulk Action Command Bar */}
         {view !== "board" && selectedItems.length > 0 && (
           <CustomerProfileBulkActionsBar
+            allowedOwnerIds={
+              capabilities.update ? capabilities.update.ownerUserIds : []
+            }
             selectedItems={selectedItems}
             totalAvailable={visibleItems.length}
             branchId={branchId}
@@ -408,8 +413,13 @@ export default function CustomerProfilesPage() {
               workspace.selection.onSelectionChange(new Set())
             }
             onScheduleActivity={openActivities}
-            onCompleted={() => {
-              workspace.selection.onSelectionChange(new Set());
+            onCompleted={(succeededIds) => {
+              const succeeded = new Set(succeededIds);
+              workspace.selection.onSelectionChange(
+                new Set(
+                  [...workspace.selection.selectedIds].filter((id) => !succeeded.has(id)),
+                ),
+              );
               void reload();
             }}
           />
@@ -438,14 +448,14 @@ export default function CustomerProfilesPage() {
           <DegradedBanner message={t.crmCustomerProfiles.loadMoreFailed} />
         )}
 
-        {(loadError || (view === "board" && board.error)) && (
+        {((loadError && loadError.status !== 403) ||
+          (view === "board" && board.error && board.error.status !== 403)) && (
           <div
             role="alert"
-            className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-destructive bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
           >
             <span>
-              {(view === "board" ? board.error?.message : undefined) ??
-                loadError?.message ??
+              {describeError((view === "board" ? board.error : null) ?? loadError) ??
                 t.crmCustomerProfiles.loadFailed}
             </span>
             <Button
@@ -461,7 +471,9 @@ export default function CustomerProfilesPage() {
         )}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          {precondition ? (
+          {loadError?.status === 403 || (view === "board" && board.error?.status === 403) ? (
+            <CrmScopeGate />
+          ) : precondition ? (
             <EmptyState title={precondition} />
           ) : (
             <>
@@ -474,14 +486,14 @@ export default function CustomerProfilesPage() {
                   onLoadMoreStatus={(status) => void board.loadMoreStatus(status)}
                   branchId={branchId}
                   sources={sources.items}
-                  canCreate={Boolean(capabilities.create && branchId)}
+                  canCreate={Boolean(canMutate && capabilities.create && branchId)}
                   canUpdate={canUpdateProfile}
                   canDelete={canDeleteProfile}
                   onOpen={openProfile}
                   onOpenQuickModal={setQuickEditCustomer}
                   onOpenFullCreate={openCreateWithStatus}
                   onDelete={promptDeleteCustomer}
-                  onOpenActivities={openActivities}
+                  onOpenActivities={canMutate ? openActivities : undefined}
                   onCardChange={(item, patch) => void updateCard(item, patch)}
                   onCardMove={requestMoveCustomerStatus}
                   onRefreshBoard={() => void reload()}
@@ -500,7 +512,7 @@ export default function CustomerProfilesPage() {
                   onOpen={openProfile}
                   onOpenQuickModal={setQuickEditCustomer}
                   onDelete={promptDeleteCustomer}
-                  onOpenActivities={openActivities}
+                  onOpenActivities={canMutate ? openActivities : undefined}
                   onCardChange={(item, patch) => void updateCard(item, patch)}
                   onMoveStatus={handleMoveStatus}
                   documentCountsByParty={documentCounts.countsByParty}
@@ -522,7 +534,7 @@ export default function CustomerProfilesPage() {
                   onOpen={openProfile}
                   onOpenQuickModal={setQuickEditCustomer}
                   onDelete={promptDeleteCustomer}
-                  onOpenActivities={openActivities}
+                  onOpenActivities={canMutate ? openActivities : undefined}
                   onCardChange={(item, patch) => void updateCard(item, patch)}
                   onMoveStatus={handleMoveStatus}
                   onRefresh={() => void reload()}
@@ -536,6 +548,9 @@ export default function CustomerProfilesPage() {
 
         {/* Centered 360° Quick-Edit & Inspector Modal (Screen 04 — zero <aside>) */}
         <CustomerQuickEditModal
+          allowedOwnerIds={
+            capabilities.update ? capabilities.update.ownerUserIds : []
+          }
           item={quickEditCustomer}
           allItems={visibleItems}
           canUpdate={canUpdateProfile}
@@ -543,11 +558,14 @@ export default function CustomerProfilesPage() {
           onClose={() => setQuickEditCustomer(null)}
           onSelectCustomer={setQuickEditCustomer}
           onOpenActivities={openActivities}
-          onCardChange={(item, patch) => {
-            void updateCard(item, patch);
-            setQuickEditCustomer((prev) =>
-              prev && prev.id === item.id ? { ...prev, ...patch } : prev,
-            );
+          onCardChange={async (item, patch) => {
+            const result = await updateCard(item, patch);
+            if (result.ok) {
+              setQuickEditCustomer((prev) =>
+                prev && prev.id === item.id ? { ...prev, ...result.patch } : prev,
+              );
+            }
+            return result;
           }}
           onMoveStatus={handleMoveStatus}
           onDelete={(item) => {
@@ -558,6 +576,9 @@ export default function CustomerProfilesPage() {
         />
 
         <CreateCustomerProfileModal
+          allowedOwnerIds={
+            capabilities.create ? capabilities.create.ownerUserIds : []
+          }
           create={create}
           sources={sources.items}
           sourcesDegraded={sources.degraded}

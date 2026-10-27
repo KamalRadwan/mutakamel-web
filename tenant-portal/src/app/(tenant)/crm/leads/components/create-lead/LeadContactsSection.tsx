@@ -14,7 +14,7 @@ import {
 import { LeadContactRow } from "./LeadContactRow";
 import { LeadFieldGuide } from "./LeadFieldGuide";
 
-export interface LeadContactsSectionProps {
+interface LeadContactsSectionProps {
   form: CreateLeadForm;
   directoryContacts: readonly LeadCompanyContactOption[];
   isLoadingContacts: boolean;
@@ -77,32 +77,32 @@ export function LeadContactsSection({
   return (
     <section
       data-form-section="contacts"
-      className="relative overflow-hidden rounded-xl border border-sky-500/20 bg-card shadow-xs transition-colors dark:border-sky-400/20"
+      className="relative overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors"
     >
-      {/* Top 3px Sky-Blue accent bar */}
+      {/* Top 3px accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-sky-500 via-blue-500 to-indigo-500"
+        className="h-1 w-full bg-primary"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-sky-500/[0.03] px-4 py-3 dark:bg-sky-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-muted/20 px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-600 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
             <Users className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">
                 03
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmLeads.create.sections.contacts}
               </h3>
-              <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+              <span className="rounded-full border border-border/60 bg-muted px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
                 {form.contacts.length} / {limits.contacts}
               </span>
               <LeadFieldGuide field="contacts" />
@@ -120,7 +120,7 @@ export function LeadContactsSection({
             size="sm"
             disabled={disabled}
             onClick={onAdd}
-            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300"
+            className="border-border/60 bg-muted/50 text-foreground hover:bg-muted"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             {t.crmLeads.create.addContact}

@@ -43,8 +43,7 @@ export function showAppToast(
 
 export interface GlobalToastEventDetail {
   type: ToastType;
-  title: string;
-  message?: string;
+  localizationKey: "authorizationDenied";
   duration?: number;
 }
 

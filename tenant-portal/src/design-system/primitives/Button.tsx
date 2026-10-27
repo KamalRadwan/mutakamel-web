@@ -19,7 +19,7 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-primary text-primary-foreground not-disabled:hover:bg-brand-700 dark:not-disabled:hover:bg-brand-300",
+          "bg-gradient-primary text-white not-disabled:hover:brightness-90 not-disabled:hover:shadow-pop",
         secondary:
           "bg-secondary text-secondary-foreground not-disabled:hover:bg-ink-200 dark:not-disabled:hover:bg-ink-700",
         outline: "border border-border bg-transparent not-disabled:hover:bg-accent",
@@ -33,20 +33,31 @@ export const buttonVariants = cva(
   },
 );
 
+type ButtonSize = VariantProps<typeof controlSize>["size"] | "toolbar";
+
+// 33px toolbar step (--size-toolbar-control, docs/design/specs/crm-leads-v3.md Part 2);
+// controlSize in variants.ts covers 24/28/32/36/40px and has no 33px slot.
+const TOOLBAR_SIZE_CLASSES =
+  "h-(--size-toolbar-control) px-3.5 gap-1.5 rounded-lg text-label font-bold";
+
+function resolveButtonSize(size: ButtonSize = "sm"): string {
+  return size === "toolbar" ? TOOLBAR_SIZE_CLASSES : controlSize({ size });
+}
+
 // buttonVariantClasses is a plain class string for the one case where the
 // framework must own the element — Radix AlertDialog.Action/.Cancel — so
 // asChild is not needed there.
 export function buttonVariantClasses(
   variant: VariantProps<typeof buttonVariants>["variant"] = "outline",
-  size: VariantProps<typeof controlSize>["size"] = "sm",
+  size: ButtonSize = "sm",
 ): string {
-  return cn(buttonVariants({ variant }), controlSize({ size }));
+  return cn(buttonVariants({ variant }), resolveButtonSize(size));
 }
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  size?: VariantProps<typeof controlSize>["size"];
+  size?: ButtonSize;
   loading?: boolean;
   asChild?: boolean;
 }
@@ -68,7 +79,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type={asChild ? type : (type ?? "button")}
         className={cn(
           buttonVariants({ variant }),
-          controlSize({ size }),
+          resolveButtonSize(size),
           // 24px is exactly the WCAG 2.2 web-target-size bar, so the xs step
           // keeps the invisible expansion rather than growing the visible box
           // — geometry.md#hit-area-expansion-not-bigger-boxes.

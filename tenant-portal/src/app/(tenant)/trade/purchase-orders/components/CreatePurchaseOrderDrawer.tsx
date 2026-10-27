@@ -8,10 +8,10 @@ import { isUUIDv7 } from "@/lib/uuid";
 import { tradePost } from "../../trade-api";
 import { TRADE_ACTION_RESPONSE_BYTES } from "../../documents/trade-document-contract";
 import { useTradeWrite } from "../../documents/hooks/useTradeWrite";
-import { TradeWriteOutcome } from "../../documents/components/TradeBoundaryStates";
+import { TradeWriteFields, TradeWriteOutcome } from "../../documents/components/TradeBoundaryStates";
 import { TradeFinancialLinesEditor } from "../../documents/components/TradeFinancialLinesEditor";
+import { useTradeOrderPricing } from "../../documents/hooks/useTradeOrderPricing";
 import {
-  computeTradeEvidence,
   createEmptyEvidenceLineDraft,
   type TradeEvidenceLineDraft,
 } from "../../documents/lib/trade-financial-evidence";
@@ -48,17 +48,12 @@ export function CreatePurchaseOrderDrawer({
     createEmptyEvidenceLineDraft(),
   ]);
 
-  const computed = React.useMemo(
-    () =>
-      computeTradeEvidence(lines, {
-        dialect: "ORDER",
-        currencyCode,
-      }),
-    [lines, currencyCode],
-  );
+  const priced = useTradeOrderPricing(headers, currencyCode, supplierPartyId, "PURCHASE", lines, open);
+  const computed = priced.computed;
 
   const canSubmit =
-    !write.isWriting &&
+    computed !== null &&
+    !write.isBlocked &&
     isUUIDv7(supplierPartyId.trim()) &&
     isUUIDv7(supplierAccountId.trim()) &&
     isUUIDv7(receivingNodeId.trim()) &&
@@ -69,7 +64,7 @@ export function CreatePurchaseOrderDrawer({
     );
 
   async function handleSubmit() {
-    if (!canSubmit) return;
+    if (!canSubmit || !computed) return;
     const payload = buildCreatePurchaseOrder({
       supplierPartyId,
       supplierAccountId,
@@ -106,25 +101,21 @@ export function CreatePurchaseOrderDrawer({
       },
     });
 
-    const ok = await write.runWrite({
+    await write.runWrite({
       operation: td.executive.newPurchaseOrder,
       send: (idempotency) =>
         tradePost(PURCHASE_ORDERS_PATH, payload, {
           headers: { ...headers, ...idempotency },
           maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
         }),
+      onSuccess: async () => { onOpenChange(false); await onCreated(); },
     });
-
-    if (ok) {
-      onOpenChange(false);
-      await onCreated();
-    }
   }
 
   return (
     <FormDrawer
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => { if (!write.isBlocked) onOpenChange(next); }}
       title={td.executive.createPurchaseOrderTitle}
       description={td.executive.createPurchaseOrderDescription}
       isDirty={supplierPartyId !== "" || draftReference !== ""}
@@ -141,7 +132,7 @@ export function CreatePurchaseOrderDrawer({
       }}
     >
       <TradeWriteOutcome write={write} />
-
+      <TradeWriteFields write={write}>
       <div className="dossier-card dossier-card-violet space-y-2">
         <div className="dossier-card-header">
           <div className="dossier-card-title">
@@ -220,10 +211,12 @@ export function CreatePurchaseOrderDrawer({
       <TradeFinancialLinesEditor
         dialect="ORDER"
         currencyCode={currencyCode}
-        lines={lines}
+        lines={priced.lines}
+        pricing={priced.pricing}
         onChangeLines={setLines}
-        disabled={write.isWriting}
+        disabled={write.isBlocked}
       />
+      </TradeWriteFields>
     </FormDrawer>
   );
 }

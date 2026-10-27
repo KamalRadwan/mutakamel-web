@@ -37,6 +37,7 @@ const profileLabels = {
     landmark: "Landmark",
     formattedAddress: "Formatted address",
     placement: "Read-only placement",
+    storageDraining: "Storage draining",
     validationTitle: "Review the required profile fields.",
     requiredField: "This field is required.",
     invalidIso: "Use a two-letter country code.",
@@ -61,6 +62,7 @@ const profileLabels = {
     landmark: "علامة مميزة",
     formattedAddress: "العنوان المنسق",
     placement: "التسكين للقراءة فقط",
+    storageDraining: "خادم التخزين قيد الإفراغ",
     validationTitle: "راجع الحقول المطلوبة في الملف التعريفي.",
     requiredField: "هذا الحقل مطلوب.",
     invalidIso: "استخدم رمز دولة مكونًا من حرفين.",
@@ -125,6 +127,9 @@ export function TenantProfilePanel({
         <Badge tone="neutral" className="normal-case tracking-normal">
           {labels.placement}: {tenant.databaseServer?.name ?? "—"} ·{" "}
           {tenant.storageServer?.name ?? "—"}
+          {tenant.storageServer?.status === "DRAINING" && (
+            <span> · {labels.storageDraining}</span>
+          )}
         </Badge>
       </div>
 

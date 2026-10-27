@@ -19,6 +19,7 @@ export interface CreateStorageServerDto {
   bucketName: string;
   credentials: StorageCredentialsDto;
   maxTenants?: number | null;
+  maxBytes?: string | null;
 }
 
 export interface UpdateStorageServerDto {
@@ -28,6 +29,7 @@ export interface UpdateStorageServerDto {
   bucketName?: string;
   credentials?: StorageCredentialsDto;
   maxTenants?: number | null;
+  maxBytes?: string | null;
   isPlatformDefault?: boolean;
 }
 
@@ -42,7 +44,7 @@ export interface RotateStorageCredentialsDto {
   graceHours?: number;
 }
 
-type StorageCredentialRotationStatus = "STAGED" | "ACTIVATED" | "REVOKED";
+type StorageCredentialRotationStatus = "STAGED" | "ACTIVATED" | "REVOKED" | "ABORTED";
 
 /** Secret-free by construction — Core never returns raw key material. */
 export interface StorageCredentialRotationView {
@@ -57,6 +59,7 @@ export interface StorageCredentialRotationView {
   activatedAt: string | null;
   graceExpiresAt: string | null;
   revokedAt: string | null;
+  abortedAt: string | null;
 }
 
 export interface StorageServerProbeResult {
@@ -79,6 +82,10 @@ export interface StorageServerView {
   bucketName: string;
   status: StorageServerStatus;
   maxTenants: number | null;
+  maxBytes: string | null;
+  reservedBytes: string;
+  committedBytes: string;
+  availableBytes: string | null;
   isPlatformDefault: boolean;
   assignedTenants: number;
   credentialsConfigured: boolean;

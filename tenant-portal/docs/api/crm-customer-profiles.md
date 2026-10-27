@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-09-18**
+Last source verification: **2026-10-18**
 
 Owning app: **crm-app**
 
@@ -27,6 +27,21 @@ Source inspected:
 
 ## Routes
 
+Owner-picker capability wiring verified **2026-10-17**: create filters branch
+owner options by `customerProfiles.create.ownerUserIds`; list quick edit and
+bulk assignment use `customerProfiles.update.ownerUserIds`. An own-scope user
+can select only themselves. `null` owner IDs allow all branch options; a
+missing action capability or an empty list exposes no owner choices. Create
+and bulk filter at render time so changed capability boundaries immediately
+apply to already loaded options. Backend authorization remains authoritative.
+
+Read-only access mode suppresses customer create, update, delete and activity
+controls. Capability answers are scoped to the selected branch and are cleared
+from view while a different branch is loading. A customer-list 403 renders the
+CRM scope gate. Notes and attachments use their own branch capability answers;
+they do not require customer-profile update permission. Activity scheduling is
+read-only for blacklisted profiles.
+
 | Method | Canonical path | Permission | Branch guard |
 | --- | --- | --- | --- |
 | POST | `/api/tenant/crm/v1/customer-profiles` | `crm.customer_profiles.create` (scoped) | body |
@@ -39,7 +54,7 @@ Source inspected:
 | POST | `/api/tenant/crm/v1/customer-profiles/:id/tags` | `crm.customer_profiles.update` (scoped) | record |
 | DELETE | `/api/tenant/crm/v1/customer-profiles/:id/tags/:tagId` | `crm.customer_profiles.update` (scoped) | record |
 | GET | `/api/tenant/crm/v1/customer-profiles/:id` | `crm.customer_profiles.read` (scoped) | record |
-| PATCH | `/api/tenant/crm/v1/customer-profiles/:id` | `crm.customer_profiles.update` (scoped) | record |
+| PATCH | `/api/tenant/crm/v1/customer-profiles/:id` | `crm.customer_profiles.update` (scoped); dedicated manual-status grant planned under D-034 / CRM-CUST-004 | record |
 | POST | `/api/tenant/crm/v1/customer-profiles/:id/contacts` | `crm.customer_profiles.update` (scoped) | record |
 | DELETE | `/api/tenant/crm/v1/customer-profiles/:id` | `crm.customer_profiles.delete` (scoped) | record |
 
@@ -94,6 +109,23 @@ exposed on 2026-08-27 as `crm.customer.profiles.contacts.post`.
 
 ## PATCH /customer-profiles/:id
 
+Table inline phone editing (source reviewed **2026-10-17**, FE-CUST-005)
+shows and edits the first customer Party phone. Corporate rows send the full
+company phone list as `companyPhones`; individual rows send the full list as
+`primaryContact.phones`. Only the displayed entry is replaced, preserving
+the remaining numbers and their order. No names or email are resent.
+Corporate contact-person phones are edited only in the contacts card.
+
+Company-field clearing verified against source **2026-10-18**: the edit
+request builder sends only changed fields. Company-phone writes use only
+`companyPhones`, replacing the PHONE set once; `[]` clears it. `companyPhone`
+remains a response display field. Emptying email, website, tax number or
+commercial registration number sends `null`, clearing the Party contact-method
+type or registration value. Registration writes use only `taxNumber` and
+`commercialRegistrationNumber`. Omitting a key leaves it unchanged. The server
+also normalizes blank tax/CR numbers to `null`.
+Company name remains non-empty and is omitted when its input is emptied.
+
 Also the board view's drag target. Moving a card between columns sends
 `{ status }` — there is no dedicated stage endpoint here, because customer
 status is a fixed enum rather than a tenant catalogue.
@@ -111,43 +143,30 @@ The same endpoint persists card presentation controls:
   presentation preference and colour-only changes are not written to the
   business audit timeline.
 
-`BLACKLISTED` is terminal in practice and should confirm before sending.
+`BLACKLISTED` changes should confirm before sending. It is not an irreversible
+state; explicit, authorized re-activation is the decided way to clear it.
 
-### `BLACKLISTED` is sticky, and today the server does not honour that
+### `BLACKLISTED` survives opportunity wins; manual-status protection is planned
 
-**Decided 2026-08-31**, from the CRM audit review's open question 2: *is
-`BLACKLISTED` sticky, or may a WON opportunity clear it?*
+**Source reviewed 2026-10-17** against `OpportunitiesService` and
+`CustomerProfilesService` (D-034, DOCS-FE-001).
 
-**The decision is sticky** — it clears only on an explicit re-activation with an
-audit trail. A blacklist is a compliance and consent state, recorded by a human
-on purpose. A sales outcome must not silently overrule it, because the system
-then forgets a decision somebody deliberately made.
+Both automatic promotion paths in `opportunities.service.ts` — creation in a
+won stage and a move entering a won stage — promote only a `PROSPECT` to
+`ACTIVE_CUSTOMER`. Neither overwrites `BLACKLISTED` or `INACTIVE`. The former
+claim that winning an existing deal silently clears a blacklist is stale.
+Creating an opportunity for a blacklisted customer is also rejected with
+`409 CUSTOMER_PROFILE_BLACKLISTED`.
 
-**Verified against source, and crm-app does not implement that today.** Two call
-sites promote the customer unconditionally when an opportunity enters `WON`:
-
-| Site | What it does |
-| --- | --- |
-| `opportunities.service.ts:223` | `updateById(customerProfileId, { status: ACTIVE_CUSTOMER })` on a status-set WIN |
-| `opportunities.service.ts:708` | The same, on a stage move that enters a `WON`-flagged stage |
-
-Neither reads the current status first. The blacklist is overwritten with no
-audit event distinguishing it from an ordinary promotion.
-
-The path is reachable, though it needs an ordering: `opportunities.service.ts:137`
-refuses to **create** an opportunity for a blacklisted customer
-(`409 CUSTOMER_PROFILE_BLACKLISTED`). So the sequence is *open the opportunity
-while the customer is active → blacklist the customer → win the opportunity*,
-and the blacklist is gone. Blacklisting rarely happens before a deal exists; it
-happens because of one.
-
-**What this means for the portal.** Do not present `BLACKLISTED` as a state the
-UI can rely on persisting, and do not build a "customer is blacklisted" gate
-that assumes the flag survives. Treat a customer that changed from
-`BLACKLISTED` to `ACTIVE_CUSTOMER` without a user action as a possible instance
-of this, not as data. This is an ask on crm-app — guard both promotions with
-`WHERE status <> 'BLACKLISTED'`, and add an explicit audited re-activation —
-not something the portal can fix.
+**Planned — D-034, CRM-CUST-004:** manual status changes, including entering
+or leaving `BLACKLISTED`, require the dedicated
+`crm.customer_profiles.status.manage` permission through the normal catalogue
+and seed, with an explicit status-change audit entry. Only a won opportunity
+may set `ACTIVE_CUSTOMER`. Current create/update DTOs still accept status and
+the update service saves it under scoped `crm.customer_profiles.update`,
+without that dedicated status grant or transition restriction. Portal status
+controls still use update access; the new permission gate is planned with the
+backend contract, not an enforced guarantee today.
 
 ## DELETE /customer-profiles/:id
 
@@ -155,11 +174,96 @@ Returns **`204`** with no body.
 
 ## Frontend notes
 
+- Quick-edit write outcomes (source reviewed **2026-10-17**, FE-CUST-006):
+  rejected rating and card-colour writes restore their previous values;
+  refused status moves retain the saved status. Failed section and contact
+  saves, card writes and status moves use translated CRM error feedback.
+  Detail loading is keyed by customer ID, so rating/colour updates and list
+  refreshes for the same customer preserve open drafts. Blacklisting still
+  waits for confirmation; cancellation applies no status change.
+
+- Tag controls (source reviewed **2026-10-17**, FE-CUST-012): detail tag
+  creation requires `crm.tags.manage` (or tenant ownership) as well as profile
+  edit access. Detail and quick-edit catalogue pickers require `crm.tags.read`
+  (or tenant ownership) and profile edit access; hiding the picker does not
+  hide attached customer tags. Failed or malformed catalogue responses show
+  the existing translated tag-load error toast and close the picker; clicking
+  Attach Tag again retries the read.
+
+- Related navigation and quick-edit pills (source reviewed **2026-10-17**,
+  FE-CUST-011) accept the base Opportunities read permission or its `.own`,
+  `.team` and `.all` variants. Trade pills require the corresponding exact
+  quotation, sales-order or invoice read permission; denied pills are hidden
+  and no count request is sent. Quick-edit labels use the existing Arabic and
+  English related-record dictionary. Pending/unavailable counts show an
+  ellipsis/dash, preserving zero for a confirmed empty result. Backend record
+  scope remains authoritative.
+
+- Existing corporate contacts (source reviewed **2026-10-17**, FE-CUST-004)
+  keep their Core directory identity and communication methods read-only in
+  quick edit and the detail Contacts card. Honorific, name, email and phone
+  changes belong to Core directory writes; CRM relationship edits retain job
+  title and primary-contact controls. Quick edit uses the validated PATCH
+  detail response for edits and refreshes detail after adding a contact, so
+  draft identities, phone values and client-generated contact IDs never appear
+  as saved server data.
+
+- CSV export (source reviewed **2026-10-22**, FE-CUST-013) in Card/Table
+  requires `crm.customer_profiles.export`. Export includes only selected rows
+  visible in the current view; no selection disables the labelled control.
+  Headers, profile types and statuses follow the current language. UTF-8 BOM
+  is preserved; every CSV cell is quoted and formula prefixes (`=`, `+`, `-`,
+  `@`, tab and carriage return, including after whitespace) receive a leading
+  apostrophe. Selections from another page or hidden by the local status
+  filter are excluded; the export label counts only selected visible rows.
+  The permission is static: it enables exporting data already admitted by
+  scoped reads, without widening record access. The normal CRM permission
+  catalogue/seed supplies it. The lead confirmed that `crm-app-common` 0.0.7
+  and provisioning release 003 have shipped the permission to the dev tenant;
+  the earlier package/seed blocker is resolved. The control is hidden without
+  the permission, including when it is removed from the active session.
+
+- Quick edit (source reviewed **2026-10-17**, FE-CUST-003) exposes no write
+  controls until `GET /:id` validates for the selected customer. Pending reads
+  show loading; refused, failed or malformed reads show Retry and Close, with
+  the scope-denied surface for HTTP 403. Switching customers immediately
+  locks edits and ignores the previous read's late response. List rows never
+  supply editable detail defaults, preserving source, description and Party
+  tax/registration values when the detail cannot be read. Ctrl/Cmd+S cannot
+  save while detail is unavailable.
+
+- Bulk actions (verified **2026-10-17**, FE-CUST-007) submit only customers
+  eligible for that action and report eligible, succeeded, skipped and failed
+  counts. Skips explain the action scope; API failures use translated CRM
+  reasons, including deletion blocked by active opportunities. After refresh,
+  successful customers leave the selection; failed and skipped customers stay
+  selected. Schedule activity is available only for a single selected customer.
+
+- Phone actions (verified **2026-10-17**) use the shared
+  `leads/lead-phone-links.ts` normalizers. WhatsApp and Telegram require an
+  international number: local numbers use the supplied country (ISO code or
+  country name) and omit their trunk zeroes; without a recognized country,
+  chat actions are hidden. An explicit international prefix takes precedence
+  over the country. Calling remains available for local numbers.
+- Board quick-add leaves the acquisition source empty until the user chooses
+  one. If saving the initial rating or tags fails after profile creation, the
+  portal keeps the created profile and shows a translated warning. Customer
+  profile labels and accessibility text use the Arabic and English dictionaries
+  rather than language-specific string branches. This includes the create
+  form's Company section, the board's Company mode and missing-phone label,
+  and the Basic search Phone field.
 - **The board axis is `CustomerStatusEnum`** — a fixed 4-value enum, in this
   order: `PROSPECT`, `ACTIVE_CUSTOMER`, `INACTIVE`, `BLACKLISTED`.
   Unlike leads and opportunities this needs **no catalogue fetch**, and the
   column set never varies by tenant.
 - Default view is `board`; Card and Table use the richer list/search projection.
+- Status funnel totals (verified **2026-10-17**) load independently in Basic
+  Card/Table view through four read-only `POST /customer-profiles/search`
+  requests with `limit: 1`, one per status. They preserve the board's search,
+  branch and owner scope, excluding the selected status token. "All" sums the
+  server totals rather than the visible page. Counts are hidden until all four
+  responses validate, and while refreshing, after failure, or after the query
+  changes; unknown counts never render as zero. Board pagination stays at 50.
 - Core owns the underlying party directory; CRM owns the profile. Do not try
   to join them client-side.
 - Card and Table consume the rich list/search projection. Preserve the owner
@@ -172,6 +276,11 @@ Returns **`204`** with no body.
 - Rating and card colour are persisted server-side and shared by Board, Card
   and Table. Optimistic updates must change only those keys, preserve the rich
   row already on screen and reconcile after an ambiguous response.
+- Customer error feedback (reviewed **2026-10-17**, FE-CUST-014) uses
+  `useCrmErrorText` for list loads, deletion and inline company, contact and
+  profile saves. Deletion blocked by active opportunities shows the translated
+  reason. Detail rating/colour write failures show a translated error toast;
+  ambiguous or unreadable write responses also reload the detail.
 - The list screen's Basic search uses removable tokens in one input. Its
   semantic choices are Customer, Email and Phone/Mobile; there is no Lead
   choice on this screen. Status, Customer type and Source are structured

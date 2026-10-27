@@ -2,7 +2,7 @@
 
 Status: **[Implemented against the WebPhone module; drift resolved]**
 
-Reverified on **2026-09-03**. The widget is the shared `@mutakamel/webphone`
+Reverified on **2026-09-03**; package identity updated on **2026-10-17**. The widget is the private shared `@mutakamel/webphone-ui`
 package, bound to the admin portal by `AdminWebPhone.tsx` and served by the
 WebPhone Gateway app at `/api/admin/webphone/v1` — a namespace of its own, so
 its absence from the generated Admin **Core** inventory is expected, not drift.

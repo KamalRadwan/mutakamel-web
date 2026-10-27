@@ -1,130 +1,151 @@
 # Typography
 
-Status: **[Verified current source; target conformance gaps recorded]**
+Status: **[Verified current source — Ocean Navy v3 aligned]**
 
-Last source verification: **2026-08-29**
+Last source verification: **2026-10-26**
 
 Owner: **Admin Portal**
 
-Source: `src/app/fonts.ts`, `src/app/globals.css`.
+Source: `src/app/fonts.ts`, `src/app/globals.css`, `src/app/layout.tsx`, `src/app/global-error.tsx`.
 
-## Pairing: IBM Plex Sans + IBM Plex Sans Arabic + IBM Plex Mono
+## Pairing: Plus Jakarta Sans + Cairo + IBM Plex Mono (`2026-10-26`)
 
-Before this migration the app loaded **zero fonts** — no `next/font`, no
-Arabic face — despite being Arabic-first, so every browser fell back to
-whatever system UI font happened to be installed.
-
-The Plex family was chosen because Plex Sans Arabic was drawn against Plex
-Latin by the same type team: mixed-script lines (a status badge's Latin enum
-value sitting inside an Arabic sentence, a `correlationId` inline with Arabic
-prose) don't jump baseline or x-height the way an unrelated Latin/Arabic pair
-would. Plex Mono pairs with both for the `correlationId` / `errorCode` /
-idempotency-key text that appears throughout the app. Not Inter, not Geist —
-picking either of those "safe default" faces is exactly the kind of choice
-that makes a product look AI-generated.
+Updated **2026-10-26** to match the Ocean Navy v3 identity across both portals
+(replacing the earlier `IBM Plex Sans` + `IBM Plex Sans Arabic` pairing while
+keeping `IBM Plex Mono` for machine identifiers).
 
 ```ts
 // src/app/fonts.ts
-export const plexLatin = IBM_Plex_Sans({ weight: ["400", "500", "600"], ... });
-export const plexArabic = IBM_Plex_Sans_Arabic({ weight: ["400", "500", "600"], ... });
-export const plexMono = IBM_Plex_Mono({ weight: ["400", "500", "600"], ... });
+import { Cairo, IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
+
+export const uiLatin = Plus_Jakarta_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-ui-latin",
+  display: "swap",
+  preload: false,
+});
+
+export const uiArabic = Cairo({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-ui-arabic",
+  display: "swap",
+  preload: false,
+});
+
+export const uiMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-ui-mono",
+  display: "swap",
+  preload: false,
+});
 ```
 
-`globals.css` declares `--font-sans` with **Latin first, Arabic second**:
+Both `src/app/layout.tsx` and `src/app/global-error.tsx` attach
+`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable}` on `<html>`,
+so the font variables are available where the `:root` bridges compute.
+`preload: false` with `display: "swap"` remains deliberate because language is
+resolved from `localStorage` on the client rather than cookies on the server.
+
+`globals.css` declares `--font-sans`, `--font-arabic`, and `--font-mono` in
+plain `@theme` (not `@theme inline`, so custom properties exist at runtime) and
+binds the font variables directly on `:root` and `body` with **Latin first,
+Arabic second**:
 
 ```css
---font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif, system-ui, sans-serif;
+--font-sans: var(--font-ui-latin), var(--font-ui-arabic), ui-sans-serif, system-ui, sans-serif;
+--font-arabic: var(--font-ui-arabic), ui-sans-serif, system-ui, sans-serif;
+--font-mono: var(--font-ui-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 ```
 
-The browser resolves font-family *per character*, so one stack serves both
-scripts on the same line with zero JavaScript and no `:lang()` switching.
+The browser resolves `font-family` *per character*, so Latin/Western-digit runs
+render in Plus Jakarta Sans and Arabic runs fall through to Cairo on the same
+line with zero JavaScript and no `:lang()` switching. `font-arabic` exposes
+Cairo explicitly (including its `"latin"` subset for digits and punctuation)
+where Arabic headlines opt into optical weight balancing.
 
-## Three weights, physically enforced
+## Five weights (`400`–`800`), `900` banned (`2026-10-26`)
 
-Only weights 400/500/600 are downloaded. `body { font-synthesis-weight:
-none; }` in `globals.css` stops the browser from synthesizing a fake bold for
-any heavier className that slips through — the ceiling is enforced by the
-font files themselves, not just convention.
-
-`globals.css` additionally remaps Tailwind's own weight keys:
-
-```css
---font-weight-bold: 600;
---font-weight-extrabold: 600;
---font-weight-black: 600;
-```
-
-This is what let 1,078 pre-existing `font-bold` / `font-extrabold` /
-`font-black` call sites (280 of which were `font-black`) de-escalate to 600
-with zero `.tsx` edits during the theme flip.
-
-**Weight policy:**
-
-| Weight | Use |
-| --- | --- |
-| 600 | Headings, `<th>`, KPI numerals, button labels, active nav |
-| 500 | Form labels, tabs, badges |
-| 400 | **All table body cells**, all prose, all values |
-
-Hierarchy comes from size and color, never weight. New code recovered from
-before this migration (e.g. Phase 22's restored dashboard charts) is
-normalized on sight — `font-bold`/`font-extrabold` classes become
-`font-semibold` even where Tailwind's default palette would otherwise render
-them correctly, because the census check treats any growth in
-`fontBoldOrHeavier` as a regression to flag, not silently accept.
-
-## The 7-step type scale
-
-13px floor, 14px base. Declared in `globals.css`'s `@theme` block (all
-values below are also self-documented there as comments):
-
-| Token | Size / line-height | Use |
-| --- | --- | --- |
-| `text-2xs` | 12px / 16px | Legacy/transitional only; target product text does not use this step |
-| `text-xs` | 13px / 18px | **Workhorse** — table cells, badges, metadata |
-| `text-sm` | 14px / 20px | **Base** — body, inputs, buttons, labels, nav |
-| `text-base` | 15px / 24px | Prose, dialog descriptions |
-| `text-lg` | 17px / 24px | Card titles, h2/h3 |
-| `text-xl` | 20px / 28px | Page title |
-| `text-2xl` | 25px / 32px | KPI numerals — **ceiling**; nothing in the app renders larger |
-
-The scale is compressed at the bottom (13→14→15px, where 90% of the app's
-pixels live) and opens up by roughly 1.2× per step above that. Before this
-migration 69% of all text was 12px or smaller (415 arbitrary
-`text-[8px]`…`text-[11px]` plus 1,030 uses of `text-xs` at Tailwind's stock
-12px) — `text-xs` alone lifting from 12px to 13px, plus the arbitrary sizes
-collapsing onto `text-2xs`/`text-xs`, was one of the single largest
-legibility fixes in the whole migration.
-
-## Arabic lift and current gap
-
-The three smallest steps get +1px in Arabic, with line-heights raised in
-lockstep so ascenders/descenders don't clip:
+Weights **400, 500, 600, 700, and 800** are downloaded for `uiLatin` and
+`uiArabic` (`400, 500, 600` for `uiMono`). Weight **900** (`font-black`) remains
+banned and remaps to `800` in `globals.css`, while `body { font-synthesis-weight: none; }`
+prevents browsers from synthesizing fake bolds:
 
 ```css
-html[lang="ar"] {
-  --text-xs: 0.875rem;   /* 14px, was 13 */
-  --text-sm: 0.9375rem;  /* 15px, was 14 */
-  --text-base: 1rem;     /* 16px, was 15 */
+@theme {
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 800;
 }
 ```
 
-Plex Arabic needs this where Plex Latin doesn't — Naskh-style Arabic forms
-need slightly more room at small sizes to keep dots and diacritics legible.
-`text-2xs` is **not** lifted by current source. The intended rule was
-Latin-uppercase-only, but current Arabic-capable table headers, sidebar labels,
-KPI labels, and status badges still use it. That makes the earlier assumption
-that it “never renders Arabic” false.
+**Weight policy:**
 
-The approved target is explicit:
+| Weight | Utility | Use |
+| --- | --- | --- |
+| 800 | `font-extrabold` | Inner KPI count chips and avatar initials (`text-micro`) |
+| 700 | `font-bold` | Stage/column titles, card titles, compact toolbar CTAs, sidebar section labels |
+| 600 | `font-semibold` | Page/section headings, `<th>`, KPI numerals, active nav items, status pills |
+| 500 | `font-medium` | Form labels, inactive tabs, badges, subtitles |
+| 400 | `font-normal` | **All table body cells**, prose, values, secondary metadata |
 
-- Arabic-capable microcopy is at least 13px;
-- Arabic uses normal casing and zero tracking;
-- translated table headings, statuses, controls, and chart ticks may not use
-  `text-2xs`;
-- chart and axis labels are at least 13px in both languages.
+## Type scale: base 7-step scale + named v3 steps (`2026-10-26`)
 
-See
+Declared in `src/app/globals.css`. Alongside Admin Portal's 7-step base scale
+(13px floor, 14px base, 25px ceiling), Ocean Navy v3 defines seven named role
+steps so compact chips, badges, nav items, and card/column headers never use
+arbitrary `text-[Npx]` utilities:
+
+| Token | Latin size / line-height | Use |
+| --- | --- | --- |
+| `text-micro` | 10px / 14px | Inner count chips & avatar initials only |
+| `text-badge` | 11px / 16px | KPI badges, activity & source pills, filter chips, sidebar section labels |
+| `text-caption` | 12px / 18px | Contact subtitles, compact helper lines |
+| `text-label` | 12.5px / 18px | Toolbar CTA & compact control labels |
+| `text-tab` | 13.5px / 20px | Nav items & collapsed rail titles |
+| `text-card-title` | 14px / 20px | Kanban & entity card titles |
+| `text-column-title` | 14.5px / 21px | Stage column header titles |
+| `text-2xs` | 13px / 18px | Legacy compatibility alias (`0.06em` tracking); migrate call sites to `text-xs` or `text-badge` |
+| `text-xs` | 13px / 18px | **Workhorse** — table headers, badges, metadata |
+| `text-sm` | 14px / 20px | **Base** — body, table cells, inputs, buttons, labels |
+| `text-base` | 15px / 24px | Prose, dialog descriptions |
+| `text-lg` | 17px / 24px | Card/section titles, h2/h3 |
+| `text-xl` | 20px / 28px | Page title |
+| `text-2xl` | 25px / 32px | KPI numerals — **ceiling**; nothing renders larger |
+
+Verified **2026-10-26**: `text-tab` names the size to avoid the `--color-nav`
+color collision. The other custom steps (`micro`, `badge`, `caption`, `label`,
+`card-title`, `column-title`, `2xs`) and `tab` have no matching `--color-*` name.
+
+Arbitrary `text-[Npx]` utilities remain banned. Sub-13px sizes are permitted
+only through the named v3 tokens (`text-micro`, `text-badge`, `text-caption`,
+`text-label`) in their designated roles.
+
+## Arabic lift (`html[lang="ar"]`)
+
+Under `html[lang="ar"]`, every small and mid step — both the named v3 steps and
+`xs` / `sm` / `base` — receives `+1px`, raised line-heights, and zeroed negative
+letter-spacing so Cairo's dots and joined forms never clip or split:
+
+```css
+html[lang="ar"] {
+  --text-micro: 0.6875rem; /* 11px / 15px */
+  --text-badge: 0.75rem; /* 12px / 17px */
+  --text-caption: 0.8125rem; /* 13px / 20px */
+  --text-label: 0.84375rem; /* 13.5px / 20px */
+  --text-tab: 0.90625rem; /* 14.5px / 22px, tracking 0em */
+  --text-card-title: 0.9375rem; /* 15px / 22px, tracking 0em */
+  --text-column-title: 0.96875rem; /* 15.5px / 23px, tracking 0em */
+  --text-xs: 0.875rem; /* 14px / 20px */
+  --text-sm: 0.9375rem; /* 15px / 22px */
+  --text-base: 1rem; /* 16px / 26px */
+}
+```
+
+`text-2xs` remains unlifted by convention (Latin uppercase compatibility alias;
+Arabic has no uppercase and must use normal casing with zero tracking). See
 [Accessibility, responsive behavior, and localization](accessibility-responsive-and-localization.md#bilingual-typography).
 
 ## Numeral policy
@@ -132,18 +153,13 @@ See
 Dashboard and KPI number formatting goes through `Intl.NumberFormat` with an
 explicit locale — `"ar-EG"` for Arabic, `"en-US"` for English — rather than
 `undefined` (which resolves to the runtime's default locale and is
-non-deterministic across machines and CI). See
-`formatDashboardMetric()` in `src/app/(shell)/dashboard/utils/formatters.ts`
-for the canonical example, fixed in Phase 22.
+non-deterministic across machines and CI). See `formatDashboardMetric()` in
+`src/app/(shell)/dashboard/utils/formatters.ts`.
 
-**Open, unresolved decision:** whether Arabic-locale numerals should render as
-Western digits (`ar-EG-u-nu-latn`, so `tabular-nums` columns stay visually
-aligned with their English-locale counterparts) or the `ar-EG` locale's
-default Eastern Arabic-Indic digits. Today the app does **both**,
-inconsistently — 3 files (`roles/page.tsx`, `StorageServerDetailScreen.tsx`,
-`StorageServersScreen.tsx`) explicitly opt into `ar-EG-u-nu-latn`, while 27
-other files pass plain `"ar-EG"` and get Eastern Arabic-Indic digits by
-default. This predates the design-system migration and was never resolved to
-one answer — it changes what numerals Arabic-locale operators see on every
-screen, so it needs an explicit product decision before a codemod picks a
-direction, not a default assumed by a docs pass.
+**Open product decision:** whether Arabic-locale numerals across Admin Portal
+should standardize on Western digits (`ar-EG-u-nu-latn`, matching Tenant Portal
+so `tabular-nums` columns align identically across locales) or retain `ar-EG`'s
+Eastern Arabic-Indic default where currently used (`roles/page.tsx`,
+`StorageServerDetailScreen.tsx`, and `StorageServersScreen.tsx` currently opt
+into `ar-EG-u-nu-latn`, while other screens pass plain `"ar-EG"`). Standardizing
+requires an explicit Admin product decision rather than an unannounced codemod.

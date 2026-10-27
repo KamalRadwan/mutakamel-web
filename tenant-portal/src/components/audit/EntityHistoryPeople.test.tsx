@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantUserProfile } from "@/context/AuthContext";
 import { en } from "@/i18n/dictionaries/en";
@@ -28,7 +28,7 @@ const history = { id: "01900100-0000-7000-8000-0000000000a1", action: "LEAD_UPDA
   createdAt: "2026-09-14T10:18:00", outcome: "SUCCESS", diff: [
     { field: "ownerUserId", before: A, after: B }, { field: "activityAssignee", before: null, after: B },
   ] };
-const core = (data: unknown) => ({ data: { success: true, data, meta: { hasNext: false }, correlationId: "test" } });
+const core = (data: unknown) => ({ data: { success: true, data: Array.isArray(data) ? { items: data, nextCursor: null } : data, correlationId: "test" } });
 function serve(path: string) {
   if (path.includes("/audit/")) return core([history]);
   if (path.endsWith(`/users/${A}`)) return core({ id: A, firstName: "Saly", lastName: "Essam", email: "saly@example.com" });
@@ -41,14 +41,24 @@ beforeEach(() => {
   vi.clearAllMocks(); locale.lang = "en";
   auth.user = { id: LEAD, firstName: "Kamal", lastName: "Radwan", email: "kamal@example.com", status: "ACTIVE", isTenantOwner: false,
     permissions: ["audit.read", "users.user.read", "org.branch.read", "crm.acquisition_sources.read"],
-    accessibleBranches: [], accessibleCompanies: [], teamMemberships: [] };
+    permissionScopes: Object.fromEntries(
+      ["audit.read", "users.user.read", "org.branch.read", "crm.acquisition_sources.read"]
+        .map((key) => [key, { tenantWide: true, companyIds: [], branchIds: [] }]),
+    ),
+    accessibleBranches: [], accessibleCompanies: [], accessibleBranchCompanies: [], teamMemberships: [],
+    accessScope: { mode: "EXPLICIT", branchesTruncated: false, companiesTruncated: false, teamMembershipsTruncated: false, teamMembershipsTotal: 0 } };
   api.get.mockImplementation(async (path: string) => serve(path));
 });
 afterEach(cleanup);
 
+async function renderHistory(props: Parameters<typeof EntityHistoryCard>[0] = { entityType: "Lead", entityId: LEAD }) {
+  // Flush the history read and dependent profile reads before querying people.
+  await act(async () => { render(<EntityHistoryCard {...props} />); });
+}
+
 describe("audit names and reusable contact cards", () => {
   it("resolves old/new salesperson names and opens the exact person's contact card, without internal data", async () => {
-    render(<EntityHistoryCard entityType="Lead" entityId={LEAD} />);
+    await renderHistory();
     const oldName = await screen.findByRole("button", { name: "View Saly Essam's contact details" });
     expect(oldName).toHaveClass("line-through");
     await screen.findAllByRole("button", { name: "View Mostafa Saleh's contact details" });
@@ -69,7 +79,7 @@ describe("audit names and reusable contact cards", () => {
   });
   it("renders permission denial without leaking IDs or fetching unauthorized user details", async () => {
     auth.user!.permissions = ["audit.read"];
-    render(<EntityHistoryCard entityType="Lead" entityId={LEAD} />);
+    await renderHistory();
     const names = await screen.findAllByRole("button", { name: "View Name unavailable's contact details" });
     fireEvent.click(names[0]);
     expect(within(screen.getByRole("dialog")).getByText(en.permissionGate.title)).toBeInTheDocument();
@@ -82,7 +92,7 @@ describe("audit names and reusable contact cards", () => {
       if (path.endsWith(`/users/${A}`) && failing) throw new Error("offline");
       return serve(path);
     });
-    render(<EntityHistoryCard entityType="Lead" entityId={LEAD} />);
+    await renderHistory();
     fireEvent.click(await screen.findByRole("button", { name: "View Name unavailable's contact details" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(en.personProfile.loadFailed)).toBeInTheDocument();
@@ -96,7 +106,7 @@ describe("audit names and reusable contact cards", () => {
       if (path.includes("/users/")) throw new TenantApiClientError("Forbidden", { status: 403, statusText: "Forbidden", headers: new Headers(), data: {} });
       return serve(path);
     });
-    render(<EntityHistoryCard entityType="Lead" entityId={LEAD} />);
+    await renderHistory();
     fireEvent.click((await screen.findAllByRole("button", { name: "View Name unavailable's contact details" }))[0]);
     expect(within(screen.getByRole("dialog")).getByText(en.permissionGate.title)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: en.common.retry })).not.toBeInTheDocument();
@@ -105,7 +115,7 @@ describe("audit names and reusable contact cards", () => {
     api.get.mockImplementation(async (path: string) => path.includes("/audit/") ? core([{ ...history, diff: [
       { field: "branchId", before: null, after: BRANCH }, { field: "acquisitionSourceId", before: SOURCE, after: null },
     ] }]) : serve(path));
-    render(<EntityHistoryCard entityType="Lead" entityId={LEAD} />);
+    await renderHistory();
     expect(await screen.findByText("Cairo")).toBeInTheDocument();
     expect(await screen.findByText("Website")).toHaveClass("line-through");
     expect(document.body.textContent).not.toContain(BRANCH);
@@ -115,7 +125,7 @@ describe("audit names and reusable contact cards", () => {
     api.get.mockImplementation(async () => core([{ ...history, diff: [
       { field: "stageId", before: null, after: SOURCE }, { field: "unknownReferenceId", before: null, after: BRANCH },
     ] }]));
-    render(<EntityHistoryCard entityType="Lead" entityId={LEAD} valueLabels={{ stageId: { [SOURCE]: "Qualified" } }} />);
+    await renderHistory({ entityType: "Lead", entityId: LEAD, valueLabels: { stageId: { [SOURCE]: "Qualified" } } });
     expect(await screen.findByText("Qualified")).toBeInTheDocument();
     expect(screen.getByText(en.audit.valueUnavailable)).toBeInTheDocument();
     expect(api.get).toHaveBeenCalledTimes(1);
@@ -126,7 +136,7 @@ describe("audit names and reusable contact cards", () => {
     api.get.mockImplementation(async (path: string) => path.includes("/audit/") ? core([{ ...history, diff: [
       { field: "ownerUserId", before: null, after: A }, { field: "acquisitionSourceId", before: null, after: SOURCE },
     ] }]) : serve(path));
-    render(<EntityHistoryCard entityType="Lead" entityId={LEAD} />);
+    await renderHistory();
     expect(await screen.findByText("الموقع الإلكتروني")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "عرض بيانات التواصل مع Saly Essam" }));
     const dialog = screen.getByRole("dialog");

@@ -3,7 +3,7 @@
 Status: **[Frontend/source audit; WebPhone drift resolved — the routes moved to
 the WebPhone module namespace]**
 
-Last source verification: **2026-09-03**
+Last invitation-contract source verification: **2026-10-18** (runtime verification pending)
 
 Owner: **Core**
 
@@ -14,6 +14,7 @@ Canonical browser prefix: `/api/admin/core/v1/users`
 | Method and browser path | Permission mode | Success | Current evidence |
 | --- | --- | ---: | --- |
 | `POST /api/admin/core/v1/users` | `admin.users.invite` + `admin.users.critical` | `201` | `DONE` |
+| `POST /api/admin/core/v1/users/:id/resend-invite` | `admin.users.invite` + `admin.users.critical` | `201` | Source integrated; runtime pending |
 | `GET /api/admin/core/v1/users` | `admin.users.read` | `200` | `DONE` |
 | `GET /api/admin/core/v1/users/:id` | `admin.users.read` | `200` | `DONE` |
 | `PATCH /api/admin/core/v1/users/:id` | `admin.users.update` + `admin.users.critical` | `200` | `DONE` |
@@ -25,6 +26,14 @@ Canonical browser prefix: `/api/admin/core/v1/users`
 | `PATCH /api/admin/core/v1/users/me/profile` | Authenticated | `200` | `DONE` |
 
 Every paired permission uses ALL semantics.
+
+Target-protection source verification: **2026-10-18** (runtime verification pending).
+The directory and detail use one capability helper with the persisted target's
+`isSuperAdmin` flag. A non-super administrator sees an Arabic/English explanation
+instead of lifecycle actions for a super-admin target; identity fields are disabled,
+role assignment is read-only, and invitation resend and delete confirmation are
+unavailable. Ordinary targets retain the existing permission, status and self-action
+rules. WebPhone controls continue to use their independent module permissions.
 
 **No WebPhone route lives under `/users`.** The five that once did
 (`:id/webphone`, `me/webphone`, `me/webphone/call-logs`) were deleted with the
@@ -46,6 +55,21 @@ interface CreateAdminUserDto {
 The returned user remains `INVITED` until invite acceptance. Only a current
 super admin may create another super admin. Duplicate email/role/invariant
 errors must be displayed from the authoritative response.
+
+Creation now commits the account, token and invitation email outbox row together;
+enqueue failure returns `503 ADMIN_INVITE_DELIVERY_UNAVAILABLE` and rolls back
+creation. A success confirms queued delivery, not receipt of the email.
+
+For another `INVITED` user, detail shows **Resend invitation** when the actor
+holds both invite permissions. The keyed POST sends `{}` and rotates the token;
+old links stop working after success. The action disables while pending, reports
+queued delivery in Arabic/English, and retains the same caller-owned UUIDv7 key
+after an ambiguous failure. The backend limits invitations to one per target
+per minute, including initial creation, returning
+`429 ADMIN_INVITE_RESEND_THROTTLED`; other statuses return
+`409 ADMIN_INVITE_NOT_PENDING`. These failures use bilingual action feedback.
+Suspend then activate returns accounts without credentials to `INVITED`; adopt
+the returned status and use resend to resume onboarding.
 
 ## List
 
@@ -74,6 +98,29 @@ directory, the table describes one page of it.
 
 ## Update and lifecycle
 
+Detail load-state source verification: **2026-10-18** (runtime verification pending).
+The detail hook distinguishes loading, ready, degraded, error, not-found and
+forbidden states. An initial network/server failure renders a persistent error
+with retry instead of the blank editable form. A failed refresh of the same
+user retains the previously loaded fields with a persistent Arabic/English
+stale-data banner and retry action. A successful retry replaces the fields and
+clears the banner. Data from a different user or an older request cannot become
+the current detail projection. WebPhone resource failures remain independent.
+
+Role-catalogue source verification: **2026-10-18** (runtime verification pending).
+Invitation, reassignment and the directory role filter load the complete
+`GET /api/admin/core/v1/roles` catalogue with `admin.roles.read`, sorted by name,
+in pages of 100 with a maximum of 50 pages (5,000 roles). Options are published
+only after every page succeeds and pagination totals reconcile. A failed page,
+inconsistent response or catalogue above that bound shows a retryable load
+error instead of a truncated list. Loading, forbidden and genuinely empty
+catalogues have separate Arabic/English feedback. Invitation and detail use
+searchable pickers over the complete catalogue; Core does not currently apply
+role-name search. Detail always retains the assigned role and its localized
+label from the user projection, even while the catalogue is loading or fails.
+Role changes are disabled until the catalogue succeeds. Retrying that resource
+does not reload the user or discard other form edits.
+
 - Email is immutable.
 - Identity, role, or super-admin changes use `PATCH /users/:id`.
 - Dedicated role replacement uses `PATCH /users/:id/roles` with the complete
@@ -83,6 +130,35 @@ directory, the table describes one page of it.
 - Delete is a soft delete and returns `204` with no body.
 - Refresh the user projection after mutations because affected sessions can be
   invalidated.
+
+Role-target status contract verified **2026-10-17**: dedicated replacement
+accepts one UUIDv7 `roleId` and requires an `ACTIVE` target. An existing inactive
+target returns `409 ADMIN_USER_NOT_ACTIVE`; an absent target still returns
+`404 ADMIN_USER_NOT_FOUND`. The detail page hides the role selector and Save
+action for inactive users and shows the existing role as text. Conflict feedback
+uses the selected Arabic or English language without treating the record as
+missing.
+
+Assignable-role source contract verified **2026-10-18**: invitation reads
+`GET /api/admin/core/v1/roles/assignable-for-invite` with the existing
+`admin.users.invite` + `admin.users.critical` pair; user detail reads
+`GET /api/admin/core/v1/roles/assignable-for-assignment` with
+`admin.users.assign_roles` + `admin.users.critical`. Neither needs
+`admin.roles.read`. Core returns only role IDs and localized names whose live
+permission memberships fit within the actor's own role (super admins bypass
+containment). Pagination applies after filtering; see
+[role projection contract](roles-permissions.md#list-and-catalogue).
+
+The portal loads an assignment projection only after an active, manageable
+target other than the actor is known. It preserves the current role as a
+disabled label even when outside the projection, and accepts saves only for
+roles returned by that projection. Role-read grants alone do not enable these
+operations. Missing prerequisites, empty results, forbidden responses and read
+failures remain distinct bilingual states. Permission or target changes discard
+stale options and pending responses. The directory catalogue remains gated by
+`admin.roles.read`. Core mutation containment, self-change and lock-out guards
+remain authoritative. This records source integration; automated and runtime
+verification are pending lead verification.
 
 ## Self profile
 

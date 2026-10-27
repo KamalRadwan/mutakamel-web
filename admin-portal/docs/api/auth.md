@@ -1,10 +1,85 @@
 # Admin Authentication API
 
+## Optional email MFA — FE-AUTH-001 (source reviewed 2026-10-23)
+
+Core owns all operations below; browser paths use
+`/api/admin/core/v1/auth`. Source authority is Gateway
+`core.route-contracts.ts`, Core's `admin-auth.controller.ts`,
+`common/auth/mfa/mfa.dto.ts`, `mfa.types.ts`, and the implemented A/B
+contracts in `backend/docs/LLD/01-core-app/10_MVP/49_email_mfa.md`.
+
+| POST suffix | Closed request | Response |
+| --- | --- | --- |
+| `/login` | Existing email/password DTO | Existing session or MFA challenge |
+| `/mfa/verify` | `{challengeId, code}` | Existing safe session metadata and cookies |
+| `/mfa/resend` | `{challengeId}` | Remaining challenge timing |
+| `/mfa/settings/challenge` | `{enabled, currentPassword}` | Purpose-bound challenge |
+| `/mfa/settings/resend` | `{challengeId}` | Remaining settings challenge timing |
+| `/mfa/settings/confirm` | `{challengeId, code}` | Empty 204; all sessions revoked and cookies cleared |
+
+Challenges are inside Core's normal `data` envelope:
+`{mfaRequired: true, challengeId, expiresIn, resendAfterSeconds}`.
+The portal validates the 43-character base64url ID, integer lifetime (0–600
+seconds), and nonnegative resend delay, and projects only those fields.
+Login and enrolled invitation acceptance display the same code step, without
+committing session metadata, loading `/me`, navigating or showing login success.
+Only successful verification enters the ordinary cookie-session bootstrap path.
+MFA-off login retains its existing behavior.
+
+The single text field accepts exactly six ASCII digits as a string, including
+leading zeroes. It supports keyboard entry, paste and `one-time-code` autofill,
+uses LTR digits inside either interface direction, and has a visible label and
+associated translated errors. Passwords clear when the challenge starts; codes
+clear after each submission and resend. Neither codes, passwords nor challenge
+IDs enter browser storage, URLs, logs or analytics. The browser does not inspect
+the HttpOnly pre-auth nonce or authentication cookies.
+
+Resend waits for the server-provided cooldown, rotates the code and never
+extends the original deadline. Core's `AUTH_MFA_THROTTLED` and Gateway 429s
+honor `Retry-After` or `details.retryAfterSeconds`, with a conservative 60-second
+fallback when timing is absent. Invalid, expired or consumed codes share
+`401 AUTH_MFA_INVALID_CHALLENGE`; the UI does not guess which server condition
+occurred. The local deadline separately prompts a restart. Availability failures
+use `503 AUTH_MFA_UNAVAILABLE`; a lost/unknown verification response blocks
+another code submission and offers a restart. Requests use the existing auth
+lock with `nonReplayable`, `skipAuthRefresh`, `skipAutoIdempotency` and
+`cache: "no-store"`; they never auto-retry verification or confirmation.
+
+The profile security section independently validates `GET /auth/me` fields
+`mfaEnabled: boolean` and `mfaUpdatedAt: ISO string | null`. Missing enrollment
+data renders unavailable, rather than treating MFA as off. Every authenticated
+user can enable or disable their own MFA without directory/admin permissions.
+Each change requires the current password (1–1024 characters) and the purpose-bound
+emailed code, with the existing sid-CSRF proof. A successful 204 clears local
+session state, broadcasts session end and returns to login. An ambiguous
+confirmation requires signing in again to check the account, without replay.
+`422 CURRENT_PASSWORD_INVALID` keeps the setting unchanged and clears the password.
+
+The bilingual recovery copy directs lost-mailbox users to their mail provider
+or organization; password recovery preserves enrollment. There is no portal
+bypass or administrative reset. Both portals and Core/Gateway A–C must ship
+together. Source implementation and regression specs are present; typecheck,
+lint, specs, real email, cookie/CSRF and two-device acceptance remain lead
+verification. No apps or checks were run in the restricted implementer sandbox.
+
 Status: **[Verified]**
 
 Last source verification: **2026-08-31**
 
 Persisted-session bootstrap recovery reverified: **2026-09-07**.
+
+Invite/reset password validation source-reviewed: **2026-10-17** (CLXAPP-111).
+Both DTOs enforce string type and 12–128 characters; the shared service policy
+alone decides strength: characters outside ASCII letters and digits, including
+Arabic, satisfy its symbol check. Length-valid weak passwords return `422 WEAK_PASSWORD`.
+On these two password submissions, validation `400`/`422` responses show the
+existing localized weak-password feedback. Explicit `INVALID_ACTION_TOKEN`,
+`AUTH_SESSION_CHANGED` and rate-limit feedback retain precedence. Specs were
+added; runtime and automated verification remain pending lead verification.
+
+Auth rate-limit defaults and planned MFA source-checked: **2026-10-17**.
+Sources: Core `login-lockout.policy.ts`, `auth-rate-limit.config.ts`,
+`admin-auth.controller.ts`; Gateway `app.config.ts` and `rate-limit.guard.ts`.
 
 Verified against the current Core controller, DTOs, cookie helpers, and gateway
 route contracts.
@@ -15,6 +90,9 @@ Core upstream prefix: `/api/v1/admin/auth`
 
 Email/password is the only enabled interactive login method. This contract does
 not add Google, social, OIDC, or another third-party identity-provider login.
+
+Optional per-user email MFA is source-integrated as recorded in the
+FE-AUTH-001 section above (2026-10-23); runtime verification remains pending.
 
 ## Browser cookie mode
 
@@ -101,7 +179,23 @@ select a credential-bearing response shape.
 
 ## POST `/api/admin/core/v1/auth/login`
 
-Public. Rate limit: 5 requests per 60 seconds. Returns HTTP `200`.
+Public. Default rate limit: **300 requests per 60 seconds per client IP**,
+per route, independently in Gateway (`RL_LOGIN_IP_LIMIT`) and Core
+(`AUTH_LOGIN_IP_LIMIT_PER_MINUTE`). Returns HTTP `200` on success.
+
+Core also reserves a login-budget slot before account lookup/password
+verification for every attempt, including unknown emails and valid passwords:
+
+- A burst of 10 attempts, refilling one slot every 90 seconds.
+- A trusted device has its own budget for the realm/account, independent of
+  other devices. The signed HttpOnly Secure trusted-device cookie is issued
+  after successful login and grants a budget only, never authentication.
+- Unknown devices are keyed by realm, tenant (when applicable), normalized
+  email and client IP, with an additional per-email ceiling of 50 unknown-device
+  attempts in a rolling 15-minute window.
+- Budget exhaustion returns `429 AUTH_LOGIN_THROTTLED`, `Retry-After` in seconds
+  and translated retry copy. The independent route/IP limiter can also return
+  429; it does not imply that the device budget is exhausted.
 
 ```ts
 interface LoginDto {
@@ -115,7 +209,9 @@ cookie response, call `/auth/me` before considering login complete.
 
 ## POST `/api/admin/core/v1/auth/refresh`
 
-Public. Rate limit: 20 requests per 60 seconds. Returns HTTP `200`.
+Public. Gateway defaults to **100 requests per 60 seconds per client IP**,
+per route (`RL_DEFAULT_IP_LIMIT`, `RL_DEFAULT_USER_WINDOW_SEC`). Core separately
+limits this route to **20 per 60 seconds**. Returns HTTP `200`.
 
 Send no request body and let Core read the HttpOnly credential. A normal
 refresh reuses that credential. Every accepted refresh endpoint call, including
@@ -285,7 +381,9 @@ never leaves a tab pending.
 
 ## POST `/api/admin/core/v1/auth/accept-invite`
 
-Public. Rate limit: 5 requests per 60 seconds. Returns HTTP `200`.
+Public. Default rate limit: **30 requests per 60 seconds per client IP**,
+per route, in both Gateway (`RL_AUTH_RECOVERY_IP_LIMIT`) and Core
+(`AUTH_RECOVERY_IP_LIMIT_PER_MINUTE`). Returns HTTP `200`.
 
 ```ts
 interface AcceptInviteDto {
@@ -314,7 +412,9 @@ this behaviour.
 
 ## POST `/api/admin/core/v1/auth/forgot-password`
 
-Public. Rate limit: 5 requests per 60 seconds. Returns HTTP `204` with no body.
+Public. Default rate limit: **30 requests per 60 seconds per client IP**,
+per route, in both Gateway (`RL_AUTH_RECOVERY_IP_LIMIT`) and Core
+(`AUTH_RECOVERY_IP_LIMIT_PER_MINUTE`). Returns HTTP `204` with no body.
 
 ```ts
 interface ForgotPasswordDto {
@@ -330,7 +430,9 @@ endpoint and displays the same confirmation regardless of account existence.
 
 ## POST `/api/admin/core/v1/auth/reset-password`
 
-Public. Rate limit: 5 requests per 60 seconds. Returns HTTP `204` with no body.
+Public. Default rate limit: **30 requests per 60 seconds per client IP**,
+per route, in both Gateway (`RL_AUTH_RECOVERY_IP_LIMIT`) and Core
+(`AUTH_RECOVERY_IP_LIMIT_PER_MINUTE`). Returns HTTP `204` with no body.
 
 ```ts
 interface ResetPasswordDto {
@@ -347,7 +449,9 @@ idempotency key.
 
 ## POST `/api/admin/core/v1/auth/logout`
 
-Public. Rate limit: 20 requests per 60 seconds. Returns HTTP `204`.
+Public. Gateway defaults to **100 requests per 60 seconds per client IP**,
+per route (`RL_DEFAULT_IP_LIMIT`, `RL_DEFAULT_USER_WINDOW_SEC`). Core separately
+limits this route to **20 per 60 seconds**. Returns HTTP `204`.
 
 Send no request body. Clear local state and notify sibling tabs only after Core
 durably ends the session (or after an explicit terminal session code). A

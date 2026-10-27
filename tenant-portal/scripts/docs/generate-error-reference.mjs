@@ -35,7 +35,7 @@ const SCOPES = [
   { area: "CRM outbound email", dir: "crm-app/src/crm/outbound-emails" },
   { area: "CRM dashboards", dir: "crm-app/src/crm/dashboards" },
 
-  { area: "Authentication & session", dir: "core-app/src/tenant/tenant-auth" },
+  { area: "Authentication & session", dir: "core-app/src/tenant/tenant-auth", sharedFile: "core-app/src/common/auth/login-lockout.policy.ts" },
   { area: "Notifications", dir: "core-app/src/tenant/notifications" },
   { area: "Organization", dir: "core-app/src/tenant/organization" },
   { area: "Users", dir: "core-app/src/tenant/tenant-users" },
@@ -131,7 +131,9 @@ function argumentsFrom(text, start) {
 function statusOf(exception, args) {
   if (exception !== "HttpException") return EXCEPTION_STATUS[exception];
   const trailing = args.match(/,\s*(\d{3})\s*$/u);
-  return trailing ? Number(trailing[1]) : undefined;
+  if (trailing) return Number(trailing[1]);
+  const named = args.match(/,\s*HttpStatus\.([A-Z_]+)\s*$/u);
+  return named?.[1] === "TOO_MANY_REQUESTS" ? 429 : undefined;
 }
 
 function literalCodes(args) {
@@ -140,8 +142,10 @@ function literalCodes(args) {
     .filter((code) => !NOT_AN_ERROR.has(code));
 }
 
-for (const { area, dir } of SCOPES) {
-  const texts = walk(resolve(backendRoot, dir)).map((file) => readFileSync(file, "utf8"));
+for (const { area, dir, sharedFile } of SCOPES) {
+  const texts = [...walk(resolve(backendRoot, dir)),
+    ...(sharedFile ? [resolve(backendRoot, sharedFile)] : [])]
+    .map((file) => readFileSync(file, "utf8"));
   const codes = new Map(); // code -> Set(status)
   const add = (code, status) => {
     if (!codes.has(code)) codes.set(code, new Set());
@@ -151,6 +155,16 @@ for (const { area, dir } of SCOPES) {
   // new ConflictException({ code, message })` — raise whatever their call
   // sites pass, so those are read instead of the definition.
   const forwarding = new Map(); // factory name -> status
+
+  // Custom HttpException subclasses carry their code/status in super(),
+  // rather than in throw-new arguments (for example LoginThrottledException).
+  for (const text of texts) {
+    for (const m of text.matchAll(/class [A-Za-z]+Exception extends HttpException\s*\{[\s\S]*?\bsuper\(/gu)) {
+      const args = argumentsFrom(text, m.index + m[0].length);
+      const status = statusOf("HttpException", args);
+      if (status) literalCodes(args).forEach((code) => add(code, status));
+    }
+  }
 
   for (const text of texts) {
     for (const m of text.matchAll(/throw new ([A-Za-z]+Exception)\(/gu)) {
@@ -178,15 +192,15 @@ for (const { area, dir } of SCOPES) {
 
   if (codes.size === 0) continue;
   total += codes.size;
-  byArea.push({ area, dir, codes: [...codes.entries()].sort((a, b) => a[0].localeCompare(b[0])) });
+  byArea.push({ area, dir, sharedFile, codes: [...codes.entries()].sort((a, b) => a[0].localeCompare(b[0])) });
 }
 
 const sections = byArea
-  .map(({ area, dir, codes }) => {
+  .map(({ area, dir, sharedFile, codes }) => {
     const rows = codes
       .map(([code, statuses]) => `| \`${code}\` | ${[...statuses].sort().join(", ")} |`)
       .join("\n");
-    return `## ${area}\n\nSource: \`../backend/mutakamel-apps/${dir}\` · ${codes.length} codes\n\n| Error code | HTTP |\n| --- | --- |\n${rows}\n`;
+    return `## ${area}\n\nSource: \`../backend/mutakamel-apps/${dir}\`${sharedFile ? ` and \`../backend/mutakamel-apps/${sharedFile}\`` : ""} · ${codes.length} codes\n\n| Error code | HTTP |\n| --- | --- |\n${rows}\n`;
   })
   .join("\n");
 

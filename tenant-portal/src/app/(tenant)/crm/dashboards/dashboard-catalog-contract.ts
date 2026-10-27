@@ -106,6 +106,7 @@ function parseVisualization(payload: unknown): VisualizationCapability[] {
 
 function parseMetric(payload: unknown): MetricDefinition[] {
   const source = record(payload);
+  if (source?.availability === "RETIRED") return [];
   if (
     !source ||
     !nonEmptyString(source.key) ||

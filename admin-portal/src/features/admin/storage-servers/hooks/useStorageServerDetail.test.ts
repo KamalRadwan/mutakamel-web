@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { getMock } = vi.hoisted(() => ({ getMock: vi.fn() }));
 vi.mock("../api/storage-servers.api", () => ({
-  storageServersApi: { get: getMock },
+  storageServersApi: { get: getMock, currentCredentialRotation: async () => null },
 }));
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ user: { id: "admin" }, isLoading: false }),

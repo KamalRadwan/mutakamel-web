@@ -1,30 +1,38 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
-  Calendar,
   Check,
-  FileText,
   Loader2,
   Pencil,
   Plus,
   Sparkles,
-  Tag,
-  User,
+  UserRound,
   X,
 } from "lucide-react";
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  DOSSIER_TAG_TONE_CLASSES,
+  DateTime,
   Field,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TagChip,
   Textarea,
   cn,
   focusRing,
+  useToast,
 } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
@@ -35,6 +43,7 @@ import { localizedName, localizedValue } from "@/lib/format/localized";
 import { isUUIDv7 } from "@/lib/uuid";
 import type { AcquisitionSource } from "../../../acquisition-sources/acquisition-source-contract";
 import { AcquisitionSourceOption } from "../../../shared/components/AcquisitionSourceIcon";
+import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import {
   CRM_TAGS_PATH,
   parseCrmTagCatalogue,
@@ -44,10 +53,11 @@ import {
 import { CreateTagModal } from "../../../leads/components/create-lead/CreateTagModal";
 import { readOwnerOptions } from "../../../leads/[id]/hooks/readLeadOwnerOptions";
 import {
+  leadDetailsInitials,
+  leadDetailsUserName,
   parseLeadDetailsUser,
   type LeadDetailsUser,
 } from "../../../leads/[id]/lead-details-edit-contract";
-import { CustomerProfileTagList } from "../../components/customer-card/CustomerProfileTagList";
 import {
   parseCustomerProfileDetailResponse,
   type CustomerProfileDetail,
@@ -79,18 +89,22 @@ export function CustomerProfileIdentityCard({
   customFieldsSlot,
 }: CustomerProfileIdentityCardProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const describeError = useCrmErrorText();
+  const toast = useToast();
   const detail = t.crmLeadDetail;
   const actions = t.crmCustomerProfileActions;
-  const unavailable = t.crmCustomerProfiles.unavailable;
   const { user: actor } = useTenantAuth();
 
   const canReadUsers = actor?.permissions.includes("users.user.read") ?? false;
+  const canReadTags =
+    actor?.isTenantOwner === true ||
+    (actor?.permissions.includes("crm.tags.read") ?? false);
   const canCreateTag =
     actor?.isTenantOwner === true ||
-    (actor?.permissions.includes("crm.tags.create") ?? false);
+    (actor?.permissions.includes("crm.tags.manage") ?? false);
 
-  const [isEditing, setIsEditing] = useState(!viewModeByDefault && canEdit);
+  const editable = Boolean(canEdit && onSaved);
+  const [isEditing, setIsEditing] = useState(!viewModeByDefault && editable);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -108,12 +122,17 @@ export function CustomerProfileIdentityCard({
 
   // Tags State
   const [tags, setTags] = useState<CrmTag[]>([]);
+  const tagWritePending = useRef(false);
   const [availableTags, setAvailableTags] = useState<CrmTag[]>([]);
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
 
   useEffect(() => {
-    if (!canReadUsers || !profile.ownerUserId || !isUUIDv7(profile.ownerUserId)) {
+    if (
+      !canReadUsers ||
+      !profile.ownerUserId ||
+      !isUUIDv7(profile.ownerUserId)
+    ) {
       return;
     }
     const controller = new AbortController();
@@ -166,7 +185,7 @@ export function CustomerProfileIdentityCard({
   }, [profile.id, profile.updatedAt]);
 
   const handleOpenTagPicker = useCallback(() => {
-    if (!canEdit) return;
+    if (!canEdit || !canReadTags) return;
     setIsTagPickerOpen((prev) => !prev);
     if (availableTags.length === 0) {
       void axiosClient
@@ -175,51 +194,66 @@ export function CustomerProfileIdentityCard({
           maxResponseBytes: 256 * 1024,
         })
         .then((res) => setAvailableTags(parseCrmTagCatalogue(res.data)))
-        .catch(() => undefined);
+        .catch(() => {
+          setIsTagPickerOpen(false);
+          toast.error(t.crmTags.loadFailed);
+        });
     }
-  }, [availableTags.length, canEdit]);
+  }, [availableTags.length, canEdit, canReadTags, t.crmTags.loadFailed, toast]);
 
   const handleAttachTag = useCallback(
     async (tag: CrmTag) => {
-      if (!canEdit) return;
-      setTags((prev) =>
-        prev.some((item) => item.id === tag.id) ? prev : [...prev, tag],
-      );
+      if (!canEdit || tagWritePending.current) return;
+      if (!isUUIDv7(profile.id) || !isUUIDv7(tag.id)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = tags;
+      if (previousTags.some((item) => item.id === tag.id)) return;
+      tagWritePending.current = true;
+      setTags([...previousTags, tag]);
       setIsTagPickerOpen(false);
-      if (isUUIDv7(profile.id) && isUUIDv7(tag.id)) {
-        try {
-          const res = await axiosClient.post<unknown>(
-            `${customerProfilePath(profile.id)}/tags`,
-            { tagId: tag.id },
-            { skipAutoIdempotency: true },
-          );
-          if (Array.isArray(res.data)) {
-            setTags(parseCrmTags(res.data));
-          }
-        } catch {
-          // Keep optimistic tag
-        }
+      try {
+        const res = await axiosClient.post<unknown>(
+          `${customerProfilePath(profile.id)}/tags`,
+          { tagIds: [tag.id] },
+          { skipAutoIdempotency: true },
+        );
+        if (!Array.isArray(res.data)) throw new Error("INVALID_CRM_TAGS_RESPONSE");
+        setTags(parseCrmTags(res.data));
+      } catch {
+        setTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [canEdit, profile.id],
+    [canEdit, profile.id, tags, t, toast],
   );
 
   const handleRemoveTag = useCallback(
     async (tagId: string) => {
-      if (!canEdit) return;
-      setTags((prev) => prev.filter((item) => item.id !== tagId));
-      if (isUUIDv7(profile.id) && isUUIDv7(tagId)) {
-        try {
-          await axiosClient.delete(
-            `${customerProfilePath(profile.id)}/tags/${encodeURIComponent(tagId)}`,
-            { nonReplayable: true, skipAutoIdempotency: true },
-          );
-        } catch {
-          // Ignore
-        }
+      if (!canEdit || tagWritePending.current) return;
+      if (!isUUIDv7(profile.id) || !isUUIDv7(tagId)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = tags;
+      tagWritePending.current = true;
+      setTags(previousTags.filter((item) => item.id !== tagId));
+      try {
+        await axiosClient.delete(
+          `${customerProfilePath(profile.id)}/tags/${encodeURIComponent(tagId)}`,
+          { nonReplayable: true, skipAutoIdempotency: true },
+        );
+      } catch {
+        setTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [canEdit, profile.id],
+    [canEdit, profile.id, tags, t, toast],
   );
 
   const handleSave = async () => {
@@ -249,7 +283,7 @@ export function CustomerProfileIdentityCard({
         setIsEditing(false);
       } else {
         setErrorMsg(
-          outcome.error.message ?? t.crmCustomerProfiles.cardUpdateFailed,
+          describeError(outcome.error) ?? t.crmCustomerProfiles.cardUpdateFailed,
         );
         if (
           outcome.kind === "ambiguous" ||
@@ -264,15 +298,21 @@ export function CustomerProfileIdentityCard({
     }
   };
 
-  const sourceLabel = localizedValue(
-    profile.acquisitionSourceNameAr,
-    profile.acquisitionSourceNameEn,
-    lang,
-  );
+  const selectedSourceId =
+    (isEditing ? draft.acquisitionSourceId : profile.acquisitionSourceId) ?? "";
+  const selectedSource = sources.find(({ id }) => id === selectedSourceId);
+  const sourceLabel = selectedSource
+    ? localizedValue(selectedSource.nameAr, selectedSource.nameEn, lang)
+    : localizedValue(
+        profile.acquisitionSourceNameAr,
+        profile.acquisitionSourceNameEn,
+        lang,
+      );
 
-  const ownerUser = profile.ownerUserId
-    ? knownUsers.get(profile.ownerUserId) ??
-      (actor?.id === profile.ownerUserId
+  const ownerId = (isEditing ? draft.ownerUserId : profile.ownerUserId) ?? "";
+  const ownerUser = ownerId
+    ? knownUsers.get(ownerId) ??
+      (actor?.id === ownerId
         ? {
             id: actor.id,
             firstName: actor.firstName,
@@ -280,12 +320,7 @@ export function CustomerProfileIdentityCard({
           }
         : undefined)
     : undefined;
-  const ownerDisplay = ownerUser
-    ? [ownerUser.firstName, ownerUser.lastName].filter(Boolean).join(" ")
-    : profile.ownerUserId || unavailable;
-
-  const createdDate = formatDate(profile.createdAt, lang);
-  const updatedDate = formatDate(profile.updatedAt, lang);
+  const ownerName = leadDetailsUserName(ownerUser);
 
   const unattachedTags = availableTags.filter(
     (candidate) => !tags.some((attached) => attached.id === candidate.id),
@@ -296,82 +331,168 @@ export function CustomerProfileIdentityCard({
   );
 
   return (
-    <section
+    <Card
       aria-label={detail.detailsTitle}
-      className="dossier-card dossier-card-violet"
+      className={cn(
+        "dossier-card dossier-card-violet",
+        isEditing && viewModeByDefault && "dossier-card-editing-violet",
+      )}
     >
-      <div className="dossier-card-header">
-        <div className="dossier-card-title-group">
-          <div className="dossier-card-icon">
-            <Sparkles className="size-4" aria-hidden="true" />
-          </div>
-          <div>
-            <h3 className="dossier-card-title">{detail.detailsTitle}</h3>
-            <p className="dossier-card-subtitle">
-              {isAr
-                ? "المسؤول ومصدر الاستقطاب والوسوم والملاحظات العامة"
-                : "Ownership, acquisition source, tags & account notes"}
-            </p>
-          </div>
+      <CardHeader
+        className={cn(
+          "dossier-card-head flex-row items-center justify-between gap-2",
+          isEditing && viewModeByDefault && "dossier-card-header-editing-violet",
+        )}
+      >
+        <div className="dossier-card-title">
+          <span
+            className="dossier-icon-pill dossier-ip-violet"
+            aria-hidden="true"
+          >
+            <Sparkles className="size-3.5" aria-hidden="true" />
+          </span>
+          <h2 className="text-xs font-semibold tracking-wider uppercase">
+            {detail.detailsTitle}
+          </h2>
         </div>
 
-        {canEdit && onSaved && !isEditing && (
-          <button
-            type="button"
-            onClick={() => {
-              setDraft({
-                ownerUserId: profile.ownerUserId ?? "",
-                acquisitionSourceId: profile.acquisitionSourceId ?? "",
-                description: profile.description ?? "",
-              });
-              setErrorMsg(null);
-              setIsEditing(true);
-            }}
-            className="dossier-edit-btn"
-          >
-            <Pencil className="size-3.5" aria-hidden="true" />
-            <span>{t.crmTags.edit}</span>
-          </button>
+        {editable ? (
+          isEditing ? (
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="dossier-btn-cancel"
+                aria-label={t.common.cancel}
+                title={t.common.cancel}
+                disabled={saving}
+                onClick={() => {
+                  setIsEditing(false);
+                  setErrorMsg(null);
+                }}
+              >
+                <X className="size-3.5" aria-hidden="true" />
+                <span>{t.common.cancel}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="dossier-btn-save"
+                aria-label={detail.saveDetails}
+                title={detail.saveDetails}
+                disabled={saving}
+                onClick={() => void handleSave()}
+              >
+                {saving ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Check className="size-3.5" aria-hidden="true" />
+                )}
+                <span>{detail.saveDetails}</span>
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="dossier-btn-action dossier-btn-action-violet"
+              aria-label={t.crmTags.edit}
+              title={t.crmTags.edit}
+              onClick={() => {
+                setDraft({
+                  ownerUserId: profile.ownerUserId ?? "",
+                  acquisitionSourceId: profile.acquisitionSourceId ?? "",
+                  description: profile.description ?? "",
+                });
+                setErrorMsg(null);
+                setIsEditing(true);
+              }}
+            >
+              <Pencil className="size-3" aria-hidden="true" />
+              <span>{t.crmTags.edit}</span>
+            </Button>
+          )
+        ) : (
+          <span className="dossier-badge dossier-badge-converted">
+            🔒 {t.crmCustomerProfiles.ui.identity.readOnly}
+          </span>
         )}
-      </div>
+      </CardHeader>
 
-      <div className="dossier-card-body space-y-4">
+      <CardContent className="dossier-card-body">
         {errorMsg && (
           <p
             role="alert"
-            className="rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive"
+            className="mb-3 rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive"
           >
             {errorMsg}
           </p>
         )}
 
-        {isEditing ? (
-          <div className="space-y-3 rounded-xl border border-violet-500/25 bg-violet-500/[0.03] p-3.5">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {canReadUsers && ownerOptions.length > 0 && (
-                <Field label={t.crmLeads.salesperson}>
-                  <Select
-                    value={draft.ownerUserId || undefined}
-                    onValueChange={(value: string) =>
-                      setDraft((d) => ({ ...d, ownerUserId: value }))
-                    }
-                  >
-                    <SelectTrigger size="sm">
-                      <SelectValue placeholder={t.crmLeads.salesperson} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ownerOptions.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {[u.firstName, u.lastName].filter(Boolean).join(" ") ||
-                            u.id}
+        <dl className="grid gap-2 sm:grid-cols-2">
+          <DetailsValue label={detail.salesPerson}>
+            {!isEditing ? (
+              <DetailsIdentity
+                name={
+                  ownerName ||
+                  (ownerId ? detail.userNameUnavailable : t.detail.notRecorded)
+                }
+                initialsName={ownerName}
+              />
+            ) : (
+              <Field label={detail.salesPerson}>
+                <Select
+                  value={ownerId || undefined}
+                  onValueChange={(value: string) =>
+                    setDraft((d) => ({ ...d, ownerUserId: value }))
+                  }
+                  disabled={saving || !canReadUsers || ownerOptions.length === 0}
+                >
+                  <SelectTrigger size="sm">
+                    <SelectValue placeholder={t.detail.notRecorded}>
+                      <DetailsIdentity
+                        name={
+                          ownerName ||
+                          (ownerId
+                            ? detail.userNameUnavailable
+                            : t.detail.notRecorded)
+                        }
+                        initialsName={ownerName}
+                      />
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ownerId &&
+                      !ownerOptions.some(({ id }) => id === ownerId) && (
+                        <SelectItem value={ownerId} disabled>
+                          <DetailsIdentity
+                            name={ownerName || detail.userNameUnavailable}
+                            initialsName={ownerName}
+                          />
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
+                      )}
+                    {ownerOptions.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        <DetailsIdentity
+                          name={
+                            leadDetailsUserName(user) ||
+                            detail.userNameUnavailable
+                          }
+                        />
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </DetailsValue>
 
-              <Field label={t.crmCustomerProfiles.source}>
+          <DetailsValue label={t.crmLeads.source}>
+            {isEditing ? (
+              <Field label={t.crmLeads.source}>
                 <Select
                   value={draft.acquisitionSourceId || NO_SOURCE_VALUE}
                   onValueChange={(value: string) =>
@@ -381,6 +502,7 @@ export function CustomerProfileIdentityCard({
                         value === NO_SOURCE_VALUE ? "" : value,
                     }))
                   }
+                  disabled={saving}
                 >
                   <SelectTrigger size="sm">
                     <SelectValue
@@ -405,244 +527,190 @@ export function CustomerProfileIdentityCard({
                   </SelectContent>
                 </Select>
               </Field>
-            </div>
-
-            <Field label={detail.description}>
-              <Textarea
-                rows={3}
-                value={draft.description}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, description: e.target.value }))
-                }
+            ) : (
+              <DetailsIdentity
+                name={sourceLabel || detail.noSource}
+                image={selectedSource?.iconUrl}
               />
-            </Field>
+            )}
+          </DetailsValue>
 
-            <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-2.5">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => setIsEditing(false)}
-                className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+          <DetailsValue label={actions.sourceLead}>
+            {profile.sourceLeadId ? (
+              <Link
+                href={`/crm/leads/${encodeURIComponent(profile.sourceLeadId)}`}
+                className={cn(
+                  "inline-flex min-h-6 items-center gap-1 font-semibold text-primary hover:underline",
+                  focusRing,
+                )}
               >
-                <X className="size-3.5" />
-                {t.common.cancel}
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void handleSave()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"
-              >
-                {saving ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+                <span dir="ltr" className="truncate font-mono text-xs tabular-nums">
+                  {profile.sourceLeadId}
+                </span>
+                <ArrowUpRight className="size-3.5 shrink-0" aria-hidden="true" />
+              </Link>
+            ) : (
+              <span className="flex min-h-6 items-center font-medium text-muted-foreground">
+                {t.detail.notRecorded}
+              </span>
+            )}
+          </DetailsValue>
+
+          <DetailsValue label={detail.createdAt}>
+            <DateTime value={profile.createdAt} precision="datetime" />
+          </DetailsValue>
+
+          <DetailsValue label={detail.updatedAt} wide>
+            <DateTime value={profile.updatedAt} precision="datetime" />
+          </DetailsValue>
+
+          <DetailsValue label={detail.notes} wide>
+            {!isEditing ? (
+              <div className="min-h-6 text-xs font-semibold text-foreground">
+                {(profile.description ?? "").trim().length > 0 ? (
+                  <span className="whitespace-pre-wrap break-words">
+                    {profile.description}
+                  </span>
                 ) : (
-                  <Check className="size-3.5" />
-                )}
-                {t.common.save}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <dl className="dossier-field-grid">
-            <div className="dossier-field">
-              <dt className="dossier-field-label">
-                {t.crmCustomerProfiles.source}
-              </dt>
-              <dd
-                className={cn(
-                  "dossier-field-value",
-                  !sourceLabel && "dossier-field-empty",
-                )}
-              >
-                {sourceLabel || unavailable}
-              </dd>
-            </div>
-
-            <div className="dossier-field">
-              <dt className="dossier-field-label">{t.crmLeads.salesperson}</dt>
-              <dd
-                className={cn(
-                  "dossier-field-value inline-flex items-center gap-1.5",
-                  !profile.ownerUserId && "dossier-field-empty",
-                )}
-              >
-                <User
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <span className="truncate">{ownerDisplay}</span>
-              </dd>
-            </div>
-
-            <div className="dossier-field">
-              <dt className="dossier-field-label">{actions.sourceLead}</dt>
-              <dd
-                className={cn(
-                  "dossier-field-value",
-                  !profile.sourceLeadId && "dossier-field-empty",
-                )}
-              >
-                {profile.sourceLeadId ? (
-                  <Link
-                    href={`/crm/leads/${encodeURIComponent(profile.sourceLeadId)}`}
-                    className={cn(
-                      "inline-flex items-center gap-1 text-primary hover:underline",
-                      focusRing,
-                    )}
-                  >
-                    <span className="truncate font-mono text-xs">
-                      {profile.sourceLeadId}
-                    </span>
-                    <ArrowUpRight
-                      className="size-3.5 shrink-0"
-                      aria-hidden="true"
-                    />
-                  </Link>
-                ) : (
-                  unavailable
-                )}
-              </dd>
-            </div>
-
-            <div className="dossier-field">
-              <dt className="dossier-field-label">{detail.createdAt}</dt>
-              <dd
-                className={cn(
-                  "dossier-field-value inline-flex items-center gap-1.5",
-                  !createdDate && "dossier-field-empty",
-                )}
-              >
-                <Calendar
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <span>{createdDate || unavailable}</span>
-              </dd>
-            </div>
-
-            <div className="dossier-field">
-              <dt className="dossier-field-label">{detail.updatedAt}</dt>
-              <dd
-                className={cn(
-                  "dossier-field-value inline-flex items-center gap-1.5",
-                  !updatedDate && "dossier-field-empty",
-                )}
-              >
-                <Calendar
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <span>{updatedDate || unavailable}</span>
-              </dd>
-            </div>
-          </dl>
-        )}
-
-        {/* Tags Section */}
-        <div className="space-y-2 border-t border-border/60 pt-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-              <Tag className="size-3.5" aria-hidden="true" />
-              <span>{t.crmLeads.create.tags}</span>
-            </span>
-
-            {canEdit && (
-              <div className="relative flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handleOpenTagPicker}
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-[11px] font-semibold text-foreground hover:bg-muted"
-                >
-                  <Plus className="size-3" />
-                  <span>{isAr ? "إضافة وسم" : "Add Tag"}</span>
-                </button>
-                {canCreateTag && (
-                  <button
-                    type="button"
-                    onClick={() => setCreateTagOpen(true)}
-                    className="inline-flex items-center gap-1 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-500/20 dark:text-violet-300"
-                  >
-                    <Sparkles className="size-3" />
-                    <span>{t.crmTags.add}</span>
-                  </button>
-                )}
-
-                {isTagPickerOpen && (
-                  <div className="absolute end-0 top-full z-30 mt-1 max-h-48 w-52 overflow-y-auto rounded-xl border border-border bg-card p-1 shadow-xl">
-                    {unattachedTags.length === 0 ? (
-                      <p className="px-2.5 py-2 text-xs text-muted-foreground">
-                        {isAr ? "لا توجد وسوم إضافية" : "No more tags"}
-                      </p>
-                    ) : (
-                      unattachedTags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => void handleAttachTag(tag)}
-                          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-xs font-medium hover:bg-muted"
-                        >
-                          <span
-                            className="size-2.5 rounded-full"
-                            style={{
-                              backgroundColor: tag.backgroundColor ?? "#6366f1",
-                            }}
-                          />
-                          <span className="truncate">{tag.name}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
+                  <span className="font-medium text-muted-foreground">
+                    {t.detail.notRecorded}
+                  </span>
                 )}
               </div>
+            ) : (
+              <Field label={detail.notes}>
+                <Textarea
+                  placeholder={detail.notes}
+                  size="sm"
+                  rows={2}
+                  value={draft.description}
+                  disabled={saving}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, description: e.target.value }))
+                  }
+                />
+              </Field>
             )}
-          </div>
+          </DetailsValue>
 
-          {tags.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <CustomerProfileTagList
-                tags={tags}
-                moreLabel={t.crmLeads.card.moreTags}
-                maxVisible={12}
-              />
-              {canEdit &&
-                tags.map((tag) => (
-                  <button
-                    key={`rm-${tag.id}`}
-                    type="button"
-                    onClick={() => void handleRemoveTag(tag.id)}
-                    title={`${t.common.delete} ${tag.name}`}
-                    className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
-                  >
-                    <span>{tag.name}</span>
-                    <X className="size-2.5" />
-                  </button>
-                ))}
+          <DetailsValue label={detail.tags} wide>
+            <div className="flex flex-col gap-2">
+              <div className="dossier-tags">
+                {tags.length > 0 ? (
+                  <ul className="flex min-h-6 flex-wrap items-center gap-1.5">
+                    {tags.map((tag, idx) => {
+                      const toneClass =
+                        DOSSIER_TAG_TONE_CLASSES[
+                          idx % DOSSIER_TAG_TONE_CLASSES.length
+                        ];
+                      return (
+                        <li
+                          key={tag.id}
+                          className="flex min-w-0 max-w-full items-center"
+                        >
+                          {tag.backgroundColor || tag.textColor ? (
+                            <span className="inline-flex items-center gap-1">
+                              <TagChip
+                                label={tag.name}
+                                backgroundColor={tag.backgroundColor}
+                                textColor={tag.textColor}
+                              />
+                              {canEdit && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="xs"
+                                  aria-label={`Remove tag ${tag.name}`}
+                                  onClick={() => void handleRemoveTag(tag.id)}
+                                  className="h-auto rounded px-1 py-0 text-xs font-semibold text-muted-foreground hover:text-destructive"
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </span>
+                          ) : (
+                            <span className={toneClass}>
+                              <span>{tag.name}</span>
+                              {canEdit && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="xs"
+                                  aria-label={`Remove tag ${tag.name}`}
+                                  onClick={() => void handleRemoveTag(tag.id)}
+                                  className="ms-1 h-auto border-0 bg-transparent p-0 font-semibold opacity-75 hover:opacity-100"
+                                >
+                                  ×
+                                </Button>
+                              )}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {detail.noTags}
+                  </span>
+                )}
+
+                {canEdit && (
+                  <>
+                    {canReadTags && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={handleOpenTagPicker}
+                        className="dossier-tag dossier-tag-add"
+                      >
+                        <Plus className="size-3" aria-hidden="true" />
+                        <span>{t.crmCustomerProfiles.ui.identity.attachTag}</span>
+                      </Button>
+                    )}
+                    {canCreateTag && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setCreateTagOpen(true)}
+                        className="dossier-tag dossier-tag-add"
+                      >
+                        <Sparkles className="size-3" aria-hidden="true" />
+                        <span>{t.crmTags.add}</span>
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {canEdit && canReadTags && isTagPickerOpen && unattachedTags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 rounded-lg border border-swatch-purple-soft bg-swatch-purple-soft p-2">
+                  {unattachedTags.map((tag) => (
+                    <Button
+                      key={tag.id}
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => void handleAttachTag(tag)}
+                      className="dossier-tag dossier-tag-indigo"
+                    >
+                      + {tag.name}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">{unavailable}</p>
-          )}
-        </div>
+          </DetailsValue>
+        </dl>
 
-        {/* Description Block */}
-        {!isEditing && (
-          <div className="space-y-1.5 border-t border-border/60 pt-3">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-              <FileText className="size-3.5" aria-hidden="true" />
-              <span>{detail.description}</span>
-            </div>
-            <p className="whitespace-pre-wrap rounded-md border border-border/60 bg-muted/20 p-2.5 text-xs leading-relaxed text-foreground">
-              {profile.description || unavailable}
-            </p>
-          </div>
-        )}
-
-        {/* Custom Fields Slot */}
         {customFieldsSlot && (
-          <div className="border-t border-border/60 pt-3">
+          <div className="dossier-custom-fields-section mt-3">
             {customFieldsSlot}
           </div>
         )}
-      </div>
+      </CardContent>
 
       {canCreateTag && (
         <CreateTagModal
@@ -661,19 +729,54 @@ export function CustomerProfileIdentityCard({
           }}
         />
       )}
-    </section>
+    </Card>
   );
 }
 
-function formatDate(value: string | null, lang: string): string {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  try {
-    return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
-      dateStyle: "medium",
-    }).format(parsed);
-  } catch {
-    return value.slice(0, 10);
-  }
+function DetailsValue({
+  label,
+  children,
+  wide,
+}: {
+  label: string;
+  children: React.ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "dossier-field-box flex min-w-0 flex-col gap-1",
+        wide && "sm:col-span-2",
+      )}
+    >
+      <dt className="dossier-field-label text-xs font-semibold text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="min-w-0 text-xs">{children}</dd>
+    </div>
+  );
 }
+
+function DetailsIdentity({
+  name,
+  image,
+  initialsName = name,
+}: {
+  name: string;
+  image?: string | null;
+  initialsName?: string;
+}) {
+  const initials = leadDetailsInitials(initialsName);
+  return (
+    <span className="flex min-h-6 min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground">
+      <Avatar className="size-6" aria-hidden="true">
+        <AvatarImage src={image ?? undefined} alt="" />
+        <AvatarFallback>
+          {initials || <UserRound className="size-3.5" aria-hidden="true" />}
+        </AvatarFallback>
+      </Avatar>
+      <span className="min-w-0 break-words">{name}</span>
+    </span>
+  );
+}
+

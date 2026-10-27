@@ -109,9 +109,9 @@ export default function CrmTagsPage() {
   // Permission string and scoping mirror CRM_ENTRY_ROUTES in
   // src/lib/navigation/tenant-routes.ts; a direct URL still gets the 403 surface.
   return (
-    <PermissionGate require="crm.tags.read">
+    <PermissionGate require="crm.tags.read" denied={tags.queryError?.status === 403}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.nav.crmTags}
           description={t.crmTags.subtitle}
           primaryAction={tags.canManage ? { label: t.crmTags.add, onClick: tags.openCreate } : undefined}

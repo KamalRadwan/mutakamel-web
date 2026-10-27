@@ -18,7 +18,6 @@ import {
   Card,
   cn,
   DataTable,
-  DegradedBanner,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -40,6 +39,7 @@ import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import { tradeStatusLabel } from "../../trade-advanced-validation";
 import { InventoryModuleSubnav } from "../components/InventoryModuleSubnav";
+import { InventoryListPagination } from "../components/InventoryListPagination";
 import {
   INVENTORY_GOVERNANCE_PERMISSION,
   INVENTORY_READ_PERMISSION,
@@ -66,6 +66,8 @@ export default function InventoryPeriodsPage() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     statusFilter,
     effectiveAtFilter,
     isLoading,
@@ -455,13 +457,7 @@ export default function InventoryPeriodsPage() {
             </div>
           </div>
 
-          {items.length === INVENTORY_LIST_LIMIT ? (
-            <DegradedBanner
-              message={formatTemplate(t.tradeCommon.limitOnlyCapped, {
-                limit: INVENTORY_LIST_LIMIT,
-              })}
-            />
-          ) : null}
+          <InventoryListPagination page={pagination} onPageChange={setPage} isRefreshing={isRefreshing} />
 
           {viewMode === "cards" ? (
             filteredItems.length === 0 && !isLoading ? (
@@ -488,7 +484,7 @@ export default function InventoryPeriodsPage() {
                           <IdentifierText className="text-sm font-semibold text-foreground">
                             {period.code}
                           </IdentifierText>
-                          <p className="font-mono text-xs text-muted-foreground">
+                          <p dir="ltr" className="font-mono text-xs text-muted-foreground">
                             {period.startsOn} → {period.endsOn}
                             {days !== null ? ` (${formatNumber(days, lang)}d)` : ""}
                           </p>
@@ -507,7 +503,7 @@ export default function InventoryPeriodsPage() {
                           <span className="block text-2xs text-muted-foreground">
                             {inv.periodMaxBackdateDays}
                           </span>
-                          <span className="font-mono font-semibold text-foreground">
+                          <span dir="ltr" className="font-mono font-semibold tabular-nums text-foreground">
                             {formatNumber(period.maxBackdateDays, lang)}d
                           </span>
                         </div>
@@ -649,7 +645,7 @@ export default function InventoryPeriodsPage() {
                   <span className="block text-2xs text-muted-foreground">
                     {inv.periodMaxBackdateDays}
                   </span>
-                  <span className="font-mono font-semibold">
+                  <span dir="ltr" className="font-mono font-semibold tabular-nums">
                     {formatNumber(inspectedPeriod.maxBackdateDays, lang)}d
                   </span>
                 </div>
@@ -681,7 +677,7 @@ export default function InventoryPeriodsPage() {
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {PERIOD_REASON_PRESETS.map((preset) => (
-                      <Badge key={preset} tone="brand" className="font-mono">
+                      <Badge key={preset} tone="brand" dir="ltr" className="font-mono">
                         {preset}
                       </Badge>
                     ))}

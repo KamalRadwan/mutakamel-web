@@ -10,7 +10,7 @@
 // detail state.
 //
 // `amount` is a **decimal string** on the way out (`amount?: string | null`)
-// and a **number** on the way in (`@IsNumber({ maxDecimalPlaces: 2 })`). That
+// and a **number** on the way in (`@IsNumber({ maxDecimalPlaces: 3 })`). That
 // asymmetry is the contract, not a mistake, and it is why the outbound builder
 // converts once behind a bounded guard while nothing ever converts the
 // inbound value.
@@ -81,7 +81,7 @@ export interface OpportunityCommercialFields {
   probabilityPercent: number | null;
 }
 
-export interface OpportunityStageSnapshot {
+interface OpportunityStageSnapshot {
   pipelineNameAr: string | null;
   pipelineNameEn: string | null;
   stageNameAr: string | null;
@@ -198,7 +198,12 @@ export function parseOpportunityDetailResponse(
   };
 }
 
-const MAX_STAGE_HISTORY_ROWS = 500;
+const MAX_STAGE_HISTORY_ROWS = 100;
+
+export interface OpportunityStageHistoryPage {
+  items: OpportunityStageHistoryEntry[];
+  nextCursor: string | null;
+}
 
 function parseStageSnapshot(value: unknown): OpportunityStageSnapshot | null {
   const snapshot = record(value);
@@ -213,23 +218,24 @@ function parseStageSnapshot(value: unknown): OpportunityStageSnapshot | null {
 }
 
 /**
- * `GET /:id/stage-history` — a plain array, **already ordered newest first**
- * (`order: { changedAt: 'DESC', createdAt: 'DESC', id: 'DESC' }`).
+ * `GET /:id/stage-history` — a cursor page ordered by changedAt,id descending.
  *
- * The order is preserved exactly: `Timeline` never sorts, and re-sorting here
+ * The order is preserved exactly: re-sorting here
  * would silently disagree with the server on rows that share a timestamp.
  *
- * The label snapshots deliberately survive a retired stage or pipeline — the
- * service bypasses TypeORM's soft-delete scope for exactly that — so a
- * historical row keeps its names after the configuration behind it is gone.
+ * Restricted pipeline sides have null snapshots and stage IDs.
  */
 export function parseOpportunityStageHistory(
   payload: unknown,
-): OpportunityStageHistoryEntry[] {
-  if (!Array.isArray(payload) || payload.length > MAX_STAGE_HISTORY_ROWS) {
+): OpportunityStageHistoryPage {
+  const page = record(payload);
+  if (!page || !Array.isArray(page.items) || page.items.length > MAX_STAGE_HISTORY_ROWS
+    || (page.nextCursor !== null && (typeof page.nextCursor !== "string"
+      || !/^[A-Za-z0-9_-]{1,256}$/.test(page.nextCursor)))
+    || (page.items.length === 0 && page.nextCursor !== null)) {
     invalid();
   }
-  return payload.map((entry) => {
+  const items = page.items.map((entry) => {
     const row = record(entry);
     if (!row || !isUUIDv7(row.id)) invalid();
     return {
@@ -247,6 +253,8 @@ export function parseOpportunityStageHistory(
       toStageSnapshot: parseStageSnapshot(row.toStageSnapshot),
     };
   });
+  if (new Set(items.map(({ id }) => id)).size !== items.length) invalid();
+  return { items, nextCursor: page.nextCursor as string | null };
 }
 
 export function opportunityPath(id: string): string {
@@ -254,8 +262,9 @@ export function opportunityPath(id: string): string {
   return `${OPPORTUNITIES_PATH}/${encodeURIComponent(id)}`;
 }
 
-export function opportunityStageHistoryPath(id: string): string {
-  return `${opportunityPath(id)}/stage-history`;
+export function opportunityStageHistoryPath(id: string, cursor?: string | null): string {
+  const path = `${opportunityPath(id)}/stage-history`;
+  return cursor ? `${path}?cursor=${encodeURIComponent(cursor)}` : path;
 }
 
 export function opportunityPipelinePath(id: string): string {

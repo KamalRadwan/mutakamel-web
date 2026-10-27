@@ -4,6 +4,8 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
+Updated: **2026-10-26** — [CRM Leads v3 fonts, weight policy & named type steps](specs/crm-leads-v3.md).
+
 Source of truth once implemented: `src/app/fonts.ts`, `src/app/globals.css`.
 
 ## What this replaced (pre-rebuild, for context)
@@ -17,73 +19,64 @@ products.
 Alongside that: 83 arbitrary `text-[Npx]` sizes, 157 `font-bold`/`extrabold`/
 `black` sites against 30 normal/medium, and no scale of any kind.
 
-## The faces: IBM Plex Sans, Plex Sans Arabic, Plex Mono
+## The faces: Plus Jakarta Sans, Cairo, IBM Plex Mono
 
-Ported verbatim from the admin portal, so both portals draw the same
-superfamily. **Plex Sans** and **Plex Sans Arabic** carry all interface text
-between them; **Plex Mono** carries machine values.
+Updated **2026-10-26** ([specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 1 #4).
+**Plus Jakarta Sans** (`latin`, `latin-ext`) and **Cairo** (`arabic`, `latin`)
+carry all interface text across weights `400`–`800`; **IBM Plex Mono** carries
+identifiers and machine values.
 
-This is still the single most consequential typographic decision in the system,
-and the port did not change what it is *for* — only how it is spelled. Plex
-Sans Arabic was drawn against Plex Latin by the same team, so a status badge's
-Latin `QUALIFIED` sitting inside an Arabic sentence still shares vertical
-metrics with the sentence around it. It does not jump baseline or x-height the
-way two independently-chosen faces do.
-
-The one thing that genuinely changed: this is **two sans families, not one**,
-and the stack order now does the work a single family used to do for free.
+The stack order does the script routing automatically:
 
 ```css
 @theme {
   --font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
     system-ui, sans-serif;
+  --font-arabic: var(--font-plex-arabic), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 ```
 
 **Latin first, Arabic second.** The browser resolves `font-family` per
-*character*, not per element: a Latin run finds its glyphs in Plex Sans and
-stops there, an Arabic run finds nothing in Plex Sans and falls through to Plex
-Sans Arabic. Both render on the same line, with no `:lang()` switching and no
-per-script stack — the property the single-family choice used to buy, bought
-here by ordering.
+*character*, not per element: a Latin or Western-digit run finds its glyphs in
+Plus Jakarta Sans and stops there; an Arabic run falls through to Cairo. Both
+render on the same line with no `:lang()` switching needed, while `font-arabic`
+(`--font-arabic`) exposes Cairo explicitly where an Arabic headline opts into
+optical weight balancing.
 
 Note `@theme`, **not** `@theme inline`. Under Tailwind v4 `inline` means
 "substitute this value into utilities and do not emit the custom property", so
-an inline `--font-sans` does not exist at runtime and
-`body { font-family: var(--font-sans) }` resolves to nothing — the app renders
-in the system stack while the webfont downloads and draws no glyph. `body`
-therefore also names the two variables directly rather than going through
-`--font-sans`.
+an inline `--font-sans` would not exist at runtime. Both `:root` and `body` bind
+the `next/font` variables directly so the page never falls back to system fonts
+when utilities are tree-shaken.
 
 What the pairing buys, concretely:
 
 - No `:lang()` switching and no component branching on language to pick a face.
-- One set of vertical metrics across both scripts, so line-height maths is
-  correct for both.
-- Mixed-script table cells — extremely common here, an Arabic customer name
-  beside a Latin UUID fragment — align without per-cell correction.
+- Full geometric clarity across five weights (`400`, `500`, `600`, `700`, `800`)
+  for dense Kanban cards, KPI badges and Arabic/English UI hierarchy.
+- Mixed-script table cells — an Arabic customer name beside a Latin UUID
+  fragment or Western numeral — align cleanly on one line.
 
-**Plex Mono** carries identifiers and machine values: UUIDs, correlation IDs,
-idempotency keys, error codes, decimal strings. Unambiguous `0`/`O` and
-`1`/`l`, and it sits quietly beside Plex Sans because it is the same
-superfamily rather than a mono chosen to look compatible.
+**IBM Plex Mono** carries identifiers and machine values: UUIDs, correlation
+IDs, idempotency keys, error codes, decimal strings, with unambiguous `0`/`O`
+and `1`/`l`.
 
 ```ts
 // src/app/fonts.ts
-import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Cairo, IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
-export const plexLatin = IBM_Plex_Sans({
+export const plexLatin = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-plex-latin",
   display: "swap",
   preload: false,
 });
 
-export const plexArabic = IBM_Plex_Sans_Arabic({
-  subsets: ["arabic"],
-  weight: ["400", "500", "600"],
+export const plexArabic = Cairo({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-plex-arabic",
   display: "swap",
   preload: false,
@@ -98,14 +91,14 @@ export const plexMono = IBM_Plex_Mono({
 });
 ```
 
-All three `.variable` classNames go on `<body>` in `src/app/layout.tsx`, never
-through a `<link>` — `next/font` self-hosts them, which removes the
-render-blocking round trip to Google and the privacy question that comes with
-it.
+The exported symbol names (`plexLatin`, `plexArabic`, `plexMono`) and CSS
+variable names (`--font-plex-latin`, `--font-plex-arabic`, `--font-plex-mono`)
+stay unchanged so `src/app/layout.tsx` attaches all three `.variable`
+classNames on `<body>` without modification, self-hosted by `next/font`.
 
-**`latin-ext` draws no glyph this UI renders.** It is declared so a tenant or a
-person named with an accented character still renders in Plex rather than
-dropping to a system sans mid-word.
+**`latin-ext` draws no glyph this UI renders by default.** It is declared so a
+tenant or contact named with an accented Latin character stays in Plus Jakarta
+Sans rather than dropping to a system sans mid-word.
 
 ### Nothing is preloaded, and that is deliberate
 
@@ -125,130 +118,106 @@ a face arrives.
 
 ### Pairing: Readex Pro + DM Mono
 
-**Superseded.** These were the system's faces until the token layer was
-replaced with the admin portal's. The reasoning that chose them — one
-superfamily across scripts, three weights, a quiet mono for identifiers — is
-the reasoning the Plex trio satisfies as well, with the extra property that
-both portals now set the same type.
+**Superseded (first by IBM Plex Sans + IBM Plex Sans Arabic on 2026-09-01, then
+by Plus Jakarta Sans + Cairo on 2026-10-26).** Readex Pro + DM Mono were the
+system's initial rebuild faces, replaced during the admin-portal token port by
+IBM Plex Sans / IBM Plex Sans Arabic, and updated in
+[CRM Leads v3](specs/crm-leads-v3.md) to Plus Jakarta Sans + Cairo (keeping IBM
+Plex Mono). The standing "fall back to **Zain**" instruction remains closed, and
+build records that link to this section — notably
+[../build/PHASE-2-FOUNDATION.md](../build/PHASE-2-FOUNDATION.md) — describe what
+that phase installed as historical record.
 
-Two things retired with them. Readex Pro was chosen partly because *nobody
-reaches for it by default*, which is no longer the argument: Plex is chosen
-because the sibling portal already ships it, and consistency between the two
-products beats distinctiveness within one. And the standing "verify at build
-time, fall back to **Zain** if Readex Pro's Arabic proves too wide at row
-density" instruction is closed — there is no Zain fallback, and the row it
-would have been measured against is 44px now, not 36.
+## Five weights, physically enforced
 
-Build records that link to this section, notably
-[../build/PHASE-2-FOUNDATION.md](../build/PHASE-2-FOUNDATION.md), describe what
-that phase installed and are accurate as history.
-
-## Three weights, physically enforced
-
-Only 400, 500 and 600 are downloaded. `font-synthesis-weight: none` on `body`
-stops the browser synthesising a fake bold for anything heavier that slips
-through, so the ceiling is enforced by the font files, not by convention.
-
-`globals.css` additionally remaps Tailwind's own weight keys, which
-de-escalates all 157 existing `font-bold`/`font-extrabold`/`font-black` call
-sites with zero file edits:
+Weights **400, 500, 600, 700 and 800** are downloaded for Plus Jakarta Sans and
+Cairo ([specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 1 #4). Weight **900**
+(`font-black`) remains forbidden by lint and is remapped to `800` in
+`globals.css`, while `font-synthesis-weight: none` on `body` prevents the
+browser from synthesising fake bolds:
 
 ```css
 @theme {
-  --font-weight-bold: 600;
-  --font-weight-extrabold: 600;
-  --font-weight-black: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 800;
 }
 ```
 
-| Weight | Use |
-| --- | --- |
-| 600 | Headings, `<th>`, KPI numerals, button labels, active nav |
-| 500 | Form labels, tabs, badges, card titles |
-| 400 | **All table body cells**, all prose, all values, all metadata |
+| Weight | Utility | Use |
+| --- | --- | --- |
+| 800 | `font-extrabold` | Inner KPI count numbers and avatar initials (`text-micro`) |
+| 700 | `font-bold` | Stage column titles, card titles, primary CTA labels, active count pills, brand title |
+| 600 | `font-semibold` | Page/section headings, `<th>`, KPI labels, activity pills, active nav tabs |
+| 500 | `font-medium` | Form labels, inactive nav tabs, contact subtitles, source pills |
+| 400 | `font-normal` | **All table body cells**, prose, values, secondary metadata |
 
-Hierarchy comes from size and color. Never weight.
+Table body cells stay **400** unconditionally.
 
-## The 7-step scale
+## The 7-step scale and named v3 steps
 
-13px floor, 14px base. Declared in `@theme`.
+Declared in `@theme` (`src/app/globals.css`). Alongside the base 7-step scale
+(`text-2xs` through `text-2xl`), CRM Leads v3
+([specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 1 #5 & Part 2) defines seven
+named steps so compact badges, chips, nav tabs and Kanban headers never use
+arbitrary `text-[Npx]` utilities:
 
 ```css
 @theme {
-  --text-2xs: 0.8125rem;              /* 13px — compatibility alias; migrate to text-xs */
-  --text-2xs--line-height: 1.125rem;  /* 18px */
-  --text-2xs--letter-spacing: 0.06em;
+  /* Named CRM Leads v3 steps */
+  --text-micro: 0.625rem;               /* 10px / 14px — inner count chips & avatar initials only */
+  --text-badge: 0.6875rem;              /* 11px / 16px — KPI badges, activity & source pills, filter chips */
+  --text-caption: 0.75rem;              /* 12px / 18px — contact subtitle, compact helper lines */
+  --text-label: 0.78125rem;             /* 12.5px / 18px — toolbar CTA & compact control labels */
+  --text-tab: 0.84375rem;               /* 13.5px / 20px — global nav tabs & collapsed rail titles */
+  --text-card-title: 0.875rem;          /* 14px / 20px — Kanban & grid card lead/entity title */
+  --text-column-title: 0.90625rem;      /* 14.5px / 21px — Kanban stage column header title */
 
-  --text-xs: 0.8125rem;               /* 13px — workhorse: table headers, badges, meta */
-  --text-xs--line-height: 1.125rem;   /* 18px */
-  --text-xs--letter-spacing: 0em;
-
-  --text-sm: 0.875rem;                /* 14px — base: body, table cells, inputs, buttons, nav */
-  --text-sm--line-height: 1.25rem;    /* 20px */
-  --text-sm--letter-spacing: -0.003em;
-
-  --text-base: 0.9375rem;             /* 15px — prose, dialog descriptions */
-  --text-base--line-height: 1.5rem;   /* 24px */
-  --text-base--letter-spacing: -0.006em;
-
-  --text-lg: 1.0625rem;               /* 17px — card titles, h2/h3 */
-  --text-lg--line-height: 1.5rem;     /* 24px */
-  --text-lg--letter-spacing: -0.01em;
-
-  --text-xl: 1.25rem;                 /* 20px — page title */
-  --text-xl--line-height: 1.75rem;    /* 28px */
-  --text-xl--letter-spacing: -0.014em;
-
-  --text-2xl: 1.5625rem;              /* 25px — KPI numerals. CEILING. */
-  --text-2xl--line-height: 2rem;      /* 32px */
-  --text-2xl--letter-spacing: -0.018em;
+  /* Base 7-step scale */
+  --text-2xs: 0.71875rem;               /* 11.5px / 16px — Latin uppercase micro-labels */
+  --text-xs: 0.78125rem;                /* 12.5px / 18px — workhorse: table headers, badges, meta */
+  --text-sm: 0.875rem;                  /* 14px / 20px — base: body, table cells, inputs, buttons */
+  --text-base: 0.9375rem;               /* 15px / 24px — prose, dialog descriptions */
+  --text-lg: 1.0625rem;                 /* 17px / 24px — section titles, h2/h3 */
+  --text-xl: 1.25rem;                   /* 20px / 28px — page title */
+  --text-2xl: 1.5625rem;                /* 25px / 32px — KPI numerals. CEILING. */
 }
 ```
 
-Nothing in the app renders larger than `text-2xl`. There is no hero type in a
-CRM.
+The `text-tab` name avoids a utility collision with `--color-nav`.
 
-The scale is compressed at the bottom — 13 → 14 → 15px, where roughly 90% of
-the app's pixels live — and opens up by about 1.2× per step above that.
-
-**Only two steps moved in the admin port**, and both are at the ends:
-`text-2xs` 12 → 13px and `text-2xl` 24 → 25px. Everything between is
-byte-identical to what it was, which is why the port changed no layout.
-
-**`text-2xs` is now a compatibility alias for `text-xs`.** It is the same 13px
-at the same 18px line-height; the only difference left is its `0.06em`
-tracking, which is what an uppercase micro-label wants. That makes it a *style*
-rather than a *size*, and new code should reach for `text-xs` plus explicit
-tracking instead. `text-xs` gained an explicit `letter-spacing: 0em` in the
-same move, so it cannot silently inherit that tracking.
-
-Where `text-2xs` is still used, the old rule holds: **Latin uppercase
-micro-labels only.** There is no uppercase in Arabic, so it must never wrap
-Arabic text — which is also why it is the one step the Arabic lift skips.
+Nothing in the app renders larger than `text-2xl`. Arbitrary `text-[Npx]`
+utilities remain banned by ESLint and `census.mjs`; small type is permitted
+only through `text-micro` (count chips and initials only), `text-badge`, and
+`text-caption` in their designated roles. Where `text-2xs` appears, it remains
+for Latin uppercase micro-labels only.
 
 ## Arabic gets a lift
 
-The three smallest steps gain 1px under Arabic, with line-heights raised in
-lockstep so ascenders and the dots below `ب`/`ي` do not clip:
+Every small and mid step — both the named CRM Leads v3 steps and `xs` / `sm` /
+`base` — gains `+1px` under `html[lang="ar"]`, with line-heights raised in
+lockstep and negative letter-spacing zeroed so Cairo's dots and joined forms
+never clip or split:
 
 ```css
 html[lang="ar"] {
-  --text-xs: 0.875rem;              /* 14px, was 13 */
-  --text-xs--line-height: 1.25rem;  /* 20px, was 18 */
-  --text-sm: 0.9375rem;             /* 15px, was 14 */
-  --text-sm--line-height: 1.375rem; /* 22px, was 20 */
-  --text-base: 1rem;                /* 16px, was 15 */
-  --text-base--line-height: 1.625rem; /* 26px, was 24 */
+  --text-micro: 0.6875rem;              /* 11px / 15px */
+  --text-badge: 0.75rem;                /* 12px / 17px */
+  --text-caption: 0.8125rem;            /* 13px / 20px */
+  --text-label: 0.84375rem;             /* 13.5px / 20px */
+  --text-tab: 0.90625rem;               /* 14.5px / 22px, tracking 0em */
+  --text-card-title: 0.9375rem;         /* 15px / 22px, tracking 0em */
+  --text-column-title: 0.96875rem;      /* 15.5px / 23px, tracking 0em */
+  --text-xs: 0.875rem;                  /* 14px / 20px */
+  --text-sm: 0.9375rem;                 /* 15px / 22px */
+  --text-base: 1rem;                    /* 16px / 26px */
 }
 ```
 
-Plex Sans Arabic's Naskh forms need more vertical room at small sizes than Plex
-Latin does to keep dots and diacritics separable. `text-2xs` is deliberately
-**not** lifted — it is Latin-only by convention, there being no uppercase in
-Arabic. This block is identical to admin's, and the port did not touch it.
-
-Because the lift is driven by `html[lang]`, it follows the language toggle
-automatically. No component branches on language for sizing, ever.
+`text-2xs` is deliberately **not** lifted — it is Latin-only by convention,
+there being no uppercase in Arabic. Because the lift is driven by `html[lang]`,
+it follows the language toggle automatically; no component branches on language
+for sizing, ever.
 
 ## Numerals
 
@@ -376,19 +345,25 @@ isolation.
 
 | Element | Class | Weight |
 | --- | --- | --- |
-| Page title | `text-xl` | 600 |
-| Section / card title | `text-lg` | 600 |
+| Page title | `text-xl` | 600 / 700 |
+| Section title | `text-lg` | 600 |
+| Stage column header title | `text-column-title` (`14.5px`) | 700 |
+| Kanban / entity card title | `text-card-title` (`14px`) | 700 |
+| Global nav tab / collapsed rail title | `text-tab` (`13.5px`) | 500 (inactive) / 600 (active) |
+| Toolbar CTA / compact control label | `text-label` (`12.5px`) | 600 / 700 |
+| Contact subtitle / helper line | `text-caption` (`12px`) | 500 |
+| KPI badge / activity pill / source pill / filter chip | `text-badge` (`11px`) | 600 / 700 |
+| Inner KPI count chip / avatar initials | `text-micro` (`10px`) | 700 / 800 |
 | Card description | `text-sm` | 400 |
 | Dialog title | `text-lg` | 600 |
 | Body prose, dialog description | `text-base` | 400 |
 | Form label | `text-sm` | 500 |
-| Input, button, nav item | `text-sm` | 400 / 500 for button label |
+| Input, button | `text-sm` | 400 / 500 for button label |
 | Table header `<th>` | `text-xs` uppercase, `tracking-wide` | 600 |
 | Table body cell | `text-sm` | **400** |
-| Badge | `text-xs` | 500 |
 | Metadata, helper, timestamp | `text-xs` | 400 |
 | Latin uppercase micro-label | `text-2xs` | 500 |
-| KPI numeral | `text-2xl` | 600 |
+| KPI numeral (StatCard) | `text-2xl` | 600 |
 | ID, code, correlation ID | `text-xs font-mono` | 400 |
 
 Table body cells are 400. A table where every cell is bold is a table with no

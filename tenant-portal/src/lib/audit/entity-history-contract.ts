@@ -1,21 +1,11 @@
 // One record's audit history, for any screen that shows one.
 //
-//   GET /api/tenant/core/v1/audit/entities/:entityType/:entityId?page=&limit=
+//   GET /api/tenant/core/v1/audit/entities/:entityType/:entityId?cursor=&limit=
 //
-// **Why this exists beside `core/contracts/audit-contract.ts`.** That one is
-// Core's, built on Core's own `core-page` parsing helpers, and a CRM or Trade
-// screen may not import it: file-architecture.md#dependency-direction allows a
-// screen a narrow named type from a sibling, "never a hook, a component, or a
-// whole module". This is the shared-spine version — `lib/` imports nothing
-// upward, so any app's screen can read a record's history through it.
-//
-// The two Core screens still use their own. Folding them onto this is the
-// follow-up, and it is a Core-area change rather than a CRM one.
+// Shared by Core, CRM and Trade. Related-party history has a grouped event
+// shape distinct from ledger rows; both readers use Core's opaque cursor.
 
 import { readCorePage, type CorePath } from "@/lib/api/envelope";
-
-/** `audit.read`, as the controller declares it. */
-export const AUDIT_READ_PERMISSION = "audit.read";
 
 const AUDIT_RESPONSE_LIMIT_BYTES = 256 * 1024;
 
@@ -57,7 +47,7 @@ export interface EntityAuditEvent {
 
 export interface EntityAuditPage {
   events: EntityAuditEvent[];
-  hasNext: boolean;
+  nextCursor: string | null;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -123,8 +113,9 @@ function legacyStageChanges(action: string, value: unknown): EntityAuditChange[]
 }
 
 /** The query half, kept out of the path for `CorePath`'s sake. */
-export function entityHistoryQuery(page: number, limit: number, relatedPartyIds?: readonly string[]): string {
-  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+export function entityHistoryQuery(cursor: string | null, limit: number, relatedPartyIds?: readonly string[]): string {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (cursor !== null) query.set("cursor", cursor);
   if (relatedPartyIds?.length) query.set("relatedPartyIds", [...new Set(relatedPartyIds)].sort().join(","));
   return query.toString();
 }
@@ -143,16 +134,18 @@ function entityHistoryPath(entityType: string, entityId: string): CorePath {
  * rather than thrown, because the rest of the story is still worth showing, and
  * only a body that is not a list at all is a failure.
  *
- * Core's envelope puts the items in `data` and the pager in a sibling `meta`,
- * which is why both halves arrive here.
+ * Core's data envelope holds { items, nextCursor }; no page totals are inferred.
  */
 export function parseEntityHistory(
   data: unknown,
-  meta: unknown,
-  limit: number,
 ): EntityAuditPage {
-  const items = Array.isArray(data) ? data : record(data)?.items;
-  if (!Array.isArray(items)) throw new Error("Invalid audit response.");
+  const body = record(data);
+  const items = body?.items;
+  const nextCursor = body?.nextCursor;
+  if (!Array.isArray(items) || (nextCursor !== null &&
+    (typeof nextCursor !== "string" || !nextCursor || nextCursor.length > 512))) {
+    throw new Error("Invalid audit response.");
+  }
   const events: EntityAuditEvent[] = [];
   for (const item of items) {
     const row = record(item);
@@ -176,33 +169,21 @@ export function parseEntityHistory(
           : legacyStageChanges(action, row.metadata),
     });
   }
-  // The server's own answer where it sends one; a full page otherwise, which is
-  // the only honest guess — and a "Load more" that returns nothing is a smaller
-  // failure than a page of history nobody can reach.
-  const hasNext = record(meta)?.hasNext;
-  const pager = record(data);
-  const currentPage = pager?.page;
-  const totalPages = pager?.totalPages;
-  return {
-    events,
-    hasNext: typeof hasNext === "boolean" ? hasNext
-      : typeof currentPage === "number" && typeof totalPages === "number"
-        ? currentPage < totalPages : items.length >= limit,
-  };
+  return { events, nextCursor };
 }
 
 export async function fetchEntityHistory(
   entityType: string,
   entityId: string,
-  page: number,
+  cursor: string | null,
   limit: number,
   signal?: AbortSignal,
   relatedPartyIds?: readonly string[],
 ): Promise<EntityAuditPage> {
-  const { data, meta } = await readCorePage(
+  const { data } = await readCorePage(
     entityHistoryPath(entityType, entityId),
-    entityHistoryQuery(page, limit, relatedPartyIds),
+    entityHistoryQuery(cursor, limit, relatedPartyIds),
     { signal, cache: "no-store", maxResponseBytes: AUDIT_RESPONSE_LIMIT_BYTES },
   );
-  return parseEntityHistory(data, meta, limit);
+  return parseEntityHistory(data);
 }

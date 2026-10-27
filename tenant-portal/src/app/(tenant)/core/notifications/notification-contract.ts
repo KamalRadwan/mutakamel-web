@@ -15,8 +15,6 @@ export const NOTIFICATIONS_UNREAD_COUNT_PATH: CorePath =
   "/api/tenant/core/v1/notifications/unread-count";
 export const NOTIFICATION_PREFERENCES_PATH: CorePath =
   "/api/tenant/core/v1/notifications/preferences";
-export const DEVICE_TOKENS_PATH: CorePath =
-  "/api/tenant/core/v1/notifications/device-tokens";
 
 /** `NotificationQueryDto` — `limit` is 1–50 and defaults to 20. */
 const NOTIFICATION_PAGE_SIZE = 25;
@@ -50,11 +48,6 @@ export function notificationAcknowledgePath(id: string): CorePath {
 export function notificationPath(id: string): CorePath {
   if (!UUID_PATTERN.test(id)) throw new Error("Invalid notification id.");
   return `${NOTIFICATIONS_PATH}/${encodeURIComponent(id)}` as CorePath;
-}
-
-export function deviceTokenPath(id: string): CorePath {
-  if (!UUID_PATTERN.test(id)) throw new Error("Invalid device-token id.");
-  return `${DEVICE_TOKENS_PATH}/${encodeURIComponent(id)}` as CorePath;
 }
 
 /**
@@ -140,60 +133,46 @@ const unreadCountSchema = z.object({ unreadCount: z.number().int().min(0) });
 const preferenceSchema = z.object({
   notificationType: z.string().min(1).max(128),
   inAppEnabled: z.boolean(),
-  pushEnabled: z.boolean(),
-  emailEnabled: z.boolean(),
   updatedAt: z.iso.datetime({ offset: true }),
 });
 
-const deviceTokenSchema = z.object({
-  id: z.uuid(),
-  provider: z.string().min(1).max(32),
-  tokenHash: z.string().min(1).max(256),
-  deviceId: z.string().max(128).nullable(),
-  platform: z.string().max(32).nullable(),
-  enabled: z.boolean(),
-  lastSeenAt: z.iso.datetime({ offset: true }),
-  revokedAt: nullableIsoDate,
+const effectivePreferenceSchema = preferenceSchema.omit({ updatedAt: true });
+const preferenceCatalogueSchema = z.object({
+  preferenceCatalogue: z.array(effectivePreferenceSchema).refine(
+    (items) => new Set(items.map((item) => item.notificationType)).size === items.length,
+  ),
 });
 
 /** `NotificationRuntimeConfig` — only the channel switches this screen reads. */
 const runtimeConfigSchema = z.object({
   enabled: z.boolean(),
   inAppEnabled: z.boolean(),
-  pushEnabled: z.boolean(),
-  emailEnabled: z.boolean(),
 });
 
 export type NotificationPage = z.infer<typeof notificationPageSchema>;
 export type NotificationPreference = z.infer<typeof preferenceSchema>;
-export type DeviceToken = z.infer<typeof deviceTokenSchema>;
+export type EffectiveNotificationPreference = z.infer<typeof effectivePreferenceSchema>;
 export type NotificationChannelConfig = z.infer<typeof runtimeConfigSchema>;
 export type InboxNotification = z.infer<typeof notificationSchema>;
 
-export type NotificationChannel = "inApp" | "push" | "email";
-
-/** `RegisterDeviceTokenDto` — `@IsIn(['fcm','apns','web-push'])`. */
-export const DEVICE_TOKEN_PROVIDERS = ["fcm", "apns", "web-push"] as const;
-export type DeviceTokenProvider = (typeof DEVICE_TOKEN_PROVIDERS)[number];
-
-export interface RegisterDeviceTokenRequest {
-  provider: DeviceTokenProvider;
-  token: string;
-  deviceId?: string;
-  platform?: string;
-  enabled?: boolean;
-}
+export type NotificationChannel = "inApp";
 
 /** `UpsertNotificationPreferenceDto` — omitted channels keep their value. */
 export interface UpsertPreferenceRequest {
   notificationType: string;
   inAppEnabled?: boolean;
-  pushEnabled?: boolean;
-  emailEnabled?: boolean;
 }
 
 export function parseNotificationPage(payload: unknown): NotificationPage {
   return notificationPageSchema.parse(payload);
+}
+
+export function parseNotification(payload: unknown, expectedId: string): InboxNotification {
+  const notification = notificationSchema.parse(payload);
+  if (notification.id.toLowerCase() !== expectedId.toLowerCase()) {
+    throw new Error("Notification response ID does not match the request.");
+  }
+  return notification;
 }
 
 export function parseUnreadCount(payload: unknown): number {
@@ -208,12 +187,23 @@ export function parseNotificationPreference(payload: unknown): NotificationPrefe
   return preferenceSchema.parse(payload);
 }
 
-export function parseDeviceToken(payload: unknown): DeviceToken {
-  return deviceTokenSchema.parse(payload);
-}
-
 export function parseChannelConfig(payload: unknown): NotificationChannelConfig {
   return runtimeConfigSchema.parse(payload);
+}
+
+export function parsePreferenceCatalogue(payload: unknown): EffectiveNotificationPreference[] {
+  return preferenceCatalogueSchema.parse(payload).preferenceCatalogue;
+}
+
+export function effectiveNotificationPreferences(
+  catalogue: readonly EffectiveNotificationPreference[],
+  overrides: readonly NotificationPreference[],
+): EffectiveNotificationPreference[] {
+  const byType = new Map(overrides.map((item) => [item.notificationType, item]));
+  return catalogue.map((defaults) => ({
+    notificationType: defaults.notificationType,
+    inAppEnabled: byType.get(defaults.notificationType)?.inAppEnabled ?? defaults.inAppEnabled,
+  }));
 }
 
 /** The only priority the backend is proven to emit; anything else renders raw. */

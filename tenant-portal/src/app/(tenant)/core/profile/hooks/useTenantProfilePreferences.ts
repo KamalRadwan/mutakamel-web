@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useTheme, type Theme } from "@/design-system";
+import { hydrateAccountTheme, useTheme, type Theme } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { setLanguage, type Language } from "@/i18n/useLanguage";
+import { hydrateAccountLanguage, setLanguage, type Language } from "@/i18n/useLanguage";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   fetchMyProfile,
@@ -55,7 +55,10 @@ export function useTenantProfilePreferences() {
       setLoadError(null);
       fetchMyProfile(controller.signal)
         .then((result) => {
-          if (!controller.signal.aborted) setProfile(result);
+          if (controller.signal.aborted) return;
+          setProfile(result);
+          hydrateAccountLanguage(result.language);
+          hydrateAccountTheme(result.themeKey);
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;

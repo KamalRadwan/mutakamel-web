@@ -19,12 +19,16 @@ import {
 } from "../model/operation-actions";
 import {
   readTenantComponentInstallation,
+  readTenantAvailableUpdate,
+  readTenantPrerequisiteEvidenceRecord,
   readTenantOperationDetail,
   readTenantOperationSummary,
   readTenantSeedState,
 } from "../model/readers";
 import {
   META,
+  availableUpdate,
+  prerequisiteEvidenceRecord,
   OPERATION_ID,
   RETRY_OPERATION_ID,
   componentInstallation,
@@ -98,6 +102,39 @@ function failedGenerationSteps(): Record<string, unknown>[] {
 }
 
 describe("TenantProvisioningWorkspaceView", () => {
+  it.each(["en", "ar"] as const)("explains a planned update and release recovery in %s", (lang) => {
+    const model = makeModel({ lang, section: "updates" });
+    model.provisioning.updates.data.items = [readTenantAvailableUpdate(availableUpdate({ updateAlreadyPlanned: true }))];
+    model.provisioning.prerequisites.data = [readTenantPrerequisiteEvidenceRecord(prerequisiteEvidenceRecord({
+      status: "RELEASE_REQUESTED",
+      recovery: { attempts: 5, alerted: true, stuck: true, nextRetryAt: null,
+        releaseEvidenceExists: false, canResendRelease: true, canCloseFailed: false },
+    }))];
+    render(<TenantProvisioningWorkspaceView model={model} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(lang === "en" ? /dead-letter queue/u : /الرسائل المتعثرة/u);
+    const link = screen.getByRole("link", { name: lang === "en" ? /View blocking operation/u : /عرض العملية المانعة/u });
+    fireEvent.click(link);
+    expect(model.provisioning.selectOperation).toHaveBeenCalledWith(OPERATION_ID);
+    expect(model.setSection).toHaveBeenCalledWith("operations");
+    const resend = screen.getByRole("button", { name: lang === "en" ? "Re-send prerequisite release" : "إعادة إرسال تحرير المتطلب المسبق" });
+    fireEvent.click(resend);
+    expect(model.requestRecovery).toHaveBeenCalledWith("resend-release", model.provisioning.prerequisites.data[0]);
+  });
+
+  it("offers close only with release evidence and the critical permission", () => {
+    const model = makeModel({ operationStatus: "MANUAL_RECOVERY_REQUIRED" });
+    model.provisioning.prerequisites.data = [readTenantPrerequisiteEvidenceRecord(prerequisiteEvidenceRecord({
+      status: "RELEASED",
+      recovery: { attempts: 1, alerted: false, stuck: false, nextRetryAt: null,
+        releaseEvidenceExists: true, canResendRelease: false, canCloseFailed: true },
+    }))];
+    const { rerender } = render(<TenantProvisioningWorkspaceView model={model} />);
+    fireEvent.click(screen.getByRole("button", { name: "Close failed operation" }));
+    expect(model.requestRecovery).toHaveBeenCalledWith("close-failed", model.provisioning.prerequisites.data[0]);
+    model.provisioning.permissions.canCloseFailed = false;
+    rerender(<TenantProvisioningWorkspaceView model={model} />);
+    expect(screen.queryByRole("button", { name: "Close failed operation" })).not.toBeInTheDocument();
+  });
   it("renders real operation progress and dispatches operation-specific cancel", () => {
     const model = makeModel();
     const { unmount } = render(<TenantProvisioningWorkspaceView model={model} />);
@@ -278,7 +315,7 @@ describe("TenantProvisioningWorkspaceView", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Core foundation — schema has reported neither a transition nor a Worker heartbeat for 4 min/u,
+        /Core foundation — schema has reported neither a state change nor a Worker heartbeat for 4 min/u,
       ),
     ).toBeInTheDocument();
     expect(
@@ -421,6 +458,19 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(screen.getByText(/^لم تُنفَّذ هذه الخطوة: فشلت خطوة اختيارية تعتمد عليها/u)).toBeInTheDocument();
   });
 
+  it.each([
+    ["en", /wait for the Worker to confirm release/u],
+    ["ar", /انتظر تأكيد العامل للتحرير/u],
+  ] as const)("localizes an open maintenance fence refusal in %s", (lang, message) => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({ lang, localError: "PROVISIONING_MAINTENANCE_FENCE_OPEN" })}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByText("PROVISIONING_MAINTENANCE_FENCE_OPEN")).toBeNull();
+  });
+
   it("tells the operator to re-bind or remove an Add-on that pins a component the update would move", () => {
     render(
       <TenantProvisioningWorkspaceView
@@ -432,6 +482,19 @@ describe("TenantProvisioningWorkspaceView", () => {
       screen.getByText(/An Add-on binding of this tenant pins a component this update would move.*Re-bind the Add-on to the new release or remove it first/u),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open updates" })).toBeNull();
+  });
+
+  it.each([
+    ["en", "WebPhone decommission is not supported yet."],
+    ["ar", "إيقاف مكوّن الهاتف عبر الويب غير مدعوم حاليًا."],
+  ] as const)("localizes unsupported WebPhone decommission in %s", (lang, message) => {
+    render(
+      <TenantProvisioningWorkspaceView
+        model={makeModel({ lang, localError: "PROVISIONING_DECOMMISSION_UNSUPPORTED_COMPONENT" })}
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.queryByText("PROVISIONING_DECOMMISSION_UNSUPPORTED_COMPONENT")).toBeNull();
   });
 
   it("localizes command refusals and points a release-upgrade refusal at Updates", () => {
@@ -484,6 +547,23 @@ describe("TenantProvisioningWorkspaceView", () => {
     expect(enabled).toBeEnabled();
     fireEvent.click(enabled);
     expect(exposed.resolveConflict).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["en", "Add-on", "Source (loaded components)", "ltr"],
+    ["ar", "إضافة", "المصدر (المكونات المحمّلة)", "rtl"],
+  ] as const)("renders parsed ADDON component evidence in %s", (lang, label, filterLabel, dir) => {
+    const model = makeModel({ section: "state", lang });
+    model.provisioning.components.data.items = [readTenantComponentInstallation(
+      componentInstallation({ componentKey: "crm.addon", selectionSource: "ADDON" }),
+    )];
+
+    const { container } = render(<TenantProvisioningWorkspaceView model={model} />);
+
+    expect(screen.getByRole("cell", { name: label })).toBeInTheDocument();
+    expect(screen.getByText("crm.addon")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: filterLabel })).toBeInTheDocument();
+    expect(container.querySelector("section")).toHaveAttribute("dir", dir);
   });
 
   it("renders the compact workflow in Arabic and preserves RTL direction", () => {
@@ -548,6 +628,7 @@ function makeModel(
       | "WAITING_RETRY"
       | "SUCCEEDED"
       | "FAILED_RETRYABLE"
+      | "MANUAL_RECOVERY_REQUIRED"
       | "CANCEL_REQUESTED"
       | "CANCELLED";
     /** The operation's current phase; the fixture's own by default. */
@@ -596,7 +677,9 @@ function makeModel(
   );
   const component = readTenantComponentInstallation(componentInstallation());
   const confirmation: ProvisioningConfirmation | null =
-    options.confirming === "repair"
+    options.confirming === "resend-release" || options.confirming === "close-failed"
+      ? { kind: options.confirming, request: readTenantPrerequisiteEvidenceRecord(prerequisiteEvidenceRecord()) }
+      : options.confirming === "repair"
       ? { kind: "repair", component, dto: buildRepairOperationDto(component, "ADMIN.REPAIR") }
       : options.confirming
         ? { kind: options.confirming, operation: detail }
@@ -656,6 +739,7 @@ function makeModel(
     confirmation,
     requestCancel: noop,
     requestRetry: noop,
+    requestRecovery: vi.fn(),
     requestResync: asyncNoop,
     requestRepair: noop,
     dismissConfirmation: noop,
@@ -700,6 +784,8 @@ function makeModel(
     provisioning: {
       authLoading: false,
       permissions: {
+        canResendRelease: true,
+        canCloseFailed: true,
         canReadOperations: true,
         canRetryOrCancel: true,
         canResync: true,
@@ -756,6 +842,7 @@ function makeModel(
       resyncOperation: asyncNoop,
       applyUpdates: asyncNoop,
       requestPrerequisites: asyncNoop,
+      recoverPrerequisite: asyncNoop,
       addApplication: asyncNoop,
       repair: asyncNoop,
       decommission: asyncNoop,

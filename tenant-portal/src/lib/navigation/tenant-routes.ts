@@ -359,6 +359,9 @@ export function canAccessCoreRoute(
   permissions: readonly string[],
   href: CoreEntryRoute,
 ): boolean {
+  if (href === TENANT_ROUTES.coreAudit) {
+    return ["audit.read", "audit.read.branch", "audit.read.own"].some((permission) => permissions.includes(permission));
+  }
   const route = CORE_ENTRY_ROUTES.find((candidate) => candidate.href === href);
   return route ? permissions.includes(route.permission) : false;
 }
@@ -403,11 +406,6 @@ const CORE_OWNER_ROUTES = [
   TENANT_ROUTES.coreSubscriptionChange,
 ] as const;
 
-/** The nav predicate for a billing or subscription entry — never a permission. */
-export function canAccessCoreOwnerRoute(isTenantOwner: boolean): boolean {
-  return isTenantOwner;
-}
-
 const CORE_EXACT_PATHS = new Set<string>([
   TENANT_ROUTES.core,
   TENANT_ROUTES.coreApplicationAccess,
@@ -438,6 +436,7 @@ const CORE_DETAIL_PATHS =
 
 export function isSupportedCorePath(pathname: string): boolean {
   return CORE_EXACT_PATHS.has(pathname) || CORE_DETAIL_PATHS.test(pathname)
+    || /^\/core\/audit\/events\/[^/]+$/u.test(pathname)
     || /^\/core\/subscription\/(?:receipts|operations)\/[^/]+$/u.test(pathname)
     || /^\/core\/application-access\/addon-seats\/[^/]+$/u.test(pathname)
     || /^\/core\/application-access\/(?:companies|branches)\/[^/]+$/u.test(pathname)

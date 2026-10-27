@@ -20,6 +20,7 @@ import {
   IdentifierText,
   Money,
   NotFoundState,
+  PermissionGate,
   ReasonDialog,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -45,6 +46,7 @@ import { QuotationRevisionsPanel } from "../components/QuotationRevisionsPanel";
 import { useTradeDraftReference } from "../../documents/hooks/useTradeDraftReference";
 import { useQuotationScreen } from "../hooks/useQuotationScreen";
 import { QUOTATIONS_PATH, QUOTATION_PERMISSIONS } from "../quotation-contract";
+import { SALES_ORDER_PERMISSIONS } from "../../sales-orders/sales-order-contract";
 
 export default function QuotationDetailPage({
   params,
@@ -79,6 +81,10 @@ export default function QuotationDetailPage({
     );
   }
 
+  if (detail.loadError?.status === 403) {
+    return <PermissionGate require={QUOTATION_PERMISSIONS.read} denied>{null}</PermissionGate>;
+  }
+
   if (detail.isMissing) {
     return (
       <TradeGate require={QUOTATION_PERMISSIONS.read}>
@@ -94,7 +100,8 @@ export default function QuotationDetailPage({
 
   const canConvert =
     quotation?.lifecycleStatus === "ACCEPTED" &&
-    detail.scope.canWrite(QUOTATION_PERMISSIONS.convert);
+    detail.scope.canWrite(QUOTATION_PERMISSIONS.convert) &&
+    detail.scope.canWrite(SALES_ORDER_PERMISSIONS.create);
 
   const stageSteps = [
     {

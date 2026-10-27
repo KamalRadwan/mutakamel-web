@@ -270,8 +270,8 @@ describe("FormModal card size", () => {
     const content = screen.getByRole("dialog");
     expect(content).toHaveClass(
       "flex",
-      "max-w-[960px]",
-      "max-h-[85dvh]",
+      "max-w-[940px]",
+      "max-h-[94dvh]",
       "w-[calc(100%-2rem)]",
     );
     expect(content).not.toHaveClass("inset-5");

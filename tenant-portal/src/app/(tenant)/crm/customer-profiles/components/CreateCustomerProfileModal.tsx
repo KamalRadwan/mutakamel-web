@@ -38,7 +38,7 @@ import {
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
 import { resolveCompanyForBranch } from "@/lib/api/organization-scope";
-import { localizedName } from "@/lib/format/localized";
+import { localizedName, localizedValue } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import { isUUIDv7 } from "@/lib/uuid";
 import type { AcquisitionSource } from "../../acquisition-sources/acquisition-source-contract";
@@ -48,7 +48,6 @@ import {
   type LeadDetailsUser,
 } from "../../leads/[id]/lead-details-edit-contract";
 import { CreateTagModal } from "../../leads/components/create-lead/CreateTagModal";
-import { LeadAddressSection } from "../../leads/components/create-lead/LeadAddressSection";
 import { LeadFieldGuide } from "../../leads/components/create-lead/LeadFieldGuide";
 import { useCreateLeadTags } from "../../leads/hooks/useCreateLeadTags";
 import { useLeadCompanyOptions } from "../../leads/hooks/useLeadCompanyOptions";
@@ -78,6 +77,7 @@ import { CustomerPersonSection } from "./create-customer/CustomerPersonSection";
 const DEFAULT_OWNER_VALUE = "__default_owner__";
 
 export interface CreateCustomerProfileModalProps {
+  allowedOwnerIds: string[] | null;
   create: ReturnType<typeof useCreateCustomerProfile>;
   sources: AcquisitionSource[];
   sourcesDegraded: boolean;
@@ -98,6 +98,7 @@ export interface CreateCustomerProfileModalProps {
  * - Directory company linking + contacts picker + Inline Tag Creation Modal (`CreateTagModal`)
  */
 export function CreateCustomerProfileModal({
+  allowedOwnerIds,
   create,
   sources,
   sourcesDegraded,
@@ -120,6 +121,9 @@ export function CreateCustomerProfileModal({
     null,
   );
   const [ownerOptions, setOwnerOptions] = useState<LeadDetailsUser[]>([]);
+  const visibleOwnerOptions = ownerOptions.filter(
+    (owner) => allowedOwnerIds === null || allowedOwnerIds.includes(owner.id),
+  );
   const [selectedCompanyOverride, setSelectedCompanyOverride] = useState<
     string | null
   >(null);
@@ -170,31 +174,25 @@ export function CreateCustomerProfileModal({
     );
   }, [corporate, existingCompany, form.companyName, companyOptions.companies]);
 
-  const visibleSections = useMemo<CustomerProfileSectionId[]>(() => {
-    const list: CustomerProfileSectionId[] = ["classification"];
+  const visibleSections = useMemo<Exclude<CustomerProfileSectionId, "address">[]>(() => {
+    const list: Exclude<CustomerProfileSectionId, "address">[] = ["classification"];
     if (corporate) {
       list.push("company", "contacts");
     } else {
       list.push("person");
-    }
-    if (!existingCompany) {
-      list.push("address");
     }
     list.push("notes");
     if (customFields.definitions.length > 0) {
       list.push("customFields");
     }
     return list;
-  }, [corporate, existingCompany, customFields.definitions.length]);
+  }, [corporate, customFields.definitions.length]);
 
   const indexEntries = useMemo<FormModalSection[]>(
     () =>
       visibleSections.map((section) => ({
         id: section,
-        label:
-          section === "address"
-            ? t.crmLeads.create.sections.address
-            : t.crmCustomerProfiles.create.sections[section],
+        label: t.crmCustomerProfiles.create.sections[section],
         invalid: customerProfileSectionErrorCount(errors, section) > 0,
       })),
     [visibleSections, errors, t],
@@ -302,7 +300,7 @@ export function CreateCustomerProfileModal({
         onSubmit={() => void handleFormSubmit(false)}
         error={describeError(create.error) ?? undefined}
         headerIcon={
-          <div className="flex size-10 items-center justify-center rounded-xl bg-linear-to-br from-indigo-600 via-violet-600 to-sky-500 text-white shadow-sm">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <UserPlus className="size-5" aria-hidden="true" />
           </div>
         }
@@ -312,8 +310,8 @@ export function CreateCustomerProfileModal({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
                 corporate
-                  ? "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300"
-                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-300",
+                  ? "border-swatch-purple bg-swatch-purple-soft text-swatch-purple-deep"
+                  : "border-swatch-green bg-swatch-green-soft text-swatch-green-deep",
               )}
             >
               {corporate ? (
@@ -326,13 +324,15 @@ export function CreateCustomerProfileModal({
                 : `${t.crmLeads.create.types.INDIVIDUAL} · B2C`}
             </span>
 
-            <span className="hidden items-center gap-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-0.5 text-[11px] font-medium text-indigo-700 sm:inline-flex dark:border-indigo-400/30 dark:bg-indigo-500/20 dark:text-indigo-300">
-              <span className="inline-flex size-3.5 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-extrabold text-white">
+            <span className="hidden items-center gap-1 rounded-full border border-swatch-indigo bg-swatch-indigo-soft px-2.5 py-0.5 text-xs font-medium text-swatch-indigo-deep sm:inline-flex">
+              <span className="inline-flex size-3.5 items-center justify-center rounded-full bg-swatch-indigo text-xs font-semibold text-primary-foreground">
                 !
               </span>
-              {lang === "ar"
-                ? "دليل الحقول التفاعلي مفعّل"
-                : "Interactive Field Guide"}
+              {localizedValue(
+                "دليل الحقول التفاعلي مفعّل",
+                "Interactive Field Guide",
+                lang,
+              )}
             </span>
           </div>
         }
@@ -347,9 +347,11 @@ export function CreateCustomerProfileModal({
                 {[1, 2, 3].map((star) => {
                   const active = star <= initialRating;
                   return (
-                    <button
+                    <Button
                       key={star}
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       disabled={create.isSubmitting}
                       aria-label={formatTemplate(t.crmLeads.card.rateStars, {
                         count: star,
@@ -358,25 +360,25 @@ export function CreateCustomerProfileModal({
                       onClick={() =>
                         setInitialRating((curr) => (curr === star ? 0 : star))
                       }
-                      className="cursor-pointer rounded p-0.5 transition-transform hover:scale-110"
+                      className="size-6 cursor-pointer rounded p-0.5 transition-transform hover:scale-110"
                     >
                       <Star
                         className={cn(
                           "size-4 transition-colors",
                           active
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground/40 hover:text-amber-400/70",
+                            ? "fill-warning text-warning"
+                            : "text-muted-foreground/40 hover:text-warning/70",
                         )}
                         aria-hidden="true"
                       />
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
             </div>
 
             {/* Assigned Salesperson (`ownerUserId`) */}
-            {ownerOptions.length > 0 && (
+            {visibleOwnerOptions.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <div className="w-44">
                   <Select
@@ -402,7 +404,7 @@ export function CreateCustomerProfileModal({
                             user.email
                           : t.crmLeads.salesperson}
                       </SelectItem>
-                      {ownerOptions.map((owner) => (
+                      {visibleOwnerOptions.map((owner) => (
                         <SelectItem key={owner.id} value={owner.id}>
                           {leadDetailsUserName(owner)}
                         </SelectItem>
@@ -421,7 +423,7 @@ export function CreateCustomerProfileModal({
             <div className="space-y-4">
               {/* Interactive Form Sections Navigation */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                   {t.crmShared.formSectionsNav}
                 </span>
                 <nav
@@ -434,24 +436,26 @@ export function CreateCustomerProfileModal({
                       section.id as CustomerProfileSectionId,
                     );
                     return (
-                      <button
+                      <Button
                         key={section.id}
                         type="button"
+                        variant="ghost"
                         onClick={() => scrollToSection(section.id)}
                         className={cn(
-                          "flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-start text-xs font-medium transition-colors",
+                          "flex h-auto w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-start text-xs font-medium transition-colors",
                           secErrors > 0
                             ? "border-destructive/40 bg-destructive/10 text-destructive"
-                            : "border-border/70 bg-card text-foreground hover:border-indigo-500/40 hover:bg-indigo-500/[0.04]",
+                            : "border-border/70 bg-card text-foreground hover:border-swatch-indigo hover:bg-swatch-indigo-soft/40",
                         )}
                       >
                         <span className="flex items-center gap-2 truncate">
                           <span
+                            dir="ltr"
                             className={cn(
-                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold",
+                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold tabular-nums",
                               secErrors > 0
-                                ? "bg-destructive text-white"
-                                : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-300",
+                                ? "bg-destructive text-primary-foreground"
+                                : "bg-swatch-indigo-soft text-swatch-indigo-deep",
                             )}
                           >
                             0{idx + 1}
@@ -460,25 +464,30 @@ export function CreateCustomerProfileModal({
                         </span>
 
                         {secErrors > 0 ? (
-                          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+                          <span
+                            dir="ltr"
+                            className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-primary-foreground"
+                          >
                             {secErrors}
                           </span>
                         ) : section.id === "contacts" ? (
-                          <span className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+                          <span
+                            dir="ltr"
+                            className="shrink-0 rounded bg-swatch-blue-soft px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-swatch-blue-deep"
+                          >
                             {form.contacts.length}/
                             {CUSTOMER_PROFILE_CREATE_LIMITS.contacts}
                           </span>
-                        ) : section.id === "address" ||
-                          section.id === "notes" ? (
-                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                        ) : section.id === "notes" ? (
+                          <span className="shrink-0 text-xs text-muted-foreground">
                             {t.crmLeads.create.optionalBadge}
                           </span>
                         ) : (
-                          <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                          <span className="shrink-0 rounded bg-swatch-green-soft px-1.5 py-0.5 text-xs font-semibold text-swatch-green-deep">
                             {t.crmLeads.create.readyBadge}
                           </span>
                         )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </nav>
@@ -488,16 +497,18 @@ export function CreateCustomerProfileModal({
             {/* Live Customer Board Card Preview & Duplicate Radar Status */}
             <div className="space-y-3">
               {/* Live Customer Board Card Preview */}
-              <div className="rounded-xl border border-indigo-500/25 bg-card p-3 shadow-xs">
+              <div className="rounded-lg border border-swatch-indigo-soft bg-card p-3 shadow-xs">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-bold tracking-wider text-indigo-600 uppercase dark:text-indigo-300">
-                    {lang === "ar"
-                      ? "معاينة بطاقة اللوحة"
-                      : "Live Card Preview"}
+                  <span className="text-xs font-semibold tracking-wider text-swatch-indigo-deep uppercase">
+                    {localizedValue(
+                      "معاينة بطاقة اللوحة",
+                      "Live Card Preview",
+                      lang,
+                    )}
                   </span>
                   <span
                     className={cn(
-                      "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold",
+                      "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-semibold",
                       previewStatusVisual.badgeClass,
                     )}
                   >
@@ -514,7 +525,7 @@ export function CreateCustomerProfileModal({
 
                 <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="truncate text-xs font-bold text-foreground">
+                    <p className="truncate text-xs font-semibold text-foreground">
                       {previewName}
                     </p>
                     <div className="flex shrink-0 items-center gap-1">
@@ -523,13 +534,16 @@ export function CreateCustomerProfileModal({
                           {Array.from({ length: initialRating }).map((_, i) => (
                             <Star
                               key={i}
-                              className="size-3 fill-amber-400 text-amber-400"
+                              className="size-3 fill-warning text-warning"
                               aria-hidden="true"
                             />
                           ))}
                         </div>
                       )}
-                      <span className="shrink-0 rounded border border-border bg-card px-1.5 py-0.5 font-mono text-[9px] font-bold text-muted-foreground">
+                      <span
+                        dir="ltr"
+                        className="shrink-0 rounded border border-border bg-card px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground"
+                      >
                         {corporate ? "B2B" : "B2C"}
                       </span>
                     </div>
@@ -538,7 +552,7 @@ export function CreateCustomerProfileModal({
                   {previewPhone && (
                     <div
                       dir="ltr"
-                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground"
                     >
                       <Phone className="size-3 shrink-0" aria-hidden="true" />
                       <span className="truncate">{previewPhone}</span>
@@ -548,7 +562,7 @@ export function CreateCustomerProfileModal({
                   {(previewSource || previewTags.length > 0) && (
                     <div className="flex flex-wrap items-center gap-1 pt-1">
                       {previewSource && (
-                        <span className="rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        <span className="rounded border border-border bg-card px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                           {previewSource}
                         </span>
                       )}
@@ -568,39 +582,45 @@ export function CreateCustomerProfileModal({
               {/* Live Duplicate Radar Status */}
               <div
                 className={cn(
-                  "flex items-center gap-2.5 rounded-xl border p-2.5 text-xs",
+                  "flex items-center gap-2.5 rounded-lg border p-2.5 text-xs",
                   matchingDirectoryCompany
-                    ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-                    : "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-700 dark:text-emerald-300",
+                    ? "border-swatch-amber bg-swatch-amber-soft text-swatch-amber-deep"
+                    : "border-swatch-green bg-swatch-green-soft/60 text-swatch-green-deep",
                 )}
               >
                 {matchingDirectoryCompany ? (
                   <ShieldAlert
-                    className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                    className="size-4 shrink-0 text-swatch-amber"
                     aria-hidden="true"
                   />
                 ) : (
                   <ShieldCheck
-                    className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    className="size-4 shrink-0 text-swatch-green"
                     aria-hidden="true"
                   />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold">
+                  <div className="font-semibold">
                     {matchingDirectoryCompany
-                      ? lang === "ar"
-                        ? "تنبيه رادار التكرار"
-                        : "Duplicate Radar Alert"
-                      : lang === "ar"
-                        ? "رادار التكرار: سليم"
-                        : "Duplicate Radar: Clear"}
+                      ? localizedValue(
+                          "تنبيه رادار التكرار",
+                          "Duplicate Radar Alert",
+                          lang,
+                        )
+                      : localizedValue(
+                          "رادار التكرار: سليم",
+                          "Duplicate Radar: Clear",
+                          lang,
+                        )}
                   </div>
-                  <div className="truncate text-[10px] opacity-80">
+                  <div className="truncate text-xs opacity-80">
                     {matchingDirectoryCompany
                       ? matchingDirectoryCompany.displayName
-                      : lang === "ar"
-                        ? "تم التحقق من الهواتف والبريد والسجل الضريبي"
-                        : "Phone, Email, Tax & CR checked"}
+                      : localizedValue(
+                          "تم التحقق من الهواتف والبريد والسجل الضريبي",
+                          "Phone, Email, Tax & CR checked",
+                          lang,
+                        )}
                   </div>
                 </div>
               </div>
@@ -620,7 +640,7 @@ export function CreateCustomerProfileModal({
                 })}
               </p>
             ) : isReadyToSubmit ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-swatch-green bg-swatch-green-soft px-3 py-1 text-xs font-semibold text-swatch-green-deep">
                 <CheckCircle2 className="size-3.5" aria-hidden="true" />
                 {t.crmLeads.create.readyBadge}
               </span>
@@ -634,16 +654,16 @@ export function CreateCustomerProfileModal({
               onClick={() => void handleFormSubmit(true)}
             >
               <Plus className="size-3.5" aria-hidden="true" />
-              {lang === "ar" ? "إنشاء وإضافة آخر" : "Create & Add Another"}
+              {localizedValue(
+                "إنشاء وإضافة آخر",
+                "Create & Add Another",
+                lang,
+              )}
             </Button>
           </div>
         }
         submitIcon={<CheckCircle2 className="size-4" aria-hidden="true" />}
-        submitClassName={
-          corporate
-            ? "bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white border-0"
-            : "bg-linear-to-r from-indigo-600 to-emerald-600 hover:from-indigo-700 hover:to-emerald-700 text-white border-0"
-        }
+        submitClassName="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
         labels={{
           submit: create.isSubmitting ? t.crmLeads.creating : t.common.create,
           cancel: t.common.cancel,
@@ -691,23 +711,27 @@ export function CreateCustomerProfileModal({
         {matchingDirectoryCompany && (
           <div
             role="status"
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:border-amber-400/35 dark:bg-amber-500/15 dark:text-amber-200"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-swatch-amber bg-swatch-amber-soft p-3.5 text-xs text-swatch-amber-deep"
           >
             <div className="flex items-center gap-2.5">
               <AlertTriangle
-                className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                className="size-4 shrink-0 text-swatch-amber"
                 aria-hidden="true"
               />
               <div>
-                <p className="font-bold">
-                  {lang === "ar"
-                    ? `توجد شركة بنفس الاسم في الدليل: "${matchingDirectoryCompany.displayName}"`
-                    : `A company named "${matchingDirectoryCompany.displayName}" already exists in the directory.`}
+                <p className="font-semibold">
+                  {localizedValue(
+                    `توجد شركة بنفس الاسم في الدليل: "${matchingDirectoryCompany.displayName}"`,
+                    `A company named "${matchingDirectoryCompany.displayName}" already exists in the directory.`,
+                    lang,
+                  )}
                 </p>
-                <p className="text-[11px] opacity-85">
-                  {lang === "ar"
-                    ? "يمكنك ربط العميل بالشركة المسجلة بدلاً من إنشاء سجل مكرر."
-                    : "Link to the existing directory organization instead of creating a duplicate party."}
+                <p className="text-xs opacity-85">
+                  {localizedValue(
+                    "يمكنك ربط العميل بالشركة المسجلة بدلاً من إنشاء سجل مكرر.",
+                    "Link to the existing directory organization instead of creating a duplicate party.",
+                    lang,
+                  )}
                 </p>
               </div>
             </div>
@@ -722,7 +746,7 @@ export function CreateCustomerProfileModal({
                 );
                 void companyOptions.selectCompany(matchingDirectoryCompany.id);
               }}
-              className="border-amber-500/50 bg-amber-500/20 text-amber-900 hover:bg-amber-500/30 dark:text-amber-100"
+              className="border-swatch-amber bg-swatch-amber-soft text-swatch-amber-deep hover:bg-swatch-amber-soft/80"
             >
               {t.crmLeads.existingCompany}
             </Button>
@@ -808,56 +832,40 @@ export function CreateCustomerProfileModal({
           />
         )}
 
-        {/* Section 03 & 04: Address (Amber) & Qualification / Internal Notes (Violet) */}
-        <div
-          className={cn(
-            "grid grid-cols-1 gap-4",
-            !existingCompany && "xl:grid-cols-2",
-          )}
-        >
-          {!existingCompany && (
-            <LeadAddressSection
-              address={form.address}
-              errors={errors}
-              disabled={create.isSubmitting}
-              defaultOpen={false}
-              onChange={create.setAddressField}
-              onBlur={create.touch}
-            />
-          )}
-
+        <div className="grid grid-cols-1 gap-4">
           {/* Collapsible Violet Notes & Qualification Section */}
           <section
             id="notes"
             data-form-section="notes"
-            className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-card shadow-xs transition-colors dark:border-violet-400/20"
+            className="relative overflow-hidden rounded-lg border border-swatch-purple-soft bg-card shadow-xs transition-colors"
           >
             <div
               aria-hidden="true"
-              className="h-1 w-full bg-linear-to-r from-violet-500 via-indigo-500 to-purple-500"
+              className="h-1 w-full bg-swatch-purple"
             />
 
             <Collapsible open={isNotesExpanded} onOpenChange={setNotesOpen}>
               <CollapsibleTrigger asChild>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   tabIndex={0}
-                  className="flex w-full cursor-pointer items-center justify-between gap-3 border-b border-border/60 bg-violet-500/[0.03] px-4 py-3 text-start transition-colors hover:bg-violet-500/[0.06] dark:bg-violet-500/[0.06]"
+                  className="flex h-auto w-full cursor-pointer items-center justify-between gap-3 rounded-none border-b border-border/60 bg-swatch-purple-soft/20 px-4 py-3 text-start transition-colors hover:bg-swatch-purple-soft/40"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-violet-500/25 bg-violet-500/10 text-violet-600 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-swatch-purple bg-swatch-purple-soft text-swatch-purple-deep">
                       <Sparkles className="size-4" aria-hidden="true" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-foreground">
+                        <span className="text-sm font-semibold text-foreground">
                           {t.crmCustomerProfiles.create.sections.notes}
                         </span>
-                        <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+                        <span className="rounded-full border border-swatch-purple bg-swatch-purple-soft px-2 py-0.5 text-xs font-semibold text-swatch-purple-deep">
                           {t.crmLeads.create.optionalBadge}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs font-normal text-muted-foreground">
                         {t.crmLeads.create.qualificationCollapsibleSubtitle}
                       </p>
                     </div>
@@ -870,15 +878,18 @@ export function CreateCustomerProfileModal({
                     )}
                     aria-hidden="true"
                   />
-                </button>
+                </Button>
               </CollapsibleTrigger>
 
               <CollapsibleContent>
                 <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
                   {/* Interest Summary */}
                   <div className="relative">
-                    <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                      <span className="font-mono text-[10px] text-muted-foreground">
+                    <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                      <span
+                        dir="ltr"
+                        className="font-mono text-xs tabular-nums text-muted-foreground"
+                      >
                         {(form.interestSummary ?? "").length}/
                         {CUSTOMER_PROFILE_CREATE_LIMITS.interestSummary}
                       </span>
@@ -907,8 +918,11 @@ export function CreateCustomerProfileModal({
 
                   {/* Expected Need */}
                   <div className="relative">
-                    <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                      <span className="font-mono text-[10px] text-muted-foreground">
+                    <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                      <span
+                        dir="ltr"
+                        className="font-mono text-xs tabular-nums text-muted-foreground"
+                      >
                         {(form.expectedNeed ?? "").length}/
                         {CUSTOMER_PROFILE_CREATE_LIMITS.expectedNeed}
                       </span>
@@ -935,8 +949,11 @@ export function CreateCustomerProfileModal({
 
                   {/* Internal Notes (full width) */}
                   <div className="relative md:col-span-2">
-                    <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                      <span className="font-mono text-[10px] text-muted-foreground">
+                    <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                      <span
+                        dir="ltr"
+                        className="font-mono text-xs tabular-nums text-muted-foreground"
+                      >
                         {form.description.length}/
                         {CUSTOMER_PROFILE_CREATE_LIMITS.description}
                       </span>
@@ -968,10 +985,10 @@ export function CreateCustomerProfileModal({
 
         {/* Section 05: Tenant Custom Fields (Teal Card) */}
         {customFields.definitions.length > 0 && (
-          <div className="relative overflow-hidden rounded-xl border border-teal-500/20 bg-card shadow-xs dark:border-teal-400/20">
+          <div className="relative overflow-hidden rounded-lg border border-swatch-teal-soft bg-card shadow-xs">
             <div
               aria-hidden="true"
-              className="h-1 w-full bg-linear-to-r from-teal-500 via-emerald-500 to-cyan-500"
+              className="h-1 w-full bg-swatch-teal"
             />
             <div className="p-4">
               <div className="mb-2 flex justify-end">

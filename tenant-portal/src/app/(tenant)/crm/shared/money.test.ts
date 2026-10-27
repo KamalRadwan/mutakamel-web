@@ -3,6 +3,7 @@ import {
   MONEY_MAX_AMOUNT,
   MONEY_MAX_INTEGER_DIGITS,
   MONEY_OUT_OF_RANGE,
+  MONEY_SCALE_INVALID,
   isExactMoneyDecimal,
   toMoneyWireNumber,
 } from "./money";
@@ -50,7 +51,7 @@ describe("CRM money conversion", () => {
 
   it.each([
     ["-1.00", "a negative amount the DTO's @Min(0) would refuse"],
-    ["1.234", "three decimal places"],
+    ["1.2345", "more than the schema's three decimal places"],
     ["1e3", "exponential notation"],
     ["1,000.00", "a thousands separator"],
     ["abc", "text"],
@@ -85,6 +86,37 @@ describe("CRM money conversion", () => {
       const emitted = /"amount":([^},]+)/.exec(wire)?.[1] ?? "";
       expect(exactCents(emitted)).toBe(exactCents(sample));
     }
+  });
+
+  it.each(["KWD", "BHD", "OMR", "JOD", "TND", "LYD", "IQD", " kwd "])(
+    "submits three-decimal %s amounts without rounding",
+    (currency) => {
+      for (const amount of ["1.234", "1.230", "0.001", "1234567890.123"]) {
+        expect(isExactMoneyDecimal(amount, currency)).toBe(true);
+        const wire = JSON.stringify({ amount: toMoneyWireNumber(amount, currency) });
+        const emitted = /"amount":([^},]+)/.exec(wire)?.[1] ?? "";
+        expect(BigInt(emitted.replace(".", "").padEnd(emitted.split(".")[0].length + 3, "0")))
+          .toBe(BigInt(amount.replace(".", "")));
+      }
+    },
+  );
+
+  it.each(["EGP", "USD", "", "AAA"])("enforces the two-decimal scale for %s", (currency) => {
+    expect(isExactMoneyDecimal("1.234", currency)).toBe(false);
+    expect(() => toMoneyWireNumber("1.234", currency)).toThrow(MONEY_SCALE_INVALID);
+    expect(isExactMoneyDecimal("1.230", currency)).toBe(true);
+    expect(toMoneyWireNumber("1.230", currency)).toBe(1.23);
+  });
+
+  it.each(["JPY", "KRW", "VND", "CLP", "ISK"])("enforces the zero-decimal scale for %s", (currency) => {
+    expect(isExactMoneyDecimal("1.001", currency)).toBe(false);
+    expect(isExactMoneyDecimal("1.000", currency)).toBe(true);
+    expect(toMoneyWireNumber("1.000", currency)).toBe(1);
+  });
+
+  it("keeps the exact-number guard for three-decimal currencies", () => {
+    expect(isExactMoneyDecimal("9999999999999.999", "KWD")).toBe(false);
+    expect(() => toMoneyWireNumber("9999999999999.999", "KWD")).toThrow(MONEY_OUT_OF_RANGE);
   });
 });
 

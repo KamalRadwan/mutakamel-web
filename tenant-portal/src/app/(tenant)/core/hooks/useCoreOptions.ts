@@ -11,6 +11,7 @@ import {
 } from "../contracts/organization-contract";
 import { fetchTenantUsers, userDisplayName } from "../contracts/user-contract";
 import { fetchTenantRoles } from "../contracts/role-contract";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 
 export interface RemoteOptions {
   options: ComboboxOption[];
@@ -18,6 +19,9 @@ export interface RemoteOptions {
   search: (query: string) => void;
   /** Labels the screen already resolved, so a selected row is never a bare id. */
   labelFor: (id: string | null | undefined) => string | undefined;
+  error?: NormalizedApiError | null;
+  retry?: () => void;
+  isReady?: boolean;
 }
 
 interface OptionSource {
@@ -40,6 +44,9 @@ function useRemoteOptions(source: OptionSource): RemoteOptions {
   const [isLoading, setIsLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [labels, setLabels] = useState<Record<string, string>>({});
+  const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [loadedKey, setLoadedKey] = useState("");
   const { load, enabled, resetKey } = source;
 
   // Every write is deferred past the effect body: React's compiler lint bans a
@@ -64,36 +71,43 @@ function useRemoteOptions(source: OptionSource): RemoteOptions {
         return;
       }
       setIsLoading(true);
+      setError(null);
       load(query, controller.signal)
         .then((next) => {
           if (controller.signal.aborted) return;
           setOptions(next);
+          setLoadedKey(resetKey);
           setLabels((current) => ({
             ...current,
             ...Object.fromEntries(next.map((option) => [option.value, option.label])),
           }));
         })
-        .catch(() => {
-          // A picker that cannot load is an empty picker with its own empty
-          // label, not a screen-level failure — the form still reports the
-          // server's answer when the user submits.
-          if (!controller.signal.aborted) setOptions([]);
+        .catch((cause: unknown) => {
+          if (!controller.signal.aborted) {
+            setOptions([]);
+            setError(normalizeApiError(cause));
+          }
         })
         .finally(() => {
           if (!controller.signal.aborted) setIsLoading(false);
         });
     });
     return () => controller.abort();
-  }, [enabled, load, query, resetKey]);
+  }, [enabled, load, query, reloadToken, resetKey]);
+
+  const retry = useCallback(() => setReloadToken((token) => token + 1), []);
 
   return useMemo(
     () => ({
       options,
       isLoading,
+      error,
+      retry,
+      isReady: enabled && loadedKey === resetKey && !isLoading && !error,
       search: setQuery,
       labelFor: (id) => (id ? labels[id] : undefined),
     }),
-    [isLoading, labels, options],
+    [enabled, error, isLoading, labels, loadedKey, options, resetKey, retry],
   );
 }
 
@@ -113,6 +127,7 @@ export function useOrgNodeOptions(
         parentId,
         limit: CORE_MAX_PAGE_LIMIT,
         signal,
+        suppressForbiddenToast: true,
       });
       return page.items.map((node) => ({
         value: node.id,
@@ -134,6 +149,7 @@ export function useTenantUserOptions(enabled = true): RemoteOptions {
         search: query,
         filters: { status: "ACTIVE" },
         signal,
+        suppressForbiddenToast: true,
       });
       return page.items.map((user) => ({
         value: user.id,
@@ -147,17 +163,17 @@ export function useTenantUserOptions(enabled = true): RemoteOptions {
   return useRemoteOptions({ load, enabled, resetKey: "users" });
 }
 
-export function useRoleOptions(enabled = true): RemoteOptions {
+export function useRoleOptions(enabled = true, excludeOwnerRole = false): RemoteOptions {
   const lang = useLanguage();
   const load = useCallback(
     async (query: string, signal: AbortSignal): Promise<ComboboxOption[]> => {
-      const page = await fetchTenantRoles({ page: 1, search: query, signal });
-      return page.items.map((role) => ({
+      const page = await fetchTenantRoles({ page: 1, search: query, signal, suppressForbiddenToast: true });
+      return page.items.filter((role) => !excludeOwnerRole || role.name !== "Tenant Super Admin").map((role) => ({
         value: role.id,
         label: localizedValue(role.nameAr, role.nameEn, lang),
       }));
     },
-    [lang],
+    [excludeOwnerRole, lang],
   );
 
   return useRemoteOptions({ load, enabled, resetKey: `roles:${lang}` });

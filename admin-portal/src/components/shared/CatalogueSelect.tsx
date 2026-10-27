@@ -131,7 +131,7 @@ export function CatalogueSelect({
           aria-invalid={ariaInvalid}
         />
       ) : (
-        <input type="hidden" name={name} value={value} />
+        <Input type="hidden" name={name} value={value} />
       )}
     </div>
   );

@@ -8,6 +8,19 @@ import {
 const FIRST = "019f0000-0000-7000-8000-000000000001";
 
 describe("admin user write intents", () => {
+  it("fingerprints chain replacement as PUT and preserves its key on retry", () => {
+    const path = "/api/admin/webphone/v1/extensions/one/servers";
+    const chain = [{ serverId: "server", priority: 0, timeoutSeconds: null, maxRetries: null }];
+    const first = claimAdminUserWriteIntent(null, "PUT", path, chain, () => FIRST);
+    expect(JSON.parse(first.fingerprint)).toEqual({ method: "PUT", path, body: chain });
+    expect(claimAdminUserWriteIntent({ ...first, ambiguous: true }, "PUT", path, chain)).toEqual({
+      ...first,
+      ambiguous: true,
+    });
+    expect(() => claimAdminUserWriteIntent({ ...first, ambiguous: true }, "PATCH", path, chain))
+      .toThrow(PendingAdminUserWriteError);
+  });
+
   it("reuses one key only for the exact method/path/body", () => {
     const first = claimAdminUserWriteIntent(
       null,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
@@ -121,6 +121,7 @@ describe("Corporate companyEmail and companyWebsite validation", () => {
     url: "Invalid URL.",
     maxLength: "Max {max}.",
     duplicatePhone: "Duplicate phone.",
+    phone: "Invalid phone.",
     contactRequired: "Contact required.",
     contactsLimit: "Too many contacts.",
     tagsLimit: "Too many tags.",

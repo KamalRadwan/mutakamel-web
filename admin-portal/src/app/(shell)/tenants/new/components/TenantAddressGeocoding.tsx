@@ -66,7 +66,7 @@ export const TenantAddressGeocoding = memo(function TenantAddressGeocoding({
         {showCompactSuggestion && state.suggestion ? (
           <div
             role="status"
-            className="absolute end-0 top-full mt-1.5 z-30 min-w-64 max-w-sm rounded-lg border border-info/30 bg-card p-2.5 text-xs text-foreground shadow-lg"
+            className="absolute end-0 top-full mt-1.5 z-30 min-w-64 max-w-sm rounded-lg border border-info/30 bg-card p-2.5 text-xs text-foreground shadow-pop"
           >
             <p className="font-semibold text-primary">{copy.suggestion}</p>
             <p className="mt-1 leading-4 text-muted-foreground">

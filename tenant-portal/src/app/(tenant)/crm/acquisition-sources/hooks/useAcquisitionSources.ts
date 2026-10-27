@@ -5,6 +5,7 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import {
   ACQUISITION_SOURCES_PATH,
   ACQUISITION_SOURCE_REORDER_PATH,
@@ -21,6 +22,7 @@ const CATALOGUE_RESPONSE_LIMIT_BYTES = 1_000_000;
 
 export function useAcquisitionSources() {
   const { lang, t } = useI18n();
+  const crmErrorText = useCrmErrorText();
   const { user } = useTenantAuth();
   const canManage =
     user?.permissions.includes("crm.acquisition_sources.manage") ?? false;
@@ -51,7 +53,8 @@ export function useAcquisitionSources() {
       return true;
     } catch (error) {
       if (isAbortError(error)) return false;
-      setQueryError(normalizeApiError(error));
+      const { status, code } = normalizeApiError(error);
+      setQueryError({ status, code });
       return false;
     } finally {
       if (!signal?.aborted) setIsLoading(false);
@@ -80,16 +83,14 @@ export function useAcquisitionSources() {
     input: CreateAcquisitionSourceInput,
   ): Promise<boolean> => {
     if (!canManage) {
-      setMutationError("You do not have permission to manage acquisition sources.");
+      setMutationError(t.crmAcquisitionSources.iconForbidden);
       return false;
     }
     let payload: CreateAcquisitionSourceInput;
     try {
       payload = buildCreateAcquisitionSourceRequest(input);
-    } catch (error) {
-      setMutationError(
-        errorMessage(error, "Invalid acquisition-source details."),
-      );
+    } catch {
+      setMutationError(t.crmAcquisitionSources.invalidNames);
       return false;
     }
     setIsCreating(true);
@@ -119,12 +120,12 @@ export function useAcquisitionSources() {
         setIsCreateOpen(false);
         setMutationError(
           reloaded
-            ? "The creation result is uncertain. The catalogue was refreshed; review it before submitting again."
-            : "The creation result is uncertain and the catalogue could not be refreshed. Reload before trying again.",
+            ? t.crmAcquisitionSources.createUncertain
+            : t.crmAcquisitionSources.createUncertainStale,
         );
       } else {
         setMutationError(
-          errorMessage(error, "Unable to create acquisition source."),
+          crmErrorText(apiFailure(error)) ?? t.crmAcquisitionSources.createFailed,
         );
       }
       return false;
@@ -136,7 +137,7 @@ export function useAcquisitionSources() {
   const handleDelete = async (): Promise<void> => {
     if (!selectedForDelete) return;
     if (!canManage) {
-      setMutationError("You do not have permission to manage acquisition sources.");
+      setMutationError(t.crmAcquisitionSources.iconForbidden);
       setSelectedForDelete(null);
       return;
     }
@@ -159,12 +160,12 @@ export function useAcquisitionSources() {
         setSelectedForDelete(null);
         setMutationError(
           reloaded
-            ? "The deletion result is uncertain. The catalogue was refreshed; review it before trying again."
-            : "The deletion result is uncertain and the catalogue could not be refreshed. Reload before trying again.",
+            ? t.crmAcquisitionSources.deleteUncertain
+            : t.crmAcquisitionSources.deleteUncertainStale,
         );
       } else {
         setMutationError(
-          errorMessage(error, "Unable to delete acquisition source."),
+          crmErrorText(apiFailure(error)) ?? t.crmAcquisitionSources.deleteFailed,
         );
       }
     } finally {
@@ -211,7 +212,9 @@ export function useAcquisitionSources() {
       // Rollback AND say why — a silent revert leaves the user watching a
       // change undo itself (docs/design/states.md, state 8).
       setItems(previous);
-      setMutationError(errorMessage(error, t.crmAcquisitionSources.reorderFailed));
+      setMutationError(error instanceof TenantApiClientError
+        ? crmErrorText(apiFailure(error))
+        : t.crmAcquisitionSources.reorderFailed);
       await load();
     } finally {
       setReorderingId(null);
@@ -277,8 +280,9 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
+function apiFailure(error: unknown): NormalizedApiError {
+  const { status, code } = normalizeApiError(error);
+  return { status, code };
 }
 
 function isAmbiguousMutationError(error: unknown): boolean {

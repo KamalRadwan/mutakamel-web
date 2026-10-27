@@ -3,11 +3,15 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TenantApiClientError } from "@/lib/api/axiosClient";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import { emptyCreateLeadForm } from "../lead-create-contract";
+import { LEADS_PATH } from "../lead-contract";
 import { useLeadCapabilities } from "./useLeadCapabilities";
 import { useLeads } from "./useLeads";
 
-const { auth, get, patch, post } = vi.hoisted(() => ({
+const { auth, get, patch, post, locale } = vi.hoisted(() => ({
+  locale: { lang: "en" as "en" | "ar" },
   auth: vi.fn(),
   get: vi.fn(),
   patch: vi.fn(),
@@ -16,17 +20,7 @@ const { auth, get, patch, post } = vi.hoisted(() => ({
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => auth() as unknown }));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({
-    t: {
-      crmLeads: {
-        messages: {
-          tagUnknown: "Selected tags changed. Remove them or choose again.",
-          createFailed: "Unable to create the lead.",
-          cardNotPermitted: "You cannot update this lead.",
-          cardUpdateAmbiguous: "The update could not be verified.",
-          cardUpdateFailed: "Unable to update the lead.",
-        },
-      },
-    },
+    t: { en, ar }[locale.lang],
   }),
 }));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
@@ -43,7 +37,6 @@ const TAG = "0192f3a0-0000-7000-8000-000000000006";
 const SECOND_TAG = "0192f3a0-0000-7000-8000-000000000007";
 const ACTOR = "0192f3a0-0000-7000-8000-000000000099";
 const CONTACT = "0192f3a0-0000-7000-8000-000000000098";
-const LEADS_PATH = "/api/tenant/crm/v1/leads";
 const LEADS_SEARCH_PATH = "/api/tenant/crm/v1/leads/search";
 
 function response(data: unknown, status = 200) {
@@ -98,12 +91,14 @@ function serverError(status: number): TenantApiClientError {
 }
 
 beforeEach(() => {
+  locale.lang = "en";
   vi.useFakeTimers();
   auth.mockReturnValue({
     user: {
       id: ACTOR,
       accessibleBranches: [BRANCH, OTHER_BRANCH],
       accessibleCompanies: [COMPANY],
+      accessibleBranchCompanies: [BRANCH, OTHER_BRANCH].map((branchId) => ({ branchId, companyId: COMPANY })),
       teamMemberships: [
         { branchId: BRANCH, companyId: COMPANY, isPrimary: true },
         { branchId: OTHER_BRANCH, companyId: COMPANY, isPrimary: false },
@@ -125,6 +120,47 @@ afterEach(() => {
 });
 
 describe("leads request lifecycle", () => {
+  it.each(["en", "ar"] as const)("translates create 429 and offline feedback in %s", async (lang) => {
+    locale.lang = lang;
+    const t = { en, ar }[lang];
+    get.mockImplementation(allowCreateReads);
+    const { result } = renderHook(() => useLeads());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    post.mockRejectedValueOnce(new TenantApiClientError("Raw server prose", {
+      status: 429, statusText: "Too Many Requests", headers: new Headers(),
+      data: { message: "Raw server prose" },
+    }));
+    act(() => result.current.openCreate());
+    await act(async () => { expect(await result.current.handleCreate(createForm())).toBe(false); });
+    expect(result.current.error).toBe(t.errors.rateLimitedDescription);
+    expect(result.current.isCreateOpen).toBe(true);
+    post.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await act(async () => { expect(await result.current.handleCreate(createForm())).toBe(false); });
+    expect(result.current.error).toContain(t.crmShared.errorOffline);
+    expect(result.current.error).toContain(t.crmLeads.messages.createAmbiguousRefreshed);
+    expect(result.current.error).not.toContain("Failed to fetch");
+    expect(result.current.isCreateOpen).toBe(false);
+  });
+
+  it("passes a definite 400 to create fields while keeping the filled modal open", async () => {
+    get.mockImplementation(allowCreateReads);
+    post.mockRejectedValueOnce(new TenantApiClientError("Invalid", {
+      status: 400, statusText: "Bad Request", headers: new Headers(),
+      data: { details: { email: ["Invalid email"] } },
+    }));
+    const { result } = renderHook(() => useLeads());
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    act(() => result.current.openCreate());
+    const reportFields = vi.fn();
+    await act(async () => {
+      expect(await result.current.handleCreate(createForm(), undefined, reportFields)).toBe(false);
+    });
+    expect(reportFields).toHaveBeenCalledWith(expect.objectContaining({
+      status: 400, fieldErrors: { email: ["Invalid email"] },
+    }));
+    expect(result.current.isCreateOpen).toBe(true);
+  });
+
   it("creates a lead and all selected tags with exactly one write", async () => {
     get.mockImplementation(allowCreateReads);
     post.mockResolvedValue(response({
@@ -186,7 +222,7 @@ describe("leads request lifecycle", () => {
     expect(created).toBe(false);
     expect(result.current.isCreateOpen).toBe(true);
     expect(result.current.error).toBe(
-      "Selected tags changed. Remove them or choose again.",
+      en.crmLeads.messages.tagUnknown,
     );
     expect(post).toHaveBeenCalledOnce();
   });

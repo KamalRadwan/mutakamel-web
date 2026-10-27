@@ -17,8 +17,7 @@
 import type { CardColor } from "@/design-system";
 import type { TenantApiRequestConfig } from "@/lib/api/axiosClient";
 import { isUUIDv7 } from "@/lib/uuid";
-
-const LEADS_PATH = "/api/tenant/crm/v1/leads";
+import { LEADS_PATH } from "./lead-contract";
 
 export const LEADS_BULK_STAGE_PATH = `${LEADS_PATH}/bulk-stage`;
 export const LEADS_BULK_UPDATE_PATH = `${LEADS_PATH}/bulk-update`;
@@ -95,13 +94,6 @@ export function bulkLeadFields(patch: BulkLeadFieldsPatch): BulkLeadFieldsPatch 
 
 /* ── KPIs ─────────────────────────────────────────────────────────────── */
 
-interface LeadKpiStageCounts {
-  stageId: string;
-  total: number;
-  hot: number;
-  overdue: number;
-}
-
 export interface LeadKpis {
   totalLeads: number;
   newStageLeads: number;
@@ -109,7 +101,6 @@ export interface LeadKpis {
   hotLeads: number;
   overdueActivityLeads: number;
   qualifiedLeads: number;
-  byStage: LeadKpiStageCounts[];
 }
 
 function count(value: unknown, field: string): number {
@@ -122,7 +113,6 @@ function count(value: unknown, field: string): number {
 export function parseLeadKpisResponse(value: unknown): LeadKpis {
   if (typeof value !== "object" || value === null) throw new Error("Invalid lead KPI response.");
   const body = value as Record<string, unknown>;
-  if (!Array.isArray(body.byStage)) throw new Error("Invalid lead KPI response: byStage.");
   return {
     totalLeads: count(body.totalLeads, "totalLeads"),
     newStageLeads: count(body.newStageLeads, "newStageLeads"),
@@ -130,19 +120,6 @@ export function parseLeadKpisResponse(value: unknown): LeadKpis {
     hotLeads: count(body.hotLeads, "hotLeads"),
     overdueActivityLeads: count(body.overdueActivityLeads, "overdueActivityLeads"),
     qualifiedLeads: count(body.qualifiedLeads, "qualifiedLeads"),
-    byStage: body.byStage.map((row) => {
-      if (typeof row !== "object" || row === null) throw new Error("Invalid lead KPI response: stage row.");
-      const stage = row as Record<string, unknown>;
-      if (typeof stage.stageId !== "string" || !isUUIDv7(stage.stageId)) {
-        throw new Error("Invalid lead KPI response: stageId.");
-      }
-      return {
-        stageId: stage.stageId,
-        total: count(stage.total, "byStage.total"),
-        hot: count(stage.hot, "byStage.hot"),
-        overdue: count(stage.overdue, "byStage.overdue"),
-      };
-    }),
   };
 }
 

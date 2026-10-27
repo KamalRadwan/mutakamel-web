@@ -80,7 +80,7 @@ export const WORKFLOW_KINDS = [
 ] as const;
 
 export const GOVERNANCE_SCOPE_TARGETS = ["TENANT", "COMPANY", "BRANCH"] as const;
-export type GovernanceScopeTarget = (typeof GOVERNANCE_SCOPE_TARGETS)[number];
+type GovernanceScopeTarget = (typeof GOVERNANCE_SCOPE_TARGETS)[number];
 
 export const POLICY_OPERATORS = [
   "EQ",

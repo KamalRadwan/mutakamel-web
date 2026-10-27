@@ -4,6 +4,15 @@ Status: **verified**
 
 Last source verification: **2026-09-24**
 
+Lead-stage protection, ordering and deactivation re-verified: **2026-10-17**
+(D-030/D-031, DOCS-FE-001).
+
+Acquisition-source and custom-field editing/creation re-verified: **2026-10-17**
+(FE-CRM-CONFIG-003), against Gateway routes, controllers, DTOs and services.
+
+Settings default-stage removal source-verified: **2026-10-19**
+(S3-CRM-SRC-001), against the settings DTO, repository and current CRM entity.
+
 Owning app: **crm-app**
 
 Portal status: **built** — all six screens are server-backed. Not exercised
@@ -81,31 +90,21 @@ Consequences for the UI:
   created, renamed, re-flagged, deactivated, or deleted. Create and update use
   centered `FormModal` surfaces; protected rows do not open the update modal.
 
-Deleting a stage that holds leads is a `409`. Surface it and refetch.
+An unprotected, non-default stage may be deactivated even while live leads use
+it; those leads stay in that stage (D-031). The active-stage board omits its
+lane, so deactivation does not imply a transfer. Changing its flag or deleting
+it while live (non-soft-deleted) leads use it returns
+`409 LEAD_STAGE_IN_USE`. Surface the conflict and refetch. Protected stages
+remain immutable, and the default stage cannot be deactivated or deleted.
 
-### `stage.isDefault` is the only authority. `settings.defaultLeadStageId` is dead
+### `stage.isDefault` is the only default lead-stage authority
 
-**Decided 2026-08-31**, from the CRM audit review's open question 3: *which of
-the two fields decides where a new lead lands?*
-
-There are two candidates, and this looked like a genuine ambiguity. It is not —
-**one of them is already dead**, and this was settled by finding the reader
-rather than by argument:
-
-| Field | Read by anything? |
-| --- | --- |
-| `crm_lead_stages.is_default` | **Yes.** `leads.service.ts:1085` resolves the stage for a new lead with `where: { isDefault: true, isActive: true }` |
-| `crm_settings.default_lead_stage_id` | **No.** It is seeded, stored, exposed on `GET /settings` and accepted on `PATCH /settings` — and no code path consults it when creating a lead |
-
-So `stage.isDefault` is the authority, and `defaultLeadStageId` should be deleted
-from Settings or turned into a read-through of it.
-
-**Why this matters more than a tidy-up:** a settings screen that offers
-`defaultLeadStageId` is a control that lies. The user picks a stage, the request
-succeeds, the value is stored and echoed back — and new leads keep landing
-somewhere else. There is no error to notice. **Do not build an editor for
-`defaultLeadStageId` in this portal.** If it has to appear at all, it is
-read-only and labelled as reflecting the stage catalogue.
+The default is stored in `crm_lead_stages.is_default` and changed through the
+lead-stage set-default action. Settings no longer accept or return
+`defaultLeadStageId`; sending that removed key to
+`PUT /api/tenant/crm/v1/settings` returns `400 CRM_VALIDATION_FAILED`.
+Resolve the displayed default from the stage catalogue. Do not send a stage
+reference through the settings endpoint.
 
 The `isDefault` side already carries its own protections, verified in
 `lead-stages.service.ts`. A default always exists, and it is always a stage a
@@ -144,6 +143,12 @@ Sources carry an **icon** — `GET /:id/icon` serves it, `POST /:id/icon`
 uploads it. Treat the icon URL as an opaque, cache-busted path; do not
 construct it by hand. Reordering uses the dedicated `reorder` endpoint, same
 reasoning as lead stages.
+
+The source edit drawer requires `crm.acquisition_sources.manage` and sends
+`{ nameAr, nameEn, isActive }` to `PATCH /:id`. Both names are trimmed,
+required, and at most 120 characters. Deactivation retains the source and its
+historical references. The raw updated source is runtime-validated before
+updating the list.
 
 ## Tags
 
@@ -238,6 +243,34 @@ Canonical prefix: `/api/tenant/crm/v1/custom-fields`
 removed — deleting one would orphan every stored value. Do not build a delete
 control for this screen.
 
+The custom-field edit drawer requires `crm.custom_fields.manage` and sends
+`{ nameAr, nameEn, isActive, isSearchable, options? }` to `PATCH /:id`.
+The editor keeps `fieldKey`, `ownerType` and `type` fixed and omits unchanged
+options when saving other metadata. PATCH does not
+include requirements in its response, so the list retains its confirmed
+requirement flags; requirements continue to use their separate operation.
+
+Creation supports all eleven field types, including `SELECT` and
+`MULTI_SELECT`, through the existing POST. Picklists require 1–100 options:
+`{ key, nameAr, nameEn, sortOrder, isActive }`. Keys are unique, non-empty
+strings of at most 64 characters; bilingual names are required and at most
+120 characters; sort order is a positive integer. Other field types omit
+`options` entirely. The option editor adds rows, edits labels, and toggles
+active status. Persisted option keys are read-only and their rows cannot be
+removed; retirement keeps the key with `isActive: false` to preserve history.
+Only newly added, unsaved rows can be removed.
+
+**Backend coordination (CRM-CF-002):** the currently inspected service returns
+`409 CUSTOM_FIELD_OPTION_IN_USE` for both removal and deactivation of options
+with stored values. The portal displays this conflict and retains the draft;
+allowing deactivation of used options remains owned by CRM-CF-002.
+
+Both metadata PATCH routes are non-idempotent in the Gateway contract. The
+portal disables replay/automatic idempotency and refreshes the catalogue after
+a transport, 5xx or malformed-response failure, closes the stale draft and
+shows an uncertain-outcome message. A failed refresh explicitly asks for a
+reload. Confirmed responses update the visible row without deleting history.
+
 `/custom-fields/values` is how a record's custom-field **values** are read and
 written. Definitions and values are separate resources: the definition list
 tells you which inputs to render, `values` supplies and persists what the user
@@ -303,13 +336,29 @@ but not on edit. Requirements are per-operation, not global.
 
 Canonical prefix: `/api/tenant/crm/v1/settings`
 
+`defaultLeadStageId` is absent from GET/PUT responses and is rejected as an
+unknown PUT field (400). `defaultPipelineId` remains read-only on this
+endpoint; pipeline selection uses the pipeline set-default action.
+
 | Method | Canonical path | Permission |
 | --- | --- | --- |
 | GET | `/api/tenant/crm/v1/settings` | `crm.settings.read` |
 | PUT | `/api/tenant/crm/v1/settings` | `crm.settings.manage` |
 
-**The write is `PUT`, not `PATCH`** — it replaces the settings document, so
-send the full object. A partial body will clear the fields you omitted.
+**The write is `PUT`, not `PATCH`**, with only changed writable fields;
+omitted fields are retained. Retention saves must include
+`expectedOutboundEmailRetentionPolicyRevision` from the loaded settings
+whenever `outboundEmailContentRetentionDays` is supplied, and omit the token
+otherwise. The response supplies the updated policy revision.
+
+Retention contract source-verified **2026-10-18** (CXCRM-OPS-104) against the
+Gateway settings routes, controller, DTO and compare-and-set service.
+`409 CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE` keeps the entire draft and
+blocks further saves until the user reloads the policy. A successful reload
+updates the confirmed server values and revision without replacing the draft.
+A failed reload keeps the draft and recovery action. Compare the current server retention days
+with the draft, then explicitly save again or discard the draft. No write is
+retried automatically.
 
 **The write permission is `crm.settings.manage`, not `crm.settings.update`.**
 `crm.settings.update` exists in the permission catalogue but does *not* guard
@@ -322,6 +371,15 @@ edited from here, because a wrong value breaks call routing tenant-wide and
 the safe editing surface is elsewhere.
 
 ## Static data catalogue
+
+Presentation reviewed **2026-10-18** (FE-CRM-CONFIG-005): settings resolve
+default stage and pipeline references through the validated catalogues, using
+the selected language and an explicit unavailable label when access or lookup
+fails. IDs and the retention revision appear only in closed technical details.
+The static catalogue shows translated group names and server-provided labels;
+unknown groups use an additional-options label. Wire keys and values remain
+available in each row's closed technical details. Derived rules use the same
+localized option labels, including a translated label for other stages.
 
 Canonical prefix: `/api/tenant/crm/v1/static-data`
 
@@ -340,6 +398,20 @@ installed package declaration wins and this documentation is stale.
 
 ## Frontend notes
 
+Disabled-action feedback reviewed **2026-10-18** (FE-CRM-CONFIG-004): lead-stage,
+pipeline and acquisition-source row actions expose cause-specific Arabic/English
+tooltips on focusable wrappers, including inactive/default/protected/restricted
+records, pending changes and reorder boundaries. Acquisition-source search also
+shows a visible instruction to clear the search before reordering.
+
+Error feedback verified by source review **2026-10-18** (FE-CRM-CONFIG-002):
+settings, acquisition-source create/delete/reorder/icon upload and custom-field
+creation use translated status/code outcomes without displaying server or parser
+prose. Local name and retention validation use dictionary messages; uncertain
+acquisition-source writes retain distinct refreshed/stale recovery messages.
+Settings load failures render one error surface (or the permission boundary for
+403); save and retention-conflict feedback stays beside the loaded form.
+
 - All five mutable catalogues use `FormDrawer` for create and edit, and
   `ConfirmActionModal` for delete.
 - All six screens render through `DataTable`.
@@ -354,9 +426,9 @@ installed package declaration wins and this documentation is stale.
 
 | Screen | Status |
 | --- | --- |
-| Lead stages | live — list, create, delete, set-default |
-| Acquisition sources | live |
+| Lead stages | live — list, create, update/deactivate, delete, set-default and reorder; NEW first, DISQUALIFIED then CONVERTED last |
+| Acquisition sources | live — list, create, edit names/active status, reorder, icon upload and delete |
 | Tags | live — list, create, edit name/colour, delete |
-| Custom fields | live |
+| Custom fields | live — all field types creatable, edit names/active/searchable/options, requirements and values |
 | CRM settings | live — safe subset writable |
 | Static data catalogue | live — read-only, contract-tested |

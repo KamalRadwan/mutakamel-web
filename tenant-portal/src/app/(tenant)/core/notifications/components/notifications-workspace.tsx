@@ -14,7 +14,6 @@ import {
   TabsTrigger,
 } from "@/design-system";
 import { formatNumber } from "@/lib/format/number";
-import { DeviceTokensPanel } from "./DeviceTokensPanel";
 import { NotificationList } from "./NotificationList";
 import { NotificationPreferencesPanel } from "./NotificationPreferencesPanel";
 import { useNotificationInbox } from "../hooks/useNotificationInbox";
@@ -45,7 +44,7 @@ export function NotificationsWorkspace() {
   return (
     <PermissionGate require="notifications.notification.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.coreNotifications.title}
           description={t.coreNotifications.subtitle}
           titleAdornment={
@@ -73,7 +72,6 @@ export function NotificationsWorkspace() {
           <TabsList>
             <TabsTrigger value="inbox">{t.coreNotifications.tabInbox}</TabsTrigger>
             <TabsTrigger value="preferences">{t.coreNotifications.tabPreferences}</TabsTrigger>
-            <TabsTrigger value="devices">{t.coreNotifications.tabDevices}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="inbox" className="flex flex-col gap-3">
@@ -106,9 +104,6 @@ export function NotificationsWorkspace() {
             <NotificationPreferencesPanel />
           </TabsContent>
 
-          <TabsContent value="devices">
-            <DeviceTokensPanel />
-          </TabsContent>
         </Tabs>
       </div>
     </PermissionGate>

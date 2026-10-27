@@ -6,6 +6,8 @@ Written: **2026-08-27**
 
 Rewritten for the two-bar shell: **2026-09-06**
 
+Restyled for CRM Leads v3 (Ocean Navy header & floating action bar): **2026-10-26** ([specs/crm-leads-v3.md](specs/crm-leads-v3.md))
+
 Implementation: `src/design-system/shell/`
 
 ## What is replaced
@@ -34,8 +36,9 @@ full-width bars have no collapsed state to remember.
 ## AppShell
 
 ```text
-┌ GlobalNav      35px ─ brand 250px │ app ▾ │ section ▾ … ⟵⟶ 🌐 ☀ 🔔 │ 👤 ┐
-├ PageActionBar  35px ─ [+ Add lead]             ⟵⟶ [branch] [search] [▤▦▥] ┤
+┌ Brand strip     3px ─ bg-gradient-brand-strip                              ┐
+├ GlobalNav      58px ─ BrandMark / AppSwitcher │ NavMenu … ⟵⟶ 🌐 ☀ 🔔 👤 ┤
+│ PageActionBar  48px ─ ╭─ [+ Add lead]    ⟵⟶ [KPIs] [search] [▤▦▥] ─╮ (floating)
 │ main                                                                      │
 └───────────────────────────────────────────────────────────────────────────┘
 ```
@@ -48,33 +51,37 @@ full-width bars have no collapsed state to remember.
 </TenantPortalRuntime>
 ```
 
-One height token per bar, and one derived total:
+Shell height tokens (`src/app/globals.css`):
 
 ```css
 :root {
-  --size-topbar:    calc(2.1875rem * var(--ui-scale)); /* 35px — global nav */
-  --size-actionbar: calc(2.1875rem * var(--ui-scale)); /* 35px — action bar */
-  --size-brand:     calc(15.625rem * var(--ui-scale)); /* 250px — brand zone */
-  --size-chrome:    calc(var(--size-topbar) + var(--size-actionbar)); /* 70px */
+  --size-topbar:  calc(3.625rem * var(--ui-scale)); /* 58px — global nav */
+  --size-toolbar: calc(3rem * var(--ui-scale));     /* 48px — floating action bar */
+  --size-chrome:  calc(var(--size-topbar) + var(--size-actionbar));
 }
 ```
 
-Nothing hard-codes a shell dimension. `--size-chrome` exists for the one thing
-that needs it: an element positioned against the chrome from **outside** the
-shell's flex column, of which there is exactly one — the suspended-tenant banner
-in `TenantHostStateBoundary`, which used to carry a hand-fitted `top-16`.
+Nothing hard-codes a shell bar height in feature code: `GlobalNav` consumes
+`h-(--size-topbar)` and `PageActionBar`'s inner container consumes
+`h-(--size-toolbar)`. `--size-chrome` exists for an element positioned against
+the chrome from **outside** the shell's flex column — the suspended-tenant
+banner in `TenantHostStateBoundary`.
 
-**Both bars are the same height on purpose.** They read as one 70px chrome block
-split by a rule, not as a header with a subordinate strip under it. 35px clears
-the bars' 28px controls with a 3.5px optical margin while preserving more of the
-1366×768 workspace for the page itself.
+The two bars have distinct visual roles ([specs/crm-leads-v3.md](specs/crm-leads-v3.md)):
+`GlobalNav` is a fixed Ocean Navy chrome band (`bg-gradient-header`) crowned by a
+`3px` multi-stop brand strip (`bg-gradient-brand-strip`), while `PageActionBar`
+floats below it (`px-5 pt-[11px]` outer wrapper) as a `48px` card-like toolbar
+(`rounded-xl border border-line-column bg-surface-toolbar px-3.5 shadow-toolbar`)
+so the screen's primary CTA, compact KPI badges, search input and view switcher
+sit on a crisp elevated surface in both light and dark themes.
 
 ### The height chain is load-bearing
 
-`h-dvh` on the shell root, `shrink-0` on both bars, `flex-1` on `<main>`. Every
-board and every `h-full` view inside one resolves its height through that chain
-and collapses to nothing if `<main>` stops being a flex item with a definite
-height. `dvh`, not `vh`, so mobile browser chrome does not clip the board.
+`h-dvh` on the shell root, `shrink-0` on the brand strip, `GlobalNav` and
+`PageActionBar` outer wrapper, and `flex-1` on `<main>`. Every board and every
+`h-full` view inside one resolves its height through that chain and collapses to
+nothing if `<main>` stops being a flex item with a definite height. `dvh`, not
+`vh`, so mobile browser chrome does not clip the board.
 
 `<main>` is also its own scroll container, which is why nothing carries a
 scroll-margin for the chrome: an in-page anchor scrolls **inside** `<main>` and
@@ -86,39 +93,62 @@ control is spacing and nothing else; the 16/24px this inherited from the sidebar
 era read as a gap where a page title used to sit, and on the 1366×768 laptop
 this is built for it spent 48px of vertical budget on nothing.
 
-## GlobalNav — 35px
+## GlobalNav — 58px
 
-| Zone | Width | Contents |
+Above `<header>`, `GlobalNav` renders a decorative `3px` strip
+(`h-[3px] w-full shrink-0 bg-gradient-brand-strip print:hidden`). The `<header>`
+itself is `h-(--size-topbar)` (`58px`) with `px-[22px]`, `bg-gradient-header`,
+`border-b border-nav-chrome-line`, `text-nav-foreground-strong` and `.nav-surface`
+(no `sticky` or `z-*` on `<header>`, preserving the focused skip link's stacking
+above the bar).
+
+| Zone | Control / Geometry | Tokens used |
 | --- | --- | --- |
-| Brand | `--size-brand`, fixed | Tenant logo + name, linking `/` |
-| App | auto | Menu trigger (below `xl`), `AppSwitcher` |
-| Sections | fills | One `NavMenu` per section of the active app (from `xl`) |
-| Account | `ms-auto` | `LanguageToggle` · `ThemeToggle` · `NotificationsDropdown` · `Separator` · `UserMenu` |
+| Brand | Mobile `Menu` trigger (`< lg`, `size-9 rounded-lg`) + `BrandMark` (`34×34` `rounded-[10px]` logo tile + tenant name, linking `/`) | `bg-gradient-logo`, `text-white`, `text-nav-foreground-strong` |
+| App | `/` divider (`>= sm`) + `AppSwitcher` pill (`h-[34px] px-3 rounded-[9px]`) + vertical `Separator` (`>= lg`, `h-5 border-s`) | `bg-nav-switcher-surface`, `border-nav-switcher-line`, `text-nav-switcher-fg`, `border-nav-chrome-line` |
+| Sections | Inline `<nav>` (`>= lg`, `flex-1 gap-1 overflow-x-auto scrollbar-none`): one `NavMenu` per section (`h-9 px-3 gap-2 xl:px-2 xl:gap-1 rounded-lg` with `23×23` `rounded-md` icon box) | Inactive: `text-tab`, `text-nav-foreground`, `bg-white/10` (hover `bg-white/15`, `text-nav-foreground-strong`); Active: `bg-gradient-primary`, `text-white`, `font-semibold`, `border-nav-tab-active-line`, `shadow-nav-active` |
+| Account | `ms-auto gap-2 ps-3` — four **separate** controls (no shared wrapper box): `LanguageToggle` (`h-9 rounded-full`), `ThemeToggle` (`size-9 rounded-full`), `NotificationsDropdown` (`size-9 rounded-full` + `size-2` unread dot), `UserMenu` (`h-[38px] rounded-full` + `28×28` avatar) | `border-nav-chrome-line`, `bg-white/8`, `text-nav-foreground`, `text-nav-foreground-strong`, `bg-activity-overdue`, `ring-navy-900`, `bg-gradient-avatar` |
 
-The brand zone is a **fixed** width rather than `w-auto`, so the first menu
-starts at the same x on every screen and for every tenant. A brand block that
-resized with the tenant's name would move a position the user learns once and
-then relies on.
+The account cluster keeps the order it had in the topbar (`LanguageToggle` ·
+`ThemeToggle` · `NotificationsDropdown` · `UserMenu`). WCAG's consistent-help
+expects the same controls in the same order on every route. Each control is an
+independent pill or circle button rather than a grouped box, and the `28×28`
+user avatar uses `bg-gradient-avatar text-white` (cyan-to-teal chrome gradient —
+never `bg-primary` and never purple).
 
-The account cluster keeps the order it had in the topbar. WCAG's
-consistent-help expects the same controls in the same order on every route, and
-moving them would have restarted that habit for nothing.
+### User menu sign-out — source updated 2026-10-17
+
+Sign-out remains pending until the auth context settles its server-confirmed
+logout operation. The menu shows a translated pending label and spinner,
+disables repeated selection, and fences activations before the next render.
+The account trigger also shows pending activity if the menu is dismissed.
+When the operation settles, the menu closes so toast actions are reachable.
+Network errors, timeouts and 503 responses produce a persistent, translated
+warning that sign-out failed and the session remains active, with a
+**Retry sign-out** action. Retry sends a new explicit logout attempt; there is
+no automatic retry. Successful logout still delegates session clearing,
+navigation and cross-tab synchronization entirely to `AuthContext`.
+Regression specs were added; execution remains pending lead verification.
 
 ### The bar carries the brand colour
 
-This bar is the product's one inverted surface: `bg-nav`, which is
-`--color-chrome` — the brand hue at the ramp's darkest end, `#000068` for the
-system brand and the tenant's own hue for a branded portal. `PageActionBar`
-below it stays `--card`, which is what keeps a screen's primary button on a
-surface it was measured for; the two bars therefore no longer read as one
-70px block, and read instead as brand chrome above a working bar.
+`GlobalNav` is the portal's fixed Ocean Navy chrome band in **both** light and
+dark modes: `bg-gradient-header` (`#091526 → #0F2342 → #132C52` via
+`--color-navy-950/900/800`) with a subtle bottom hairline
+(`border-nav-chrome-line`), crowned by a `3px` `bg-gradient-brand-strip` bar.
+Per [specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 1 #3, the header, brand
+strip and user avatar gradient are fixed chrome while active pills
+(`bg-gradient-primary`) and logo marks (`bg-gradient-logo`) consume
+`--color-brand-*` so white-label tenant hues still recolour interactive accents.
+`PageActionBar` below it uses `bg-surface-toolbar` (`#FFFFFF` in light mode and
+its calibrated dark counterpart in `.dark`), keeping the screen's primary button
+and KPI chips on a surface measured for them.
 
-Nothing in this bar styles itself for that. `.nav-surface` on the `<header>`
-re-points the ordinary semantic names for the subtree, so a control here asks
-for `text-muted-foreground` and `hover:bg-accent` exactly as it would anywhere
-else. The tokens, the measured ratios and the three conditions this depends on
-are in [tokens.md](tokens.md#the-nav-is-the-one-inverted-surface); the rule it
-narrowed is [anti-patterns.md § 8](anti-patterns.md).
+`.nav-surface` stays on `<header>` so semantic tokens (`--ring`, `--border`,
+`--foreground`) resolve to high-contrast on-chrome values for focus rings and
+primitives rendered directly on the bar, while Radix dropdown and popover
+portals render under `<body>` on the standard `--popover` surface. See
+[tokens.md](tokens.md#the-nav-is-the-one-inverted-surface).
 
 ### Sections are menus, with promoted record links
 
@@ -133,8 +163,9 @@ row. These are the app's primary destinations; with the Dashboards and Setup
 triggers they make six desktop entries, the same count as Trade's six triggers,
 which is the row the `xl` breakpoint below was sized for. The Records trigger is
 therefore absent from the desktop GlobalNav; the responsive sheet retains the
-full grouping, while PageActionBar omits the redundant grouping only on an
-exact route marked `primaryPage` and restores it on descendant detail routes.
+full grouping, including the prebuilt CRM Reports link, while PageActionBar
+omits the redundant grouping only on an exact route marked `primaryPage` and
+restores it on descendant detail routes.
 
 **Activities** leads the row (2026-09-24): it is Core's activity hub filtered to
 CRM records, admitted by Core `activities.read` rather than a CRM grant, and it
@@ -154,29 +185,38 @@ all.
 filtering does that routinely, and a menu whose only job is to reveal one item
 costs a click to say what it could have said outright.
 
-**Active state is a 2px logical bar along the bottom edge** plus weight 500 —
-the horizontal equivalent of the sidebar's inset-start bar. Not a filled chip;
-see [anti-patterns.md](anti-patterns.md). The marker stays on while any route in
-the section is open, so the bar answers "where am I" at the section level with
-every menu closed. The item level is answered by the bar below it.
+**Inactive vs active tab styling (updated 2026-10-26).** Inactive tabs render at
+`h-9 px-3 gap-2 xl:px-2 xl:gap-1` in `text-tab` (`13.5px`) and high-contrast `text-nav-foreground`
+(`#E2E8F0` — never dark or muted slate on the navy header), with the item or
+section glyph inside a `23×23` (`size-[23px]`) `rounded-md` soft container
+(`bg-white/10`, lightening on hover to `bg-white/15` +
+`text-nav-foreground-strong`, with zero hue-coded or purple icon badges). The
+active tab or open-route section trigger uses the brand-to-sky pill
+(`bg-gradient-primary text-white font-semibold border border-nav-tab-active-line shadow-nav-active`),
+and active links keep `aria-current="page"`. The trigger stays marked while any
+route in the section is open, so the bar answers "where am I" at the section
+level with every menu closed. The item level is answered by the bar below it.
 
-### The menus appear at `xl`, not `lg`
+The `text-tab` name avoids a collision with `--color-nav`. The tab row keeps horizontal scrolling with a visually hidden scrollbar; compact spacing at `xl` makes room for the six CRM tabs at 1440px.
 
-The fixed costs are the brand zone, the switcher and the account cluster —
-roughly 570px before a section is drawn. Trade's six triggers need about 600px.
-At 1280px that fits; at 1024px it does not, and the honest options there are a
-clipped row, a horizontal scrollbar inside a 35px bar, or the sheet.
+### The menus appear at `lg`
 
-Below `xl` the menu trigger opens `NavSheet`: an inline-start `Sheet` listing
-every section with its **descriptive** heading and every item under it. That is
-where the sidebar's one real advantage — the whole tree at once — survives. It
-closes on a route change so a tapped item does not leave the sheet standing over
-the screen it opened.
+Inline section triggers appear from `lg` (`1024px`, `lg:flex` on `<nav>` with
+`overflow-x-auto` safety) and expand their inter-tab gap at `xl` (`xl:gap-1.5`).
 
-This is also what the old shell did at the same width, where `lg`–`xl` defaulted
-the sidebar to its icon rail.
+Below `lg` (`lg:hidden` on the mobile trigger) the menu button opens `NavSheet`:
+an inline-start `Sheet` listing every section with its **descriptive** heading
+and every item under it. That is where the sidebar's one real advantage — the
+whole tree at once — survives. It closes on a route change so a tapped item does
+not leave the sheet standing over the screen it opened.
 
-## PageActionBar — 35px
+## PageActionBar — 48px floating container
+
+`PageActionBar` renders an outer spacing wrapper
+(`shrink-0 px-5 pt-[11px] print:hidden`) around a floating `48px` container
+(`flex h-(--size-toolbar) items-center gap-2.5 overflow-x-auto rounded-xl border border-line-column bg-surface-toolbar px-3.5 shadow-toolbar`).
+It remains the direct sibling after `<header>`, preserving slot portal order and
+keyboard traversal across every tenant app.
 
 Two jobs, and the first is the one that is easy to miss.
 
@@ -288,8 +328,8 @@ are worse than a control sitting directly above the table it filters. They are
 the boundary of what folded into the bar, not an oversight.
 
 **The bar renders on every route**, including one that registers nothing. A bar
-that vanished on some screens would move the page 35px on those routes, and
-every navigation between the two kinds would shift content under the pointer.
+that vanished on some screens would shift the page vertically on those routes,
+moving content under the pointer on every navigation between the two kinds.
 
 ### Filters are one shape at every width now
 
@@ -316,6 +356,17 @@ to `<main>` but leaves focus at the top of the document, and the next Tab lands
 back in the nav.
 
 The link text comes from the dictionary like everything else.
+
+### Notification panel keyboard interaction — source updated 2026-10-17
+
+The bell opens a non-modal popover with a `dialog` role, labelled by the
+translated Notifications heading. Opening focuses that heading even while
+loading, empty or forbidden, so asynchronous updates do not move focus.
+Tab and Shift+Tab use normal browser traversal through enabled Mark all read,
+Retry and unread notification buttons; read and pending buttons are disabled.
+Notification buttons show an inset focus ring within the scroll viewport.
+Escape dismisses the panel and restores focus to the bell. This panel uses
+ordinary buttons rather than menu items or menu keyboard navigation.
 
 ### The unread badge has to be announced
 
@@ -397,10 +448,10 @@ that is about to be redirected.
 
 | Breakpoint | Shell |
 | --- | --- |
-| `< xl` (1280px) | Section menus hidden; the menu trigger opens `NavSheet` |
-| `≥ xl` | Section menus inline in the global nav |
+| `< lg` (1024px) | Section menus hidden; the menu trigger opens `NavSheet` |
+| `≥ lg` | Section menus inline in `GlobalNav` (`xl` widens inter-tab spacing) |
 
-Both bars, the brand zone, the app switcher and the account cluster are present
+Both bars, the brand mark, the app switcher and the account controls are present
 at every width. Only the section row moves.
 
 The target machine is 1366×768. At that width the full menu row renders, and the
@@ -409,13 +460,14 @@ change.
 
 ## Checklist
 
-- [x] One height token per bar; no hard-coded shell heights anywhere
+- [x] One height token per bar (`--size-topbar` 58px, `--size-toolbar` 48px); no hard-coded shell bar heights
 - [x] `--size-chrome` derived, never a second literal
-- [x] Active nav is a 2px edge bar, not a filled chip
-- [x] No hue-coded nav icons
-- [x] Chrome is light in light mode (`bg-card`)
-- [x] Mirrors correctly under RTL, including the sheet side
+- [x] `3px` `bg-gradient-brand-strip` above the `bg-gradient-header` Ocean Navy `<header>`
+- [x] Inactive nav tabs use high-contrast `text-nav-foreground` with neutral `bg-white/10` `23×23` icon containers; active tab uses `bg-gradient-primary`, `border-nav-tab-active-line`, `shadow-nav-active` and `aria-current`
+- [x] No purple or hue-coded nav icon badges in chrome; user avatar uses `bg-gradient-avatar text-white`
+- [x] Floating `PageActionBar` (`bg-surface-toolbar`, `border-line-column`, `shadow-toolbar`) adapts cleanly in light and dark mode while header stays Ocean Navy
+- [x] Mirrors correctly under RTL with logical properties only, including `NavSheet` side and `ChevronRight` breadcrumb mirror
 - [x] Every nav item gated by real permissions
-- [x] Keyboard: skip link first, tab order, visible focus
+- [x] Keyboard: skip link first, tab order, visible focus (`focusRing`)
 - [x] The sheet traps focus and closes on route change
-- [x] The bar names the current location on every route, including detail routes
+- [x] The bar names the current location on every non-primary route, including detail routes

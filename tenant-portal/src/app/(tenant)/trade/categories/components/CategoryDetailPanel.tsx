@@ -400,7 +400,7 @@ export function CategoryDetailPanel({
   );
 }
 
-export function CategoryInspectorModal({
+function CategoryInspectorModal({
   node,
   workspace: state,
   onClose,

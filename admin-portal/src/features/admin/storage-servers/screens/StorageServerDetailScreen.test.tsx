@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 
 import type { AnchorHTMLAttributes, ReactNode } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StorageServerStatus, StorageServerView } from "../types";
+import type { StorageCredentialRotationReceipt } from "../lib/rotation-receipt";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 
 const SERVER_ID = "019f0000-0000-7000-8000-000000000010";
 
@@ -31,7 +34,10 @@ const { i18nMock, toastMock, routerMock, detailMock } = vi.hoisted(() => ({
     // Inlined: vi.hoisted runs before this module's own consts exist.
     loadedServerId: "019f0000-0000-7000-8000-000000000010" as string | null,
     lastProbe: null,
-    currentRotation: null,
+    currentRotation: null as StorageCredentialRotationReceipt | null,
+    abortReason: "",
+    setAbortReason: vi.fn(),
+    abortCredentialRotation: vi.fn(),
     isLoading: false,
     isMutating: false,
     error: null,
@@ -53,7 +59,7 @@ const { i18nMock, toastMock, routerMock, detailMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/i18n/I18nContext", () => ({
-  useI18n: () => i18nMock,
+  useI18n: () => ({ ...i18nMock, t: i18nMock.lang === "ar" ? ar : en }),
   useOptionalI18n: () => i18nMock,
 }));
 vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toastMock }));
@@ -88,6 +94,10 @@ function makeServer(
     bucketName: "mutakamel-cairo",
     status,
     maxTenants: 100,
+    maxBytes: "9223372036854775807",
+    reservedBytes: "0",
+    committedBytes: "0",
+    availableBytes: "9223372036854775807",
     isPlatformDefault: false,
     assignedTenants: 0,
     credentialsConfigured: true,
@@ -116,6 +126,7 @@ function makeServer(
  */
 describe("StorageServerDetailScreen draining lifecycle", () => {
   beforeEach(() => {
+    detailMock.currentRotation = null;
     i18nMock.lang = "en";
     i18nMock.dir = "ltr";
     detailMock.isMutating = false;
@@ -188,5 +199,182 @@ describe("StorageServerDetailScreen draining lifecycle", () => {
     expect(
       screen.getByRole("button", { name: /Test & activate/ }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("StorageServerDetailScreen byte capacity", () => {
+  beforeEach(() => {
+    i18nMock.lang = "en";
+    i18nMock.dir = "ltr";
+    detailMock.server = makeServer("ACTIVE", { assignedTenants: 1 });
+    detailMock.currentRotation = null;
+    detailMock.isLoading = false;
+    detailMock.isMutating = false;
+    detailMock.canUpdate = true;
+    detailMock.update.mockReset().mockResolvedValue(undefined);
+  });
+
+  it.each(["en", "ar"] as const)("shows exhausted bytes despite spare tenant slots in %s", (lang) => {
+    i18nMock.lang = lang;
+    i18nMock.dir = lang === "ar" ? "rtl" : "ltr";
+    detailMock.server = makeServer("ACTIVE", { assignedTenants: 1, maxBytes: "10", committedBytes: "10", availableBytes: "0" });
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    expect(screen.getByText((lang === "ar" ? ar : en).storageByteCapacity.exhausted)).toBeInTheDocument();
+  });
+
+  it.each(["9007199254740993", "9223372036854775807", ""])("saves an exact byte limit %s", async (value) => {
+    detailMock.server = makeServer("ACTIVE", { assignedTenants: 1, maxBytes: "1000", availableBytes: "1000" });
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: en.storageServerDetail.editButton }));
+    const input = await screen.findByRole("textbox", { name: en.storageByteCapacity.maxLabel });
+    expect(input).toHaveValue("1000");
+    fireEvent.change(input, { target: { value } });
+    fireEvent.submit(document.getElementById("storage-server-editor-form")!);
+    await waitFor(() => expect(detailMock.update).toHaveBeenCalledWith({ maxBytes: value || null }));
+  });
+
+  it.each(["en", "ar"] as const)("shows unlimited byte capacity explicitly in %s", (lang) => {
+    i18nMock.lang = lang;
+    i18nMock.dir = lang === "ar" ? "rtl" : "ltr";
+    const copy = (lang === "ar" ? ar : en).storageByteCapacity;
+    detailMock.server = makeServer("ACTIVE", { maxBytes: null, availableBytes: null });
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    expect(screen.getAllByText(copy.unlimited)).toHaveLength(2);
+    expect(screen.queryByText(copy.exhausted)).toBeNull();
+  });
+
+  it("rejects bigint overflow with an inline error before saving", async () => {
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: en.storageServerDetail.editButton }));
+    const input = await screen.findByRole("textbox", { name: en.storageByteCapacity.maxLabel });
+    expect(input).toHaveValue("9223372036854775807");
+    fireEvent.change(input, { target: { value: "9223372036854775808" } });
+    fireEvent.submit(document.getElementById("storage-server-editor-form")!);
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+    expect(input).toHaveAccessibleDescription(en.storageByteCapacity.invalidLimit);
+    expect(detailMock.update).not.toHaveBeenCalled();
+  });
+
+  it("does not offer limit editing to a read-only operator", () => {
+    detailMock.canUpdate = false;
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    expect(screen.queryByRole("button", { name: en.storageServerDetail.editButton })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: en.storageByteCapacity.maxLabel })).toBeNull();
+    expect(detailMock.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("StorageServerDetailScreen credential actions", () => {
+  beforeEach(() => {
+    i18nMock.lang = "en";
+    i18nMock.dir = "ltr";
+    detailMock.server = makeServer("ACTIVE", { isPlatformDefault: true });
+    detailMock.currentRotation = null;
+    detailMock.isLoading = false;
+    detailMock.isMutating = false;
+    detailMock.canUpdate = true;
+    detailMock.update.mockReset().mockResolvedValue(undefined);
+    detailMock.rotateCredentials.mockReset().mockResolvedValue(undefined);
+  });
+
+  it.each(["en", "ar"] as const)("submits safe rotation for an unassigned ACTIVE platform default in %s", async (lang) => {
+    i18nMock.lang = lang;
+    i18nMock.dir = lang === "ar" ? "rtl" : "ltr";
+    const copy = (lang === "ar" ? ar : en).storageServerDetail;
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    await act(async () => { await Promise.resolve(); });
+
+    expect(screen.queryByRole("button", { name: copy.rotateButton })).toBeNull();
+    expect(screen.getByText(copy.platformDefaultRotationNote)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: copy.safeRotationButton }));
+    const dialog = await screen.findByRole("dialog", { name: copy.safeRotationEditorTitle });
+    fireEvent.change(within(dialog).getByPlaceholderText(`${copy.newAccessKeyIdLabel} *`), {
+      target: { value: "NEW-ACCESS-KEY" },
+    });
+    fireEvent.change(within(dialog).getByPlaceholderText(`${copy.newSecretAccessKeyLabel} *`), {
+      target: { value: "test-secret-material-for-rotation" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: copy.startRotationButton }));
+
+    await waitFor(() => expect(detailMock.rotateCredentials).toHaveBeenCalledWith(
+      { accessKeyId: "NEW-ACCESS-KEY", secretAccessKey: "test-secret-material-for-rotation" },
+      4,
+    ));
+    expect(detailMock.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { status: "ACTIVE", isPlatformDefault: true, assignedTenants: 0, safe: true, patch: false },
+    { status: "ACTIVE", isPlatformDefault: true, assignedTenants: 2, safe: true, patch: false },
+    { status: "DRAINING", isPlatformDefault: true, assignedTenants: 0, safe: true, patch: false },
+    { status: "DRAFT", isPlatformDefault: true, assignedTenants: 0, safe: false, patch: false },
+    { status: "OFFLINE", isPlatformDefault: true, assignedTenants: 0, safe: false, patch: false },
+    { status: "ACTIVE", isPlatformDefault: false, assignedTenants: 0, safe: false, patch: true },
+    { status: "DRAINING", isPlatformDefault: false, assignedTenants: 0, safe: false, patch: true },
+    { status: "ACTIVE", isPlatformDefault: false, assignedTenants: 2, safe: true, patch: false },
+    { status: "DRAINING", isPlatformDefault: false, assignedTenants: 2, safe: true, patch: false },
+    { status: "DRAFT", isPlatformDefault: false, assignedTenants: 0, safe: false, patch: true },
+    { status: "DRAFT", isPlatformDefault: false, assignedTenants: 2, safe: false, patch: false },
+    { status: "OFFLINE", isPlatformDefault: false, assignedTenants: 2, safe: false, patch: true },
+  ] as const)("selects credentials for $status default=$isPlatformDefault assigned=$assignedTenants", ({ status, isPlatformDefault, assignedTenants, safe, patch }) => {
+    detailMock.server = makeServer(status, { isPlatformDefault, assignedTenants });
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    const copy = en.storageServerDetail;
+    expect(screen.queryByRole("button", { name: copy.safeRotationButton }) !== null).toBe(safe);
+    expect(screen.queryByRole("button", { name: copy.rotateButton }) !== null).toBe(patch);
+  });
+
+  it("withholds credential actions without update authority", () => {
+    detailMock.canUpdate = false;
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    expect(screen.queryByRole("button", { name: en.storageServerDetail.safeRotationButton })).toBeNull();
+    expect(screen.queryByRole("button", { name: en.storageServerDetail.rotateButton })).toBeNull();
+  });
+});
+
+describe("StorageServerDetailScreen staged rotation recovery", () => {
+  beforeEach(() => {
+    detailMock.server = makeServer("ACTIVE");
+    detailMock.isLoading = false;
+    detailMock.isMutating = false;
+    detailMock.canUpdate = true;
+    detailMock.abortReason = "Wrong provider key";
+    detailMock.abortCredentialRotation.mockReset().mockResolvedValue({ status: "ABORTED" });
+    detailMock.currentRotation = {
+      version: 1, storageServerId: SERVER_ID,
+      rotationId: "019f0000-0000-7000-8000-000000000030",
+      status: "STAGED", graceExpiresAt: null, revokedAt: null, savedAt: new Date().toISOString(),
+    };
+  });
+
+  it.each(["en", "ar"] as const)("confirms a staged abort in %s before sending the audited command", async (lang) => {
+    i18nMock.lang = lang;
+    i18nMock.dir = lang === "ar" ? "rtl" : "ltr";
+    const copy = (lang === "ar" ? ar : en).storageServerDetail;
+    render(<StorageServerDetailScreen id={SERVER_ID} />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getByRole("button", { name: copy.abortRotationButton }));
+    const dialog = await screen.findByRole("alertdialog", { name: copy.abortRotationTitle });
+    const confirm = within(dialog).getByRole("button", { name: copy.abortRotationButton });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "Garage Cairo" } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(detailMock.abortCredentialRotation).toHaveBeenCalledWith(
+      "019f0000-0000-7000-8000-000000000030", "Wrong provider key",
+    ));
+  });
+
+  it("withholds abort without update authority or after activation", () => {
+    i18nMock.lang = "en";
+    i18nMock.dir = "ltr";
+    detailMock.canUpdate = false;
+    const view = render(<StorageServerDetailScreen id={SERVER_ID} />);
+    expect(screen.queryByRole("button", { name: en.storageServerDetail.abortRotationButton })).toBeNull();
+    detailMock.canUpdate = true;
+    detailMock.currentRotation!.status = "ACTIVATED";
+    view.rerender(<StorageServerDetailScreen id={SERVER_ID} />);
+    expect(screen.queryByRole("button", { name: en.storageServerDetail.abortRotationButton })).toBeNull();
   });
 });

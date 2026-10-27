@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
@@ -13,6 +14,7 @@ import { buildLeadDetailsRequest, toLeadDetailsForm, type LeadDetailsForm } from
 export function useLeadDetailsEdit(lead: LeadDetail, canEdit: boolean, onSaved: (lead: LeadDetail) => void, onReconcile: () => void, allowedOwnerIds: string[] | null) {
   const { user } = useTenantAuth();
   const { t } = useI18n();
+  const toast = useToast();
   const [draft, setDraft] = useState<{ lead: LeadDetail; form: LeadDetailsForm; baseline: LeadDetailsForm } | null>(null);
   const [reconciliation, setReconciliation] = useState({ lead, pending: false });
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -38,7 +40,7 @@ export function useLeadDetailsEdit(lead: LeadDetail, canEdit: boolean, onSaved: 
     if (!form || inFlight.current) return;
     setDraft((current) => {
       const previous = current?.lead.id === lead.id && (current.lead === lead || hasChanges(current.form, current.baseline)) ? current : null;
-      return { lead, baseline: previous?.baseline ?? baseline, form: { ...(previous?.form ?? form), [field]: value } };
+      return { lead: previous?.lead ?? lead, baseline: previous?.baseline ?? baseline, form: { ...(previous?.form ?? form), [field]: value } };
     });
     setError(null);
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -57,13 +59,16 @@ export function useLeadDetailsEdit(lead: LeadDetail, canEdit: boolean, onSaved: 
     setSaving(true);
     setError(null);
     try {
-      const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body, parse: parseLeadDetailResponse });
+      const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body: { ...body, expectedUpdatedAt: (activeDraft?.lead ?? lead).updatedAt }, parse: parseLeadDetailResponse });
       if (outcome.kind === "success") {
         onSaved(outcome.value);
         setDraft(null);
       } else {
         setError(outcome.error);
-        if (outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable") {
+        const conflict = outcome.error.code === "CRM.LEAD.CONCURRENT_UPDATE" || outcome.error.status === 409;
+        // Reload unmounts this card, so its inline error cannot carry the notice.
+        if (conflict) toast.warning(t.crmShared.refusals["CRM.LEAD.CONCURRENT_UPDATE"], undefined, 0, { label: t.crmLeadDetail.reloadLead, onClick: onReconcile });
+        if (outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable" || conflict) {
           setDraft(null);
           setReconciliation((current) => ({ ...current, pending: true }));
           onReconcile();

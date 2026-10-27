@@ -19,6 +19,7 @@ import type {
   SeedConflictDecision,
   TenantComponentInstallation,
   TenantOperationDetail,
+  TenantPrerequisiteEvidenceRecord,
   TenantSeedState,
 } from "../types";
 import { useTenantProvisioning } from "./useTenantProvisioning";
@@ -36,6 +37,7 @@ export type ProvisioningWorkspaceSection =
  * already-validated body: what is confirmed is exactly what is sent.
  */
 export type ProvisioningConfirmation =
+  | { kind: "resend-release" | "close-failed"; request: TenantPrerequisiteEvidenceRecord }
   | { kind: "cancel"; operation: TenantOperationDetail }
   | { kind: "retry"; operation: TenantOperationDetail }
   | {
@@ -234,6 +236,11 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     setConfirmation({ kind: "retry", operation });
   }, []);
 
+  const requestRecovery = useCallback((kind: "resend-release" | "close-failed", request: TenantPrerequisiteEvidenceRecord) => {
+    setLocalError(null);
+    setConfirmation({ kind, request });
+  }, []);
+
   const requestRepair = useCallback(() => {
     setLocalError(null);
     const component = provisioning.components.data.items.find(
@@ -296,16 +303,24 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
         await provisioning.cancelOperation(pending.operation.id);
       } else if (pending.kind === "retry") {
         await provisioning.retryOperation(pending.operation.id);
-      } else {
+      } else if (pending.kind === "repair") {
         await provisioning.repair(pending.dto);
         setSection("operations");
+      } else {
+        await provisioning.recoverPrerequisite(pending.kind, {
+          operationId: pending.request.operationId,
+          expectedPlanDigest: pending.request.planDigest,
+          reasonCode: pending.kind === "resend-release" ? "CORE.PROVISIONING.RELEASE_RECOVERY_ADMIN" : "CORE.PROVISIONING.CLOSE_FAILED_ADMIN",
+        });
+        toast.success(t.tenantProvisioning.recoveryAcceptedTitle,
+          pending.kind === "resend-release" ? t.tenantProvisioning.releaseResentMessage : t.tenantProvisioning.failedClosedMessage);
       }
     } catch (error) {
       setLocalError(readLocalError(error));
     } finally {
       setConfirmation(null);
     }
-  }, [confirmation, provisioning]);
+  }, [confirmation, provisioning, t, toast]);
 
   const submitDecommission = useCallback(async () => {
     setLocalError(null);
@@ -423,6 +438,7 @@ export function useTenantProvisioningWorkspace(tenantId: string) {
     confirmation,
     requestCancel,
     requestRetry,
+    requestRecovery,
     requestResync,
     requestRepair,
     dismissConfirmation,

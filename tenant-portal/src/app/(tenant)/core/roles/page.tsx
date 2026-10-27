@@ -79,7 +79,7 @@ export default function TenantRolesPage() {
   return (
     <PermissionGate require="roles.role.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.title}
           description={copy.subtitle}
           primaryAction={

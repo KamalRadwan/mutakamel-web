@@ -179,7 +179,7 @@ export function DashboardRangePicker({ value, onChange }: DashboardRangePickerPr
                   <span
                     key={`head-${day.getDay()}`}
                     role="columnheader"
-                    className="py-0.5 text-center text-[11px] font-semibold text-muted-foreground"
+                    className="py-0.5 text-center text-xs font-semibold text-muted-foreground"
                   >
                     {dayName.format(day)}
                   </span>
@@ -287,18 +287,20 @@ function DayCell({
   const selected = start || end;
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       role="gridcell"
       aria-selected={selected || inside}
       aria-current={isSameDay(day, today) ? "date" : undefined}
       onClick={() => onPick(day)}
       className={[
-        "h-8 text-xs tabular-nums transition-colors motion-reduce:transition-none",
+        "h-8 p-0 text-xs tabular-nums transition-colors motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
         outside ? "text-muted-foreground/60" : "text-foreground",
         inside ? "bg-selected/40" : "",
-        selected ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-accent",
+        selected ? "bg-primary font-semibold text-primary-foreground hover:bg-primary/90" : "hover:bg-accent",
         start ? "rounded-s-md" : "",
         end ? "rounded-e-md" : "",
         // Today keeps a ring so it stays findable once something else is picked.
@@ -306,7 +308,7 @@ function DayCell({
       ].join(" ")}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 

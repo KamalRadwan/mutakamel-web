@@ -53,8 +53,15 @@ import {
 import type { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import { fromIsoDate, toIsoDate } from "../../shared/iso-date";
-import type { OpportunityPipeline } from "../hooks/pipeline-types";
-import type { useCreateOpportunity } from "../hooks/useCreateOpportunity";
+import type {
+  OpportunityActionCapability,
+  OpportunityPipeline,
+} from "../hooks/pipeline-types";
+import { opportunityCapabilityAllowsOwner } from "../hooks/usePipelineWorkspace";
+import {
+  useOpportunityCurrencyOptions,
+  type useCreateOpportunity,
+} from "../hooks/useCreateOpportunity";
 import { useCustomerProfileOptions } from "../hooks/useCustomerProfileOptions";
 import {
   OPPORTUNITY_SECTION_IDS,
@@ -62,13 +69,14 @@ import {
 } from "../opportunity-create-validation";
 
 const DEFAULT_OWNER_VALUE = "__default_owner__";
-const CURRENCY_PRESETS = ["EGP", "USD", "SAR", "AED", "EUR"] as const;
 const PROBABILITY_PRESETS = ["25", "50", "75", "90"] as const;
 
 export interface CreateOpportunityModalProps {
   create: ReturnType<typeof useCreateOpportunity>;
   pipelines: OpportunityPipeline[];
   branchId: string | null;
+  createCapability: OpportunityActionCapability | null;
+  updateCapability: OpportunityActionCapability | null;
   customFields: ReturnType<typeof useCrmCreateCustomFields>;
 }
 
@@ -80,10 +88,11 @@ export function CreateOpportunityModal({
   create,
   pipelines,
   branchId,
+  createCapability,
+  updateCapability,
   customFields,
 }: CreateOpportunityModalProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
   const { user } = useTenantAuth();
   const describeError = useCrmErrorText();
   const ambiguousLabels = useAmbiguousOutcomeLabels();
@@ -91,8 +100,25 @@ export function CreateOpportunityModal({
   const customers = useCustomerProfileOptions(branchId, create.open);
   const tags = useCreateLeadTags(create.open);
   const { form, errors } = create;
+  const currencyOptions = useOpportunityCurrencyOptions(create.open);
 
   const [ownerOptions, setOwnerOptions] = useState<LeadDetailsUser[]>([]);
+  const allowedOwners = ownerOptions.filter((owner) =>
+    opportunityCapabilityAllowsOwner(createCapability, owner.id),
+  );
+  const allowedCustomers = customers.items.filter((customer) =>
+    opportunityCapabilityAllowsOwner(createCapability, customer.ownerUserId),
+  );
+  const canDefaultToSelf = Boolean(
+    user && opportunityCapabilityAllowsOwner(createCapability, user.id),
+  );
+  const opportunityOwnerId = form.ownerUserId === DEFAULT_OWNER_VALUE
+    ? user?.id ?? null
+    : form.ownerUserId || user?.id || null;
+  const canUpdateCreatedOpportunity = opportunityCapabilityAllowsOwner(
+    updateCapability,
+    opportunityOwnerId,
+  );
   const [createTagDraftName, setCreateTagDraftName] = useState<string | null>(
     null,
   );
@@ -152,6 +178,9 @@ export function CreateOpportunityModal({
   );
 
   const errorCount = Object.keys(errors).length;
+  const tagRecoveryError = create.tagRecovery
+    ? describeError(create.tagRecovery.error)
+    : null;
 
   function scrollToSection(sectionId: string) {
     const node = document.querySelector<HTMLElement>(
@@ -172,17 +201,18 @@ export function CreateOpportunityModal({
         description={t.crmOpportunityDetail.createDescription}
         isDirty={create.isDirty}
         isSubmitting={create.isSubmitting}
+        submitDisabled={Boolean(create.ambiguity || create.tagRecovery)}
         onSubmit={() => void create.submit({ keepOpenAfterSuccess: false })}
         error={describeError(create.error) ?? undefined}
         headerIcon={
-          <div className="flex size-10 items-center justify-center rounded-xl bg-linear-to-br from-blue-600 via-indigo-600 to-emerald-500 text-white shadow-sm">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <TrendingUp className="size-5" aria-hidden="true" />
           </div>
         }
         titleBadge={
           <div className="flex flex-wrap items-center gap-2">
             {selectedPipeline && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-400/30 dark:bg-blue-500/20 dark:text-blue-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-info bg-info-subtle px-2.5 py-0.5 text-xs font-semibold text-info-subtle-foreground">
                 <Sparkles className="size-3.5" aria-hidden="true" />
                 {localizedName(selectedPipeline, lang)}
                 {selectedStage ? ` · ${localizedName(selectedStage, lang)}` : ""}
@@ -201,9 +231,11 @@ export function CreateOpportunityModal({
                 {[1, 2, 3].map((star) => {
                   const active = star <= currentImportance;
                   return (
-                    <button
+                    <Button
                       key={star}
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       disabled={create.isSubmitting}
                       aria-label={formatTemplate(
                         t.crmOpportunities.setImportance,
@@ -221,22 +253,22 @@ export function CreateOpportunityModal({
                         className={cn(
                           "size-4 transition-colors",
                           active
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground/40 hover:text-amber-400/70",
+                            ? "fill-warning text-warning"
+                            : "text-muted-foreground/40 hover:text-warning/70",
                         )}
                         aria-hidden="true"
                       />
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
             </div>
 
             {/* Assigned Salesperson (`ownerUserId`) */}
-            {ownerOptions.length > 0 && (
+            {(canDefaultToSelf || allowedOwners.length > 0) && (
               <div className="w-44">
                 <Select
-                  value={form.ownerUserId || DEFAULT_OWNER_VALUE}
+                  value={form.ownerUserId || (canDefaultToSelf ? DEFAULT_OWNER_VALUE : undefined)}
                   disabled={create.isSubmitting}
                   onValueChange={(val) =>
                     create.setField(
@@ -249,17 +281,21 @@ export function CreateOpportunityModal({
                     <SelectValue placeholder={t.crmOpportunities.owner} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={DEFAULT_OWNER_VALUE}>
-                      {user
-                        ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
-                          user.email
-                        : t.crmOpportunities.owner}
-                    </SelectItem>
-                    {ownerOptions.map((owner) => (
-                      <SelectItem key={owner.id} value={owner.id}>
-                        {leadDetailsUserName(owner)}
+                    {canDefaultToSelf && (
+                      <SelectItem value={DEFAULT_OWNER_VALUE}>
+                        {user
+                          ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
+                            user.email
+                          : t.crmOpportunities.owner}
                       </SelectItem>
-                    ))}
+                    )}
+                    {allowedOwners
+                      .filter((owner) => owner.id !== user?.id)
+                      .map((owner) => (
+                        <SelectItem key={owner.id} value={owner.id}>
+                          {leadDetailsUserName(owner)}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -271,7 +307,7 @@ export function CreateOpportunityModal({
           <div className="flex h-full flex-col justify-between gap-4 p-4">
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                <span className="text-2xs font-semibold tracking-wider text-muted-foreground uppercase">
                   {t.crmShared.formSectionsNav}
                 </span>
                 <nav
@@ -283,24 +319,25 @@ export function CreateOpportunityModal({
                       section.id as OpportunitySectionId,
                     );
                     return (
-                      <button
+                      <Button
                         key={section.id}
                         type="button"
+                        variant="ghost"
                         onClick={() => scrollToSection(section.id)}
                         className={cn(
-                          "flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-start text-xs font-medium transition-colors",
+                          "flex h-auto w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-start text-xs font-medium transition-colors",
                           secErrors > 0
                             ? "border-destructive/40 bg-destructive/10 text-destructive"
-                            : "border-border/70 bg-card text-foreground hover:border-blue-500/40 hover:bg-blue-500/[0.04]",
+                            : "border-border/70 bg-card text-foreground hover:border-primary/40 hover:bg-accent",
                         )}
                       >
                         <span className="flex items-center gap-2 truncate">
                           <span
                             className={cn(
-                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold",
+                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-2xs font-semibold tabular-nums",
                               secErrors > 0
                                 ? "bg-destructive text-white"
-                                : "bg-blue-500/15 text-blue-600 dark:text-blue-300",
+                                : "bg-info-subtle text-info-subtle-foreground",
                             )}
                           >
                             0{idx + 1}
@@ -309,19 +346,19 @@ export function CreateOpportunityModal({
                         </span>
 
                         {secErrors > 0 ? (
-                          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+                          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-white">
                             {secErrors}
                           </span>
                         ) : section.id === "notes" ? (
-                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                          <span className="shrink-0 text-2xs text-muted-foreground">
                             {t.crmLeads.create.optionalBadge}
                           </span>
                         ) : (
-                          <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                          <span className="shrink-0 rounded bg-success-subtle px-1.5 py-0.5 text-2xs font-semibold text-success-subtle-foreground">
                             {t.crmLeads.create.readyBadge}
                           </span>
                         )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </nav>
@@ -329,20 +366,20 @@ export function CreateOpportunityModal({
             </div>
 
             {/* Live Opportunity Board Card Preview */}
-            <div className="rounded-xl border border-blue-500/25 bg-card p-3 shadow-xs">
+            <div className="rounded-lg border border-border bg-card p-3 shadow-xs">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[10px] font-bold tracking-wider text-blue-600 uppercase dark:text-blue-300">
-                  {isAr ? "معاينة بطاقة الفرصة" : "Live Deal Card Preview"}
+                <span className="text-2xs font-semibold tracking-wider text-info uppercase">
+                  {t.crmOpportunities.liveCardPreview}
                 </span>
                 {selectedStage && (
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  <span className="rounded-full bg-info-subtle px-2 py-0.5 text-2xs font-semibold text-info-subtle-foreground">
                     {localizedName(selectedStage, lang)}
                   </span>
                 )}
               </div>
 
               <div className="space-y-2 rounded-lg border border-border bg-background p-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+                <div className="flex items-center gap-1.5 text-2xs font-semibold text-muted-foreground">
                   <Building2 className="size-3 shrink-0" aria-hidden="true" />
                   <span className="truncate">
                     {create.customerLabel ||
@@ -350,17 +387,17 @@ export function CreateOpportunityModal({
                   </span>
                 </div>
 
-                <p className="truncate text-xs font-extrabold text-foreground">
+                <p className="truncate text-xs font-semibold text-foreground">
                   {form.title.trim() || t.crmOpportunities.title}
                 </p>
 
-                <div className="flex items-center justify-between gap-2 rounded-md bg-emerald-500/10 px-2 py-1 text-[11px]">
-                  <span className="inline-flex items-center gap-1 font-extrabold text-emerald-700 dark:text-emerald-300">
+                <div className="flex items-center justify-between gap-2 rounded-md bg-success-subtle px-2 py-1 text-2xs">
+                  <span className="inline-flex items-center gap-1 font-semibold text-success-subtle-foreground">
                     <Banknote className="size-3" aria-hidden="true" />
                     {form.amount.trim() ? (
                       <Money
                         value={form.amount.trim()}
-                        currency={form.currencyCode.trim().toUpperCase() || "EGP"}
+                        currency={form.currencyCode.trim().toUpperCase() || undefined}
                         language={lang}
                       />
                     ) : (
@@ -368,7 +405,7 @@ export function CreateOpportunityModal({
                     )}
                   </span>
                   {form.probabilityPercent.trim() && (
-                    <span className="inline-flex items-center gap-0.5 font-bold text-blue-600 dark:text-blue-400">
+                    <span className="inline-flex items-center gap-0.5 font-semibold text-info">
                       <CirclePercent className="size-3" aria-hidden="true" />
                       {form.probabilityPercent.trim()}%
                     </span>
@@ -396,14 +433,14 @@ export function CreateOpportunityModal({
                         className={cn(
                           "size-3",
                           st <= currentImportance
-                            ? "fill-amber-400 text-amber-400"
+                            ? "fill-warning text-warning"
                             : "text-muted-foreground/30",
                         )}
                       />
                     ))}
                   </div>
                   {form.expectedCloseDate && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-2xs text-muted-foreground">
                       <Calendar className="size-2.5" aria-hidden="true" />
                       {form.expectedCloseDate}
                     </span>
@@ -430,11 +467,11 @@ export function CreateOpportunityModal({
               type="button"
               variant="outline"
               size="sm"
-              disabled={create.isSubmitting}
+              disabled={create.isSubmitting || Boolean(create.ambiguity || create.tagRecovery)}
               onClick={() => void create.submit({ keepOpenAfterSuccess: true })}
             >
               <Plus className="me-1 size-3.5" aria-hidden="true" />
-              {isAr ? "إنشاء وإضافة أخرى" : "Create & Add Another"}
+              {t.crmOpportunities.createAndAddAnother}
             </Button>
             {errorCount > 0 && (
               <p role="status" className="text-xs text-destructive">
@@ -454,7 +491,8 @@ export function CreateOpportunityModal({
               description={t.crmOpportunityDetail.ambiguousDescription}
               correlationId={create.ambiguity.error.correlationId}
               onRetry={() => void create.ambiguity?.replay()}
-              onDismiss={create.dismissAmbiguity}
+              onDismiss={create.closeModal}
+              retrying={create.isSubmitting}
               labels={ambiguousLabels}
             />
           )}
@@ -471,6 +509,45 @@ export function CreateOpportunityModal({
             />
           )}
 
+          {create.tagRecovery && (
+            <section
+              aria-live="polite"
+              className="space-y-3 rounded-sm border border-warning bg-warning-subtle p-4"
+            >
+              <div>
+                <h3 className="text-sm font-medium text-foreground">
+                  {create.tagRecovery.status === "uncertain"
+                    ? t.crmOpportunityDetail.create.tagsUncertainTitle
+                    : t.crmOpportunityDetail.create.tagsFailedTitle}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatTemplate(
+                    create.tagRecovery.status === "uncertain"
+                      ? t.crmOpportunityDetail.create.tagsUncertainDescription
+                      : t.crmOpportunityDetail.create.tagsFailedDescription,
+                    { id: create.tagRecovery.opportunityId },
+                  )}
+                </p>
+                {tagRecoveryError && (
+                  <p className="mt-1 text-xs text-warning-subtle-foreground">
+                    {tagRecoveryError}
+                  </p>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={create.isRetryingTags}
+                onClick={() => void create.retryTagAttachment()}
+              >
+                {create.isRetryingTags
+                  ? t.crmOpportunityDetail.create.retryingTags
+                  : t.crmOpportunityDetail.create.retryTags}
+              </Button>
+            </section>
+          )}
+
           {customFields.degraded && (
             <DegradedBanner message={t.crmShared.customFieldsUnavailable} />
           )}
@@ -479,15 +556,15 @@ export function CreateOpportunityModal({
           <section
             id="placement"
             data-form-section="placement"
-            className="overflow-hidden rounded-2xl border border-indigo-500/25 bg-card shadow-xs"
+            className="overflow-hidden rounded-lg border border-swatch-indigo-soft bg-card shadow-xs"
           >
-            <div className="flex items-center justify-between border-b border-indigo-500/15 bg-linear-to-r from-indigo-500/[0.08] via-blue-500/[0.04] to-transparent px-5 py-3.5">
+            <div className="flex items-center justify-between border-b border-swatch-indigo-soft bg-swatch-indigo-soft px-5 py-3.5">
               <div className="flex items-center gap-2.5">
-                <span className="inline-flex size-6 items-center justify-center rounded-lg bg-indigo-600 font-mono text-xs font-bold text-white">
+                <span className="inline-flex size-6 items-center justify-center rounded-lg bg-swatch-indigo font-mono text-xs font-semibold tabular-nums text-white">
                   01
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">
+                  <h3 className="text-sm font-semibold text-foreground">
                     {t.crmOpportunityDetail.create.sections.placement}
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -507,7 +584,7 @@ export function CreateOpportunityModal({
                   value={form.customerProfileId || undefined}
                   selectedLabel={create.customerLabel}
                   onValueChange={(next) => {
-                    const option = customers.items.find(
+                    const option = allowedCustomers.find(
                       ({ id }) => id === next,
                     );
                     create.selectCustomer(
@@ -516,7 +593,7 @@ export function CreateOpportunityModal({
                     );
                     create.touch("customerProfileId");
                   }}
-                  options={customers.items.map((profile) => ({
+                  options={allowedCustomers.map((profile) => ({
                     value: profile.id,
                     label: profile.displayName,
                     description: profile.companyName ?? undefined,
@@ -569,26 +646,28 @@ export function CreateOpportunityModal({
                       {create.selectableStages.map((stage) => {
                         const isSelected = form.stageId === stage.id;
                         return (
-                          <button
+                          <Button
                             key={stage.id}
                             type="button"
+                            variant="outline"
+                            size="sm"
                             disabled={create.isSubmitting}
                             onClick={() => {
                               create.setField("stageId", stage.id);
                               create.touch("stageId");
                             }}
                             className={cn(
-                              "inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all",
+                              "inline-flex h-auto items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all",
                               isSelected
-                                ? "border-blue-600 bg-blue-600 text-white shadow-xs"
-                                : "border-border bg-background text-foreground hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-slate-800",
+                                ? "border-primary bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:text-primary-foreground"
+                                : "border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted",
                             )}
                           >
                             {isSelected && (
                               <Check className="size-3.5" aria-hidden="true" />
                             )}
                             <span>{localizedName(stage, lang)}</span>
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -628,15 +707,15 @@ export function CreateOpportunityModal({
           <section
             id="deal"
             data-form-section="deal"
-            className="overflow-hidden rounded-2xl border border-emerald-500/25 bg-card shadow-xs"
+            className="overflow-hidden rounded-lg border border-swatch-green-soft bg-card shadow-xs"
           >
-            <div className="flex items-center justify-between border-b border-emerald-500/15 bg-linear-to-r from-emerald-500/[0.08] via-teal-500/[0.04] to-transparent px-5 py-3.5">
+            <div className="flex items-center justify-between border-b border-swatch-green-soft bg-swatch-green-soft px-5 py-3.5">
               <div className="flex items-center gap-2.5">
-                <span className="inline-flex size-6 items-center justify-center rounded-lg bg-emerald-600 font-mono text-xs font-bold text-white">
+                <span className="inline-flex size-6 items-center justify-center rounded-lg bg-swatch-green font-mono text-xs font-semibold tabular-nums text-white">
                   02
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">
+                  <h3 className="text-sm font-semibold text-foreground">
                     {t.crmOpportunityDetail.create.sections.deal}
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -704,7 +783,8 @@ export function CreateOpportunityModal({
                 <div className="space-y-1.5">
                   <Input
                     size="sm"
-                    placeholder={t.crmLeadConvert.currencyCode}
+                    aria-label={t.crmLeadConvert.currencyCode}
+                    placeholder={t.crmOpportunities.workspaceDefaultCurrency}
                     value={form.currencyCode}
                     maxLength={3}
                     dir="ltr"
@@ -715,21 +795,23 @@ export function CreateOpportunityModal({
                     onBlur={() => create.touch("currencyCode")}
                   />
                   <div className="flex flex-wrap gap-1">
-                    {CURRENCY_PRESETS.map((code) => (
-                      <button
+                    {currencyOptions.map((code) => (
+                      <Button
                         key={code}
                         type="button"
+                        variant="outline"
+                        size="xs"
                         disabled={create.isSubmitting}
                         onClick={() => create.setField("currencyCode", code)}
                         className={cn(
-                          "rounded-md border px-2 py-0.5 text-[10px] font-bold transition-colors",
+                          "h-auto rounded-md border px-2 py-0.5 text-2xs font-semibold transition-colors",
                           form.currencyCode.toUpperCase() === code
-                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            ? "border-success bg-success text-white hover:bg-success/90 hover:text-white"
                             : "border-border bg-muted/40 text-muted-foreground hover:text-foreground",
                         )}
                       >
                         {code}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -758,22 +840,24 @@ export function CreateOpportunityModal({
                   />
                   <div className="flex flex-wrap gap-1">
                     {PROBABILITY_PRESETS.map((preset) => (
-                      <button
+                      <Button
                         key={preset}
                         type="button"
+                        variant="outline"
+                        size="xs"
                         disabled={create.isSubmitting}
                         onClick={() =>
                           create.setField("probabilityPercent", preset)
                         }
                         className={cn(
-                          "rounded-md border px-2 py-0.5 text-[10px] font-bold transition-colors",
+                          "h-auto rounded-md border px-2 py-0.5 text-2xs font-semibold transition-colors",
                           form.probabilityPercent === preset
-                            ? "border-blue-600 bg-blue-600 text-white"
+                            ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
                             : "border-border bg-muted/40 text-muted-foreground hover:text-foreground",
                         )}
                       >
                         {preset}%
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -805,15 +889,15 @@ export function CreateOpportunityModal({
           <section
             id="notes"
             data-form-section="notes"
-            className="overflow-hidden rounded-2xl border border-amber-500/25 bg-card shadow-xs"
+            className="overflow-hidden rounded-lg border border-swatch-amber-soft bg-card shadow-xs"
           >
-            <div className="flex items-center justify-between border-b border-amber-500/15 bg-linear-to-r from-amber-500/[0.08] via-orange-500/[0.04] to-transparent px-5 py-3.5">
+            <div className="flex items-center justify-between border-b border-swatch-amber-soft bg-swatch-amber-soft px-5 py-3.5">
               <div className="flex items-center gap-2.5">
-                <span className="inline-flex size-6 items-center justify-center rounded-lg bg-amber-600 font-mono text-xs font-bold text-white">
+                <span className="inline-flex size-6 items-center justify-center rounded-lg bg-swatch-amber font-mono text-xs font-semibold tabular-nums text-white">
                   03
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-foreground">
+                  <h3 className="text-sm font-semibold text-foreground">
                     {t.crmOpportunityDetail.create.sections.notes}
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -827,35 +911,43 @@ export function CreateOpportunityModal({
               {/* Tags Selection */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground">
-                    <Tag className="size-3.5 text-amber-600" aria-hidden="true" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <Tag className="size-3.5 text-warning" aria-hidden="true" />
                     {t.crmLeads.create.tags}
                   </span>
-                  {tags.canManage && (
-                    <button
+                  {canUpdateCreatedOpportunity && tags.canManage && (
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="xs"
                       onClick={() => setCreateTagDraftName("")}
-                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                      className="inline-flex h-auto items-center gap-1 rounded-lg border border-info bg-info-subtle px-2.5 py-1 text-xs font-semibold text-info-subtle-foreground hover:bg-info-subtle/80"
                     >
                       <Plus className="size-3" aria-hidden="true" />
                       <span>{t.crmTags.add}</span>
-                    </button>
+                    </Button>
                   )}
                 </div>
 
-                {tags.items.length > 0 && (
+                {!canUpdateCreatedOpportunity ? (
+                  <p className="text-sm text-muted-foreground" role="note">
+                    {t.crmOpportunityDetail.create.tagsRequireUpdate}
+                  </p>
+                ) : tags.items.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {tags.items.map((tag) => {
                       const selected = (form.tagIds ?? []).includes(tag.id);
                       return (
-                        <button
+                        <Button
                           key={tag.id}
                           type="button"
+                          variant="ghost"
+                          size="xs"
                           onClick={() => create.toggleTag(tag.id)}
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full border p-0.5 transition-all",
+                            "inline-flex h-auto items-center gap-1 rounded-full border p-0.5 transition-all",
                             selected
-                              ? "border-blue-600 ring-2 ring-blue-500/20"
+                              ? "border-primary ring-2 ring-primary/20"
                               : "border-transparent opacity-75 hover:opacity-100",
                           )}
                         >
@@ -864,7 +956,7 @@ export function CreateOpportunityModal({
                             backgroundColor={tag.backgroundColor}
                             textColor={tag.textColor}
                           />
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>

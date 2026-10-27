@@ -28,6 +28,7 @@ import type { usePipelineAssignments } from "../hooks/usePipelineAssignments";
 interface PipelineAssignmentsSectionProps {
   state: ReturnType<typeof usePipelineAssignments>;
   canManage: boolean;
+  isDefault: boolean;
   onSave: () => void;
 }
 
@@ -39,6 +40,7 @@ interface PipelineAssignmentsSectionProps {
 export function PipelineAssignmentsSection({
   state,
   canManage,
+  isDefault,
   onSave,
 }: PipelineAssignmentsSectionProps) {
   const { t, lang } = useI18n();
@@ -115,7 +117,7 @@ export function PipelineAssignmentsSection({
           <Button
             variant="outline"
             size="sm"
-            disabled={!state.isDirty || state.isSaving}
+            disabled={!state.isDirty || state.isSaving || (isDefault && state.accessMode !== "ALL")}
             onClick={() => setConfirming(true)}
           >
             {t.crmPipelines.saveAssignments}
@@ -130,12 +132,13 @@ export function PipelineAssignmentsSection({
 
         <Field
           label={t.crmPipelines.accessMode}
-          hint={t.crmPipelines.accessModeHint}
+          hint={isDefault ? t.crmPipelines.defaultAccessModeHint : t.crmPipelines.accessModeHint}
         >
           <Select
             value={state.accessMode}
+            disabled={isDefault}
             onValueChange={(next) => {
-              if (PIPELINE_ACCESS_MODES.includes(next as "ALL")) {
+              if (!isDefault && PIPELINE_ACCESS_MODES.includes(next as "ALL")) {
                 state.setAccessMode(next as "ALL" | "RESTRICTED");
               }
             }}
@@ -229,6 +232,7 @@ export function PipelineAssignmentsSection({
         formatCount={(count) => formatNumber(count, lang)}
         onConfirm={() => {
           setConfirming(false);
+          if (isDefault && state.accessMode !== "ALL") return;
           onSave();
         }}
         labels={{

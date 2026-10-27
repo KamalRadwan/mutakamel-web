@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { derivePageInfo, isTradeReplay, tradeErrorCode, tradeIfMatch } from "./trade-api";
+import { derivePageInfo, isTradeReplay, tradeIfMatch } from "./trade-api";
 
-// These four rules differ from Core's and each would break every Trade screen
+// These three rules differ from Core's and each would break every Trade screen
 // at once. They are pinned here because they were read from trade-app source
 // (docs/api/trade-*.md), not inferred from Core.
 
@@ -63,28 +63,5 @@ describe("derivePageInfo", () => {
   it("returns null rather than guessing when the shape is not a page", () => {
     expect(derivePageInfo({ id: "a" })).toBeNull();
     expect(derivePageInfo(null)).toBeNull();
-  });
-});
-
-describe("tradeErrorCode", () => {
-  it("reads `code`, not Core's `errorCode`", () => {
-    expect(tradeErrorCode({ code: "TRADE.CONCURRENCY.IF_MATCH_REQUIRED" })).toBe(
-      "TRADE.CONCURRENCY.IF_MATCH_REQUIRED",
-    );
-  });
-
-  it("does not mistake Core's key for Trade's", () => {
-    expect(tradeErrorCode({ errorCode: "COMMON.SOMETHING" })).toBeNull();
-  });
-
-  it("reaches a nested error object, since Trade has no exception filter", () => {
-    expect(tradeErrorCode({ error: { code: "TRADE.IMPORT.FILE_UNSAFE" } })).toBe(
-      "TRADE.IMPORT.FILE_UNSAFE",
-    );
-  });
-
-  it("returns null instead of a non-string", () => {
-    expect(tradeErrorCode({ code: 422 })).toBeNull();
-    expect(tradeErrorCode("boom")).toBeNull();
   });
 });

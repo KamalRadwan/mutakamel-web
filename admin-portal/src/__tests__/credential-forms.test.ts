@@ -29,6 +29,7 @@ describe("admin native credential submissions", () => {
   it("covers auth screens and the existing nested secret-entry forms", () => {
     expect(credentialForms.map(({ file }) => file).sort()).toEqual([
       "app/(auth)/login/page.tsx",
+      "app/(shell)/profile/components/ProfileMfa.tsx",
       "app/(shell)/settings/fatal-alerts/page.tsx",
       "app/(shell)/settings/smtp/page.tsx",
       "app/(shell)/settings/webphone/components/ServerIceServers.tsx",

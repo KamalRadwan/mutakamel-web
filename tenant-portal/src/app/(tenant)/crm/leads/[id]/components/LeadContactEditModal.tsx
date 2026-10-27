@@ -71,29 +71,31 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
         aria-label={t.crmLeadDetail.editContact}
         className="dossier-contact-card editing min-w-0 sm:col-span-2"
       >
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-cyan-500/25 pb-2.5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-cyan-500/35 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300"
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-foreground"
               aria-hidden="true"
             >
               <Pencil className="size-3.5" />
             </span>
-            <span className="text-xs font-extrabold text-foreground">
+            <span className="text-xs font-semibold text-foreground">
               {t.crmLeadDetail.editContact}
             </span>
             {form?.displayName && (
-              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold text-cyan-700 dark:text-cyan-300">
+              <span className="rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
                 {form.displayName}
               </span>
             )}
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {t.crmLeadDetail.contactSharedRecord}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               className="dossier-btn dossier-btn-cancel"
               aria-label={t.common.cancel}
               disabled={edit.saving}
@@ -101,9 +103,11 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
             >
               <X className="size-3.5" aria-hidden="true" />
               <span>{t.common.cancel}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               className="dossier-btn dossier-btn-save"
               aria-label={t.common.save}
               disabled={edit.saving || edit.loading || edit.mustReload || !form}
@@ -111,7 +115,7 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
             >
               <Check className="size-3.5" aria-hidden="true" />
               <span>{t.common.save}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -130,7 +134,7 @@ export function LeadContactEditModal({ edit }: { edit: LeadContactModal }) {
           form && (
             <>
               {!edit.canEditIdentity && (
-                <p className="mb-2.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+                <p className="mb-2.5 rounded-md border border-warning/30 bg-warning-subtle px-2.5 py-1.5 text-xs font-medium text-warning-subtle-foreground">
                   {t.crmLeadDetail.contactIdentityPermission}
                 </p>
               )}

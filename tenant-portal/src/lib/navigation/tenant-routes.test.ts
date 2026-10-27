@@ -4,7 +4,6 @@ import {
   canAccessCoreRoute,
   canAccessCrmRoute,
   getFirstPermittedCrmRoute,
-  canAccessCoreOwnerRoute,
   isSupportedCorePath,
   isSupportedCrmPath,
   permittedCoreSettingsRoutes,
@@ -40,7 +39,7 @@ describe("Tenant Portal production route surface", () => {
     expect(isSupportedCrmPath(TENANT_ROUTES.crmLeads)).toBe(true);
     expect(isSupportedCrmPath("/crm/customer-profiles/customer-id")).toBe(true);
     expect(isSupportedCrmPath("/crm/customer-profiles/customer-id/general")).toBe(false);
-    expect(isSupportedCrmPath("/crm/dashboard")).toBe(false);
+    expect(isSupportedCrmPath("/crm/dashboard")).toBe(true);
     // Q40: these five screens existed and were redirected to /unavailable
     // because only customer-profiles was admitted here.
     expect(isSupportedCrmPath("/crm/leads/lead-id")).toBe(true);
@@ -203,14 +202,6 @@ describe("Core settings route surface", () => {
     expect(isSupportedCorePath("/core/billing/payments")).toBe(false);
   });
 
-  it("gates billing and subscription on ownership, never on a permission string", () => {
-    // TenantBillingController and SubscriptionSelfServeController declare no
-    // @RequirePermissions at all, so no permission set can open them and no
-    // permission set can close them — only `is_tenant_owner` decides.
-    expect(canAccessCoreOwnerRoute(true)).toBe(true);
-    expect(canAccessCoreOwnerRoute(false)).toBe(false);
-  });
-
   it("admits every Core identity screen and exactly one detail segment below it", () => {
     for (const href of [
       TENANT_ROUTES.coreProfile,
@@ -309,6 +300,10 @@ describe("Core settings route surface", () => {
     );
     expect(canAccessCoreRoute(["activities.read"], TENANT_ROUTES.coreActivities)).toBe(true);
     expect(canAccessCoreRoute(["audit.read"], TENANT_ROUTES.coreAudit)).toBe(true);
+    expect(canAccessCoreRoute(["audit.read.branch"], TENANT_ROUTES.coreAudit)).toBe(true);
+    expect(canAccessCoreRoute(["audit.read.own"], TENANT_ROUTES.coreAudit)).toBe(true);
+    expect(isSupportedCorePath("/core/audit/events/01900100-0000-7000-8000-000000000001")).toBe(true);
+    expect(isSupportedCorePath("/core/audit/events/id/extra")).toBe(false);
     expect(canAccessCoreRoute(["templates.create"], TENANT_ROUTES.coreTemplates)).toBe(false);
     expect(canAccessCoreRoute(["audit.read.all"], TENANT_ROUTES.coreAudit)).toBe(false);
   });

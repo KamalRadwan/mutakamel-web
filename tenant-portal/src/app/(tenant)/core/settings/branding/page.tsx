@@ -19,6 +19,7 @@ import {
   CORE_SETTINGS_NAV_ITEMS,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { BRANDING_TEXT_MAX_LENGTH } from "@/lib/branding/public-branding";
 import { useAccessModeLabels } from "../../hooks/useAccessModeLabels";
 import { BRANDING_READ_PERMISSION } from "./branding-contract";
 import { BrandingAssetCard } from "./components/BrandingAssetCard";
@@ -39,7 +40,7 @@ function BrandingWorkspace() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={t.coreBilling.brandingTitle}
         description={t.coreBilling.brandingSubtitle}
         primaryAction={
@@ -106,10 +107,12 @@ function BrandingWorkspace() {
                 <Field
                   label={t.coreBilling.brandingAppName}
                   hint={t.coreBilling.brandingAppNameHint}
+                  error={branding.fieldErrors.appName}
                   readOnly={!branding.canManage}
                 >
                   <Input size="sm" placeholder={t.coreBilling.brandingAppName}
                     value={branding.values.appName}
+                    maxLength={BRANDING_TEXT_MAX_LENGTH}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
                     onChange={(event) => branding.setValue({ appName: event.target.value })}
@@ -118,10 +121,12 @@ function BrandingWorkspace() {
                 <Field
                   label={t.coreBilling.brandingTabTitle}
                   hint={t.coreBilling.brandingTabTitleHint}
+                  error={branding.fieldErrors.tabTitle}
                   readOnly={!branding.canManage}
                 >
                   <Input size="sm" placeholder={t.coreBilling.brandingTabTitle}
                     value={branding.values.tabTitle}
+                    maxLength={BRANDING_TEXT_MAX_LENGTH}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
                     onChange={(event) => branding.setValue({ tabTitle: event.target.value })}
@@ -130,11 +135,12 @@ function BrandingWorkspace() {
                 <Field
                   label={t.coreBilling.brandingPrimaryColor}
                   hint={t.coreBilling.brandingPrimaryColorHint}
-                  error={branding.formError ?? undefined}
+                  error={branding.fieldErrors.primaryColor ?? branding.formError ?? undefined}
                   readOnly={!branding.canManage}
                 >
                   <Input size="sm"
                     value={branding.values.primaryColor}
+                    maxLength={9}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
                     placeholder="#2563eb"
@@ -144,10 +150,12 @@ function BrandingWorkspace() {
                 <Field
                   label={t.coreBilling.brandingSecondaryColor}
                   hint={t.coreBilling.brandingSecondaryColorHint}
+                  error={branding.fieldErrors.secondaryColor}
                   readOnly={!branding.canManage}
                 >
                   <Input size="sm" placeholder={t.coreBilling.brandingSecondaryColor}
                     value={branding.values.secondaryColor}
+                    maxLength={9}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
                     onChange={(event) => branding.setValue({ secondaryColor: event.target.value })}
@@ -156,11 +164,13 @@ function BrandingWorkspace() {
                 <Field
                   label={t.coreBilling.brandingFontFamily}
                   hint={t.coreBilling.brandingFontFamilyHint}
+                  error={branding.fieldErrors.fontFamily}
                   readOnly={!branding.canManage}
                   className="sm:col-span-2"
                 >
                   <Input size="sm" placeholder={t.coreBilling.brandingFontFamily}
                     value={branding.values.fontFamily}
+                    maxLength={BRANDING_TEXT_MAX_LENGTH}
                     readOnly={!branding.canManage}
                     disabled={branding.isSaving}
                     onChange={(event) => branding.setValue({ fontFamily: event.target.value })}

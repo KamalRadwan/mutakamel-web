@@ -160,6 +160,7 @@ export async function fetchTenantRoles(options: {
   sortBy?: TenantRoleSortField;
   sortDir?: "ASC" | "DESC";
   signal?: AbortSignal;
+  suppressForbiddenToast?: boolean;
 }): Promise<CorePage<TenantRole>> {
   const query = buildCoreListQuery({
     page: options.page,
@@ -172,6 +173,7 @@ export async function fetchTenantRoles(options: {
   });
   const envelope = await readCorePage(ROLES_PATH, query, {
     signal: options.signal,
+    suppressForbiddenToast: options.suppressForbiddenToast,
     cache: "no-store",
     maxResponseBytes: CORE_LIST_RESPONSE_LIMIT_BYTES,
   });

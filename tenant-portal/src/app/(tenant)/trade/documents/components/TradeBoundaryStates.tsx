@@ -1,7 +1,8 @@
 "use client";
 
-import { Landmark, ShieldQuestion } from "lucide-react";
-import { AmbiguousOutcomePanel, EmptyState } from "@/design-system";
+import type { ReactNode } from "react";
+import { CircleAlert, Landmark, ShieldQuestion } from "lucide-react";
+import { Button, cn, EmptyState, IdentifierText, proseMeasure } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { TradeWriteState } from "../hooks/useTradeWrite";
 
@@ -11,9 +12,8 @@ import type { TradeWriteState } from "../hooks/useTradeWrite";
  * Every commercial-document route targets `BRANCH`, and 28 of them are also
  * Gateway `BRANCH_REQUIRED` — the request is refused as `GW.REQUEST.INVALID`
  * (400) before trade-app sees it. Nothing failed and nothing is missing: the
- * user has no branch the portal can pair with a company through their own team
- * memberships, which is a setup gap, so this is an empty state and not a red
- * banner.
+ * user still needs to choose an operating scope in the selector mounted by
+ * the Trade layout. Selecting it resolves this state in place.
  */
 export function TradeScopeRequired() {
   const { t } = useI18n();
@@ -60,22 +60,23 @@ export function TradeWriteOutcome({ write }: { write: TradeWriteState }) {
   const { t } = useI18n();
   if (!write.ambiguous) return null;
   return (
-    <AmbiguousOutcomePanel
-      operation={write.ambiguous.operation}
-      idempotencyKey={write.ambiguous.idempotencyKey}
-      correlationId={write.ambiguous.correlationId}
-      description={t.tradeDocuments.ambiguousDescription}
-      retrying={write.isWriting}
-      onRetry={() => void write.ambiguous?.retry()}
-      onDismiss={write.dismissAmbiguous}
-      labels={{
-        title: t.tradeDocuments.ambiguousTitle,
-        operation: t.tradeDocuments.ambiguousOperation,
-        idempotencyKey: t.tradeDocuments.ambiguousKey,
-        correlationId: t.errors.reference,
-        retry: t.common.retry,
-        dismiss: t.common.dismiss,
-      }}
-    />
+    <section role="status" className="space-y-2 rounded-sm border border-caution-200 bg-caution-100 p-3 text-caution-900 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-200">
+      <h2 className="flex items-center gap-2 text-sm font-medium"><CircleAlert className="size-4 shrink-0" aria-hidden="true" />{t.tradeDocuments.ambiguousTitle}</h2>
+      <p className={cn("text-xs", proseMeasure)}>{t.tradeDocuments.ambiguousDescription}</p>
+      <dl className="space-y-1 text-xs">
+        <div><dt>{t.tradeDocuments.ambiguousOperation}</dt><dd>{write.ambiguous.operation}</dd></div>
+        <div><dt>{t.tradeDocuments.ambiguousKey}</dt><dd><IdentifierText>{write.ambiguous.idempotencyKey}</IdentifierText></dd></div>
+        {write.ambiguous.correlationId ? (
+          <div><dt>{t.errors.reference}</dt><dd><IdentifierText>{write.ambiguous.correlationId}</IdentifierText></dd></div>
+        ) : null}
+      </dl>
+      <Button type="button" variant="outline" size="sm" loading={write.isWriting}
+        onClick={() => void write.ambiguous?.retry()}>{t.common.retry}</Button>
+    </section>
   );
+}
+
+/** Recovery stays outside this fieldset so the frozen request can be replayed. */
+export function TradeWriteFields({ write, children }: { write: TradeWriteState; children: ReactNode }) {
+  return <fieldset disabled={write.isBlocked} className="min-w-0 space-y-3">{children}</fieldset>;
 }

@@ -13,6 +13,7 @@
 import type { ReactNode } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
 
 const { api, authMock } = vi.hoisted(() => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
@@ -148,7 +149,7 @@ describe("useLeadStages — the reorder write", () => {
       "Disqualified",
       "Converted",
     ]);
-    expect(result.current.error).toBe("Stage order rejected.");
+    expect(result.current.error).toBe(en.crmShared.errorOffline);
   });
 
   // Both refusals `assertExactOrder` answers 422 for. Neither costs a round

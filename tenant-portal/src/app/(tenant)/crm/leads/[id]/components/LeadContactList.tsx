@@ -80,19 +80,19 @@ export function LeadContactReadCard({
             span2: true,
             value: (
               <span className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2">
-                <span className="flex min-w-0 flex-wrap items-center gap-2 font-bold text-foreground">
+                <span className="flex min-w-0 flex-wrap items-center gap-2 font-semibold text-foreground">
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white shadow-2xs",
+                      "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-primary-foreground shadow-2xs",
                       isPrimary
-                        ? "bg-gradient-to-br from-emerald-500 to-teal-600"
-                        : "bg-gradient-to-br from-cyan-500 to-indigo-600",
+                        ? "bg-primary"
+                        : "bg-secondary text-secondary-foreground",
                     )}
                   >
                     {initials}
                   </span>
-                  <span className="wrap-anywhere text-[13px] font-extrabold text-foreground">
+                  <span className="wrap-anywhere text-xs font-semibold text-foreground">
                     {name}
                   </span>
                   {isPrimary && (
@@ -104,13 +104,15 @@ export function LeadContactReadCard({
                 </span>
                 <span className="flex shrink-0 items-center gap-1.5">
                   {!isPrimary && onSetPrimary && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       className="dossier-btn dossier-btn-sm"
                       onClick={onSetPrimary}
                     >
-                      ★ {lang === "ar" ? "تعيين كرئيسي" : "Set Primary"}
-                    </button>
+                      ★ {{ ar: "تعيين كرئيسي", en: "Set Primary" }[lang]}
+                    </Button>
                   )}
                   {onEdit && (
                     <Button
@@ -132,7 +134,7 @@ export function LeadContactReadCard({
           {
             label: t.crmLeadConvert.contactJobTitle,
             value: jobTitle ? (
-              <span className="inline-flex items-center rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-800 dark:border-cyan-400/30 dark:bg-cyan-500/15 dark:text-cyan-200">
+              <span className="inline-flex items-center rounded-md border border-border/60 bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
                 {jobTitle}
               </span>
             ) : null,
@@ -254,7 +256,7 @@ export function HonorificSelect({
         onChange(event.target.value);
       }}
       className={cn(
-        "flex h-8 w-full rounded-md border border-input bg-card px-2.5 text-xs font-semibold text-foreground shadow-2xs transition-colors focus:border-indigo-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-8 w-full rounded-md border border-input bg-card px-2.5 text-xs font-semibold text-foreground shadow-2xs transition-colors focus:border-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
         readOnly && "bg-muted/50 text-muted-foreground",
       )}
     >

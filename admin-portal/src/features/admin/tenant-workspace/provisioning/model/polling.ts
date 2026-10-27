@@ -76,6 +76,9 @@ export function provisioningPollFingerprint(observed: {
       request.status,
       request.maintenanceFence?.status ?? null,
       request.evidence.length,
+      request.recovery.attempts,
+      request.recovery.alerted,
+      request.recovery.canCloseFailed,
     ]) ?? null,
   ]);
 }

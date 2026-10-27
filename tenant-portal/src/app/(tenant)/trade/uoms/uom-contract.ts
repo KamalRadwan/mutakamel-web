@@ -15,10 +15,9 @@ import {
 // trade-app/src/modules/catalog/catalog.controller.ts (CatalogUomsController),
 // catalog-uom.service.ts and dto/catalog.dto.ts.
 //
-// **Read and write on this resource take opposite headers.** The Gateway
-// declares `organizationScopeMode: BRANCH_REQUIRED` on both GETs and `NONE` on
-// both writes, so a list needs the company AND branch headers while a create or
-// update must send neither — a company header on `POST /uoms` is a 400
+// The Gateway declares `organizationScopeMode: OPTIONAL_COMPANY_BRANCH` on
+// both GETs and `NONE` on both writes. Reads work without scope headers;
+// create and update must send neither — a company header on `POST /uoms` is a 400
 // `GW.REQUEST.INVALID` before trade-app ever sees it. The controller targets
 // agree (`OPERATING_CONTEXT` for reads, `TENANT` for writes) but the two
 // policies are enforced by different components with different error shapes.

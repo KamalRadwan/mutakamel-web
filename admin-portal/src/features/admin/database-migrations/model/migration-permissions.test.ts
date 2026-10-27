@@ -34,21 +34,18 @@ describe("migration permissions", () => {
     expect(permissions.canDestroy).toBe(false);
     expect(missingExecutePermissions(permissions)).toEqual([
       MIGRATION_EXECUTE_PERMISSION,
-      MIGRATION_CRITICAL_PERMISSION,
     ]);
   });
 
-  it("refuses execution to a manage-only operator, matching the ALL route contract", () => {
+  it("grants run control without granting the critical tier to a manage-only operator", () => {
     const permissions = readMigrationPermissions(
       user([MIGRATION_READ_PERMISSION, MIGRATION_EXECUTE_PERMISSION]),
     );
     expect(permissions.hasExecute).toBe(true);
     expect(permissions.hasCritical).toBe(false);
-    expect(permissions.canExecute).toBe(false);
+    expect(permissions.canExecute).toBe(true);
     expect(permissions.canDestroy).toBe(false);
-    expect(missingExecutePermissions(permissions)).toEqual([
-      MIGRATION_CRITICAL_PERMISSION,
-    ]);
+    expect(missingExecutePermissions(permissions)).toEqual([]);
   });
 
   it("refuses execution to a critical-only operator", () => {
@@ -62,7 +59,7 @@ describe("migration permissions", () => {
     ]);
   });
 
-  it("grants execution and destruction only with both mutating permissions", () => {
+  it("grants run control and the critical tier with both mutating permissions", () => {
     const permissions = readMigrationPermissions(
       user([
         MIGRATION_READ_PERMISSION,

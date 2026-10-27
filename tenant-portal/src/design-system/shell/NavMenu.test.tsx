@@ -101,13 +101,13 @@ describe("NavMenu", () => {
     ];
     const { rerender } = render(<NavMenu section={section(items)} activeItemId="customFields" />);
     expect(screen.getByRole("button", { name: new RegExp(en.nav.navMenuSetup) }).className).toContain(
-      "after:bg-nav-active",
+      "bg-gradient-primary",
     );
 
     rerender(<NavMenu section={section(items)} activeItemId="tradeItems" />);
     expect(
       screen.getByRole("button", { name: new RegExp(en.nav.navMenuSetup) }).className,
-    ).not.toContain("after:bg-nav-active");
+    ).not.toContain("bg-gradient-primary");
   });
 });
 

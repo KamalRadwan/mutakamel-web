@@ -41,4 +41,45 @@ describe("ViewSwitcher", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Table" }));
     expect(onChange).toHaveBeenCalledWith("table");
   });
+
+  it("renders the toolbar segmented container and gradient active segment", () => {
+    renderSwitcher({ value: "card", onChange: vi.fn(), available: ["board", "card", "table"], labels });
+
+    expect(screen.getByRole("radiogroup")).toHaveClass(
+      "h-(--size-toolbar-control)",
+      "rounded-lg",
+      "border",
+      "border-line-control",
+      "bg-surface-subtle",
+      "p-0.5",
+    );
+
+    const active = screen.getByRole("radio", { name: "Card" });
+    const inactive = screen.getByRole("radio", { name: "Board" });
+
+    expect(active).toHaveClass("bg-gradient-primary", "text-white", "rounded-md", "shadow-sm");
+    expect(inactive).toHaveClass("rounded-md", "text-muted-foreground");
+    expect(inactive).not.toHaveClass("bg-gradient-primary");
+  });
+
+  it("supports non-record view sets such as calendar/board/table", () => {
+    const onChange = vi.fn();
+    render(
+      <TooltipProvider>
+        <ViewSwitcher
+          value="calendar"
+          onChange={onChange}
+          available={["calendar", "board", "table"]}
+          labels={{ calendar: "Calendar", board: "Board", table: "Table" }}
+        />
+      </TooltipProvider>,
+    );
+
+    const active = screen.getByRole("radio", { name: "Calendar" });
+    expect(active).toHaveAttribute("aria-checked", "true");
+    expect(active).toHaveClass("bg-gradient-primary", "text-white");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Board" }));
+    expect(onChange).toHaveBeenCalledWith("board");
+  });
 });

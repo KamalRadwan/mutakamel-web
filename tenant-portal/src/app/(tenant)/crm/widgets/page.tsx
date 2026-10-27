@@ -69,7 +69,7 @@ export default function WidgetsPage() {
   return (
     <PermissionGate require="crm.widgets.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.crmWidgets.title}
           description={t.crmWidgets.subtitle}
           primaryAction={
@@ -124,8 +124,6 @@ export default function WidgetsPage() {
           searchPlaceholder={t.crmWidgets.search}
         />
 
-        {/* `GET /widgets` declares no pagination — `accessibleWidgets` returns
-            one array of every visible widget. */}
         <DataTable
           columns={columns}
           rows={widgets.items}
@@ -151,6 +149,12 @@ export default function WidgetsPage() {
             },
           }}
         />
+
+        {widgets.hasMore ? (
+          <Button variant="outline" disabled={widgets.isLoading} loading={widgets.isLoading} onClick={() => void widgets.loadMore()}>
+            {t.crmDashboards.loadMoreWidgets}
+          </Button>
+        ) : null}
 
         <WidgetFormDrawer
           key={isCreateOpen ? "open" : "closed"}

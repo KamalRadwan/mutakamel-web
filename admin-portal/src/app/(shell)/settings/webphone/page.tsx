@@ -19,7 +19,7 @@ export default function WebphoneSettingsPage() {
 
   return (
     <div className="space-y-3">
-      <header className="rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-2xs">
+      <header className="rounded-lg border border-border bg-card p-3 sm:p-3.5">
         <h1 className="flex items-center gap-2 text-base font-semibold tracking-tight">
           <Phone
             className="size-4 text-info"

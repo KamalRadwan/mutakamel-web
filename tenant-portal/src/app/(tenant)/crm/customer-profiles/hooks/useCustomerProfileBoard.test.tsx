@@ -2,7 +2,10 @@
 
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CUSTOMER_PROFILE_SEARCH } from "../customer-profile-search-contract";
+import {
+  DEFAULT_CUSTOMER_PROFILE_SEARCH,
+  customerProfileSearchWithField,
+} from "../customer-profile-search-contract";
 
 const mocks = vi.hoisted(() => ({
   post: vi.fn(),
@@ -100,5 +103,122 @@ describe("useCustomerProfileBoard", () => {
     });
     expect(result.current.error).toBeNull();
     expect(result.current.loadMoreError).toMatchObject({ status: 0 });
+  });
+});
+
+function countPage(
+  status: (typeof CUSTOMER_PROFILE_BOARD_STATUSES)[number],
+  total: number,
+) {
+  const sample = firstPage().statuses[0].items[0];
+  return {
+    items: total ? [{ ...sample, status }] : [],
+    total,
+    page: 1,
+    limit: 1,
+    totalPages: total,
+    hasNext: total > 1,
+    hasPrev: false,
+  };
+}
+
+describe("customer status funnel totals", () => {
+  it("loads server totals without the board and replaces the selected status only", async () => {
+    const totals = [51, 7, 0, 2];
+    CUSTOMER_PROFILE_BOARD_STATUSES.forEach((status, index) => {
+      mocks.post.mockResolvedValueOnce({ data: countPage(status, totals[index]) });
+    });
+    const { result } = renderHook(() =>
+      useCustomerProfileBoard({
+        enabled: false,
+        totalsEnabled: true,
+        branchId: BRANCH_ID,
+        search: customerProfileSearchWithField(
+          DEFAULT_CUSTOMER_PROFILE_SEARCH,
+          "status",
+          "ACTIVE_CUSTOMER",
+        ),
+        sort: { id: "createdAt", direction: "desc" },
+        revision: 0,
+      }),
+    );
+    expect(result.current.totals.size).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect([...result.current.totals.values()]).toEqual(totals);
+    expect(result.current.items).toEqual([]);
+    expect(mocks.post).toHaveBeenCalledTimes(4);
+    CUSTOMER_PROFILE_BOARD_STATUSES.forEach((status, index) => {
+      expect(mocks.post).toHaveBeenNthCalledWith(
+        index + 1,
+        "/api/tenant/crm/v1/customer-profiles/search",
+        {
+          branchId: BRANCH_ID,
+          page: 1,
+          limit: 1,
+          sort: "createdAt:DESC",
+          filterTree: {
+            op: "AND",
+            children: [
+              {
+                field: "ownerUserId",
+                operator: "eq",
+                value: "0192f3a0-0000-7000-8000-000000000099",
+              },
+              { field: "status", operator: "eq", value: status },
+            ],
+          },
+        },
+        expect.objectContaining({ skipAutoIdempotency: true }),
+      );
+    });
+  });
+
+  it("hides previous totals immediately on branch changes and after a failed read", async () => {
+    CUSTOMER_PROFILE_BOARD_STATUSES.forEach((status) => {
+      mocks.post.mockResolvedValueOnce({ data: countPage(status, 0) });
+    });
+    const { result, rerender } = renderHook(
+      ({ branchId }) =>
+        useCustomerProfileBoard({
+          enabled: false,
+          totalsEnabled: true,
+          branchId,
+          search: DEFAULT_CUSTOMER_PROFILE_SEARCH,
+          sort: { id: "createdAt", direction: "desc" },
+          revision: 0,
+        }),
+      { initialProps: { branchId: BRANCH_ID } },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect([...result.current.totals.values()]).toEqual([0, 0, 0, 0]);
+    mocks.post.mockRejectedValue(new TypeError("Failed to fetch"));
+    rerender({ branchId: "0192f3a0-0000-7000-8000-000000000004" });
+    expect(result.current.totals.size).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(result.current.totals.size).toBe(0);
+    expect(result.current.error).not.toBeNull();
+  });
+
+  it("does not fetch or invent totals when both reads are disabled", async () => {
+    const { result } = renderHook(() =>
+      useCustomerProfileBoard({
+        enabled: false,
+        branchId: BRANCH_ID,
+        search: DEFAULT_CUSTOMER_PROFILE_SEARCH,
+        sort: { id: "createdAt", direction: "desc" },
+        revision: 0,
+      }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(result.current.totals.size).toBe(0);
   });
 });

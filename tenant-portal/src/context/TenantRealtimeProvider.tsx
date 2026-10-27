@@ -11,6 +11,7 @@ import {
   createSocketIoTransportFactory,
   parseRealtimeDeploymentMode,
   type ConnectionLease,
+  type ConnectionSnapshot,
   type RealtimeApplicationConnection,
   type RealtimeApplicationStopReason,
   type RealtimeDeploymentMode,
@@ -22,13 +23,16 @@ import {
   coordinateTenantSessionRefresh,
 } from "@/lib/api/axiosClient";
 import {
-  resyncTenantNotifications,
+  refreshTenantNotifications,
   tenantNotificationRuntime,
 } from "@/lib/notifications/tenant-notification-runtime";
 import { uuidCrypto } from "@/lib/uuid";
+import { can } from "@/lib/auth/permission-scope";
+import { normalizeApiError } from "@/lib/api/errors";
 
 export interface TenantRealtimeCoordinator extends RealtimeApplicationConnection {
-  getSnapshot(): { readonly generation: string | null };
+  getSnapshot(): ConnectionSnapshot;
+  subscribe(listener: () => void): () => void;
   replaceGeneration(generation: string): void;
   acquire(generation: string): ConnectionLease;
   clearGeneration(expectedGeneration?: string): void;
@@ -46,13 +50,28 @@ export const TENANT_REALTIME_SHELL_EVENTS = Object.freeze({
   resyncRequired: "tenant-realtime:resync-required",
   serverDraining: "tenant-realtime:server-draining",
   permanentStop: "tenant-realtime:permanent-stop",
+  connectionChanged: "tenant-realtime:connection-changed",
 } as const);
+
+let connectionSnapshot: ConnectionSnapshot | null = null;
+export const getTenantRealtimeConnectionSnapshot = () => connectionSnapshot;
+export const getServerRealtimeConnectionSnapshot = () => null;
+export function subscribeTenantRealtimeConnection(listener: () => void): () => void {
+  window.addEventListener(TENANT_REALTIME_SHELL_EVENTS.connectionChanged, listener);
+  return () => window.removeEventListener(TENANT_REALTIME_SHELL_EVENTS.connectionChanged, listener);
+}
+
+function publishConnectionSnapshot(snapshot: ConnectionSnapshot | null): void {
+  connectionSnapshot = snapshot;
+  dispatchShellEvent(TENANT_REALTIME_SHELL_EVENTS.connectionChanged, snapshot);
+}
 
 interface TenantRealtimeProviderProps {
   children: ReactNode;
   /** Test seam; production always uses the package-backed runtime singleton. */
   coordinator?: TenantRealtimeCoordinator;
   mode?: RealtimeDeploymentMode;
+  notificationsAuthorized?: boolean;
 }
 
 const runtime = new RuntimeConnectionSingleton<TenantRealtimeCoordinator>();
@@ -62,12 +81,13 @@ export function TenantRealtimeProvider({
   coordinator: suppliedCoordinator,
   mode: suppliedMode,
 }: TenantRealtimeProviderProps) {
-  const { realtimeAuthGeneration } = useTenantAuth();
+  const { realtimeAuthGeneration, user } = useTenantAuth();
   return (
     <TenantRealtimeBinding
       generation={realtimeAuthGeneration}
       coordinator={suppliedCoordinator}
       mode={suppliedMode}
+      notificationsAuthorized={can(user, "notifications.notification.read")}
     >
       {children}
     </TenantRealtimeBinding>
@@ -79,6 +99,7 @@ export function TenantRealtimeBinding({
   generation,
   coordinator: suppliedCoordinator,
   mode: suppliedMode,
+  notificationsAuthorized = true,
 }: TenantRealtimeProviderProps & { generation: string | null }) {
   const mode = suppliedMode ?? readDeploymentMode();
 
@@ -90,6 +111,7 @@ export function TenantRealtimeBinding({
     // the coordinator a signed-in session did create.
     if (generation === null) {
       (suppliedCoordinator ?? runtime.peek())?.clearGeneration();
+      publishConnectionSnapshot(null);
       tenantNotificationRuntime.clear();
       return;
     }
@@ -99,7 +121,10 @@ export function TenantRealtimeBinding({
     coordinator.setDeploymentMode(mode);
     coordinator.setNetworkOnline(navigator.onLine);
 
-    const onOnline = () => coordinator.setNetworkOnline(true);
+    const onOnline = () => {
+      coordinator.setNetworkOnline(true);
+      reconcileForeground();
+    };
     const onOffline = () => coordinator.setNetworkOnline(false);
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
@@ -108,8 +133,11 @@ export function TenantRealtimeBinding({
     let notificationCacheInitialized = false;
     let resyncInFlight: Promise<void> | null = null;
     let queuedResyncCursor: string | null | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let retryAttempt = 0;
+    let recoveryPaused = false;
     const applicationUnsubscribers: Array<() => void> = [];
-    tenantNotificationRuntime.bindGeneration(generation);
+    tenantNotificationRuntime.bindGeneration(notificationsAuthorized ? generation : null);
     const boundGeneration = coordinator.getSnapshot().generation;
     if (
       boundGeneration !== null &&
@@ -117,36 +145,76 @@ export function TenantRealtimeBinding({
     ) {
       coordinator.replaceGeneration(generation);
     }
+    const publishConnection = () => {
+      const snapshot = coordinator.getSnapshot();
+      if (!active || snapshot.generation !== generation) return;
+      const newlyBlocked = snapshot.phase === "blocked" &&
+        (connectionSnapshot?.generation !== generation || connectionSnapshot?.phase !== "blocked");
+      publishConnectionSnapshot(snapshot);
+      // REST owns session validity; a socket denial alone must not sign out a user.
+      if (newlyBlocked && (
+        snapshot.blockedReason === "classified_permanent" ||
+        snapshot.blockedReason === "credential_refresh_failed" ||
+        snapshot.blockedReason === "reconnect_attempts_exhausted"
+      )) void revalidateTenantRestSession();
+    };
+    const unsubscribeConnection = coordinator.subscribe(publishConnection);
     const lease: ConnectionLease = coordinator.acquire(generation);
+    publishConnection();
     const applicationClient = new RealtimeApplicationClient({
       connection: coordinator,
       onPermanentStop: handlePermanentStop,
     });
     const requestNotificationResync = (
       lastCommittedCursor: string | null,
+      automaticRetry = false,
     ): void => {
+      if (!active || !notificationsAuthorized || tenantNotificationRuntime.getSnapshot().generation !== generation) return;
       queuedResyncCursor = lastCommittedCursor;
       if (resyncInFlight !== null) return;
+      clearTimeout(retryTimer);
+      retryTimer = undefined;
+      recoveryPaused = false;
+      if (!automaticRetry) retryAttempt = 0;
+      const deferRecovery = (cursor: string | null, retryable: boolean) => {
+        if (!active || tenantNotificationRuntime.getSnapshot().generation !== generation) return;
+        if (queuedResyncCursor === undefined) queuedResyncCursor = cursor;
+        recoveryPaused = true;
+        // A quiet healthy socket must not strand failed REST reconciliation.
+        // Stop after three retries; focus/online and the bell remain usable.
+        if (!retryable || retryAttempt >= 3) return;
+        const delay = 1_000 * 2 ** retryAttempt++;
+        retryTimer = setTimeout(() => {
+          retryTimer = undefined;
+          requestNotificationResync(queuedResyncCursor === undefined ? cursor : queuedResyncCursor, true);
+        }, delay);
+      };
       const run = async (): Promise<void> => {
         while (active && queuedResyncCursor !== undefined) {
           const cursor = queuedResyncCursor;
           queuedResyncCursor = undefined;
           try {
-            const applied = await resyncTenantNotifications(
+            const applied = await refreshTenantNotifications(
               generation,
               cursor,
             );
-            if (!active || !applied) return;
+            if (!active) return;
+            if (!applied) {
+              deferRecovery(cursor, true);
+              return;
+            }
             notificationCacheInitialized = true;
-          } catch {
-            // Keep the last complete cache and cursor. The next ready/sync
-            // signal retries; partial REST results never become visible.
+            retryAttempt = 0;
+          } catch (error: unknown) {
+            const { status } = normalizeApiError(error);
+            deferRecovery(cursor, status === 0 || status === 408 || status === 429 || status >= 500);
+            return;
           }
         }
       };
       resyncInFlight = run().finally(() => {
         resyncInFlight = null;
-        if (active && queuedResyncCursor !== undefined) {
+        if (active && !recoveryPaused && queuedResyncCursor !== undefined) {
           requestNotificationResync(queuedResyncCursor);
         }
       });
@@ -154,9 +222,10 @@ export function TenantRealtimeBinding({
     applicationUnsubscribers.push(
       applicationClient.subscribe("session.ready.v1", (event) => {
         dispatchShellEvent(TENANT_REALTIME_SHELL_EVENTS.sessionReady, event);
+        if (!notificationsAuthorized) return;
         if (
           event.payload.notificationResyncRequired ||
-          !notificationCacheInitialized
+          (!notificationCacheInitialized && resyncInFlight === null)
         ) {
           dispatchShellEvent(
             TENANT_REALTIME_SHELL_EVENTS.resyncRequired,
@@ -168,6 +237,7 @@ export function TenantRealtimeBinding({
         }
       }),
       applicationClient.subscribe("notification.created.v1", (event) => {
+        if (!active || !notificationsAuthorized) return;
         const result = tenantNotificationRuntime.applyCreated(
           generation,
           event.payload,
@@ -195,6 +265,7 @@ export function TenantRealtimeBinding({
         }
       }),
       applicationClient.subscribe("notification.updated.v1", (event) => {
+        if (!active || !notificationsAuthorized) return;
         const result = tenantNotificationRuntime.applyUpdated(
           generation,
           event.payload,
@@ -216,6 +287,7 @@ export function TenantRealtimeBinding({
       applicationClient.subscribe(
         "notification.unread-count.changed.v1",
         (event) => {
+          if (!active || !notificationsAuthorized) return;
           const result = tenantNotificationRuntime.applyUnreadCount(
             generation,
             event.payload.unreadCount,
@@ -234,6 +306,7 @@ export function TenantRealtimeBinding({
         },
       ),
       applicationClient.subscribe("realtime.sync.required.v1", (event) => {
+        if (!notificationsAuthorized && event.payload.scope === "NOTIFICATIONS") return;
         dispatchShellEvent(
           TENANT_REALTIME_SHELL_EVENTS.resyncRequired,
           event,
@@ -254,7 +327,16 @@ export function TenantRealtimeBinding({
         );
       }),
     );
+    // REST hydration must also work when realtime is off or never handshakes.
+    requestNotificationResync(tenantNotificationRuntime.getSnapshot().lastRealtimeCursor);
     applicationClient.start();
+
+    function reconcileForeground() {
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      // Repeated browser focus events share the current request.
+      if (resyncInFlight !== null) return;
+      requestNotificationResync(tenantNotificationRuntime.getSnapshot().lastRealtimeCursor);
+    }
 
     const pushLifecycle = () =>
       applicationClient.updateLifecycle(readBrowserLifecycle());
@@ -269,10 +351,10 @@ export function TenantRealtimeBinding({
         applicationClient.signalActivity();
       }
     };
-    const onVisibilityChange = () => { pushLifecycle(); };
-    const onFocus = () => { pushLifecycle(); };
+    const onVisibilityChange = () => { pushLifecycle(); reconcileForeground(); };
+    const onFocus = () => { pushLifecycle(); reconcileForeground(); };
     const onBlur = () => { pushLifecycle(); };
-    const onPageShow = () => { pushLifecycle(); };
+    const onPageShow = () => { pushLifecycle(); reconcileForeground(); };
     const onPageHide = () => { pushBackgroundLifecycle(); };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -287,6 +369,7 @@ export function TenantRealtimeBinding({
 
     return () => {
       active = false;
+      clearTimeout(retryTimer);
       queuedResyncCursor = undefined;
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
@@ -299,10 +382,12 @@ export function TenantRealtimeBinding({
       document.removeEventListener("keydown", signalActivity);
       document.removeEventListener("touchstart", signalActivity);
       for (const unsubscribe of applicationUnsubscribers) unsubscribe();
+      unsubscribeConnection();
+      if (connectionSnapshot?.generation === generation) publishConnectionSnapshot(null);
       applicationClient.dispose();
       lease.release();
     };
-  }, [generation, mode, suppliedCoordinator]);
+  }, [generation, mode, suppliedCoordinator, notificationsAuthorized]);
 
   return children;
 }

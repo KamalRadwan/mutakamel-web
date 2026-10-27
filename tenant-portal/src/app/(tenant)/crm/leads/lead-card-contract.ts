@@ -15,13 +15,17 @@
 import { isCardColor, type CardColor } from "@/design-system";
 import { countryIsoFromName } from "@/lib/geo/country-data";
 import { isUUIDv7 } from "@/lib/uuid";
+import type { CrmActivityState } from "../shared/crm-activity-tone";
+import { MAX_CRM_RATING } from "../shared/crm-rating-contract";
+
+export { crmActivityState as leadActivityState } from "../shared/crm-activity-tone";
 
 const LEAD_ACTIVITY_BUCKETS = ["OVERDUE", "TODAY", "FUTURE"] as const;
 
 type LeadActivityBucket = (typeof LEAD_ACTIVITY_BUCKETS)[number];
 
 /** The board card's bucket set: the server's three, plus "no open activity". */
-export type LeadActivityState = LeadActivityBucket | "NONE";
+export type LeadActivityState = CrmActivityState;
 
 export interface LeadNextActivity {
   activityAt: string;
@@ -33,9 +37,6 @@ export interface LeadOwner {
   firstName: string;
   lastName: string;
 }
-
-/** Stars on a card. The server clamps to the same range. */
-export const MAX_LEAD_RATING = 3;
 
 function invalid(): never {
   throw new Error("Invalid leads response.");
@@ -57,7 +58,7 @@ export function parseLeadRating(value: unknown): number {
     typeof value !== "number" ||
     !Number.isInteger(value) ||
     value < 0 ||
-    value > MAX_LEAD_RATING
+    value > MAX_CRM_RATING
   ) {
     invalid();
   }
@@ -104,13 +105,8 @@ export function parseLeadNextActivity(value: unknown): LeadNextActivity | null {
   return { activityAt, bucket: activity.bucket as LeadActivityBucket };
 }
 
-/** The bucket the card paints, with "no open activity" folded in. */
-export function leadActivityState(activity: LeadNextActivity | null): LeadActivityState {
-  return activity === null ? "NONE" : activity.bucket;
-}
-
 /**
- * The owner's initials — "Kamal Radwan" is `KR`.
+ * The owner's initials, using the first letter of each known name.
  *
  * One letter when only one name is known, and an empty string when neither is:
  * a badge reading "?" claims the owner is unknown, when what is unknown is
@@ -128,6 +124,7 @@ export function leadOwnerInitials(owner: LeadOwner): string {
 /** Avatar initials for a lead or contact display name, by code point. */
 export function leadNameInitials(name: string): string {
   const words = name.trim().split(/\s+/u).filter(Boolean);
+  if (words.length === 0) return "LD";
   if (words.length === 1) return Array.from(words[0]).slice(0, 2).join("").toUpperCase();
   return words.slice(0, 2).map((word) => Array.from(word)[0] ?? "").join("").toUpperCase();
 }
@@ -155,7 +152,7 @@ export function leadCardHeading(lead: {
   leadProfileType: "INDIVIDUAL" | "CORPORATE";
   leadName: string;
   company: string;
-  primaryContactName: string;
+  primaryContact: { displayName: string } | null;
 }): {
   title: string;
   contactName: string | null;
@@ -163,7 +160,7 @@ export function leadCardHeading(lead: {
   if (lead.leadProfileType === "INDIVIDUAL") {
     return { title: lead.leadName, contactName: null };
   }
-  const contactName = lead.primaryContactName.trim();
+  const contactName = lead.primaryContact?.displayName.trim() ?? "";
   return {
     title: lead.company || lead.leadName,
     contactName: contactName || null,

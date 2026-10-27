@@ -258,6 +258,7 @@ export function controlTowerMessage(
     case "TRADE.CONTROL_TOWER.TARGET_STALE":
       return t.tradeControlTower.errorTargetStale;
     case "TRADE.CONTROL_TOWER.RESOLUTION_INVALID":
+    case "TRADE.CONTROL_TOWER.RESOLUTION_CONFLICT":
       return t.tradeControlTower.errorResolutionInvalid;
     case "TRADE.CONTROL_TOWER.PROJECTION_UNAVAILABLE":
       return t.tradeControlTower.errorProjectionUnavailable;

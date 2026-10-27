@@ -47,7 +47,7 @@ export function EmailConfigWorkspace() {
   return (
     <PermissionGate require="workspace.email.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.coreSettings.emailTitle}
           description={t.coreSettings.emailSubtitle}
           primaryAction={

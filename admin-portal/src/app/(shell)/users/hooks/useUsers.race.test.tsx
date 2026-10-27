@@ -66,7 +66,7 @@ describe("useUsers out-of-order responses", () => {
     });
     apiMock.isForbiddenError.mockReturnValue(false);
     apiMock.normalizeErrorCode.mockReturnValue("UNKNOWN");
-    apiMock.listRoles.mockResolvedValue({ data: [] });
+    apiMock.listRoles.mockResolvedValue({ data: [], meta: { page: 1, limit: 100, total: 0, totalPages: 0, hasNext: false, hasPrev: false } });
     apiMock.listWebphoneExtensions.mockResolvedValue([]);
     apiMock.countAdminUsers.mockResolvedValue(0);
   });

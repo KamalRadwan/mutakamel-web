@@ -3,28 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
-  parseLeadStageCatalogueResponse,
   isProtectedLeadStage,
   protectedLeadStageIds,
   type LeadStageItem,
   type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
-import { LEAD_STAGES_PATH } from "./lead-stage-requests";
+import { readLeadStageCatalogue } from "../../shared/lead-stage-catalogue";
 import { useLeadStageMutations } from "./useLeadStageMutations";
 
 export type { LeadStageItem } from "../lead-stage-contract";
-
-async function readCatalogue(signal?: AbortSignal): Promise<LeadStageItem[]> {
-  const response = await axiosClient.get<unknown>(LEAD_STAGES_PATH, {
-    signal,
-    cache: "no-store",
-    maxResponseBytes: 256 * 1024,
-  });
-  return parseLeadStageCatalogueResponse(response.data);
-}
 
 /**
  * The lead-stage catalogue: list, filter and dialog state.
@@ -54,7 +43,7 @@ export function useLeadStages() {
 
   const reconcileCatalogue = useCallback(async (): Promise<boolean> => {
     try {
-      setItems(await readCatalogue());
+      setItems(await readLeadStageCatalogue());
       return true;
     } catch {
       return false;
@@ -66,7 +55,7 @@ export function useLeadStages() {
     setError(null);
     setLoadError(null);
     try {
-      setItems(await readCatalogue(signal));
+      setItems(await readLeadStageCatalogue(signal));
     } catch (caught) {
       if (isAbortError(caught)) return;
       setItems([]);

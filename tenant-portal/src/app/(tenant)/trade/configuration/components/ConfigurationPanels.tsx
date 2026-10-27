@@ -64,6 +64,8 @@ export function VersionsPanel({
   report,
   onCreate,
   onAction,
+  supersedesVersionId,
+  onSupersedesVersionIdChange,
 }: {
   definition: ConfigurationDefinition;
   canManage: boolean;
@@ -72,6 +74,8 @@ export function VersionsPanel({
   report: VersionTestReport | null;
   onCreate: () => void;
   onAction: (version: ConfigurationVersion, action: "test" | "publish") => void;
+  supersedesVersionId: string;
+  onSupersedesVersionIdChange: (id: string) => void;
 }) {
   const { t, lang } = useI18n();
   const copy = CONFIG_UI_COPY[lang];
@@ -93,6 +97,11 @@ export function VersionsPanel({
       }
     >
       <div className="flex flex-col gap-3">
+        {canPublish ? (
+          <Field showLabel label={t.tradeCommon.supersedesVersionId} hint={t.tradeCommon.supersedesVersionHint}>
+            <Input value={supersedesVersionId} onChange={(event) => onSupersedesVersionIdChange(event.target.value)} disabled={isSubmitting} />
+          </Field>
+        ) : null}
         {/* Selected Definition Summary & Maker-Checker Governance Banner */}
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/25 p-3 text-xs">
           <div className="flex flex-wrap items-center gap-2">
@@ -198,6 +207,12 @@ export function VersionsPanel({
                       ? ` → ${formatDateTime(version.effectiveTo, lang)}`
                       : ""}
                   </span>
+                  <IdentifierText className="block text-xs">{version.id}</IdentifierText>
+                  {version.supersededAt ? (
+                    <span className="block text-xs text-muted-foreground">
+                      {t.tradeCommon.eligibilityEnds}: {formatDateTime(version.supersededAt, lang)}
+                    </span>
+                  ) : null}
                 </div>
                 <span className="flex shrink-0 items-center gap-2">
                   <Badge
@@ -411,7 +426,7 @@ export function ResolvePanel() {
                     <IdentifierText className="block truncate text-xs font-semibold text-muted-foreground">
                       {k}
                     </IdentifierText>
-                    <p className="mt-1 font-mono text-sm font-semibold text-foreground">
+                    <p dir="ltr" className="mt-1 font-mono text-sm font-semibold text-foreground">
                       {formatPolicyValueHumanReadable(v, lang)}
                     </p>
                   </div>

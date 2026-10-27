@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { escapeCsvCell } from "@/lib/export/csv-cell";
+import Link from "next/link";
 import {
   Activity,
   Banknote,
@@ -9,15 +11,12 @@ import {
   CirclePercent,
   Clock,
   ExternalLink,
-  Eye,
   Mail,
-  MessageCircle,
-  Phone,
-  Send,
   Star,
   UserRound,
 } from "lucide-react";
 import {
+  Button,
   DateTime,
   EmptyState,
   ErrorState,
@@ -32,16 +31,18 @@ import {
   type PageInfo,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import type { Dictionary } from "@/i18n/dictionaries/ar";
+import type { Language } from "@/i18n/useLanguage";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { useTenantAuth } from "@/context/AuthContext";
 import { localizedName } from "@/lib/format/localized";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import { countryIsoFromName } from "@/lib/geo/country-data";
-import {
-  normalizePhoneDigits,
-  normalizeWhatsAppDigits,
-} from "../../leads/lead-phone-links";
+import { OpportunityPhoneActions } from "./OpportunityQuickEditModal";
 import { AcquisitionSourceIcon } from "../../shared/components/AcquisitionSourceIcon";
 import type { CrmActivityState } from "../../shared/crm-activity-tone";
+import { buildPartyDocumentHref } from "../../shared/party-document-counts-contract";
 import type { OpportunityCardPatch } from "../opportunity-card-contract";
 import type {
   OpportunityDocumentCountVisibility,
@@ -72,8 +73,6 @@ export interface OpportunityExecutiveCardViewProps {
   documentCountsByParty?: ReadonlyMap<string, OpportunityDocumentCounts>;
   documentCountVisibility?: OpportunityDocumentCountVisibility;
   onOpenOpportunity: (item: OpportunityListItem) => void;
-  onOpenQuickModal: (item: OpportunityListItem) => void;
-  onOpenActivities: (item: OpportunityListItem) => void;
   onDeleteOpportunity: (item: OpportunityListItem) => void;
   onMoveStage: (item: OpportunityListItem, stageId: string) => void;
   onCardChange: (
@@ -85,17 +84,17 @@ export interface OpportunityExecutiveCardViewProps {
 }
 
 const CARD_BORDER_ACCENT: Partial<Record<CardColor, string>> = {
-  RED: "border-s-4 border-s-red-500",
-  ORANGE: "border-s-4 border-s-amber-500",
-  AMBER: "border-s-4 border-s-amber-500",
-  YELLOW: "border-s-4 border-s-yellow-500",
-  GREEN: "border-s-4 border-s-emerald-500",
-  TEAL: "border-s-4 border-s-teal-500",
-  BLUE: "border-s-4 border-s-blue-600",
-  INDIGO: "border-s-4 border-s-indigo-500",
-  PURPLE: "border-s-4 border-s-purple-500",
-  PINK: "border-s-4 border-s-pink-500",
-  SLATE: "border-s-4 border-s-slate-500",
+  RED: "border-s-4 border-s-swatch-red",
+  ORANGE: "border-s-4 border-s-swatch-amber",
+  AMBER: "border-s-4 border-s-swatch-amber",
+  YELLOW: "border-s-4 border-s-swatch-yellow",
+  GREEN: "border-s-4 border-s-swatch-green",
+  TEAL: "border-s-4 border-s-swatch-teal",
+  BLUE: "border-s-4 border-s-swatch-blue",
+  INDIGO: "border-s-4 border-s-swatch-indigo",
+  PURPLE: "border-s-4 border-s-swatch-purple",
+  PINK: "border-s-4 border-s-swatch-pink",
+  SLATE: "border-s-4 border-s-swatch-slate",
 };
 
 function getInitials(name: string): string {
@@ -105,16 +104,16 @@ function getInitials(name: string): string {
   return `${words[0][0] ?? ""}${words[1][0] ?? ""}`.toUpperCase();
 }
 
-function formatStageAgeBadge(isoDate?: string, isAr?: boolean): string {
-  if (!isoDate) return isAr ? "الآن بالمرحلة" : "Just now";
+function formatStageAgeBadge(isoDate: string | undefined, labels: Dictionary["crmOpportunities"], lang: Language): string {
+  if (!isoDate) return labels.justNow;
   const time = new Date(isoDate).getTime();
-  if (Number.isNaN(time)) return isAr ? "بالمرحلة" : "in stage";
+  if (Number.isNaN(time)) return labels.inStage;
   const diffMins = Math.max(1, Math.floor((Date.now() - time) / (1000 * 60)));
-  if (diffMins < 60) return isAr ? `${diffMins} د بالمرحلة` : `${diffMins}m in stage`;
+  if (diffMins < 60) return formatTemplate(labels.minutesInStage, { count: formatNumber(diffMins, lang) });
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return isAr ? `${diffHours} س بالمرحلة` : `${diffHours}h in stage`;
+  if (diffHours < 24) return formatTemplate(labels.hoursInStage, { count: formatNumber(diffHours, lang) });
   const diffDays = Math.floor(diffHours / 24);
-  return isAr ? `${diffDays} يوم بالمرحلة` : `${diffDays}d in stage`;
+  return formatTemplate(labels.daysInStage, { count: formatNumber(diffDays, lang) });
 }
 
 function resolveCountryIso(country: string | null): string {
@@ -141,8 +140,8 @@ export function OpportunityExecutiveCardView({
   branchId,
   selectedIds,
   onSelectionChange,
-  canUpdate,
-  canDelete,
+  canUpdate: canUpdateByScope,
+  canDelete: canDeleteByScope,
   isLoading,
   error,
   onRetry,
@@ -153,17 +152,20 @@ export function OpportunityExecutiveCardView({
   documentCountsByParty,
   documentCountVisibility,
   onOpenOpportunity,
-  onOpenQuickModal,
-  onOpenActivities,
   onDeleteOpportunity,
   onMoveStage,
   onCardChange,
   onBulkMoveStage,
 }: OpportunityExecutiveCardViewProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { canMutate } = useAccessMode();
+  const canUpdate = (item: OpportunityListItem) => canMutate && canUpdateByScope(item);
+  const canDelete = (item: OpportunityListItem) => canMutate && canDeleteByScope(item);
+  const { user } = useTenantAuth();
+  const canExport = user?.permissions.includes("crm.opportunities.export") ?? false;
   const cardDict = t.crmLeads.card;
   const [bulkStageValue, setBulkStageValue] = useState("");
+  const canUpdateAny = items.some((item) => selectedIds.has(item.id) && canUpdate(item));
 
   if (!branchId) {
     return <EmptyState title={t.crmOpportunities.selectBranchFirst} />;
@@ -173,7 +175,7 @@ export function OpportunityExecutiveCardView({
     return (
       <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 8 }).map((_, idx) => (
-          <Skeleton key={`opp-card-skel-${idx}`} className="h-80 rounded-xl" />
+          <Skeleton key={`opp-card-skel-${idx}`} className="h-80 rounded-lg" />
         ))}
       </div>
     );
@@ -214,10 +216,9 @@ export function OpportunityExecutiveCardView({
   }
 
   function exportCsv() {
-    const rowsToExport =
-      selectedIds.size > 0
-        ? items.filter((i) => selectedIds.has(i.id))
-        : items;
+    if (!canExport) return;
+    const rowsToExport = items.filter((item) => selectedIds.has(item.id));
+    if (rowsToExport.length === 0) return;
     const header = [
       "ID",
       "Title",
@@ -230,22 +231,22 @@ export function OpportunityExecutiveCardView({
       "Importance",
     ];
     const csvLines = [
-      header.join(","),
+      header.map(escapeCsvCell).join(","),
       ...rowsToExport.map((r) =>
         [
           r.id,
-          `"${(r.title || "").replace(/"/g, '""')}"`,
-          `"${(r.customerCompanyName || r.customerDisplayName || "").replace(/"/g, '""')}"`,
+          r.title,
+          r.customerCompanyName || r.customerDisplayName || "",
           r.status,
           r.amount ?? "",
           r.currencyCode ?? "",
           r.probabilityPercent ?? "",
           r.expectedCloseDate ?? "",
           r.importance,
-        ].join(","),
+        ].map(escapeCsvCell).join(","),
       ),
     ];
-    const blob = new Blob([csvLines.join("\n")], {
+    const blob = new Blob(["\uFEFF", csvLines.join("\r\n")], {
       type: "text/csv;charset=utf-8;",
     });
     const url = URL.createObjectURL(blob);
@@ -259,87 +260,66 @@ export function OpportunityExecutiveCardView({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {/* Sub-Toolbar Bar (Selection + Batch Controls + Sort & Density) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3.5 py-2 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-100">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
             <input
               type="checkbox"
               checked={isAllSelected}
               onChange={toggleSelectAll}
-              className="size-4 rounded-xs border-slate-300 text-blue-600 focus:ring-blue-500"
+              className="size-4 rounded-xs border-input text-primary focus:ring-ring"
             />
             <span>
               {selectedIds.size > 0
-                ? isAr
-                  ? `${selectedIds.size} محدد`
-                  : `${selectedIds.size} Selected`
-                : isAr
-                  ? "تحديد الكل"
-                  : "Select All"}
+                ? formatTemplate(t.crmOpportunities.selectedCount, { count: formatNumber(selectedIds.size, lang) })
+                : t.crmOpportunities.selectAll}
             </span>
           </label>
 
           {/* Move Stage Dropdown */}
-          <select
-            value={bulkStageValue}
-            disabled={selectedIds.size === 0}
-            onChange={(e) => {
-              const target = e.target.value;
-              setBulkStageValue("");
-              if (target) void onBulkMoveStage(target);
-            }}
-            className="h-7 rounded-lg border border-blue-200 bg-blue-50/70 px-2.5 text-xs font-semibold text-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-          >
-            <option value="">{isAr ? "نقل المرحلة ▾" : "Move Stage ▾"}</option>
-            {nonLostStages.map((st) => (
-              <option key={st.id} value={st.id}>
-                {localizedName(st, lang)}
-              </option>
-            ))}
-          </select>
+          {canMutate && (
+            <select
+              value={bulkStageValue}
+              disabled={!canUpdateAny}
+              aria-label={t.crmOpportunities.bulkMoveStage}
+              onChange={(e) => {
+                const target = e.target.value;
+                setBulkStageValue("");
+                if (target && canUpdateAny) void onBulkMoveStage(target);
+              }}
+              className="h-7 rounded-lg border border-primary/30 bg-primary-subtle px-2.5 text-xs font-semibold text-primary-subtle-foreground disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
+            >
+              <option value="">{t.crmOpportunities.moveStage}</option>
+              {nonLostStages.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {localizedName(st, lang)}
+                </option>
+              ))}
+            </select>
+          )}
 
-          <button
-            type="button"
-            disabled={selectedIds.size === 0}
-            onClick={() => {
-              const firstSelected = items.find((i) => selectedIds.has(i.id));
-              if (firstSelected) onOpenQuickModal(firstSelected);
-            }}
-            className="h-7 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            {isAr ? "تعيين مسؤول ▾" : "Assign Salesperson ▾"}
-          </button>
-
-          <button
-            type="button"
-            disabled={selectedIds.size === 0}
-            onClick={() => {
-              const firstSelected = items.find((i) => selectedIds.has(i.id));
-              if (firstSelected) onOpenQuickModal(firstSelected);
-            }}
-            className="h-7 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            {isAr ? "تعديل الأهمية / الوسوم ▾" : "Importance & Tags ▾"}
-          </button>
-
-          <button
-            type="button"
-            onClick={exportCsv}
-            className="h-7 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            {isAr ? "تصدير المحدد" : "Export Selected"}
-          </button>
+          {canExport && (
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              disabled={!items.some((item) => selectedIds.has(item.id))}
+              onClick={exportCsv}
+              className="h-7 rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-foreground hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t.crmOpportunities.exportSelectedOnPage}
+            </Button>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span>
-            {isAr ? "كثافة البطاقات:" : "Card Density:"}{" "}
-            <strong className="font-semibold text-slate-800 dark:text-slate-200">
-              Detailed 360°
+            <strong className="font-semibold text-foreground">
+              {t.crmOpportunities.detailedCards}
             </strong>
           </span>
-          <span className="text-slate-300 dark:text-slate-700">|</span>
-          <span>{isAr ? "ترتيب حسب:" : "Sort by:"}</span>
+          <span className="text-border">|</span>
+          <span>{t.crmOpportunities.sortBy}</span>
           <select
             value={`${sort?.id ?? "createdAt"}:${sort?.direction ?? "desc"}`}
             onChange={(e) => {
@@ -349,31 +329,33 @@ export function OpportunityExecutiveCardView({
                 direction: dir === "asc" ? "asc" : "desc",
               });
             }}
-            className="h-7 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="h-7 rounded-lg border border-border bg-card px-2 text-xs font-semibold text-foreground"
           >
             <option value="createdAt:desc">
-              {isAr ? "تاريخ الإنشاء (الأحدث)" : "Created Date (Newest)"}
+              {t.crmOpportunities.sortNewest}
             </option>
             <option value="createdAt:asc">
-              {isAr ? "تاريخ الإنشاء (الأقدم)" : "Created Date (Oldest)"}
+              {t.crmOpportunities.sortOldest}
             </option>
             <option value="amount:desc">
-              {isAr ? "قيمة الصفقة (الأعلى)" : "Deal Value (High → Low)"}
+              {t.crmOpportunities.sortValue}
             </option>
             <option value="probabilityPercent:desc">
-              {isAr ? "الاحتمال (الأعلى)" : "Probability (High → Low)"}
+              {t.crmOpportunities.sortProbability}
             </option>
             <option value="expectedCloseDate:asc">
-              {isAr ? "تاريخ الإغلاق (الأقرب)" : "Close Date (Soonest)"}
+              {t.crmOpportunities.sortCloseDate}
             </option>
             <option value="title:asc">
-              {isAr ? "العنوان (أ - ي)" : "Title (A → Z)"}
+              {t.crmOpportunities.sortTitle}
             </option>
           </select>
-          <span className="text-[11px] font-medium tabular-nums text-slate-400">
-            {isAr
-              ? `عرض 1–${items.length} من ${page?.total ?? items.length}`
-              : `Showing 1–${items.length} of ${page?.total ?? items.length} opportunities`}
+          <span className="text-2xs font-medium tabular-nums text-muted-foreground">
+            {formatTemplate(t.crmOpportunities.showingRange, {
+              from: formatNumber(items.length ? (page ? (page.page - 1) * page.limit + 1 : 1) : 0, lang),
+              to: formatNumber((page ? (page.page - 1) * page.limit : 0) + items.length, lang),
+              total: formatNumber(page?.total ?? items.length, lang),
+            })}
           </span>
         </div>
       </div>
@@ -389,8 +371,6 @@ export function OpportunityExecutiveCardView({
               item.customerDisplayName ??
               t.crmOpportunities.notProvided;
             const stage = stageById.get(item.stageId);
-            const isTerminal =
-              stage?.flag === "WON" || stage?.flag === "LOST";
             const isWon = stage?.flag === "WON" || item.status === "WON";
             const isLost = stage?.flag === "LOST" || item.status === "LOST";
 
@@ -403,15 +383,6 @@ export function OpportunityExecutiveCardView({
               item.primaryContact?.phones[0] ?? item.customerPhone ?? "";
             const primaryEmail =
               item.primaryContact?.email ?? item.customerEmail ?? "";
-            const callDigits = primaryPhone
-              ? normalizePhoneDigits(primaryPhone)
-              : "";
-            const waDigits = primaryPhone
-              ? normalizeWhatsAppDigits(
-                  primaryPhone,
-                  item.customerCountry ?? undefined,
-                )
-              : null;
 
             const counts = documentCountsByParty?.get(item.customerPartyId);
             const actState = mapActivityState(item.activityState);
@@ -432,11 +403,11 @@ export function OpportunityExecutiveCardView({
               <div
                 key={item.id}
                 className={cn(
-                  "flex flex-col justify-between gap-3 rounded-xl border-2 bg-white p-3.5 shadow-2xs transition-all hover:shadow-md dark:bg-slate-900",
+                  "flex flex-col justify-between gap-3 rounded-lg border-2 bg-card p-3.5 shadow-2xs transition-all hover:shadow-md",
                   item.cardColor ? CARD_BORDER_ACCENT[item.cardColor] : "",
                   isSelected
-                    ? "border-blue-600 ring-2 ring-blue-500/15"
-                    : "border-slate-200/90 hover:border-blue-300 dark:border-slate-800",
+                    ? "border-primary ring-2 ring-primary/15"
+                    : "border-border hover:border-primary/40",
                 )}
               >
                 <div className="flex flex-col gap-2.5">
@@ -448,22 +419,24 @@ export function OpportunityExecutiveCardView({
                         checked={isSelected}
                         onChange={() => toggleOne(item.id)}
                         aria-label={`Select ${item.title}`}
-                        className="mt-1.5 size-4 shrink-0 rounded-xs border-slate-300 text-blue-600 focus:ring-blue-500"
+                        className="mt-1.5 size-4 shrink-0 rounded-xs border-input text-primary focus:ring-ring"
                       />
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-xs font-bold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary-subtle text-xs font-semibold text-primary-subtle-foreground">
                         {getInitials(item.title)}
                       </span>
                       <div className="min-w-0">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="xs"
                           onClick={() => onOpenOpportunity(item)}
-                          className="block max-w-full truncate text-start text-sm font-bold text-slate-900 hover:text-blue-600 dark:text-slate-100 dark:hover:text-blue-400"
+                          className="block h-auto max-w-full truncate p-0 text-start text-sm font-semibold text-foreground hover:bg-transparent hover:text-primary"
                         >
                           {item.title}
-                        </button>
-                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                        </Button>
+                        <p className="truncate text-2xs text-muted-foreground">
                           {countryIso && (
-                            <span className="font-semibold text-slate-600 dark:text-slate-300">
+                            <span className="font-semibold text-foreground">
                               {countryIso}{" "}
                             </span>
                           )}
@@ -475,18 +448,18 @@ export function OpportunityExecutiveCardView({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-1">
-                      {canUpdate(item) && !isTerminal ? (
+                      {canUpdate(item) ? (
                         <select
                           value={item.stageId}
                           onChange={(e) => onMoveStage(item, e.target.value)}
                           aria-label={`Stage for ${item.title}`}
                           className={cn(
-                            "h-6 max-w-24 truncate rounded-md border px-1.5 text-[11px] font-bold",
+                            "h-6 max-w-24 truncate rounded-md border px-1.5 text-2xs font-semibold",
                             isWon
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
                               : isLost
-                                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
-                                : "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
+                                ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+                                : "border-primary/30 bg-primary-subtle text-primary-subtle-foreground",
                           )}
                         >
                           {stages.map((st) => (
@@ -498,53 +471,29 @@ export function OpportunityExecutiveCardView({
                       ) : (
                         <span
                           className={cn(
-                            "rounded-md border px-2 py-0.5 text-[11px] font-bold",
+                            "rounded-md border px-2 py-0.5 text-2xs font-semibold",
                             isWon
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
                               : isLost
-                                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
-                                : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                                ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+                                : "border-border bg-muted text-foreground",
                           )}
                         >
                           {stage ? localizedName(stage, lang) : "—"}
                         </span>
                       )}
 
-                      <button
+                      <Button
                         type="button"
-                        onClick={() => onOpenQuickModal(item)}
-                        title={
-                          isAr
-                            ? "معاينة وتعديل سريع 360°"
-                            : "Open 360° Quick-Edit Modal"
-                        }
-                        aria-label={
-                          isAr
-                            ? "معاينة وتعديل سريع 360°"
-                            : "Open 360° Quick-Edit Modal"
-                        }
-                        className="flex size-6 items-center justify-center rounded-md border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
-                      >
-                        <Eye className="size-3.5" aria-hidden="true" />
-                      </button>
-
-                      <button
-                        type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => onOpenOpportunity(item)}
-                        title={
-                          isAr
-                            ? "فتح الصفحة الكاملة"
-                            : "Open Full Standalone Page"
-                        }
-                        aria-label={
-                          isAr
-                            ? "فتح الصفحة الكاملة"
-                            : "Open Full Standalone Page"
-                        }
-                        className="flex size-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                        title={t.crmOpportunities.openOpportunity}
+                        aria-label={t.crmOpportunities.openOpportunity}
+                        className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                       >
                         <ExternalLink className="size-3" aria-hidden="true" />
-                      </button>
+                      </Button>
 
                       <OpportunityCardMenu
                         cardColor={item.cardColor}
@@ -577,18 +526,18 @@ export function OpportunityExecutiveCardView({
                   </div>
 
                   {/* LAYER 2: Deal Commercials Highlight Box */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-3 py-2 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                    <div className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-800 dark:text-emerald-300">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-success/30 bg-success-subtle/50 px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-success-subtle-foreground">
                       <Banknote className="size-4 shrink-0" aria-hidden="true" />
                       {item.amount ? (
                         <Money
                           value={item.amount}
                           currency={item.currencyCode ?? undefined}
                           language={lang}
-                          className="font-extrabold"
+                          className="font-semibold"
                         />
                       ) : (
-                        <span className="text-xs font-medium text-slate-400">
+                        <span className="text-xs font-medium text-muted-foreground">
                           {t.crmOpportunities.notProvided}
                         </span>
                       )}
@@ -596,13 +545,13 @@ export function OpportunityExecutiveCardView({
 
                     <div className="flex items-center gap-2">
                       {probabilityLabel && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-extrabold text-blue-700 shadow-2xs dark:bg-slate-900 dark:text-blue-300">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-0.5 text-2xs font-semibold text-primary shadow-2xs">
                           <CirclePercent className="size-3" aria-hidden="true" />
                           {probabilityLabel}
                         </span>
                       )}
                       {item.expectedCloseDate && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                        <span className="inline-flex items-center gap-1 text-2xs font-semibold text-muted-foreground">
                           <Calendar className="size-3 shrink-0" aria-hidden="true" />
                           <DateTime
                             value={`${item.expectedCloseDate.slice(0, 10)}T00:00:00.000Z`}
@@ -621,15 +570,15 @@ export function OpportunityExecutiveCardView({
                       <StatusBadge
                         value={item.status}
                         kind="OpportunityStatus"
-                        className="px-2 py-0.5 text-[10px] font-bold"
+                        className="px-2 py-0.5 text-2xs font-semibold"
                       />
 
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                          "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-2xs font-semibold",
                           isCorporate
-                            ? "border-blue-200 bg-blue-50/80 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                            : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                            ? "border-primary/30 bg-primary-subtle text-primary-subtle-foreground"
+                            : "border-border bg-muted text-foreground",
                         )}
                       >
                         {isCorporate ? (
@@ -641,7 +590,7 @@ export function OpportunityExecutiveCardView({
                       </span>
 
                       {item.leadSourceName && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-2xs font-medium text-foreground">
                           <AcquisitionSourceIcon
                             source={{ iconUrl: item.leadSourceIconUrl }}
                           />
@@ -652,40 +601,40 @@ export function OpportunityExecutiveCardView({
                       )}
                     </div>
 
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                    <span className="inline-flex items-center gap-1 text-2xs font-medium text-muted-foreground">
                       <Clock className="size-3" aria-hidden="true" />
-                      <span>{formatStageAgeBadge(item.createdAt, isAr)}</span>
+                      <span>{formatStageAgeBadge(item.createdAt, t.crmOpportunities, lang)}</span>
                     </span>
                   </div>
 
                   {/* LAYER 4: Primary Contact & Instant Channels Box */}
-                  <div className="flex flex-col gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/80 p-2.5 dark:border-slate-800 dark:bg-slate-800/40">
+                  <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/40 p-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex min-w-0 items-center gap-1 text-xs">
                         <UserRound
-                          className="size-3.5 shrink-0 text-slate-500"
+                          className="size-3.5 shrink-0 text-muted-foreground"
                           aria-hidden="true"
                         />
-                        <strong className="truncate font-bold text-slate-800 dark:text-slate-100">
+                        <strong className="truncate font-semibold text-foreground">
                           {item.primaryContact?.displayName || customerName}
                         </strong>
                         {item.primaryContact?.jobTitle && (
-                          <span className="truncate text-slate-400">
+                          <span className="truncate text-muted-foreground">
                             · {item.primaryContact.jobTitle}
                           </span>
                         )}
                       </span>
                       {item.primaryContact?.isPrimary && (
-                        <span className="shrink-0 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                        <span className="shrink-0 rounded-md border border-primary/30 bg-primary-subtle px-1.5 py-0.5 text-2xs font-semibold text-primary-subtle-foreground">
                           {cardDict.primary}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                    <div className="flex items-center justify-between gap-2 text-2xs text-muted-foreground">
                       <div className="min-w-0 truncate">
                         {primaryPhone ? (
-                          <span className="font-mono font-bold text-slate-700 dark:text-slate-200" dir="ltr">
+                          <span className="font-mono font-semibold tabular-nums text-foreground" dir="ltr">
                             {primaryPhone}
                           </span>
                         ) : primaryEmail ? (
@@ -696,42 +645,12 @@ export function OpportunityExecutiveCardView({
                       </div>
 
                       <div className="flex shrink-0 items-center gap-1">
-                        {callDigits && (
-                          <a
-                            href={`tel:${callDigits}`}
-                            aria-label={`Call ${primaryPhone}`}
-                            className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800"
-                          >
-                            <Phone className="size-3" aria-hidden="true" />
-                          </a>
-                        )}
-                        {waDigits && (
-                          <>
-                            <a
-                              href={`https://wa.me/${waDigits}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`WhatsApp ${primaryPhone}`}
-                              className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-emerald-600 hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-800"
-                            >
-                              <MessageCircle className="size-3" aria-hidden="true" />
-                            </a>
-                            <a
-                              href={`https://t.me/+${waDigits}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Telegram ${primaryPhone}`}
-                              className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-sky-600 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-800"
-                            >
-                              <Send className="size-3" aria-hidden="true" />
-                            </a>
-                          </>
-                        )}
+                        {primaryPhone && <OpportunityPhoneActions phone={primaryPhone} country={item.customerCountry} />}
                         {primaryEmail && (
                           <a
                             href={`mailto:${primaryEmail}`}
                             aria-label={`Email ${primaryEmail}`}
-                            className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800"
+                            className="flex size-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-primary"
                           >
                             <Mail className="size-3" aria-hidden="true" />
                           </a>
@@ -740,41 +659,54 @@ export function OpportunityExecutiveCardView({
                     </div>
                   </div>
 
-                  {/* LAYER 5: Trade Document Counters Strip */}
-                  {counts && (
-                    <div className="grid grid-cols-3 gap-1.5 text-center text-[10px]">
-                      {documentCountVisibility?.quotations !== false && (
-                        <div className="rounded-lg border border-slate-200/80 bg-slate-50 py-1 dark:border-slate-800 dark:bg-slate-800/40">
-                          <span className="font-bold text-slate-500">
-                            {t.crmLeadViews.documentCountsShort.quotations}:{" "}
-                          </span>
-                          <strong className="font-extrabold text-slate-800 dark:text-slate-100">
-                            {counts.quotations ?? 0}
-                          </strong>
-                        </div>
-                      )}
-                      {documentCountVisibility?.salesOrders !== false && (
-                        <div className="rounded-lg border border-slate-200/80 bg-slate-50 py-1 dark:border-slate-800 dark:bg-slate-800/40">
-                          <span className="font-bold text-slate-500">
-                            {t.crmLeadViews.documentCountsShort.salesOrders}:{" "}
-                          </span>
-                          <strong className="font-extrabold text-slate-800 dark:text-slate-100">
-                            {counts.salesOrders ?? 0}
-                          </strong>
-                        </div>
-                      )}
-                      {documentCountVisibility?.invoices !== false && (
-                        <div className="rounded-lg border border-slate-200/80 bg-slate-50 py-1 dark:border-slate-800 dark:bg-slate-800/40">
-                          <span className="font-bold text-slate-500">
-                            {t.crmLeadViews.documentCountsShort.invoices}:{" "}
-                          </span>
-                          <strong className="font-extrabold text-slate-800 dark:text-slate-100">
-                            {counts.invoices ?? 0}
-                          </strong>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* LAYER 5: Trade Document Counters Strip (PQ | SO | INV) */}
+                  <div className="grid grid-cols-3 gap-1.5 text-center text-2xs">
+                    {documentCountVisibility?.quotations !== false && (
+                      <Link
+                        href={buildPartyDocumentHref("quotations", item.customerPartyId)}
+                        onClick={(e) => e.stopPropagation()}
+                        data-testid={`opportunity-card-pq-${item.id}`}
+                        className="rounded-lg border border-border bg-muted/40 py-1 transition-colors hover:border-primary/40 hover:bg-primary-subtle/40"
+                      >
+                        <span className="font-semibold text-muted-foreground">
+                          {t.crmLeadViews.documentCountsShort.quotations}:{" "}
+                        </span>
+                        <strong className="font-semibold text-foreground">
+                          {counts?.quotations ?? 0}
+                        </strong>
+                      </Link>
+                    )}
+                    {documentCountVisibility?.salesOrders !== false && (
+                      <Link
+                        href={buildPartyDocumentHref("salesOrders", item.customerPartyId)}
+                        onClick={(e) => e.stopPropagation()}
+                        data-testid={`opportunity-card-so-${item.id}`}
+                        className="rounded-lg border border-border bg-muted/40 py-1 transition-colors hover:border-primary/40 hover:bg-primary-subtle/40"
+                      >
+                        <span className="font-semibold text-muted-foreground">
+                          {t.crmLeadViews.documentCountsShort.salesOrders}:{" "}
+                        </span>
+                        <strong className="font-semibold text-foreground">
+                          {counts?.salesOrders ?? 0}
+                        </strong>
+                      </Link>
+                    )}
+                    {documentCountVisibility?.invoices !== false && (
+                      <Link
+                        href={buildPartyDocumentHref("invoices", item.customerPartyId)}
+                        onClick={(e) => e.stopPropagation()}
+                        data-testid={`opportunity-card-inv-${item.id}`}
+                        className="rounded-lg border border-border bg-muted/40 py-1 transition-colors hover:border-primary/40 hover:bg-primary-subtle/40"
+                      >
+                        <span className="font-semibold text-muted-foreground">
+                          {t.crmLeadViews.documentCountsShort.invoices}:{" "}
+                        </span>
+                        <strong className="font-semibold text-foreground">
+                          {counts?.invoices ?? 0}
+                        </strong>
+                      </Link>
+                    )}
+                  </div>
 
                   {/* LAYER 6: Tags */}
                   {item.tags.length > 0 && (
@@ -788,7 +720,7 @@ export function OpportunityExecutiveCardView({
                         />
                       ))}
                       {item.tags.length > 3 && (
-                        <span className="text-[10px] font-semibold text-slate-400">
+                        <span className="text-2xs font-semibold text-muted-foreground">
                           +{item.tags.length - 3}
                         </span>
                       )}
@@ -797,15 +729,18 @@ export function OpportunityExecutiveCardView({
                 </div>
 
                 {/* LAYER 7: Footer (1★-3★ Importance + Activity Pill + Owner Avatar) */}
-                <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                <div className="flex items-center justify-between gap-2 border-t border-border pt-2.5">
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-0.5">
                       {[1, 2, 3].map((st) => {
                         const filled = st <= item.importance;
+                        if (!canUpdate(item)) return <Star key={st} className={cn("size-3.5", filled ? "fill-warning text-warning" : "text-muted-foreground")} aria-hidden="true" />;
                         return (
-                          <button
+                          <Button
                             key={st}
                             type="button"
+                            variant="ghost"
+                            size="xs"
                             disabled={!canUpdate(item)}
                             onClick={() =>
                               onCardChange(
@@ -818,33 +753,35 @@ export function OpportunityExecutiveCardView({
                               t.crmOpportunities.setImportance,
                               { level: st },
                             )}
-                            className="p-0.5 disabled:cursor-default"
+                            className="h-auto w-auto p-0.5 hover:bg-transparent disabled:cursor-default"
                           >
                             <Star
                               className={cn(
                                 "size-3.5",
                                 filled
-                                  ? "fill-amber-400 text-amber-500"
-                                  : "text-slate-300 dark:text-slate-600",
+                                  ? "fill-warning text-warning"
+                                  : "text-muted-foreground/40",
                               )}
                             />
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
 
-                    <button
+                    <Button
                       type="button"
-                      onClick={() => onOpenActivities(item)}
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => onOpenOpportunity(item)}
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                        "inline-flex h-auto items-center gap-1 rounded-md border px-2 py-0.5 text-2xs font-semibold",
                         actState === "OVERDUE"
-                          ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
+                          ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
                           : actState === "TODAY"
-                            ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+                            ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
                             : actState === "FUTURE"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
-                              : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400",
+                              ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+                              : "border-border bg-muted text-muted-foreground",
                       )}
                     >
                       <Activity className="size-3 shrink-0" aria-hidden="true" />
@@ -855,15 +792,15 @@ export function OpportunityExecutiveCardView({
                             )
                           : t.activities.title}
                       </span>
-                    </button>
+                    </Button>
                   </div>
 
                   {item.ownerDisplayName && (
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <span className="flex size-5 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-[10px] font-bold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                      <span className="flex size-5 items-center justify-center rounded-md border border-primary/30 bg-primary-subtle text-2xs font-semibold text-primary-subtle-foreground">
                         {ownerInit}
                       </span>
-                      <span className="max-w-20 truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                      <span className="max-w-20 truncate text-2xs font-medium text-muted-foreground">
                         {item.ownerDisplayName}
                       </span>
                     </div>

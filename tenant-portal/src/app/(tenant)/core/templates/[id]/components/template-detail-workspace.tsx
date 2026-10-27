@@ -16,7 +16,7 @@ import {
 } from "@/design-system";
 import { formatDateTime } from "@/lib/format/date";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import { EntityHistoryPanel } from "../../../components/EntityHistoryPanel";
+import { RecordHistoryTab } from "@/components/audit/RecordHistoryTab";
 import { useCoreOperationsErrorText } from "../../../hooks/useCoreOperationsErrorText";
 import { TEMPLATE_READ_PERMISSION } from "../../templates-contract";
 import { useTemplateDetail } from "../hooks/useTemplateDetail";
@@ -126,12 +126,6 @@ export function TemplateDetailWorkspace({ id }: { id: string }) {
               }
             />
 
-            {/* 7.12 — this is the definition's metadata and lifecycle, not a
-                document editor. The design system has no component that can
-                express `TemplateDocumentV1` (18 node types, absolute and flow
-                layout, bindings, formula ASTs); `RichTextEditor` handles
-                sanitized HTML for one field. Shipping a list under an editor's
-                name is what MASTER-PLAN 7.12 forbids. */}
             <DetailSection
               title={copy.definitionTitle}
               description={copy.definitionDescription}
@@ -192,7 +186,7 @@ export function TemplateDetailWorkspace({ id }: { id: string }) {
               <TemplateRecoveryPanel recovery={recovery} />
             ) : null}
 
-            <EntityHistoryPanel entityType={TEMPLATE_AUDIT_ENTITY_TYPE} entityId={template.id} />
+            <RecordHistoryTab entityType={TEMPLATE_AUDIT_ENTITY_TYPE} entityId={template.id} />
 
             <EditTemplateDrawer
               key={template.etag}

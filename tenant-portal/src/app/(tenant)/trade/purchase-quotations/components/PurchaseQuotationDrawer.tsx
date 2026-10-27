@@ -15,6 +15,7 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TradeLineEditor } from "../../documents/components/TradeLineEditor";
+import { TradeWriteFields, TradeWriteOutcome } from "../../documents/components/TradeBoundaryStates";
 import {
   TRADE_NOTES_MAX_LENGTH,
   TRADE_REFERENCE_MAX_LENGTH,
@@ -59,6 +60,8 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
         discardCancel: t.common.cancel,
       }}
     >
+      <TradeWriteOutcome write={state.write} />
+      <TradeWriteFields write={state.write}>
       {state.suppliersError ? (
         <DegradedBanner
           message={
@@ -80,7 +83,7 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
         <Select
           value={state.values.supplierPartyId}
           onValueChange={(next) => state.setValue({ supplierPartyId: next })}
-          disabled={state.isLoadingSuppliers || state.suppliers.length === 0}
+          disabled={state.write.isBlocked || state.isLoadingSuppliers || state.suppliers.length === 0}
         >
           <SelectTrigger size="sm">
             <SelectValue placeholder={t.tradeDocuments.purchaseQuotations.supplierPlaceholder} />
@@ -136,8 +139,9 @@ export function PurchaseQuotationDrawer({ state, isEdit }: PurchaseQuotationDraw
       <TradeLineEditor
         state={state.lineDraft}
         currencyCode={state.values.currencyCode}
-        disabled={state.write.isWriting}
+        disabled={state.write.isBlocked}
       />
+      </TradeWriteFields>
     </FormDrawer>
   );
 }

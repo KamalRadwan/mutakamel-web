@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
+import Link from "next/link";
 import { en as enDict } from "@/i18n/dictionaries/en";
 import { ar as arDict } from "@/i18n/dictionaries/ar";
 import { localeForLanguage } from "@/i18n/locale";
@@ -58,6 +59,7 @@ import type {
   ProvisioningWorkspaceSection,
   TenantProvisioningWorkspaceModel,
 } from "../hooks/useTenantProvisioningWorkspace";
+import { useTenantComponentSourceFilter } from "../hooks/useTenantComponentSourceFilter";
 import {
   provisioningCodeText,
   provisioningSafeCodeHint,
@@ -77,6 +79,9 @@ import {
   provisioningUpdateScope,
   type ProvisioningUpdateScope,
 } from "../model/update-scope";
+import {
+  TENANT_COMPONENT_SELECTION_SOURCES,
+} from "../types";
 import type {
   ProvisioningResource,
   SeedConflictDecision,
@@ -271,6 +276,18 @@ function confirmationContent(pending: ProvisioningConfirmation): {
 } {
   const en = enDict.tenantProvisioning;
   const ar = arDict.tenantProvisioning;
+  if ("request" in pending) {
+    const resend = pending.kind === "resend-release";
+    return {
+      titleEn: `${resend ? en.resendReleaseButton : en.closeFailedButton} · ${en.recoveryGeneration(pending.request.generation)}`,
+      titleAr: `${resend ? ar.resendReleaseButton : ar.closeFailedButton} · ${ar.recoveryGeneration(pending.request.generation)}`,
+      descriptionEn: resend ? en.resendReleaseDescription : en.closeFailedDescription,
+      descriptionAr: resend ? ar.resendReleaseDescription : ar.closeFailedDescription,
+      confirmEn: resend ? en.resendReleaseButton : en.closeFailedButton,
+      confirmAr: resend ? ar.resendReleaseButton : ar.closeFailedButton,
+      variant: "warning",
+    };
+  }
   if (pending.kind === "repair") {
     return {
       titleEn: en.repairConfirmTitle(pending.component.componentKey),
@@ -422,7 +439,7 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
       {!provisioning.selectedOperation.data ? (
         <EmptyState icon={CircleDashed} title={copy.selectOperationTitle} />
       ) : (
-        <div className="space-y-4">
+        <div id={`provisioning-operation-${provisioning.selectedOperation.data.id}`} className="space-y-4">
           {(() => {
             const operation = provisioning.selectedOperation.data;
             const latestOperation = model.latestOperation;
@@ -450,6 +467,8 @@ function OperationDetail({ model }: TenantProvisioningWorkspaceViewProps) {
                 : null;
             return (
               <>
+                <RecoveryStatus model={model} operationId={operation.id} />
+                {operation.currentPhase === "FAILED_OPERATION_CLOSED" && <p className="text-xs text-muted-foreground">{copy.recoveryClosedLabel}</p>}
                 <div className="rounded-lg border border-border p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -792,14 +811,14 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
               const checked = model.selectedUpdateKeys.includes(update.componentKey);
               const selectable = !update.updateAlreadyPlanned && update.current.manifestChecksum !== null;
               return (
+                <article key={update.componentKey} className="space-y-2 rounded-lg border border-border p-3">
                 <Button size="sm"
                   type="button"
-                  key={update.componentKey}
                   variant="outline"
                   aria-pressed={checked}
                   disabled={!selectable}
                   onClick={() => model.toggleUpdate(update.componentKey)}
-                  className={`h-auto justify-start whitespace-normal rounded-lg p-3 text-start ${checked ? "border-primary bg-selected text-selected-foreground" : "border-border"}`}
+                  className={`h-auto w-full justify-start whitespace-normal rounded-lg p-3 text-start ${checked ? "border-primary bg-selected text-selected-foreground" : "border-border"}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -819,6 +838,20 @@ function UpdatesSection({ model }: TenantProvisioningWorkspaceViewProps) {
                     {update.updateAlreadyPlanned && <Badge tone="neutral">{copy.alreadyPlannedBadge}</Badge>}
                   </div>
                 </Button>
+                {update.updateAlreadyPlanned && (
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <p>{copy.plannedRecoveryReason}</p>
+                    {update.lastOperationId && <>
+                      <Link href={`#provisioning-operation-${update.lastOperationId}`}
+                        className="text-primary underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                        onClick={() => { provisioning.selectOperation(update.lastOperationId!); model.setSection("operations"); }}>
+                        {copy.blockingOperationLink} · <bdi>{update.lastOperationId}</bdi>
+                      </Link>
+                      <RecoveryStatus model={model} operationId={update.lastOperationId} />
+                    </>}
+                  </div>
+                )}
+                </article>
               );
             })}
           </div>
@@ -832,17 +865,34 @@ function StateSection({ model }: TenantProvisioningWorkspaceViewProps) {
   const ar = model.lang === "ar";
   const copy = tpCopy(ar);
   const { provisioning } = model;
+  const { selectionSource, setSelectionSource, components } =
+    useTenantComponentSourceFilter(provisioning.components.data.items);
   return (
     <div className="space-y-5">
       <ResourceBoundary resource={provisioning.components} ar={ar}>
         <div>
-          <h3 className="mb-2 text-sm font-semibold text-foreground">{copy.installedComponentsTitle}</h3>
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+            <h3 className="text-sm font-semibold text-foreground">{copy.installedComponentsTitle}</h3>
+            <Field label={copy.componentSourceFilterLabel}>
+              {(fieldProps) => (
+                <Select value={selectionSource} onValueChange={setSelectionSource} dir={model.dir}>
+                  <SelectTrigger {...fieldProps} size="sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">{copy.allComponentSourcesLabel}</SelectItem>
+                    {TENANT_COMPONENT_SELECTION_SOURCES.map((source) => (
+                      <SelectItem key={source} value={source}>{copy.componentSelectionSources[source]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+          </div>
           <div className="overflow-x-auto rounded-lg border border-border" role="region" aria-label={copy.installedComponentsTitle} tabIndex={0}>
             <Table className="min-w-full text-xs">
               <TableHeader className="text-muted-foreground"><TableRow><Th>{copy.componentColumnHeader}</Th><Th>{copy.sourceColumnHeader}</Th><Th>{copy.stateColumnHeader}</Th><Th>{copy.desiredColumnHeader}</Th><Th>{copy.appliedColumnHeader}</Th></TableRow></TableHeader>
               <TableBody>
-                {provisioning.components.data.items.map((component) => (
-                  <TableRow key={component.id}><Td><strong className="text-foreground">{component.componentKey}</strong><span className="block text-xs text-muted-foreground">{component.ownerApp}</span></Td><Td>{component.selectionSource}</Td><Td><Badge tone="neutral">{component.state}</Badge></Td><Td>{component.desired.releaseVersion ?? "—"}</Td><Td>{component.applied.releaseVersion ?? "—"}</Td></TableRow>
+                {components.map((component) => (
+                  <TableRow key={component.id}><Td><strong className="text-foreground">{component.componentKey}</strong><span className="block text-xs text-muted-foreground">{component.ownerApp}</span></Td><Td>{copy.componentSelectionSources[component.selectionSource]}</Td><Td><Badge tone="neutral">{component.state}</Badge></Td><Td>{component.desired.releaseVersion ?? "—"}</Td><Td>{component.applied.releaseVersion ?? "—"}</Td></TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -962,6 +1012,7 @@ function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
           <div className="space-y-3">
             {provisioning.prerequisites.data.map((request) => (
               <article key={request.requestId} className="rounded-lg border border-border p-4">
+                <RecoveryStatus model={model} operationId={request.operationId} />
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div><p className="text-xs font-semibold text-foreground">{copy.requestLabelInline} {request.generation}</p><p className="mt-1 text-xs text-muted-foreground">{shortDigest(request.requestDigest)} · {formatDate(request.requestedAt, model.lang)}</p></div>
                   <Badge tone="neutral">{request.status}</Badge>
@@ -984,6 +1035,37 @@ function PrerequisitesSection({ model }: TenantProvisioningWorkspaceViewProps) {
           </div>
         )}
       </ResourceBoundary>
+    </div>
+  );
+}
+
+function RecoveryStatus({ model, operationId }: TenantProvisioningWorkspaceViewProps & { operationId: string }) {
+  const copy = tpCopy(model.lang === "ar");
+  const { provisioning } = model;
+  const resource = provisioning.prerequisites;
+  const request = resource.data.find((record) => record.operationId === operationId);
+  if (resource.status !== "ready") return <p className="text-xs text-muted-foreground">{copy.recoveryUnavailableLabel}</p>;
+  if (!request) return <p className="text-xs text-muted-foreground">{copy.noPrerequisiteLabel}</p>;
+  const { recovery } = request;
+  const busy = provisioning.mutation.name !== null;
+  return (
+    <div className="space-y-2 rounded-md bg-muted p-3 text-xs">
+      <p>{copy.prerequisiteStateLabel}: <bdi>{request.status}</bdi> · {copy.recoveryFenceLabel}: <bdi>{request.maintenanceFence?.status ?? copy.noFenceLabel}</bdi></p>
+      <p>{copy.recoveryAttemptsLabel(recovery.attempts)}</p>
+      {recovery.alerted ? <p role="alert" className="text-warning-subtle-foreground">{copy.recoveryAlertLabel}</p>
+        : recovery.stuck ? <p role="status">{copy.recoveryWaitingLabel}</p> : null}
+      {recovery.stuck && recovery.nextRetryAt && <p>{copy.recoveryNextRetryLabel(formatDate(recovery.nextRetryAt, model.lang))}</p>}
+      {recovery.releaseEvidenceExists && <p>{copy.recoveryRetryLabel}</p>}
+      <div className="flex flex-wrap gap-2">
+        {provisioning.permissions.canResendRelease && recovery.canResendRelease && (
+          <Button type="button" variant="outline" size="sm" disabled={busy}
+            onClick={() => model.requestRecovery("resend-release", request)}>{copy.resendReleaseButton}</Button>
+        )}
+        {provisioning.permissions.canCloseFailed && recovery.canCloseFailed && (
+          <Button type="button" variant="outline" size="sm" disabled={busy}
+            onClick={() => model.requestRecovery("close-failed", request)}>{copy.closeFailedButton}</Button>
+        )}
+      </div>
     </div>
   );
 }

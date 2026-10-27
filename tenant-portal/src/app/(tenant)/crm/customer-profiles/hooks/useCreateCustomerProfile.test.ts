@@ -2,6 +2,7 @@
 
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@/i18n/I18nContext";
 import type { CustomerProfileCreateMessages } from "../customer-profile-create-validation";
 
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => ({
@@ -17,6 +18,7 @@ const messages: CustomerProfileCreateMessages = {
   email: "Bad email.",
   maxLength: "At most {max} characters.",
   duplicatePhone: "Already listed.",
+  phone: "Invalid phone.",
   url: "Bad URL.",
 };
 
@@ -31,6 +33,7 @@ function setup(requiredCustomFieldKeys: string[] = []) {
       () => undefined,
       () => undefined,
     ),
+    { wrapper: I18nProvider },
   );
 }
 

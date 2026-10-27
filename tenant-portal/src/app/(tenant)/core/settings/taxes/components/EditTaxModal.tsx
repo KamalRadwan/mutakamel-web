@@ -55,6 +55,7 @@ export function EditTaxModal({
         values={values}
         onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
         companies={companies}
+        tenantWideAllowed={tax.companyId === null}
         isSubmitting={isSubmitting}
         scopeReadOnly
       />

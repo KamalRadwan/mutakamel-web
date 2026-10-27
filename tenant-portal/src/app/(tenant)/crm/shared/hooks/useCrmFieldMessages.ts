@@ -23,6 +23,7 @@ export function useCrmFieldMessages(): CrmFieldMessages {
       email: t.crmShared.fieldEmail,
       maxLength: t.crmShared.fieldMaxLength,
       duplicatePhone: t.crmShared.fieldDuplicatePhone,
+      phone: t.crmShared.fieldPhone,
       url: t.crmShared.fieldUrl,
     }),
     [t],

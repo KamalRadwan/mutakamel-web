@@ -5,12 +5,12 @@ import { tradeGet } from "../../trade-api";
 import { useTradeScopeRequest } from "../../useTradeScope";
 import { ACCOUNTS_PATH } from "../commercial-account-contract";
 
-export interface PaymentTermLookupOption {
+interface PaymentTermLookupOption {
   id: string;
   source: string;
 }
 
-export interface CreditPolicyLookupOption {
+interface CreditPolicyLookupOption {
   id: string;
   code: string;
   versionNumber: number;

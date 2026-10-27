@@ -15,6 +15,7 @@ import { useTradeWrite, type TradeWriteState } from "../../documents/hooks/useTr
 import {
   PURCHASE_QUOTATIONS_PATH,
   buildCreatePurchaseQuotation,
+  buildUpdatePurchaseQuotation,
   parseSupplierAccounts,
   supplierAccountsPath,
   type PurchaseQuotationDetail,
@@ -58,8 +59,8 @@ const EMPTY: PurchaseQuotationFormValues = {
  *
  * `UpdatePurchaseQuotationDto` uses `@ValidateIf(value !== undefined)` on every
  * field, so **`null` is a 400** — an omitted key is the only way to leave a
- * field alone. Supplying `lines` replaces the whole set, which is why the
- * drawer says so before it saves.
+ * field alone. Supplying `lines` replaces the whole set, so header-only saves
+ * omit it to preserve the persisted line identities.
  */
 export function usePurchaseQuotationForm(
   headers: Record<string, string>,
@@ -116,9 +117,10 @@ export function usePurchaseQuotationForm(
     lineDraft.lines.every((line) => line.itemId !== "" && line.uomId !== "");
 
   const submit = useCallback(async (): Promise<void> => {
+    if (write.isBlocked) return;
     setFormError(null);
     try {
-      const request = buildCreatePurchaseQuotation({
+      const input = {
         ...values,
         lines: lineDraft.lines.map((line) => ({
           clientLineId: line.clientLineId,
@@ -126,8 +128,11 @@ export function usePurchaseQuotationForm(
           uomId: line.uomId,
           quantity: line.quantity,
         })),
-      });
-      const saved = await write.runWrite({
+      };
+      const request = existing
+        ? buildUpdatePurchaseQuotation(input, existing)
+        : buildCreatePurchaseQuotation(input);
+      await write.runWrite({
         operation: existing
           ? t.tradeDocuments.purchaseQuotations.editTitle
           : t.tradeDocuments.purchaseQuotations.createTitle,
@@ -149,21 +154,36 @@ export function usePurchaseQuotationForm(
                 headers: { ...headers, ...idempotency },
                 maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
               }),
+        onSuccess: async () => {
+          setIsOpen(false);
+          setValues(EMPTY);
+          lineDraft.reset([]);
+          await onSaved();
+        },
       });
-      if (saved) {
-        setIsOpen(false);
-        setValues(EMPTY);
-        await onSaved();
-      }
     } catch (error) {
       setFormError(formMessage(error, t));
     }
-  }, [values, lineDraft.lines, write, existing, t, headers, onSaved]);
+  }, [values, lineDraft, write, existing, t, headers, onSaved]);
 
   return {
     isOpen,
     open: () => {
+      if (write.isBlocked) return;
       setFormError(null);
+      lineDraft.reset(
+        existing
+          ? existing.lines.map((line) => ({
+              clientLineId: line.clientLineId,
+              itemId: line.itemId,
+              uomId: line.uomId,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              isPricing: false,
+              priceError: null,
+            }))
+          : [],
+      );
       setValues(
         existing
           ? {
@@ -178,7 +198,7 @@ export function usePurchaseQuotationForm(
       setIsOpen(true);
     },
     close: () => {
-      if (write.isWriting) return;
+      if (write.isBlocked) return;
       setIsOpen(false);
     },
     values,
@@ -194,7 +214,7 @@ export function usePurchaseQuotationForm(
       values.supplierPartyId !== "" &&
       values.currencyCode.trim().length === 3 &&
       values.validUntil !== "" &&
-      !write.isWriting,
+      !write.isBlocked,
     submit,
   };
 }

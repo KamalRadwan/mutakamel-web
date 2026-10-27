@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/design-system";
+import { Button, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import {
@@ -11,9 +11,7 @@ import {
 
 export interface OpportunityStageFunnelBarProps {
   stages: readonly OpportunityStage[];
-  items: readonly { stageId: string }[];
   boardLanes?: readonly OpportunityBoardLane[];
-  totalCount?: number;
   selectedStageId?: string;
   onSelectStage: (stageId: string | undefined) => void;
   disabled?: boolean;
@@ -25,20 +23,17 @@ export interface OpportunityStageFunnelBarProps {
  */
 export function OpportunityStageFunnelBar({
   stages,
-  items,
   boardLanes,
-  totalCount,
   selectedStageId,
   onSelectStage,
   disabled,
 }: OpportunityStageFunnelBarProps) {
-  const { lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t, lang } = useI18n();
 
   const countByStageId = new Map<string, number>();
   const amountByStageId = new Map<string, string | undefined>();
 
-  if (boardLanes && boardLanes.length > 0) {
+  if (boardLanes) {
     for (const lane of boardLanes) {
       countByStageId.set(lane.stage.id, lane.summary.totalCount);
       amountByStageId.set(
@@ -46,94 +41,90 @@ export function OpportunityStageFunnelBar({
         formatOpportunityAmountSummary(lane.summary.amountsByCurrency),
       );
     }
-  } else {
-    for (const item of items) {
-      countByStageId.set(item.stageId, (countByStageId.get(item.stageId) ?? 0) + 1);
-    }
   }
 
-  const allTotal =
-    totalCount ??
-    (boardLanes && boardLanes.length > 0
-      ? boardLanes.reduce((sum, lane) => sum + lane.summary.totalCount, 0)
-      : items.length);
+  const allTotal = boardLanes
+    ? stages.reduce((sum, stage) => sum + (countByStageId.get(stage.id) ?? 0), 0)
+    : "—";
 
   const isAllActive = !selectedStageId;
 
   return (
     <div
       role="navigation"
-      aria-label={isAr ? "تصفية حسب المرحلة" : "Stage funnel filter"}
-      className="flex w-full items-stretch divide-x divide-slate-200 overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-2xs dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900"
+      aria-label={t.crmOpportunities.stageFilter}
+      className="flex w-full items-stretch divide-x divide-border overflow-x-auto rounded-lg border border-border bg-card shadow-2xs"
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
         disabled={disabled}
         aria-pressed={isAllActive}
         onClick={() => onSelectStage(undefined)}
         className={cn(
-          "flex min-w-36 flex-1 items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold transition-colors",
+          "flex min-w-36 flex-1 items-center justify-center gap-2 rounded-none px-3.5 py-2 text-xs font-semibold transition-colors",
           isAllActive
-            ? "bg-blue-600 text-white"
-            : "bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70",
+            ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+            : "bg-card text-foreground hover:bg-muted",
         )}
       >
-        <span className="truncate">{isAr ? "كل الفرص" : "All Opportunities"}</span>
+        <span className="truncate">{t.crmOpportunities.allOpportunities}</span>
         <span
           className={cn(
-            "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
+            "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums",
             isAllActive
               ? "bg-white/20 text-white"
-              : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+              : "bg-muted text-foreground",
           )}
         >
           {allTotal}
         </span>
-      </button>
+      </Button>
 
       {stages.map((stage) => {
         const isActive = selectedStageId === stage.id;
-        const count = countByStageId.get(stage.id) ?? 0;
+        const count = boardLanes ? countByStageId.get(stage.id) ?? 0 : "—";
         const amountSummary = amountByStageId.get(stage.id);
         const topAccent =
           stage.flag === "WON"
-            ? "border-t-2 border-t-emerald-500"
+            ? "border-t-2 border-t-success"
             : stage.flag === "LOST"
-              ? "border-t-2 border-t-red-500"
+              ? "border-t-2 border-t-destructive"
               : stage.flag === "ON_HOLD"
-                ? "border-t-2 border-t-amber-500"
+                ? "border-t-2 border-t-warning"
                 : "";
 
         return (
-          <button
+          <Button
             key={stage.id}
             type="button"
+            variant="ghost"
             disabled={disabled}
             aria-pressed={isActive}
             onClick={() => onSelectStage(isActive ? undefined : stage.id)}
             className={cn(
-              "flex min-w-28 flex-1 items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors",
+              "flex min-w-28 flex-1 items-center justify-center gap-1.5 rounded-none px-3 py-2 text-xs font-semibold transition-colors",
               topAccent,
               isActive
-                ? "bg-blue-600 text-white"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
                 : stage.flag === "WON"
-                  ? "bg-emerald-50/40 text-emerald-800 hover:bg-emerald-50/80 dark:bg-emerald-950/20 dark:text-emerald-300"
+                  ? "bg-success-subtle text-success-subtle-foreground hover:bg-success-subtle/80"
                   : stage.flag === "LOST"
-                    ? "bg-white text-slate-700 hover:bg-red-50/40 dark:bg-slate-900 dark:text-slate-200"
-                    : "bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70",
+                    ? "bg-card text-foreground hover:bg-destructive-subtle"
+                    : "bg-card text-foreground hover:bg-muted",
             )}
           >
             <span className="truncate">{localizedName(stage, lang)}</span>
             <span
               className={cn(
-                "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums",
+                "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums",
                 isActive
                   ? "bg-white/20 text-white"
                   : stage.flag === "WON"
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
+                    ? "bg-success-subtle text-success-subtle-foreground"
                     : stage.flag === "LOST"
-                      ? "bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300"
-                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                      ? "bg-destructive-subtle text-destructive-subtle-foreground"
+                      : "bg-muted text-foreground",
               )}
             >
               {count}
@@ -141,14 +132,14 @@ export function OpportunityStageFunnelBar({
             {amountSummary && (
               <span
                 className={cn(
-                  "hidden truncate text-[10px] font-medium tabular-nums xl:inline",
-                  isActive ? "text-blue-100" : "text-slate-400 dark:text-slate-500",
+                  "hidden truncate text-2xs font-medium tabular-nums xl:inline",
+                  isActive ? "text-primary-foreground/80" : "text-muted-foreground",
                 )}
               >
                 · {amountSummary}
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>

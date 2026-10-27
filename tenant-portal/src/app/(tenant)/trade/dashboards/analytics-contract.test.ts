@@ -15,6 +15,7 @@ import {
   parseDashboardListPage,
   parseDashboardScalar,
   parseWidgetExecutionResult,
+  parseWidgetRecord,
   shareTargetsPath,
   unwrapAnalyticsWrite,
   widgetPath,
@@ -24,7 +25,7 @@ import {
   buildLayoutRequest,
   buildRunRequest,
   buildSetFavoriteRequest,
-  buildWidgetPreviewRequest,
+  buildSavedWidgetPreviewRequest,
   preferenceContext,
 } from "./analytics-requests";
 
@@ -33,6 +34,46 @@ const dashboardId = "01902001-3000-7000-8000-000000000002";
 const widgetId = "01902001-3000-7000-8000-000000000003";
 const shareId = "01902001-3000-7000-8000-000000000004";
 const placementId = "01902001-3000-7000-8000-000000000005";
+
+describe("saved widget previews", () => {
+  const saved = {
+    id: widgetId, name: "Filtered sales", visualizationType: "LINE", revision: 2,
+    updatedAt: "2026-10-18T00:00:00.000Z",
+    querySpec: {
+      series: [{ metricKey: "trade.sales.total", label: "Sales", axis: "RIGHT", aggregation: "AVERAGE" }],
+      dimensionKey: "item", grain: "MONTH",
+      comparison: { mode: "TARGET", target: "9007199254740993.12345678" },
+      filters: [{ key: "item_id", values: [companyId] }],
+    },
+    displaySpec: {
+      title: "Sales", subtitle: "Filtered", paletteToken: "brand", color: "#123456",
+      seriesColors: ["#abcdef"], targetColor: "#654321", numberFormatKey: "DECIMAL",
+      precision: 8, legendPosition: "END", axisLabels: { right: "Sales" },
+      targetDisplay: false, options: { stacked: false },
+    },
+  };
+
+  it("round-trips the complete saved definition and sends only preview DTO fields", () => {
+    const widget = parseWidgetRecord(saved);
+    const request = buildSavedWidgetPreviewRequest(widget);
+    expect(request).toEqual({
+      name: saved.name, visualizationType: saved.visualizationType,
+      querySpec: saved.querySpec, displaySpec: saved.displaySpec,
+      requestId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u),
+    });
+    expect(buildSavedWidgetPreviewRequest(widget).requestId).not.toBe(request.requestId);
+    expect(saved.querySpec.comparison.target).toBe("9007199254740993.12345678");
+  });
+
+  it.each([
+    { ...saved, querySpec: { series: [] } },
+    { ...saved, querySpec: { ...saved.querySpec, grain: "INVALID" } },
+    { ...saved, querySpec: { ...saved.querySpec, filters: [{ key: "item_id", values: [42] }] } },
+    { ...saved, displaySpec: { precision: 9 } },
+  ])("rejects malformed saved specs instead of previewing a reduced definition", (payload) => {
+    expect(() => parseWidgetRecord(payload)).toThrow("Invalid Trade analytics response.");
+  });
+});
 
 describe("Trade analytics — the scalar union", () => {
   it("types a COUNT metric as a number and everything else as a decimal string", () => {
@@ -189,19 +230,8 @@ describe("Trade analytics — paths and request bodies", () => {
     expect(() => dashboardPath("nope")).toThrow("Invalid Trade analytics response.");
   });
 
-  it("sends a requestId on a run and on a preview, because both require one", () => {
-    // RunDashboardDto.requestId and PreviewWidgetDto.requestId are both
-    // required UUID v7s; the preview also needs the complete definition.
+  it("sends the required requestId on a run", () => {
     expect(buildRunRequest().requestId).toMatch(/^[0-9a-f-]{36}$/u);
-    const preview = buildWidgetPreviewRequest(
-      "Orders",
-      "METRIC_CARD",
-      [{ metricKey: "trade.orders.count", label: "" }],
-      "",
-    );
-    expect(preview.requestId).toMatch(/^[0-9a-f-]{36}$/u);
-    expect(preview.querySpec.series).toEqual([{ metricKey: "trade.orders.count" }]);
-    expect(preview.visualizationType).toBe("METRIC_CARD");
   });
 
   it("sends a preference context on set-default and set-favorite", () => {
@@ -243,7 +273,7 @@ describe("Trade analytics — paths and request bodies", () => {
   it("treats the two 422 authorization codes as permission refusals", () => {
     // S7's 403-to-PermissionGate rule never fires for these.
     expect(
-      isDashboardPermissionRefusal({ status: 422, code: "TRADE.DASHBOARD.SCOPE_DENIED" }),
+      isDashboardPermissionRefusal({ status: 422, code: "TRADE.DASHBOARD.SCOPE_INVALID" }),
     ).toBe(true);
     expect(
       isDashboardPermissionRefusal({

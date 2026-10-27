@@ -27,7 +27,7 @@
 
 import { isUUIDv7 } from "@/lib/uuid";
 
-const LEADS_PATH = "/api/tenant/crm/v1/leads";
+export const LEADS_PATH = "/api/tenant/crm/v1/leads";
 
 const LEAD_STATUSES = [
   "OPEN",
@@ -400,7 +400,9 @@ export function parseLeadDetailResponse(payload: unknown): LeadDetail {
   };
 }
 
-const MAX_COMPANY_OPTIONS = 1000;
+// LeadCompanyOptionsQueryDto caps the remote company picker at fifty rows.
+const MAX_COMPANY_OPTIONS = 50;
+const MAX_COMPANY_CONTACT_OPTIONS = 1000;
 
 export function parseLeadCompanyOptions(payload: unknown): LeadCompanyOption[] {
   if (!Array.isArray(payload) || payload.length > MAX_COMPANY_OPTIONS) invalid();
@@ -430,7 +432,7 @@ export function parseLeadCompanyOptions(payload: unknown): LeadCompanyOption[] {
 export function parseLeadCompanyContactOptions(
   payload: unknown,
 ): LeadCompanyContactOption[] {
-  if (!Array.isArray(payload) || payload.length > MAX_COMPANY_OPTIONS) invalid();
+  if (!Array.isArray(payload) || payload.length > MAX_COMPANY_CONTACT_OPTIONS) invalid();
   return payload.map((entry) => {
     const contact = record(entry);
     if (
@@ -468,8 +470,10 @@ export function leadConvertPath(id: string): string {
   return `${leadPath(id)}/convert`;
 }
 
-export function leadCompanyOptionsPath(branchId: string): string {
-  return `${LEADS_PATH}/company-options?${new URLSearchParams({ branchId })}`;
+export function leadCompanyOptionsPath(branchId: string, search = ""): string {
+  const query = new URLSearchParams({ branchId, limit: "50" });
+  if (search.trim()) query.set("search", search.trim().slice(0, 180));
+  return `${LEADS_PATH}/company-options?${query}`;
 }
 
 export function leadCompanyContactsPath(

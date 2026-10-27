@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
 import { Checkbox, Field, FormDrawer, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import {
   CRM_CUSTOM_FIELD_OWNER_TYPES,
-  CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES,
-  isValidCrmCustomFieldKey,
-  normalizeCrmCustomFieldKey,
+  CRM_CUSTOM_FIELD_TYPES,
   type CreateCustomFieldInput,
   type CrmCustomFieldCreateOwnerType,
-  type CrmCustomFieldSimpleCreateType,
+  type CrmCustomFieldType,
 } from "../custom-field-contract";
+import { useCustomFieldForm } from "../hooks/useCustomFieldForm";
+import { CustomFieldOptionsEditor } from "./CustomFieldOptionsEditor";
 
 interface CreateModalProps {
   isOpen: boolean;
@@ -23,68 +22,21 @@ interface CreateModalProps {
 
 export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClose, onSubmit }: CreateModalProps) {
   const { t } = useI18n();
-  const [nameAr, setNameAr] = useState("");
-  const [nameEn, setNameEn] = useState("");
-  const [fieldKey, setFieldKey] = useState("");
-  const [ownerType, setOwnerType] = useState<CrmCustomFieldCreateOwnerType>("LEAD");
-  const [type, setType] = useState<CrmCustomFieldSimpleCreateType>("TEXT");
-  const [isSearchable, setIsSearchable] = useState(false);
-  const [nameValidationError, setNameValidationError] = useState<string | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-
-  const isDirty = nameAr !== "" || nameEn !== "" || fieldKey !== "";
-
-  const reset = () => {
-    setNameAr("");
-    setNameEn("");
-    setFieldKey("");
-    setOwnerType("LEAD");
-    setType("TEXT");
-    setIsSearchable(false);
-    setNameValidationError(null);
-    setValidationError(null);
-  };
-
-  const close = () => {
-    reset();
-    onClose();
-  };
-
-  const handleSubmit = async (event?: FormEvent) => {
-    event?.preventDefault();
-    const normalizedKey = normalizeCrmCustomFieldKey(fieldKey);
-    if (!nameAr.trim() || !nameEn.trim()) {
-      setNameValidationError(t.crmCustomFields.invalidNames);
-      return;
-    }
-    setNameValidationError(null);
-    if (!isValidCrmCustomFieldKey(normalizedKey)) {
-      setValidationError(t.crmCustomFields.invalidKey);
-      return;
-    }
-    setValidationError(null);
-    const created = await onSubmit({
-      ownerType,
-      fieldKey: normalizedKey,
-      nameAr: nameAr.trim(),
-      nameEn: nameEn.trim(),
-      type,
-      isSearchable,
-    });
-    if (created) close();
-  };
+  const form = useCustomFieldForm();
+  const { nameAr, setNameAr, nameEn, setNameEn, fieldKey, setFieldKey, ownerType, setOwnerType,
+    type, setType, isSearchable, setIsSearchable } = form;
 
   return (
     <FormDrawer
       open={isOpen}
       onOpenChange={(open) => {
-        if (!open) close();
+        if (!open && !isSubmitting) onClose();
       }}
       title={t.crmCustomFields.addTitle}
-      isDirty={isDirty}
+      isDirty={form.isDirty}
       isSubmitting={isSubmitting}
-      onSubmit={() => void handleSubmit()}
-      error={error ?? undefined}
+      onSubmit={() => void form.submitCreate(onSubmit, onClose)}
+      error={error ?? form.validationError ?? undefined}
       labels={{
         submit: isSubmitting ? t.crmCustomFields.creating : t.crmCustomFields.create,
         cancel: t.common.cancel,
@@ -96,7 +48,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
     >
       <div className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t.crmLeadStages.arabicName} error={nameValidationError ?? undefined} required>
+          <Field label={t.crmLeadStages.arabicName} showLabel error={form.namesError ?? undefined} required>
             <Input size="sm" placeholder={t.crmLeadStages.arabicName}
               dir="rtl"
               value={nameAr}
@@ -106,7 +58,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
               disabled={isSubmitting}
             />
           </Field>
-          <Field label={t.crmLeadStages.englishName} error={nameValidationError ?? undefined} required>
+          <Field label={t.crmLeadStages.englishName} showLabel error={form.namesError ?? undefined} required>
             <Input size="sm" placeholder={t.crmLeadStages.englishName}
               dir="ltr"
               value={nameEn}
@@ -118,7 +70,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
           </Field>
         </div>
 
-        <Field label={t.crmCustomFields.key} error={validationError ?? undefined} required>
+        <Field label={t.crmCustomFields.key} showLabel error={form.keyError ?? undefined} required>
           <Input size="sm"
             dir="ltr"
             value={fieldKey}
@@ -131,7 +83,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
         </Field>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t.crmCustomFields.owner}>
+          <Field label={t.crmCustomFields.owner} showLabel>
             <Select value={ownerType} onValueChange={(value) => setOwnerType(value as CrmCustomFieldCreateOwnerType)}>
               <SelectTrigger size="sm" disabled={isSubmitting}>
                 <SelectValue />
@@ -145,13 +97,13 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
               </SelectContent>
             </Select>
           </Field>
-          <Field label={t.crmCustomFields.fieldType}>
-            <Select value={type} onValueChange={(value) => setType(value as CrmCustomFieldSimpleCreateType)}>
+          <Field label={t.crmCustomFields.fieldType} showLabel>
+            <Select value={type} onValueChange={(value) => setType(value as CrmCustomFieldType)}>
               <SelectTrigger size="sm" disabled={isSubmitting}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES.map((value) => (
+                {CRM_CUSTOM_FIELD_TYPES.map((value) => (
                   <SelectItem key={value} value={value}>
                     {t.crmCustomFields.fieldTypes[value] ?? value}
                   </SelectItem>
@@ -170,7 +122,7 @@ export function CreateCrmCustomFieldsModal({ isOpen, isSubmitting, error, onClos
           {t.crmCustomFields.searchable}
         </label>
 
-        <p className="text-xs text-muted-foreground">{t.crmCustomFields.simpleTypesNote}</p>
+        {form.picklist ? <CustomFieldOptionsEditor form={form} disabled={isSubmitting} /> : null}
       </div>
     </FormDrawer>
   );

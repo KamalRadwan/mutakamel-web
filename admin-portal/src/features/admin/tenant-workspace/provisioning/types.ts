@@ -86,6 +86,7 @@ export const TENANT_COMPONENT_SELECTION_SOURCES = [
   "FOUNDATION",
   "ENTITLEMENT",
   "DEPENDENCY",
+  "ADDON",
 ] as const;
 
 type TenantComponentSelectionSource =
@@ -356,6 +357,7 @@ export interface SafeReleaseEvidence {
 }
 
 export interface TenantAvailableUpdate {
+  lastOperationId: string | null;
   componentId: string;
   componentKey: string;
   ownerApp: string;
@@ -496,6 +498,15 @@ export interface TenantPrerequisiteEvidence {
 
 export interface TenantPrerequisiteEvidenceRecord
   extends TenantPrerequisiteRequest {
+  recovery: {
+    attempts: number;
+    alerted: boolean;
+    releaseEvidenceExists: boolean;
+    stuck: boolean;
+    nextRetryAt: string | null;
+    canResendRelease: boolean;
+    canCloseFailed: boolean;
+  };
   maintenanceFence: TenantMaintenanceFence | null;
   evidence: TenantPrerequisiteEvidence[];
 }
@@ -651,6 +662,8 @@ export interface ProvisioningResource<T> {
 }
 
 export type ProvisioningMutationName =
+  | "resend-release"
+  | "close-failed"
   | "retry"
   | "cancel"
   | "resync"
@@ -668,6 +681,8 @@ export interface ProvisioningMutationState {
 }
 
 export interface ProvisioningPermissions {
+  canResendRelease: boolean;
+  canCloseFailed: boolean;
   canReadOperations: boolean;
   canRetryOrCancel: boolean;
   canResync: boolean;

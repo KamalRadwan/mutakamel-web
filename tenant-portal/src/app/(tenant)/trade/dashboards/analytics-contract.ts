@@ -253,6 +253,8 @@ export interface WidgetRecord {
   accessLevel: string;
   isShared: boolean;
   updatedAt: string;
+  querySpec: Record<string, unknown>;
+  displaySpec: Record<string, unknown>;
   series: WidgetSeriesSpec[];
   displayTitle: string | null;
   legendPosition: string | null;
@@ -661,6 +663,10 @@ export function parseWidgetRecord(payload: unknown): WidgetRecord {
   const displaySpec = row ? record(row.displaySpec) : null;
   if (
     !row ||
+    !querySpec ||
+    !displaySpec ||
+    !isWidgetQuerySpec(querySpec) ||
+    !isWidgetDisplaySpec(displaySpec) ||
     !isUuidV7(row.id) ||
     !isNonEmptyString(row.name, DASHBOARD_LIMITS.nameMaxLength) ||
     !isNonEmptyString(row.visualizationType, 40) ||
@@ -677,6 +683,8 @@ export function parseWidgetRecord(payload: unknown): WidgetRecord {
     accessLevel: typeof row.accessLevel === "string" ? row.accessLevel : "VIEW",
     isShared: row.isShared === true,
     updatedAt: row.updatedAt,
+    querySpec,
+    displaySpec,
     series: Array.isArray(querySpec?.series)
       ? querySpec.series.flatMap((entry) => {
           const series = record(entry);
@@ -698,6 +706,60 @@ export function parseWidgetRecord(payload: unknown): WidgetRecord {
       typeof displaySpec?.legendPosition === "string" ? displaySpec.legendPosition : null,
     precision: isBoundedInteger(displaySpec?.precision, 0, 8) ? displaySpec.precision : null,
   };
+}
+
+// Validate the saved DTO without projecting away optional query/display fields.
+// Metric compatibility and data scope remain authoritative on the backend.
+function isWidgetQuerySpec(spec: Record<string, unknown>): boolean {
+  const optional = (key: string, valid: (value: unknown) => boolean) =>
+    spec[key] === undefined || valid(spec[key]);
+  return Array.isArray(spec.series) && spec.series.length >= 1 &&
+    spec.series.length <= DASHBOARD_LIMITS.maxWidgetSeries &&
+    spec.series.every((entry) => {
+      const series = record(entry);
+      return series !== null && typeof series.metricKey === "string" &&
+        /^trade\.[a-z0-9_.]+$/u.test(series.metricKey) &&
+        (series.label === undefined || isNonEmptyString(series.label, 80)) &&
+        (series.axis === undefined || isMemberOf(series.axis, ["LEFT", "RIGHT"])) &&
+        (series.aggregation === undefined ||
+          isMemberOf(series.aggregation, ["COUNT", "SUM", "AVERAGE", "MIN", "MAX", "PERCENT"]));
+    }) &&
+    optional("dimensionKey", (value) => typeof value === "string" &&
+      value.length <= 40 && /^[a-z][a-z0-9_]*$/u.test(value)) &&
+    optional("grain", (value) => isMemberOf(value, ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"])) &&
+    optional("comparison", (value) => {
+      const comparison = record(value);
+      return comparison !== null &&
+        isMemberOf(comparison.mode, ["NONE", "PREVIOUS_PERIOD", "PREVIOUS_YEAR", "TARGET"]) &&
+        (comparison.target === undefined ? comparison.mode !== "TARGET" :
+          typeof comparison.target === "string" &&
+          /^(?=.*[1-9])(?:0|[1-9]\d*)(?:\.\d{1,8})?$/u.test(comparison.target));
+    }) &&
+    optional("filters", (value) => Array.isArray(value) && value.every((entry) => {
+      const filter = record(entry);
+      return filter !== null && typeof filter.key === "string" &&
+        /^[a-z][a-z0-9_.-]{0,79}$/u.test(filter.key) &&
+        Array.isArray(filter.values) && filter.values.length > 0 &&
+        filter.values.every((item) => isNonEmptyString(item, 120));
+    }));
+}
+
+function isWidgetDisplaySpec(spec: Record<string, unknown>): boolean {
+  const optional = (key: string, valid: (value: unknown) => boolean) =>
+    spec[key] === undefined || valid(spec[key]);
+  const color = (value: unknown) => typeof value === "string" && /^#[0-9A-Fa-f]{6}$/u.test(value);
+  return optional("title", (value) => typeof value === "string" && value.length <= 120) &&
+    optional("subtitle", (value) => typeof value === "string" && value.length <= 300) &&
+    optional("paletteToken", (value) => typeof value === "string" && /^[a-z][a-z0-9_.-]{0,79}$/u.test(value)) &&
+    optional("color", color) && optional("targetColor", color) &&
+    optional("seriesColors", (value) => Array.isArray(value) &&
+      value.length <= DASHBOARD_LIMITS.maxWidgetSeries && value.every(color)) &&
+    optional("numberFormatKey", (value) => typeof value === "string" && /^[A-Z][A-Z0-9_]{0,79}$/u.test(value)) &&
+    optional("precision", (value) => isBoundedInteger(value, 0, 8)) &&
+    optional("legendPosition", (value) => isMemberOf(value, ["TOP", "BOTTOM", "START", "END", "HIDDEN"])) &&
+    optional("axisLabels", (value) => record(value) !== null) &&
+    optional("targetDisplay", (value) => typeof value === "boolean") &&
+    optional("options", (value) => record(value) !== null);
 }
 
 export function parseShareTargets(payload: unknown): ShareTarget[] {
@@ -783,14 +845,14 @@ export function parseDashboardCatalog(payload: unknown): DashboardCatalog {
 }
 
 /**
- * `TRADE.DASHBOARD.SCOPE_DENIED` and `METRIC_PERMISSION_REQUIRED` are
- * authorization failures the server reports as **422**, so S7's
- * 403-to-`PermissionGate` rule never fires for them. A caller must treat both
- * as permission states regardless of status.
+ * Scope and metric refusals remain permission states even when the domain
+ * reports an invalid scope as 422 rather than an authorization failure.
  */
 export function isDashboardPermissionRefusal(error: NormalizedApiError): boolean {
   return (
     error.code === "TRADE.DASHBOARD.SCOPE_DENIED" ||
+    error.code === "TRADE.DASHBOARD.SCOPE_INVALID" ||
+    error.code === "TRADE.DASHBOARD.WIDGET_ACCESS_DENIED" ||
     error.code === "TRADE.DASHBOARD.METRIC_PERMISSION_REQUIRED" ||
     error.code === "TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED" ||
     error.code === "TRADE.DASHBOARD.TRANSITIVE_SHARE_FORBIDDEN"
@@ -805,6 +867,7 @@ export function analyticsMessage(
     case "TRADE.DASHBOARD.NOT_FOUND":
       return t.tradeAnalytics.errorNotFound;
     case "TRADE.DASHBOARD.SCOPE_DENIED":
+    case "TRADE.DASHBOARD.SCOPE_INVALID":
       return t.tradeAnalytics.errorScopeDenied;
     case "TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED":
       return t.tradeAnalytics.errorSourcePermission;
@@ -813,6 +876,8 @@ export function analyticsMessage(
     case "TRADE.DASHBOARD.TRANSITIVE_SHARE_FORBIDDEN":
       return t.tradeAnalytics.errorTransitiveShare;
     case "TRADE.DASHBOARD.WIDGET_UNAVAILABLE":
+    case "TRADE.DASHBOARD.WIDGET_ACCESS_DENIED":
+    case "TRADE.DASHBOARD.WIDGET_INVALID":
       return t.tradeAnalytics.errorWidgetUnavailable;
     case "TRADE.DASHBOARD.REVISION_CONFLICT":
       return t.tradeAnalytics.errorRevisionConflict;

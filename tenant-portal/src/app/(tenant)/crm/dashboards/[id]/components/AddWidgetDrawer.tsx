@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  Button,
   Field,
   FormDrawer,
   Select,
@@ -20,6 +21,9 @@ interface AddWidgetDrawerProps {
   widgets: WidgetDefinition[];
   placedWidgetIds: ReadonlySet<string>;
   widgetsUnavailable: boolean;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
   isSubmitting: boolean;
   atCapacity: boolean;
   error?: string;
@@ -32,6 +36,9 @@ export function AddWidgetDrawer({
   widgets,
   placedWidgetIds,
   widgetsUnavailable,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
   isSubmitting,
   atCapacity,
   error,
@@ -91,7 +98,7 @@ export function AddWidgetDrawer({
                 <SelectItem key={widget.id} value={widget.id}>
                   {`${widget.name} · ${
                     t.crmDashboards.visualizations[widget.visualizationType] ??
-                    widget.visualizationType
+                    t.crmDashboards.unknownVisualization
                   }`}
                 </SelectItem>
               ))}
@@ -100,6 +107,11 @@ export function AddWidgetDrawer({
         </Field>
       )}
 
+      {hasMore ? (
+        <Button variant="outline" disabled={isLoadingMore} loading={isLoadingMore} onClick={onLoadMore}>
+          {t.crmDashboards.loadMoreWidgets}
+        </Button>
+      ) : null}
       <p className="text-xs text-muted-foreground">{t.crmDashboards.addWidgetPositionNote}</p>
     </FormDrawer>
   );

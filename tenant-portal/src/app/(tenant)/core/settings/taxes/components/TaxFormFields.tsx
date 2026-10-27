@@ -18,6 +18,7 @@ interface TaxFormFieldsProps {
   values: TaxFormValues;
   onChange: (patch: Partial<TaxFormValues>) => void;
   companies: CompanyOption[];
+  tenantWideAllowed: boolean;
   isSubmitting: boolean;
   /** `UpdateTaxDto` carries neither `code` nor `companyId` — the scope key is fixed. */
   scopeReadOnly: boolean;
@@ -27,6 +28,7 @@ export function TaxFormFields({
   values,
   onChange,
   companies,
+  tenantWideAllowed,
   isSubmitting,
   scopeReadOnly,
 }: TaxFormFieldsProps) {
@@ -50,7 +52,9 @@ export function TaxFormFields({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={TENANT_WIDE_COMPANY}>{t.coreSettings.taxTenantWide}</SelectItem>
+            {tenantWideAllowed ? (
+              <SelectItem value={TENANT_WIDE_COMPANY}>{t.coreSettings.taxTenantWide}</SelectItem>
+            ) : null}
             {companies.map((company) => (
               <SelectItem key={company.id} value={company.id}>
                 {`${company.code} — ${company.name}`}

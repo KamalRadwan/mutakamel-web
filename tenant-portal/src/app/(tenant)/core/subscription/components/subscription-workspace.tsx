@@ -79,7 +79,7 @@ export function SubscriptionWorkspace() {
   return (
     <OwnerGate denied={subscription.denied}>
     <div className="flex flex-col gap-4">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={t.coreBilling.subscriptionPageTitle}
         description={t.coreBilling.subscriptionPageSubtitle}
         titleAdornment={

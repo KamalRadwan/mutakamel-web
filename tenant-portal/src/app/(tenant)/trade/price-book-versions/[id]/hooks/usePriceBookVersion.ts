@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet, tradeIfMatch, tradePost } from "../../../trade-api";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
@@ -13,9 +13,11 @@ import {
   PRICING_MANAGE_PERMISSION,
   PRICING_READ_PERMISSION,
   parsePriceBookVersionDetail,
+  parsePriceBookVersionTestReport,
   priceBookVersionActionPath,
   priceBookVersionPath,
   type PriceBookVersionDetail,
+  type PriceBookVersionTestReport,
 } from "../../../price-books/pricing-contract";
 import {
   pricingFormMessage,
@@ -29,13 +31,19 @@ export function usePriceBookVersion(id: string) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchId } = useTenantBranchSelection(user);
+  const { branchId } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [detail, setDetail] = useState<PriceBookVersionDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [pending, setPending] = useState<"test" | "publish" | null>(null);
+  const [replacement, setReplacement] = useState({ versionId: id, predecessorId: "" });
+  const supersedesVersionId = replacement.versionId === id ? replacement.predecessorId : "";
+  const [testResult, setTestResult] = useState<{
+    versionId: string;
+    report: PriceBookVersionTestReport;
+  } | null>(null);
 
   const canRead = hasTradePermission(
     scope.permissions,
@@ -49,11 +57,25 @@ export function usePriceBookVersion(id: string) {
   );
   // Publishing a price-book version is behind a Policy Studio grant, not
   // `trade.pricing.manage` — a pricing manager cannot publish on its own.
-  const canPublish = hasTradePermission(
+  const hasPublishPermission = hasTradePermission(
     scope.permissions,
     scope.isTenantOwner,
     POLICY_PUBLISH_PERMISSION,
   );
+  const publishDisabledReasons: string[] = [];
+  if (!hasPublishPermission) publishDisabledReasons.push(t.tradePricing.publishPermissionRequired);
+  if (detail?.version.status !== "TESTED") publishDisabledReasons.push(t.tradePricing.publishTestedRequired);
+  if (!detail?.latestTestEvidence?.passed) publishDisabledReasons.push(t.tradePricing.publishEvidenceRequired);
+  if (!user?.id || !detail?.version.createdByUserId) {
+    publishDisabledReasons.push(t.tradePricing.publishIdentityRequired);
+  } else if (detail.version.createdByUserId === user.id) {
+    publishDisabledReasons.push(t.tradePricing.publishCheckerRequired);
+  }
+  if (!scope.isResolved || isLoading || queryError || detail?.version.id !== id) {
+    publishDisabledReasons.push(t.tradePricing.publishRefreshRequired);
+  }
+  if (pending !== null) publishDisabledReasons.push(t.tradePricing.publishActionPending);
+  const canPublish = publishDisabledReasons.length === 0;
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -91,19 +113,30 @@ export function usePriceBookVersion(id: string) {
   const run = useCallback(
     async (action: "test" | "publish"): Promise<void> => {
       if (!detail || pending) return;
+      if (action === "publish" && !canPublish) return;
       setPending(action);
+      if (action === "test") setTestResult(null);
       try {
-        await tradePost(priceBookVersionActionPath(detail.version.id, action), undefined, {
+        const body = action === "publish" && supersedesVersionId.trim()
+          ? { supersedesVersionId: supersedesVersionId.trim() } : undefined;
+        const response = await tradePost(priceBookVersionActionPath(detail.version.id, action), body, {
           headers: {
             ...scope.headers,
             "If-Match": tradeIfMatch(detail.version.version),
           },
-          maxResponseBytes: 200_000,
+          maxResponseBytes: action === "test" ? VERSION_RESPONSE_LIMIT_BYTES : 200_000,
         });
-        toast.success(
-          t.tradeCommon.savedTitle,
-          action === "test" ? t.tradePricing.testPassed : t.tradePricing.versionPublished,
-        );
+        if (action === "test") {
+          const report = parsePriceBookVersionTestReport(response.data);
+          setTestResult({ versionId: detail.version.id, report });
+          if (report.passed) {
+            toast.success(t.tradeCommon.savedTitle, t.tradePricing.testPassed);
+          } else {
+            toast.error(t.tradePricing.testFailedTitle, t.tradePricing.errorTestFailed);
+          }
+        } else {
+          toast.success(t.tradeCommon.savedTitle, t.tradePricing.versionPublished);
+        }
       } catch (error) {
         const normalized = normalizeApiError(error);
         if (normalized.status !== 403 && !toast.outcomeFromApi(normalized)) {
@@ -117,7 +150,7 @@ export function usePriceBookVersion(id: string) {
         await load();
       }
     },
-    [detail, pending, scope.headers, toast, t, load],
+    [detail, pending, canPublish, supersedesVersionId, scope.headers, toast, t, load],
   );
 
   return {
@@ -126,11 +159,15 @@ export function usePriceBookVersion(id: string) {
     canRead,
     canTest,
     canPublish,
+    supersedesVersionId,
+    setSupersedesVersionId: (predecessorId: string) => setReplacement({ versionId: id, predecessorId }),
+    publishDisabledReasons,
     detail,
     isLoading,
     queryError,
     isNotFound: queryError?.status === 404,
     pending,
+    testReport: testResult?.versionId === id ? testResult.report : null,
     test: () => run("test"),
     publish: () => run("publish"),
     reload: () => load(),

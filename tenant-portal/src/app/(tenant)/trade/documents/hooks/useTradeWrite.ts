@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -8,7 +8,7 @@ import { generateUUIDv7 } from "@/lib/uuid";
 import { isTradeReplay, type TradeResult } from "../../trade-api";
 import { tradeDocumentMessage } from "../trade-document-errors";
 
-/** The write that may or may not have applied, held until the user resolves it. */
+/** The write that may or may not have applied, held until same-key recovery succeeds. */
 interface TradeAmbiguousWrite {
   operation: string;
   idempotencyKey: string;
@@ -21,16 +21,17 @@ interface TradeWriteRequest {
   operation: string;
   /** Receives the key so the same one is replayed on retry, never a fresh one. */
   send: (headers: Record<string, string>) => Promise<TradeResult>;
-  onSuccess?: (result: TradeResult) => void;
+  onSuccess?: (result: TradeResult) => void | Promise<unknown>;
 }
 
 export interface TradeWriteState {
   isWriting: boolean;
+  /** Pending requests and unknown outcomes fence off every new write. */
+  isBlocked: boolean;
   /** The last rejection, for an in-body surface a toast cannot host. */
   writeError: NormalizedApiError | null;
   ambiguous: TradeAmbiguousWrite | null;
   clearWriteError: () => void;
-  dismissAmbiguous: () => void;
   runWrite: (request: TradeWriteRequest) => Promise<boolean>;
 }
 
@@ -59,58 +60,76 @@ export function useTradeWrite(): TradeWriteState {
   const [isWriting, setIsWriting] = useState(false);
   const [writeError, setWriteError] = useState<NormalizedApiError | null>(null);
   const [ambiguous, setAmbiguous] = useState<TradeAmbiguousWrite | null>(null);
+  const inFlight = useRef(false);
+  const unresolved = useRef<TradeAmbiguousWrite | null>(null);
 
   const runWrite = useCallback(
     async (request: TradeWriteRequest): Promise<boolean> => {
-      const attempt = async (idempotencyKey: string): Promise<boolean> => {
+      // Refs close the gap before React commits disabled controls, including
+      // double clicks and calls through a callback from an earlier render.
+      if (inFlight.current || unresolved.current) return false;
+      const { send, onSuccess, operation } = request;
+      const idempotencyKey = generateUUIDv7();
+      const attempt = async (recovery = false): Promise<boolean> => {
+        if (inFlight.current || (recovery && unresolved.current?.idempotencyKey !== idempotencyKey)) return false;
+        inFlight.current = true;
         setIsWriting(true);
         setWriteError(null);
         try {
-          const result = await request.send({ "x-idempotency-key": idempotencyKey });
+          let result: TradeResult;
+          try {
+            result = await send({ "x-idempotency-key": idempotencyKey });
+          } catch (error) {
+            const normalized = normalizeApiError(error);
+            if (normalized.status === 0) {
+              const pending: TradeAmbiguousWrite = {
+                operation,
+                idempotencyKey,
+                correlationId: normalized.correlationId,
+                retry: async () => {
+                  await attempt(true);
+                },
+              };
+              unresolved.current = pending;
+              setAmbiguous(pending);
+              return false;
+            }
+            setWriteError(normalized);
+            if (normalized.status === 403) return false;
+            if (toast.outcomeFromApi(normalized)) return false;
+            const specific = tradeDocumentMessage(normalized.code, t.tradeDocuments.errors);
+            if (specific) toast.error(operation, specific);
+            else toast.errorFromApi(operation, normalized);
+            return false;
+          }
+          unresolved.current = null;
           setAmbiguous(null);
-          request.onSuccess?.(result);
           toast.success(
-            request.operation,
+            operation,
             isTradeReplay(result.headers)
               ? t.tradeDocuments.replayedDescription
               : t.tradeDocuments.savedDescription,
           );
+          // A refresh failure is not evidence that the write failed. Only the
+          // transport catch above may create an ambiguous outcome.
+          await onSuccess?.(result);
           return true;
-        } catch (error) {
-          const normalized = normalizeApiError(error);
-          if (normalized.status === 0) {
-            setAmbiguous({
-              operation: request.operation,
-              idempotencyKey,
-              correlationId: normalized.correlationId,
-              retry: async () => {
-                await attempt(idempotencyKey);
-              },
-            });
-            return false;
-          }
-          setWriteError(normalized);
-          if (normalized.status === 403) return false;
-          if (toast.outcomeFromApi(normalized)) return false;
-          const specific = tradeDocumentMessage(normalized.code, t.tradeDocuments.errors);
-          if (specific) toast.error(request.operation, specific);
-          else toast.errorFromApi(request.operation, normalized);
-          return false;
         } finally {
+          inFlight.current = false;
           setIsWriting(false);
         }
       };
-      return attempt(generateUUIDv7());
+      return attempt();
     },
     [t, toast],
   );
 
   return {
     isWriting,
+    isBlocked: isWriting || ambiguous !== null,
     writeError,
     ambiguous,
     clearWriteError: () => setWriteError(null),
-    dismissAmbiguous: () => setAmbiguous(null),
     runWrite,
   };
 }

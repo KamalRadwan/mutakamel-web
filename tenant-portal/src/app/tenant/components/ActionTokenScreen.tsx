@@ -8,6 +8,7 @@ import {
   Input,
   LanguageToggle,
   ThemeToggle,
+  MfaCodeStep,
 } from "@/design-system";
 import {
   NEW_PASSWORD_MAX_LENGTH,
@@ -36,7 +37,7 @@ export function ActionTokenScreen({ flow }: { flow: ActionTokenFlow }) {
             <p className="mt-1 text-xs text-muted-foreground">{flowCopy.subtitle}</p>
           </div>
 
-          {screen.state === "missing-token" ? (
+          {screen.mfa.step ? <MfaCodeStep flow={screen.mfa} onRestart={screen.restartMfa} /> : screen.state === "missing-token" ? (
             <div role="alert" className="flex flex-col gap-3">
               <p className="text-sm font-medium text-foreground">{copy.missingTokenTitle}</p>
               <p className="text-xs text-muted-foreground">{copy.missingTokenDescription}</p>

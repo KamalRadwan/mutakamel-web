@@ -12,7 +12,7 @@ vi.mock("../hooks/useLeadDetailsReferences", () => ({ useLeadDetailsReferences: 
   knownUsers: new Map([["01900100-0000-7000-8000-000000000001", { id: "01900100-0000-7000-8000-000000000001", firstName: "Kamal", lastName: "Radwan" }]]),
   ownerOptions: [{ id: "01900100-0000-7000-8000-000000000001", firstName: "Kamal", lastName: "Radwan" }],
   tags: [{ id: "01900100-0000-7000-8000-000000000007", name: "Priority" }], tagsLoading: false, tagsUnavailable: false,
-  canReadUsers: true, usersLoading: false, usersUnavailable: false,
+  canReadUsers: false, usersLoading: false, usersUnavailable: false,
 }) }));
 
 const lead = { id: "01900100-0000-7000-8000-000000000003", status: "OPEN", ownerUserId: OWNER, createdByUserId: OWNER, acquisitionSourceId: "01900100-0000-7000-8000-000000000004", acquisitionSourceNameEn: "Website", acquisitionSourceNameAr: "الموقع", createdAt: "2026-09-07T00:00:00.000Z", updatedAt: "2026-09-07T01:00:00.000Z", interestSummary: "Summary", expectedNeed: "Need", description: "Existing note" } as LeadDetail;
@@ -23,6 +23,8 @@ describe("Lead details card", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     render(<LeadIdentityCards lead={lead} sources={[]} canEdit allowedOwnerIds={null} onSaved={vi.fn()} onReconcile={vi.fn()} />);
     expect(screen.getByText("Website")).toBeVisible();
+    expect(screen.queryByText(en.crmLeadDetail.usersPermissionRequired)).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: en.crmLeadDetail.salesPerson })).toBeEnabled();
     expect(screen.getByText("Priority")).toBeVisible();
     expect(screen.getAllByText("Kamal Radwan")).toHaveLength(2);
     expect(screen.getAllByText("KR")).toHaveLength(2);

@@ -38,10 +38,12 @@ vi.mock("next/link", () => ({
 }));
 
 import TenantsDirectoryPage from "./page";
-import type { TenantRecord } from "./hooks/useTenants";
+import { readTenantDirectoryPage, type TenantRecord } from "./hooks/useTenants";
 import {
   DATABASE_ID,
+  OTHER_TENANT_ID,
   TENANT_ID,
+  tenantPayload,
 } from "@/features/admin/tenant-workspace/core/__tests__/fixtures";
 
 describe("TenantsDirectoryPage", () => {
@@ -50,6 +52,48 @@ describe("TenantsDirectoryPage", () => {
     i18nMock.lang = "en";
     i18nMock.t = englishDictionary();
     hookMock.mockReturnValue(baseController() as never);
+  });
+
+  it("renders every directory row when one tenant's storage server is draining", () => {
+    const draining = tenantPayload();
+    draining.id = OTHER_TENANT_ID;
+    draining.name = "acme-draining";
+    draining.companyName = "Acme draining";
+    (draining.storageServer as Record<string, unknown>).status = "DRAINING";
+    const directory = readTenantDirectoryPage(
+      {
+        success: true,
+        data: [tenantPayload(), draining],
+        meta: {
+          page: 1,
+          limit: 10,
+          total: 2,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      },
+      { page: 1, limit: 10 },
+    );
+    hookMock.mockReturnValue(
+      baseController({
+        tenants: directory.items,
+        totalItems: directory.meta.total,
+        pagination: directory.meta,
+      }) as never,
+    );
+    render(<TenantsDirectoryPage />);
+
+    expect(screen.getByRole("link", { name: /Acme LLC/ })).toHaveAttribute(
+      "href",
+      `/tenants/${TENANT_ID}`,
+    );
+    expect(screen.getByRole("link", { name: /Acme draining/ })).toHaveAttribute(
+      "href",
+      `/tenants/${OTHER_TENANT_ID}`,
+    );
+    expect(screen.getAllByText("Garage Cairo")).toHaveLength(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("renders the exact failed status and only real observed database servers", () => {

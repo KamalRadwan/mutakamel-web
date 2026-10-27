@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 
 export function useDeleteCustomerProfile() {
+  const describeError = useCrmErrorText();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<NormalizedApiError | null>(null);
 
   async function deleteProfile(profileId: string): Promise<boolean> {
     setIsDeleting(true);
@@ -26,12 +25,17 @@ export function useDeleteCustomerProfile() {
       );
       return true;
     } catch (caught) {
-      setError(errorMessage(caught, "Unable to delete the customer profile."));
+      setError(normalizeApiError(caught));
       return false;
     } finally {
       setIsDeleting(false);
     }
   }
 
-  return { deleteProfile, isDeleting, error, clearError: () => setError(null) };
+  return {
+    deleteProfile,
+    isDeleting,
+    error: describeError(error),
+    clearError: () => setError(null),
+  };
 }

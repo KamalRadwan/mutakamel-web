@@ -622,7 +622,7 @@ function readStorageServer(
     region: requiredString(server.region, "INVALID_TENANT_STORAGE_RESPONSE"),
     status: oneOf(
       server.status,
-      ["DRAFT", "ACTIVE", "OFFLINE"] as const,
+      ["DRAFT", "ACTIVE", "DRAINING", "OFFLINE"] as const,
       "INVALID_TENANT_STORAGE_RESPONSE",
     ),
   };

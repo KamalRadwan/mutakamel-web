@@ -21,10 +21,12 @@ import {
   type ComboboxOption,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { localizedValue } from "@/lib/format/localized";
 import { LeadFieldGuide } from "../../../leads/components/create-lead/LeadFieldGuide";
 import type { useLeadCompanyOptions } from "../../../leads/hooks/useLeadCompanyOptions";
 import { CrmPhoneListField } from "../../../shared/components/CrmPhoneListField";
 import type { CrmFormErrors } from "../../../shared/hooks/useCrmCreateForm";
+import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import {
   CUSTOMER_PROFILE_CREATE_LIMITS,
   type CreateCustomerProfileForm,
@@ -32,7 +34,7 @@ import {
 
 const NEW_COMPANY_VALUE = "__new_company__";
 
-export type CompanyField =
+type CompanyField =
   | "companyName"
   | "legalName"
   | "taxNumber"
@@ -75,11 +77,12 @@ export function CustomerCompanySection({
   onBlur,
 }: CustomerCompanySectionProps) {
   const { t, lang } = useI18n();
+  const errorText = useCrmErrorText();
   const [query, setQuery] = useState("");
   const limits = CUSTOMER_PROFILE_CREATE_LIMITS;
   const existingCompanyPartyId = form.existingCompanyPartyId ?? "";
   const existing = existingCompanyPartyId.trim().length > 0;
-  const companies = options?.companies ?? [];
+  const companies = useMemo(() => options?.companies ?? [], [options?.companies]);
 
   const selectedCompany = useMemo(
     () =>
@@ -133,28 +136,28 @@ export function CustomerCompanySection({
     <section
       id="company"
       data-form-section="company"
-      className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-card shadow-xs transition-colors dark:border-violet-400/20"
+      className="relative overflow-hidden rounded-lg border border-swatch-purple-soft bg-card shadow-xs transition-colors"
     >
       {/* Top 3px Violet-Fuchsia accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-violet-600 via-purple-500 to-fuchsia-500"
+        className="h-1 w-full bg-swatch-purple"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-violet-500/[0.03] px-4 py-3 dark:bg-violet-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-swatch-purple-soft px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-violet-500/25 bg-violet-500/10 text-violet-600 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-swatch-purple-soft bg-swatch-purple-soft text-swatch-purple-deep">
             <Building2 className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+              <span dir="ltr" className="rounded bg-swatch-purple-soft px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-swatch-purple-deep">
                 02
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmCustomerProfiles.create.sections.company}
               </h3>
@@ -167,16 +170,16 @@ export function CustomerCompanySection({
 
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-2xs font-semibold",
             existing
-              ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300"
-              : "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300",
+              ? "border-swatch-blue-soft bg-swatch-blue-soft text-swatch-blue-deep"
+              : "border-swatch-purple-soft bg-swatch-purple-soft text-swatch-purple-deep",
           )}
         >
           {existing ? (
             <>
               <Link2 className="size-3" aria-hidden="true" />
-              {lang === "ar" ? "مرتبط بالدليل" : "Directory Linked"}
+              {localizedValue("مرتبط بالدليل", "Directory Linked", lang)}
             </>
           ) : (
             <>
@@ -191,17 +194,17 @@ export function CustomerCompanySection({
       <div className="space-y-4 p-4">
         {options?.error && (
           <DegradedBanner
-            message={options.error.message ?? t.crmShared.errorGeneric}
+            message={errorText(options.error) ?? t.crmShared.errorGeneric}
           />
         )}
 
         {/* Directory Company Route Picker */}
-        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.03] p-3 dark:border-violet-400/20 dark:bg-violet-500/[0.05]">
+        <div className="rounded-lg border border-swatch-purple-soft bg-swatch-purple-soft p-3">
           <div className="relative">
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-              <span className="rounded bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+            <div className="absolute end-0 top-0 flex items-center gap-1.5">
+              <span className="rounded bg-swatch-purple-soft px-1.5 py-0.5 text-2xs font-semibold text-swatch-purple-deep">
                 {companies.length}{" "}
-                {lang === "ar" ? "شركة في الدليل" : "in directory"}
+                {localizedValue("شركة في الدليل", "in directory", lang)}
               </span>
               <LeadFieldGuide field="existingCompanyPartyId" />
             </div>
@@ -237,22 +240,24 @@ export function CustomerCompanySection({
 
         {/* Route A: Locked Directory Organization Summary Card when existingCompanyPartyId is set */}
         {existing ? (
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-sky-500/25 bg-linear-to-r from-sky-500/[0.06] via-indigo-500/[0.04] to-violet-500/[0.06] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-swatch-blue-soft bg-swatch-blue-soft p-4">
             <div className="flex items-start gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/15 text-sky-600 dark:text-sky-300">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-swatch-blue-soft bg-swatch-blue-soft text-swatch-blue-deep">
                 <Lock className="size-4" aria-hidden="true" />
               </div>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-bold text-foreground">
+                  <span className="text-sm font-semibold text-foreground">
                     {selectedCompany?.displayName ??
                       (form.companyName || existingCompanyPartyId)}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-swatch-green-soft bg-swatch-green-soft px-2 py-0.5 text-2xs font-semibold text-swatch-green-deep">
                     <CheckCircle2 className="size-2.5" aria-hidden="true" />
-                    {lang === "ar"
-                      ? "مرتبط بسجل المنشأة في الدليل"
-                      : "Verified Directory Party"}
+                    {localizedValue(
+                      "مرتبط بسجل المنشأة في الدليل",
+                      "Verified Directory Party",
+                      lang,
+                    )}
                   </span>
                 </div>
                 {selectedCompany?.legalName && (
@@ -283,8 +288,8 @@ export function CustomerCompanySection({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
             {/* Company Trade Name (6 cols) */}
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {form.companyName.length}/{limits.companyName}
                 </span>
                 <LeadFieldGuide field="companyName" />
@@ -311,8 +316,8 @@ export function CustomerCompanySection({
 
             {/* Official Legal Name (6 cols) */}
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {(form.legalName ?? "").length}/{limits.legalName}
                 </span>
                 <LeadFieldGuide field="legalName" />
@@ -338,8 +343,8 @@ export function CustomerCompanySection({
 
             {/* Tax Number (4 cols) */}
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {form.taxNumber.length}/{limits.taxNumber}
                 </span>
                 <LeadFieldGuide field="taxNumber" />
@@ -366,8 +371,8 @@ export function CustomerCompanySection({
 
             {/* Commercial Registration Number (4 cols) */}
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {form.commercialRegistrationNumber.length}/
                   {limits.commercialRegistrationNumber}
                 </span>
@@ -398,8 +403,8 @@ export function CustomerCompanySection({
 
             {/* Company Website (4 cols) */}
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {(form.companyWebsite ?? "").length}/{limits.companyWebsite}
                 </span>
                 <LeadFieldGuide field="companyWebsite" />
@@ -434,8 +439,8 @@ export function CustomerCompanySection({
 
             {/* Company Official Email (6 cols) */}
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {(form.companyEmail ?? "").length}/{limits.email}
                 </span>
                 <LeadFieldGuide field="companyEmail" />

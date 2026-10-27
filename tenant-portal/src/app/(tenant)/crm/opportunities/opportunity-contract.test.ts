@@ -9,9 +9,8 @@ import {
 import { ar } from "@/i18n/dictionaries/ar";
 import { en } from "@/i18n/dictionaries/en";
 import { WRITE_APPLIED_UNREADABLE } from "@/lib/api/idempotent-write";
-import { MONEY_MAX_AMOUNT, MONEY_OUT_OF_RANGE } from "../shared/money";
+import { MONEY_MAX_AMOUNT, MONEY_OUT_OF_RANGE, MONEY_SCALE_INVALID } from "../shared/money";
 import {
-  OPPORTUNITY_AMOUNT_NOT_CLEARABLE,
   OPPORTUNITY_CURRENCY_INVALID,
   OPPORTUNITY_IMPORTANCE_REQUIRED,
   OPPORTUNITY_NOTHING_TO_SEND,
@@ -128,34 +127,47 @@ describe("opportunity stage history", () => {
     },
   };
 
-  it("reads a plain array, not a paginated page", () => {
-    const [entry] = parseOpportunityStageHistory([row]);
+  const parseHistory = (items: unknown[]) => parseOpportunityStageHistory({ items, nextCursor: null }).items;
+
+  it("reads a cursor page", () => {
+    const [entry] = parseHistory([row]);
     expect(entry.toStatus).toBe("WON");
     expect(entry.toStageSnapshot?.stageNameEn).toBe("Won");
   });
 
   it("preserves the server's order rather than re-sorting", () => {
     const older = { ...row, id: ID, changedAt: "2026-06-01T00:00:00.000Z" };
-    const parsed = parseOpportunityStageHistory([row, older]);
+    const parsed = parseHistory([row, older]);
     expect(parsed.map(({ id }) => id)).toEqual([HISTORY_ID, ID]);
   });
 
   it("falls back to createdAt when changedAt is absent", () => {
-    const [entry] = parseOpportunityStageHistory([
+    const [entry] = parseHistory([
       { ...row, changedAt: null, createdAt: "2026-06-01T00:00:00.000Z" },
     ]);
     expect(entry.changedAt).toBe("2026-06-01T00:00:00.000Z");
   });
 
   it("tolerates a snapshot the server could not resolve", () => {
-    const [entry] = parseOpportunityStageHistory([
+    const [entry] = parseHistory([
       { ...row, fromStageSnapshot: null },
     ]);
     expect(entry.fromStageSnapshot).toBeNull();
   });
 
   it("rejects a row with no id", () => {
-    expect(() => parseOpportunityStageHistory([{ ...row, id: null }])).toThrow();
+    expect(() => parseHistory([{ ...row, id: null }])).toThrow();
+  });
+
+  it("preserves opaque cursors and rejects malformed or unbounded pages", () => {
+    expect(parseOpportunityStageHistory({ items: [row], nextCursor: "opaque_cursor" }).nextCursor).toBe("opaque_cursor");
+    for (const payload of [[row], { items: [row] }, { items: [], nextCursor: "loop" },
+      { items: [row], nextCursor: 1 }, { items: [row, row], nextCursor: null },
+      { items: Array(101).fill(row), nextCursor: null }]) {
+      expect(() => parseOpportunityStageHistory(payload)).toThrow();
+    }
+    const [entry] = parseHistory([{ ...row, fromStageId: null, fromStageSnapshot: null }]);
+    expect(entry.fromStageSnapshot).toBeNull();
   });
 });
 
@@ -245,6 +257,19 @@ describe("opportunity write payloads", () => {
     expect(round.amount).toBe("150000.00");
   });
 
+  it("creates and edits KWD to three decimals while refusing the same EGP amount", () => {
+    const kwd = { ...form, currencyCode: "KWD", amount: "1.234" };
+    expect(isValidOpportunityAmount(kwd.amount, kwd.currencyCode)).toBe(true);
+    expect(JSON.stringify(buildCreateOpportunityRequest(kwd, BRANCH))).toContain('"amount":1.234');
+    expect(buildUpdateOpportunityRequest(kwd, { ...kwd, amount: "1.230" })).toEqual({ amount: 1.234 });
+    const egp = { ...kwd, currencyCode: "EGP" };
+    expect(isValidOpportunityAmount(egp.amount, egp.currencyCode)).toBe(false);
+    expect(() => buildCreateOpportunityRequest(egp, BRANCH)).toThrow(MONEY_SCALE_INVALID);
+    expect(() => buildUpdateOpportunityRequest(egp, { ...egp, amount: "1.230" })).toThrow(MONEY_SCALE_INVALID);
+    expect(() => buildUpdateOpportunityRequest(egp, kwd)).toThrow(MONEY_SCALE_INVALID);
+    expect(toOpportunityForm(parseOpportunityDetailResponse({ ...opportunity, amount: "1.230", currencyCode: "KWD" })).amount).toBe("1.230");
+  });
+
   it("patches only the changed keys and never pipeline or stage", () => {
     const baseline = { ...form };
     expect(buildUpdateOpportunityRequest(baseline, baseline)).toEqual({});
@@ -258,6 +283,16 @@ describe("opportunity write payloads", () => {
     expect(changed).not.toHaveProperty("customerProfileId");
   });
 
+  it("patches only edited custom fields, preserving false, zero, arrays and explicit clears", () => {
+    const baseline = { ...form, customFields: { note: "old", untouched: "keep", enabled: true, count: 5, choices: ["a"] } };
+    expect(buildUpdateOpportunityRequest({ ...baseline, customFields: { ...baseline.customFields, choices: ["a"] } }, baseline)).toEqual({});
+    expect(buildUpdateOpportunityRequest({ ...baseline, customFields: {
+      note: null, enabled: false, count: 0, choices: [], added: "new",
+    } }, baseline)).toEqual({ customFields: {
+      note: null, enabled: false, count: 0, choices: [], added: "new",
+    } });
+  });
+
   // D8. This used to assert `{}` — an emptied box produced a request with
   // nothing in it, the drawer closed, and the old title stayed on the record.
   // A key the API has no representation for is now a refusal the user reads.
@@ -268,13 +303,14 @@ describe("opportunity write payloads", () => {
     ).toThrow(OPPORTUNITY_TITLE_REQUIRED);
   });
 
-  it("clears the three columns the API can empty, with null rather than ''", () => {
+  it("clears amount and currency together, with null rather than ''", () => {
     const baseline = { ...form };
     expect(
       buildUpdateOpportunityRequest(
         {
           ...baseline,
           expectedCloseDate: "",
+          amount: "",
           currencyCode: "",
           probabilityPercent: "",
         },
@@ -283,18 +319,37 @@ describe("opportunity write payloads", () => {
     ).toEqual({
       // "" here is `@IsDateString()`'s 400 — the reason Clear used to fail.
       expectedCloseDate: null,
+      amount: null,
       currencyCode: null,
       probabilityPercent: null,
     });
   });
 
-  it("refuses the two columns the API cannot empty rather than no-opping", () => {
+  it("clears amount alone while retaining currency", () => {
+    expect(buildUpdateOpportunityRequest({ ...form, amount: "" }, form))
+      .toEqual({ amount: null });
+  });
+
+  it.each(["150000.00", "0"])("refuses clearing currency while amount %s remains", (amount) => {
+    const baseline = { ...form, amount };
+    expect(() => buildUpdateOpportunityRequest({ ...baseline, currencyCode: "" }, baseline))
+      .toThrow("OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED");
+  });
+
+  it("clears currency with an explicit amount null when amount was already empty", () => {
+    const baseline = { ...form, amount: "" };
+    expect(buildUpdateOpportunityRequest({ ...baseline, currencyCode: "" }, baseline))
+      .toEqual({ amount: null, currencyCode: null });
+  });
+
+  it("refuses setting an amount without currency", () => {
+    const baseline = { ...form, amount: "", currencyCode: "" };
+    expect(() => buildUpdateOpportunityRequest({ ...baseline, amount: "0" }, baseline))
+      .toThrow("OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED");
+  });
+
+  it("refuses empty importance rather than no-opping", () => {
     const baseline = { ...form };
-    // `OpportunitiesService.amountValue` is `String(dto.amount)`, so a null
-    // would reach numeric(18,2) as the text "null".
-    expect(() =>
-      buildUpdateOpportunityRequest({ ...baseline, amount: "" }, baseline),
-    ).toThrow(OPPORTUNITY_AMOUNT_NOT_CLEARABLE);
     // `importance` is smallint NOT NULL DEFAULT 0.
     expect(() =>
       buildUpdateOpportunityRequest({ ...baseline, importance: "" }, baseline),
@@ -315,11 +370,13 @@ describe("opportunity write payloads", () => {
   it("gives every client-side refusal a sentence in both dictionaries", () => {
     const codes = [
       MONEY_OUT_OF_RANGE,
+      MONEY_SCALE_INVALID,
       OPPORTUNITY_VALUE_OUT_OF_RANGE,
       OPPORTUNITY_TITLE_REQUIRED,
       OPPORTUNITY_IMPORTANCE_REQUIRED,
       OPPORTUNITY_CURRENCY_INVALID,
-      OPPORTUNITY_AMOUNT_NOT_CLEARABLE,
+      "OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED",
+      "OPPORTUNITY_AMOUNT_SCALE_INVALID",
       OPPORTUNITY_NOTHING_TO_SEND,
     ];
     for (const dictionary of [ar, en]) {

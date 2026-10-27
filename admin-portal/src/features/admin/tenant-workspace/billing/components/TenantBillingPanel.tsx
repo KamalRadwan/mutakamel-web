@@ -82,6 +82,27 @@ export function TenantBillingPanel({
         {workspace.mutation.error ? (
           <ErrorNotice error={workspace.mutation.error} lang={lang} focusOnMount />
         ) : null}
+        {workspace.walletConfirmation ? (
+          <Card className="space-y-3 p-3 sm:p-3.5">
+            <p role="status" className="text-sm text-warning-subtle-foreground">{copy.walletRecoveryHelp}</p>
+            <p className="break-words font-mono text-xs">{copy.walletQuote}: {workspace.walletConfirmation.quoteId}</p>
+            <p className="break-words text-sm">{copy.auditNote}: {workspace.walletConfirmation.note}</p>
+            {workspace.permissions.canConfirmWalletAdjustment ? (
+              <Button
+                size="sm"
+                type="button"
+                variant="primary"
+                disabled={Boolean(workspace.mutation.name) || workspace.walletRecoveryUnavailable}
+                onClick={() => void workspace.confirmWalletAdjustment("")}
+              >
+                {copy.recoverWalletAdjustment}
+              </Button>
+            ) : <p className="text-sm text-muted-foreground">{copy.previewOnly}</p>}
+          </Card>
+        ) : null}
+        {workspace.walletRecoveryUnavailable && workspace.permissions.canPreviewWalletAdjustment ? (
+          <p role="alert" className="text-sm text-warning-subtle-foreground">{copy.walletRecoveryUnavailable}</p>
+        ) : null}
         <TabsContent value="subscription" className="mt-0 space-y-4">
           <BillingSummary workspace={workspace} lang={lang} />
           <SubscriptionSection workspace={workspace} lang={lang} />
@@ -265,6 +286,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [note, setNote] = useState("");
+  const recoveryBlocked = Boolean(workspace.walletConfirmation) || workspace.walletRecoveryUnavailable;
   if ((workspace.walletState === "loading" || workspace.walletState === "idle") && !workspace.wallet)
     return <StateCard>{copy.loadingWallet}</StateCard>;
   if (workspace.walletState === "forbidden")
@@ -363,7 +385,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
               {copy.currenciesForbidden}
             </p>
           ) : null}
-          {currencyOptions.length > 0 ? (
+          {currencyOptions.length > 0 && !recoveryBlocked ? (
             <form
               className="mt-4 grid gap-3 md:grid-cols-3"
               onSubmit={(event) => {
@@ -424,7 +446,7 @@ function WalletSection({ workspace, lang }: TenantBillingPanelProps) {
           ) : workspace.inputCurrenciesState === "empty" ? (
             <p className="mt-3 text-sm text-muted-foreground">{copy.noCurrencies}</p>
           ) : null}
-          {workspace.walletPreview ? (
+          {workspace.walletPreview && !recoveryBlocked ? (
             <div className="mt-4 rounded-lg border border-info/30 bg-info-subtle p-4 text-info-subtle-foreground">
               <div className="grid gap-2 md:grid-cols-4">
                 <Metric
@@ -1139,7 +1161,13 @@ function ErrorNotice({
       tabIndex={-1}
       className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-sm text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <p className="font-medium">{error.message}</p>
+      <p className="font-medium">{
+        error.errorCode === "WALLET_RECOVERY_UNAVAILABLE"
+          ? billingCopy[lang].walletRecoveryUnavailable
+          : error.errorCode === "WALLET_CONFIRM_UNRESOLVED"
+            ? billingCopy[lang].walletRecoveryHelp
+            : error.message
+      }</p>
       <p className="mt-1 font-mono text-xs">
         {error.errorCode}
         {error.correlationId
@@ -1322,6 +1350,10 @@ const billingCopy = {
     balanceAfter: "Balance after",
     auditNote: "Audit note",
     confirmAdjustment: "Confirm adjustment",
+    walletQuote: "Original adjustment quote",
+    walletRecoveryHelp: "This adjustment has an unresolved result. Recover the original command before starting another adjustment. Recovery reuses the original quote, audit note and key, even after quote expiry.",
+    recoverWalletAdjustment: "Recover original adjustment",
+    walletRecoveryUnavailable: "Wallet recovery storage is unavailable or invalid. Adjustments are blocked. Restore browser storage access and refresh; do not clear an unresolved record.",
     previewOnly: "You may review this quote but cannot confirm it.",
     loadingCurrencies: "Loading accepted input currencies…",
     currenciesForbidden:
@@ -1448,6 +1480,10 @@ const billingCopy = {
     balanceAfter: "الرصيد بعد",
     auditNote: "ملاحظة التدقيق",
     confirmAdjustment: "تأكيد التعديل",
+    walletQuote: "عرض التعديل الأصلي",
+    walletRecoveryHelp: "نتيجة هذا التعديل غير محسومة. استعد الأمر الأصلي قبل بدء تعديل آخر. تستخدم الاستعادة نفس العرض وملاحظة التدقيق والمفتاح، حتى بعد انتهاء صلاحية العرض.",
+    recoverWalletAdjustment: "استعادة التعديل الأصلي",
+    walletRecoveryUnavailable: "تخزين استعادة المحفظة غير متاح أو غير صالح. التعديلات محظورة. أعد إتاحة تخزين المتصفح ثم حدّث الصفحة؛ لا تمسح سجلاً لم تُحسم نتيجته.",
     previewOnly: "يمكنك مراجعة العرض ولا يمكنك تأكيده.",
     loadingCurrencies: "جارٍ تحميل عملات الإدخال المقبولة…",
     currenciesForbidden: "عملات الإدخال المقبولة غير متاحة لهذا المسؤول.",

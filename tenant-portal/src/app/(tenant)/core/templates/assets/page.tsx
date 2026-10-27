@@ -88,7 +88,7 @@ export default function TemplateAssetsPage() {
               <ExternalLink className="size-3.5" aria-hidden="true" />
             </Button>
           ) : null}
-          {assets.canManage && asset.status === "ACTIVE" ? (
+          {assets.canRetire(asset) && asset.status === "ACTIVE" ? (
             <Button
               variant="ghost"
               size="xs"
@@ -107,11 +107,11 @@ export default function TemplateAssetsPage() {
   return (
     <PermissionGate require={TEMPLATE_READ_PERMISSION}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.assetsTitle}
           description={copy.assetsSubtitle}
           primaryAction={
-            assets.canManage ? { label: copy.assetUpload, onClick: assets.openUpload } : undefined
+            assets.canUpload ? { label: copy.assetUpload, onClick: assets.openUpload } : undefined
           }
           secondaryActions={
             <Button size="sm" variant="outline" onClick={assets.reload} disabled={assets.isLoading}>

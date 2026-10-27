@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Building2,
   CheckCircle2,
@@ -32,7 +32,7 @@ import { LeadFieldGuide } from "./LeadFieldGuide";
 
 const NEW_COMPANY_VALUE = "__new_company__";
 
-export type LeadCompanyField =
+type LeadCompanyField =
   | "companyName"
   | "legalName"
   | "taxNumber"
@@ -40,7 +40,7 @@ export type LeadCompanyField =
   | "companyEmail"
   | "companyWebsite";
 
-export interface LeadCompanySectionProps {
+interface LeadCompanySectionProps {
   form: CreateLeadForm;
   errors: CrmFormErrors;
   options: ReturnType<typeof useLeadCompanyOptions>;
@@ -75,30 +75,19 @@ export function LeadCompanySection({
   onBlur,
 }: LeadCompanySectionProps) {
   const { t, lang } = useI18n();
-  const [query, setQuery] = useState("");
   const limits = LEAD_CREATE_LIMITS;
   const existing = form.existingCompanyPartyId.trim().length > 0;
 
   const selectedCompany = useMemo(
     () =>
-      options.companies.find(
+      options.selectedCompany ?? options.companies.find(
         (company) => company.id === form.existingCompanyPartyId,
       ) ?? null,
-    [options.companies, form.existingCompanyPartyId],
+    [options.selectedCompany, options.companies, form.existingCompanyPartyId],
   );
 
   const comboboxOptions = useMemo<ComboboxOption[]>(() => {
-    const needle = query.trim().toLowerCase();
     const matched = options.companies
-      .filter((company) => {
-        if (!needle) return true;
-        const displayMatch = company.displayName.toLowerCase().includes(needle);
-        const legalMatch =
-          company.legalName?.toLowerCase().includes(needle) ?? false;
-        const orgMatch =
-          company.organizationName?.toLowerCase().includes(needle) ?? false;
-        return displayMatch || legalMatch || orgMatch;
-      })
       .map((company) => ({
         value: company.id,
         label: company.displayName,
@@ -115,7 +104,7 @@ export function LeadCompanySection({
       },
       ...matched,
     ];
-  }, [options.companies, query, t.crmLeads.newCompany]);
+  }, [options.companies, t.crmLeads.newCompany]);
 
   function handleSelectCompanyOption(nextValue: string | undefined) {
     if (!nextValue || nextValue === NEW_COMPANY_VALUE) {
@@ -131,28 +120,28 @@ export function LeadCompanySection({
   return (
     <section
       data-form-section="company"
-      className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-card shadow-xs transition-colors dark:border-violet-400/20"
+      className="relative overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors"
     >
-      {/* Top 3px Violet-Fuchsia accent bar */}
+      {/* Top 3px accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-violet-600 via-purple-500 to-fuchsia-500"
+        className="h-1 w-full bg-primary"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-violet-500/[0.03] px-4 py-3 dark:bg-violet-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-muted/20 px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-violet-500/25 bg-violet-500/10 text-violet-600 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
             <Building2 className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">
                 02
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmLeads.create.sections.company}
               </h3>
@@ -165,16 +154,16 @@ export function LeadCompanySection({
 
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
             existing
-              ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300"
-              : "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300",
+              ? "border-border/60 bg-muted text-foreground"
+              : "border-border/60 bg-muted text-muted-foreground",
           )}
         >
           {existing ? (
             <>
               <Link2 className="size-3" aria-hidden="true" />
-              {lang === "ar" ? "مرتبط بالدليل" : "Directory Linked"}
+              {{ ar: "مرتبط بالدليل", en: "Directory Linked" }[lang]}
             </>
           ) : (
             <>
@@ -192,12 +181,12 @@ export function LeadCompanySection({
         )}
 
         {/* Directory Company Route Picker */}
-        <div className="rounded-lg border border-violet-500/20 bg-violet-500/[0.03] p-3 dark:border-violet-400/20 dark:bg-violet-500/[0.05]">
+        <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
           <div className="relative">
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-              <span className="rounded bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+            <div className="absolute end-0 top-0 flex items-center gap-1.5">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
                 {options.companies.length}{" "}
-                {lang === "ar" ? "شركة في الدليل" : "in directory"}
+                {{ ar: "شركة في الدليل", en: "in directory" }[lang]}
               </span>
               <LeadFieldGuide field="existingCompanyPartyId" />
             </div>
@@ -216,7 +205,7 @@ export function LeadCompanySection({
                     : t.crmLeads.newCompany
                 }
                 options={comboboxOptions}
-                onSearch={setQuery}
+                onSearch={options.searchCompanies}
                 debounceMs={0}
                 loading={options.isLoadingCompanies}
                 placeholder={t.crmLeads.newCompany}
@@ -233,22 +222,23 @@ export function LeadCompanySection({
 
         {/* Route A: Locked Directory Organization Summary Card when existingCompanyPartyId is set */}
         {existing ? (
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-sky-500/25 bg-linear-to-r from-sky-500/[0.06] via-indigo-500/[0.04] to-violet-500/[0.06] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/60 bg-muted/30 p-4">
             <div className="flex items-start gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/30 bg-sky-500/15 text-sky-600 dark:text-sky-300">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
                 <Lock className="size-4" aria-hidden="true" />
               </div>
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-bold text-foreground">
+                  <span className="text-sm font-semibold text-foreground">
                     {selectedCompany?.displayName ??
                       (form.companyName || form.existingCompanyPartyId)}
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success-subtle px-2 py-0.5 text-xs font-semibold text-success-subtle-foreground">
                     <CheckCircle2 className="size-2.5" aria-hidden="true" />
-                    {lang === "ar"
-                      ? "مرتبط بسجل المنشأة في الدليل"
-                      : "Verified Directory Party"}
+                    {{
+                      ar: "مرتبط بسجل المنشأة في الدليل",
+                      en: "Verified Directory Party",
+                    }[lang]}
                   </span>
                 </div>
                 {selectedCompany?.legalName && (
@@ -279,8 +269,8 @@ export function LeadCompanySection({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
             {/* Company Trade Name (6 cols) */}
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.companyName.length}/{limits.companyName}
                 </span>
                 <LeadFieldGuide field="companyName" />
@@ -307,8 +297,8 @@ export function LeadCompanySection({
 
             {/* Official Legal Name (6 cols) */}
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.legalName.length}/{limits.legalName}
                 </span>
                 <LeadFieldGuide field="legalName" />
@@ -334,8 +324,8 @@ export function LeadCompanySection({
 
             {/* Tax Number (4 cols) */}
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.taxNumber.length}/{limits.taxNumber}
                 </span>
                 <LeadFieldGuide field="taxNumber" />
@@ -362,8 +352,8 @@ export function LeadCompanySection({
 
             {/* Commercial Registration Number (4 cols) */}
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.commercialRegistrationNumber.length}/
                   {limits.commercialRegistrationNumber}
                 </span>
@@ -394,8 +384,8 @@ export function LeadCompanySection({
 
             {/* Company Website (4 cols) */}
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {(form.companyWebsite ?? "").length}/{limits.companyWebsite}
                 </span>
                 <LeadFieldGuide field="companyWebsite" />
@@ -430,8 +420,8 @@ export function LeadCompanySection({
 
             {/* Company Official Email (6 cols) */}
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {(form.companyEmail ?? "").length}/{limits.email}
                 </span>
                 <LeadFieldGuide field="companyEmail" />

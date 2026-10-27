@@ -10,6 +10,7 @@ import { NumberingFormFields } from "./NumberingFormFields";
 interface CreateNumberingSequenceModalProps {
   isOpen: boolean;
   companies: CompanyOption[];
+  tenantWideAllowed: boolean;
   onClose: () => void;
   onSubmit: (values: NumberingFormValues) => Promise<boolean>;
   isSubmitting: boolean;
@@ -19,22 +20,24 @@ interface CreateNumberingSequenceModalProps {
 export function CreateNumberingSequenceModal({
   isOpen,
   companies,
+  tenantWideAllowed,
   onClose,
   onSubmit,
   isSubmitting,
   error,
 }: CreateNumberingSequenceModalProps) {
   const { t } = useI18n();
-  const [values, setValues] = useState<NumberingFormValues>(EMPTY_NUMBERING_FORM);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_NUMBERING_FORM);
+  const initial = { ...EMPTY_NUMBERING_FORM, companyId: tenantWideAllowed ? null : companies[0]?.id ?? null };
+  const [values, setValues] = useState<NumberingFormValues>(initial);
+  const isDirty = JSON.stringify(values) !== JSON.stringify(initial);
 
   const close = () => {
-    setValues(EMPTY_NUMBERING_FORM);
+    setValues(initial);
     onClose();
   };
 
   const handleSubmit = async () => {
-    if (await onSubmit(values)) setValues(EMPTY_NUMBERING_FORM);
+    if (await onSubmit(values)) setValues(initial);
   };
 
   return (
@@ -62,6 +65,7 @@ export function CreateNumberingSequenceModal({
         values={values}
         onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
         companies={companies}
+        tenantWideAllowed={tenantWideAllowed}
         isSubmitting={isSubmitting}
         scopeReadOnly={false}
         counterLabel={t.coreSettings.numberingStartValue}

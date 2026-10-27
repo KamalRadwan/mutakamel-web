@@ -3,7 +3,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useOpportunitiesList } from "./useOpportunitiesList";
-import { useOpportunityCards } from "./useOpportunityCards";
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/lib/api/axiosClient", async (importOriginal) => {
@@ -20,17 +19,7 @@ const STAGE = "01900100-0000-7000-8000-000000000101";
 
 const LIST_PAGE = { items: [], page: 1, limit: 25, total: 0 };
 
-function cardsPage(nextCursor: string | null) {
-  return {
-    pipeline: { id: PIPELINE, stages: [] },
-    selectedStageId: null,
-    totalCount: 0,
-    items: [],
-    pageInfo: { limit: 50, hasMore: nextCursor !== null, nextCursor },
-  };
-}
-
-// Both hooks fetch from a queued microtask inside an effect.
+// The hook fetches from a queued microtask inside an effect.
 async function settle() {
   await act(async () => {
     await Promise.resolve();
@@ -93,43 +82,5 @@ describe("opportunity stage filter requests", () => {
     );
   });
 
-  it("sends stageId on the card request", async () => {
-    get.mockResolvedValue({ data: cardsPage(null) });
-    renderHook(() => useOpportunityCards(PIPELINE, BRANCH, STAGE));
-    await settle();
 
-    expect(get).toHaveBeenCalledWith(
-      `/api/tenant/crm/v1/pipelines/${PIPELINE}/cards?branchId=${BRANCH}&limit=50&stageId=${STAGE}`,
-      expect.anything(),
-    );
-  });
-
-  it("omits it for All, which is why the card endpoint made it optional", async () => {
-    get.mockResolvedValue({ data: cardsPage(null) });
-    renderHook(() => useOpportunityCards(PIPELINE, BRANCH, null));
-    await settle();
-
-    expect(get).toHaveBeenCalledWith(
-      `/api/tenant/crm/v1/pipelines/${PIPELINE}/cards?branchId=${BRANCH}&limit=50`,
-      expect.anything(),
-    );
-  });
-
-  it("repeats the stage on the next cursor page", async () => {
-    get.mockResolvedValue({ data: cardsPage("cursor-1") });
-    const { result } = renderHook(() => useOpportunityCards(PIPELINE, BRANCH, STAGE));
-    await settle();
-
-    get.mockResolvedValue({ data: cardsPage(null) });
-    await act(async () => {
-      await result.current.loadMore();
-    });
-
-    // The server stamps the stage into the cursor and validates it back, so a
-    // load-more that dropped the filter would be rejected, not broadened.
-    expect(get).toHaveBeenLastCalledWith(
-      `/api/tenant/crm/v1/pipelines/${PIPELINE}/cards?branchId=${BRANCH}&limit=50&cursor=cursor-1&stageId=${STAGE}`,
-      expect.anything(),
-    );
-  });
 });

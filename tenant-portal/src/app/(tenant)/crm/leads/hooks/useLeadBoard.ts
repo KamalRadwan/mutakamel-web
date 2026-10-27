@@ -7,6 +7,7 @@ import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
   buildLeadBoardRequest,
+  buildLeadInitialBoardRequest,
   LEAD_BOARD_STAGE_LIMIT,
 } from "../lead-board-contract";
 import type { LeadSearchState } from "../lead-search-contract";
@@ -14,7 +15,7 @@ import {
   parseLeadsResponse,
   type LeadItem,
   type LeadStage,
-} from "./useLeads";
+} from "../lead-list-contract";
 
 export interface LeadBoardLane {
   items: LeadItem[];
@@ -22,6 +23,8 @@ export interface LeadBoardLane {
   page: number;
   hasMore: boolean;
 }
+
+class LeadBoardStagesChangedError extends Error {}
 
 const EMPTY_LANES: Record<string, LeadBoardLane> = {};
 
@@ -76,7 +79,7 @@ export function parseLeadBoardResponse(
     new Set(ids).size !== ids.length ||
     expectedStageIds.some((id) => !ids.includes(id))
   ) {
-    throw new Error("Invalid lead board response.");
+    throw new LeadBoardStagesChangedError("Invalid lead board response.");
   }
   return Object.fromEntries(entries.map(({ stageId, lane }) => [stageId, lane]));
 }
@@ -89,16 +92,16 @@ export function useLeadBoard({
   enabled,
   branchId,
   stages,
+  refreshStages,
   search,
   sort,
-  revision,
 }: {
   enabled: boolean;
   branchId: string | null;
   stages: LeadStage[];
+  refreshStages: () => Promise<LeadStage[]>;
   search: LeadSearchState;
   sort: { id: "displayName" | "createdAt"; direction: "asc" | "desc" };
-  revision: number;
 }) {
   const { user } = useTenantAuth();
   const [lanes, setLanes] = useState<Record<string, LeadBoardLane>>(EMPTY_LANES);
@@ -107,12 +110,19 @@ export function useLeadBoard({
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const requestEpochRef = useRef(0);
   const hasLoadedRef = useRef(false);
+  const reloadTimerRef = useRef<number | undefined>(undefined);
   const loadMoreRef = useRef<Set<string>>(new Set());
+  const stagesRef = useRef(stages);
+  useEffect(() => {
+    stagesRef.current = stages;
+  }, [stages]);
+  const hasStages = stages.length > 0;
 
   const requestBody = useCallback(
-    (page: number) => {
+    (page: number, initial = false) => {
       if (!branchId) throw new Error("A branch is required to load the lead board.");
-      return buildLeadBoardRequest(search, {
+      const buildRequest = initial ? buildLeadInitialBoardRequest : buildLeadBoardRequest;
+      return buildRequest(search, {
         branchId,
         page,
         limit: LEAD_BOARD_STAGE_LIMIT,
@@ -147,12 +157,16 @@ export function useLeadBoard({
   );
 
   const reload = useCallback(async (signal?: AbortSignal) => {
+    // A pending filter debounce must not supersede an awaited mutation reload.
+    window.clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = undefined;
     const epoch = requestEpochRef.current + 1;
     requestEpochRef.current = epoch;
+    const knownStages = stagesRef.current;
     if (
       !enabled ||
       !branchId ||
-      stages.length === 0 ||
+      !hasStages ||
       (search.mode === "basic" && search.basic.myLeads && !isUUIDv7(user?.id))
     ) {
       setLanes(EMPTY_LANES);
@@ -165,21 +179,32 @@ export function useLeadBoard({
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axiosClient.post<unknown>(
+      const readBoard = (stageCount: number) => axiosClient.post<unknown>(
         "/api/tenant/crm/v1/leads/board",
-        requestBody(1),
+        requestBody(1, true),
         {
           signal,
           cache: "no-store",
           // Every lane is up to 50 full list rows, so the board gets the list
           // page's 1 MiB budget once per stage rather than one fixed cap.
-          maxResponseBytes: Math.max(1, stages.length) * 1024 * 1024,
+          maxResponseBytes: Math.max(1, stageCount) * 1024 * 1024,
           skipAutoIdempotency: true,
           replayAfterRefresh: true,
         },
       );
+      const response = await readBoard(knownStages.length);
       if (signal?.aborted || epoch !== requestEpochRef.current) return false;
-      setLanes(parseLeadBoardResponse(response.data, branchId, stages.map(({ id }) => id)));
+      try {
+        setLanes(parseLeadBoardResponse(response.data, branchId, knownStages.map(({ id }) => id)));
+      } catch (caught) {
+        if (!(caught instanceof LeadBoardStagesChangedError)) throw caught;
+        const currentStages = await refreshStages();
+        stagesRef.current = currentStages;
+        if (signal?.aborted || epoch !== requestEpochRef.current) return false;
+        const retry = await readBoard(currentStages.length);
+        if (signal?.aborted || epoch !== requestEpochRef.current) return false;
+        setLanes(parseLeadBoardResponse(retry.data, branchId, currentStages.map(({ id }) => id)));
+      }
       return true;
     } catch (caught) {
       if (isAbortError(caught) || epoch !== requestEpochRef.current) return false;
@@ -189,7 +214,7 @@ export function useLeadBoard({
     } finally {
       if (!signal?.aborted && epoch === requestEpochRef.current) setIsLoading(false);
     }
-  }, [branchId, enabled, requestBody, search, stages, user?.id]);
+  }, [branchId, enabled, hasStages, refreshStages, requestBody, search, user?.id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -198,11 +223,12 @@ export function useLeadBoard({
     const timer = window.setTimeout(() => {
       if (!controller.signal.aborted) void reload(controller.signal);
     }, hasLoadedRef.current ? 250 : 0);
+    reloadTimerRef.current = timer;
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [reload, revision]);
+  }, [reload]);
 
   const loadMoreStage = useCallback(async (stageId: string) => {
     const lane = lanes[stageId];

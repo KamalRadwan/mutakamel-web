@@ -63,7 +63,7 @@ export function AddonOwnerPicker({ owners, truncated, copy, onSelect, onClose }:
                   <RadioGroupItem id={`addon-owner-${owner.key}`} value={owner.key} />
                   <label htmlFor={`addon-owner-${owner.key}`} className="min-w-0 grow cursor-pointer">
                     <span className="block text-xs font-semibold">{owner.name}</span>
-                    <bdi className="block break-all font-mono text-[11px] text-muted-foreground" dir="ltr">{owner.key}.</bdi>
+                    <bdi className="block break-all font-mono text-xs text-muted-foreground" dir="ltr">{owner.key}.</bdi>
                   </label>
                 </div>
               ))}

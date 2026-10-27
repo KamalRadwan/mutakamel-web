@@ -139,11 +139,7 @@ export function useMigrationRunDetail(runId: string) {
       name: Exclude<MigrationMutationName, "START">,
       reason: string,
     ): Promise<MigrationRun | null> => {
-      const destructive = name === "ABORT";
-      const allowed = destructive
-        ? permissions.canDestroy
-        : permissions.canExecute;
-      if (!allowed) return null;
+      if (!permissions.canExecute) return null;
 
       setMutation({ name, phase: "PENDING", error: null });
       try {
@@ -164,7 +160,7 @@ export function useMigrationRunDetail(runId: string) {
         return null;
       }
     },
-    [permissions.canDestroy, permissions.canExecute, runId],
+    [permissions.canExecute, runId],
   );
 
   const visibleState: ResourceState = isAuthLoading

@@ -45,6 +45,10 @@ export interface CreateAcquisitionSourceInput {
   nameEn: string;
 }
 
+export interface UpdateAcquisitionSourceInput extends CreateAcquisitionSourceInput {
+  isActive: boolean;
+}
+
 export function acquisitionSourcePath(id: string): string {
   if (!UUID_V7_PATTERN.test(id)) invalidResponse();
   return `${ACQUISITION_SOURCES_PATH}/${encodeURIComponent(id)}`;
@@ -110,6 +114,12 @@ export function buildCreateAcquisitionSourceRequest(
   };
 }
 
+export function buildUpdateAcquisitionSourceRequest(
+  input: UpdateAcquisitionSourceInput,
+): UpdateAcquisitionSourceInput {
+  return { ...buildCreateAcquisitionSourceRequest(input), isActive: input.isActive };
+}
+
 export function parseAcquisitionSourcesResponse(
   payload: unknown,
 ): AcquisitionSource[] {
@@ -163,9 +173,7 @@ export function parseAcquisitionSourceResponse(
 function normalizedName(value: string): string {
   const normalized = value.trim();
   if (!validName(normalized)) {
-    throw new Error(
-      `Acquisition-source names must contain 1-${ACQUISITION_SOURCE_NAME_MAX_LENGTH} characters.`,
-    );
+    throw new Error("CRM_ACQUISITION_SOURCE_NAMES_INVALID");
   }
   return normalized;
 }
@@ -200,5 +208,5 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 function invalidResponse(): never {
-  throw new Error("Invalid CRM acquisition-sources response.");
+  throw new Error("INVALID_CRM_ACQUISITION_SOURCES_RESPONSE");
 }

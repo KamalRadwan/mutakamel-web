@@ -35,7 +35,7 @@ export default function OrganizationTreePage() {
   return (
     <PermissionGate require="org.company.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.title}
           description={copy.subtitle}
           secondaryActions={

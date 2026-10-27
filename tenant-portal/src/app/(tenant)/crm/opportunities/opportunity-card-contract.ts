@@ -1,7 +1,7 @@
 import { isCardColor, type CardColor } from "@/design-system";
 import { isUUIDv7 } from "@/lib/uuid";
 
-export const MAX_OPPORTUNITY_IMPORTANCE = 3;
+const MAX_OPPORTUNITY_IMPORTANCE = 3;
 
 export interface OpportunityCardPatch {
   importance?: number;

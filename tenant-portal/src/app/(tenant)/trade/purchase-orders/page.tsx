@@ -15,6 +15,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { TradeScopeRequired } from "../documents/components/TradeBoundaryStates";
 import { TradeDocumentFilters } from "../documents/components/TradeDocumentFilters";
+import { TradeDocumentListBoundary } from "../documents/components/TradeDocumentListBoundary";
 import {
   TradeDocumentExecutiveBoard,
   type TradeBoardColumnSpec,
@@ -85,7 +86,7 @@ export default function PurchaseOrdersPage() {
           },
           {
             label: td.purchaseOrders.dispatchAxis,
-            value: row.dispatchStatus,
+            value: t.statusValues[`TradePurchaseDispatchStatus.${row.dispatchStatus}`] ?? row.dispatchStatus,
           },
         ],
         tags: [
@@ -265,6 +266,7 @@ export default function PurchaseOrdersPage() {
     <TradeGate require={PURCHASE_ORDER_PERMISSIONS.read}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={td.purchaseOrders.title}
           description={td.purchaseOrders.subtitle}
           primaryAction={
@@ -313,6 +315,15 @@ export default function PurchaseOrdersPage() {
               onChange={list.setStatus}
             />
 
+            <TradeDocumentListBoundary
+              isLoading={list.isLoading}
+              error={list.queryError}
+              recordCount={viewMode === "table" ? undefined : list.items.length}
+              permission={PURCHASE_ORDER_PERMISSIONS.read}
+              emptyTitle={td.purchaseOrders.empty}
+              errorTitle={td.purchaseOrders.loadFailed}
+              onRetry={() => void list.reload()}
+            >
             {viewMode === "board" ? (
               <TradeDocumentExecutiveBoard
                 columns={boardColumns}
@@ -352,6 +363,8 @@ export default function PurchaseOrdersPage() {
                 labels={labels}
               />
             )}
+
+            </TradeDocumentListBoundary>
 
             <TradeQuickInspectModal
               open={inspectId !== null}

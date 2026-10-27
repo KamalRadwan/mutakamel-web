@@ -8,16 +8,17 @@ import type { PublicBranding } from "./public-branding";
 
 // Writes tenant branding into the token layer at runtime (MASTER-PLAN 6.17).
 //
-// Three semantic tokens read the brand ramp, all declared in
-// `src/app/globals.css`: `--primary`, `--ring` and `--sidebar-active`. None of
-// them is written here — overriding `--color-brand-*` on `:root` moves all
-// three at once, in both themes, which is the whole reason the ramp is the
-// indirection layer.
+// Semantic tokens and CRM Leads v3 brand roles in `src/app/globals.css` read
+// `--color-brand-*` (`--primary`, `--ring`, `--sidebar-active`, the primary
+// button and active-tab `bg-gradient-primary`, logo mark, active filter chips
+// and stage/KPI counts). None of those downstream tokens is written here —
+// overriding `--color-brand-*` on `:root` recolours all of them at once, in
+// both themes, which is why the ramp is the indirection layer.
 //
-// `--color-chrome` is written beside the ramp and is the one brand colour that
-// is not a step of it: the light theme's nav bar. It has to move with the hue
-// for the same reason the marker on it does — a tenant who sets green and gets
-// the system's navy bar has a bar belonging to somebody else's product.
+// Since CRM Leads v3 the global top bar no longer follows the tenant hue: it
+// renders the fixed Ocean Navy gradient (`bg-gradient-header`). `--color-chrome`
+// is still written beside the ramp for `--nav` token consumers, while the
+// header itself stays fixed navy chrome.
 //
 // The override is an inline style on the root element, so it outranks the
 // stylesheet without a second `:root` rule and without `!important`.
@@ -73,6 +74,11 @@ function applyBrandingIcon(iconUrl: string): void {
 export function applyBrandingTokens(branding: PublicBranding): BrandingOutcome {
   if (branding.tabTitle) document.title = branding.tabTitle;
   if (branding.iconUrl) applyBrandingIcon(branding.iconUrl);
+  // A live update can reset or reject a previously applied tenant colour.
+  for (const step of BRAND_RAMP_STEPS) {
+    document.documentElement.style.removeProperty(`--color-brand-${step}`);
+  }
+  document.documentElement.style.removeProperty("--color-chrome");
   if (!branding.primaryColor) return { kind: "systemDefault" };
 
   const verdict = evaluateBrandColor(branding.primaryColor);

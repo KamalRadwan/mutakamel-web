@@ -310,7 +310,7 @@ export function getChannelTemplateName(
   return map[lang];
 }
 
-export const CHANNEL_CODE_VALID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
+const CHANNEL_CODE_VALID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 
 export function sanitizeChannelCodeInput(raw: string): string {
   return raw

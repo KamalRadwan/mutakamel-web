@@ -26,6 +26,7 @@ export function UserDropdown() {
   } = useUserDropdown();
 
   const fullName = `${currentAdmin.firstName} ${currentAdmin.lastName}`.trim();
+  const avatarInitials = `${currentAdmin.firstName.charAt(0)}${currentAdmin.lastName.charAt(0)}`.toUpperCase();
   const accountMenuLabel = `${fullName}, ${t.common.accountMenu}`;
 
   return (
@@ -36,22 +37,18 @@ export function UserDropdown() {
           variant="ghost"
           size="sm"
           aria-label={accountMenuLabel}
-          className="h-auto gap-2.5 px-1.5 py-1 ps-2 text-white hover:bg-white/10 hover:text-white"
+          className="h-9.5 shrink-0 gap-2 rounded-full border border-nav-chrome-line bg-white/5 px-0 ps-1 pe-2.5 text-nav-foreground hover:bg-white/10 hover:text-nav-foreground-strong md:pe-3"
         >
-          <span className="relative flex size-8 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
-            <span>{currentAdmin.firstName[0]}</span>
-            <span className="absolute bottom-0 end-0 size-2.5 rounded-full border-2 border-[#0f172a] bg-success" aria-hidden="true" />
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-avatar text-xs font-semibold leading-none text-white">
+            {avatarInitials}
           </span>
 
-          <span className="hidden flex-col text-start md:flex">
-            <span className="text-xs font-semibold leading-none text-white">
+          {fullName ? (
+            <span className="hidden max-w-40 truncate text-label font-semibold text-nav-foreground-strong md:inline">
               {fullName}
             </span>
-            <span className="mt-0.5 text-xs leading-none text-slate-300">
-              {currentAdmin.roleName}
-            </span>
-          </span>
-          <ChevronDown className="ms-0.5 size-3.5 text-slate-300" aria-hidden="true" />
+          ) : null}
+          <ChevronDown className="size-3.5 shrink-0 text-nav-foreground/75" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
 
@@ -69,8 +66,8 @@ export function UserDropdown() {
 
         <DropdownMenuItem asChild>
           <Link href="/profile">
-                <User className="size-4 text-muted-foreground" aria-hidden="true" />
-                <span>{t.common.profileAndCurrency}</span>
+            <User className="size-4 text-muted-foreground" aria-hidden="true" />
+            <span>{t.common.profileAndCurrency}</span>
           </Link>
         </DropdownMenuItem>
         {canViewRoles ? (

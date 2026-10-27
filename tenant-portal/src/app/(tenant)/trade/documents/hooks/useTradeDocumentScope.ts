@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { BRANCH_SCOPE_HEADER, COMPANY_SCOPE_HEADER } from "@/lib/api/organization-scope";
+import { can } from "@/lib/auth/permission-scope";
 import { useTradeScopeRequest } from "../../useTradeScope";
 
 export interface TradeDocumentScope {
@@ -31,16 +32,15 @@ export function useTradeDocumentScope(): TradeDocumentScope {
   const { user } = useTenantAuth();
   const { headers, gap } = useTradeScopeRequest("BRANCH");
 
-  const permissions = useMemo(() => user?.permissions ?? [], [user]);
-  const isOwner = user?.isTenantOwner ?? false;
-
   return {
     isResolved: gap === null,
     headers,
-    // Trade publishes no capabilities endpoint (Q30), so this is the most the
-    // browser can know: the permission string plus the owner bypass, which is
-    // the only thing `TradePermissionsGuard` short-circuits on.
-    canWrite: (permission: string) => isOwner || permissions.includes(permission),
+    canWrite: (permission: string) => gap === null && (
+      user?.isTenantOwner === true || can(user, permission, {
+        companyId: headers[COMPANY_SCOPE_HEADER],
+        branchId: headers[BRANCH_SCOPE_HEADER],
+      })
+    ),
     userId: user?.id ?? null,
   };
 }

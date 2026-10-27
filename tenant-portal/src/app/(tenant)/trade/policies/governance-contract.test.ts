@@ -23,7 +23,6 @@ import {
   validateWorkflowGraphClient,
 } from "./governance-contract";
 import {
-  DOCUMENT_PROFILE_ALLOWED_SCOPES,
   buildCreateDocumentProfileVersionRequest,
   buildDefaultVisualProfileConfig,
   serializeVisualProfileContent,
@@ -191,7 +190,6 @@ describe("Trade governance ladder", () => {
   });
 
   it("serializes document profile visual schema with mandatory locks and lineage", () => {
-    expect(DOCUMENT_PROFILE_ALLOWED_SCOPES).toEqual(["TENANT", "COMPANY"]);
     const config = buildDefaultVisualProfileConfig("QUOTATION");
     // Try to uncheck a mandatory field and verify serializer enforces required=true & visible=true
     config.fields[0].required = false;

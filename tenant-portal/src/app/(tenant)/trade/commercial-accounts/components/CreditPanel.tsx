@@ -15,6 +15,7 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatDateTime } from "@/lib/format/date";
+import { INTL_LOCALE } from "@/lib/format/locale";
 import type { CreditDecision } from "../commercial-account-contract";
 import { ACCOUNT_UI_COPY, ISO_CURRENCY_PRESETS } from "../commercial-account-metadata";
 
@@ -101,9 +102,10 @@ export function CreditPanel({
                   variant={amount === presetAmt ? "primary" : "outline"}
                   disabled={isSubmitting}
                   onClick={() => setAmount(presetAmt)}
-                  className="px-1.5 py-0.5 font-mono text-xs font-semibold"
+                  dir="ltr"
+                  className="px-1.5 py-0.5 font-mono tabular-nums text-xs font-semibold"
                 >
-                  {Number(presetAmt).toLocaleString()}
+                  {Number(presetAmt).toLocaleString(INTL_LOCALE[lang])}
                 </Button>
               ))}
             </div>
@@ -129,6 +131,7 @@ export function CreditPanel({
                   variant={currency.toUpperCase() === preset.code ? "primary" : "outline"}
                   disabled={isSubmitting}
                   onClick={() => setCurrency(preset.code)}
+                  dir="ltr"
                   className="px-1.5 py-0.5 font-mono text-xs font-semibold"
                 >
                   {preset.code}
@@ -184,7 +187,7 @@ export function CreditPanel({
                   <span className="font-medium text-muted-foreground">
                     {copy.creditUtilization}
                   </span>
-                  <span className="font-mono font-semibold text-foreground">
+                  <span className="font-mono tabular-nums font-semibold text-foreground">
                     {utilizationPct}%
                   </span>
                 </div>

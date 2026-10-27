@@ -45,7 +45,7 @@ export function BillingWorkspace() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={t.coreBilling.title}
         description={t.coreBilling.subtitle}
         secondaryActions={

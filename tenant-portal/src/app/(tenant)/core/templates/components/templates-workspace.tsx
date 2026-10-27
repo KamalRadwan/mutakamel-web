@@ -115,7 +115,7 @@ export function TemplatesWorkspace() {
   return (
     <PermissionGate require={TEMPLATE_READ_PERMISSION}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.listTitle}
           description={copy.listSubtitle}
           primaryAction={

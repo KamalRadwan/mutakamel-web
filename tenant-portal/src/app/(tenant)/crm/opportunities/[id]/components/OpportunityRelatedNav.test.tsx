@@ -88,8 +88,14 @@ describe("Opportunity related records", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("link", { name: `${en.crmLeadDetail.related.labels.invoices}: 4` }),
-      ).toBeInTheDocument(),
+      ).toHaveAttribute("href", `/trade/invoices?partyId=${PARTY_ID}`),
     );
+    expect(
+      screen.getByRole("link", { name: `${en.crmLeadDetail.related.labels.quotations}: 2` }),
+    ).toHaveAttribute("href", `/trade/quotations?partyId=${PARTY_ID}`);
+    expect(
+      screen.getByRole("link", { name: `${en.crmLeadDetail.related.labels.salesOrders}: 3` }),
+    ).toHaveAttribute("href", `/trade/sales-orders?partyId=${PARTY_ID}`);
 
     expect(api.post).toHaveBeenCalledTimes(3);
     for (const [, body, config] of api.post.mock.calls) {

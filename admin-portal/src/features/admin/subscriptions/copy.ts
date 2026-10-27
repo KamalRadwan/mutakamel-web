@@ -4,6 +4,8 @@ export const SUBSCRIPTIONS_COPY = {
   en: {
     addon: "Addon", baseTotal: "Applications", addonTotal: "Addons", addonSeats: "Addon seats",
     title: "Subscriptions",
+    detailTitle: "Subscription detail",
+    backToSubscriptions: "Back to subscriptions",
     total: "Total subscriptions",
     activeOnPage: "Active on page",
     scheduledOnPage: "Cancellation scheduled",
@@ -68,6 +70,8 @@ export const SUBSCRIPTIONS_COPY = {
   ar: {
     addon: "إضافة", baseTotal: "التطبيقات", addonTotal: "الإضافات", addonSeats: "مقاعد الإضافة",
     title: "الاشتراكات",
+    detailTitle: "تفاصيل الاشتراك",
+    backToSubscriptions: "العودة إلى الاشتراكات",
     total: "إجمالي الاشتراكات",
     activeOnPage: "النشطة في الصفحة",
     scheduledOnPage: "إلغاء مجدول",

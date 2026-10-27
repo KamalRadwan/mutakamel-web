@@ -1,4 +1,4 @@
-import { splitPhoneNumber } from "@/lib/geo/country-data";
+import { countryIsoFromName, getCountryOptions, splitPhoneNumber } from "@/lib/geo/country-data";
 
 /**
  * Normalizes a raw phone number for `tel:` links.
@@ -17,19 +17,23 @@ export function normalizePhoneDigits(phone: string): string {
 }
 
 /**
- * Normalizes a raw phone number to pure digits (without `+`) for `https://wa.me/<digits>`
- * and `https://t.me/+<digits>` links.
+ * Chat links need an international number. Local numbers require a known
+ * country; an explicit international prefix takes precedence over that country.
  */
-export function normalizeWhatsAppDigits(phone: string, _country?: string | null): string {
+export function normalizeWhatsAppDigits(phone: string, country?: string | null): string {
   const trimmed = phone.trim();
-  if (!trimmed) return "";
   const parsed = splitPhoneNumber(trimmed);
-  if (parsed && (parsed.callingCode || parsed.nationalNumber)) {
-    const calling = parsed.callingCode.replace(/\D/g, "");
-    const national = calling
-      ? parsed.nationalNumber.replace(/^0+/u, "").replace(/\D/g, "")
-      : parsed.nationalNumber.replace(/\D/g, "");
-    return `${calling}${national}`;
+  if (!parsed?.nationalNumber) return "";
+  if (parsed.callingCode) {
+    return `${parsed.callingCode.replace(/\D/g, "")}${parsed.nationalNumber}`;
   }
-  return trimmed.replace(/\D/g, "");
+  // Never reinterpret an unrecognized explicit international number as local.
+  if (trimmed.startsWith("+") || trimmed.startsWith("00")) return "";
+  const countryName = country?.trim() ?? "";
+  const iso = /^[A-Z]{2}$/iu.test(countryName)
+    ? countryName.toUpperCase()
+    : countryIsoFromName(countryName);
+  const callingCode = getCountryOptions("en").find(({ isoCode }) => isoCode === iso)?.callingCode;
+  const national = parsed.nationalNumber.replace(/^0+/u, "");
+  return callingCode && national ? `${callingCode.replace(/\D/g, "")}${national}` : "";
 }

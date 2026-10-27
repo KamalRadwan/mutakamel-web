@@ -3,20 +3,19 @@
 import { useCallback, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { normalizeApiError } from "@/lib/api/errors";
+import { readLeadStageCatalogue } from "../../shared/lead-stage-catalogue";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import { crmCapabilityAllowsOwner } from "../../shared/crm-capabilities";
-import type { LeadItem } from "../lead-list-contract";
+import { parseLeadStagesResponse, type LeadItem, type LeadStage } from "../lead-list-contract";
 import { useLeadCardWrites } from "./useLeadCardWrites";
+import { useLeadBoard } from "./useLeadBoard";
 import { useLeadList, type LeadsView } from "./useLeadList";
 import { useLeadMutations } from "./useLeadMutations";
 import { useLeadStagesAndCapabilities } from "./useLeadStagesAndCapabilities";
 
 export type { LeadItem, LeadStage } from "../lead-list-contract";
-export { parseLeadsResponse } from "../lead-list-contract";
 export { DEFAULT_LEADS_SORT, type LeadsView } from "./useLeadList";
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
 
 /**
  * The Leads screen: list, stage catalogue and capabilities, and every write
@@ -24,17 +23,18 @@ function errorMessage(error: unknown, fallback: string): string {
  * to the branch on screen and to one write-feedback message.
  */
 export function useLeads() {
+  const errorText = useCrmErrorText();
   const { user } = useTenantAuth();
   const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
   // The page synchronizes the view before the debounced read fires; "card"
   // keeps the hook usable on its own.
   const [activeView, setActiveView] = useState<LeadsView>("card");
   const [error, setError] = useState<string | null>(null);
-  // Bumped after every write so the board lanes and KPIs, which this hook
-  // does not own, read again.
+  // KPIs read again after every reconciliation; board reads are awaited below.
   const [dataRevision, setDataRevision] = useState(0);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<LeadItem | null>(null);
+  const [refreshedStages, setRefreshedStages] = useState<LeadStage[] | null>(null);
 
   const clearError = useCallback(() => setError(null), []);
   const openCreate = useCallback(() => {
@@ -42,26 +42,44 @@ export function useLeads() {
     setIsCreateOpen(true);
   }, []);
   const support = useLeadStagesAndCapabilities(branchId);
+  const stages = refreshedStages ?? support.stages;
   const list = useLeadList({ branchId, actorId: user?.id, activeView, onLoadStart: clearError });
   const { capabilities } = support;
+  const refreshStages = useCallback(async () => {
+    const currentStages = parseLeadStagesResponse(await readLeadStageCatalogue());
+    setRefreshedStages(currentStages);
+    return currentStages;
+  }, []);
   const { reload } = list;
+  const board = useLeadBoard({
+    enabled: activeView === "board",
+    branchId,
+    stages,
+    refreshStages,
+    search: list.appliedSearch,
+    sort: list.sort,
+  });
+  const { reload: reloadBoard } = board;
 
   const reconcile = useCallback(
     async (page?: number) => {
-      const reloaded = await reload(page);
+      const [reloaded, boardReloaded] = await Promise.all([reload(page), reloadBoard()]);
       setDataRevision((current) => current + 1);
-      return reloaded;
+      return activeView === "board" ? boardReloaded : reloaded;
     },
-    [reload],
+    [activeView, reload, reloadBoard],
   );
   const report = useCallback(
-    (caught: unknown, fallback: string) => setError(errorMessage(caught, fallback)),
-    [],
+    (caught: unknown, fallback: string, leadId?: string) => {
+      const message = errorText(normalizeApiError(caught)) ?? fallback;
+      setError(leadId ? `${message} (${leadId})` : message);
+    },
+    [errorText],
   );
   const writeContext = {
     branchId,
     items: list.items,
-    stages: support.stages,
+    stages,
     capabilities,
     setError,
     report,
@@ -78,14 +96,16 @@ export function useLeads() {
   const cardWrites = useLeadCardWrites({ ...writeContext, setItems: list.setItems });
 
   return {
+    board,
     activeView,
     setActiveView,
     items: list.items,
-    stages: support.stages,
+    stages,
     branchIds,
     branchId,
     selectBranch: (nextBranchId: string) => {
       selectBranch(nextBranchId);
+      setRefreshedStages(null);
       list.clear();
       list.resetSearch();
       setSelectedForDelete(null);
@@ -100,6 +120,7 @@ export function useLeads() {
     isMovePending: mutations.isMovePending,
     error,
     loadError: list.loadError,
+    scopeDenied: list.loadError?.status === 403,
     degraded: support.degraded,
     search: list.search,
     appliedSearch: list.appliedSearch,

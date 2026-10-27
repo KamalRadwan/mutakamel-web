@@ -1,8 +1,110 @@
 # Trade — Commercial Documents
 
+Error contract reviewed **2026-10-18** (SHARED-I18N-DEAD-001): Trade uses
+common's error envelope without an extra `lang` field. HTTP statuses are
+preserved while former mixed-status codes are split. Numbering refusals use
+`TRADE.DEPENDENCY.NUMBERING_UNAVAILABLE` (422); `TRADE.DEPENDENCY.TIMEOUT`
+remains 503. Missing quotations use `TRADE.QUOTE.NOT_FOUND` (404), missing
+sales-order sources use `TRADE.SALES_ORDER.SOURCE_NOT_FOUND` (404), and
+commit-time template changes use `TRADE.QUOTE.PDF_TEMPLATE_CHANGED` or
+`TRADE.BUSINESS_DOCUMENT.PDF_TEMPLATE_CHANGED` (409). Portal error mappings
+resolve these codes in the selected locale. Runtime verification is pending.
+
+Quotation revision duration validation reviewed **2026-10-18**: delivery days
+and warranty months accept complete non-negative integer strings up to
+`Number.MAX_SAFE_INTEGER` (9007199254740991). Outer whitespace is trimmed;
+blank/whitespace-only values explicitly default to 14 days and 12 months.
+Zero is preserved. Malformed, fractional, negative and unsafe values stay in
+the fields with bilingual inline errors and block both Save and direct hook
+submission. The drawer explains the blank defaults. `CreateQuotationRevisionDto`
+accepts an object for `terms` without field-specific duration bounds; the portal's
+upper bound prevents numeric precision loss. Regression specs are included;
+execution is pending lead verification.
+
 Status: **verified**
 
-Last source verification: **2026-08-31** (re-verified while building Phase 11)
+Last source verification: **2026-10-18** (shared portal scope; route contracts last verified while building Phase 11 on 2026-08-31)
+
+### Shared portal scope
+
+Action admission reviewed **2026-10-24** (AUD24-FE-TENANT-04): document
+actions check `permissionScopes` with `can()` against the company and branch
+sent in request headers. A create grant limited to branch A no longer enables
+Create after selecting branch B, even when read access covers both branches.
+Missing scope projections or unresolved selections disable actions. Tenant
+owners retain their bypass once the selection is resolved. These checks are
+advisory; the server still enforces exact-target grants.
+
+Scoped detail isolation reviewed **2026-10-18** (CXPORTAL-TRADE-112): commercial
+document details are keyed by resource, route ID, resolved scope headers and
+signed-in user. A context change hides the previous document immediately;
+refreshes clear actionable details until the current read succeeds. Superseded
+requests, including manual reloads, are aborted and cannot commit late data,
+errors or loading completion. Failed reads leave no stale document. All six
+detail screens render an authoritative 403 through the bilingual permission
+boundary before details or mutation controls; 404 remains the not-found state.
+Regression specs cover failed refreshes, context changes and reversed responses;
+execution is pending lead verification.
+
+Scoped list isolation reviewed **2026-10-18** (CXTRADE-OPS-121): commercial
+document list results are keyed by resolved scope headers, signed-in user,
+resource and query. Changing scope immediately hides previous rows, totals
+and errors and resets the page. Superseded requests, including manual and
+realtime refreshes, are aborted and cannot commit late results. Failed reads
+clear rows. Purchase-order table, cards and board share loading, explicit
+403 denial, retryable error and empty boundaries. Regression specs cover
+scope failures and reversed responses; execution is pending lead verification.
+
+The Trade layout displays labelled company, branch and channel selectors on
+document list and detail deep links, including the scope-required state. With
+empty storage and multiple accessible scopes, choose the company and branch
+there to load the document screen in place. Documents, pricing, inventory and
+other advanced Trade screens share the route-group provider and its persisted
+selection. Changing company clears the previous branch and channel. Existing
+advanced branch actions update that same selection.
+
+Choices remain limited to the authenticated user's accessible IDs; membership
+pairings narrow branch options where available. The server still validates
+company/branch ownership and exact-scope authorization. Company-target requests
+omit the branch header, and tenant-target requests omit all scope headers.
+Quotation customer pickers continue to show all branch customers (D-038).
+
+Order form pricing re-verified **2026-10-17** against the Gateway pricing route,
+`PricingController`, `PricingEvaluateDto`, `DocumentsService.priceLines`, and
+`PurchasingService`. Sales and purchase orders evaluate each line through
+`POST /api/tenant/trade/v1/pricing/evaluate` with the document's company/branch
+headers, party, SALES/PURCHASE purpose, currency, item, UOM and quantity. This
+requires the existing `trade.pricing.read` permission and `trade.pricing`
+feature. Returned decimal-string prices are read-only; only current prices
+can produce the displayed and submitted order evidence. Incomplete, pending
+or failed pricing blocks order creation and hides financial totals, with
+localized awaiting/unavailable feedback (including permission failures).
+Changing a pricing input or closing the form invalidates prices immediately;
+aborted or late responses cannot restore old evidence. Sales quotation revision
+and purchase quotation editors use the same pricing lifecycle for their
+previews; their DTOs still carry no unit price. Invoice prices and contract
+financial totals remain authored values supported by their existing DTOs.
+
+Draft preview consistency reviewed **2026-10-17** (CXPORTAL-TRADE-109):
+`useTradeLineDraft` shares `useTradeDocumentPricing`'s request fingerprint,
+including stable client line IDs, item, UOM, quantity, currency, party, purpose
+and company/branch headers. Removing or replacing lines invalidates the old
+request, so neither its success nor its error can attach to a reused position.
+Party, currency and scope changes hide prices and the running total immediately
+until the new evaluation settles. The server remains authoritative on save.
+Focused regression specs cover reversed responses and context changes;
+execution is pending lead verification.
+
+Quotation conversion re-verified **2026-10-17** against the Gateway conversion
+route, `QuotationsController`, `ConvertQuotationDto`,
+`assertQuotationConversionEvidence`, and `validateNewOrderFinancialEvidence`.
+
+Invoice/contract draft editing re-verified **2026-10-17** against the Gateway
+update routes, `TradeInvoicesController`, `TradeContractsController`, their
+create/update DTOs and `FinancialDocumentsService`. The portal has separate
+create and update serializers: only create sends `partyId` and `currencyCode`;
+both identity fields are read-only in the edit drawers. Updates remain full
+atomic replacements and retain the existing `If-Match` and idempotency headers.
 
 Quotation/sales-order list context re-verified **2026-09-14** against Gateway
 route metadata, `RouteContextMiddleware`, `UpstreamClientService`,
@@ -26,12 +128,14 @@ Canonical prefixes: `/api/tenant/trade/v1/quotations`, `.../sales-orders`,
 
 Upstream: `/api/v1/trade/*`
 
-Portal status: **built, with four families complete and two blocked.**
+Portal status: **source-integrated invoice and contract draft editing.**
 MASTER-PLAN Phase 11 ships every list, detail and lifecycle action, both PDF
-flows and the purchase-quotation create and edit. Sales-order create, purchase-
-order create, quotation conversion, and invoice and contract create and edit
-are **not** built: each needs an evidence object with no published schema
-(Q32, Q85). Nine statements on this page were corrected against source while
+flows and the purchase-quotation create and edit. Invoice and contract create
+and edit drawers are source-integrated; their request serialization and edit
+hydration were reviewed on **2026-10-17**, with authenticated runtime
+verification pending. Sales-order and purchase-order creation still need
+their own evidence integration review (Q32, Q85).
+Nine statements on this page were corrected against source while
 building it — see [Q84](../build/OPEN-QUESTIONS.md#q84--nine-corrections-to-trade-documentsmd-verified-from-source).
 
 **63 routes.** Quotations 15 · Sales orders 13 · Purchase orders 12 ·
@@ -96,6 +200,38 @@ this one:
   bare `n` alike. The ETag comes back as a strong `"n"`.
 - **Money is a decimal string with trailing zeros stripped** — `"10.5"`, never
   `"10.50"`. Never `Number()` it.
+
+### Portal write recovery
+
+Quantity entry reviewed **2026-10-17** (CXPORTAL-TRADE-110). The shared
+quotation line editor retains raw text while typing, including `1.` and
+`0.0`, and canonicalizes parseable decimals on blur. Invalid text remains
+available for correction. Sequential entry of `0.5`, `1.25` and `10.05`
+preserves each decimal instead of removing its decimal point mid-entry.
+Quantity-entry regression specs cover the controlled input, blur and the
+resulting decimal-string submission value; execution is pending lead verification.
+
+Recovery behavior reviewed **2026-10-17** (CXPORTAL-TRADE-113). A document
+write with no HTTP response keeps its original request callback, payload,
+scope/version headers and idempotency key. It fences every new write through
+that hook, including calls made before React renders disabled controls.
+The form disables normal Save and editing and guards closing/resetting the
+draft. Its persistent recovery panel offers only same-key Retry; dismissing
+the panel cannot discard an unresolved operation. Recovery stays accessible
+outside the disabled fields.
+
+Only confirmed success clears this fence. A rejected recovery request keeps
+the original evidence and key because it does not prove the first write
+failed. Ordinary HTTP rejections before any ambiguous outcome still allow
+correction and a new submission. Both first execution and replayed success run
+the form's same success callback to close/reset and refresh the list/detail.
+Refresh failures after confirmed success are not classified as unknown writes.
+
+Regression coverage: `useTradeWrite.test.ts` covers concurrent submissions,
+same-key recovery, rejected recovery and success callbacks;
+`InvoiceFormDrawer.recovery.test.tsx` covers a committed create whose response
+is lost, disabled Save/editing, unchanged replay and close/refresh. These tests
+were added but not executed in the implementer's sandbox.
 
 ---
 
@@ -171,6 +307,17 @@ document as a whole rather than per line.
 
 ### Rounding differs between neighbouring document families
 
+Portal financial-input validation reviewed **2026-10-17** (CXTRADE-SALES-116).
+The shared evidence calculator returns field or calculation errors without
+substitute amounts. Invalid/empty required decimals, non-positive quantities,
+negative amounts, values outside numeric(24,8), and tax percentages outside
+0–100 or integer basis-point precision block draft submission. A valid zero
+price remains valid. Excessive discounts and invalid/overflowing calculated
+totals also block submission. Inputs stay unchanged for correction; invalid
+evidence hides totals and the verified badge. Inline Arabic/English field
+errors use the existing accessible Field primitive. Order pricing readiness
+and financial validation must both pass. Server validation remains authoritative.
+
 | Family | `totals.roundingTotal` |
 | --- | --- |
 | Sales order, purchase order, quotation conversion | **signed** — `^-?(?:0\|[1-9]\d*)(?:\.\d{1,8})?$` |
@@ -201,7 +348,7 @@ fifteen.
 | POST | `/api/tenant/trade/v1/quotations/:id/accept` | `trade.quotations.accept` | **no body** · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/quotations/:id/reject` | `trade.quotations.reject` | `DocumentReasonDto` · `If-Match` — **200** |
 | POST | `/api/tenant/trade/v1/quotations/:id/cancel` | `trade.quotations.cancel` | `DocumentReasonDto` · `If-Match` — **200** |
-| POST | `/api/tenant/trade/v1/quotations/:id/convert-to-sales-order` | `trade.quotations.convert` | `ConvertQuotationDto` · `If-Match` — **201** |
+| POST | `/api/tenant/trade/v1/quotations/:id/convert-to-sales-order` | `trade.quotations.convert` **and** `trade.sales_orders.create` | `ConvertQuotationDto` · `If-Match` — **201** |
 | POST | `/api/tenant/trade/v1/quotations/:quotationId/render-pdf` | `trade.quotations.read` | `RenderQuotationPdfDto` — **202** |
 | GET | `/api/tenant/trade/v1/quotations/:quotationId/render-jobs/:renderJobId` | `trade.quotations.read` | — |
 
@@ -212,6 +359,51 @@ fifteen.
 Every mutating route needs `x-idempotency-key`. `send` and `accept` take
 **no body at all** — the handler has no `@Body()`, so sending one is rejected
 by `forbidUnknownValues`.
+
+### Portal quotation conversion evidence
+
+Conversion is live through the canonical POST action above with the existing
+`trade.quotations.convert` and `trade.sales_orders.create` grants in the exact
+source branch, branch/company headers, `If-Match` and `x-idempotency-key`.
+Both grants are checked before conversion or durable replay; the quotation
+must still resolve in that branch before a stored result is returned. The
+portal shows conversion only when both advisory permission checks pass.
+Authorization re-verified **2026-10-17**. Its dedicated serializer emits `lines`, `totals` and
+`terms`. Each line contains **only `clientLineId` and `financial`**; `financial`
+contains `discountTotal`, `chargeTotal`, `taxTotal`, `lineTotal` and
+`taxSnapshot`. Item, UOM, quantity and pricing identities remain on the server.
+The nested DTO whitelist remains strict.
+
+The drawer requires a tax code, an explicitly selected STANDARD/ZERO/EXEMPT
+treatment, and an explicit percentage for every line. STANDARD requires a
+positive rate; ZERO and EXEMPT require zero. A code never implies its rate or
+treatment. Rates support four decimal places; discounts and charges support
+eight. Tax is calculated on `quantity × accepted unitPrice − discount + charge`
+using exact fixed-decimal arithmetic, rounded half-up at eight decimals. The
+snapshot records the chosen code/treatment/rate, taxable base, calculated tax
+and currency. All line and document totals use the existing ORDER arithmetic;
+rounding and paid amounts are explicitly zero, and due equals grand total.
+
+The accepted revision must be the current revision exposed by `currentLines`.
+Its priced subtotal must match the computed subtotal, and its non-empty terms
+are copied exactly. Missing/stale source evidence blocks submission; no terms,
+revision, rate or treatment is invented. Every input edit clears review.
+Submission requires explicit review of the evidence, all eight totals and
+terms. Existing write outcomes remain visible; pending/ambiguous writes lock
+the evidence and prevent another conversion submission.
+
+The response remains the wrapped created sales order (201); the backend owns
+atomic creation and idempotent replay. Server refusals retain existing Trade
+outcome handling, including 403 and 422
+`TRADE.FINALIZED_DOCUMENT.SNAPSHOT_INCOMPLETE`. Local refusals are documented in
+[errors.md](../reference/errors.md#quotation-conversion-client-validation).
+
+Regression coverage: `quotation-conversion-contract.test.ts` checks nested
+request keys, taxable/zero/exempt calculations, exact decimals, line identity
+and accepted terms; the conversion hook tests cover review and submission.
+Actual nested DTO validation and single-order creation/replay require the
+lead's backend/integration verification; they were not executed in the
+implementer's sandbox.
 
 ### The state machine
 
@@ -316,7 +508,8 @@ The response sets `Cache-Control: no-store, private`.
 
 | `code` | Status | When |
 | --- | --- | --- |
-| `TRADE.QUOTE.TRANSITION_NOT_ALLOWED` | **409**, also **404** | any refused transition, and a not-found-in-scope document |
+| `TRADE.QUOTE.TRANSITION_NOT_ALLOWED` | **409** | transition refused |
+| `TRADE.QUOTE.NOT_FOUND` | **404** | quotation not found in scope |
 | `TRADE.QUOTE.EXPIRED` | 409 | accepting past `validUntil` |
 | `TRADE.QUOTE.LINE_INVALID` | 422 | a revision line references an unusable item or UOM |
 | `TRADE.QUOTE.VALIDITY_INVALID` | 422 | `validUntil` in the past or malformed |
@@ -324,7 +517,8 @@ The response sets `Cache-Control: no-store, private`.
 | `TRADE.QUOTE.CUSTOMER_NOT_ELIGIBLE` | 422 | |
 | `TRADE.QUOTE.CUSTOMER_ELIGIBILITY_UNAVAILABLE` | **503** | the eligibility source could not be reached — retry, do not treat as a refusal |
 | `TRADE.PRICE.BOOK_REQUIRED` | 422 | a line gave no `priceBookId` and no company default resolves |
-| `TRADE.PRICE.LOCK_INVALID` | **409**, also **422** | the revision's price locks no longer apply |
+| `TRADE.PRICE.LOCK_INVALID` | **409** | the revision's price locks no longer apply |
+| `TRADE.PRICE.LOCK_DATA_INVALID` | **422** | invalid price lock data |
 | `TRADE.PRICE.LOCK_EXPIRED` | 409 | accept after the lock window |
 | `TRADE.PRICE.LOCK_CONTEXT_MISMATCH` | 409 | |
 | `TRADE.PRICE.MARGIN_GUARD` | 409 | a pricing policy refused the margin |
@@ -471,11 +665,13 @@ a `CANCELLED` order.
 | `TRADE.SALES_ORDER.HOLD_TRANSITION_INVALID` | 409 | holding a held order, or releasing one that is not held |
 | `TRADE.SALES_ORDER.CANCEL_NOT_ALLOWED` | 409 | already `CANCELLED`, or no `reasonCode` |
 | `TRADE.SALES_ORDER.CUSTOMER_BLOCKED` | **409** | the customer became blocked — not 422 |
-| `TRADE.SALES_ORDER.SOURCE_INVALID` | **422**, also **404** | the source quotation is unusable |
+| `TRADE.SALES_ORDER.SOURCE_INVALID` | **422** | source quotation is unusable |
+| `TRADE.SALES_ORDER.SOURCE_NOT_FOUND` | **404** | source quotation not found |
 | `TRADE.SALES_ORDER.LINE_INVALID` | 422 | |
 | `TRADE.INVENTORY.NODE_INVALID` | 422 | fulfilment node rejected during confirmation |
 | `TRADE.FINALIZED_DOCUMENT.SNAPSHOT_INCOMPLETE` | 422 | totals evidence failed |
-| `TRADE.DEPENDENCY.TIMEOUT` | **503**, also **422** | |
+| `TRADE.DEPENDENCY.TIMEOUT` | **503** | |
+| `TRADE.DEPENDENCY.NUMBERING_UNAVAILABLE` | **422** | Numbering sequence unavailable |
 | `TRADE.POLICY.DECISION_UNAVAILABLE` | 503 | |
 
 `TRADE.SALES_ORDER.ALREADY_CONVERTED` and
@@ -485,6 +681,17 @@ throw site.
 ---
 
 ## Purchase orders — 12 routes
+
+Delivery behavior verified against source on 2026-10-18 (CXTRADE-OPS-115): confirmation commits a durable supplier-delivery intent. Dispatch labels are localized: `NOT_REQUESTED` (not requested), `REQUESTED` (delivery pending), `SENT` (email sent), `FAILED` (delivery failed). Sent means provider acceptance, not proof of mailbox delivery. Detail responses include nullable `delivery` evidence with stage, attempt count, safe last error code and next attempt time. Delivery failures are shown independently of commercial status. No new portal route is introduced. The renderer pins the confirmed PDF revision and Worker attaches its verified bytes; duplicate result events cannot send a second email or reverse terminal status.
+
+Approval readiness re-verified **2026-10-17**. Detail responses include the
+server-derived boolean `approvalReady`. The portal requires it before offering
+Confirm; a missing value is treated as false. `NOT_REQUIRED` alone does not
+prove a waiver. Confirmation rechecks either a version-bound `ALLOW` receipt
+with profile mode `NONE`, or the completed current workflow instance and its
+independent checker, before allocating a number or writing confirmation evidence.
+Withdrawal and draft edits invalidate readiness. A fresh submission is required
+after edits, withdrawal, or an older waiver without submission-version evidence.
 
 Feature gate: **`trade.purchasing`**. Every route targets **`BRANCH`**.
 
@@ -542,11 +749,11 @@ any non-CANCELLED ──cancel (reasonCode required)──▶ CANCELLED
   approval instance created.
 - `withdraw`, `approve` and `reject` all require `PENDING`.
 - `withdraw` resets `approval_status` to **`NOT_REQUIRED`**, not `WITHDRAWN` —
-  a withdrawn order is indistinguishable from one never submitted, on the
-  order row. The step row keeps the history.
+  both withdrawn and never-submitted orders have `approvalReady: false`.
+  The instance and step rows keep the history.
 - `confirm` requires `DRAFT` and an approval status of `APPROVED` **or**
-  `NOT_REQUIRED`. A `REJECTED` order cannot be confirmed and cannot be
-  re-submitted; the only exit is `cancel`.
+  `NOT_REQUIRED`, plus valid current approval evidence. A `REJECTED` order cannot
+  be confirmed and cannot be re-submitted; the only exit is `cancel`.
 - `cancel` requires a `reasonCode`.
 
 ### Request bodies
@@ -567,7 +774,8 @@ any non-CANCELLED ──cancel (reasonCode required)──▶ CANCELLED
 | `TRADE.PURCHASE_ORDER.APPROVAL_INVALID` | 409 | wrong approval state for the action |
 | `TRADE.PURCHASE_ORDER.CONFIRM_NOT_ALLOWED` | 409 | |
 | `TRADE.PURCHASE_ORDER.CANCEL_NOT_ALLOWED` | 409 | already cancelled, or no `reasonCode` |
-| `TRADE.PURCHASE_ORDER.SUPPLIER_INVALID` | **422**, also **404** | |
+| `TRADE.PURCHASE_ORDER.SUPPLIER_INVALID` | **422** | |
+| `TRADE.PURCHASE_ORDER.SUPPLIER_NOT_FOUND` | **404** | |
 | `TRADE.PURCHASE_ORDER.ITEM_NOT_PURCHASABLE` | 422 | the item's company profile has `canPurchase: false` |
 | `TRADE.PURCHASE_ORDER.LINE_INVALID` | 422 | |
 | `TRADE.PURCHASE_ORDER.PRICE_INVALID` | 422 | |
@@ -584,6 +792,14 @@ any non-CANCELLED ──cancel (reasonCode required)──▶ CANCELLED
 ---
 
 ## Purchase quotations — 8 routes
+
+Creation/issue persistence re-verified **2026-10-17**. Creation saves calculated
+header totals after saving lines in the same transaction and returns that saved
+version. Issue can repair the known all-zero header defect only on an unfinalized
+`DRAFT`, under its existing version check and lock, after validating the persisted
+line pricing receipts. Only the exact zero-total shape is repaired; other
+mismatches fail validation. The normal audited issue save retains the correction,
+without renumbering or changing finalized documents.
 
 Feature gate: **`trade.purchasing`**. Every route targets **`BRANCH`**, and
 **all eight are Gateway `BRANCH_REQUIRED`** — the header shape is validated
@@ -690,9 +906,32 @@ line — or it is a 400. There is no per-line edit.
 | `FinancialTotalsDto` | `subtotal`, `discountTotal`, `chargeTotal`, `taxTotal`, `roundingTotal`, `grandTotal`, `amountPaid`, `amountDue` — **all eight non-negative decimal strings** |
 | `UpdateInvoiceDto` | identical to `InvoiceDraftContentDto` |
 
+Create/update request separation re-verified against the DTO source on
+**2026-10-17** (CXTRADE-SALES-113). The invoice drawer uses separate create
+and update builders. Party and currency are read-only when editing; PATCH
+explicitly selects only draft-content fields, excluding `partyId` and
+`currencyCode` even from a create-shaped input. POST retains both required
+identity fields. Strict backend whitelisting stays enabled.
+
 **Invoices are the one family where the caller supplies `unitPrice`.** They
 also require a second non-empty object per line, `priceSnapshot`, whose
 contents are as unspecified as `taxSnapshot` (**Q32**).
+
+The invoice editor reads the item ID from `printSnapshot.item.id`, rather than
+using the line's `itemCompanyProfileId` as an item ID. It reads discounts,
+charges, tax amounts and the opaque price/tax evidence from
+`printSnapshot.financial`. Editing uses authored tax amounts rather than
+inferring a percentage from an arbitrary evidence object. A notes-only update
+preserves the original decimal strings, totals, payment terms and per-line
+evidence. Changing amounts recalculates totals with decimal-string arithmetic;
+untouched lines keep their original evidence and values. Missing identity or
+financial evidence fails response validation instead of receiving defaults.
+
+Lossless edit evidence re-verified **2026-10-17** (CXTRADE-SALES-114).
+Unit price and line total are also read from `printSnapshot.financial`:
+database numeric columns may pad those decimals, while the snapshot retains
+their original text. Both snapshot amounts are required; the editor never
+rebuilds missing financial evidence from display columns.
 
 ### Errors
 
@@ -755,8 +994,27 @@ Same full-replacement rule as invoices.
 | `ContractClauseInputDto` | `clientClauseId` (UUID v7), `title` (≤ 500), `body` (**≤ 20 000 characters**) |
 | `UpdateContractDto` | identical to `ContractDraftContentDto` |
 
+Create/update request separation re-verified against the DTO source on
+**2026-10-17** (CXTRADE-SALES-113). The contract drawer uses separate create
+and update builders. Party and currency are read-only when editing; PATCH
+explicitly selects only draft-content fields, excluding `partyId` and
+`currencyCode` even from a create-shaped input. POST retains both required
+identity fields. Strict backend whitelisting stays enabled.
+
 A `NON_FINANCIAL` contract still requires a complete `totalsSnapshot`; the
 mode does not make it optional.
+
+Contract editing hydrates the actual eight stored totals, including tax and
+rounding, and never synthesizes a priced line from the subtotal. The drawer
+preserves `termsSnapshot`, including custom governing law, termination terms
+and other negotiated keys, and extracts the original financial mode and
+`sourceEvidence` from `termsSnapshot.financial`. A notes-only update sends
+those values unchanged. Create defaults are used only for new contracts.
+Restoring an edited amount, including a formatting-only change, restores the
+original totals snapshot rather than recalculating its decimal strings or
+payment values (CXTRADE-SALES-114, **2026-10-17**).
+The existing update permission, DTO validation and error handling apply;
+these paths are source-integrated, with runtime verification pending.
 
 ### Errors
 
@@ -784,10 +1042,21 @@ The six `GET`s set `Cache-Control: no-store, private`.
 value**.
 
 `RenderTradeBusinessPdfDto` (the other five):
-`sourceVersion` (**int ≥ 1, required** — the document version being printed),
+`sourceVersion` (**int ≥ 1, required** — the current document version read by the caller),
 `templateVersionId?`, `locale?`, `timeZone?`, `purpose` —
 `@IsIn(["SUPPLIER_QUOTATION","SALES_ORDER","PURCHASE_ORDER","INVOICE","CONTRACT"])`.
 `purpose` must match the route's own family; it is not inferred.
+
+Order PDF revision handling re-verified **2026-10-17** against
+`TypeOrmTradeBusinessPdfRepository` and `useSalesOrderScreen`. Sales-order
+requests continue to send `order.version` as the initial read precondition.
+The server resolves the confirmed immutable snapshot, and the job's
+`sourceVersion` identifies that snapshot's confirmation version, which may
+be older than the request's operational version. Hold/release and fulfillment
+updates preserve the same print source and checksums. The commit transaction
+rechecks the exact prepared print revision and the current order's scope and
+lifecycle; cancellation prevents a new render. Existing write `If-Match` and
+idempotency requirements remain unchanged.
 
 ### The `Location` mismatch — a live defect
 
@@ -828,7 +1097,8 @@ Quotation renders use the `TRADE.QUOTE.PDF_*` family; the other five use
 | --- | --- | --- |
 | `PDF_NOT_FOUND` | 404 | unknown job or document |
 | `PDF_REVISION_NOT_ELIGIBLE` / `PDF_SOURCE_NOT_ELIGIBLE` | 409 | the revision or `sourceVersion` is not printable |
-| `PDF_TEMPLATE_INCOMPATIBLE` | **409**, also **422** | |
+| `PDF_TEMPLATE_INCOMPATIBLE` | **422** | |
+| `PDF_TEMPLATE_CHANGED` | **409** | commit-time template recheck refused |
 | `PDF_BUNDLE_UNAVAILABLE` | **503** | |
 | `PDF_ARTIFACT_UNAVAILABLE` | **503** | rendered, but the artifact cannot be fetched |
 | `PDF_INPUT_EXPIRED` | **none** | see below |

@@ -7,16 +7,13 @@
 // more than the service uses, and a form that offers a box the service drops
 // on the floor is a form that lies.
 //
-// Three service rules shape this file more than the DTO does:
+// Two service rules shape this file more than the DTO does:
 //
-//  1. `assertCorporateLeadDetails` rejects `companyPhone(s)`, `legalName`,
+//  1. `assertCorporateLeadDetails` rejects `companyPhones`, `legalName`,
 //     `taxNumber`, `commercialRegistrationNumber` and `address` outright when
 //     `existingCompanyPartyId` is set — 422 LEAD_EXISTING_COMPANY_FIELDS_FORBIDDEN.
 //  2. The same guard rejects the corporate registration trio on an INDIVIDUAL
 //     lead — 422 LEAD_CORPORATE_FIELDS_FORBIDDEN.
-//  3. `phones ?? [primaryMobile]` and `companyPhones ?? [companyPhone]`: when
-//     the array is present the singular is IGNORED. Only the arrays are sent,
-//     so there is no shape in which one silently wins over the other.
 
 import type { CrmProfileType } from "./lead-contract";
 
@@ -68,7 +65,6 @@ export interface LeadAddressForm {
   street2: string;
   buildingNo: string;
   floor: string;
-  apartment: string;
   landmark: string;
   postalCode: string;
 }
@@ -136,7 +132,6 @@ const EMPTY_LEAD_ADDRESS: LeadAddressForm = {
   street2: "",
   buildingNo: "",
   floor: "",
-  apartment: "",
   landmark: "",
   postalCode: "",
 };
@@ -207,21 +202,6 @@ export function usesExistingCompany(form: CreateLeadForm): boolean {
   return isCorporateLead(form) && form.existingCompanyPartyId.length > 0;
 }
 
-/**
- * `LeadsService.normalizeMobile`, mirrored.
- *
- * Only ever used to compare two numbers the user typed. What is SENT is the
- * raw string — normalising client-side would hide from the user which of their
- * two entries the server considers the same number.
- */
-export function normalizeLeadPhone(phone: string): string {
-  const compact = phone.replace(/[^\d+]/gu, "").trim();
-  const digits = compact.replace(/\D/gu, "");
-  if (compact.startsWith("+")) return `+${digits}`;
-  if (digits.startsWith("00")) return `+${digits.slice(2)}`;
-  return digits;
-}
-
 function filledPhones(phones: readonly string[]): string[] {
   return phones.map((phone) => phone.trim()).filter((phone) => phone.length > 0);
 }
@@ -242,7 +222,6 @@ export interface CreateLeadAddressRequest {
   street2?: string;
   buildingNo?: string;
   floor?: string;
-  apartment?: string;
   landmark?: string;
   postalCode?: string;
 }
@@ -273,7 +252,6 @@ export interface CreateLeadRequest {
   legalName?: string;
   taxNumber?: string;
   commercialRegistrationNumber?: string;
-  companyPhone?: string;
   companyPhones?: string[];
   companyEmail?: string;
   companyWebsite?: string;
@@ -281,7 +259,6 @@ export interface CreateLeadRequest {
   firstName?: string;
   lastName?: string;
   honorificTitle?: string;
-  primaryMobile?: string;
   email?: string;
   phones?: string[];
   address?: CreateLeadAddressRequest;
@@ -294,10 +271,9 @@ export interface CreateLeadRequest {
 /**
  * The address block, or nothing.
  *
- * The legacy aliases (`area`, `street`, `apartment`) are deliberately not
- * offered: `leadPartyAddresses` maps `state -> area`, `street1 -> street` and
- * `street2 -> apartment`, so a form carrying both spellings would have two
- * boxes writing one column with the modern one always winning.
+ * `leadPartyAddresses` maps `state -> area`, `street1 -> street` and
+ * `street2 -> apartment` in Directory storage. Street 2 is the only input
+ * for a suite or apartment, so two boxes cannot overwrite the same column.
  */
 function buildAddress(address: LeadAddressForm): CreateLeadAddressRequest | undefined {
   const request: CreateLeadAddressRequest = {
@@ -308,7 +284,6 @@ function buildAddress(address: LeadAddressForm): CreateLeadAddressRequest | unde
     ...optional("street2", address.street2),
     ...optional("buildingNo", address.buildingNo),
     ...optional("floor", address.floor),
-    ...optional("apartment", address.apartment),
     ...optional("landmark", address.landmark),
     ...optional("postalCode", address.postalCode),
   };

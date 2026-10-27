@@ -48,12 +48,12 @@ export const EMPTY_OPPORTUNITY_FORM: OpportunityForm = {
 
 /**
  * `amount` is the one field on this form that becomes a JSON **number**, and
- * `../shared/money` owns the range where that conversion keeps every cent —
+ * `../shared/money` checks currency scale and keeps every minor unit —
  * defect D3. Nothing converts it on the way in: it arrives as a decimal string
  * and renders through `Money`.
  */
-export function isValidOpportunityAmount(value: string): boolean {
-  return isExactMoneyDecimal(value);
+export function isValidOpportunityAmount(value: string, currencyCode = ""): boolean {
+  return isExactMoneyDecimal(value, currencyCode);
 }
 
 /**
@@ -68,13 +68,6 @@ export const OPPORTUNITY_VALUE_OUT_OF_RANGE = "CRM_VALUE_OUT_OF_RANGE";
 export const OPPORTUNITY_TITLE_REQUIRED = "CRM_OPPORTUNITY_TITLE_REQUIRED";
 export const OPPORTUNITY_IMPORTANCE_REQUIRED = "CRM_OPPORTUNITY_IMPORTANCE_REQUIRED";
 export const OPPORTUNITY_CURRENCY_INVALID = "CRM_OPPORTUNITY_CURRENCY_INVALID";
-/**
- * `OpportunitiesService.amountValue` is `String(dto.amount)`, and it runs
- * whenever `amount` is not `undefined` — so a null reaches `numeric(18,2)` as
- * the literal text `"null"`. There is no way to empty this column through the
- * API, and pretending otherwise is worse than saying so.
- */
-export const OPPORTUNITY_AMOUNT_NOT_CLEARABLE = "CRM_OPPORTUNITY_AMOUNT_NOT_CLEARABLE";
 /** An edited form that produced nothing to send — never a silent close. */
 export const OPPORTUNITY_NOTHING_TO_SEND = "CRM_OPPORTUNITY_NOTHING_TO_SEND";
 
@@ -120,7 +113,7 @@ export function buildCreateOpportunityRequest(
     title: form.title.trim(),
   };
   const importance = optionalInteger(form.importance, 0, 3);
-  const amount = toMoneyWireNumber(form.amount);
+  const amount = toMoneyWireNumber(form.amount, form.currencyCode);
   const probabilityPercent = optionalInteger(form.probabilityPercent, 0, 100);
   const currencyCode = form.currencyCode.trim().toUpperCase();
   const description = form.description.trim();
@@ -163,20 +156,19 @@ export function buildCreateOpportunityRequest(
  *   `null`   the box was emptied, and the stored value is cleared;
  *   a value  the box was set.
  *
- * `null` is spelled out for exactly the three columns the API can empty.
- * `@IsOptional()` skips validation for `null` as well as `undefined`, and
- * `OpportunitiesService.update` keys its patch on `!== undefined`, so a null
- * reaches the (nullable) column. `title`, `importance` and `amount` are not in
- * that set and are refused rather than dropped.
+ * `OpportunitiesService.update` keys its patch on `!== undefined`, and
+ * `amountValue` preserves null. Currency can be cleared only together with
+ * an explicit amount clear. Title and importance cannot be emptied.
  */
 export interface UpdateOpportunityRequest {
   title?: string;
   importance?: number;
-  amount?: number;
+  amount?: number | null;
   currencyCode?: string | null;
   description?: string;
   expectedCloseDate?: string | null;
   probabilityPercent?: number | null;
+  customFields?: Record<string, unknown>;
 }
 
 export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
@@ -195,9 +187,8 @@ export function toOpportunityForm(item: OpportunityDetail): OpportunityForm {
     expectedCloseDate: item.expectedCloseDate ?? "",
     probabilityPercent:
       item.probabilityPercent === null ? "" : String(item.probabilityPercent),
-    // The edit drawer does not write custom fields — the detail screen's own
-    // rail owns them — so the baseline is always empty here and the PATCH
-    // builder never looks at it.
+    // Values have their own read endpoint; the edit hook supplies the stored
+    // baseline after loading both definitions and values.
     customFields: {},
   };
 }
@@ -233,8 +224,12 @@ export function buildUpdateOpportunityRequest(
   const currencyCode = changed("currencyCode");
   if (currencyCode !== null) {
     const code = currencyCode.toUpperCase();
-    if (code.length === 0) request.currencyCode = null;
-    else if (code.length === 3) request.currencyCode = code;
+    if (code.length === 0) {
+      if (form.amount.trim()) throw new Error("OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED");
+      request.currencyCode = null;
+      // The DTO requires this even when the stored amount is already empty.
+      request.amount = null;
+    } else if (code.length === 3) request.currencyCode = code;
     else throw new Error(OPPORTUNITY_CURRENCY_INVALID);
   }
 
@@ -263,9 +258,22 @@ export function buildUpdateOpportunityRequest(
 
   const amount = changed("amount");
   if (amount !== null) {
-    if (amount.length === 0) throw new Error(OPPORTUNITY_AMOUNT_NOT_CLEARABLE);
-    request.amount = toMoneyWireNumber(amount);
+    if (amount.length === 0) request.amount = null;
+    else {
+      if (!form.currencyCode.trim()) throw new Error("OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED");
+      request.amount = toMoneyWireNumber(amount, form.currencyCode);
+    }
+  } else if (currencyCode !== null && form.amount.trim()) {
+    // A currency-only change still has to fit the retained amount's scale.
+    toMoneyWireNumber(form.amount, form.currencyCode);
   }
+  // Omitted keys retain their stored values; null explicitly clears a value.
+  const customFields = Object.entries(form.customFields).filter(
+    ([key, value]) =>
+      value !== undefined &&
+      JSON.stringify(value) !== JSON.stringify(baseline.customFields[key]),
+  );
+  if (customFields.length > 0) request.customFields = Object.fromEntries(customFields);
   return request;
 }
 

@@ -17,33 +17,36 @@ import { ActivityModal } from "@/components/activities/ActivityModal";
 import type { ActivityTargetSelection } from "@/components/activities/activity-contract";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { CrmScopeGate } from "../shared/components/CrmScopeGate";
+import { useCrmErrorText } from "../shared/hooks/useCrmErrorText";
 import { CreateLeadsModal } from "./components/CreateLeadsModal";
 import { DeleteLeadsConfirmModal } from "./components/DeleteLeadsConfirmModal";
 import { LeadBulkActionsBar } from "./components/LeadBulkActionsBar";
 import { LeadExecutiveBoardView } from "./components/LeadExecutiveBoardView";
 import { LeadExecutiveCardView } from "./components/LeadExecutiveCardView";
 import { LeadExecutiveTableView } from "./components/LeadExecutiveTableView";
-import { LeadKpiStrip, type LeadQuickFilterPreset } from "./components/LeadKpiStrip";
+import { LeadKpiStrip } from "./components/LeadKpiStrip";
 import { LeadQuickEditModal } from "./components/LeadQuickEditModal";
 import { LeadStageFunnelBar } from "./components/LeadStageFunnelBar";
 import { LeadSearchBar } from "./components/LeadSearchBar";
-import { leadActivityState } from "./lead-card-contract";
+import { LeadSortMenu } from "./components/LeadSortMenu";
 import { leadPrimaryPhonePatch } from "./lead-phone-patch";
 import {
   type CreateLeadRequest,
   type QuickCreateLeadDraft,
-  emptyCreateLeadForm,
-  emptyLeadContact,
 } from "./lead-create-contract";
+import { createLeadFormFromQuickRequest } from "./lead-quick-create-draft";
 import { leadSearchValuesOf, leadSearchWithField } from "./lead-search-contract";
 import {
   DEFAULT_LEADS_SORT,
   type LeadItem,
   useLeads,
 } from "./hooks/useLeads";
-import { useLeadBoard } from "./hooks/useLeadBoard";
 import { useLeadDocumentCounts } from "./hooks/useLeadDocumentCounts";
 import { useLeadKpis } from "./hooks/useLeadKpis";
+import { useLeadBulkDelete } from "./hooks/useLeadCardWrites";
+import { useLeadBulkOwnerOptions } from "./hooks/useLeadMutations";
 
 // A lead in a CONVERTED stage is finished: the backend rejects the move and
 // the board must not offer it as a destination either — see
@@ -52,21 +55,25 @@ const TERMINAL_STAGE_FLAG = "CONVERTED";
 
 export default function LeadsPage() {
   const { t } = useI18n();
+  const { canMutate } = useAccessMode();
+  const errorText = useCrmErrorText();
   const router = useRouter();
   const {
+    board,
     items,
     stages,
     branchIds,
     branchId,
     selectBranch,
-    canCreate,
-    canUpdateLead,
-    canDeleteLead,
+    canCreate: capabilityCanCreate,
+    canUpdateLead: capabilityCanUpdateLead,
+    canDeleteLead: capabilityCanDeleteLead,
     isLoading,
     isDeleting,
     isMovePending,
     error,
     loadError,
+    scopeDenied: listScopeDenied,
     degraded,
     search,
     appliedSearch,
@@ -95,6 +102,9 @@ export default function LeadsPage() {
     dataRevision,
     refreshData,
   } = useLeads();
+  const canCreate = canMutate && capabilityCanCreate;
+  const canUpdateLead = (lead: LeadItem) => canMutate && capabilityCanUpdateLead(lead);
+  const canDeleteLead = (lead: LeadItem) => canMutate && capabilityCanDeleteLead(lead);
 
   // Keep identity only: booking an activity reloads the lead's current data.
   const [activityLead, setActivityLead] = useState<ActivityTargetSelection | null>(null);
@@ -105,7 +115,7 @@ export default function LeadsPage() {
 
   // Centered 360° Quick-Edit & Inspector Modal state (Screen 04 - zero <aside>)
   const [quickEditLead, setQuickEditLead] = useState<LeadItem | null>(null);
-  const [kpiPreset, setKpiPreset] = useState<LeadQuickFilterPreset>("ALL");
+  const kpiPreset = appliedSearch.kpiPreset ?? "ALL";
 
   // A column's add action seeds the editable stage (and any draft typed in the
   // quick-add card); the header leaves both unset.
@@ -142,42 +152,28 @@ export default function LeadsPage() {
     if (activeView !== next) setActiveView(next);
   }, [activeView, setActiveView, view]);
 
-  const board = useLeadBoard({
-    enabled: view === "board",
-    branchId,
-    stages,
-    search: appliedSearch,
-    sort,
-    revision: dataRevision,
-  });
   const documentCounts = useLeadDocumentCounts(items, branchId, view === "card");
-  const kpis = useLeadKpis({ branchId, search: appliedSearch, revision: dataRevision, enabled: Boolean(branchId) });
+  // Pill counts describe the base search, so changing presets keeps the other counts usable.
+  const kpis = useLeadKpis({ branchId, search: { ...appliedSearch, kpiPreset: "ALL" }, revision: dataRevision, enabled: Boolean(branchId) });
 
   const stageById = useMemo(() => new Map(stages.map((stage) => [stage.id, stage])), [stages]);
 
-  const filterByKpiPreset = useCallback(
-    (list: readonly LeadItem[]): LeadItem[] => {
-      if (kpiPreset === "ALL") return [...list];
-      return list.filter((lead) => {
-        const st = stageById.get(lead.stageId);
-        if (kpiPreset === "NEW_STAGE") return st?.flag === "NEW";
-        if (kpiPreset === "HOT_3_STAR") return lead.rating >= 3;
-        if (kpiPreset === "OVERDUE_ACTIVITY") {
-          return leadActivityState(lead.nextActivity) === "OVERDUE";
-        }
-        if (kpiPreset === "QUALIFIED") return st?.flag === "QUALIFIED";
-        return true;
-      });
-    },
-    [kpiPreset, stageById],
+  const visibleItems = items;
+  const visibleBoardItems = board.items;
+  const canUpdateSelected = visibleItems.some((item) =>
+    workspace.selection.selectedIds.has(item.id) && canUpdateLead(item) &&
+    stageById.get(item.stageId)?.flag !== TERMINAL_STAGE_FLAG,
   );
-
-  const visibleItems = useMemo(() => filterByKpiPreset(items), [filterByKpiPreset, items]);
-  const visibleBoardItems = useMemo(
-    () => filterByKpiPreset(board.items),
-    [board.items, filterByKpiPreset],
-  );
-  const kpiSourceLeads = view === "board" ? board.items : items;
+  const bulkOwners = useLeadBulkOwnerOptions(branchId, view !== "board" && canUpdateSelected);
+  const bulkDelete = useLeadBulkDelete({
+    scopeKey: JSON.stringify([branchId, workspace.page, pageInfo.page, search, appliedSearch, sort, kpiPreset]),
+    items: visibleItems,
+    selectedIds: workspace.selection.selectedIds,
+    onSelectionChange: workspace.selection.onSelectionChange,
+    canDeleteLead,
+    deleteLeads: bulkDeleteLeads,
+    disabled: isLoading || isDeleting,
+  });
 
   const nonTerminalStages = useMemo(
     () => stages.filter((st) => st.flag !== TERMINAL_STAGE_FLAG),
@@ -186,29 +182,10 @@ export default function LeadsPage() {
 
   const handleInColumnQuickCreate = useCallback(
     async (payload: CreateLeadRequest, rating?: number) => {
-      const form = emptyCreateLeadForm("quick-col-contact-1");
-      form.branchId = payload.branchId;
-      form.stageId = payload.stageId ?? "";
-      form.leadProfileType = payload.leadProfileType;
-      form.acquisitionSourceId = payload.acquisitionSourceId ?? "";
-      if (payload.leadProfileType === "CORPORATE") {
-        form.existingCompanyPartyId = payload.existingCompanyPartyId ?? "";
-        form.companyName = payload.companyName ?? "";
-        form.companyPhones = payload.companyPhones?.length ? [...payload.companyPhones] : [""];
-        const firstContact = payload.contacts?.[0];
-        const c = emptyLeadContact("quick-col-contact-1");
-        c.contactPartyId = firstContact?.contactPartyId ?? "";
-        c.fullName = firstContact?.fullName ?? "";
-        c.firstName = firstContact?.firstName ?? (payload.companyName ?? "");
-        c.lastName = firstContact?.lastName ?? "";
-        c.phones = firstContact?.phones?.length ? [...firstContact.phones] : [""];
-        form.contacts = [c];
-      } else {
-        form.firstName = payload.firstName ?? "";
-        form.lastName = payload.lastName ?? "";
-        form.phones = payload.phones?.length ? [...payload.phones] : [""];
-      }
-      return handleCreate(form, rating);
+      return handleCreate(
+        createLeadFormFromQuickRequest(payload, "quick-col-contact-1"),
+        rating,
+      );
     },
     [handleCreate],
   );
@@ -216,11 +193,12 @@ export default function LeadsPage() {
   const selectedStageFilter =
     search.mode === "basic" ? leadSearchValuesOf(search, "stage")[0] : undefined;
 
-  const boardErrorMessage = board.error?.message ?? loadError?.message ?? null;
-  const listErrorMessage = loadError?.message ?? null;
+  const scopeDenied = view === "board" ? board.error?.status === 403 : listScopeDenied;
+  const boardErrorMessage = errorText(board.error ?? loadError);
+  const listErrorMessage = errorText(loadError);
 
   return (
-    <PermissionGate require="crm.leads.read" scoped>
+    <PermissionGate require={["crm.leads.read", "crm.lead_stages.read"]} scoped>
       <div className="flex h-full flex-col gap-3">
         {/* Preserve the accessible heading; actions render in the shell's top action bar alongside KPI pills. */}
         <PageHeader
@@ -236,10 +214,11 @@ export default function LeadsPage() {
               {branchId && (
                 <LeadKpiStrip
                   kpis={kpis}
-                  leads={kpiSourceLeads}
-                  stages={stages}
                   activePreset={kpiPreset}
-                  onSelectPreset={setKpiPreset}
+                  onSelectPreset={(preset) => {
+                    workspace.setPage(1);
+                    setSearch({ ...search, kpiPreset: preset });
+                  }}
                 />
               )}
               <TenantBranchSelect
@@ -276,16 +255,17 @@ export default function LeadsPage() {
         )}
 
         {/* Floating Dark Bottom Bulk Action Command Bar (Screen 07) */}
-        {view !== "board" && workspace.selection.selectedIds.size > 0 && (
+        {canMutate && view !== "board" && workspace.selection.selectedIds.size > 0 && (
           <LeadBulkActionsBar
             selectedIds={workspace.selection.selectedIds}
             stages={nonTerminalStages}
-            canUpdateAny={visibleItems.some((item) =>
-              workspace.selection.selectedIds.has(item.id) && canUpdateLead(item),
-            )}
-            canDeleteAny={visibleItems.some((item) =>
-              workspace.selection.selectedIds.has(item.id) && canDeleteLead(item),
-            )}
+            canUpdateAny={canUpdateSelected}
+            owners={bulkOwners.owners}
+            ownersLoading={bulkOwners.isLoading}
+            ownersFailed={bulkOwners.failed}
+            canDeleteAny={bulkDelete.eligibleCount > 0}
+            deleteEligibleCount={bulkDelete.eligibleCount}
+            isDeleting={isDeleting || isLoading}
             onBulkMoveStage={async (stageId) => {
               const ids = Array.from(workspace.selection.selectedIds);
               await bulkMoveStage(ids, stageId);
@@ -296,11 +276,13 @@ export default function LeadsPage() {
               await bulkUpdateLeads(ids, { rating });
               workspace.selection.onSelectionChange(new Set());
             }}
-            onBulkDelete={async () => {
-              const ids = Array.from(workspace.selection.selectedIds);
-              await bulkDeleteLeads(ids);
-              workspace.selection.onSelectionChange(new Set());
+            onBulkAssignOwner={async (ownerUserId) => {
+              const ids = visibleItems.filter((item) => workspace.selection.selectedIds.has(item.id)).map((item) => item.id);
+              if (await bulkUpdateLeads(ids, { ownerUserId })) {
+                workspace.selection.onSelectionChange(new Set());
+              }
             }}
+            onBulkDelete={bulkDelete.request}
             onClearSelection={() => workspace.selection.onSelectionChange(new Set())}
           />
         )}
@@ -312,17 +294,18 @@ export default function LeadsPage() {
             available={["board", "card", "table"]}
             labels={{ board: t.views.board, card: t.views.card, table: t.views.table }}
           />
+          <LeadSortMenu sort={workspace.sort ?? DEFAULT_LEADS_SORT} setSort={workspace.setSort} />
           <ActivitiesWorkspaceLink type="LEAD" />
         </PageActions>
 
-        {degraded.stages && <DegradedBanner message={t.crmLeads.stagesUnavailable} />}
-        {degraded.capabilities && <DegradedBanner message={t.crmLeads.capabilitiesUnavailable} />}
+        {!scopeDenied && degraded.stages && <DegradedBanner message={t.crmLeads.stagesUnavailable} />}
+        {!scopeDenied && degraded.capabilities && <DegradedBanner message={t.crmLeads.capabilitiesUnavailable} />}
 
         {/* Load errors belong to the view; this alert carries write feedback. */}
         {error && (
           <div
             role="alert"
-            className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-destructive/30 bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
           >
             <span>{error}</span>
             <Button variant="outline" size="sm" onClick={() => void fetchLeads()}>
@@ -334,6 +317,8 @@ export default function LeadsPage() {
         <div className="flex min-h-0 flex-1 flex-col">
           {!branchId ? (
             <EmptyState title={t.crmLeads.selectBranchFirst} />
+          ) : scopeDenied ? (
+            <CrmScopeGate />
           ) : (
             <>
               {view === "board" && (
@@ -386,11 +371,6 @@ export default function LeadsPage() {
                   onDeleteLead={setSelectedForDelete}
                   onMoveStage={(lead, toStageId) => void moveLead(lead.id, toStageId, lead)}
                   onCardChange={(leadId, patch, lead) => void updateLeadCard(leadId, patch, lead)}
-                  onBulkMoveStage={async (stageId) => {
-                    const ids = Array.from(workspace.selection.selectedIds);
-                    await bulkMoveStage(ids, stageId);
-                    workspace.selection.onSelectionChange(new Set());
-                  }}
                 />
               )}
 
@@ -435,10 +415,7 @@ export default function LeadsPage() {
           canDelete={quickEditLead ? canDeleteLead(quickEditLead) : false}
           onClose={() => setQuickEditLead(null)}
           onNavigateLead={setQuickEditLead}
-          onMoveStage={async (lead, stageId) => {
-            await moveLead(lead.id, stageId, lead);
-            setQuickEditLead((prev) => (prev && prev.id === lead.id ? { ...prev, stageId } : prev));
-          }}
+          onMoveStage={(lead, stageId) => moveLead(lead.id, stageId, lead)}
           onOpenActivities={openActivities}
           onDeleteLead={setSelectedForDelete}
           onSave={(lead, patch) => updateLeadInline(lead.id, patch, lead)}
@@ -452,7 +429,7 @@ export default function LeadsPage() {
               ? `create-open-${createStageId ?? "any"}-${createDraft ? "draft" : "blank"}`
               : "create-closed"
           }
-          isOpen={isCreateOpen}
+          isOpen={canCreate && isCreateOpen}
           stages={stages}
           branchId={branchId}
           initialStageId={createStageId ?? undefined}
@@ -469,18 +446,27 @@ export default function LeadsPage() {
         <ActivityModal
           scope="CRM"
           branchId={branchId}
-          request={activityLead ? { kind: "create", target: activityLead, agenda: true } : null}
+          request={canMutate && activityLead ? { kind: "create", target: activityLead, agenda: true } : null}
           onClose={() => setActivityLead(null)}
           onChanged={() => void refreshData()}
         />
 
         <DeleteLeadsConfirmModal
-          isOpen={selectedForDelete !== null}
+          isOpen={canMutate && selectedForDelete !== null}
           item={selectedForDelete}
           onClose={() => setSelectedForDelete(null)}
           onConfirm={() => void handleDelete()}
           isDeleting={isDeleting}
           error={selectedForDelete ? error : null}
+        />
+        <DeleteLeadsConfirmModal
+          isOpen={canMutate && bulkDelete.isOpen}
+          item={null}
+          bulkCounts={{ eligible: bulkDelete.eligibleCount, selected: bulkDelete.selectedCount, skipped: bulkDelete.skippedCount }}
+          onClose={bulkDelete.close}
+          onConfirm={() => void bulkDelete.confirm()}
+          isDeleting={isDeleting || bulkDelete.isPending}
+          error={bulkDelete.isOpen ? error : null}
         />
       </div>
     </PermissionGate>

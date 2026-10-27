@@ -118,11 +118,16 @@ export function OrganizationNodeForm({
       ) : null}
 
       {config.fields.includes("currencyCode") ? (
-        <Field label={copy.fields.currencyCode} hint={copy.fields.currencyCodeHint}>
+        <Field
+          label={copy.fields.currencyCode}
+          hint={mode === "edit" ? copy.fields.currencyCodeRequiredHint : copy.fields.currencyCodeHint}
+          required={mode === "edit"}
+        >
           <Input size="sm" placeholder={copy.fields.currencyCode}
             dir="ltr"
             value={values.currencyCode}
             onChange={(event) => onChange({ currencyCode: event.target.value })}
+            required={mode === "edit"}
             maxLength={ORG_CURRENCY_CODE_LENGTH}
             disabled={isSubmitting}
           />

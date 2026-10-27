@@ -151,7 +151,7 @@ export default function CurrenciesPage() {
   return (
     <PermissionGate require="currencies.currency.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.coreSettings.currenciesTitle}
           description={t.coreSettings.currenciesSubtitle}
           primaryAction={

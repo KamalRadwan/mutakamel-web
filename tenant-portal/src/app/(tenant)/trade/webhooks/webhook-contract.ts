@@ -40,6 +40,9 @@ export const WEBHOOK_PAGE_SIZE = 50;
 const WEBHOOK_EVENTS_MIN = 1;
 export const WEBHOOK_EVENTS_MAX = 30;
 export const WEBHOOK_ENDPOINT_MAX_LENGTH = 2048;
+// Trade RotateWebhookSecretDto: covers the longest ten-attempt retry schedule.
+export const WEBHOOK_ROTATION_MIN_OVERLAP_HOURS = 30;
+export const WEBHOOK_ROTATION_MAX_OVERLAP_HOURS = 168;
 
 /** `DRAFT` is the create-time state and cannot be returned to. */
 export const WEBHOOK_SUBSCRIPTION_STATUSES = ["DRAFT", "ACTIVE", "DISABLED"] as const;
@@ -241,10 +244,14 @@ export function buildCreateWebhookSubscriptionRequest(
   };
 }
 
-/** `RotateWebhookSecretDto.overlapHours` — int 0–168, default 24. */
+/** `RotateWebhookSecretDto.overlapHours` — int 30–168, default 30. */
 export function buildRotateSecretRequest(raw: string) {
   const overlapHours = Number(raw.trim());
-  if (!Number.isSafeInteger(overlapHours) || overlapHours < 0 || overlapHours > 168) {
+  if (
+    !Number.isSafeInteger(overlapHours) ||
+    overlapHours < WEBHOOK_ROTATION_MIN_OVERLAP_HOURS ||
+    overlapHours > WEBHOOK_ROTATION_MAX_OVERLAP_HOURS
+  ) {
     throw new Error("WEBHOOK_FORM_OVERLAP");
   }
   return { overlapHours };
@@ -461,6 +468,7 @@ export function webhookMessage(error: NormalizedApiError, t: Dictionary): string
     case "TRADE.WEBHOOK.ENDPOINT_FORBIDDEN":
       return t.tradeAutomation.errorEndpointForbidden;
     case "TRADE.WEBHOOK.PAYLOAD_FORBIDDEN":
+    case "TRADE.WEBHOOK.PAYLOAD_INVALID":
       return t.tradeAutomation.errorPayloadForbidden;
     case "TRADE.WEBHOOK.SECRET_VERSION_INVALID":
       return t.tradeAutomation.errorSecretVersionInvalid;

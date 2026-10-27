@@ -46,6 +46,7 @@ export default function TradeWidgetPage({
   const {
     lang,
     widget,
+    canShare,
     shares,
     shareTargets,
     sharesUnavailable,
@@ -158,11 +159,13 @@ export default function TradeWidgetPage({
             title={t.tradeAnalytics.shares}
             description={t.tradeAnalytics.widgetSharesDescription}
           >
-            {sharesUnavailable ? (
+            {!canShare ? (
+              <p className="text-sm text-muted-foreground">{t.tradeAnalytics.sharePermissionRequired}</p>
+            ) : sharesUnavailable ? (
               <DegradedBanner message={t.tradeAnalytics.sharesUnavailable} />
             ) : null}
 
-            <div className="flex flex-wrap items-end gap-3">
+            {canShare ? <div className="flex flex-wrap items-end gap-3">
               <Field
                 label={t.tradeAnalytics.subjectId}
                 required
@@ -255,7 +258,7 @@ export default function TradeWidgetPage({
                 <Plus className="size-4" aria-hidden="true" />
                 {t.tradeAnalytics.addShare}
               </Button>
-            </div>
+            </div> : null}
 
             {shares.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t.tradeAnalytics.sharesEmpty}</p>
@@ -270,14 +273,15 @@ export default function TradeWidgetPage({
                     <Badge tone="brand">
                       {tradeStatusLabel(t.tradeStatus, share.accessLevel, t.common.unknownCode)}
                     </Badge>
-                    <Button
+                    {canShare ? <Button
                       variant="ghost"
                       size="sm"
+                      aria-label={t.tradeAnalytics.removeShare}
                       disabled={pending !== null}
                       onClick={() => void removeShare(share.id)}
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
-                    </Button>
+                    </Button> : null}
                   </li>
                 ))}
               </ul>

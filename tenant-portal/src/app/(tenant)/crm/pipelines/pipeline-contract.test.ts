@@ -186,15 +186,36 @@ describe("Pipeline API contract", () => {
   });
 
   it("builds the complete ordered id list a reorder replaces ranks with", () => {
-    const stages = parsePipelineResponse(pipeline).stages;
-    expect(moveStageOrder(stages, STAGE_ONE, 1)).toEqual([
-      STAGE_TWO,
-      STAGE_ONE,
-    ]);
+    const stages = parsePipelineResponse({
+      ...pipeline,
+      stages: [
+        membership(STAGE_ONE, 1),
+        { ...membership(STAGE_TWO, 2), flag: "PROPOSAL" },
+        { ...membership(PIPELINE_ID, 3), flag: "WON" },
+      ],
+    }).stages;
+    expect(moveStageOrder(stages, STAGE_TWO, 1)).toEqual([STAGE_ONE, PIPELINE_ID, STAGE_TWO]);
+    expect(moveStageOrder(stages, PIPELINE_ID, -1)).toEqual([STAGE_ONE, PIPELINE_ID, STAGE_TWO]);
+    expect(stages.map(({ id }) => id)).toEqual([STAGE_ONE, STAGE_TWO, PIPELINE_ID]);
     // Off either end is not an error, it is "no move" — the control is
     // disabled and nothing must be sent.
     expect(moveStageOrder(stages, STAGE_ONE, -1)).toBeNull();
-    expect(moveStageOrder(stages, STAGE_TWO, 1)).toBeNull();
+    expect(moveStageOrder(stages, PIPELINE_ID, 1)).toBeNull();
+    expect(moveStageOrder(stages, "missing", 1)).toBeNull();
+    expect(moveStageOrder(stages, STAGE_ONE, 1)).toBeNull();
+    expect(moveStageOrder(stages, STAGE_TWO, -1)).toBeNull();
+    expect(moveStageOrder([], STAGE_ONE, 1)).toBeNull();
+  });
+
+  it("refuses reorder requests when NEW is missing, duplicated or not first", () => {
+    const stages = parsePipelineResponse(pipeline).stages;
+    expect(moveStageOrder(stages, STAGE_ONE, 1)).toBeNull();
+    const withoutNew = stages.map((stage) => ({ ...stage, flag: "PROPOSAL" as const }));
+    expect(moveStageOrder(withoutNew, STAGE_ONE, 1)).toBeNull();
+    expect(moveStageOrder([
+      withoutNew[0],
+      stages[1],
+    ], STAGE_ONE, 1)).toBeNull();
   });
 
   it("builds canonical Gateway paths and refuses a non-UUIDv7 id", () => {

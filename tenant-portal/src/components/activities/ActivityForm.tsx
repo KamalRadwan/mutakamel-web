@@ -39,6 +39,7 @@ import {
   activityTypeTraits,
 } from "./activity-presentation";
 import { ActivityScheduleFields } from "./ActivityScheduleFields";
+import { ActivityReminderField } from "./ActivityReminderField";
 import { ActivityTargetField } from "./ActivityTargetField";
 import { ActivityTypePicker } from "./ActivityTypePicker";
 import { useActivityAssigneeOptions } from "./hooks/useActivityAssigneeOptions";
@@ -378,6 +379,7 @@ export function ActivityForm(props: ActivityFormProps) {
       )}
 
       {/* 3. Schedule / Time Window Card */}
+      {(mode === "edit" || values.status !== "DONE") && <ActivityReminderField form={form} disabled={disabled} />}
       <ActivityScheduleFields
         form={form}
         disabled={disabled}

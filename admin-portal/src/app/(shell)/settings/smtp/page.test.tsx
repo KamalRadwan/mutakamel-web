@@ -64,6 +64,7 @@ const { smtpMock, toastMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("./hooks/useSmtpSettings", () => ({ useSmtpSettings: () => smtpMock }));
+vi.mock("./components/EmailSuppressionSection", () => ({ EmailSuppressionSection: () => null }));
 vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toastMock }));
 
 import SmtpSettingsPage from "./page";

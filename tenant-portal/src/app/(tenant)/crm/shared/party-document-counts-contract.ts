@@ -52,6 +52,24 @@ export const PARTY_DOCUMENT_COUNT_SCOPED: Record<PartyDocumentCountKind, boolean
   invoices: false,
 };
 
+const PARTY_DOCUMENT_ROUTES: Record<PartyDocumentCountKind, string> = {
+  opportunities: "/crm/opportunities",
+  quotations: "/trade/quotations",
+  salesOrders: "/trade/sales-orders",
+  invoices: "/trade/invoices",
+};
+
+/** Builds a party-scoped destination href (`?partyId=<id>`) for `next/link` navigation. */
+export function buildPartyDocumentHref(
+  kind: PartyDocumentCountKind,
+  partyId: string | null | undefined,
+): string {
+  const base = PARTY_DOCUMENT_ROUTES[kind];
+  const trimmed = partyId?.trim() ?? "";
+  if (!trimmed) return base;
+  return `${base}?partyId=${encodeURIComponent(trimmed)}`;
+}
+
 /** The request body each kind's route expects for one batch of Party ids. */
 export function partyDocumentCountsRequestBody(
   kind: PartyDocumentCountKind,

@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-09-03**
+Last source verification: **2026-09-03**; extension-chain request contract reverified **2026-10-18**.
 
 Owner: **Core**
 
@@ -150,6 +150,28 @@ against, replaced wholesale by the `PUT`. Each link may override the server's
 empty list is valid and means the user registers nowhere — `/me` then reports a
 phone that does not render, rather than an error.
 
+The request body is `{ servers: [...] }`, including `{ servers: [] }` to clear
+the chain. Each entry sends only `serverId`, `timeoutSeconds` and `maxRetries`;
+the response-only `priority` is omitted because the DTO rejects unknown fields.
+Adding, reordering and clearing all use `PUT`, including mutation-intent metadata.
+An exact retry retains its original UUIDv7 key and body, and the user panel
+re-reads the stored chain after a successful replacement. Regression specs cover
+these contracts; automated checks and authenticated persistence remain pending
+lead verification.
+
+User-panel read safety reverified **2026-10-18** (source only): the extension,
+server catalogue and assigned chain each have explicit loading, failure and
+success states. A failed owner lookup never means an unconfigured phone, and
+a failed chain read never means an empty chain. Inline bilingual errors retain
+the mapped error details and correlation ID, with a WebPhone-only retry that
+reloads the authoritative baseline without resetting unrelated user edits.
+Replacement editing and the save handler require all three reads to succeed
+and `admin.webphone.update`. A successful lookup with no extension permits
+identity creation; its new chain must then be read successfully before chain
+editing. A failed chain refresh after creation or replacement also blocks
+further replacements until retry succeeds. Regression specs cover these states;
+typecheck, lint, tests and authenticated runtime remain lead verification gates.
+
 There is no `transport` on an extension any more. Protocol belongs to the server.
 
 ## Cross-tenant and fleet route matrix
@@ -221,7 +243,7 @@ reports against the Save button next to it.
   and type for server, ICE, and extension responses, shared by both screens
 - `src/components/layout/AdminWebPhone.tsx` — binds the shared widget to
   `/api/admin/webphone/v1`
-- Shared client: `@mutakamel/webphone` (`packages/webphone`)
+- Shared client: private workspace package `@mutakamel/webphone-ui` (`packages/webphone`), renamed on **2026-10-17** to distinguish it from the published backend `@mutakamel/webphone` package. It must not be published under the backend name.
 
 ## Source map
 

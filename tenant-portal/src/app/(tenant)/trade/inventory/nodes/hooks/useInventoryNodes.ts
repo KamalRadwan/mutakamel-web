@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isTradeReplay, tradePost } from "../../../trade-api";
 import { parseTradeArray } from "../../../trade-advanced-validation";
-import { hasTradePermission, tradeScopeHeaders, useTradeScope } from "../../../trade-advanced-scope";
+import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import { tradeGet } from "../../../trade-api";
 import {
   INVENTORY_NODES_MANAGE_PERMISSION,
@@ -35,8 +35,9 @@ export function useInventoryNodes() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const readScope = useTradeScope("BRANCH", branchId);
+  const writeScope = useTradeScope("COMPANY", branchId);
 
   const [items, setItems] = useState<InventoryNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,7 +105,7 @@ export function useInventoryNodes() {
           // A node write targets COMPANY even though the list beside it is
           // BRANCH — sending the branch header here narrows the resolved
           // target and the create is refused.
-          headers: tradeScopeHeaders(user, branchId, "COMPANY"),
+          headers: writeScope.headers,
           maxResponseBytes: NODE_RESPONSE_LIMIT_BYTES,
         });
         setCreateOpen(false);
@@ -133,7 +134,7 @@ export function useInventoryNodes() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, user, branchId, toast, t, load],
+    [canManage, isSubmitting, writeScope.headers, toast, t, load],
   );
 
   return {

@@ -98,6 +98,7 @@ export default function OpportunityStagesPage() {
     <PermissionGate require="crm.pipelines.manage">
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={t.crmOpportunityStages.title}
           description={t.crmOpportunityStages.subtitle}
           primaryAction={

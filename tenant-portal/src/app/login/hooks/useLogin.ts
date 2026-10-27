@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useLoginCooldown } from "./useLoginCooldown";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { classifyApiOutcome } from "@/lib/api/outcomes";
+import { formatNumber } from "@/lib/format/number";
+import { useMfaChallenge } from "@/lib/auth/useMfaChallenge";
 
 /**
  * The distinguishable ways a sign-in attempt fails.
@@ -33,6 +36,7 @@ export type LoginFailureKind =
   | "rateLimited"
   | "coordinationUnavailable"
   | "offline"
+  | "temporarilyUnavailable"
   | "unknown";
 
 export function classifyLoginFailure(error: NormalizedApiError): LoginFailureKind {
@@ -43,17 +47,23 @@ export function classifyLoginFailure(error: NormalizedApiError): LoginFailureKin
   if (error.code === "ACCOUNT_NOT_ACTIVE") return "accountNotActive";
   if (error.code === "SUBSCRIPTION_PAST_DUE") return "subscriptionPastDue";
   if (error.code === "TENANT_INACTIVE") return "tenantInactive";
+  if (error.status === 503) return "temporarilyUnavailable";
   if (error.status === 401) return "invalidCredentials";
   return "unknown";
 }
 
 export function useLogin() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { startCooldown, isCoolingDown, retryMinutes } = useLoginCooldown();
   const toast = useToast();
   const { login } = useTenantAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
+  const mfa = useMfaChallenge(async (challengeId, code) => {
+    await login({ challengeId, code, rememberMe });
+    toast.success(t.auth.signInSuccess, t.auth.signInSuccessMessage);
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
@@ -76,12 +86,16 @@ export function useLogin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || isCoolingDown) return;
     setIsSubmitting(true);
     setFailure(null);
     try {
-      await login({ email, password, rememberMe });
+      const step = await login({ email, password, rememberMe });
+      setPassword("");
+      if (step) { mfa.start(step); return; }
       toast.success(t.auth.signInSuccess, t.auth.signInSuccessMessage);
     } catch (error) {
+      startCooldown(error);
       setFailure(normalizeApiError(error));
     } finally {
       setIsSubmitting(false);
@@ -99,14 +113,16 @@ export function useLogin() {
       );
       toast.info(t.auth.resetLinkSent, t.auth.resetLinkSentMessage);
       setIsForgotModalOpen(false);
-    } catch {
-      toast.error(t.auth.resetFailed, t.auth.resetFailedMessage);
+    } catch (error) {
+      toast.error(t.auth.resetFailed, normalizeApiError(error).status === 503
+        ? t.auth.temporarilyUnavailable : t.auth.resetFailedMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return {
+    mfa,
     t,
     email,
     setEmail,
@@ -115,6 +131,9 @@ export function useLogin() {
     rememberMe,
     showPassword,
     isSubmitting,
+    isCoolingDown,
+    throttleMessage: t.auth.loginThrottled.replace("{minutes}",
+      formatNumber(retryMinutes, lang)),
     isForgotModalOpen,
     setIsForgotModalOpen,
     openForgotModal,

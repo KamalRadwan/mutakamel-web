@@ -23,6 +23,10 @@ import {
   SWATCH_SURFACE_PALETTES,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { SerialKeysField } from "./SerialKeysField";
+import { ReversalLinesFields } from "./ReversalLinesFields";
+import { useReversalLines } from "../hooks/useReversalLines";
+import { splitSerialInput } from "../serial-input";
 import type { InventoryNode } from "../../inventory-contract";
 import {
   EMPTY_MOVEMENT_FORM,
@@ -31,6 +35,8 @@ import {
   REVERSAL_REASON_PRESETS,
   type MovementFormValues,
   type MovementLineValues,
+  type ReversalLineValues,
+  type SessionMovementEntry,
 } from "../movements-contract";
 
 interface MovementPanelProps {
@@ -50,6 +56,7 @@ interface MovementPanelProps {
     version: number,
     reasonCode: string,
     effectiveAt: string,
+    lines?: ReversalLineValues[],
   ) => Promise<boolean>;
   pending: string | null;
   disabled: boolean;
@@ -59,6 +66,7 @@ interface MovementPanelProps {
   knownNodes?: InventoryNode[];
   selectedTargetId?: string;
   selectedTargetVersion?: number;
+  sessionEntries?: SessionMovementEntry[];
 }
 
 /**
@@ -88,6 +96,7 @@ export function MovementPanel({
   knownNodes = [],
   selectedTargetId,
   selectedTargetVersion,
+  sessionEntries = [],
 }: MovementPanelProps) {
   const { t, lang } = useI18n();
   const isAr = lang === "ar";
@@ -110,6 +119,8 @@ export function MovementPanel({
   };
 
   const targetId = actionId || selectedTargetId || (createdId ?? "");
+  const reversal = useReversalLines(targetId);
+  const knownLines = sessionEntries.find((entry) => entry.id === targetId)?.lines ?? [];
   const effectiveVersion =
     actionVersion !== "1"
       ? actionVersion
@@ -262,10 +273,7 @@ export function MovementPanel({
 
           {values.lines.map((line, index) => {
             const isExpanded = Boolean(expandedLines[index]);
-            const serialCount = (line.serialKeys ?? "")
-              .split(/[\s,]+/)
-              .map((s) => s.trim())
-              .filter((s) => s.length > 0).length;
+            const serialCount = splitSerialInput(line.serialKeys ?? "").length;
 
             return (
               <div
@@ -346,7 +354,7 @@ export function MovementPanel({
                       }
                     />
                   </Field>
-                  <Field label={t.tradeInventory.quantity} required>
+                  <Field label={t.tradeInventory.quantity} required hint={serialCount > 0 ? t.tradeInventory.serialArrayHint : undefined}>
                     <Input
                       size="sm"
                       placeholder="10"
@@ -375,23 +383,9 @@ export function MovementPanel({
                         }
                       />
                     </Field>
-                    <Field
-                      label={
-                        isAr
-                          ? "الأرقام التسلسلية (serialKeys)"
-                          : "Serial Keys (comma/space separated)"
-                      }
-                    >
-                      <Input
-                        size="sm"
-                        placeholder="SN-001, SN-002"
-                        value={line.serialKeys ?? ""}
-                        disabled={disabled || pending !== null}
-                        onChange={(event) =>
-                          updateLine(index, { serialKeys: event.target.value })
-                        }
-                      />
-                    </Field>
+                    <SerialKeysField value={line.serialKeys ?? ""} quantity={line.quantity}
+                      disabled={disabled || pending !== null}
+                      onChange={(serialKeys) => updateLine(index, { serialKeys })} />
                     {isDelivery ? (
                       <Field
                         label={
@@ -412,15 +406,11 @@ export function MovementPanel({
                       </Field>
                     ) : (
                       <Field
-                        label={
-                          isAr
-                            ? "تاريخ انتهاء الصلاحية (expiresAt)"
-                            : "Expiration Date (expiresAt)"
-                        }
+                        label={t.tradeInventory.trackingExpiryDate}
                       >
                         <Input
                           size="sm"
-                          type="datetime-local"
+                          type="date"
                           value={line.expiresAt ?? ""}
                           disabled={disabled || pending !== null}
                           onChange={(event) =>
@@ -515,6 +505,9 @@ export function MovementPanel({
           </Field>
         </div>
 
+        <ReversalLinesFields editor={reversal} knownLines={knownLines}
+          disabled={!canReverse || pending !== null} />
+
         {/* Reversal Reason Presets */}
         <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-muted/20 p-2.5">
           <span className="text-2xs font-medium text-muted-foreground">
@@ -567,7 +560,8 @@ export function MovementPanel({
                 Number(effectiveVersion),
                 reasonCode,
                 reversalAt,
-              )
+                reversal.lines,
+              ).then((saved) => { if (saved) reversal.clear(); })
             }
           >
             <RotateCcw className="size-4" aria-hidden="true" />

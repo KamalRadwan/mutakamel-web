@@ -3,7 +3,7 @@
 import { useCallback, useRef } from "react";
 import { useToast } from "@/design-system";
 import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
-import { normalizeApiError } from "@/lib/api/errors";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { useI18n } from "@/i18n/I18nContext";
 import { isAmbiguousWriteFailure } from "@/lib/api/idempotent-write";
 import {
@@ -12,6 +12,11 @@ import {
   type CustomerProfileCardPatch,
 } from "../customer-profile-card-contract";
 import type { CustomerProfileItem } from "./useCustomerProfiles";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
+
+export type CustomerCardUpdateResult =
+  | { ok: true; patch: CustomerProfileCardPatch }
+  | { ok: false; error?: NormalizedApiError };
 
 export function useUpdateCustomerProfileCard({
   branchId,
@@ -29,16 +34,17 @@ export function useUpdateCustomerProfileCard({
 }) {
   const { t } = useI18n();
   const toast = useToast();
+  const errorText = useCrmErrorText();
   const pendingIds = useRef(new Set<string>());
 
   const updateCard = useCallback(
-    async (item: CustomerProfileItem, patch: CustomerProfileCardPatch) => {
-      if (!branchId || pendingIds.current.has(item.id)) return;
+    async (item: CustomerProfileItem, patch: CustomerProfileCardPatch): Promise<CustomerCardUpdateResult> => {
+      if (!branchId || pendingIds.current.has(item.id)) return { ok: false };
       if (!canUpdate(item)) {
         toast.errorFromApi(t.crmCustomerProfiles.cardNotPermitted, {
           status: 403,
         });
-        return;
+        return { ok: false, error: { status: 403 } };
       }
 
       const previous: CustomerProfileCardPatch = {
@@ -64,20 +70,21 @@ export function useUpdateCustomerProfileCard({
             },
           );
         } catch (caught) {
+          const error = { ...normalizeApiError(caught), message: undefined };
           applyCardFields(item.id, previous);
           if (isAmbiguousWriteFailure(caught)) {
             reconcile();
             toast.errorFromApi(
               t.crmCustomerProfiles.cardUpdateAmbiguous,
-              normalizeApiError(caught),
+              error,
             );
           } else {
             toast.errorFromApi(
-              t.crmCustomerProfiles.cardUpdateFailed,
-              normalizeApiError(caught),
+              errorText(error) ?? t.crmCustomerProfiles.cardUpdateFailed,
+              error,
             );
           }
-          return;
+          return { ok: false, error };
         }
 
         try {
@@ -86,21 +93,26 @@ export function useUpdateCustomerProfileCard({
             item.id,
             branchId,
           );
-          applyCardFields(item.id, {
+          const confirmedPatch: CustomerProfileCardPatch = {
             ...(patch.rating !== undefined
               ? { rating: confirmed.rating }
               : {}),
             ...(patch.cardColor !== undefined
               ? { cardColor: confirmed.cardColor }
               : {}),
-          });
+          };
+          applyCardFields(item.id, confirmedPatch);
           reconcile();
+          return { ok: true, patch: confirmedPatch };
         } catch (caught) {
+          const error = { ...normalizeApiError(caught), message: undefined };
+          applyCardFields(item.id, previous);
           reconcile();
           toast.errorFromApi(
             t.crmCustomerProfiles.cardUpdateAmbiguous,
-            normalizeApiError(caught),
+            error,
           );
+          return { ok: false, error };
         }
       } finally {
         pendingIds.current.delete(item.id);
@@ -110,6 +122,7 @@ export function useUpdateCustomerProfileCard({
       applyCardFields,
       branchId,
       canUpdate,
+      errorText,
       reconcile,
       t.crmCustomerProfiles.cardNotPermitted,
       t.crmCustomerProfiles.cardUpdateAmbiguous,

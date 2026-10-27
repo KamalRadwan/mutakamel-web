@@ -104,7 +104,7 @@ export default function AuthenticationManagementPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={t.authSessions.title}
         description={t.authSessions.subtitle}
         secondaryActions={

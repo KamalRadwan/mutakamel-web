@@ -56,7 +56,12 @@ describe("SubNav", () => {
 
     expect(screen.getByRole("navigation", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Authentication" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Authentication" })).toHaveClass("bg-selected");
+    expect(screen.getByRole("link", { name: "Authentication" })).toHaveClass(
+      "bg-gradient-primary",
+      "text-white",
+      "font-semibold",
+      "shadow-nav-active",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Scroll Settings toward the beginning" }));
     fireEvent.click(screen.getByRole("button", { name: "Scroll Settings toward the end" }));

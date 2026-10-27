@@ -17,7 +17,12 @@ import {
 import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import { userDisplayName, type UserStatus } from "../../../contracts/user-contract";
+import {
+  userDisplayName,
+  type TenantUser,
+  type UpdateUserInput,
+  type UserStatus,
+} from "../../../contracts/user-contract";
 import { useCoreErrorText } from "../../../hooks/useCoreErrorText";
 import { useTenantUserDetail } from "../hooks/useTenantUserDetail";
 import { UserFormDrawer, type UserFormValues } from "../../components/UserFormDrawer";
@@ -95,7 +100,13 @@ export function UserDetailWorkspace({ id }: { id: string }) {
                 <Link href={`${TENANT_ROUTES.coreAddonSeats}/${id}`}>{t.addonAssignments.nav}</Link>
               </Button>}
               {screen.canUpdate ? (
-                <Button size="sm" variant="outline" onClick={screen.openEdit}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={screen.openEdit}
+                  disabled={screen.isProtectedTarget}
+                  aria-describedby={screen.isProtectedTarget ? "user-management-protection" : undefined}
+                >
                   <Pencil className="size-4" aria-hidden="true" />
                   {copy.actions.edit}
                 </Button>
@@ -122,8 +133,18 @@ export function UserDetailWorkspace({ id }: { id: string }) {
           }
         />
 
-        <UserFormDrawer
-          key={screen.isEditOpen ? "edit-open" : "edit-closed"}
+        {screen.protectedTargetReason ? (
+          <p id="user-management-protection" className="text-xs text-muted-foreground">
+            {screen.protectedTargetReason}
+          </p>
+        ) : null}
+        {screen.isSelfTarget ? (
+          <Button size="sm" variant="outline" className="self-start" asChild>
+            <Link href={TENANT_ROUTES.coreProfile}>{copy.users.editMyName}</Link>
+          </Button>
+        ) : null}
+
+        {screen.isEditOpen ? <UserFormDrawer
           mode="edit"
           isOpen={screen.isEditOpen}
           initial={{
@@ -139,10 +160,10 @@ export function UserDetailWorkspace({ id }: { id: string }) {
             jobTitle: user.jobTitle ?? "",
           }}
           onClose={screen.closeEdit}
-          onSubmit={(values) => screen.saveEdits(toUpdateInput(values))}
+          onSubmit={(values) => screen.saveEdits(toUpdateInput(values, user))}
           isSubmitting={screen.isSubmitting}
           error={screen.isEditOpen ? actionText : undefined}
-        />
+        /> : null}
 
         {actionText ? (
           <p
@@ -196,16 +217,18 @@ export function UserDetailWorkspace({ id }: { id: string }) {
         <TeamMembershipsPanel
           userId={user.id}
           canManage={screen.canManageMemberships}
+          protectedTargetReason={screen.protectedTargetReason}
           homeTeamId={user.teamId}
         />
 
-        <ModuleSeatsPanel userId={user.id} canManage={screen.canUpdate} />
+        <ModuleSeatsPanel userId={user.id} canManage={screen.canManageModules} />
 
         {screen.canAssignRoles ? (
           <RoleGrantsPanel
             userId={user.id}
             canAssignRoles={screen.canAssignRoles}
             isTenantOwnerActor={screen.isTenantOwnerActor}
+            protectedTargetReason={screen.protectedTargetReason}
           />
         ) : null}
 
@@ -229,18 +252,20 @@ export function UserDetailWorkspace({ id }: { id: string }) {
 }
 
 /**
- * `UpdateTenantUserDto` — no `email`, and an emptied optional is sent as an
- * empty string rather than omitted, so clearing a job title actually clears it.
+ * `UpdateTenantUserDto` — no `email`; changed team/manager IDs use `null` to
+ * clear them. Optional text fields use empty strings to clear their values.
  */
-function toUpdateInput(values: UserFormValues) {
+function toUpdateInput(values: UserFormValues, loaded: TenantUser): UpdateUserInput {
+  const teamId = values.teamId || null;
+  const managerId = values.managerId || null;
   return {
     firstName: values.firstName,
     lastName: values.lastName,
     companyId: values.companyId,
     branchId: values.branchId,
     departmentId: values.departmentId,
-    ...(values.teamId ? { teamId: values.teamId } : {}),
-    ...(values.managerId ? { managerId: values.managerId } : {}),
+    ...(teamId !== loaded.teamId ? { teamId } : {}),
+    ...(managerId !== loaded.managerId ? { managerId } : {}),
     employeeCode: values.employeeCode,
     jobTitle: values.jobTitle,
   };

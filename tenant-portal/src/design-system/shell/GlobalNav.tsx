@@ -1,6 +1,8 @@
 "use client";
 
 import { Menu } from "lucide-react";
+import { useTenantAuth } from "@/context/AuthContext";
+import { can } from "@/lib/auth/permission-scope";
 import { useI18n } from "@/i18n/I18nContext";
 import { Button } from "../primitives/Button";
 import { Separator } from "../primitives/Separator";
@@ -34,48 +36,56 @@ export function GlobalNav({
   activeItemId,
 }: GlobalNavProps) {
   const { t } = useI18n();
+  const { user } = useTenantAuth();
 
   return (
-    <header className="nav-surface flex h-(--size-topbar) shrink-0 items-center border-b-2 border-[#38bdf8] bg-gradient-to-r from-[#0f172a] via-[#1e1b4b] to-[#172554] pe-2.5 text-white shadow-[0_2px_8px_rgba(15,23,42,0.18)] dark:border-[#3b82f6] dark:from-[#0b1120] dark:via-[#131c38] dark:to-[#0f172a] print:hidden">
-      <div className="flex h-full shrink-0 items-center ps-1 lg:ps-0">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 px-0 text-white hover:bg-white/10 hover:text-white lg:hidden"
-          onClick={onMobileMenuOpen}
-          aria-label={t.nav.openNavigation}
-        >
-          <Menu className="size-4" aria-hidden="true" />
-        </Button>
-        <BrandMark />
-      </div>
-      <span
+    <>
+      <div
         aria-hidden="true"
-        className="hidden select-none text-xs text-white/30 sm:inline"
-      >
-        /
-      </span>
-      <div className="flex shrink-0 items-center gap-1.5 ps-1.5 sm:ps-2">
-        {/* It scopes every menu that follows it, so it reads and tabs first. */}
-        <AppSwitcher apps={apps} activeApp={activeApp} onSelect={onAppSelect} />
-        <Separator orientation="vertical" className="mx-0.5 hidden h-4 bg-white/15 lg:block" />
-      </div>
-      <nav
-        aria-label={t.nav.mainNavigation}
-        className="hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto ps-1 lg:flex xl:gap-1.5"
-      >
-        {sections.map((section) => (
-          <NavMenu key={section.id} section={section} activeItemId={activeItemId} />
-        ))}
-      </nav>
-      <div className="ms-auto flex shrink-0 items-center gap-2 ps-2">
-        <div className="flex items-center gap-0.5 rounded-md border border-white/15 bg-white/10 px-1 text-white">
-          <LanguageToggle />
-          <ThemeToggle />
-          <NotificationsDropdown />
+        className="h-(--size-brand-strip) w-full shrink-0 bg-gradient-brand-strip print:hidden"
+      />
+      <header className="nav-surface flex h-(--size-topbar) shrink-0 items-center border-b border-nav-chrome-line bg-gradient-header px-[22px] text-nav-foreground-strong print:hidden">
+        <div className="flex min-w-0 shrink items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="size-9 rounded-lg px-0 text-nav-foreground not-disabled:hover:bg-white/10 not-disabled:hover:text-nav-foreground-strong lg:hidden"
+            onClick={onMobileMenuOpen}
+            aria-label={t.nav.openNavigation}
+          >
+            <Menu className="size-4" aria-hidden="true" />
+          </Button>
+          <BrandMark />
         </div>
-        <UserMenu />
-      </div>
-    </header>
+        <span
+          aria-hidden="true"
+          className="mx-2.5 hidden select-none text-xs text-nav-foreground/35 sm:inline"
+        >
+          /
+        </span>
+        <div className="flex shrink-0 items-center">
+          {/* It scopes every menu that follows it, so it reads and tabs first. */}
+          <AppSwitcher apps={apps} activeApp={activeApp} onSelect={onAppSelect} />
+          <Separator
+            orientation="vertical"
+            className="mx-3 hidden h-5 w-0 border-s border-nav-chrome-line bg-transparent lg:block"
+          />
+        </div>
+        <nav
+          aria-label={t.nav.mainNavigation}
+          className="scrollbar-none hidden min-w-0 flex-1 items-center gap-1 overflow-x-auto lg:flex"
+        >
+          {sections.map((section) => (
+            <NavMenu key={section.id} section={section} activeItemId={activeItemId} />
+          ))}
+        </nav>
+        <div className="ms-auto flex shrink-0 items-center gap-2 ps-3">
+          <LanguageToggle tone="chrome" />
+          <ThemeToggle tone="chrome" />
+          {can(user, "notifications.notification.read") && <NotificationsDropdown />}
+          <UserMenu />
+        </div>
+      </header>
+    </>
   );
 }

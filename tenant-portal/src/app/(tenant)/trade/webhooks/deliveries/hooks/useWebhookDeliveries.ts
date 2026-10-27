@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../../trade-api";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
@@ -25,7 +25,7 @@ const LIST_RESPONSE_LIMIT_BYTES = 800_000;
 export function useWebhookDeliveries() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("BRANCH", branchId);
 
   const [items, setItems] = useState<WebhookDelivery[]>([]);

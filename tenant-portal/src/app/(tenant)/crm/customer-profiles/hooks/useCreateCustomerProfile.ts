@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useToast } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
-import type { NormalizedApiError } from "@/lib/api/errors";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import type { CrmProfileType } from "../../leads/lead-contract";
 import type { LeadAddressForm } from "../../leads/lead-create-contract";
 import {
@@ -78,6 +80,8 @@ export function useCreateCustomerProfile(
    */
   onReconcile: () => void,
 ) {
+  const { t } = useI18n();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -321,20 +325,34 @@ export function useCreateCustomerProfile(
           if (outcome.kind === "success") {
             const createdId = outcome.value.id;
             // Best-effort follow-up writes for tags and initial rating
+            const followUpWrites: Promise<unknown>[] = [];
             if (selectedTagIds.length > 0) {
-              void axiosClient
-                .post(`${CUSTOMER_PROFILES_PATH}/${createdId}/tags`, {
+              followUpWrites.push(
+                axiosClient.post(`${CUSTOMER_PROFILES_PATH}/${createdId}/tags`, {
                   tagIds: selectedTagIds,
-                })
-                .catch(() => undefined);
+                }),
+              );
             }
             if (initialRating > 0) {
-              void axiosClient
-                .patch(`${CUSTOMER_PROFILES_PATH}/${createdId}`, {
+              followUpWrites.push(
+                axiosClient.patch(`${CUSTOMER_PROFILES_PATH}/${createdId}`, {
                   rating: initialRating,
-                })
-                .catch(() => undefined);
+                }),
+              );
             }
+            void Promise.allSettled(followUpWrites).then((results) => {
+              const hasVisibleFailure = results.some(
+                (result) =>
+                  result.status === "rejected" &&
+                  normalizeApiError(result.reason).status !== 403,
+              );
+              if (hasVisibleFailure) {
+                toast.warning(
+                  t.crmCustomerProfiles.followUpWarningTitle,
+                  t.crmCustomerProfiles.followUpWarningMessage,
+                );
+              }
+            });
 
             setAmbiguity(null);
             reset();
@@ -372,7 +390,19 @@ export function useCreateCustomerProfile(
       await send();
       return succeeded;
     },
-    [allErrors, branchId, form, isSubmitting, onCreated, onReconcile, reset, revealAll],
+    [
+      allErrors,
+      branchId,
+      form,
+      isSubmitting,
+      onCreated,
+      onReconcile,
+      reset,
+      revealAll,
+      t.crmCustomerProfiles.followUpWarningMessage,
+      t.crmCustomerProfiles.followUpWarningTitle,
+      toast,
+    ],
   );
 
   return {

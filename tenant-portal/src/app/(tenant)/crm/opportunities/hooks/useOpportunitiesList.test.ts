@@ -405,4 +405,24 @@ describe("Opportunities list — the two endpoints", () => {
       expect.anything(),
     );
   });
+
+  it("initializes basic search with the party id as a customer filter when initialPartyId is provided", async () => {
+    const partyId = "01900100-0000-7000-8000-000000000114";
+    get.mockResolvedValue(EMPTY_PAGE);
+    const { result } = renderHook(() =>
+      useOpportunitiesList(branchId, PIPELINE, null, ACTOR, partyId),
+    );
+    await settle();
+
+    expect(result.current.search.basic).toEqual({
+      text: "",
+      myOpportunities: false,
+      filters: [{ field: "customer", value: partyId }],
+    });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).toHaveBeenCalledWith(
+      `/api/tenant/crm/v1/opportunities?branchId=${branchId}&page=1&limit=25&sortBy=createdAt&sortDir=DESC&pipelineId=${PIPELINE}&search=${partyId}&searchField=customer`,
+      expect.anything(),
+    );
+  });
 });

@@ -294,6 +294,7 @@ export default function QuotationsPage() {
     <TradeGate require={QUOTATION_PERMISSIONS.read}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={td.quotations.title}
           description={td.quotations.subtitle}
           primaryAction={
@@ -339,6 +340,8 @@ export default function QuotationsPage() {
               kind="TradeQuotationStatus"
               value={list.status}
               onChange={list.setStatus}
+              partyId={list.partyId}
+              onPartyIdChange={list.setPartyId}
             />
 
             {viewMode === "board" ? (

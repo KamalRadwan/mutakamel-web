@@ -20,6 +20,7 @@ vi.mock("@/i18n/I18nContext", async (importOriginal) => ({
 
 const lead = {
   id: "01900100-0000-7000-8000-0000000000a1",
+  updatedAt: "2026-10-26T10:00:00.123Z",
   leadProfileType: "CORPORATE",
   companyName: "Acme LLC",
   companyEmail: "info@acme.test",
@@ -95,7 +96,10 @@ describe("LeadCompanyCard", () => {
     const modal = await openEditor();
     fireEvent.change(modal.getByRole("textbox", { name: en.crmLeads.companyName }), { target: { value: "Acme Trading" } });
     await pressSave();
-    expect(save).toHaveBeenCalledExactlyOnceWith("company", { companyName: "Acme Trading" });
+    expect(save).toHaveBeenCalledExactlyOnceWith("company", {
+      companyName: "Acme Trading",
+      expectedUpdatedAt: lead.updatedAt,
+    });
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -109,7 +113,7 @@ describe("LeadCompanyCard", () => {
     expect(modal.getByText(en.crmShared.fieldRequired)).toBeTruthy();
     fireEvent.change(modal.getByRole("textbox", { name: en.crmLeads.companyName }), { target: { value: "Acme LLC" } });
     await pressSave();
-    expect(save).toHaveBeenCalledWith("company", { taxNumber: null });
+    expect(save).toHaveBeenCalledWith("company", { taxNumber: null, expectedUpdatedAt: lead.updatedAt });
   });
 
   it("retains malformed email for correction instead of closing as a no-op", async () => {
@@ -159,7 +163,7 @@ describe("LeadCompanyCard", () => {
     expect(numbers[0].value).toBe("221001100");
     fireEvent.change(numbers[0], { target: { value: "1050049800" } });
     await pressSave();
-    expect(save).toHaveBeenCalledWith("company", { companyPhones: ["+201050049800", "+201050049899"] });
+    expect(save).toHaveBeenCalledWith("company", { companyPhones: ["+201050049800", "+201050049899"], expectedUpdatedAt: lead.updatedAt });
   });
 
   it("adds and removes phone rows with the existing calling code", async () => {
@@ -171,7 +175,7 @@ describe("LeadCompanyCard", () => {
     fireEvent.change(rows[2], { target: { value: "1112223334" } });
     fireEvent.click(modal.getByLabelText("Remove phone 1"));
     await pressSave();
-    expect(save).toHaveBeenCalledWith("company", { companyPhones: ["+201050049899", "+201112223334"] });
+    expect(save).toHaveBeenCalledWith("company", { companyPhones: ["+201050049899", "+201112223334"], expectedUpdatedAt: lead.updatedAt });
   });
 
   it("stops adding phones at the DTO limit", async () => {
@@ -184,7 +188,7 @@ describe("LeadCompanyCard", () => {
     const modal = await openEditor();
     fireEvent.change(modal.getByLabelText(en.crmLeads.create.buildingNo), { target: { value: "15" } });
     await pressSave();
-    expect(save).toHaveBeenCalledWith("company", { address: {
+    expect(save).toHaveBeenCalledWith("company", { expectedUpdatedAt: lead.updatedAt, address: {
       country: "Egypt", city: "Cairo", state: "", street1: "Nile Street",
       street2: "Suite 8", buildingNo: "15", floor: "", landmark: "", postalCode: "11511",
     } });

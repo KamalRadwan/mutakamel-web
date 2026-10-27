@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useToast } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { leadPath, parseLeadDetailResponse, type LeadDetail } from "../../lead-contract";
@@ -33,15 +35,19 @@ export function useLeadCompanyEdit(
    */
   onReconcile: () => void,
 ): LeadCompanyEdit {
+  const { t } = useI18n();
+  const toast = useToast();
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [reconciliationRequired, setReconciliationRequired] = useState(false);
+  const [reconciliation, setReconciliation] = useState({ lead, pending: false });
   const inFlight = useRef(false);
+  if (reconciliation.lead !== lead) setReconciliation({ lead, pending: false });
 
   const clearError = useCallback(() => {
     setError(null);
-    setReconciliationRequired(false);
-  }, []);
+    if (!reconciliation.pending) setReconciliationRequired(false);
+  }, [reconciliation.pending]);
 
   const save = useCallback(
     async (key: string, request: UpdateLeadRequest) => {
@@ -53,7 +59,7 @@ export function useLeadCompanyEdit(
         attempt: createWriteAttempt(),
         method: "patch",
         path: leadPath(lead.id),
-        body: request,
+        body: { ...request, expectedUpdatedAt: request.expectedUpdatedAt ?? lead.updatedAt },
         parse: parseLeadDetailResponse,
       });
       setSavingKey(null);
@@ -63,10 +69,13 @@ export function useLeadCompanyEdit(
         onSaved(outcome.value);
         return true;
       }
-      // Both may have applied. Re-read and block retrying this draft with a
-      // fresh attempt; closing and reopening seeds the next draft from the read.
-      if (outcome.kind === "applied_unreadable" || outcome.kind === "ambiguous") {
+      // Unknown outcomes and stale drafts need a read before a new attempt.
+      // Closing and reopening then seeds the draft from the refreshed lead.
+      const conflict = outcome.error.code === "CRM.LEAD.CONCURRENT_UPDATE" || outcome.error.status === 409;
+      if (conflict) toast.warning(t.crmShared.refusals["CRM.LEAD.CONCURRENT_UPDATE"], undefined, 0, { label: t.crmLeadDetail.reloadLead, onClick: onReconcile });
+      if (outcome.kind === "applied_unreadable" || outcome.kind === "ambiguous" || conflict) {
         setReconciliationRequired(true);
+        setReconciliation((current) => ({ ...current, pending: true }));
         onReconcile();
         setError(outcome.error);
         return false;
@@ -74,7 +83,7 @@ export function useLeadCompanyEdit(
       setError(outcome.error);
       return false;
     },
-    [lead, onReconcile, onSaved, reconciliationRequired],
+    [lead, onReconcile, onSaved, reconciliationRequired, t, toast],
   );
 
   return { savingKey, error, reconciliationRequired, clearError, save };

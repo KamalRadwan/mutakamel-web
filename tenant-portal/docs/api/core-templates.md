@@ -4,6 +4,9 @@ Status: **verified**
 
 Last source verification: **2026-08-31**
 
+Publish concurrency contract re-verified against the controller and service:
+**2026-10-17**.
+
 Owning app: **core-app**
 
 Canonical prefix: `/api/tenant/core/v1/templates`
@@ -67,9 +70,15 @@ an end user except through a resolved assignment.
 
 `POST /templates/:templateId/publish` requires:
 
-1. the **definition revision** (`If-Match`),
-2. the **draft revision** (in the body), and
+1. the **definition revision** (`definitionRevision` in the body),
+2. the **draft revision** (`draftRevision` in the body, with
+   `currentDraft.etag` echoed verbatim in `If-Match`), and
 3. a **passed validation run id** for that exact draft revision.
+
+Definition and draft revisions advance independently. A metadata-only rename
+can advance the definition revision, while a draft save advances the draft
+revision. Publishing works when these revisions differ; a stale draft ETag
+still returns `CORE.TEMPLATE.CONCURRENCY.STALE_REVISION` (409).
 
 Change one character of the draft after validating and the run no longer
 applies. **Surface all three states before enabling the button** (task 7.15) —
@@ -150,6 +159,14 @@ artifact. The artifact **expires**, so "succeeded but the download is gone" is a
 real fifth state alongside queued/running/succeeded/failed. Use the
 `AsyncJobState` pattern (task 1.32).
 
+Portal monitoring behavior verified **2026-10-18**: after 60 pending (`PENDING`
+or `RETRYING`) status responses, monitoring pauses with an explicit recovery
+message instead of continuing to display an active pending indicator. This is
+a monitoring timeout, not a render failure. **Resume status checks** starts
+another bounded polling window using the retained job ID and existing status
+GET; it never requests another render. A completed response then exposes the
+same job's artifact through the normal download action.
+
 ### Assets
 
 | Method | Canonical path | Permission | Notes |
@@ -205,6 +222,15 @@ Template Platform uses **HMAC-signed cursors**, not page/limit:
 not persist it across a page reload — an expired or re-fingerprinted cursor is
 rejected, and the correct UI response is to restart the list, not to retry.
 
+Version and recovery history pagination updated **2026-10-18**: each panel
+retains its own cursor metadata and in-memory cursor trail, with Previous/Next
+controls and at most 25 records displayed at once. Switching definitions
+clears both trails and their rows. Superseded requests cannot update rows,
+errors or loading completion. An invalid cursor restarts only the affected
+history and displays the existing bilingual restart notice. Older versions
+retain their view, restore and retire actions; older snapshots retain their
+checksum-pinned restore action and explicit discard acknowledgement.
+
 Sorting is also its own dialect: definitions use `sortBy` + `sortDirection`
 (**lowercase** `asc`/`desc`), and assets use a combined token like
 `createdAt:desc`. This is the `sortDir` divergence recorded as gap G13 and task
@@ -234,8 +260,7 @@ Idempotent commands additionally read
 
 ## What the portal does not have yet
 
-**The editor.** Task 1.48 shipped `RichTextEditor`, which edits sanitized HTML
-for one field. `TemplateDocumentV1` is a layout document — 18 node types, flow
+**The editor.** `TemplateDocumentV1` is a layout document — 18 node types, flow
 and absolute layout, page configuration, theme, bindings and formula ASTs
 (`@mutakamel/template-schema`) — and nothing in the design system can express
 it. Phase 7 therefore built the **definition** screen and left 7.12 open rather

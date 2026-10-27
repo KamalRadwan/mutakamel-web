@@ -32,6 +32,14 @@ import {
 } from "../test/fixtures";
 
 describe("tenant provisioning wire readers", () => {
+  it("reads recovery state and rejects malformed recovery evidence", () => {
+    const recovery = { attempts: 5, alerted: true, releaseEvidenceExists: false,
+      stuck: true, nextRetryAt: null, canResendRelease: true, canCloseFailed: false };
+    expect(readTenantPrerequisiteEvidenceRecord(prerequisiteEvidenceRecord({ recovery })).recovery).toEqual(recovery);
+    expect(() => readTenantPrerequisiteEvidenceRecord(prerequisiteEvidenceRecord({ recovery: { ...recovery, attempts: -1 } })))
+      .toThrow("INVALID_TENANT_PREREQUISITE_EVIDENCE_RESPONSE");
+    expect(readTenantAvailableUpdate(availableUpdate()).lastOperationId).toMatch(/^019f/u);
+  });
   it("accepts only the current seven operation types and rejects stale reconcile/add-module contracts", () => {
     expect(readTenantOperationSummary(operationSummary()).type).toBe(
       "INITIAL_PROVISION",
@@ -93,6 +101,22 @@ describe("tenant provisioning wire readers", () => {
     );
     expect(component.desired.manifestChecksum).toBe(SHA_A);
     expect(component.applied.releaseVersion).toBe("1.0.0");
+  });
+
+  it("parses a components page containing an add-on and rejects unknown selection sources", () => {
+    const page = readProvisioningPage(
+      [componentInstallation(), componentInstallation({ selectionSource: "ADDON" })],
+      META,
+      readTenantComponentInstallation,
+    );
+
+    expect(page.items.map((component) => component.selectionSource)).toEqual([
+      "FOUNDATION",
+      "ADDON",
+    ]);
+    expect(() => readTenantComponentInstallation(
+      componentInstallation({ selectionSource: "UNKNOWN" }),
+    )).toThrow("INVALID_TENANT_COMPONENT_STATE_RESPONSE");
   });
 
   it("fails closed on the currently omitted seed revision and enables exact conflict evidence only when present", () => {

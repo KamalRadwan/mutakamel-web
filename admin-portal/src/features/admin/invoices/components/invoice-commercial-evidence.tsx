@@ -1,4 +1,4 @@
-import { Badge, Card } from "@/design-system";
+import { Badge, Card, Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/design-system";
 import { INVOICE_COMMERCIAL_COPY } from "../model/invoice-commercial-copy";
 import type { InvoiceCommercial, RetainedInvoiceLine } from "../model/invoice-commercial";
 import { isRetainedInvoice } from "../model/invoice-commercial";
@@ -33,12 +33,12 @@ function RecordedBrackets({ line, lang }: { line: RetainedInvoiceLine; lang: "ar
   const copy = INVOICE_COMMERCIAL_COPY[lang];
   return <details className="min-w-0 text-xs">
     <summary className="min-h-8 cursor-pointer rounded-md py-1.5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">{copy.breakdown}</summary>
-    <div className="overflow-x-auto"><table className="w-full text-start text-xs">
-      <caption className="sr-only">{copy.breakdown}: {line.description}</caption>
-      <thead><tr>{[copy.from, copy.through, copy.charged, copy.unit, copy.lineAmount].map(label => <th key={label} scope="col" className="px-2 py-1.5 text-start font-semibold">{label}</th>)}</tr></thead>
-      <tbody>{line.acceptedPricingSnapshot.breakdown?.map(row => <tr key={row.minUsers} className="border-t border-border">
-        {[String(row.minUsers), row.maxUsers === null ? copy.open : String(row.maxUsers), String(row.chargedUsers), row.unitPriceUsd, row.amountUsd].map((value, index) => <td key={index} className="px-2 py-1.5 font-mono"><bdi>{value}</bdi></td>)}
-      </tr>)}</tbody>
-    </table></div>
+    <div className="overflow-x-auto"><Table className="w-full text-start text-xs">
+      <TableCaption className="sr-only">{copy.breakdown}: {line.description}</TableCaption>
+      <TableHeader><TableRow>{[copy.from, copy.through, copy.charged, copy.unit, copy.lineAmount].map(label => <TableHead key={label} scope="col" className="px-2 py-1.5 text-start font-semibold">{label}</TableHead>)}</TableRow></TableHeader>
+      <TableBody>{line.acceptedPricingSnapshot.breakdown?.map(row => <TableRow key={row.minUsers} className="border-t border-border">
+        {[String(row.minUsers), row.maxUsers === null ? copy.open : String(row.maxUsers), String(row.chargedUsers), row.unitPriceUsd, row.amountUsd].map((value, index) => <TableCell key={index} className="px-2 py-1.5 font-mono"><bdi>{value}</bdi></TableCell>)}
+      </TableRow>)}</TableBody>
+    </Table></div>
   </details>;
 }

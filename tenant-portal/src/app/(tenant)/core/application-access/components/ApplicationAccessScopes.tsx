@@ -16,7 +16,7 @@ export function ApplicationAccessScopes() {
     {canAdopt && <div><Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscriptionDefinitionAdoption}>{t.commercialAdoption.open}</Link></Button></div>}
     <PermissionGate require={[]} denied={!allowed}>
     <div className="flex flex-col gap-4">
-      <PageHeader title={copy.title} description={copy.scopeDiscoveryNotice} />
+      <PageHeader className="sr-only" title={copy.title} description={copy.scopeDiscoveryNotice} />
       {companies.length + branches.length === 0 ? <EmptyState title={copy.noScopes} description={copy.noScopesDescription} /> : (
         <div className="max-w-xl">
           <Field label={copy.chooseScope} hint={copy.exactScopeNotice}>

@@ -7,22 +7,13 @@ import { cn } from "../lib/cn";
 import { focusRing } from "../lib/variants";
 
 /**
- * The global nav's inline-start zone — a fixed `--size-brand` (250px) block
- * holding the tenant's own logo and name, linking home.
- *
- * The old sidebar reserved its head for a logo and then never rendered one, so
- * a white-labelled tenant paid for branding that appeared on the login screen
- * and nowhere else. This is where it finally lands.
+ * The global nav's inline-start brand mark — a 34×34 `bg-gradient-logo` tile
+ * paired with the tenant's name, linking home.
  *
  * `logoUrl` is a same-origin path to Core's `@Public()` logo route, not a
  * free-form URL: `parsePublicBranding` compares it against the exact constant
  * and rejects anything else, so a compromised upstream cannot point this
  * `<img>` at another host.
- *
- * The zone is a fixed width rather than `w-auto` because the menus that follow
- * it must start at the same x on every screen. A brand block that resized with
- * the tenant's name would move the whole nav for each tenant, and the first
- * menu's position is something a user learns once and then relies on.
  */
 export function BrandMark() {
   const { t } = useI18n();
@@ -37,23 +28,26 @@ export function BrandMark() {
       href="/"
       aria-label={t.nav.brandHome}
       className={cn(
-        "flex h-full w-auto max-w-36 shrink-0 items-center gap-2 px-2.5 sm:max-w-44 lg:max-w-52 lg:px-3",
-        "text-sm font-semibold tracking-tight text-white hover:bg-white/10 hover:text-white",
+        "flex h-10 w-auto min-w-0 max-w-44 items-center gap-2.5 rounded-lg pe-1 font-semibold tracking-tight text-nav-foreground-strong transition-opacity hover:opacity-90 sm:max-w-52 lg:max-w-60",
         focusRing,
       )}
     >
       {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- a same-origin Core route streaming tenant-owned bytes under the session cookie; next/image would add an optimizer hop and needs a remote pattern for a path that is already capped server-side.
-        <img src={logoUrl} alt="" className="h-5 w-auto max-w-20 shrink-0 object-contain" />
+        <img
+          src={logoUrl}
+          alt=""
+          className="h-[34px] w-auto max-w-24 shrink-0 rounded-[10px] object-contain"
+        />
       ) : (
         <span
           aria-hidden="true"
-          className="flex size-5.5 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-violet-600 text-2xs font-bold text-white shadow-[0_2px_6px_rgba(59,130,246,0.4)]"
+          className="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-gradient-logo font-semibold text-white"
         >
-          {monogram}
+          <span className="text-base leading-none">{monogram}</span>
         </span>
       )}
-      <span className="truncate">{name}</span>
+      <span className="min-w-0 truncate text-base">{name}</span>
     </Link>
   );
 }

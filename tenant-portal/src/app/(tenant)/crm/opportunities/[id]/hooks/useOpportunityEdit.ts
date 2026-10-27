@@ -1,13 +1,23 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import type { NormalizedApiError } from "@/lib/api/errors";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   createWriteAttempt,
   runIdempotentWrite,
   type AppliedUnreadable,
   type WriteAttempt,
 } from "@/lib/api/idempotent-write";
+import {
+  CRM_CUSTOM_FIELDS_PATH,
+  parseCrmCustomFieldsResponse,
+  type CustomFieldItem,
+} from "../../../custom-fields/custom-field-contract";
+import {
+  buildCrmCustomFieldValuesPath,
+  parseCrmCustomFieldValues,
+} from "../../../shared/custom-fields-contract";
 import {
   opportunityPath,
   parseOpportunityDetailResponse,
@@ -47,9 +57,14 @@ export function useOpportunityEdit(
    */
   onReconcile: () => void,
 ) {
+  const [customFieldsBaseline, setCustomFieldsBaseline] = useState<Record<string, unknown>>({});
+  const [definitions, setDefinitions] = useState<CustomFieldItem[]>([]);
+  const [customFieldsLoading, setCustomFieldsLoading] = useState(false);
+  const [customFieldsError, setCustomFieldsError] = useState<NormalizedApiError | null>(null);
+  const [customFieldsReload, setCustomFieldsReload] = useState(0);
   const baseline = useMemo(
-    () => (item ? toOpportunityForm(item) : null),
-    [item],
+    () => (item ? { ...toOpportunityForm(item), customFields: customFieldsBaseline } : null),
+    [item, customFieldsBaseline],
   );
   const [form, setForm] = useState<OpportunityForm | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,22 +77,69 @@ export function useOpportunityEdit(
   const [appliedUnreadable, setAppliedUnreadable] =
     useState<AppliedUnreadable | null>(null);
 
+  const open = form !== null;
+  const branchId = item?.branchId;
+  const ownerId = item?.id;
+  useEffect(() => {
+    if (!open || !branchId || !ownerId) return;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) setCustomFieldsLoading(true);
+    });
+    void (async () => {
+      try {
+        const config = {
+          signal: controller.signal,
+          cache: "no-store" as const,
+          maxResponseBytes: 512 * 1024,
+        };
+        const [fieldsResponse, valuesResponse] = await Promise.all([
+          axiosClient.get<unknown>(CRM_CUSTOM_FIELDS_PATH, config),
+          axiosClient.get<unknown>(buildCrmCustomFieldValuesPath({
+            branchId, ownerType: "OPPORTUNITY", ownerId,
+          }), config),
+        ]);
+        if (controller.signal.aborted) return;
+        const fields = parseCrmCustomFieldsResponse(fieldsResponse.data)
+          .filter((field) => field.isActive && field.ownerType === "OPPORTUNITY")
+          .sort((left, right) => left.sortOrder - right.sortOrder);
+        const values = parseCrmCustomFieldValues(valuesResponse.data, { ownerType: "OPPORTUNITY", ownerId });
+        const byId = new Map(values.map((value) => [value.fieldDefinitionId, value.value]));
+        const stored = Object.fromEntries(
+          fields.map((field) => [field.fieldKey, byId.get(field.id) ?? null]),
+        );
+        setDefinitions(fields);
+        setCustomFieldsBaseline(stored);
+        setForm((current) => current ? { ...current, customFields: { ...stored } } : current);
+        setCustomFieldsError(null);
+      } catch (caught) {
+        if (!controller.signal.aborted) setCustomFieldsError(normalizeApiError(caught));
+      } finally {
+        if (!controller.signal.aborted) setCustomFieldsLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [open, branchId, ownerId, customFieldsReload]);
+
   const isDirty = useMemo(() => {
     if (!form || !baseline) return false;
-    // `customFields` is excluded rather than compared: this drawer does not
-    // edit it — the detail screen's own rail does — so it is `{}` on both
-    // sides and only the string fields carry a change.
-    return (Object.keys(form) as Array<keyof OpportunityForm>).some(
-      (key) =>
-        key !== "customFields" &&
-        (form[key] as string).trim() !== (baseline[key] as string).trim(),
-    );
+    return Object.entries(form).some(([key, value]) => {
+      const original = baseline[key as keyof OpportunityForm];
+      return typeof value === "string" && typeof original === "string"
+        ? value.trim() !== original.trim()
+        : JSON.stringify(value) !== JSON.stringify(original);
+    });
   }, [baseline, form]);
 
   const openDrawer = useCallback(() => {
-    if (baseline) setForm({ ...baseline });
+    if (baseline) setForm({ ...baseline, customFields: {} });
+    setCustomFieldsBaseline({});
+    setDefinitions([]);
+    setCustomFieldsError(null);
+    setCustomFieldsLoading(baseline !== null);
     setError(null);
     setAmbiguity(null);
+    setAppliedUnreadable(null);
   }, [baseline]);
 
   const closeDrawer = useCallback(() => {
@@ -173,8 +235,27 @@ export function useOpportunityEdit(
     onReconcile,
   ]);
 
+  const requiredFieldKeys = useMemo(() => definitions.filter((field) =>
+    field.requirements.some((requirement) =>
+      requirement.isRequired && requirement.operation === "UPDATE" &&
+      (requirement.entityScope === null || requirement.entityScope === "OPPORTUNITY"),
+    ),
+  ).map((field) => field.fieldKey), [definitions]);
+
   return {
-    open: form !== null,
+    open,
+    requiredFieldKeys,
+    definitions,
+    customFieldsLoading,
+    customFieldsError,
+    retryCustomFields: () => setCustomFieldsReload((current) => current + 1),
+    setCustomField: (key: string, value: unknown) => {
+      if (customFieldsLoading || customFieldsError || isSubmitting || ambiguity || appliedUnreadable) return;
+      if (!definitions.some((field) => field.fieldKey === key)) return;
+      setForm((current) => current ? {
+        ...current, customFields: { ...current.customFields, [key]: value === "" ? null : value },
+      } : current);
+    },
     form,
     isDirty,
     isSubmitting,

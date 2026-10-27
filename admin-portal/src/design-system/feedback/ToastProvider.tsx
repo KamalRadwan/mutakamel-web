@@ -12,17 +12,18 @@ import { GLOBAL_TOAST_EVENT, showAppToast, type GlobalToastEventDetail } from ".
  * useToast() uses — see docs/design-system/toast-contract.md.
  */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const { lang, dir } = useI18n();
+  const { lang, dir, t } = useI18n();
   const dismissLabel = lang === "ar" ? "إغلاق الإشعار" : "Dismiss notification";
 
   useEffect(() => {
     const handleGlobalToast = (event: Event) => {
       const detail = (event as CustomEvent<GlobalToastEventDetail>).detail;
-      showAppToast(detail.type, detail.title, detail.message, detail.duration, dismissLabel);
+      const copy = t.globalToast[detail.localizationKey];
+      showAppToast(detail.type, copy.title, copy.message, detail.duration, dismissLabel);
     };
     window.addEventListener(GLOBAL_TOAST_EVENT, handleGlobalToast);
     return () => window.removeEventListener(GLOBAL_TOAST_EVENT, handleGlobalToast);
-  }, [dismissLabel]);
+  }, [dismissLabel, t.globalToast]);
 
   return (
     <>

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+import { useMfaChallenge } from "@/lib/auth/useMfaChallenge";
 import { getAuthErrorCode, getAuthErrorStatus } from "@/lib/auth/sessionRefresh";
 import {
   getAdminPasswordChecks,
@@ -19,7 +21,9 @@ export type AdminPasswordActionError =
   | "unavailable";
 
 export function useAdminPasswordAction(mode: AdminPasswordActionMode) {
-  const { acceptInvite, resetPassword } = useAuth();
+  const { acceptInvite, resetPassword, login } = useAuth();
+  const router = useRouter();
+  const mfa = useMfaChallenge((challengeId, code) => login({ challengeId, code }));
   const [token, setToken] = useState<string | null>(null);
   const [isTokenReady, setIsTokenReady] = useState(false);
   const [password, setPassword] = useState("");
@@ -86,7 +90,14 @@ export function useAdminPasswordAction(mode: AdminPasswordActionMode) {
     try {
       const input = { token: token as string, newPassword: password };
       if (mode === "acceptInvite") {
-        await acceptInvite(input);
+        const step = await acceptInvite(input);
+        if (step) {
+          mfa.start(step);
+          setToken(null);
+          setPassword("");
+          setConfirmation("");
+          return;
+        }
       } else {
         await resetPassword(input);
       }
@@ -101,13 +112,15 @@ export function useAdminPasswordAction(mode: AdminPasswordActionMode) {
         setError("sessionChanged");
       } else if (status === 429) {
         setError("rateLimited");
+      } else if (status === 400 || status === 422) {
+        setError("passwordWeak");
       } else {
         setError("unavailable");
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [acceptInvite, confirmation, isSubmitting, mode, password, resetPassword, token]);
+  }, [acceptInvite, confirmation, isSubmitting, mfa, mode, password, resetPassword, token]);
 
   return {
     token,
@@ -122,5 +135,7 @@ export function useAdminPasswordAction(mode: AdminPasswordActionMode) {
     isSubmitting,
     error,
     submit,
+    mfa,
+    restartMfa: () => router.replace("/login"),
   };
 }

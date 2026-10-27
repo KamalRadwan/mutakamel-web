@@ -26,6 +26,8 @@ import { useI18n } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { useStorageServerDetail } from "../hooks/useStorageServerDetail";
+import { useStorageByteLimit } from "../hooks/useStorageByteLimit";
+import { formatStorageBytes } from "../lib/storage-byte-capacity";
 import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 import { isSecureStorageEndpoint, probeFreshnessPercent } from "../lib/storage-server-contract";
 import type { StorageCredentialRotationReceipt } from "../lib/rotation-receipt";
@@ -64,11 +66,12 @@ function dict(lang: Lang) {
 export function StorageServerDetailScreen({ id }: { id: string }) {
   const { lang, dir, t } = useI18n();
   const copy = dict(lang);
+  const byteCopy = (lang === "ar" ? ar : en).storageByteCapacity;
   const router = useRouter();
   const toast = useToast();
   const view = useStorageServerDetail(id);
   const [editor, setEditor] = useState<"configuration" | "credentials" | "safe-rotation" | null>(null);
-  const [confirmation, setConfirmation] = useState<"offline" | "drain" | "delete" | null>(null);
+  const [confirmation, setConfirmation] = useState<"offline" | "drain" | "delete" | "abort-rotation" | null>(null);
   const [actionError, setActionError] = useState<SafeErrorDetails | null>(null);
   const actionErrorRef = useRef<HTMLDivElement>(null);
   const BackIcon = dir === "rtl" ? ArrowRight : ArrowLeft;
@@ -128,6 +131,8 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
 
   const deleteBlocked = server.isPlatformDefault || server.assignedTenants > 0 || !["DRAFT", "OFFLINE"].includes(server.status);
   const connectionEditBlocked = server.assignedTenants > 0 && server.status !== "OFFLINE";
+  const canPatchCredentials = !server.isPlatformDefault && !connectionEditBlocked;
+  const canUseSafeRotation = !canPatchCredentials && ["ACTIVE", "DRAINING"].includes(server.status);
   const canMakeDefault = server.status === "ACTIVE" && server.connectionEvidenceFresh && !server.isPlatformDefault;
 
   return (
@@ -234,7 +239,14 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
               <Datum label={copy.bucketLabel} value={server.bucketName} mono />
               <Datum label={copy.tenantCapacityLabel} value={`${formatStorageNumber(server.assignedTenants, lang)} / ${server.maxTenants === null ? "∞" : formatStorageNumber(server.maxTenants, lang)}`} mono />
               <Datum label={copy.configRevisionLabel} value={`v${formatStorageNumber(server.configRevision, lang)}`} mono />
+              <Datum label={byteCopy.maxLabel} value={server.maxBytes === null ? byteCopy.unlimited : formatStorageBytes(server.maxBytes, lang)} mono />
+              <Datum label={byteCopy.reservedLabel} value={formatStorageBytes(server.reservedBytes, lang)} mono />
+              <Datum label={byteCopy.committedLabel} value={formatStorageBytes(server.committedBytes, lang)} mono />
+              <Datum label={byteCopy.availableLabel} value={server.availableBytes === null ? byteCopy.unlimited : formatStorageBytes(server.availableBytes, lang)} mono />
             </dl>
+            {server.availableBytes === "0" && (
+              <p className="mt-3 text-xs font-semibold text-destructive-subtle-foreground">{byteCopy.exhausted}</p>
+            )}
             {connectionEditBlocked && (
               <p className="mt-5 rounded-md border border-warning/30 bg-warning-subtle p-3 text-xs leading-5 text-warning-subtle-foreground">
                 {copy.connectionEditBlockedNote}
@@ -247,17 +259,17 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
             icon={<KeyRound className="size-4" aria-hidden="true" />}
             action={
               view.canUpdate &&
-              (connectionEditBlocked ? (
+              (canUseSafeRotation ? (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("safe-rotation")}>
                   <ShieldCheck className="size-3.5" aria-hidden="true" />
                   {copy.safeRotationButton}
                 </Button>
-              ) : (
+              ) : canPatchCredentials ? (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setEditor("credentials")}>
                   <KeyRound className="size-3.5" aria-hidden="true" />
                   {copy.rotateButton}
                 </Button>
-              ))
+              ) : null)
             }
           >
             <div className="flex items-start gap-2.5 rounded-md border border-info/30 bg-info-subtle p-2.5 text-info-subtle-foreground">
@@ -267,7 +279,9 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                   {server.credentialsConfigured ? copy.credentialsConfiguredLabel : copy.credentialsNotConfiguredLabel}
                 </p>
                 <p className="mt-1 text-xs leading-5">
-                  {connectionEditBlocked ? copy.safeRotationRequiredNote : copy.rotationGeneralNote}
+                  {server.isPlatformDefault
+                    ? copy.platformDefaultRotationNote
+                    : connectionEditBlocked ? copy.safeRotationRequiredNote : copy.rotationGeneralNote}
                 </p>
               </div>
             </div>
@@ -281,6 +295,10 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
                 lang={lang}
                 isMutating={view.isMutating}
                 isDurable={view.isRotationReceiptDurable}
+                canUpdate={view.canUpdate && !view.isLoading && !view.error}
+                abortReason={view.abortReason}
+                onAbortReasonChange={view.setAbortReason}
+                onAbort={() => setConfirmation("abort-rotation")}
                 onRevoke={() =>
                   void run(
                     () => view.revokeCredentialRotation(view.currentRotation!.rotationId),
@@ -336,7 +354,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
         </div>
       </div>
 
-      {editor && editor !== "safe-rotation" && (
+      {view.canUpdate && editor && editor !== "safe-rotation" && (editor !== "credentials" || canPatchCredentials) && (
         <StorageServerEditor
           key={`${editor}:${server.configRevision}:${server.updatedAt}`}
           mode={editor}
@@ -353,7 +371,7 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
         />
       )}
 
-      {editor === "safe-rotation" && (
+      {editor === "safe-rotation" && canUseSafeRotation && (
         <SafeRotationEditor
           key={`safe-rotation:${server.configRevision}`}
           lang={lang}
@@ -367,6 +385,24 @@ export function StorageServerDetailScreen({ id }: { id: string }) {
         />
       )}
 
+      <DestructiveActionModal
+        isOpen={confirmation === "abort-rotation"}
+        onClose={() => setConfirmation(null)}
+        onConfirm={() => {
+          if (!view.currentRotation || view.currentRotation.status !== "STAGED") return;
+          void run(
+            () => view.abortCredentialRotation(view.currentRotation!.rotationId, view.abortReason.trim()),
+            copy.abortRotationSuccess,
+          ).then((success) => { if (success) setConfirmation(null); });
+        }}
+        title={copy.abortRotationTitle}
+        description={copy.abortRotationDescription}
+        targetName={server.name}
+        actionType="delete"
+        confirmLabel={copy.abortRotationButton}
+        requireNameTyping
+        isSubmitting={view.isMutating}
+      />
       <DestructiveActionModal
         isOpen={confirmation === "drain"}
         onClose={() => setConfirmation(null)}
@@ -491,6 +527,7 @@ function StorageServerEditor({
   const [region, setRegion] = useState(server.region);
   const [bucketName, setBucketName] = useState(server.bucketName);
   const [maxTenants, setMaxTenants] = useState(server.maxTenants?.toString() ?? "");
+  const byteLimit = useStorageByteLimit(server.maxBytes);
   const [accessKeyId, setAccessKeyId] = useState("");
   const [secretAccessKey, setSecretAccessKey] = useState("");
   const [error, setError] = useState<SafeErrorDetails | null>(null);
@@ -508,6 +545,7 @@ function StorageServerEditor({
         await onSubmit({ credentials: { accessKeyId: accessKeyId.trim(), secretAccessKey } });
         return;
       }
+      if (!byteLimit.validate()) throw new Error(byteLimit.copy.invalidLimit);
       if (!connectionEditBlocked && !isSecureStorageEndpoint(endpoint.trim())) {
         throw new Error(copy.httpsOnlyError);
       }
@@ -516,6 +554,8 @@ function StorageServerEditor({
       const nextMaximum = maxTenants ? Number(maxTenants) : null;
       if (nextName !== server.name) dto.name = nextName;
       if (nextMaximum !== server.maxTenants) dto.maxTenants = nextMaximum;
+      const nextMaxBytes = byteLimit.value === "" ? null : byteLimit.value;
+      if (nextMaxBytes !== server.maxBytes) dto.maxBytes = nextMaxBytes;
       if (!connectionEditBlocked) {
         const nextEndpoint = new URL(endpoint.trim()).origin;
         const nextRegion = region.trim().toLowerCase();
@@ -590,6 +630,9 @@ function StorageServerEditor({
             </Field>
             <Field label={copy.maxTenantsLabel} hideLabel>
               {(fp) => <Input {...fp} size="sm" dir="ltr" type="number" min={Math.max(1, server.assignedTenants)} max={1_000_000} placeholder={copy.maxTenantsLabel} value={maxTenants} onChange={(e) => setMaxTenants(e.target.value)} />}
+            </Field>
+            <Field label={byteLimit.copy.maxLabel} hint={byteLimit.copy.limitHint} error={byteLimit.error} className="sm:col-span-2">
+              {(fp) => <Input {...fp} size="sm" dir="ltr" type="text" inputMode="numeric" value={byteLimit.value} onChange={(e) => byteLimit.setValue(e.target.value)} onBlur={() => byteLimit.validate()} />}
             </Field>
             <Field label={copy.endpointLabel} hideLabel className="sm:col-span-2" required>
               {(fp) => <Input {...fp} size="sm" dir="ltr" required disabled={connectionEditBlocked} type="url" placeholder={`${copy.endpointLabel} *`} value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="font-mono" />}
@@ -699,6 +742,10 @@ function RotationStatusCard({
   isDurable,
   onRevoke,
   onDismiss,
+  canUpdate,
+  abortReason,
+  onAbortReasonChange,
+  onAbort,
 }: {
   rotation: StorageCredentialRotationReceipt;
   lang: Lang;
@@ -706,6 +753,10 @@ function RotationStatusCard({
   isDurable: boolean;
   onRevoke: () => void;
   onDismiss: () => void;
+  canUpdate: boolean;
+  abortReason: string;
+  onAbortReasonChange: (reason: string) => void;
+  onAbort: () => void;
 }) {
   const copy = dict(lang);
   const [graceExpired, setGraceExpired] = useState(false);
@@ -722,7 +773,7 @@ function RotationStatusCard({
     }, remaining);
     return () => window.clearTimeout(timer);
   }, [rotation.graceExpiresAt]);
-  const canRevoke = rotation.status === "ACTIVATED" && graceExpired;
+  const canRevoke = canUpdate && rotation.status === "ACTIVATED" && graceExpired;
   return (
     <div className="mt-4 rounded-md border border-border bg-muted/40 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -735,10 +786,25 @@ function RotationStatusCard({
         <DatumRow label={copy.graceExpiresLabel} value={formatDate(rotation.graceExpiresAt, lang)} />
         {rotation.revokedAt && <DatumRow label={copy.revokedAtLabel} value={formatDate(rotation.revokedAt, lang)} />}
       </dl>
+      {rotation.status === "STAGED" && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs leading-5 text-muted-foreground">{copy.stagedRotationRecoveryNote}</p>
+          {canUpdate && (
+            <>
+              <Field label={copy.abortRotationReasonLabel} required>
+                {(fp) => <Input {...fp} size="sm" maxLength={500} value={abortReason} onChange={(event) => onAbortReasonChange(event.target.value)} disabled={isMutating} />}
+              </Field>
+              <Button type="button" variant="destructive" size="sm" onClick={onAbort} disabled={isMutating || !abortReason.trim()}>
+                {copy.abortRotationButton}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
       {rotation.status === "ACTIVATED" && (
         <>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            {isDurable ? copy.rotationReceiptKeptNote : copy.rotationReceiptVolatileWarning}
+            {copy.rotationServerRecoveryNote}
           </p>
           <Button
             type="button"

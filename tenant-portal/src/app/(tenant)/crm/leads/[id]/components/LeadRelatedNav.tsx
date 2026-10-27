@@ -7,7 +7,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import {
   LEAD_RELATED_KINDS,
-  LEAD_RELATED_ROUTES,
+  buildLeadRelatedHref,
   type LeadRelatedKind,
 } from "../lead-related-contract";
 import { useLeadRelatedCounts } from "../hooks/useLeadRelatedCounts";
@@ -29,7 +29,7 @@ const KPI_PILL_TONES: Record<LeadRelatedKind, string> = {
   invoices: "dossier-kpi-pill dossier-kpi-inv",
 };
 
-export interface LeadRelatedNavProps {
+interface LeadRelatedNavProps {
   leadId: string;
   /** The lead's own party — what a trade document is filed against. */
   partyId: string;
@@ -73,7 +73,7 @@ export function LeadRelatedNav({ leadId, partyId, branchId }: LeadRelatedNavProp
         return (
           <Link
             key={kind}
-            href={LEAD_RELATED_ROUTES[kind]}
+            href={buildLeadRelatedHref(kind, partyId)}
             className={cn(
               buttonVariantClasses("ghost", "sm"),
               KPI_PILL_TONES[kind],

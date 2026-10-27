@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useToast } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
+import { useCan, useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { coreDelete, coreGet, corePatch, corePost } from "../../../core-api";
@@ -34,8 +33,7 @@ const ROW_RESPONSE_LIMIT_BYTES = 20_000;
 export function useCurrencies() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("currencies.currency.manage") ?? false;
+  const canManage = useCan("currencies.currency.manage", { tenantWide: true });
 
   const [items, setItems] = useState<Currency[]>([]);
   const [total, setTotal] = useState(0);
@@ -75,6 +73,14 @@ export function useCurrencies() {
           },
         );
         const parsed = parseCurrenciesResponse(result.data);
+        if (signal?.aborted) return;
+        const lastPage = Math.max(1, Math.ceil(parsed.total / CURRENCY_PAGE_SIZE));
+        // Mutations can remove the final row on a filtered page. Changing the
+        // page triggers a fresh read with the same filters, search and sort.
+        if (page > lastPage) {
+          setPage(lastPage);
+          return;
+        }
         setItems(parsed.items);
         setTotal(parsed.total);
         setHasLoaded(true);
@@ -276,6 +282,12 @@ type Dictionary = ReturnType<typeof useI18n>["t"];
 /** One message per documented rejection — never a shared "operation failed". */
 function currencyMessage(code: string | undefined, t: Dictionary): string | undefined {
   switch (code) {
+    case "CURRENCY_DECIMAL_PLACES_IMMUTABLE":
+      return t.coreSettings.currencyDecimalPlacesImmutable;
+    case "CURRENCY_REBASE_OUT_OF_RANGE":
+      return t.coreSettings.currencyRebaseOutOfRange;
+    case "CURRENCY_NOT_FOUND":
+      return t.coreSettings.currencyNotFound;
     case CURRENCY_CODE_TAKEN_CODE:
       return t.coreSettings.currencyCodeTaken;
     case CURRENCY_CODE_INVALID_CODE:

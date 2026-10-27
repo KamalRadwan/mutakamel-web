@@ -21,6 +21,7 @@ vi.mock("@/i18n/I18nContext", () => ({
 }));
 
 import { TenantAccessPanel } from "./tenant-access-panel";
+import { tenantAccessCopy } from "../copy";
 import {
   BRANCH_ID,
   COMPANY_ID,
@@ -226,6 +227,32 @@ describe("TenantAccessPanel", () => {
     render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
     expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["en", userFixture({ status: "DEACTIVATED" })],
+    ["ar", userFixture({ status: "DEACTIVATED" })],
+    ["en", userFixture({ deletedAt: "2026-10-18T00:00:00.000Z" })],
+    ["ar", userFixture({ deletedAt: "2026-10-18T00:00:00.000Z" })],
+  ] as const)("explains unavailable recovery in %s", (locale, user) => {
+    state.controller = controller({ selectedUser: { status: "ready", data: user, error: null } });
+    const copy = tenantAccessCopy(locale);
+    render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" locale={locale} />);
+    const reset = screen.getByRole("button", { name: copy.resetPassword });
+    expect(reset).toBeDisabled();
+    expect(reset).toHaveAccessibleDescription(copy.resetPasswordUnavailable);
+    expect(screen.getByText(copy.resetPasswordUnavailable)).toBeVisible();
+    fireEvent.click(reset);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("does not expose recovery without the reset permission pair", () => {
+    state.controller = controller({
+      permissions: { ...controller().permissions, canResetPassword: false },
+      selectedUser: { status: "ready", data: userFixture(), error: null },
+    });
+    render(<TenantAccessPanel tenantId={TENANT_ID} tenantStatus="ACTIVE" />);
+    expect(screen.queryByRole("button", { name: "Send reset link" })).not.toBeInTheDocument();
   });
 
   it("associates invite labels and focuses the persistent validation summary", async () => {

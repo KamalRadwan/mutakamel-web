@@ -32,6 +32,7 @@ vi.mock("@/design-system", async () => ({
   ...(await import("@/design-system/patterns/error-state/ErrorState")),
   ...(await import("@/design-system/patterns/timeline/Timeline")),
   ...(await import("@/design-system/primitives/RatingStars")),
+  ...(await import("@/design-system/patterns/permission-gate/PermissionGate")),
 }));
 
 import { I18nProvider } from "@/i18n/I18nContext";
@@ -47,7 +48,7 @@ const ENTITY_ID = "01900100-0000-7000-8000-0000000000a1";
 
 function ledger(items: unknown[]) {
   // Core's envelope: the rows in `data`, the pager in a sibling `meta`.
-  return { data: { success: true, data: items, meta: { hasNext: false }, correlationId: "c" } };
+  return { data: { success: true, data: { items, nextCursor: null as string | null }, correlationId: "c" } };
 }
 
 const STAGE_CHANGE = {
@@ -111,7 +112,7 @@ describe("the history card", () => {
 
   it("discards an old load-more response after a successful save refresh", async () => {
     const first = ledger([STAGE_CHANGE]);
-    first.data.meta.hasNext = true;
+    first.data.data.nextCursor = "opaque-cursor";
     let resolveOld!: (result: ReturnType<typeof ledger>) => void;
     api.get.mockResolvedValueOnce(first)
       .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
@@ -214,7 +215,14 @@ describe("the history card", () => {
     expect(actor.parentElement).toBe(timestamp.parentElement);
   });
 
-  it("renders nothing at all without audit.read", async () => {
+  it.each(["audit.read.branch", "audit.read.own"])("loads history with %s", async (permission) => {
+    authMock.user.permissions = [permission];
+    renderCard();
+    await screen.findByText(STAGE_CHANGE.actorLabel);
+    expect(String(api.get.mock.calls[0][0])).not.toContain("page=");
+  });
+
+  it("renders nothing at all without any audit read permission", async () => {
     authMock.user = { permissions: [], isTenantOwner: false };
     const { container } = render(
       <I18nProvider>

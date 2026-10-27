@@ -18,6 +18,7 @@ import {
   Target,
   XCircle,
 } from "lucide-react";
+import { Button } from "@/design-system";
 import {
   readPreconditionCode,
   type MigrationPreconditionCode,
@@ -252,6 +253,8 @@ export const MIGRATIONS_COPY = {
     preconditionLint: "A migration in scope failed the safety linter.",
     preconditionBackup:
       "A pre-migration backup is missing for a forward-only migration.",
+    preconditionBackupRequired:
+      "A recent completed backup is required for every tenant in scope.",
     preconditionWindow:
       "The maintenance window is closed for this application.",
     preconditionClaim:
@@ -474,6 +477,8 @@ export const MIGRATIONS_COPY = {
     preconditionLint: "أحد الترحيلات في النطاق رسب في مدقق السلامة.",
     preconditionBackup:
       "نسخة احتياطية سابقة للترحيل مفقودة لترحيل أحادي الاتجاه.",
+    preconditionBackupRequired:
+      "يلزم وجود نسخة احتياطية مكتملة وحديثة لكل مستأجر في النطاق.",
     preconditionWindow: "نافذة الصيانة مغلقة لهذا التطبيق.",
     preconditionClaim:
       "عملية بنيوية أخرى تحتجز مستأجرًا في النطاق.",
@@ -614,7 +619,7 @@ export function MigrationChip({
         aria-hidden="true"
       />
       <span>{label}</span>
-      <code dir="ltr" className="font-mono text-2xs opacity-70">
+      <code dir="ltr" className="font-mono text-xs opacity-70">
         {code}
       </code>
     </span>
@@ -725,7 +730,7 @@ export function MigrationsHero({
   action?: ReactNode;
 }) {
   return (
-    <header className="rounded-lg border border-border bg-primary p-3 sm:p-3.5 text-primary-foreground shadow-sm">
+    <header className="rounded-lg border border-border bg-primary p-3 sm:p-3.5 text-primary-foreground">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="grid size-8 place-items-center rounded-lg bg-primary-foreground/15 text-primary-foreground">
@@ -770,7 +775,7 @@ export function MigrationsStatePanel({
   return (
     <section
       role={kind === "error" || kind === "forbidden" ? "alert" : "status"}
-      className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-border bg-card p-6 text-center shadow-sm"
+      className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-border bg-card p-6 text-center"
     >
       <Icon
         className={`mb-3 size-9 text-primary ${kind === "loading" ? "animate-spin motion-reduce:animate-none" : ""}`}
@@ -805,8 +810,10 @@ export function RefreshMigrationsButton({
   pending?: boolean;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       onClick={onClick}
       disabled={pending}
       className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-2.5 text-xs font-semibold text-primary disabled:opacity-50"
@@ -816,7 +823,7 @@ export function RefreshMigrationsButton({
         aria-hidden="true"
       />
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -918,6 +925,15 @@ export function MigrationMutationNotice({
         <p className="mt-1">{preconditionMessage(precondition, copy)}</p>
       ) : null}
       {mutation.error ? <p className="mt-1">{mutation.error.message}</p> : null}
+      {precondition && mutation.error?.details ? (
+        <ul className="mt-1 list-inside list-disc break-words">
+          {Object.entries(mutation.error.details).flatMap(([field, reasons]) =>
+            reasons.map((reason, index) => (
+              <li key={`${field}-${index}`}>{reason}</li>
+            )),
+          )}
+        </ul>
+      ) : null}
       {mutation.error?.errorCode ? (
         <code dir="ltr" className="mt-1 block break-all font-mono text-xs">
           {mutation.error.errorCode}
@@ -938,18 +954,14 @@ function preconditionMessage(
   copy: MigrationsCopy,
 ): string {
   return {
-    MIGRATION_RUN_ALREADY_ACTIVE: copy.preconditionRunActive,
-    MIGRATION_UNTESTED: copy.preconditionUntested,
-    MIGRATION_TEST_EXPIRED: copy.preconditionUntested,
-    MIGRATION_TEST_CHECKSUM_MISMATCH: copy.preconditionUntested,
-    MIGRATION_NOT_APPROVED: copy.preconditionUntested,
-    MIGRATION_BLOCKED: copy.preconditionBlocked,
-    MIGRATION_LINT_FAILED: copy.preconditionLint,
-    MIGRATION_BACKUP_REQUIRED: copy.preconditionBackup,
-    TENANT_CLAIM_HELD: copy.preconditionClaim,
-    TENANT_INELIGIBLE: copy.preconditionIneligible,
-    MAINTENANCE_WINDOW_CLOSED: copy.preconditionWindow,
-    BASELINE_AHEAD_OF_APPLICATION: copy.preconditionRunActive,
+    "WORKER.MIGRATION.RUN_ALREADY_ACTIVE": copy.preconditionRunActive,
+    "WORKER.MIGRATION.UNTESTED": copy.preconditionUntested,
+    "WORKER.MIGRATION.BLOCKED": copy.preconditionBlocked,
+    "WORKER.MIGRATION.LINT_FAILED": copy.preconditionLint,
+    "WORKER.MIGRATION.BACKUP_REQUIRED": copy.preconditionBackupRequired,
+    "WORKER.TENANT_CLAIM.HELD": copy.preconditionClaim,
+    "WORKER.MIGRATION.TENANT_INELIGIBLE": copy.preconditionIneligible,
+    "WORKER.MIGRATION.MAINTENANCE_WINDOW_CLOSED": copy.preconditionWindow,
   }[code];
 }
 
@@ -981,22 +993,26 @@ export function MigrationPager({
           : `Page ${page} of ${totalPages}`}
       </span>
       <div className="flex gap-1.5">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={page <= 1}
           onClick={() => onPageChange(Math.max(1, page - 1))}
           className="h-8 rounded-md border border-border px-2.5 text-xs font-semibold disabled:opacity-50"
         >
           {isArabic ? "السابق" : "Previous"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
           className="h-8 rounded-md border border-border px-2.5 text-xs font-semibold disabled:opacity-50"
         >
           {isArabic ? "التالي" : "Next"}
-        </button>
+        </Button>
       </div>
     </nav>
   );

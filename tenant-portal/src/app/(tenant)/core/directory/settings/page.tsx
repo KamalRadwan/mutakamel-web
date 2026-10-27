@@ -42,7 +42,7 @@ export default function DirectorySettingsPage() {
   return (
     <PermissionGate require={DIRECTORY_SETTINGS_PERMISSION}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.settingsTitle}
           description={copy.settingsSubtitle}
           breadcrumbs={[
@@ -158,16 +158,6 @@ export default function DirectorySettingsPage() {
                     inputMode="numeric"
                     value={values.maxAddressesPerParty}
                     onChange={(event) => change({ maxAddressesPerParty: event.target.value })}
-                    disabled={isSaving}
-                  />
-                </Field>
-
-                <Field label={copy.settingsCacheTtl} hint={copy.settingsCacheTtlHint}>
-                  <Input size="sm" placeholder={copy.settingsCacheTtl}
-                    dir="ltr"
-                    inputMode="numeric"
-                    value={values.partyCacheTtlSeconds}
-                    onChange={(event) => change({ partyCacheTtlSeconds: event.target.value })}
                     disabled={isSaving}
                   />
                 </Field>

@@ -3,7 +3,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TenantNotificationRuntimeStore,
+  refreshTenantNotifications,
   resyncTenantNotifications,
+  type TenantNotification,
 } from "./tenant-notification-runtime";
 
 const generation = "tenant:session:user";
@@ -12,6 +14,109 @@ describe("TenantNotificationRuntimeStore", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("invalidates queries on data changes and commands without changing recipient ordering", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const reload = vi.fn(async () => {});
+    const unsubscribe = store.subscribeInvalidation(reload);
+    const before = store.getSnapshot();
+    await store.invalidateQueries();
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot()).toBe(before);
+    store.setLoadState(generation, "loading");
+    store.setLoadState(generation, "ready");
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(store.applyCreated(generation, createdPayload())).toBe("applied");
+    expect(reload).toHaveBeenCalledTimes(2);
+    expect(store.applyCreated(generation, createdPayload())).toBe("duplicate");
+    expect(reload).toHaveBeenCalledTimes(2);
+    expect(store.applyUnreadCount(generation, 7, 1, "2026-10-17T12:00:00.000Z")).toBe("applied");
+    expect(reload).toHaveBeenCalledTimes(3);
+    unsubscribe();
+    await store.invalidateQueries();
+    expect(reload).toHaveBeenCalledTimes(3);
+  });
+
+  it("invalidates historical queries for recipient changes outside the bounded shell cache", () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const reload = vi.fn(async () => {});
+    store.subscribeInvalidation(reload);
+    const before = store.getSnapshot();
+    expect(store.applyUpdated(generation, {
+      notificationId: uuid(999), recipientId: uuid(2), change: "READ",
+      state: { readAt: "2026-10-17T12:00:00.000Z", acknowledgedAt: null, dismissedAt: null },
+      changedAt: "2026-10-17T12:00:00.000Z", recipientStateVersion: 1,
+    })).toBe("missing");
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot()).toBe(before);
+  });
+
+  it("shares REST hydration and exposes loading without changing the data revision", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const revision = store.getSnapshot().revision;
+    let resolve!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((done) => { resolve = done; })));
+
+    const first = refreshTenantNotifications(generation, null, store);
+    const second = refreshTenantNotifications(generation, null, store);
+    expect(first).toBe(second);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(store.getSnapshot()).toMatchObject({ loadState: "loading", revision, items: [] });
+
+    resolve(jsonResponse(page([restItem(1)], 7, null, false)));
+    await expect(first).resolves.toBe(true);
+    expect(store.getSnapshot()).toMatchObject({ loadState: "ready", unreadCount: 7 });
+    expect(store.getSnapshot().items).toHaveLength(1);
+  });
+
+  it("keeps failed hydration recoverable and preserves a previously loaded cache", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    mockFetch([{ invalid: true }, page([restItem(1)], 3, null, false), { invalid: true }]);
+
+    await expect(refreshTenantNotifications(generation, null, store)).rejects.toBeDefined();
+    expect(store.getSnapshot()).toMatchObject({ loadState: "error", items: [] });
+    await expect(refreshTenantNotifications(generation, null, store)).resolves.toBe(true);
+    const ready = store.getSnapshot();
+    await expect(refreshTenantNotifications(generation, null, store)).rejects.toBeDefined();
+    expect(store.getSnapshot()).toMatchObject({ loadState: "error", unreadCount: 3 });
+    expect(store.getSnapshot().items).toBe(ready.items);
+    expect(store.getSnapshot().revision).toBe(ready.revision);
+  });
+
+  it("does not publish a prior session's loading failure into a new session", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    let reject!: (error: Error) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((_resolve, fail) => { reject = fail; })));
+    const pending = refreshTenantNotifications(generation, null, store);
+    await vi.waitFor(() => expect(reject).toBeTypeOf("function"));
+    store.bindGeneration("tenant:other-session:other-user");
+    reject(new TypeError("Network unavailable"));
+    await expect(pending).rejects.toBeDefined();
+    expect(store.getSnapshot()).toMatchObject({ generation: "tenant:other-session:other-user", loadState: "idle", items: [] });
+  });
+
+  it("starts a fresh post-mutation reconciliation after an older REST request", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    let resolve!: (response: Response) => void;
+    const fetcher = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((done) => { resolve = done; }))
+      .mockResolvedValueOnce(jsonResponse({ ...page([], 0, null, false), unreadRevision: 2 }));
+    vi.stubGlobal("fetch", fetcher);
+    const initial = refreshTenantNotifications(generation, null, store);
+    const afterMutation = refreshTenantNotifications(generation, null, store, true);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    resolve(jsonResponse(page([restItem(1)], 1, null, false)));
+    await initial;
+    await expect(afterMutation).resolves.toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(store.getSnapshot()).toMatchObject({ loadState: "ready", unreadCount: 0, items: [] });
   });
 
   it("applies a delivery once and detects conflicting replay identities", () => {
@@ -80,6 +185,194 @@ describe("TenantNotificationRuntimeStore", () => {
     expect(store.getSnapshot().lastRealtimeCursor).toBe("stream-cursor-1");
   });
 
+  it.each([501, 2_000])(
+    "hydrates and reconnects a recent window from %i retained notifications",
+    async (total) => {
+      const store = new TenantNotificationRuntimeStore();
+      store.bindGeneration(generation);
+      const retained = Array.from({ length: total }, (_, index) =>
+        restItem(total - index),
+      );
+      const before = store.getSnapshot();
+      mockFetch(inboxPages(retained, total));
+      const listener = vi.fn();
+      const unsubscribe = store.subscribe(listener);
+
+      await expect(
+        resyncTenantNotifications(generation, "initial-cursor", store),
+      ).resolves.toBe(true);
+
+      expect(fetch).toHaveBeenCalledTimes(10);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(store.getSnapshot().revision).toBe(before.revision + 1);
+      expect(store.getSnapshot().items).toEqual(retained.slice(0, 500));
+      expect(store.getSnapshot().unreadCount).toBe(total);
+      expect(store.getUnreadOrderingRevision()).toBe(1);
+
+      const changedAt = "2026-08-14T10:05:00.000Z";
+      const reconnected = [
+        restItem(total + 1),
+        { ...retained[0], readAt: changedAt, recipientStateVersion: 1 },
+        ...retained.slice(1),
+      ];
+      mockFetch(inboxPages(reconnected, total, 2, changedAt));
+
+      await expect(
+        resyncTenantNotifications(generation, "reconnect-cursor", store),
+      ).resolves.toBe(true);
+
+      expect(fetch).toHaveBeenCalledTimes(10);
+      expect(listener).toHaveBeenCalledTimes(2);
+      expect(store.getSnapshot().items).toEqual(reconnected.slice(0, 500));
+      expect(store.getSnapshot()).toMatchObject({
+        unreadCount: total,
+        lastRealtimeCursor: "reconnect-cursor",
+      });
+      expect(store.getUnreadOrderingRevision()).toBe(2);
+      unsubscribe();
+    },
+  );
+
+  it("merges concurrent reads, dismissal, eviction and unread authority in a full window", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const initial = Array.from({ length: 500 }, (_, index) => restItem(500 - index));
+    store.replaceAfterResync(
+      generation, initial, 2_000, 1, "2026-08-14T10:00:00.000Z",
+      "initial-cursor", store.getSnapshot().revision,
+    );
+    const changedAt = "2026-08-14T10:05:00.000Z";
+    const created = {
+      ...createdPayload(),
+      notificationId: uuid(501),
+      recipientId: uuid(601),
+    };
+    const newItem = { ...restItemFromPayload(created), id: created.notificationId };
+    // Core has omitted the dismissed row. A stale read projection for the
+    // evicted tail must still receive the newer live read state on retry.
+    const recent = [newItem, initial[0], ...initial.slice(2)];
+    const responses = [
+      ...inboxPages(initial, 2_000),
+      ...inboxPages(recent, 2_000),
+    ];
+    let request = 0;
+    const fetcher = vi.fn(() => {
+      if (request === 0) {
+        for (const item of [initial[0], initial[499]]) {
+          expect(store.applyUpdated(generation, {
+            ...updatedPayload(1, changedAt),
+            notificationId: item.id,
+            recipientId: item.recipientId,
+          })).toBe("applied");
+        }
+        expect(store.applyCreated(generation, created)).toBe("applied");
+        expect(store.applyUpdated(generation, {
+          ...updatedPayload(1, changedAt, null),
+          notificationId: initial[1].id,
+          recipientId: initial[1].recipientId,
+          change: "DISMISSED",
+          state: { readAt: null, acknowledgedAt: null, dismissedAt: changedAt },
+        })).toBe("applied");
+        expect(store.applyUnreadCount(generation, 1_998, 2, changedAt)).toBe("applied");
+      }
+      return Promise.resolve(jsonResponse(responses[request++]));
+    });
+    vi.stubGlobal("fetch", fetcher);
+
+    await expect(
+      resyncTenantNotifications(generation, "resync-start", store),
+    ).resolves.toBe(true);
+
+    expect(fetcher).toHaveBeenCalledTimes(20);
+    expect(store.getSnapshot().items.map((item) => item.id)).toEqual(
+      recent.map((item) => item.id),
+    );
+    for (const id of [initial[0].id, initial[499].id]) {
+      expect(store.getSnapshot().items.find((item) => item.id === id)).toMatchObject({
+        readAt: changedAt,
+        recipientStateVersion: 1,
+      });
+    }
+    expect(store.getSnapshot().items.some((item) => item.id === initial[1].id)).toBe(false);
+    expect(store.getSnapshot()).toMatchObject({
+      unreadCount: 1_998,
+      lastRealtimeCursor: created.cursor,
+    });
+    expect(store.getUnreadOrderingRevision()).toBe(2);
+    expect(store.applyUnreadCount(generation, 2_000, 1, changedAt)).toBe("stale");
+    expect(store.applyUpdated(generation, {
+      ...updatedPayload(0, changedAt),
+      notificationId: initial[0].id,
+      recipientId: initial[0].recipientId,
+    })).toBe("stale");
+  });
+
+  it("does not require a delayed creation outside the recent REST window", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const recent = Array.from({ length: 500 }, (_, index) => restItem(2_000 - index));
+    const responses = inboxPages(recent, 2_000);
+    let request = 0;
+    vi.stubGlobal("fetch", vi.fn(() => {
+      if (request === 0) store.applyCreated(generation, createdPayload());
+      return Promise.resolve(jsonResponse(responses[request++ % 10]));
+    }));
+
+    await expect(
+      resyncTenantNotifications(generation, "resync-start", store),
+    ).resolves.toBe(true);
+
+    expect(fetch).toHaveBeenCalledTimes(20);
+    expect(store.getSnapshot().items).toEqual(recent);
+    expect(store.getSnapshot()).toMatchObject({
+      unreadCount: 2_000,
+      lastRealtimeCursor: "stream-cursor-1",
+    });
+  });
+
+  it("retries an advancing unread authority before publishing the window", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const items = Array.from({ length: 500 }, (_, index) => restItem(500 - index));
+    const changedAt = "2026-08-14T10:05:00.000Z";
+    const recent = [
+      { ...items[0], readAt: changedAt, recipientStateVersion: 1 },
+      ...items.slice(1),
+    ];
+    const initial = inboxPages(items, 2_000);
+    mockFetch([
+      initial[0],
+      { ...initial[1], unreadCount: 1_999, unreadRevision: 2, unreadChangedAt: changedAt },
+      ...inboxPages(recent, 1_999, 2, changedAt),
+    ]);
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+
+    await expect(resyncTenantNotifications(generation, null, store)).resolves.toBe(true);
+
+    expect(fetch).toHaveBeenCalledTimes(12);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().items).toEqual(recent);
+    expect(store.getSnapshot().unreadCount).toBe(1_999);
+    expect(store.getUnreadOrderingRevision()).toBe(2);
+    unsubscribe();
+  });
+
+  it("rejects conflicting unread authority at the same revision across pages", async () => {
+    const store = new TenantNotificationRuntimeStore();
+    store.bindGeneration(generation);
+    const before = store.getSnapshot();
+    mockFetch([
+      page([restItem(2)], 2_000, "page-2", true),
+      page([restItem(1)], 1_999, "page-3", true),
+    ]);
+
+    await expect(resyncTenantNotifications(generation, null, store)).rejects.toThrow(
+      "Notification unread authority changed during resync.",
+    );
+    expect(store.getSnapshot()).toBe(before);
+  });
+
   it("cannot apply an async resync across an authentication generation", async () => {
     const store = new TenantNotificationRuntimeStore();
     store.bindGeneration(generation);
@@ -91,9 +384,11 @@ describe("TenantNotificationRuntimeStore", () => {
     const pending = resyncTenantNotifications(generation, null, store);
     await vi.waitFor(() => expect(resolveResponse).toBeTypeOf("function"));
     store.bindGeneration("tenant:other-session:other-user");
-    resolveResponse?.(jsonResponse(page([], 0, null, false)));
+    // An obsolete response is ignored before validation or another page read.
+    resolveResponse?.(jsonResponse({ invalid: true }));
 
     await expect(pending).resolves.toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot()).toMatchObject({
       generation: "tenant:other-session:other-user",
       items: [],
@@ -515,6 +810,19 @@ function page(
     nextCursor,
     hasNext,
   };
+}
+
+function inboxPages(
+  items: readonly TenantNotification[],
+  unreadCount: number,
+  unreadRevision = 1,
+  unreadChangedAt = "2026-08-14T10:00:00.000Z",
+) {
+  return Array.from({ length: 10 }, (_, index) => ({
+    ...page(items.slice(index * 50, (index + 1) * 50), unreadCount, `page-${index + 2}`, true),
+    unreadRevision,
+    unreadChangedAt,
+  }));
 }
 
 function restItem(suffix: number) {

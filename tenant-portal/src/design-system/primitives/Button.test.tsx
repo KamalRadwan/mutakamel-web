@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Button } from "./Button";
+import { Button, buttonVariantClasses } from "./Button";
 
 afterEach(cleanup);
 
@@ -39,5 +39,33 @@ describe("Button", () => {
     );
     const link = screen.getByRole("link", { name: "Go to leads" });
     expect(link.querySelector("svg")).toBeNull();
+  });
+
+  it("renders the primary variant with bg-gradient-primary, text-white, and token hover states", () => {
+    render(<Button variant="primary">New Lead</Button>);
+    const button = screen.getByRole("button", { name: "New Lead" });
+
+    expect(button).toHaveClass(
+      "bg-gradient-primary",
+      "text-white",
+      "not-disabled:hover:brightness-90",
+      "not-disabled:hover:shadow-pop",
+      "focus-visible:ring-2",
+    );
+    expect(button.className).not.toMatch(/purple|violet|indigo|fuchsia|pink/);
+  });
+
+  it("supports the 33px toolbar control size step", () => {
+    render(<Button size="toolbar">Filter</Button>);
+    const button = screen.getByRole("button", { name: "Filter" });
+
+    expect(button).toHaveClass(
+      "h-(--size-toolbar-control)",
+      "rounded-lg",
+      "text-label",
+      "font-bold",
+    );
+    expect(button).not.toHaveClass("rounded-md", "font-medium");
+    expect(buttonVariantClasses("outline", "toolbar")).toContain("h-(--size-toolbar-control)");
   });
 });

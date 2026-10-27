@@ -42,6 +42,7 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [targetSearchError, setTargetSearchError] = useState<NormalizedApiError | null>(null);
 
   const resourcePath = dashboardPath(dashboardId);
   // Defect D9. Neither read was ordered or cancelled, so moving from one
@@ -53,6 +54,7 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
   const sharesRequestRef = useRef<AbortController | null>(null);
   const targetsEpochRef = useRef(0);
   const targetsRequestRef = useRef<AbortController | null>(null);
+  const targetSearchRef = useRef("");
 
   useEffect(
     () => () => {
@@ -107,6 +109,7 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
   }, [load]);
 
   const searchTargets = async (search: string): Promise<void> => {
+    targetSearchRef.current = search;
     const epoch = targetsEpochRef.current + 1;
     targetsEpochRef.current = epoch;
     targetsRequestRef.current?.abort();
@@ -116,6 +119,7 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
     }
     const controller = new AbortController();
     targetsRequestRef.current = controller;
+    setTargetSearchError(null);
     try {
       const response = await axiosClient.get<unknown>(
         `${DASHBOARD_SHARE_TARGETS_PATH}${shareTargetsQuery(search, 0)}`,
@@ -124,15 +128,21 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
       const parsed = parseShareTargetsResponse(response.data).items;
       if (epoch !== targetsEpochRef.current) return;
       setTargets(parsed);
+      setTargetSearchError(null);
     } catch (caught) {
       // A failed target search leaves the picker empty rather than failing the
       // panel: the existing shares are a separate, already-loaded source. A
       // superseded one leaves it alone entirely.
       if (isAbortError(caught) || epoch !== targetsEpochRef.current) return;
       setTargets([]);
+      setTargetSearchError(normalizeApiError(caught));
     } finally {
       if (epoch === targetsEpochRef.current) targetsRequestRef.current = null;
     }
+  };
+
+  const retrySearchTargets = (): void => {
+    void searchTargets(targetSearchRef.current);
   };
 
   const share = async (input: {
@@ -179,7 +189,19 @@ export function useDashboardShares(dashboardId: string, enabled: boolean) {
     }
   };
 
-  return { shares, targets, isLoading, isSubmitting, error, searchTargets, share, revoke, reload: load };
+  return {
+    shares,
+    targets,
+    isLoading,
+    isSubmitting,
+    error,
+    targetSearchError,
+    searchTargets,
+    retrySearchTargets,
+    share,
+    revoke,
+    reload: load,
+  };
 }
 
 function isAbortError(error: unknown): boolean {

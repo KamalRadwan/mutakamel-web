@@ -21,7 +21,10 @@ const profile = (id: string, fullName = "Saly Essam"): UserContactProfile => ({ 
 beforeEach(() => {
   vi.clearAllMocks();
   auth.user = { id: ME, firstName: "Kamal", lastName: "Radwan", email: "kamal@example.com", isTenantOwner: false,
-    status: "ACTIVE", permissions: ["users.user.read"], accessibleBranches: [], accessibleCompanies: [], teamMemberships: [] };
+    status: "ACTIVE", permissions: ["users.user.read"], permissionScopes: {
+      "users.user.read": { tenantWide: true, companyIds: [], branchIds: [] },
+    }, accessibleBranches: [], accessibleCompanies: [], accessibleBranchCompanies: [], teamMemberships: [],
+    accessScope: { mode: "EXPLICIT", branchesTruncated: false, companiesTruncated: false, teamMembershipsTruncated: false, teamMembershipsTotal: 0 } };
   auth.realtimeAuthGeneration = "session-1";
   read.mockImplementation(async (id: string) => profile(id));
 });

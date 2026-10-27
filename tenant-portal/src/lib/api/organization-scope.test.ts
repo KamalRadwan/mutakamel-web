@@ -65,10 +65,11 @@ describe("organization scope resolver", () => {
     });
   });
 
-  it("pairs a branch with its owning company from team memberships", () => {
+  it("pairs a branch only with its mapped owning company", () => {
     const source = {
       accessibleBranches: [BRANCH, OTHER_BRANCH],
       accessibleCompanies: [COMPANY],
+      accessibleBranchCompanies: [{ branchId: BRANCH, companyId: COMPANY }],
       teamMemberships: [
         { companyId: COMPANY, branchId: BRANCH, isPrimary: true },
         { companyId: COMPANY, branchId: null, isPrimary: false },
@@ -85,6 +86,7 @@ describe("authoritative branch company scope", () => {
   const source = {
     accessibleBranches: [BRANCH],
     accessibleCompanies: [COMPANY, OTHER_COMPANY],
+    accessibleBranchCompanies: [],
     teamMemberships: [{ companyId: OTHER_COMPANY, branchId: BRANCH, isPrimary: true }],
   };
 
@@ -103,8 +105,8 @@ describe("authoritative branch company scope", () => {
     }, BRANCH)).toBe(COMPANY);
   });
 
-  it("uses legacy memberships only when the map is absent", () => {
-    expect(resolveCompanyForBranch(source, BRANCH)).toBe(OTHER_COMPANY);
+  it("never substitutes memberships for an empty or absent ownership map", () => {
+    expect(resolveCompanyForBranch({ ...source, accessibleBranchCompanies: undefined } as unknown as TenantScopeSource, BRANCH)).toBeNull();
     expect(resolveCompanyForBranch({ ...source, accessibleBranchCompanies: [] }, BRANCH)).toBeNull();
   });
 
@@ -118,6 +120,7 @@ describe("authoritative branch company scope", () => {
   });
 
   it.each([
+    { name: "absent map", mapping: undefined },
     { name: "null map", mapping: null },
     { name: "object instead of array", mapping: { branchId: BRANCH, companyId: COMPANY } },
     { name: "null entry", mapping: [null] },
@@ -204,11 +207,11 @@ describe("route inventory coverage", () => {
     expect([...declared].sort()).toEqual([...declared].filter((mode) => HANDLED.includes(mode as OrganizationScopeMode)).sort());
   });
 
-  it("still covers 84 scope-carrying routes across all three apps", () => {
+  it("still covers 89 scope-carrying routes across all three apps", () => {
     const scoped = routes.filter(
       (route) => route.organizationScopeMode && route.organizationScopeMode !== "NONE",
     );
-    expect(scoped).toHaveLength(84);
+    expect(scoped).toHaveLength(89);
     // L4-3's point: this is not a CRM-only concern.
     expect(new Set(scoped.map((route) => route.app))).toEqual(new Set(["core", "crm", "trade"]));
   });

@@ -198,17 +198,29 @@ export function parseChannelResponse(payload: unknown): Channel {
   };
 }
 
-/**
- * `GET /channels` answers a **bare array**, not `{ items, total, page, limit }`.
- *
- * `CatalogService.listChannels` returns the repository `find()` result
- * directly, ordered `createdAt DESC`, with no pagination of any kind. A
- * generic list adapter reads `undefined` here, which is why this has its own
- * parser and its own screen-level "everything is on one page" pager.
- */
-export function parseChannelListResponse(payload: unknown): Channel[] {
-  if (!Array.isArray(payload)) invalidResponse();
-  return payload.map(parseChannelResponse);
+export interface ChannelPage {
+  items: Channel[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** CatalogService.listChannels: createdAt DESC, id DESC; max 100 rows. */
+export function parseChannelListResponse(payload: unknown): ChannelPage {
+  const page = record(payload);
+  if (!page || !Array.isArray(page.items) ||
+      !Number.isSafeInteger(page.total) || (page.total as number) < 0 ||
+      !Number.isSafeInteger(page.page) || (page.page as number) < 1 ||
+      !Number.isSafeInteger(page.limit) || (page.limit as number) < 1 ||
+      (page.limit as number) > 100 || page.items.length > (page.limit as number)) {
+    invalidResponse();
+  }
+  return {
+    items: page.items.map(parseChannelResponse),
+    total: page.total as number,
+    page: page.page as number,
+    limit: page.limit as number,
+  };
 }
 
 function parseChannelBranchResponse(payload: unknown): ChannelBranch {

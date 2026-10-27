@@ -20,7 +20,7 @@ vi.mock("@/context/AuthContext", () => ({
 }));
 vi.mock("./trade-api", async (importOriginal) => ({
   ...await importOriginal<typeof import("./trade-api")>(),
-  tradeGet: vi.fn().mockResolvedValue({ data: [] }),
+  tradeGet: vi.fn().mockResolvedValue({ data: { items: [], total: 0, page: 1, limit: 100 } }),
 }));
 
 function ScopeSnapshot() {

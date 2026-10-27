@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import {
+  Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -15,12 +16,12 @@ import type { CrmFormErrors } from "../../../shared/hooks/useCrmCreateForm";
 import { LEAD_CREATE_LIMITS, type CreateLeadForm } from "../../lead-create-contract";
 import { LeadFieldGuide } from "./LeadFieldGuide";
 
-export type LeadQualificationField =
+type LeadQualificationField =
   | "description"
   | "interestSummary"
   | "expectedNeed";
 
-export interface LeadQualificationSectionProps {
+interface LeadQualificationSectionProps {
   form: CreateLeadForm;
   errors: CrmFormErrors;
   disabled: boolean;
@@ -56,31 +57,33 @@ export function LeadQualificationSection({
   return (
     <section
       data-form-section="qualification"
-      className="relative overflow-hidden rounded-xl border border-violet-500/20 bg-card shadow-xs transition-colors dark:border-violet-400/20"
+      className="relative overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors"
     >
-      {/* Top 3px Violet-Indigo accent bar */}
+      {/* Top 3px accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-violet-500 via-indigo-500 to-purple-500"
+        className="h-1 w-full bg-primary"
       />
 
       <Collapsible open={isOpen} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             tabIndex={0}
-            className="flex w-full cursor-pointer items-center justify-between gap-3 border-b border-border/60 bg-violet-500/[0.03] px-4 py-3 text-start transition-colors hover:bg-violet-500/[0.06] dark:bg-violet-500/[0.06]"
+            className="flex h-auto w-full cursor-pointer items-center justify-between gap-3 rounded-none border-b border-border/60 bg-muted/20 px-4 py-3 text-start transition-colors hover:bg-muted/40"
           >
             <div className="flex items-center gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-violet-500/25 bg-violet-500/10 text-violet-600 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
                 <Sparkles className="size-4" aria-hidden="true" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-foreground">
+                  <span className="text-sm font-semibold text-foreground">
                     {t.crmLeads.create.sections.qualification}
                   </span>
-                  <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+                  <span className="rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                     {t.crmLeads.create.optionalBadge}
                   </span>
                 </div>
@@ -97,15 +100,15 @@ export function LeadQualificationSection({
               )}
               aria-hidden="true"
             />
-          </button>
+          </Button>
         </CollapsibleTrigger>
 
         <CollapsibleContent>
           <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
             {/* Interest Summary */}
             <div className="relative">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.interestSummary.length}/{limits.interestSummary}
                 </span>
                 <LeadFieldGuide field="interestSummary" />
@@ -131,8 +134,8 @@ export function LeadQualificationSection({
 
             {/* Expected Need */}
             <div className="relative">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.expectedNeed.length}/{limits.expectedNeed}
                 </span>
                 <LeadFieldGuide field="expectedNeed" />
@@ -158,8 +161,8 @@ export function LeadQualificationSection({
 
             {/* Internal Qualification Notes (full width) */}
             <div className="relative md:col-span-2">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.description.length}/{limits.description}
                 </span>
                 <LeadFieldGuide field="description" />

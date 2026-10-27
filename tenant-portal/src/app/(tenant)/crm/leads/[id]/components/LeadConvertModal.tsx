@@ -9,6 +9,11 @@ import {
   Input,
   RadioGroup,
   RadioGroupItem,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Switch,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -27,7 +32,7 @@ export function LeadConvertModal({ convert }: { convert: LeadConvertState }) {
   const describeError = useCrmErrorText();
   const { form, lead, result, errors } = convert;
   const disabled = convert.locked || convert.reviewing;
-  const primary = lead?.contacts.find(({ isPrimary }) => isPrimary);
+  const primary = convert.primaryContact;
   const serverError = convert.error?.code
     ? t.crmLeadConvert.serverErrors[convert.error.code as keyof typeof t.crmLeadConvert.serverErrors]
     : undefined;
@@ -52,21 +57,35 @@ export function LeadConvertModal({ convert }: { convert: LeadConvertState }) {
         <>
           {convert.reviewing && <p role="status" className="text-xs text-muted-foreground">{t.crmLeadConvert.reviewDescription}</p>}
           <FormSection id="profile" title={t.crmLeadConvert.steps.profile}>
-            <Field label={t.crmLeadConvert.profileType} hint={t.crmLeadConvert.profileTypeFixed} error={errors.profileType}>
-              <Input size="sm" placeholder={t.crmLeadConvert.profileType} readOnly value={t.crmCustomerProfiles.profileTypes[form.profileType]} />
+            <Field label={t.crmLeadConvert.profileType} showLabel required hint={t.crmLeadConvert.targetTypeHint} error={errors.profileType}>
+              <Select value={form.profileType} disabled={disabled}
+                onValueChange={(value) => { if (value === "INDIVIDUAL" || value === "CORPORATE") convert.setField("profileType", value); }}>
+                <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
+                <SelectContent>{(["INDIVIDUAL", "CORPORATE"] as const).map((type) => (
+                  <SelectItem key={type} value={type}>{t.crmCustomerProfiles.profileTypes[type]}</SelectItem>
+                ))}</SelectContent>
+              </Select>
             </Field>
-            <Field label={t.crmLeads.name} hint={t.crmLeadConvert.nameFallback} error={errors.displayName}>
+            <Field label={t.crmLeads.name} showLabel required={convert.createsOrganization && !form.companyName.trim()}
+              hint={convert.createsOrganization ? t.crmLeadConvert.newCompanyNameHint
+                : convert.usesContactPerson ? t.crmLeadConvert.contactNameFallback : t.crmLeadConvert.nameFallback} error={errors.displayName}>
               <Input size="sm" placeholder={t.crmLeads.name} value={form.displayName} maxLength={180} disabled={disabled}
+                onBlur={() => { convert.validate(); }}
                 onChange={(event) => convert.setField("displayName", event.target.value)} />
             </Field>
-            {form.profileType === "CORPORATE" && <Field label={t.crmLeads.companyName} hint={t.crmLeadConvert.nameFallback} error={errors.companyName}>
+            {form.profileType === "CORPORATE" && <Field label={t.crmLeads.companyName} showLabel
+              required={convert.createsOrganization && !form.displayName.trim()}
+              hint={convert.createsOrganization ? t.crmLeadConvert.newCompanyNameHint : t.crmLeadConvert.nameFallback} error={errors.companyName}>
               <Input size="sm" placeholder={t.crmLeads.companyName} value={form.companyName} maxLength={180} disabled={disabled}
+                onBlur={() => { convert.validate(); }}
                 onChange={(event) => convert.setField("companyName", event.target.value)} />
             </Field>}
           </FormSection>
           <FormSection id="contact" title={t.crmLeadConvert.steps.contact}>
             <p className="text-xs text-muted-foreground md:col-span-2">
-              {form.profileType === "INDIVIDUAL" ? t.crmLeadConvert.individualContact
+              {convert.usesContactPerson ? (primary ? t.crmLeadConvert.individualFromContact + ": " + primary.displayName
+                  : t.crmLeadConvert.serverErrors.LEAD_CONVERSION_CONTACT_REQUIRED)
+                : lead.leadProfileType === "INDIVIDUAL" ? t.crmLeadConvert.individualContact
                 : primary ? t.crmLeadConvert.existingContact + ": " + primary.displayName : t.crmLeadConvert.noPrimaryContact}
             </p>
             {form.profileType === "CORPORATE" && <>

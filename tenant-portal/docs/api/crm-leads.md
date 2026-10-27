@@ -2,14 +2,116 @@
 
 Status: **verified**
 
-Last source verification: **2026-10-16**
+Optimistic lead edits source-reviewed: **2026-10-26** (CRM-LEADS-027).
+`PATCH /api/tenant/crm/v1/leads/:id` accepts optional `expectedUpdatedAt`: the
+loaded lead's `updatedAt`, as an ISO timestamp with timezone and at most three
+fractional digits. The server compares at millisecond precision inside the
+update transaction. A stale timestamp returns `409 CRM.LEAD.CONCURRENT_UPDATE`
+before any related writes; both languages instruct the user to reload before
+saving again. Omission retains last-write-wins and contacts still replace the
+whole set. Detail drafts retain their opening timestamp across refreshes.
+Contact-list actions that preflight a fresh list send that read's timestamp,
+protecting the gap between the preflight and the replacement PATCH.
 
-Contact detail/write contract re-verified: **2026-09-07** (scoped update below).
+Detail conflict recovery source-reviewed: **2026-10-26** (AUD26-FE-TENANT-04).
+Rating/colour, details, individual contacts and company edits automatically
+reload the lead after `CRM.LEAD.CONCURRENT_UPDATE` or HTTP 409 and retain the
+existing translated conflict notice. Details and contact drafts are discarded;
+the user re-applies changes against the refreshed timestamp. Company saves
+stay blocked until the user closes and reopens the editor after the fresh
+read, discarding its old draft. Closing/reopening before the read completes
+cannot unlock a stale retry. Other definite failures keep their drafts.
+Conflict notices also use a persistent, dismissible translated warning toast
+with a **Refresh lead** action wired to the same reconciliation read:
+the automatic reload unmounts the cards and company modal, so an inline error
+alone would disappear before the user could read it.
+
+Quick-edit custom-field preservation source-reviewed: **2026-10-24**
+(AUD24-FE-TENANT-01). Failed or malformed custom-field value reads are tracked
+separately from definition failures. Quick-edit omits custom-field controls and
+writes until values have loaded successfully for the current record; unrelated
+qualification edits remain available. Successful reads submit only edited fields
+whose values differ from the loaded values, including intentional text clears.
+
+Lead existence handling source-reviewed: **2026-10-18** (CRM-LEADS-026).
+After route admission, missing, deleted and out-of-scope leads all return
+`404 LEAD_NOT_FOUND` from detail, tag and mutation routes. Bulk operations also
+conceal record scope with that 404 and retain the submitted `details.leadId`.
+`useLeadDetail` clears any previously loaded record and the detail workspace
+renders the same Arabic/English `NotFoundState`, with a link back to Leads and
+no retry. Route-level and dataset permission failures retain 403 and their
+permission boundaries; a lead-detail 404 never explains record scope.
+
+Shared lead reads source-reviewed: **2026-10-18** (FE-LEADS-044).
+Detail, quick-edit, contact-modal preflights/readbacks and Board cards use
+`leads/lead-requests.ts`'s `fetchLeadDetail`, which validates the requested
+lead ID and keeps optional card-field failures separate from lead detail.
+Stage setup, the Leads workspace (including board catalogue refresh), detail
+and CRM settings reference labels use
+`shared/lead-stage-catalogue.ts`'s `readLeadStageCatalogue`. Both helpers own
+their no-store request, abort signal, response limit and runtime validation;
+callers retain their loading, error and stage-degradation behavior.
+
+Shared lead UI helpers source-reviewed: **2026-10-18** (FE-LEADS-042).
+Detail, quick-edit and Card avatars use `leadNameInitials`, preserving Unicode
+characters and the `LD` empty-name fallback. Card/Table countries resolve
+through `leadCountryIso`; unknown names have no guessed country code.
+Quick-edit phone flags come from the country catalogue, with a globe for
+calling codes shared by multiple countries. Lead rating parsers and controls
+share the CRM rating range and star sequence. Card colors use the design-system
+catalogue and border tokens, preserving all eleven distinct swatches on Board
+cards. Lead and stage API base paths live in their respective contracts.
+
+Phone validation source-reviewed: **2026-10-18** (CRM-LEADS-017).
+Supplied lead phone numbers require at least five digits after normalization
+(formatting removed, an initial `00` replaced by `+`). `abc`, `1` and `001234`
+return `422 LEAD_PHONE_INVALID`; create/edit phone-array validation mirrors
+this rule with Arabic/English field feedback. Blank form rows remain optional
+and are omitted from requests.
+
+Disabled-action accessibility source-reviewed: **2026-10-18** (FE-LEADS-024).
+Disabled lead stage controls remain keyboard-focusable and include the reason
+in their accessible name; activation cannot open a stage change. Lead-stage
+setup actions retain native disabled buttons inside named, focusable wrappers
+that announce the action, stage and reason and expose the same tooltip on focus.
+Card/table rating stars have translated names. Read-only table phones render
+as text, with an em dash for a missing phone rather than an Add phone action.
+
+Search-body cleanup source-reviewed: **2026-10-18** (CRM-LEADS-DEAD-006).
+All lead search bodies reject `withDeleted`, `relations`, `select` and
+`addSelect` with HTTP 400. List search accepts sorting and pagination;
+the initial board accepts sorting and a fixed limit of 50, with no `page`.
+Stage board reads retain `page` for loading more. KPI requests contain only
+search predicates and reject `sort`, `page` and `limit`. Portal builders omit
+these unsupported options while preserving Basic/Advanced filters and presets.
+
+Last source verification: **2026-10-26** (board/grid card-face reconciliation).
+
+Owner-decision alignment source-reviewed: **2026-10-17** (DOCS-FE-001).
+Planned items below describe decisions still absent from the current code.
+
+Contact detail/write contract re-verified: **2026-10-17** (scoped update below).
+
+Lead contact-name projection source-reviewed: **2026-10-18**
+(CRM-LEADS-DEAD-003). List, search and board rows use the lead's own
+`primaryContact.displayName` for corporate contact headings and fallbacks.
+There is no separate `primaryContactName` field or organization-contact
+fallback on leads. A missing lead contact leaves the contact heading empty.
+Customer-profile contracts and consumers keep their existing field.
+
+Lead input cleanup source-reviewed: **2026-10-18** (CRM-LEADS-DEAD-002, D-025).
+Create uses `phones`, `companyPhones`, `contacts[].phones` and
+`contacts[].honorificTitle`; singular phone aliases and contact `title` are
+rejected. Create/update addresses use `state`, `street1` and `street2`, with
+Street 2 as the sole suite/apartment input. There is no separate `apartment`
+form field. Detail responses retain Directory names (`area`, `street`,
+`apartment`), and editors send those values back through the canonical keys.
+`primaryMobile` remains supported on update only.
 
 Basic search GET/POST, semantic text scopes, Tag, owner filtering and pagination
 re-verified: **2026-09-16**.
 
-Board/Card/Table projections verified: **2026-10-16** (board lanes carry the list row; Card and Table are built on the design-system `CardView`/`TableView`). Card bulk document counts verified: **2026-09-16**.
+Board/grid card faces verified: **2026-10-26** against [CRM Leads v3](../design/specs/crm-leads-v3.md). Board/Card/Table projections verified: **2026-10-16** (board lanes carry the list row; Card and Table are built on the design-system `CardView`/`TableView`). Card bulk document counts verified: **2026-09-16**.
 
 Related quotation/sales-order count scope re-verified: **2026-09-14**.
 
@@ -31,6 +133,16 @@ it needs `x-mutakamel-company-id` and `x-mutakamel-branch-id` as well as the
 `branchId` query parameter. Without them `RouteContextMiddleware` answers
 `400 GW.REQUEST.INVALID` before crm-app sees the request, which reads exactly
 like "no capabilities" and is not a permission answer.
+
+Capability response budget source-reviewed: **2026-10-18** (CXCRM-PLAT-102).
+The current response carries ten action boundaries, each supporting up to 500
+owner UUIDs. All consumers of `/leads/capabilities` (list, create, detail, and
+attached records) use a shared finite limit of **211,384 bytes**: ten actions ×
+500 owners × 39 JSON bytes per UUID, plus 16 KiB for structure. The transport
+rejects larger UTF-8 bodies with `API_RESPONSE_TOO_LARGE`; the capability parser
+also rejects owner arrays above 500. Valid 200- and 500-owner teams retain
+their action boundaries. The existing wire shape is retained without a package
+release; unavailable actions remain `null`.
 
 The company header comes from `/auth/me.accessibleBranchCompanies`, with
 branch-specific team memberships used only when an older Core response omits
@@ -94,6 +206,37 @@ KPIs, the duplicate check and the three bulk routes,
 `@RequireBranchAccess('query')` on the list and both option routes,
 `@RequireRecordBranchAccess('LEAD')` on every `:id` route.
 
+## Idempotency headers on lead update and delete
+
+Source-reviewed **2026-10-18** (FE-LEADS-031): `PATCH /leads/:id` and
+`DELETE /leads/:id` are `WRITE_SENSITIVE` with `idempotent: false` in the
+Gateway CRM route contract. Sending `x-idempotency-key` on these routes is
+accepted, but supplies no Gateway deduplication or replay guarantee.
+
+`GatewayIdempotencyService.reserve` returns `undefined` for these routes
+before reading or validating the header or accessing the idempotency store.
+The proxy therefore has no reservation to replay, commit or release, and
+`UpstreamClientService.maxAttempts` permits only one upstream attempt for
+these route policies, regardless of the supplied key. The header is still
+forwarded upstream and may be recorded as bounded Gateway audit metadata;
+it is ignored for Gateway idempotency, rather than stripped from the request.
+
+The calls in `useLeadContactsEdit.ts`, `useLeadContactModal.ts` and
+`lead-detail-workspace.tsx` retain `runIdempotentWrite` for outcome
+classification. They reconcile ambiguous or applied-but-unreadable results
+through a lead read instead of offering a same-key replay. The helper name
+and the presence of a key do not make these routes replayable. The separate
+lead create and conversion contracts retain their idempotency policies.
+
+Evidence: Gateway `src/routing-proxy/route-contracts/crm.route-contracts.ts`,
+`src/idempotency/gateway-idempotency.service.ts`,
+`src/routing-proxy/routing-proxy.controller.ts`,
+`src/routing-proxy/upstream-client.service.ts` and
+`src/common/middleware/gateway-audit.middleware.ts`. Existing
+`gateway-idempotency.service.spec.ts` covers the non-idempotent route bypass;
+the three callers' specs cover reconciliation after uncertain outcomes.
+This confirmation is based on source and spec review; checks were not run.
+
 ## GET /leads — list
 
 Query (`LeadsQueryDto extends BranchListQueryDto extends PaginationQueryDto`):
@@ -136,10 +279,24 @@ column's More button does not reload another stage. Both routes accept the same
 basic/advanced filter body as `/leads/search`; the server adds each lane's
 stage constraint after scoped access.
 
-Board cards include identity/type, stage, `stageEnteredAt`, owner, rating,
+If the active stage catalogue changes while the Board is open, the client
+reloads `/lead-stages` and retries the board read once against the current
+stage ids. The refreshed catalogue also replaces the displayed lane axis.
+
+Source reviewed **2026-10-17** (CRM-LEADS-029): search, board, board-stage and
+KPI bodies accept the optional boolean `hasOverdueActivity`. True selects leads
+with at least one open Core activity (`PLANNED` or `IN_PROGRESS`) targeting the
+lead and due before `now()`; false selects leads without one, and omission
+applies no activity filter. Strings and numbers are rejected by DTO validation.
+Completed, cancelled, deleted, undated and future activities do not match.
+The server applies this predicate before counts and pagination, ANDed with all
+branch, owner, text, tag and advanced filters; multiple activities count one lead.
+
+Board rows include identity/type, stage, `stageEnteredAt`, owner, rating,
 colour, next activity, primary-contact name and tags. `stageEnteredAt` (on every
-lead shape since 2026-10-14) is when the lead entered its current stage; the
-stage-age badges on board and card count from it, never from `updatedAt`. Each tag is `{ id, name, backgroundColor,
+lead shape since 2026-10-14) is when the lead entered its current stage;
+board and grid card faces no longer display time-in-stage. Stage age remains
+available on lead and opportunity detail pages. Each tag is `{ id, name, backgroundColor,
 textColor }` — the colour pair is upper-case `#RRGGBB` or both `null`
 (2026-09-24, [catalogues](crm-catalogues.md#tags)). They also carry the address,
 primary-contact details, email and phone aggregates of the list row. Card and
@@ -151,25 +308,41 @@ when the user selects a stage.
 Body: the `POST /leads/search` body (`buildLeadBoardRequest` builds it; the
 backend ignores `sort`, `page` and `limit`). Response
 `{ totalLeads, newStageLeads, newTodayLeads, hotLeads, overdueActivityLeads,
-qualifiedLeads, byStage: [{ stageId, total, hot, overdue }] }` over **every**
+qualifiedLeads }` over **every**
 lead the filters and scoped read access select — not the loaded page. "Today"
-and "overdue" are civil dates in the tenant zone, the rule
-`nextActivity.bucket` follows. `useLeadKpis` reads it after every search and
-data revision, keyed on the serialized body. Until the first answer, and after a
-failed read, `LeadKpiStrip` renders nothing: it never counts the loaded rows.
+uses the tenant's civil date. "Overdue" uses `due_at < now()`, including earlier
+today, matching `hasOverdueActivity: true`; the card's display classification
+follows [decision 9](../design/specs/crm-leads-v3.md), using a parseable
+`activityAt` before the server `bucket`. `useLeadKpis` reads it after every search and
+data revision, keyed on the serialized body. The strip displays an unknown count
+and disables its filter buttons when no KPI response is available; it never
+substitutes counts of loaded rows.
 Parser: `parseLeadKpisResponse` (`lead-bulk-contract.ts`).
 
-Re-verified **2026-10-16**. The strip filters on the server only. **Total**,
-**New** and **Qualified** are toggles that set or clear the Basic search's
-`stageFlag` filter (`NEW`, `QUALIFIED`), so the list, the board and the figures
-re-query together. **Rated 3 stars** and **Overdue activity** are figures only:
-the list has no rating-preset or overdue filter, and a toggle that narrowed only
-the loaded rows while its count described the whole pipeline was removed — see
-[Q140](../build/OPEN-QUESTIONS.md#q140--kpi-presets-filter-only-the-loaded-rows).
-The Card/Table stage bar (`LeadStageFunnelBar`, the design-system `StageBar`)
-takes its per-stage counts from `byStage`. With no stage chosen, a stage absent
-from `byStage` shows 0. Once a stage is chosen, the other stages and the "every
-stage" total show no count, because the search no longer covers them.
+Re-verified **2026-10-17** against `page.tsx`, `LeadKpiStrip`,
+`LeadStageFunnelBar`, `LeadSearchDto` and `LeadInsightsService`. All four
+filterable presets send server predicates before counting and pagination:
+New uses `stageFlag = NEW`, Rated 3 stars uses `rating = 3`, and Qualified uses
+`stageFlag = QUALIFIED`; Overdue activity sends `hasOverdueActivity: true`.
+They are ANDed with the existing Basic or submitted
+Advanced search, including its owner, text and tag filters. Basic uses POST
+search while a preset is active; board and stage paging use the same compiler.
+Selecting a preset resets list paging to one. Selecting Total or pressing the
+active pill again removes only the preset. An Advanced draft stays unapplied
+when selecting a pill. The strip counts the base search without the preset,
+so each pill's count describes the result total obtained by selecting it.
+
+**CRM-LEADS-029 (2026-10-17):** Overdue activity uses the same localized,
+keyboard-operable toggle button and pressed state as the other pills. It
+retains its filter in Card/Table paging and board-stage More reads. Selecting
+Total or pressing the active pill clears it. The stage funnel still counts
+its supplied rows.
+
+**Source-reviewed 2026-10-18 — D-027, CRM-LEADS-DEAD-014:** the KPI response
+and parser expose only the six headline counts above. The backend aggregates
+them directly without grouping by stage. For per-stage server counts, use board
+lane totals. List rows do not supply `contactsCount`; the list parser and card
+do not read or display an additional-contact count.
 
 ## POST /leads/document-counts — Card view counters (2026-10-14)
 
@@ -197,11 +370,10 @@ Directory's `duplicate_scope`. `displayName` is `null` for a Party of another
 branch and `leads` holds only leads the user may read; `restricted` says that
 something was withheld. `useLeadDuplicateCheck` sends it 500 ms after typing
 stops, skips it when the form reuses an existing company, and swallows
-failures — the warning never blocks saving. `CreateLeadsModal` lists the
-matches under the existing company-name suggestion (`LeadDuplicateWarnings`).
-The page mounts the modal only while it is open (2026-10-16), so the duplicate
-check, the company, custom-field, tag and acquisition-source reads all belong to
-an actual create. The modal's logic lives in `useCreateLeadModal`.
+failures — the warning never blocks saving. `CreateLeadsModal` renders the
+matches inline under the existing company-name suggestion. The page mounts the
+modal only while it is open (2026-10-16), so the duplicate check, the company,
+custom-field, tag and acquisition-source reads all belong to an actual create.
 
 ## Bulk actions — POST /leads/bulk-stage · bulk-update · bulk-delete (2026-10-14)
 
@@ -210,15 +382,23 @@ least one of `rating`, `ownerUserId`, `cardColor` (`null` clears),
 `acquisitionSourceId` (`null` clears) (bulk-update). Responses
 `{ stageId, updatedIds, unchangedIds }`, `{ updatedIds, unchangedIds }`,
 `{ deletedIds }`. Each request is **all or nothing**: the first refused lead —
-`404 LEAD_NOT_FOUND`, `403 CRM_SCOPED_PERMISSION_DENIED`,
+`404 LEAD_NOT_FOUND` (including records outside branch/owner scope),
 `409 LEAD_ALREADY_CONVERTED` — rolls the batch back and is named in
 `details.leadId`. `useLeads` pre-filters the selection by the capabilities it
-read, sends one request per 100 ids (`leadIdBatches`), and refetches the list
+read, excludes converted-stage leads from bulk field updates, sends one request
+per 100 ids (`leadIdBatches`), and refetches the list
 whatever the outcome. The Card/Table bar (`LeadBulkActionsBar`, the
 design-system `BulkActionBar`) offers Move stage (never to `CONVERTED`), Set
 rating and Delete. Each one opens a `BulkConfirmDialog` that names the selection
 size and holds the stage or rating picker. `useLeadsWorkspaceBulk` clears the
 selection only after a successful write (2026-10-16).
+
+Converted-lead controls reviewed **2026-10-17**: Board/Card/Table stars,
+colour and inline phone fields are read-only for converted-stage leads, and
+single-lead field writers refuse those records before sending a request. Detail
+stage controls also remain disabled after conversion. Bulk failures include the
+server's `details.leadId` in the displayed error so a record converted since the
+last read can be identified.
 
 ## GET /leads/capabilities
 
@@ -256,6 +436,12 @@ Body: `CreateLeadDto` (`crm-app/src/crm/leads/dto/lead.dto.ts`). Must include
 the branch, since `@RequireBranchAccess('body')` reads it from the payload.
 
 Success `201` with the created lead. Errors: `409` conflict, `422` validation.
+
+**Planned — D-022, CRM-LEADS-023:** reject creation into a `DISQUALIFIED`
+stage and conversion of a disqualified lead. The current create service rejects
+`CONVERTED` with `LEAD_CONVERSION_REQUIRED`, but does not reject
+`DISQUALIFIED`; conversion likewise has no disqualified-state guard. These are
+decided preconditions, not enforced guarantees or new error codes yet.
 
 `forbidNonWhitelisted` is on — send only documented keys.
 
@@ -318,12 +504,14 @@ Both of those are terminal and require confirmation before the request — see
 
 ## POST /leads/:id/convert
 
-Verified 2026-09-18 against all conversion DTO classes in
+Conversion target types re-verified **2026-10-17** against the conversion DTOs,
+`LeadsService.convert` and LLD `06_leads.md` (CRM-LEADS-002 / FE-LEADS-046).
+Other conversion fields verified 2026-09-18 against all conversion DTO classes in
 `crm-app/src/crm/leads/dto/lead.dto.ts`, the complete `LeadsService.convert`
 transaction and its validation/helpers, `PartyDirectoryAdapter`, scoped owner
 assignment, and Gateway `crm.route-contracts.ts`.
 
-Promotes the lead's existing Party to a customer profile. Qualification is
+Creates or links a customer profile for the selected target Party. Qualification is
 required only when tenant settings enable `requireQualifiedStageForConversion`;
 the server remains the authority for that condition.
 
@@ -354,9 +542,10 @@ status before displaying the receipt links.
 
 | Field | DTO / service contract |
 | --- | --- |
-| `profileType` | Required `INDIVIDUAL \| CORPORATE`; must match the lead's existing Party type |
-| `displayName`, `companyName` | Optional non-empty strings, max 180; omission retains the existing name/fallback |
-| `primaryContact` | Optional nested **new person**, not an existing-contact update |
+| `profileType` | Required `INDIVIDUAL \| CORPORATE`; defaults to the lead type, and the modal allows either target |
+| `displayName`, `companyName` | Optional non-empty strings, max 180; a new corporate destination requires at least one nonblank name. `companyName` is corporate-only; omitted `displayName` preserves the selected existing Party's name |
+| `legalName` | Optional corporate-only string/null, max 180; never inferred from company/display name. The modal omits it |
+| `primaryContact` | Corporate target only; optional nested **new person**, not an existing-contact update |
 | `createOpportunity` | Optional strict boolean |
 | `keepLead` | Optional strict boolean; omission preserves the previous behavior (`true`). The portal asks and sends the choice explicitly |
 | `opportunity` | Required when the switch is true; forbidden when it is false/omitted |
@@ -374,10 +563,11 @@ status before displaying the receipt links.
 | `contactMethods[].value` | Required non-empty string, max 255 |
 | `contactMethods[].label` | Optional string, max 80 |
 
-For a corporate lead, omitting `primaryContact` reuses its existing primary
-contact if present. Supplying it **creates another person and relationship**.
+For a corporate target, omitting `primaryContact` reuses the lead's existing primary
+contact if present, or the original person when creating a company from an individual.
+Supplying it **creates another person and relationship**.
 The modal defaults that toggle off and never prefills company identity as a
-person. An individual uses its own Party as its contact and sends no nested
+person. An individual target uses the selected person as its contact and sends no nested
 `primaryContact`. Duplicate methods are checked using the adapter's
 normalization, including an email repeated in the email field and method list.
 
@@ -404,7 +594,8 @@ requires the independent `opportunities.create` capability returned with
 assignment and branch eligibility.
 
 Reference reads: `GET /pipelines` requires `crm.pipelines.read`.
-Owner options use branch-visible ACTIVE users from Core `GET /users`
+The conversion modal's optional opportunity owner options still use
+branch-visible ACTIVE users from Core `GET /users`
 (`users.user.read`, page/limit 100, all pages), narrowed by the creation
 capability's owner IDs. The active authenticated actor can also be a verified
 candidate. Missing directory permission does not invent names or raw-ID inputs;
@@ -412,13 +603,36 @@ inheritance remains available. Custom fields reuse the shared create definition
 reader and wait for its request; unavailable definitions show a degraded
 notice, with the server retaining required-field authority.
 
-### Conversion cannot change a Party from a person into an organization
+**Planned — D-015:** migrate this remaining conversion opportunity-owner
+picker to `GET /api/tenant/crm/v1/assignable-owners` with
+`resource=opportunities&action=create&branchId=...`, without `users.user.read`.
+This is distinct from the lead create/update pickers already migrated below.
 
-The service passes the lead's existing `partyId` to
-`PartyDirectoryAdapter.ensureParty`. A mismatched type produces
-**409 PARTY_TYPE_IMMUTABLE**. The modal displays a read-only profile type.
-A genuine individual-to-company promotion would require a new organization and
-relationship; that is not part of this operation.
+### Target profile type and Party identity
+
+The modal defaults to the lead's type and offers both Individual and Company.
+Switching types clears destination name fields and turns off new-contact creation;
+switching back restores the source names. Fields are disabled during review or
+an unresolved write, preserving the reviewed request and idempotency key.
+
+- **INDIVIDUAL → CORPORATE:** creates a new organization, even if the person is
+  already linked to companies. The user must explicitly enter a company name or
+  display name; both are checked client-side for nonblank content and the existing
+  180-character limit. The original person becomes a contact on the new company;
+  personal phones, email and addresses stay on the person. The optional new-contact
+  toggle can create a different primary person while retaining the original as a
+  secondary contact.
+- **CORPORATE → INDIVIDUAL:** uses this lead's existing primary contact mapping.
+  The dialog names that person and blocks review if no primary contact is mapped;
+  the user must select one on the lead before converting. The backend checks that
+  the selected Party is an active person in this branch or shared across branches.
+  An omitted display name preserves that person's name. Company fields and a new
+  primary contact are never sent for this target.
+
+Existing Party types, company relationships and the lead's original `partyId` and
+`leadProfileType` remain unchanged. If the selected destination already has a live
+customer profile in the lead branch, the backend links it. The returned customer
+profile ID identifies the destination in every case.
 
 ### Writes and failures
 
@@ -436,10 +650,17 @@ customer profile, Party contact relationships and opportunity remain. A later
 `DELETE /leads/:id` of a retained converted lead likewise deletes only the
 Lead aggregate; it never cascades into the converted customer or Party.
 
-Errors include 403 scoped access/owner denial, 404 missing lead, 409
-`LEAD_ALREADY_CONVERTED` / `PARTY_TYPE_IMMUTABLE`, and 422 conversion,
+Errors include 404 `LEAD_NOT_FOUND` for missing, deleted or out-of-scope leads
+(including insufficient delete scope with `keepLead: false`), 403 for independent
+checks such as Directory edit authority or opportunity-create scope, 409
+`LEAD_ALREADY_CONVERTED`, and 422 conversion,
 contact-name, pipeline-stage, nested-opportunity or required-custom-field
 validation. Preserve the draft on a definite rejection and refresh on conflict.
+The modal maps `LEAD_CONVERSION_COMPANY_NAME_REQUIRED`,
+`LEAD_CONVERSION_CONTACT_REQUIRED`, `LEAD_CONVERSION_CONTACT_INVALID`,
+`LEAD_CONVERSION_INDIVIDUAL_FIELDS_INVALID` and `PARTY_NOT_FOUND` to Arabic and
+English messages rather than displaying raw backend text. The backend remains
+authoritative when a contact becomes invalid after the lead was loaded.
 An uncertain outcome freezes the body/key even across modal close/reopen and
 offers explicit same-request retry plus refresh. Applied-but-unreadable 2xx
 permits refresh, never another write. See the
@@ -463,10 +684,19 @@ Delete is a **soft delete**, returns **`204` with no body** (`404`, `409`).
 Deleting a converted lead does not delete its Party, customer profile, contact
 relationships, or converted opportunity.
 
+### Detail-page deletion (2026-10-17)
+
+A definite delete rejection (including 409) keeps the confirmation open with
+localized CRM error text and allows retry or cancel. An uncertain or
+applied-but-unreadable outcome closes the confirmation, shows a persistent
+localized notice that deletion could not be confirmed, and reloads the lead;
+no automatic delete retry is sent. A successful delete closes the dialog and
+uses client router navigation to `/crm/leads`.
+
 ### Contacts on the One Lead screen
 
 Source: `crm-app/src/crm/leads/dto/lead.dto.ts`, the lead detail read model,
-`LeadsService.update` and `PartyDirectoryAdapter`. Verified 2026-09-07.
+`LeadsService.update` and `PartyDirectoryAdapter`. Verified 2026-10-17.
 
 `GET /leads/:id` returns `contacts[]` with `partyId`, `relationshipId`,
 `displayName`, `firstName`, `lastName`, `honorificTitle`, `jobTitle`,
@@ -481,6 +711,23 @@ each existing person is identified by `contactPartyId` (the read model's
 and `isPrimary` for each person. All people and untouched job titles must remain
 in the list; an empty job title clears the relationship label. Exactly one
 contact is selected as primary by this editor. It does not add/remove people.
+
+The detail card's **Set Primary** and **Add Contact** actions use
+`useLeadContactModal` and the builders in `contact-modal-contract.ts`, with no
+separate component-owned writer. Both read the latest lead before replacing
+its contacts, retaining all current people and untouched relationship titles.
+Set Primary sends only `contactPartyId`, `jobTitle` and `isPrimary` for each
+existing person. Add Contact appends one new row using `fullName` (or a name
+composed from first/last name), supported identity fields, email and phones;
+the new row has no `contactPartyId`. Neither action sends the response keys
+`partyId`, `displayName` or `relationshipId` in the replacement payload.
+The first contact is primary automatically; choosing a new primary clears the
+other primary flags. The add form validates CRM's name, email and phone limits.
+Both actions require update capability and an unconverted corporate lead.
+Confirmed saves use the validated PATCH response. Definite failures retain
+the add draft; uncertain or applied-but-unreadable outcomes discard that
+submitted draft and block further actions until an explicit Retry reads the
+lead again, preventing accidental duplicate person creation.
 
 When `contactPartyId` is supplied, identity/contact inputs do **not** update
 that existing person. Omitting the ID takes the create-person path and must
@@ -506,6 +753,19 @@ before retrying after any applied or uncertain operation. A fresh lead read
 before the relationship replacement preserves other contact rows. Re-read
 the lead after completion; never simulate a successful response.
 
+Quick-edit contact saves use these same Core write builders (verified
+2026-10-17). Existing-person name/email/phone changes require the three
+Directory grants; job-title and primary relationship changes still use CRM
+without those grants. Method IDs are read before saving, unchanged phone
+methods keep their IDs/types, and unrelated method types are preserved. The
+handler reads the latest lead before replacing relationships and uses only
+existing `contactPartyId` rows for existing people. Add Contact sends a new
+person without a client-generated Party ID. Quick edit ends contact edit mode
+only after a validated lead reload, displaying the server's saved values.
+Definite write failures retain the draft; partial, uncertain and unreadable
+results retire the submitted draft and show the existing Retry/Close read
+boundary. Retry reads current data without replaying writes.
+
 For an individual lead, the same card PATCHes only changed supported fields:
 `displayName` (nonempty, max 180), `firstName`/`lastName` (max 80),
 `honorificTitle` (max 40), `email` (max 180) and `phones` (max 10 strings,
@@ -518,11 +778,20 @@ Both profile types require the lead update capability and a non-converted lead.
 The editor sends no request on cancel/no change, keeps drafts on definite
 failure, and re-reads after an uncertain or applied-but-unreadable result rather
 than presenting simulated success or retrying with a fresh write automatically.
+The corporate quick editor validates a non-empty company email before building
+the PATCH and keeps the draft visible with a localized field error when invalid;
+it does not update the displayed detail as if the value had been saved.
 
 ## One Lead Details editor
 
 Verified 2026-09-07 against `UpdateLeadDto`, Lead detail/tags read models,
 Core tenant-users controller/service and Gateway route contracts.
+
+Owner write validation source-reviewed **2026-10-17** (CRM-LEADS-010): create
+and update reject explicit `ownerUserId: null` with HTTP 400. Supply a UUIDv7
+to assign an owner or omit the field to retain the default/current owner.
+The quick editor offers owner assignments without an Unassigned action;
+an empty owner draft sends no owner change.
 
 The Details card PATCHes only changed `acquisitionSourceId`, `ownerUserId`,
 `interestSummary`, `expectedNeed` and `description`. Created by, creation date
@@ -539,29 +808,107 @@ The one-lead page no longer mounts its standalone notes-ledger card; Notes in
 Details remains `description`. This removes no stored ledger notes and makes
 no notes-ledger create/delete call.
 
-`GET /api/tenant/crm/v1/leads/:id/tags` supplies the read-only tags — full
+`GET /api/tenant/crm/v1/leads/:id/tags` supplies the attached tags — full
 catalogue items, `{ id, name, backgroundColor, textColor, createdAt, updatedAt }`
 (re-verified 2026-09-24, see [catalogues](crm-catalogues.md#tags)).
+The backend permits attach/detach through the standalone tag routes under scoped
+`crm.leads.update` even after conversion (D-024, CRM-LEADS-014); this is an
+exception to the converted-lead field lock. The current detail tag controls use
+the Details editor's `editable` gate, which still excludes converted leads.
+**Planned — D-024:** separate that tag gate so converted leads with update
+access can attach/detach tags in the portal too.
 Owner/creator names use the authenticated actor when IDs match; otherwise
-`GET /api/tenant/core/v1/users/:id` requires `users.user.read`. The owner picker
-uses the same permission-gated `/users` list filtered by branch and ACTIVE
-status, paginated fully, then narrowed to the CRM update capability's owner IDs
-(`null` means all, not an empty list). Neither user response exposes an avatar
-URL; use initials until a real image contract exists. A missing permission or
+`GET /api/tenant/core/v1/users/:id` requires `users.user.read`. Lead owner pickers
+were re-verified **2026-10-17** against the Gateway route contract and CRM's
+`AssignableOwnersController`, DTO and service. Full create uses
+`GET /api/tenant/crm/v1/assignable-owners?resource=leads&action=create&branchId=...`;
+detail and quick-edit reassignment use `action=update`. These reads require the
+corresponding CRM capability, without `users.user.read`. CRM supplies active,
+branch-eligible CRM users within that action's owner scope. The raw response is
+`{ items: [{ id, displayName, avatarUrl }], nextCursor }`; readers follow every
+cursor with the same branch/resource/action, validate every page, and fail the
+whole read on a malformed or failed page. Display names remain intact; the
+existing picker renders initials rather than requesting avatars. Reassignment
+also narrows candidates to the loaded update capability's owner IDs (`null`
+means all). It never adds the actor when CRM omitted them. Aborted branch
+responses cannot replace current candidates. A missing permission or
 failed request must not invent names or impersonate the current actor.
+
+Scope handling source-reviewed **2026-10-17** (CLXAPP-124): full-create,
+bulk reassignment and detail owner lookups wait for
+`useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId).ready`. Every cursor
+request carries both `x-mutakamel-company-id` and `x-mutakamel-branch-id`,
+resolved for the same branch as the query. A branch query alone does not
+satisfy the Gateway's scope policy; unresolved scope sends no owner request.
 
 ## Company options
 
-For linking a corporate lead to an existing organization party:
+Full-create scope re-verified **2026-10-17** (FE-LEADS-007): opening the modal
+loads `GET /leads/capabilities?branchId=...` for each accessible branch, with
+that branch's company/branch headers. Only branches with non-null
+`leads.create` appear in the branch choices. The requested branch is retained
+when allowed; otherwise the first permitted branch is selected. The selected
+branch's CRM assignable owners are additionally filtered by
+`leads.create.ownerUserIds` (`null` permits all returned candidates). The actor
+is the default only when present in these candidates; no synthetic owner is
+added. Changing branch clears the explicit owner selection. Submission waits
+for an allowed branch and owner, and sends the displayed branch and owner.
+Closing/reopening or changing the actor discards old capability answers;
+aborted owner reads cannot repopulate a new scope. Capability denials render a
+scope boundary when no branch is allowed; failed or malformed reads show
+degradation and never grant create access.
 
-- `GET /leads/company-options?branchId=` → `[{ id, displayName, legalName, branchId }]`
+Verified **2026-10-17** (CRM-PARTY-001). For linking a corporate lead to an
+existing organization party:
+
+- `GET /leads/company-options?branchId=&search=&limit=50` → `[{ id, displayName, legalName, branchId }]`
 - `GET /leads/company-options/:companyPartyId/contacts?branchId=` → active
   contact people for that party
+
+The company-options query accepts optional `search` (trimmed, max 180 characters)
+and `limit` (integer 1-50, default 50). It returns at most fifty active,
+non-deleted organizations in the branch or with a tenant-wide NULL branch,
+ordered by case-insensitive display name and ID. Search is a case-insensitive
+literal substring of display, legal or organization name, applied before the
+SQL limit. The raw array carries no total. Full create and board quick-create
+use the shared hook's 300 ms debounced server search, discard aborted results,
+and retain the selected company label across searches. Type a name to find a
+company outside the initial fifty; the new-company route stays available.
+The contacts route is unchanged.
 
 Both require `crm.leads.create`. Both are Gateway-exposed (previously
 documented otherwise — that was wrong).
 
+**Planned — D-028, FE-LEADS-038:** board quick-create must leave a new
+corporate contact's name empty until entered by the user. The current
+`page.tsx` quick-create adapter still substitutes `payload.companyName` for
+an omitted contact first name. Do not describe that fallback as an entered
+contact identity.
+
 ## Frontend notes
+
+### Shared notes and attachments read admission (verified 2026-10-18)
+
+`RecordNotesSection` and `RecordAttachmentsSection` check `crm.notes.read` and
+`crm.attachments.read` respectively through the scoped `PermissionGate` before
+mounting their data hooks. Missing read grants show the standard localized
+permission-missing state and send no list request. The gate accepts the existing
+`own`, `team` and `all` suffixes using `hasPermission(..., true)`. A list request
+that returns 403 after this admission still renders `CrmScopeGate` to explain
+record scope. This shared behavior also applies to customer and opportunity
+screens; write capabilities do not substitute for a read grant.
+
+### Per-note action admission (source-verified 2026-10-17)
+
+CRM note list rows and create/update receipts include required boolean `canEdit`
+and `canDelete` fields. The server combines the matching note route permission
+in the stored branch with authorship or source-resource `update.all` moderation
+(CRM-NOTES-002). Source reassignment does not transfer authorship. Missing authors
+require moderation. Forbidden checks produce false flags; lookup failures remain
+errors. The portal validates both fields and shows Edit/Delete only from those
+flags, subject to its existing read-only boundary. Creation still uses the
+source-owner create capability; no `notes.update` capability is added. This
+shared section serves lead, customer-profile and opportunity screens.
 
 ### One Lead side-panel contract (2026-09-07)
 
@@ -602,6 +949,10 @@ Lead GET/PATCH DTO or add another main-column attachments section.
   cap. Preserve source-owner create/delete capabilities and read-only access
   mode; no permission is granted by selecting a tab. The queued upload and
   ambiguous/applied-unreadable evidence survive tab switches.
+- The quick-edit Notes and Attachments sections use read-only access mode and
+  converted-record state for their `readOnly` boundary. Their create/delete
+  controls use the source-owner capabilities for creation and attachment deletion;
+  existing note edit/delete controls use the per-note response flags above.
 - Download uses same-origin navigation to
   `GET /api/tenant/crm/v1/attachments/:id/download`; its attachment stream is
   handled by the browser with session cookies, not the JSON transport. No
@@ -616,6 +967,109 @@ described in [the activity template](../design/patterns.md#the-activity-template
 
 ### Existing lead integration
 
+- **Lead UI copy (2026-10-18, FE-LEADS-021):** the executive Board, Card and
+  Table views, quick editor, bulk actions, stage funnel and detail identity/company
+  cards resolve their formerly inline Arabic/English labels, accessible names,
+  validation messages and interpolated counts from `crmLeads` in both dictionaries. Tenant-authored stage
+  and source names still use the localized data helpers. The quick editor uses
+  the shared explicit date locales, including Western digits in Arabic.
+
+- **User-facing copy (2026-10-18, FE-LEADS-041):** the detail dossier status
+  uses the existing Arabic/English `LeadStatus` labels rather than the wire
+  enum. Board and Card views omit the former implementation captions and
+  unsupported undo promise; no static card-density caption is shown.
+
+- **Quick-edit write feedback (2026-10-17):** inline updates and single-lead
+  stage moves return an explicit outcome and normalized API error. The modal
+  renders translated failures in its own alert, keeps rejected section drafts
+  open, and restores rejected rating, card colour and stage changes. Writes are
+  serialized so a pending optimistic value cannot become another write's
+  rollback baseline. Late outcomes from a previous lead/branch do not alter the
+  new selection. Successful stage changes stay in the editor without replacing
+  the selected list row and restarting its detail read. Unknown outcomes retain
+  the hooks' existing reconciliation reads and are never treated as success.
+
+- **Detail stage control (2026-10-17):** the detail workspace renders one
+  visible stage track, with no additional hidden stage control. Selecting a
+  destination opens the workspace's confirmation before moving. The track
+  remains disabled without update access, while moving, and for converted
+  records; current and converted destinations are disabled too.
+
+- **Disabled action accessibility (2026-10-18):** rating stars in Card and
+  Table views have localized names that include the lead and target rating.
+  Disabled stage-track destinations remain keyboard-focusable with a localized
+  reason in their accessible name. Disabled lead-stage management controls use
+  a focusable tooltip trigger so protected-stage and terminal-stage reasons are
+  reachable without a pointer. Read-only phone cells render as text rather than
+  an inert edit affordance.
+  Table stage actions also remain keyboard-focusable when updates are unavailable
+  or the lead is converted, announce a localized reason, and refuse activation.
+
+- **Quick-edit conversion admission (2026-10-17):** Convert appears only when
+  the convert capability allows the loaded lead's owner, access mode permits
+  writes, and the lead is not converted. Update access does not grant conversion.
+  The CTA opens the conversion modal; denied conversion has no fallback CTA
+  navigating to the detail page.
+
+- **Branch read denial (2026-10-17):** a 403 from Card/Table list/search or
+  the active Board read renders `CrmScopeGate`, without a retryable load error
+  or supporting-source degradation banners. The branch picker remains available
+  so the member can select another branch. A capabilities 403 leaves all action
+  capabilities unavailable without an outage banner; network/server failures
+  and invalid capability responses still show the degradation notice.
+
+- **Bulk assignment and rating (2026-10-17):** the selected-lead bar reads all
+  CRM assignable-owner pages for `resource=leads&action=update` and intersects
+  them with a freshly loaded `update.ownerUserIds` boundary (`null` means all).
+  Loading, empty and failed reads disable assignment; reopening the selection
+  retries. Selecting a salesperson sends `bulkUpdateLeads(ids, { ownerUserId })`
+  for selected visible leads, with the existing write hook excluding converted
+  leads and rechecking source-owner access. Successful assignment refreshes the
+  views and clears selection; failure preserves selection and reports the error.
+  Rating is labelled "Set rating"; the unsupported campaign control is removed.
+
+- **Card toolbar bulk actions (2026-10-17):** card selection feeds the page's
+  `LeadBulkActionsBar`, whose update/delete controls use eligible selected leads
+  on the visible page. The card toolbar contains selection, CSV export and sort
+  controls; it has no duplicate stage-move, salesperson or tag write controls,
+  and no selection action opens only the first lead's quick editor.
+- **Stage move menus (2026-10-17):** card view and both collapsed and expanded
+  board cards supply move targets and the move callback only when the branch
+  update capability allows updating that lead and its stage is not `CONVERTED`.
+  An own-scope user sees no move items on another representative's card;
+  converted cards also have no move items, matching the board's drag gate.
+- **Quick-edit detail boundary (2026-10-17):** the modal shows its editor only
+  after `GET /leads/:id` passes runtime validation for the requested lead. It
+  never synthesizes writable detail or a contact replacement list from a list
+  row's primary-contact summary. Loading exposes only close; failed reads,
+  including malformed responses, expose retry and close without any write
+  controls. A 403 uses the permission boundary. Retry re-reads the detail, and
+  navigating to another lead or branch removes the previous editor immediately;
+  aborted requests cannot supply stale detail to the next lead. Conversion hook
+  state survives reloads, preserving its receipt when the detail read recovers.
+- **Bulk delete (2026-10-17):** the list bulk bar opens the existing destructive
+  confirmation before sending a request. The bar and dialog show the number of
+  selected leads that are on the current visible page and allowed by the
+  branch's delete capability, the total selection and the skipped count.
+  Cancel sends nothing. Confirm sends only those eligible IDs to the existing
+  branch-scoped bulk-delete route; the write hook rechecks owner access.
+  Completion reports skipped leads in a localized toast. Selection clears only
+  after all delete batches succeed, or when page, branch, search, sort or the
+  KPI preset changes. A failed delete retains selection and confirmation;
+  earlier successful batches may still have applied, so the existing reload on
+  failure remains. Changing the result scope dismisses a stale confirmation,
+  and an older in-flight delete cannot clear a new scope's selection.
+- **Phone actions (2026-10-17):** the board, card, table, quick-edit phone pills
+  and detail cards use `LeadPhoneActionsRow`, backed by
+  `lead-phone-links.ts`. WhatsApp and Telegram use the same international
+  digits: local numbers take the lead's country calling code (ISO code or
+  Arabic/English country name from the country catalogue), removing leading
+  local trunk zeros. Explicit `+`/`00` international numbers keep their supplied
+  calling code and national digits, regardless of the lead's country. A local
+  number without a recognized country has no chat links; calling keeps the
+  stored local number. Empty/non-numeric numbers have no actions. Compact icons
+  and labelled pills share the same links and localized accessible names, and
+  activating them does not open the surrounding lead card.
 - One Lead's History combines Lead + current company/person Party + current
   contact Parties through the existing Core history endpoint's bounded
   `relatedPartyIds` query. It uses IDs already in the detail response; no
@@ -656,24 +1110,40 @@ described in [the activity template](../design/patterns.md#the-activity-template
   navigates there.
 - Card and Table are the design-system `CardView` and `TableView` (compact
   density, server paging and sorting by `createdAt` or `displayName`), with
-  row selection feeding the bulk bar. Selecting rows also shows a
-  **Download CSV** action (`useLeadTableViewExport`): the file is built in the
-  browser from the selected rows of the current page only — there is no lead
-  export route.
+  row selection feeding the bulk bar. The Card toolbar also has a CSV action.
+  Source reviewed **2026-10-17** (CRM-PERM-001): the card export requires
+  `crm.leads.export` and is disabled without selected visible rows. It exports
+  only those rows, never the unselected page or off-page IDs; there is no lead
+  export route. A UTF-8 BOM preserves Arabic. Every header and data cell uses
+  the CSV escaping helper shared with customer and opportunity exports: quotes
+  are doubled and spreadsheet formula prefixes (`=`, `+`, `-`, `@`, tab, CR
+  and LF, including after whitespace) receive an apostrophe prefix. The
+  permission is in the normal catalogue and seed (bound 103); scoped reads
+  still bound exported data. Deploy the approved common package and seed grants
+  before enabling the portal gate.
 - A card shows, from the list row: the heading (a corporate lead is filed under
   its company with the primary contact's name and position below; an individual
   lead is the person), an Individual/Company label, the stage badge, the Party
   country and city, tax and commercial-registration numbers, the interest or
   need text, and tags. Its pressable footer holds the primary number through the
   shared `LeadPhoneActionsRow` (call, WhatsApp, Telegram), a `mailto:` email, the
-  source catalogue avatar and name, the count of further contacts, the
+  source catalogue avatar and name, the
   `OPP`/`PQ`/`SO`/`IN` counters, the star rating, the next-activity mark and the
   salesperson. The overflow menu opens the lead, moves its stage (never to or
   from a `CONVERTED` stage), sets the card colour and deletes, each gated by
   `capabilities`.
-- The **stage-age** badge ("{age} in stage") is computed by `formatLeadStageAge`
-  from `stageEnteredAt` alone. A row without it, or with an unreadable value,
-  shows no badge — never a fallback to `createdAt` or "just now".
+- Board and grid card faces omit the **stage-age** badge. `stageEnteredAt`
+  remains in the API for stage age on detail pages, measured from entry into
+  the current stage rather than `updatedAt` or `createdAt`.
+- Board-card expansion is the **Expand card** item in `LeadCardMenu`; the
+  separate expand-card square no longer appears on the card face.
+- Board and grid activity marks say **No activities** when there is no next
+  activity. Per [decision 9](../design/specs/crm-leads-v3.md), with
+  `startOfToday` at local midnight: `OVERDUE` means `due < startOfToday`,
+  `TODAY` means `startOfToday <= due <= now`, `FUTURE` means `due > now`, and
+  `NONE` means no next activity. A parseable `activityAt` wins over the server
+  `bucket`, which is only the fallback. The server's Overdue Activity KPI
+  continues to count `due < now`, including earlier today.
 - The Table has columns for name (linking to the lead), contact, phone, country,
   stage, source, salesperson, follow-up and a delete action. The phone cell is
   the one place a number is edited in place (`useLeadInlinePhone`: Enter saves,
@@ -688,7 +1158,11 @@ described in [the activity template](../design/patterns.md#the-activity-template
   read for the page. A kind the backend answered for no card is hidden; a card
   without its own answer shows `—`, never zero.
 - Stage move is `POST /:id/stage`, never a generic `PATCH`.
-- Move optimistically; roll back on failure.
+- Move optimistically; reconcile against the server after every outcome,
+  including definite rejections such as 409. The move remains pending until
+  the active board reload finishes, bypassing the filter-change debounce.
+  A failed board reload clears stale lanes and exposes the existing read error.
+  Source reviewed **2026-10-17** (FE-LEADS-020).
 - Every action control is gated by `capabilities`, not by permission strings.
 - Status renders through `StatusBadge`; never display the raw wire value.
 - `ownerUserId` is a filter, not an authorization mechanism.
@@ -719,8 +1193,10 @@ described in [the activity template](../design/patterns.md#the-activity-template
   at that row, and changing OR back to AND merges it into the previous group.
   A new row starts with a blank Key and reveals its remaining controls only
   after the field is selected. Editing retains a draft; only the explicit
-  Search action applies it. Re-entering Advanced reapplies its last submitted
-  query without promoting later draft edits.
+  Apply action applies it. The Advanced toolbar has no saved-preset controls or
+  result count; its Apply button submits the current filter tree. Re-entering
+  Advanced reapplies its last submitted query without promoting later draft
+  edits.
 - The Advanced field catalogue mirrors every repository-filterable Lead column
   except `branchId`, which already scopes the request. This includes `rating`
   and nullable `cardColor`. Operator choices follow a per-field UX policy
@@ -733,7 +1209,43 @@ described in [the activity template](../design/patterns.md#the-activity-template
   free-text `search` value. Lead, Email and Phone/Mobile semantic text scopes
   remain in Basic search.
 
+## Capability freshness
+
+Access-mode controls reviewed **2026-10-18** (FE-LEADS-030): the Leads page,
+all three Executive views and lead-stage management intersect write capability
+with `useAccessMode().canMutate`. Restricted modes hide create, delete, bulk
+writes, activity creation, inline phone/stage editing and card-menu writes;
+rating stars remain visible as static icons. Board dragging and quick-add are
+unavailable, including drafts opened before the mode changed. Open write
+dialogs and stage popovers are withdrawn when access becomes read-only.
+Read navigation, filtering, selection and authorized local CSV export remain
+available. The shared unresolved-mode policy is unchanged: a mode absent from
+the auth projection still follows the existing helper policy (OPEN-QUESTIONS Q16).
+
+Verified **2026-10-17** (FE-LEADS-014): list and detail action capabilities
+are tagged with the requested branch and organization scope. A branch switch
+immediately hides the previous branch's actions while capabilities reload.
+Window focus and the transport's structured `CRM_SCOPED_PERMISSION_DENIED`
+403 event invalidate the mounted list, detail and create capability readers, including denials
+from notes, attachments and other write hooks. Reloading clears action grants;
+aborted or superseded reads cannot restore them. Capability-read denials do
+not trigger another reload. The existing global 403 toast is unchanged; the
+separate permission event carries the error code, endpoint, method and request
+company/branch headers without request bodies or credentials. The backend
+remains authoritative. This does not refresh `/auth/me` route admission.
+
 ## Portal status
+
+Error feedback source-reviewed **2026-10-17** (FE-LEADS-019): list and board
+reads and lead/lead-stage writes use `useCrmErrorText`, including translated
+rate-limit and offline outcomes. Bulk failures retain their HTTP status and
+append the refused lead ID after the translated message. Ambiguous writes keep
+their existing reconciliation and duplicate-prevention notices. Definite create
+rejections pass normalized field errors to the modal's existing inline fields,
+including nested contacts, addresses and custom fields. Phone indexes map back
+to the displayed rows after blank rows are omitted from the request. Editing or
+resetting the submitted form clears its server field errors; client validation
+continues to gate submission so corrected fields can be resubmitted.
 
 | Capability | Status |
 | --- | --- |
@@ -744,8 +1256,8 @@ described in [the activity template](../design/patterns.md#the-activity-template
 | Tags during create | live — multi-select catalogue ids in the single atomic, idempotent create request |
 | Delete | live |
 | Stage move + board | live |
-| Card view | live — design-system `CardView`; selection and CSV export of the selected rows |
-| Table view | live — design-system `TableView`; first column links to the detail screen; inline primary-phone edit; CSV export of the selected rows |
+| Card view | live — selected visible-row CSV gated by crm.leads.export, BOM and shared formula protection |
+| Table view | live — detail links and inline primary-phone edit; protected selected-row CSV planned under D-014 / FE-LEADS-026 |
 | Capabilities-driven actions | live — every control on the list and the detail screen |
 | Detail route | live — `/crm/leads/[id]`; **the proxy does not admit the path yet, see OPEN-QUESTIONS.md Q40** |
 | Update | live — `PATCH /:id`, changed keys only |

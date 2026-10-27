@@ -214,9 +214,31 @@ export function useRoleDetail(id: string) {
   );
   const canUpdateMetadata =
     role !== null && !isSystem && adminCan(user, "admin.roles.update");
+  const delegablePermissionIds = useMemo(
+    () =>
+      new Set(
+        catalogue
+          .filter((permission) => adminCan(user, permission.key))
+          .map((permission) => permission.id),
+      ),
+    [catalogue, user],
+  );
+  // Core checks the complete replacement, including unchanged assignments.
+  // Freezing this editor preserves protected grants rather than dropping them
+  // or submitting a set that Core must reject. Unknown IDs also fail closed.
+  const permissionsDelegationBlocked =
+    !isCatalogueLoading &&
+    !catalogueError &&
+    user?.isSuperAdmin !== true &&
+    [...originalPermissionIds].some(
+      (permissionId) => !delegablePermissionIds.has(permissionId),
+    );
   const canReplacePermissions =
     role !== null &&
     !isSystem &&
+    !isCatalogueLoading &&
+    !catalogueError &&
+    !permissionsDelegationBlocked &&
     adminCanAll(user, ADMIN_RBAC_CRITICAL.ROLES_UPDATE);
 
   const nameError = useMemo(() => {
@@ -320,7 +342,21 @@ export function useRoleDetail(id: string) {
 
   const savePermissions = useCallback(async () => {
     if (!canReplacePermissions || isSavingPermissions) {
-      if (!canReplacePermissions) setPermissionsError(permissionsForbiddenError());
+      if (!canReplacePermissions) {
+        setPermissionsError(
+          permissionsDelegationBlocked
+            ? localForbidden(t.roles.protectedPermissionSetHint)
+            : permissionsForbiddenError(),
+        );
+      }
+      return;
+    }
+    // Recheck the draft against current grants in case /auth/me changed after
+    // the operator selected it. Never silently strip permissions on save.
+    if ([...assignedPermissions].some(
+      (permissionId) => !delegablePermissionIds.has(permissionId),
+    )) {
+      setPermissionsError(localForbidden(t.roles.permissionNotDelegableHint));
       return;
     }
     const permissionIds = [...assignedPermissions].sort();
@@ -373,8 +409,10 @@ export function useRoleDetail(id: string) {
     applyAuthoritativeRole,
     assignedPermissions,
     canReplacePermissions,
+    delegablePermissionIds,
     id,
     isSavingPermissions,
+    permissionsDelegationBlocked,
     t,
     toast,
   ]);
@@ -384,7 +422,7 @@ export function useRoleDetail(id: string) {
       if (
         !canReplacePermissions ||
         permissionsAmbiguous ||
-        !catalogue.some((permission) => permission.id === permissionId)
+        !delegablePermissionIds.has(permissionId)
       ) {
         return;
       }
@@ -395,7 +433,7 @@ export function useRoleDetail(id: string) {
         return next;
       });
     },
-    [canReplacePermissions, catalogue, permissionsAmbiguous],
+    [canReplacePermissions, delegablePermissionIds, permissionsAmbiguous],
   );
 
   const toggleGroup = useCallback(
@@ -403,8 +441,11 @@ export function useRoleDetail(id: string) {
       if (!canReplacePermissions || permissionsAmbiguous) return;
       setAssignedPermissions((current) => {
         const next = new Set(current);
-        catalogue
-          .filter((permission) => permission.group === groupName)
+        visiblePermissions
+          .filter((permission) =>
+            (permission.group || "Ungrouped") === groupName &&
+            delegablePermissionIds.has(permission.id),
+          )
           .forEach((permission) => {
             if (state) next.add(permission.id);
             else next.delete(permission.id);
@@ -412,7 +453,12 @@ export function useRoleDetail(id: string) {
         return next;
       });
     },
-    [canReplacePermissions, catalogue, permissionsAmbiguous],
+    [
+      canReplacePermissions,
+      delegablePermissionIds,
+      permissionsAmbiguous,
+      visiblePermissions,
+    ],
   );
 
   useEffect(() => {
@@ -438,6 +484,8 @@ export function useRoleDetail(id: string) {
     isSuperAdmin,
     canUpdateMetadata,
     canReplacePermissions,
+    delegablePermissionIds,
+    permissionsDelegationBlocked,
     search,
     setSearch,
     groupedPermissions,

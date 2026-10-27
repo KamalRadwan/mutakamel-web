@@ -18,6 +18,11 @@ vi.mock("@/lib/api/idempotent-write", async (original) => ({ ...await original<t
 
 const all: CrmActionCapability = { scope: "all", ownerUserIds: null };
 const defaults = { canConvert: true, capability: all as CrmActionCapability | null, lead: conversionLead };
+const individualLead = { ...conversionLead, leadProfileType: "INDIVIDUAL" as const, displayName: "Noura Saleh", companyName: null };
+const corporateLead = { ...conversionLead, contacts: [{
+  partyId: ids.party, relationshipId: null, displayName: "Noura Saleh", firstName: "Noura", lastName: "Saleh",
+  honorificTitle: null, jobTitle: null, isPrimary: true, email: null, phones: [],
+}] };
 const success = (): WriteOutcome<LeadConversionResult> => ({ kind: "success", replayed: false,
   value: parseLeadConversionResponse(conversionReceipt(), ids.lead, false, true) });
 
@@ -91,6 +96,8 @@ describe("useLeadConvert", () => {
     act(() => result.current.openModal());
     expect(result.current.form?.displayName).toBe("Acme");
     expect(result.current.hasReceipt).toBe(true);
+    act(() => result.current.setField("profileType", "INDIVIDUAL"));
+    expect(result.current.form?.profileType).toBe("CORPORATE");
     await act(async () => result.current.submit());
     expect(runIdempotentWrite).toHaveBeenCalledOnce();
     await act(async () => result.current.retry());
@@ -131,14 +138,64 @@ describe("useLeadConvert", () => {
     await act(async () => result.current.submit());
     expect(runIdempotentWrite).not.toHaveBeenCalled();
   });
-  it("keeps the party type immutable and requires independent opportunity permission", async () => {
+  it("requires independent opportunity permission", async () => {
     const { result } = setup({ capability: null });
-    act(() => result.current.setField("profileType", "INDIVIDUAL"));
-    expect(result.current.form?.profileType).toBe("CORPORATE");
     act(() => result.current.setField("createOpportunity", true));
     await act(async () => result.current.submit());
     expect(result.current.errors.createOpportunity).toBe(en.crmLeadConvert.opportunityNotPermitted);
     expect(result.current.reviewing).toBe(false);
+  });
+  it.each(["displayName", "companyName"] as const)("requires an explicit %s for individual-to-company conversion", async (field) => {
+    vi.mocked(runIdempotentWrite).mockResolvedValue(success());
+    const { result } = setup({ lead: individualLead });
+    expect(result.current.form?.profileType).toBe("INDIVIDUAL");
+    act(() => result.current.setField("profileType", "CORPORATE"));
+    expect(result.current.form).toMatchObject({ displayName: "", companyName: "", newContact: false });
+    act(() => result.current.setField(field, "  "));
+    await act(async () => result.current.submit());
+    expect(result.current.errors.companyName).toBe(en.crmLeadConvert.serverErrors.LEAD_CONVERSION_COMPANY_NAME_REQUIRED);
+    expect(result.current.reviewing).toBe(false);
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+    act(() => result.current.setField(field, " New Company "));
+    await act(async () => result.current.submit());
+    expect(result.current.reviewing).toBe(true);
+    await act(async () => result.current.submit());
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: {
+      profileType: "CORPORATE", [field]: "New Company", keepLead: true, createOpportunity: false,
+    } }));
+  });
+  it("converts a company to its primary person without sending company or drafted new-contact fields", async () => {
+    vi.mocked(runIdempotentWrite).mockResolvedValue(success());
+    const { result } = setup({ lead: corporateLead });
+    act(() => { result.current.setField("newContact", true); result.current.setField("contactFullName", "Another person"); });
+    act(() => result.current.setField("profileType", "INDIVIDUAL"));
+    expect(result.current.form).toMatchObject({ profileType: "INDIVIDUAL", displayName: "", companyName: "", newContact: false });
+    expect(result.current.primaryContact?.displayName).toBe("Noura Saleh");
+    await act(async () => result.current.submit());
+    expect(result.current.errors).toEqual({});
+    expect(result.current.reviewing).toBe(true);
+    await act(async () => result.current.submit());
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: {
+      profileType: "INDIVIDUAL", keepLead: true, createOpportunity: false,
+    } }));
+  });
+  it("blocks company-to-individual conversion without this lead's primary contact", async () => {
+    const { result } = setup({ lead: { ...corporateLead, contacts: corporateLead.contacts.map((contact) => ({ ...contact, isPrimary: false })) } });
+    act(() => result.current.setField("profileType", "INDIVIDUAL"));
+    await act(async () => result.current.submit());
+    expect(result.current.errors.profileType).toBe(en.crmLeadConvert.serverErrors.LEAD_CONVERSION_CONTACT_REQUIRED);
+    expect(result.current.reviewing).toBe(false);
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+  });
+  it("restores source names when switching back and resets the target on reopen", () => {
+    const { result } = setup();
+    act(() => result.current.setField("profileType", "INDIVIDUAL"));
+    act(() => result.current.setField("profileType", "CORPORATE"));
+    expect(result.current.form).toMatchObject({ displayName: "Acme", companyName: "Acme Trading" });
+    act(() => result.current.setField("profileType", "INDIVIDUAL"));
+    act(() => result.current.closeModal());
+    act(() => result.current.openModal());
+    expect(result.current.form?.profileType).toBe("CORPORATE");
   });
   it("uses pipeline membership ids, excludes won/lost stages and clears stage on pipeline change", async () => {
     const { result } = setup();

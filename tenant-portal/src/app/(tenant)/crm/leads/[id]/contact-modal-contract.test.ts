@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import type { LeadContact, LeadDetail } from "../lead-contract";
-import { buildContactCoreWrites, buildSelectedContactLeadRequest, contactModalForm, parseContactPerson, validateContactModal } from "./contact-modal-contract";
+import { buildAddedContactLeadRequest, buildContactCoreWrites, buildSelectedContactLeadRequest, contactModalForm, emptyNewLeadContact, parseContactPerson, validateContactModal, validateNewLeadContact } from "./contact-modal-contract";
 
 const personId = "01900100-0000-7000-8000-000000000011";
 const id = (suffix: string) => `01900100-0000-7000-8000-0000000000${suffix}`;
@@ -77,11 +77,43 @@ describe("selected contact modal contract", () => {
     const lead = { contacts: [{ ...contact, partyId: id("12") }, selected] } as LeadDetail;
     const result = buildSelectedContactLeadRequest(lead, { ...baseline, isPrimary: true }, baseline);
     expect(result.contacts?.map(({ contactPartyId, isPrimary }) => ({ contactPartyId, isPrimary }))).toEqual([{ contactPartyId: id("12"), isPrimary: false }, { contactPartyId: personId, isPrimary: true }]);
+    expect(result.contacts?.map((row) => Object.keys(row).sort())).toEqual([
+      ["contactPartyId", "isPrimary", "jobTitle"], ["contactPartyId", "isPrimary", "jobTitle"],
+    ]);
   });
   it("validates editable fields but skips unavailable identity fields", () => {
     const form = { ...contactModalForm(contact, person()), displayName: "", email: "invalid" };
     const messages = { ...en.crmLeads.create.errors, url: en.crmShared.fieldUrl, invalid: en.crmShared.errorValidation };
     expect(validateContactModal(form, true, messages)).toMatchObject({ displayName: messages.required, email: messages.email });
     expect(validateContactModal(form, false, messages)).toEqual({});
+  });
+});
+
+describe("new lead contact replacement contract", () => {
+  const messages = { ...en.crmLeads.create.errors, url: en.crmShared.fieldUrl, invalid: en.crmShared.errorValidation };
+  it("uses only CreateLeadCorporateContactDto keys and retains existing identities", () => {
+    const draft = { ...emptyNewLeadContact(), displayName: " Mona Hassan ", firstName: " Mona ", lastName: " Hassan ",
+      honorificTitle: " Dr ", jobTitle: " Director ", email: " mona@example.test ", phones: [" +20105551234 ", ""], isPrimary: true };
+    const body = buildAddedContactLeadRequest({ contacts: [contact] } as LeadDetail, draft);
+    expect(body).toEqual({ contacts: [
+      { contactPartyId: personId, jobTitle: "Manager", isPrimary: false },
+      { fullName: "Mona Hassan", firstName: "Mona", lastName: "Hassan", honorificTitle: "Dr", jobTitle: "Director", email: "mona@example.test", phones: ["+20105551234"], isPrimary: true },
+    ] });
+    expect(body.contacts?.map((row) => Object.keys(row).sort())).toEqual([
+      ["contactPartyId", "isPrimary", "jobTitle"],
+      ["email", "firstName", "fullName", "honorificTitle", "isPrimary", "jobTitle", "lastName", "phones"],
+    ]);
+  });
+  it("composes a one-word name and promotes the first contact", () => {
+    const draft = { ...emptyNewLeadContact(), firstName: " Mona " };
+    expect(validateNewLeadContact(draft, messages)).toEqual({});
+    expect(buildAddedContactLeadRequest({ contacts: [] } as unknown as LeadDetail, draft).contacts?.[0]).toMatchObject({ fullName: "Mona", isPrimary: true });
+    expect(buildAddedContactLeadRequest({ contacts: [contact] } as LeadDetail, draft).contacts?.map((row) => row.isPrimary)).toEqual([true, false]);
+  });
+  it("validates CRM limits, duplicate phones and email before transport", () => {
+    expect(validateNewLeadContact(emptyNewLeadContact(), messages)).toMatchObject({ displayName: messages.required });
+    const errors = validateNewLeadContact({ ...emptyNewLeadContact(), displayName: "a".repeat(181), firstName: "a".repeat(81), email: "invalid", phones: ["0096612345", "+96612345", "1".repeat(33)] }, messages);
+    expect(Object.keys(errors).sort()).toEqual(["displayName", "email", "firstName", "phones.1", "phones.2"]);
+    expect(() => buildAddedContactLeadRequest({ contacts: Array(20).fill(contact) } as LeadDetail, emptyNewLeadContact())).toThrow("Contact limit reached");
   });
 });

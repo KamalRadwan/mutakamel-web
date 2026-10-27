@@ -3,10 +3,12 @@ import {
   DECIMAL_ZERO,
   addFixedDecimal,
   canonicalizeDecimalInput,
+  compareFixedDecimal,
   multiplyFixedDecimal,
   subtractFixedDecimal,
 } from "../fixed-decimal";
 import { computeDocumentTotals } from "../document-totals";
+import { validateTradeEvidence, type TradeEvidenceError } from "./trade-evidence-validation";
 
 export type TradeEvidenceDialect = "ORDER" | "FINANCIAL";
 
@@ -24,7 +26,7 @@ export interface TradeEvidenceLineDraft {
   taxRatePercent: string;
 }
 
-export interface ComputedTradeEvidenceLine {
+interface ComputedTradeEvidenceLine {
   lineNumber: number;
   clientLineId: string;
   itemId: string;
@@ -56,17 +58,9 @@ export interface ComputedTradeDocumentTotals {
   amountDue: string;
 }
 
-function safeCanonicalNonNegative(raw: string | undefined): string {
-  const canonical = canonicalizeDecimalInput(raw ?? "0");
-  if (!canonical || canonical.startsWith("-")) return DECIMAL_ZERO;
-  return canonical;
-}
-
-function safeCanonicalPositive(raw: string | undefined): string {
-  const canonical = canonicalizeDecimalInput(raw ?? "1");
-  if (!canonical || canonical === "0" || canonical.startsWith("-")) return "1";
-  return canonical;
-}
+export type TradeEvidenceOutcome =
+  | (ComputedTradeDocumentTotals & { ok: true; errors: TradeEvidenceError[] })
+  | { ok: false; errors: TradeEvidenceError[] };
 
 export function computeTradeEvidence(
   drafts: TradeEvidenceLineDraft[],
@@ -76,35 +70,31 @@ export function computeTradeEvidence(
     roundingTotal?: string;
     amountPaid?: string;
   },
-): ComputedTradeDocumentTotals {
+): TradeEvidenceOutcome {
+  const errors = validateTradeEvidence(drafts, options);
+  if (errors.length) return { ok: false, errors };
   const currency = options.currencyCode.trim().toUpperCase() || "SAR";
 
   const preparedLines = drafts.map((line, idx) => {
-    const quantity = safeCanonicalPositive(line.quantity);
-    const unitPrice = safeCanonicalNonNegative(line.unitPrice);
+    const quantity = canonicalizeDecimalInput(line.quantity)!;
+    const unitPrice = canonicalizeDecimalInput(line.unitPrice)!;
     const grossAmount = multiplyFixedDecimal(quantity, unitPrice);
-    const rawDiscount = safeCanonicalNonNegative(line.discountAmount);
+    const rawDiscount = canonicalizeDecimalInput(line.discountAmount)!;
     const discountAmount = rawDiscount;
     const chargeAmount =
       options.dialect === "FINANCIAL"
-        ? safeCanonicalNonNegative(line.chargeAmount)
+        ? canonicalizeDecimalInput(line.chargeAmount)!
         : DECIMAL_ZERO;
 
     const afterDiscount = subtractFixedDecimal(grossAmount, discountAmount);
-    const safeAfterDiscount = afterDiscount.startsWith("-")
-      ? DECIMAL_ZERO
-      : afterDiscount;
     const taxableAmount =
       options.dialect === "FINANCIAL"
-        ? addFixedDecimal(safeAfterDiscount, chargeAmount)
-        : safeAfterDiscount;
+        ? addFixedDecimal(afterDiscount, chargeAmount)
+        : afterDiscount;
 
-    const rateNum = Number.parseFloat(line.taxRatePercent || "0");
-    const safeRatePercent =
-      Number.isFinite(rateNum) && rateNum >= 0 && rateNum <= 100 ? rateNum : 0;
-    const taxRateBps = Math.round(safeRatePercent * 100);
-    const rateFraction =
-      canonicalizeDecimalInput(String(safeRatePercent / 100)) ?? DECIMAL_ZERO;
+    const rate = canonicalizeDecimalInput(line.taxRatePercent)!;
+    const taxRateBps = Number.parseInt(multiplyFixedDecimal(rate, "100"), 10);
+    const rateFraction = multiplyFixedDecimal(rate, "0.01");
     const taxAmount = multiplyFixedDecimal(taxableAmount, rateFraction);
     const lineTotal = addFixedDecimal(taxableAmount, taxAmount);
 
@@ -136,7 +126,7 @@ export function computeTradeEvidence(
         taxCode,
         category,
         rateBps: taxRateBps,
-        ratePercent: safeRatePercent,
+        ratePercent: taxRateBps / 100,
         taxableBase: taxableAmount,
         taxAmount,
         currencyCode: currency,
@@ -151,14 +141,17 @@ export function computeTradeEvidence(
     };
   });
 
-  const roundingTotal =
-    options.dialect === "FINANCIAL"
-      ? safeCanonicalNonNegative(options.roundingTotal)
-      : (canonicalizeDecimalInput(options.roundingTotal ?? "0") ?? DECIMAL_ZERO);
+  const invalidDiscountIndex = preparedLines.findIndex((line) =>
+    compareFixedDecimal(line.discountAmount, line.grossAmount) > 0);
+  if (invalidDiscountIndex >= 0) {
+    return { ok: false, errors: [{ field: "discountAmount", lineIndex: invalidDiscountIndex, message: "calculationInvalid" }] };
+  }
+
+  const roundingTotal = canonicalizeDecimalInput(options.roundingTotal ?? "0")!;
 
   const amountPaid =
     options.dialect === "ORDER"
-      ? safeCanonicalNonNegative(options.amountPaid)
+      ? canonicalizeDecimalInput(options.amountPaid ?? "0")!
       : DECIMAL_ZERO;
 
   const outcome = computeDocumentTotals(
@@ -189,7 +182,17 @@ export function computeTradeEvidence(
   );
 
   if (outcome.ok) {
+    // Match the numeric(24,8) storage domain for calculated amounts too.
+    const amounts = [
+      ...preparedLines.flatMap((line) => [line.grossAmount, line.taxableAmount, line.taxAmount, line.lineTotal]),
+      ...Object.entries(outcome.value.totals).filter(([key]) => key !== "roundingTotal").map(([, value]) => value),
+    ];
+    if (amounts.some((amount) => compareFixedDecimal(amount, "0") < 0 || compareFixedDecimal(amount, "10000000000000000") >= 0)) {
+      return { ok: false, errors: [{ field: "calculation", message: "calculationInvalid" }] };
+    }
     return {
+      ok: true,
+      errors: [],
       lines: preparedLines.map((l, i) => ({
         ...l,
         grossAmount: outcome.value.lines[i]?.lineSubtotal ?? l.grossAmount,
@@ -200,15 +203,8 @@ export function computeTradeEvidence(
   }
 
   return {
-    lines: preparedLines,
-    subtotal: DECIMAL_ZERO,
-    discountTotal: DECIMAL_ZERO,
-    chargeTotal: DECIMAL_ZERO,
-    taxTotal: DECIMAL_ZERO,
-    roundingTotal: DECIMAL_ZERO,
-    grandTotal: DECIMAL_ZERO,
-    amountPaid: DECIMAL_ZERO,
-    amountDue: DECIMAL_ZERO,
+    ok: false,
+    errors: [{ field: outcome.rejection === "LINE_DISCOUNT_EXCEEDS_SUBTOTAL" ? "discountAmount" : "calculation", lineIndex: outcome.lineIndex, message: "calculationInvalid" }],
   };
 }
 

@@ -4,6 +4,10 @@ Status: **App half built** (MASTER-PLAN 13.1) · **Nginx half still to configure
 
 Written: **2026-08-28** · CSP built and verified: **2026-08-31**
 
+Trusted-device cookie source verification: **2026-10-17**
+
+Cookie and ingress policy source verification: **2026-10-17** (D-041).
+
 Ingress: **Nginx Proxy Manager**
 
 Resolves [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md) Q1.
@@ -12,7 +16,7 @@ Resolves [OPEN-QUESTIONS.md](../build/OPEN-QUESTIONS.md) Q1.
 
 | Header | Owner | Why |
 | --- | --- | --- |
-| `Strict-Transport-Security` | **NPM, only for an HTTPS deployment** | Omit it for the selected HTTP deployment |
+| `Strict-Transport-Security` | **NPM, required in staging/production** | Emit on HTTPS responses, including errors; omit for development/test HTTP use |
 | `X-Content-Type-Options` | **NPM** | Static, transport-level |
 | `X-Frame-Options` | **NPM** | Static, transport-level |
 | `Referrer-Policy` | **NPM** | Static, transport-level |
@@ -53,6 +57,8 @@ Per proxy host, **Advanced → Custom Nginx Configuration**:
 # `always` is required: without it nginx drops the header on 4xx/5xx
 # responses, so an error page ships unprotected.
 
+# In the HTTPS proxy host; HTTP-to-HTTPS redirect is configured separately.
+add_header Strict-Transport-Security "max-age=31536000" always;
 add_header X-Content-Type-Options    "nosniff" always;
 add_header X-Frame-Options           "DENY" always;
 add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
@@ -62,7 +68,7 @@ add_header Permissions-Policy        "camera=(), microphone=(), geolocation=(), 
 # and fails closed on a host it cannot verify — see architecture/routing.md.
 proxy_set_header Host              $host;
 proxy_set_header X-Real-IP         $remote_addr;
-proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-For   $remote_addr;
 proxy_set_header X-Forwarded-Proto $scheme;
 ```
 
@@ -74,10 +80,10 @@ proxy_set_header X-Forwarded-Proto $scheme;
    header goes missing, this is why: re-declare the full set inside that
    location.
 
-2. **Keep HSTS and preload disabled for the HTTP deployment.** They instruct
-   browsers to upgrade to HTTPS and conflict with this transport choice.
-   Previously cached HSTS policies can also upgrade a URL before it reaches
-   the application.
+2. **Enable HSTS for staging/production HTTPS.** Use either NPM's toggle or
+   the explicit header above, with one effective policy. Preload is a separate
+   operational choice. Omit HSTS only for development/test HTTP use; cached
+   policies can upgrade a local URL before it reaches the application.
 
 3. **NPM's "Block Common Exploits" toggle is fine to leave on**, but it is not
    a substitute for any header above. It filters a small set of known-bad
@@ -85,9 +91,19 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 ### SSL tab
 
-- **Force SSL** — off for the selected HTTP deployment.
-- **HTTP/2 Support** — only relevant if TLS is enabled later.
-- **HSTS Enabled** — off; no HSTS header is set in the HTTP configuration.
+- **SSL certificate** — configure a valid certificate for every public host.
+- **Force SSL** — on in staging/production (D-041).
+- **HTTP/2 Support** — available on the TLS listener.
+- **HSTS Enabled** — on in staging/production, unless the explicit header above
+  owns the policy. Do not emit duplicate HSTS headers.
+
+At the public ingress overwrite incoming forwarding headers with the scheme
+and client address nginx actually sees, as above. Preserve the tenant Host,
+cookies, Origin and CSRF headers. Set Gateway `TRUST_PROXY` to only nginx's
+actual peer IPs or narrow CIDRs, and restrict direct Gateway access to ingress.
+Gateway passes this allowlist to Express `trust proxy`, which ignores
+`X-Forwarded-Proto`/`X-Forwarded-For` from untrusted peers. Additional proxy hops
+must sanitize headers and be explicitly represented in that allowlist.
 
 ## The app's CSP — built
 
@@ -342,27 +358,39 @@ production effect: `next build` / `next start` never call this code path.
 
 ## SD-03 · HTTP deployment and cookie profiles
 
-**Status: ACCEPTED · decided 2026-08-31 · owner: Kamal Radwan**
+**Status: Deployment policy SUPERSEDED by D-041 · 2026-10-17 · owner: Kamal Radwan**
 
-The user explicitly selected HTTP for the application, including deployments
-beyond development. This supersedes the earlier HTTPS-only requirement.
+The original 2026-08-31 decision allowed HTTP beyond development. D-041 now
+requires browser-facing HTTPS behind nginx with Secure cookies in staging and
+production. The HTTP profile remains available only for development/test. See
+backend [SECURITY_DECISIONS.md](../../../../backend/docs/SECURITY_DECISIONS.md) (SD-02).
 
 ### Cookie configuration
 
 Gateway and Core must use the same `AUTH_COOKIE_SECURE` value. It defaults to
-`true`; the selected HTTP deployment sets it to `false` in every environment.
-No browser header selects the cookie profile.
+`true`; only development/test may set it to `false`. Both apps reject `false`
+in staging/production, and Gateway also checks `APP_ENV`. No browser header
+selects the cookie profile.
 
 | Profile | Tenant cookies | Secure attribute |
 | --- | --- | --- |
 | `true` (default) | `__Host-mutakamel-tenant-access`, `__Host-mutakamel-tenant-session`, `__Host-mutakamel-tenant-csrf` | yes |
-| `false` (HTTP) | `mutakamel-http-tenant-access`, `mutakamel-http-tenant-session`, `mutakamel-http-tenant-csrf` | no |
+| `false` (development/test HTTP only) | `mutakamel-http-tenant-access`, `mutakamel-http-tenant-session`, `mutakamel-http-tenant-csrf` | no |
 
 Both profiles retain HttpOnly access/session credentials, host-only cookies,
 `Path=/`, and session-bound double-submit CSRF. The browser reads only the CSRF
 proof, preferring its page transport's profile and falling back when that proof
 is absent. It never reads or stores bearer credentials. The HTTP profile uses
 different names because browsers reject a `__Host-` cookie without `Secure`.
+
+The secure profile also uses `__Host-mutakamel-tenant-trusted-device` (Admin
+uses `__Host-mutakamel-admin-trusted-device`). This signed account/device proof
+is HttpOnly, Secure, SameSite=Lax, Path=/, host-only with no Domain, and lasts
+90 days. JavaScript never reads it; logout preserves it. Only the matching
+realm's Core login receives/sets it through Gateway. It grants a separate
+login budget, not authentication. It has no HTTP-profile alias; Core currently
+emits the Secure cookie even in HTTP mode, where a plain-HTTP tenant host
+cannot use it.
 
 ### Browser coordination and forms
 
@@ -380,7 +408,7 @@ fallback does not replace the JavaScript authentication flow.
 
 ### Running the portal
 
-Use `pnpm dev` on port `5002`, for example
+For local development, use `pnpm dev` on port `5002`, for example
 `http://mersany.mutakamel.ai:5002`. Tenant host admission still applies. The
 existing `DEV_TENANT_HOST` override only substitutes a configured tenant for a
 loopback host during development; it does not bypass production host admission.
@@ -388,7 +416,8 @@ loopback host during development; it does not bypass production host admission.
 The optional `pnpm dev:https` script remains available with explicit certificate
 and key files. Because both are supplied, Next uses them without generating or
 installing a local certificate authority. No HTTPS redirect, HSTS policy, or
-certificate installation is required for the HTTP deployment.
+certificate installation is required for development/test HTTP use. Staging
+and production require nginx TLS, redirects and HSTS as configured above.
 
 `DEV_API_TARGET` is the development route handler's fixed server-side Gateway
 origin. It preserves the incoming Host and port using Node HTTP; Next's built-in

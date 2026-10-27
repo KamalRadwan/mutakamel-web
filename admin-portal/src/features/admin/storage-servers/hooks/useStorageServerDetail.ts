@@ -18,6 +18,7 @@ import {
 } from "../lib/rotation-receipt";
 import type {
   RotateStorageCredentialsDto,
+  StorageCredentialRotationView,
   StorageServerProbeResult,
   StorageServerView,
   UpdateStorageServerDto,
@@ -37,6 +38,7 @@ export function useStorageServerDetail(id: string) {
   const [isRotationReceiptDurable, setIsRotationReceiptDurable] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
+  const [abortReason, setAbortReason] = useState("");
   const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const canRead = adminCan(user, "admin.storage_servers.read");
@@ -59,8 +61,19 @@ export function useStorageServerDetail(id: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await storageServersApi.get(id, controller.signal);
+      const [result, rotation] = await Promise.all([
+        storageServersApi.get(id, controller.signal),
+        storageServersApi.currentCredentialRotation(id, controller.signal),
+      ]);
       if (generation !== requestGeneration.current) return;
+      if (rotation) {
+        const remembered = rememberStorageRotation(id, rotation);
+        setCurrentRotation(remembered.receipt);
+        setIsRotationReceiptDurable(remembered.durable);
+      } else {
+        forgetStorageRotationReceipt(id);
+        setCurrentRotation(null);
+      }
       setServer(result);
       setLoadedServerId(id);
     } catch (caught) {
@@ -82,9 +95,9 @@ export function useStorageServerDetail(id: string) {
       setServer(null);
       setLoadedServerId(null);
       setLastProbe(null);
-      // The rotation this browser is still holding for the server now on
-      // screen. Without it the revoke card cannot be rebuilt after a reload,
-      // and the grace window it is waiting out is measured in hours.
+      setAbortReason("");
+      // A safe cached display only; refresh recovers authoritative open state
+      // before loadedServerId permits a recovery mutation.
       setCurrentRotation(readStorageRotationReceipt(id));
       setIsRotationReceiptDurable(true);
       setError(null);
@@ -196,15 +209,20 @@ export function useStorageServerDetail(id: string) {
       if (!canUpdate || !server) throw new Error("STORAGE_SERVER_UPDATE_FORBIDDEN");
       assertCurrentServer();
       const expectedConfigRevision = server.configRevision;
-      const result = await write(
-        { action: "rotateCredentials", id, expectedConfigRevision },
-        (key) =>
-          storageServersApi.rotateCredentials(
-            id,
-            { expectedConfigRevision, credentials, graceHours },
-            key,
+      let result: StorageCredentialRotationView;
+      try {
+        result = await write(
+          { action: "rotateCredentials", id, expectedConfigRevision },
+          (key) => storageServersApi.rotateCredentials(
+            id, { expectedConfigRevision, credentials, graceHours }, key,
           ),
-      );
+        );
+      } catch (caught) {
+        // The command may have staged before its probe failed. Recover its
+        // authoritative identity so the operator can abort it without secrets.
+        if (idRef.current === id) await refresh();
+        throw caught;
+      }
       if (idRef.current !== id) throw new Error("STORAGE_SERVER_CONTEXT_CHANGED");
       const remembered = rememberStorageRotation(id, result);
       setCurrentRotation(remembered.receipt);
@@ -230,6 +248,31 @@ export function useStorageServerDetail(id: string) {
       return result;
     },
     [assertCurrentServer, canUpdate, id, write],
+  );
+
+  const abortCredentialRotation = useCallback(
+    async (rotationId: string, reason: string) => {
+      if (!canUpdate) throw new Error("STORAGE_SERVER_UPDATE_FORBIDDEN");
+      assertCurrentServer();
+      let result: StorageCredentialRotationView;
+      try {
+        result = await write(
+          { action: "abortCredentialRotation", id, rotationId, reason },
+          (key) => storageServersApi.abortCredentialRotation(id, rotationId, reason, key),
+        );
+      } catch (caught) {
+        if (idRef.current === id) await refresh();
+        throw caught;
+      }
+      if (idRef.current !== id) throw new Error("STORAGE_SERVER_CONTEXT_CHANGED");
+      const remembered = rememberStorageRotation(id, result);
+      setCurrentRotation(null);
+      setIsRotationReceiptDurable(remembered.durable);
+      setAbortReason("");
+      await refresh();
+      return result;
+    },
+    [assertCurrentServer, canUpdate, id, refresh, write],
   );
 
   const remove = useCallback(async () => {
@@ -263,6 +306,8 @@ export function useStorageServerDetail(id: string) {
     loadedServerId,
     lastProbe,
     currentRotation,
+    abortReason,
+    setAbortReason,
     isRotationReceiptDurable,
     dismissRotationReceipt,
     isLoading,
@@ -279,6 +324,7 @@ export function useStorageServerDetail(id: string) {
     drain,
     rotateCredentials,
     revokeCredentialRotation,
+    abortCredentialRotation,
     remove,
     makePlatformDefault,
     refresh,

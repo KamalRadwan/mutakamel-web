@@ -11,6 +11,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -75,13 +76,15 @@ export function LeadCompanyEditModal({ state, edit, readOnly }: {
             <span className="dossier-icon-pill dossier-ip-indigo" aria-hidden="true">
               <Pencil className="size-3.5" aria-hidden="true" />
             </span>
-            <CardTitle className="text-xs font-extrabold tracking-wider text-indigo-900 uppercase dark:text-indigo-200">
+            <CardTitle className="text-xs font-semibold tracking-wider text-foreground uppercase">
               {t.crmLeadDetail.editCompany}
             </CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               disabled={state.saving}
               onClick={requestClose}
               aria-label={t.common.cancel}
@@ -89,9 +92,11 @@ export function LeadCompanyEditModal({ state, edit, readOnly }: {
             >
               <X className="size-3.5" aria-hidden="true" />
               <span>{t.common.cancel}</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               disabled={disabled}
               onClick={() => void state.save()}
               aria-label={t.crmLeadDetail.saveCompany}
@@ -99,7 +104,7 @@ export function LeadCompanyEditModal({ state, edit, readOnly }: {
             >
               <Check className="size-3.5" aria-hidden="true" />
               <span>{t.crmLeadDetail.saveCompany}</span>
-            </button>
+            </Button>
           </div>
         </CardHeader>
 

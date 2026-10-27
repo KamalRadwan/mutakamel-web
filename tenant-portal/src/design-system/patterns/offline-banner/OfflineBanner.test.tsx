@@ -3,6 +3,8 @@
 import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TENANT_REALTIME_SHELL_EVENTS } from "@/context/TenantRealtimeProvider";
+import { ar } from "@/i18n/dictionaries/ar";
+import { en } from "@/i18n/dictionaries/en";
 import { OfflineBanner } from "./OfflineBanner";
 import { useConnectivity } from "./useConnectivity";
 
@@ -14,6 +16,7 @@ afterEach(() => {
 const labels = {
   offline: "You are offline. Changes cannot be saved right now.",
   draining: "Live updates are moving to another server.",
+  retrying: "Live updates are reconnecting.",
   stopped: "Live updates have stopped. Reload to restore them.",
   reload: "Reload",
   stopReasons: {
@@ -80,13 +83,15 @@ describe("useConnectivity", () => {
     expect(result.current.stopReason).toBe("access_revoked");
   });
 
-  it("treats stopped as terminal — coming back online does not restart it", () => {
+  it("keeps stopped through network recovery and clears it on session ready", () => {
     const { result } = renderHook(() => useConnectivity());
     dispatch(TENANT_REALTIME_SHELL_EVENTS.permanentStop, "tenant_unavailable");
     setOnline(true);
     dispatch("online");
-    dispatch(TENANT_REALTIME_SHELL_EVENTS.sessionReady, {});
     expect(result.current.status).toBe("stopped");
+    dispatch(TENANT_REALTIME_SHELL_EVENTS.sessionReady, {});
+    expect(result.current.status).toBe("online");
+    expect(result.current.stopReason).toBeNull();
   });
 
   it("outranks offline with stopped, since neither reconnects on its own", () => {
@@ -124,6 +129,7 @@ describe("useConnectivity", () => {
         TENANT_REALTIME_SHELL_EVENTS.serverDraining,
         TENANT_REALTIME_SHELL_EVENTS.sessionReady,
         TENANT_REALTIME_SHELL_EVENTS.permanentStop,
+        TENANT_REALTIME_SHELL_EVENTS.connectionChanged,
       ]),
     );
     remove.mockRestore();
@@ -131,6 +137,11 @@ describe("useConnectivity", () => {
 });
 
 describe("OfflineBanner", () => {
+  it.each([ar.connectivity, en.connectivity])("renders reconnecting feedback in the selected language", (localizedLabels) => {
+    render(<OfflineBanner status="retrying" labels={localizedLabels} />);
+    expect(screen.getByRole("status")).toHaveTextContent(localizedLabels.retrying);
+  });
+
   it("renders nothing while online", () => {
     const { container } = render(<OfflineBanner status="online" labels={labels} />);
     expect(container).toBeEmptyDOMElement();
@@ -141,6 +152,8 @@ describe("OfflineBanner", () => {
     expect(screen.getByText(labels.offline)).toBeInTheDocument();
     rerender(<OfflineBanner status="draining" labels={labels} />);
     expect(screen.getByText(labels.draining)).toBeInTheDocument();
+    rerender(<OfflineBanner status="retrying" labels={labels} />);
+    expect(screen.getByText(labels.retrying)).toBeInTheDocument();
     rerender(<OfflineBanner status="stopped" labels={labels} />);
     expect(screen.getByText(labels.stopped)).toBeInTheDocument();
   });

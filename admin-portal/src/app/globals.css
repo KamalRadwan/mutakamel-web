@@ -12,25 +12,28 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
-  /* Latin first, Arabic second: the browser resolves font-family per
-     character, so Latin/digit runs render in Plex Sans and Arabic runs in
-     Plex Sans Arabic on the same line with no :lang() switching needed. */
-  --font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
-    system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
-}
-
 /* =========================================================================
    Design-system tokens (docs/design-system/tokens.md)
 
-   These are the authoritative semantic roles used by the migrated portal.
-   Legacy Tailwind family aliases remain below as a compatibility safety net
-   for third-party/generated markup; the design census prevents production
-   call sites from reintroducing direct palette dependencies.
+   These are the authoritative semantic roles and Ocean Navy v3 ramps used by
+   the portal. Legacy Tailwind family aliases remain below as a compatibility
+   safety net for third-party/generated markup; the design census prevents
+   production call sites from reintroducing direct palette dependencies.
    ========================================================================= */
 
 @theme {
+  /* Font stacks bridged from src/app/fonts.ts (NOT `@theme inline` — under
+     Tailwind v4 `inline` substitutes values into utilities without emitting
+     the custom property at runtime). Latin first, Arabic second: the browser
+     resolves font-family per character, so Latin/digit runs render in Plus
+     Jakarta Sans and Arabic runs in Cairo on the same line with no :lang()
+     switching needed. `font-arabic` exposes Cairo explicitly where Arabic
+     headlines opt into optical weight balancing. */
+  --font-sans: var(--font-ui-latin), var(--font-ui-arabic), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-arabic: var(--font-ui-arabic), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ui-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
   /* Action — cobalt interaction and information. This family must never
      encode success or health. The 500–800 steps match the approved design
      references in docs/design-system/design-update.md. */
@@ -46,9 +49,12 @@
   --color-action-900: oklch(0.321 0.101 266.2);
   --color-action-950: oklch(0.245 0.098 267.1);
 
+  /* Chrome — fixed inverted nav surface fallback (#000068). */
+  --color-chrome: oklch(0.233811 0.162024 264.051);
+
   /* Success — healthy, completed, connected, and verified states only.
      `brand` remains a transitional alias to this green family so existing
-     status call sites stay green while action styling migrates to cobalt. */
+     status call sites stay green while action styling uses cobalt. */
   --color-success-50: oklch(0.981926 0.01806 155.826);
   --color-success-100: oklch(0.962 0.044 156.743);
   --color-success-200: oklch(0.925 0.084 155.995);
@@ -85,7 +91,7 @@
   --color-control-border: oklch(0.656043 0.054999 250.432);
 
   /* Ink — the neutral ramp. Hue 232->245, half the chroma of Tailwind's
-     slate and rotated ~25deg cooler: machined steel, not denim. 12 steps
+     slate and rotated ~25deg cooler: machined steel, not denim. 13 steps
      (an admin table needs a zebra-row step above 50 and a dark-canvas step
      below 950 that Tailwind's 11-step families don't have). */
   --color-ink-25: var(--color-surface-25);
@@ -130,21 +136,85 @@
   --color-warn-800: oklch(0.455 0.12 48);
   --color-warn-900: oklch(0.39 0.086 46);
   --color-warn-950: oklch(0.255 0.078 44);
+
+  /* Accent — Tailwind sky family fitted inside sRGB gamut (600 = #0284c7).
+     Powers fixed Ocean Navy chrome highlights, company entity badges and
+     primary/avatar/logo gradient stops without purple. */
+  --color-accent-50: oklch(0.977 0.0115 236.62);
+  --color-accent-100: oklch(0.951 0.025 236.82);
+  --color-accent-200: oklch(0.901 0.056 230.9);
+  --color-accent-300: oklch(0.828 0.105 230.32);
+  --color-accent-400: oklch(0.746 0.142 232.66);
+  --color-accent-500: oklch(0.685 0.148 237.32);
+  --color-accent-600: oklch(0.587618 0.138871 241.964); /* #0284c7 */
+  --color-accent-700: oklch(0.5 0.118 242.75);
+  --color-accent-800: oklch(0.443 0.098 240.79);
+  --color-accent-900: oklch(0.391 0.08 240.88);
+  --color-accent-950: oklch(0.293 0.058 243.16);
+
+  /* Aqua — Tailwind teal family fitted inside sRGB gamut (600 = #0d9488).
+     Powers user/owner avatar and brand-mark gradient stops. */
+  --color-aqua-50: oklch(0.984 0.014 180.72);
+  --color-aqua-100: oklch(0.953 0.048 180.8);
+  --color-aqua-200: oklch(0.91 0.088 180.43);
+  --color-aqua-300: oklch(0.855 0.126 181.07);
+  --color-aqua-400: oklch(0.777 0.134 181.91);
+  --color-aqua-500: oklch(0.704 0.123 182.5);
+  --color-aqua-600: oklch(0.600205 0.103871 184.706); /* #0d9488 */
+  --color-aqua-700: oklch(0.511 0.086 186.39);
+  --color-aqua-800: oklch(0.437 0.07 188.22);
+  --color-aqua-900: oklch(0.386 0.056 188.42);
+  --color-aqua-950: oklch(0.277 0.044 192.52);
+
+  /* Ember — Tailwind orange family fitted inside sRGB gamut (500 = #f97316).
+     Carries "due today" activity status distinctly from amber rating stars. */
+  --color-ember-50: oklch(0.98 0.014 73.68);
+  --color-ember-100: oklch(0.954 0.036 75.16);
+  --color-ember-200: oklch(0.901 0.074 70.7);
+  --color-ember-300: oklch(0.837 0.116 66.29);
+  --color-ember-400: oklch(0.75 0.168 55.93);
+  --color-ember-500: oklch(0.704871 0.186722 47.604); /* #f97316 */
+  --color-ember-600: oklch(0.646 0.194 41.12);
+  --color-ember-700: oklch(0.553 0.172 38.4);
+  --color-ember-800: oklch(0.47 0.14 37.3);
+  --color-ember-900: oklch(0.408 0.11 38.17);
+  --color-ember-950: oklch(0.266 0.07 36.26);
+
+  /* Navy — fixed Ocean Navy header stops (800 = #132c52, 900 = #0f2342,
+     950 = #091526). */
+  --color-navy-800: oklch(0.295828 0.075909 258.62); /* #132c52 */
+  --color-navy-900: oklch(0.258227 0.064048 258.91); /* #0f2342 */
+  --color-navy-950: oklch(0.194715 0.038695 257.16); /* #091526 */
 }
 
 /* Semantic roles — light values. Named to match shadcn's registry exactly
    (background/foreground/card/popover/primary/…/sidebar*) so `npx shadcn
    add <x>` pastes in with zero edits. NOTE: shadcn's own "--accent" means
-   neutral hover fill, not brand — it stays ink here on purpose. Brand as an
-   accent lives only in --primary and --ring. */
+   neutral hover fill, not brand — it stays ink here on purpose. Cobalt as an
+   accent lives in --primary and --ring. */
 :root {
+  --font-sans: var(--font-ui-latin), var(--font-ui-arabic), ui-sans-serif,
+    system-ui, sans-serif;
+  --font-arabic: var(--font-ui-arabic), ui-sans-serif, system-ui, sans-serif;
+
   --background: var(--color-surface-50);
-  --foreground: oklch(0.256528 0.058664 258.037);
+  --foreground: #0f172a;
+  --foreground-secondary: #334155;
 
   --card: white;
   --card-foreground: var(--foreground);
   --popover: white;
   --popover-foreground: var(--foreground);
+
+  --surface-column: #f6f8fc;
+  --surface-column-header: #ffffff;
+  --surface-toolbar: #ffffff;
+  --surface-subtle: #f8fafc;
+
+  --line-column: #dce3ef;
+  --line-card: #e2e8f0;
+  --line-control: #cbd5e1;
+  --line-divider: #e8eef6;
 
   --primary: var(--color-action-600);
   --primary-foreground: white;
@@ -153,7 +223,7 @@
   --secondary-foreground: var(--foreground);
 
   --muted: var(--color-surface-100);
-  --muted-foreground: oklch(0.518211 0.050915 249.823);
+  --muted-foreground: #64748b;
 
   --accent: var(--color-surface-100);
   --accent-foreground: var(--foreground);
@@ -192,18 +262,8 @@
   --warning-subtle-foreground: var(--color-warn-800);
   --warning-vivid: var(--color-warn-600);
 
-  /* danger-700, not -600 — but NOT for the reason this comment used to give.
-     It claimed "-600 fails contrast (~3.4:1) with white text". Measured
-     against the ramp above, white on danger-600 (oklch 0.567 0.203 27) is
-     5.01:1, which passes AA. The 3.4:1 figure belongs to some earlier -600
-     step and outlived it; nothing enforced it, because no test asserts a
-     ratio for -600.
-
-     The real reason to stay on -700 is headroom, not compliance. Destructive
-     is the one role a user cannot undo by looking again, it is drawn as a
-     filled button at small sizes, and 7.02:1 leaves room for the hover state
-     to darken without approaching the 4.5 floor. -600 would spend that margin
-     for nothing. */
+  /* danger-700, not -600 — headroom for small filled destructive controls
+     (7.02:1 with white, leaving margin for hover darkening). */
   --destructive: var(--color-danger-700);
   --destructive-foreground: white;
   --destructive-subtle: var(--color-danger-100);
@@ -213,22 +273,10 @@
   --border: var(--color-surface-200);
   --input: var(--color-control-border);
   --ring: var(--color-action-500);
+  --row-zebra: var(--color-surface-25);
 
   /* Chart roles are semantic first. Qualitative slots are reserved for
      unrelated categories and are always paired with labels or patterns. */
-  /* Marks sit just above WCAG's 3:1 floor for non-text graphics (the axis,
-     which is text, keeps 4.5:1 — ChartPalette.test.ts enforces both). They
-     were -600/-700 ramp steps at L 0.49-0.55, which on a white card read
-     dark and muddy rather than as data.
-
-     Two constraints shape these. Lightness is where chroma lives, since
-     sRGB's ceiling peaks near L 0.6-0.7, so brightening buys saturation
-     too. But a categorical palette also has to stay *level*: a series that
-     is darker than its neighbours reads as more important before the data
-     says anything. So every slot is held inside L 0.625-0.681 and takes the
-     chroma available there, rather than each chasing its own maximum — hue
-     does the separating. Explicit values, not ramp aliases, because no
-     single step lands on the floor. */
   --chart-action: oklch(0.625 0.189 264.376);
   --chart-success: oklch(0.645 0.168 150.069);
   --chart-warning: oklch(0.679 0.165 52);
@@ -247,22 +295,20 @@
   --chart-4: var(--chart-danger);
   --chart-5: var(--chart-qualitative-3);
 
-  /* Elevation (docs/design-system/geometry-and-density.md "Elevation"):
-     shadow means "floating above the document," nothing else — cards use
-     border + background step, never a shadow. `pop` is the small-surface
-     elevation (popover, tooltip, dropdown, select, switch thumb, toast,
-     surface.raised); `overlay` is the large-surface elevation (dialog,
-     sheet, alert-dialog). Bridged to the shadow-pop/shadow-overlay
-     utilities via the @theme inline block below so .dark's override
-     actually reaches them (same reason --background needs the inline
-     bridge, see the comment above that block). */
+  /* Elevation — pop/overlay cover floating portals; toolbar/column/card/nav-active
+     supply the Ocean Navy v3 layered surface hierarchy. Bridged to shadow-*
+     utilities via @theme inline below so .dark's overrides reach them. */
   --elevation-pop: 0 4px 6px -1px rgb(15 23 32 / 0.08), 0 2px 4px -2px rgb(15 23 32 / 0.06);
   --elevation-overlay: 0 20px 25px -5px rgb(15 23 32 / 0.12), 0 8px 10px -6px rgb(15 23 32 / 0.08);
+  --elevation-toolbar: 0 4px 16px -3px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.03);
+  --elevation-column: 0 4px 16px -4px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.03);
+  --elevation-card: 0 4px 14px -3px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.04);
+  --elevation-nav-active: 0 4px 14px rgb(2 132 199 / 0.42);
 
-  /* Sidebar (Phase 14) is bg-sidebar in BOTH themes — unlike the navbar it
-     replaces, which is permanently dark. */
+  /* Sidebar is theme-adaptive in both light and dark modes. */
   --sidebar: var(--color-surface-25);
   --sidebar-foreground: var(--foreground);
+  --sidebar-active: var(--color-action-800);
   --sidebar-primary: var(--color-action-600);
   --sidebar-primary-foreground: white;
   --sidebar-accent: var(--color-surface-100);
@@ -271,6 +317,90 @@
   --sidebar-selected-foreground: var(--color-action-800);
   --sidebar-border: var(--color-surface-200);
   --sidebar-ring: var(--color-action-500);
+
+  /* Ocean Navy header & chrome tokens — invariant dark navy topbar with light
+     on-chrome foregrounds and translucent sky switcher accents. */
+  --nav: var(--color-chrome);
+  --nav-foreground: #e2e8f0;
+  --nav-foreground-strong: #f8fafc;
+  --nav-muted-foreground: var(--color-ink-300);
+  --nav-accent: var(--color-action-900);
+  --nav-border: var(--color-action-800);
+  --nav-active: #38bdf8;
+  --nav-ring: white;
+  --nav-switcher-surface: rgb(14 165 233 / 0.16);
+  --nav-switcher-line: rgb(56 189 248 / 0.35);
+  --nav-switcher-fg: #e0f2fe;
+  --nav-tab-active-line: rgb(125 211 252 / 0.45);
+  --nav-chrome-line: rgb(148 163 184 / 0.2);
+
+  /* Ocean Navy v3 semantic roles — activity health, pills, stars, KPI badges,
+     entity badges, count pills, active filter chips and named gradients.
+     Blues map onto --color-action-* (`brand` stays the green alias of success). */
+  --activity-none: #cbd5e1;
+  --activity-today: var(--color-ember-500);
+  --activity-future: #16a34a;
+  --activity-overdue: #ef4444;
+
+  --activity-none-surface: #f1f5f9;
+  --activity-none-line: #cbd5e1;
+  --activity-none-text: #475569;
+  --activity-future-surface: #f0fdf4;
+  --activity-future-line: #86efac;
+  --activity-future-text: #15803d;
+  --activity-today-surface: #fff7ed;
+  --activity-today-line: #fdba74;
+  --activity-today-text: #c2410c;
+  --activity-overdue-surface: #fef2f2;
+  --activity-overdue-line: #fca5a5;
+  --activity-overdue-text: #b91c1c;
+
+  --star-filled: #f59e0b;
+  --star-empty: #cbd5e1;
+
+  --kpi-total-surface: #f1f5f9;
+  --kpi-total-line: #cbd5e1;
+  --kpi-total-text: #1e293b;
+  --kpi-total-count: #334155;
+  --kpi-new-surface: var(--color-action-50);
+  --kpi-new-line: var(--color-action-200);
+  --kpi-new-text: var(--color-action-800);
+  --kpi-new-count: var(--color-action-600);
+  --kpi-rated-surface: #fffbeb;
+  --kpi-rated-line: #fde68a;
+  --kpi-rated-text: #92400e;
+  --kpi-rated-count: #b45309;
+  --kpi-qualified-surface: #ecfdf5;
+  --kpi-qualified-line: #a7f3d0;
+  --kpi-qualified-text: #065f46;
+  --kpi-qualified-count: #15803d;
+  --kpi-overdue-surface: #fef2f2;
+  --kpi-overdue-line: #fecaca;
+  --kpi-overdue-text: #991b1b;
+  --kpi-overdue-count: #dc2626;
+
+  --entity-person-surface: var(--color-action-50);
+  --entity-person-fg: var(--color-action-600);
+  --entity-company-surface: var(--color-accent-50);
+  --entity-company-fg: var(--color-accent-600);
+
+  --count-active-surface: var(--color-action-50);
+  --count-active-fg: var(--color-action-700);
+  --count-zero-surface: #f1f5f9;
+  --count-zero-fg: #475569;
+  --count-danger-surface: #fef2f2;
+  --count-danger-fg: #b91c1c;
+
+  --chip-active-line: var(--color-action-300);
+  --chip-active-fg: var(--color-action-700);
+
+  --gradient-header: linear-gradient(90deg, var(--color-navy-950) 0%, var(--color-navy-900) 52%, var(--color-navy-800) 100%);
+  --gradient-brand-strip: linear-gradient(90deg, #2563eb 0%, #0ea5e9 35%, #10b981 70%, #f59e0b 100%);
+  --gradient-primary: linear-gradient(135deg, var(--color-action-600) 0%, var(--color-accent-700) 100%);
+  --gradient-avatar: linear-gradient(135deg, var(--color-accent-700) 0%, var(--color-aqua-700) 100%);
+  --gradient-logo: linear-gradient(135deg, var(--color-action-600) 0%, var(--color-accent-600) 55%, var(--color-aqua-600) 100%);
+  --gradient-canvas: linear-gradient(180deg, #edf2f8, #e4ebf5);
+  --gradient-chip-active: linear-gradient(135deg, var(--color-action-50), var(--color-action-100));
 }
 
 /* Control height scale (docs/design-system/geometry-and-density.md) —
@@ -284,6 +414,9 @@
   --size-control-md: 2.25rem; /* 36px */
   --size-control-lg: 2.5rem; /* 40px */
   --size-control-xl: 2.75rem; /* 44px */
+  --size-brand-strip: 3px; /* fixed Ocean Navy brand accent strip */
+  --size-toolbar: 3rem; /* 48px — floating toolbar */
+  --size-toolbar-control: 2.0625rem; /* 33px — compact toolbar CTA & control step */
 }
 
 /* Real pointer targets for dense controls. `ds-hit-area` increases the
@@ -321,17 +454,46 @@
   }
 }
 
+/* The nav surface — repoints generic foreground, surface, border and focus-ring
+   tokens inside the fixed Ocean Navy Topbar (`<header className="nav-surface">`)
+   so shared controls (`LanguageToggle`, `ThemeToggle`, `NotificationDropdown`,
+   `UserDropdown`) render on-chrome in both light and dark modes while Radix
+   dropdown/popover portals under `<body>` keep their light/dark `--popover`
+   surface. */
+.nav-surface {
+  --background: var(--nav);
+  --card: var(--color-navy-900);
+  --foreground: var(--nav-foreground);
+  --muted-foreground: var(--nav-muted-foreground);
+  --accent: var(--nav-accent);
+  --accent-foreground: var(--nav-foreground);
+  --border: var(--nav-border);
+  --input: var(--nav-chrome-line);
+  --ring: var(--nav-ring);
+}
+
 /* Semantic roles — dark overrides. Interactive fills use dark ink labels so
    the same bright role remains AA when consumed as standalone text. Control
    boundaries retain at least 3:1 against the dark card surface. */
 .dark {
   --background: var(--color-ink-1000);
   --foreground: var(--color-ink-100);
+  --foreground-secondary: #cbd5e1;
 
   --card: var(--color-ink-950);
   --card-foreground: var(--color-ink-100);
   --popover: var(--color-ink-900);
   --popover-foreground: var(--color-ink-100);
+
+  --surface-column: #070f1a;
+  --surface-column-header: var(--color-ink-950);
+  --surface-toolbar: var(--color-ink-950);
+  --surface-subtle: #111c2b;
+
+  --line-column: #1e2d42;
+  --line-card: #243449;
+  --line-control: #62758f;
+  --line-divider: #1b293b;
 
   /* Bright action text and fills share one role in the component API. The
      darker action-500 step was AA as a fill with white, but only 3.66:1 when
@@ -386,6 +548,7 @@
   --border: oklch(0.49 0.024 237);
   --input: oklch(0.49 0.024 237);
   --ring: var(--color-action-400);
+  --row-zebra: var(--color-ink-950);
 
   --chart-action: var(--color-action-400);
   --chart-success: var(--color-success-400);
@@ -405,14 +568,18 @@
   --chart-4: var(--chart-danger);
   --chart-5: var(--chart-qualitative-3);
 
-  /* Dark mode substitutes a top inset hairline for shadow rather than a
-     darker shadow — a box-shadow reads poorly against an already-dark
-     canvas (docs/design-system/geometry-and-density.md "Elevation"). */
+  /* Dark mode substitutes a top inset hairline for document shadows while
+     keeping the sky glow on active Ocean Navy navigation items. */
   --elevation-pop: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
   --elevation-overlay: inset 0 1px 0 0 rgb(255 255 255 / 0.08);
+  --elevation-toolbar: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+  --elevation-column: inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+  --elevation-card: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --elevation-nav-active: 0 4px 14px rgb(2 132 199 / 0.36);
 
   --sidebar: var(--color-ink-950);
   --sidebar-foreground: var(--color-ink-100);
+  --sidebar-active: var(--color-action-200);
   --sidebar-primary: var(--color-action-500);
   --sidebar-primary-foreground: white;
   --sidebar-accent: var(--color-ink-800);
@@ -421,6 +588,87 @@
   --sidebar-selected-foreground: var(--color-action-200);
   --sidebar-border: var(--color-ink-800);
   --sidebar-ring: var(--color-action-400);
+
+  /* Dark mode keeps the Ocean Navy header invariant (`bg-gradient-header`
+     across navy-950 -> navy-900 -> navy-800). */
+  --nav: var(--color-chrome);
+  --nav-foreground: #e2e8f0;
+  --nav-foreground-strong: #f8fafc;
+  --nav-muted-foreground: var(--color-ink-300);
+  --nav-accent: var(--color-action-900);
+  --nav-border: var(--color-action-800);
+  --nav-active: #38bdf8;
+  --nav-ring: var(--ring);
+  --nav-switcher-surface: rgb(14 165 233 / 0.18);
+  --nav-switcher-line: rgb(56 189 248 / 0.38);
+  --nav-switcher-fg: #e0f2fe;
+  --nav-tab-active-line: rgb(125 211 252 / 0.48);
+  --nav-chrome-line: rgb(148 163 184 / 0.22);
+
+  --activity-none: #64748b;
+  --activity-today: #fb923c;
+  --activity-future: #22c55e;
+  --activity-overdue: #f87171;
+
+  --activity-none-surface: rgb(148 163 184 / 0.14);
+  --activity-none-line: rgb(148 163 184 / 0.32);
+  --activity-none-text: #cbd5e1;
+  --activity-future-surface: rgb(34 197 94 / 0.14);
+  --activity-future-line: rgb(74 222 128 / 0.35);
+  --activity-future-text: #86efac;
+  --activity-today-surface: rgb(249 115 22 / 0.15);
+  --activity-today-line: rgb(251 146 60 / 0.38);
+  --activity-today-text: #fdba74;
+  --activity-overdue-surface: rgb(239 68 68 / 0.15);
+  --activity-overdue-line: rgb(248 113 113 / 0.38);
+  --activity-overdue-text: #fca5a5;
+
+  --star-filled: #fbbf24;
+  --star-empty: #475569;
+
+  --kpi-total-surface: rgb(148 163 184 / 0.14);
+  --kpi-total-line: rgb(148 163 184 / 0.32);
+  --kpi-total-text: #e2e8f0;
+  --kpi-total-count: #334155;
+  --kpi-new-surface: var(--color-action-950);
+  --kpi-new-line: var(--color-action-800);
+  --kpi-new-text: var(--color-action-200);
+  --kpi-new-count: var(--color-action-600);
+  --kpi-rated-surface: rgb(245 158 11 / 0.15);
+  --kpi-rated-line: rgb(251 191 36 / 0.35);
+  --kpi-rated-text: #fde68a;
+  --kpi-rated-count: #b45309;
+  --kpi-qualified-surface: rgb(16 185 129 / 0.15);
+  --kpi-qualified-line: rgb(52 211 153 / 0.35);
+  --kpi-qualified-text: #a7f3d0;
+  --kpi-qualified-count: #15803d;
+  --kpi-overdue-surface: rgb(239 68 68 / 0.15);
+  --kpi-overdue-line: rgb(248 113 113 / 0.38);
+  --kpi-overdue-text: #fecaca;
+  --kpi-overdue-count: #dc2626;
+
+  --entity-person-surface: var(--color-action-950);
+  --entity-person-fg: var(--color-action-300);
+  --entity-company-surface: var(--color-accent-950);
+  --entity-company-fg: var(--color-accent-300);
+
+  --count-active-surface: var(--color-action-950);
+  --count-active-fg: var(--color-action-200);
+  --count-zero-surface: rgb(148 163 184 / 0.14);
+  --count-zero-fg: #cbd5e1;
+  --count-danger-surface: rgb(239 68 68 / 0.15);
+  --count-danger-fg: #fca5a5;
+
+  --chip-active-line: var(--color-action-700);
+  --chip-active-fg: var(--color-action-200);
+
+  --gradient-header: linear-gradient(90deg, var(--color-navy-950) 0%, var(--color-navy-900) 52%, var(--color-navy-800) 100%);
+  --gradient-brand-strip: linear-gradient(90deg, #2563eb 0%, #0ea5e9 35%, #10b981 70%, #f59e0b 100%);
+  --gradient-primary: linear-gradient(135deg, var(--color-action-600) 0%, var(--color-accent-700) 100%);
+  --gradient-avatar: linear-gradient(135deg, var(--color-accent-700) 0%, var(--color-aqua-700) 100%);
+  --gradient-logo: linear-gradient(135deg, var(--color-action-500) 0%, var(--color-accent-600) 55%, var(--color-aqua-600) 100%);
+  --gradient-canvas: linear-gradient(180deg, #040911, #060d17);
+  --gradient-chip-active: linear-gradient(135deg, var(--color-action-950), var(--color-action-900));
 }
 
 /* Bridges the semantic :root/.dark custom properties above into Tailwind
@@ -431,10 +679,19 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-surface-column: var(--surface-column);
+  --color-surface-column-header: var(--surface-column-header);
+  --color-surface-toolbar: var(--surface-toolbar);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-line-column: var(--line-column);
+  --color-line-card: var(--line-card);
+  --color-line-control: var(--line-control);
+  --color-line-divider: var(--line-divider);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -468,6 +725,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-row-zebra: var(--row-zebra);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -487,8 +745,13 @@
   --color-chart-axis: var(--chart-axis);
   --shadow-pop: var(--elevation-pop);
   --shadow-overlay: var(--elevation-overlay);
+  --shadow-toolbar: var(--elevation-toolbar);
+  --shadow-column: var(--elevation-column);
+  --shadow-card: var(--elevation-card);
+  --shadow-nav-active: var(--elevation-nav-active);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--sidebar-active);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -498,10 +761,110 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-nav: var(--nav);
+  --color-nav-active: var(--nav-active);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-nav-foreground-strong: var(--nav-foreground-strong);
+  --color-nav-muted-foreground: var(--nav-muted-foreground);
+  --color-nav-accent: var(--nav-accent);
+  --color-nav-border: var(--nav-border);
+  --color-nav-ring: var(--nav-ring);
+  --color-nav-switcher-surface: var(--nav-switcher-surface);
+  --color-nav-switcher-line: var(--nav-switcher-line);
+  --color-nav-switcher-fg: var(--nav-switcher-fg);
+  --color-nav-tab-active-line: var(--nav-tab-active-line);
+  --color-nav-chrome-line: var(--nav-chrome-line);
+
+  --color-activity-none: var(--activity-none);
+  --color-activity-today: var(--activity-today);
+  --color-activity-future: var(--activity-future);
+  --color-activity-overdue: var(--activity-overdue);
+  --color-activity-none-surface: var(--activity-none-surface);
+  --color-activity-none-line: var(--activity-none-line);
+  --color-activity-none-text: var(--activity-none-text);
+  --color-activity-future-surface: var(--activity-future-surface);
+  --color-activity-future-line: var(--activity-future-line);
+  --color-activity-future-text: var(--activity-future-text);
+  --color-activity-today-surface: var(--activity-today-surface);
+  --color-activity-today-line: var(--activity-today-line);
+  --color-activity-today-text: var(--activity-today-text);
+  --color-activity-overdue-surface: var(--activity-overdue-surface);
+  --color-activity-overdue-line: var(--activity-overdue-line);
+  --color-activity-overdue-text: var(--activity-overdue-text);
+
+  --color-star-filled: var(--star-filled);
+  --color-star-empty: var(--star-empty);
+
+  --color-kpi-total-surface: var(--kpi-total-surface);
+  --color-kpi-total-line: var(--kpi-total-line);
+  --color-kpi-total-text: var(--kpi-total-text);
+  --color-kpi-total-count: var(--kpi-total-count);
+  --color-kpi-new-surface: var(--kpi-new-surface);
+  --color-kpi-new-line: var(--kpi-new-line);
+  --color-kpi-new-text: var(--kpi-new-text);
+  --color-kpi-new-count: var(--kpi-new-count);
+  --color-kpi-rated-surface: var(--kpi-rated-surface);
+  --color-kpi-rated-line: var(--kpi-rated-line);
+  --color-kpi-rated-text: var(--kpi-rated-text);
+  --color-kpi-rated-count: var(--kpi-rated-count);
+  --color-kpi-qualified-surface: var(--kpi-qualified-surface);
+  --color-kpi-qualified-line: var(--kpi-qualified-line);
+  --color-kpi-qualified-text: var(--kpi-qualified-text);
+  --color-kpi-qualified-count: var(--kpi-qualified-count);
+  --color-kpi-overdue-surface: var(--kpi-overdue-surface);
+  --color-kpi-overdue-line: var(--kpi-overdue-line);
+  --color-kpi-overdue-text: var(--kpi-overdue-text);
+  --color-kpi-overdue-count: var(--kpi-overdue-count);
+
+  --color-entity-person-surface: var(--entity-person-surface);
+  --color-entity-person-fg: var(--entity-person-fg);
+  --color-entity-company-surface: var(--entity-company-surface);
+  --color-entity-company-fg: var(--entity-company-fg);
+
+  --color-count-active-surface: var(--count-active-surface);
+  --color-count-active-fg: var(--count-active-fg);
+  --color-count-zero-surface: var(--count-zero-surface);
+  --color-count-zero-fg: var(--count-zero-fg);
+  --color-count-danger-surface: var(--count-danger-surface);
+  --color-count-danger-fg: var(--count-danger-fg);
+
+  --color-chip-active-line: var(--chip-active-line);
+  --color-chip-active-fg: var(--chip-active-fg);
+
   /* canvas is an explicit alias distinct from --background for the surface
      ladder in docs/design-system/geometry-and-density.md (canvas / surface
      / surface-raised / surface-sunken). */
   --color-canvas: var(--background);
+}
+
+/* Named gradient utilities (Ocean Navy v3 token contract). Each reads its
+   theme-aware custom property from :root / .dark; blues map onto action. */
+@utility bg-gradient-header {
+  background-image: var(--gradient-header);
+}
+
+@utility bg-gradient-brand-strip {
+  background-image: var(--gradient-brand-strip);
+}
+
+@utility bg-gradient-primary {
+  background-image: var(--gradient-primary);
+}
+
+@utility bg-gradient-avatar {
+  background-image: var(--gradient-avatar);
+}
+
+@utility bg-gradient-logo {
+  background-image: var(--gradient-logo);
+}
+
+@utility bg-gradient-canvas {
+  background-image: var(--gradient-canvas);
+}
+
+@utility bg-gradient-chip-active {
+  background-image: var(--gradient-chip-active);
 }
 
 /* =========================================================================
@@ -789,21 +1152,47 @@
   --color-pink-950: var(--color-ink-950);
 }
 
-/* Weight ceiling: font-bold/extrabold/black all compute to 600 (semibold).
-   1,078 pre-existing bold-or-heavier call sites de-escalate with zero file
-   edits — see the 3-weight policy in docs/design-system/typography.md. */
+/* Weight ceiling — 400/500/600/700/800 are downloaded (src/app/fonts.ts).
+   900 stays forbidden and remaps to 800 so no stray heavy utility triggers
+   synthetic bolding (docs/design-system/typography.md). */
 @theme {
-  --font-weight-bold: 600;
-  --font-weight-extrabold: 600;
-  --font-weight-black: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 800;
 }
 
-/* Type scale — 7 steps, 13px floor, 14px base (docs/design-system/
-   typography.md). text-2xs is new; the rest override Tailwind's defaults.
-   Two (text-sm, text-xl) happen to already match Tailwind's stock values —
-   declared explicitly anyway so the scale is self-documenting in one place
-   rather than "correct by coincidence". */
+/* Type scale — named Ocean Navy v3 steps plus the base 7-step scale
+   (docs/design-system/typography.md). Arabic lift is applied below in
+   html[lang="ar"]. */
 @theme {
+  --text-micro: 0.625rem; /* 10px — inner count chips & avatar initials only */
+  --text-micro--line-height: 0.875rem; /* 14px */
+  --text-micro--letter-spacing: 0em;
+
+  --text-badge: 0.6875rem; /* 11px — KPI badges, activity & source pills, filter chips */
+  --text-badge--line-height: 1rem; /* 16px */
+  --text-badge--letter-spacing: 0em;
+
+  --text-caption: 0.75rem; /* 12px — contact subtitle, compact helper lines */
+  --text-caption--line-height: 1.125rem; /* 18px */
+  --text-caption--letter-spacing: 0em;
+
+  --text-label: 0.78125rem; /* 12.5px — toolbar CTA & compact control labels */
+  --text-label--line-height: 1.125rem; /* 18px */
+  --text-label--letter-spacing: 0em;
+
+  --text-tab: 0.84375rem; /* 13.5px — global nav tabs & collapsed rail titles */
+  --text-tab--line-height: 1.25rem; /* 20px */
+  --text-tab--letter-spacing: -0.002em;
+
+  --text-card-title: 0.875rem; /* 14px — Kanban & grid card lead/entity title */
+  --text-card-title--line-height: 1.25rem; /* 20px */
+  --text-card-title--letter-spacing: -0.003em;
+
+  --text-column-title: 0.90625rem; /* 14.5px — Kanban stage column header title */
+  --text-column-title--line-height: 1.3125rem; /* 21px */
+  --text-column-title--letter-spacing: -0.005em;
+
   --text-2xs: 0.8125rem; /* 13px — compatibility alias; migrate to text-xs */
   --text-2xs--line-height: 1.125rem; /* 18px */
   --text-2xs--letter-spacing: 0.06em;
@@ -833,11 +1222,28 @@
   --text-2xl--letter-spacing: -0.018em;
 }
 
-/* Arabic gets +1px on the three smallest steps, line-height raised in
-   lockstep so ascenders/descenders don't clip — Plex Arabic needs it where
-   Plex Latin doesn't. text-2xs is Latin-only by convention (no uppercase in
-   Arabic) so it is deliberately not lifted here. */
+/* Arabic gets +1px on the small and mid steps, line-heights raised in lockstep
+   and tracking zeroed so Cairo's dots and joined forms never clip or split.
+   text-2xs is Latin-only by convention (no uppercase in Arabic) so it is
+   deliberately not lifted here. */
 html[lang="ar"] {
+  --text-micro: 0.6875rem; /* 11px */
+  --text-micro--line-height: 0.9375rem; /* 15px */
+  --text-badge: 0.75rem; /* 12px */
+  --text-badge--line-height: 1.0625rem; /* 17px */
+  --text-caption: 0.8125rem; /* 13px */
+  --text-caption--line-height: 1.25rem; /* 20px */
+  --text-label: 0.84375rem; /* 13.5px */
+  --text-label--line-height: 1.25rem; /* 20px */
+  --text-tab: 0.90625rem; /* 14.5px */
+  --text-tab--line-height: 1.375rem; /* 22px */
+  --text-tab--letter-spacing: 0em;
+  --text-card-title: 0.9375rem; /* 15px */
+  --text-card-title--line-height: 1.375rem; /* 22px */
+  --text-card-title--letter-spacing: 0em;
+  --text-column-title: 0.96875rem; /* 15.5px */
+  --text-column-title--line-height: 1.4375rem; /* 23px */
+  --text-column-title--letter-spacing: 0em;
   --text-xs: 0.875rem; /* 14px */
   --text-xs--line-height: 1.25rem; /* 20px */
   --text-sm: 0.9375rem; /* 15px */
@@ -846,19 +1252,19 @@ html[lang="ar"] {
   --text-base--line-height: 1.625rem; /* 26px */
 }
 
-/* Radius — 5 steps (docs/design-system/geometry-and-density.md). Phase 7's
-   codemod renamed every rounded-2xl/3xl call site to rounded-xl, so no
-   transitional alias is needed for those two Tailwind keys any more. */
+/* Radius — 5 generic steps plus the named card (13px) and column (16px)
+   surfaces from Ocean Navy v3 (docs/design-system/geometry-and-density.md). */
 @theme {
   --radius-xs: 0.1875rem; /* 3px — checkbox */
   --radius-sm: 0.25rem; /* 4px — chips, inline code */
   --radius-md: 0.375rem; /* 6px — default: buttons, inputs, badges, tabs */
   --radius-lg: 0.5rem; /* 8px — cards, table shell, popovers */
   --radius-xl: 0.625rem; /* 10px — dialogs, drawers */
+  --radius-card: 0.8125rem; /* 13px — Kanban & entity cards */
+  --radius-column: 1rem; /* 16px — Kanban stage columns & collapsed rails */
 }
 
-/* One of the 3-gradient budget — the Skeleton primitive's shimmer sweep
-   (src/design-system/primitives/Skeleton.tsx). */
+/* Skeleton primitive's shimmer sweep (src/design-system/primitives/Skeleton.tsx). */
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -866,11 +1272,11 @@ html[lang="ar"] {
 }
 
 body {
-  font-family: var(--font-sans);
-  /* Only 400/500/600 are downloaded (src/app/fonts.ts) — this stops a
+  font-family: var(--font-ui-latin), var(--font-ui-arabic), ui-sans-serif,
+    system-ui, sans-serif;
+  /* 400/500/600/700/800 are downloaded (src/app/fonts.ts) — this stops a
      heavier className from faking a weight the family doesn't define. */
   font-synthesis-weight: none;
   background-color: var(--background);
   color: var(--foreground);
 }
-

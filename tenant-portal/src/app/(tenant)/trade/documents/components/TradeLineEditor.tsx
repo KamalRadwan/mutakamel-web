@@ -127,6 +127,7 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
                     inputMode="decimal"
                     value={line.quantity}
                     onChange={(event) => state.setQuantity(index, event.target.value)}
+                    onBlur={() => state.commitQuantity(index)}
                     disabled={disabled}
                   />
                 </Field>
@@ -138,7 +139,7 @@ export function TradeLineEditor({ state, currencyCode, disabled }: TradeLineEdit
                   <p className="mt-0.5 text-xs text-foreground">
                     {line.unitPrice === null ? (
                       <span className="text-muted-foreground">
-                        {line.priceError
+                        {line.priceError !== null
                           ? (tradeDocumentMessage(line.priceError, t.tradeDocuments.errors) ??
                             t.tradeDocuments.lineEditor.priceUnavailable)
                           : t.tradeDocuments.lineEditor.awaitingPrice}

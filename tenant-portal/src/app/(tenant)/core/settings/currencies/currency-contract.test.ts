@@ -53,19 +53,48 @@ describe("Core currencies contract", () => {
     expect(parsed.symbol).toBeNull();
   });
 
-  it("omits the exchange rate when the new currency is the default", () => {
-    // The server pins the default's rate to 1, so sending one is a value it discards.
+  it("allows the first default currency to omit the exchange rate", () => {
     expect(
       buildCreateCurrencyRequest({
         code: "usd",
         name: " US Dollar ",
         symbol: "$",
         decimalPlaces: "2",
-        exchangeRate: "5",
+        exchangeRate: " ",
         isDefault: true,
       }),
     ).toEqual({ code: "USD", name: "US Dollar", symbol: "$", decimalPlaces: 2, isDefault: true });
   });
+
+  it("sends the replacement default's rate against the current default for rebasing", () => {
+    expect(buildCreateCurrencyRequest({
+      code: "egp",
+      name: "Egyptian Pound",
+      symbol: "",
+      decimalPlaces: "2",
+      exchangeRate: " 50 ",
+      isDefault: true,
+    })).toEqual({
+      code: "EGP",
+      name: "Egyptian Pound",
+      decimalPlaces: 2,
+      exchangeRate: 50,
+      isDefault: true,
+    });
+  });
+
+  it.each(["0", "-1", "NaN", "1.123456789", "1000000001"])(
+    "rejects an invalid supplied rate for a new default: %s", (exchangeRate) => {
+      expect(() => buildCreateCurrencyRequest({
+        code: "EGP",
+        name: "Egyptian Pound",
+        symbol: "",
+        decimalPlaces: "2",
+        exchangeRate,
+        isDefault: true,
+      })).toThrow("CURRENCY_FORM_RATE");
+    },
+  );
 
   it("requires a well-formed rate for a non-default currency", () => {
     expect(
@@ -108,6 +137,15 @@ describe("Core currencies contract", () => {
     });
     expect(request).toEqual({ name: "Euro area" });
     expect("code" in request).toBe(false);
+  });
+
+  it.each(["3", "2", "invalid"])("never sends decimal places on update: %s", (decimalPlaces) => {
+    const current = parseCurrencyResponse(currency);
+    expect(buildUpdateCurrencyRequest(current, {
+      ...toCurrencyForm(current),
+      name: "Euro area",
+      decimalPlaces,
+    })).toEqual({ name: "Euro area" });
   });
 
   it("rejects a page whose row carries an unknown status", () => {

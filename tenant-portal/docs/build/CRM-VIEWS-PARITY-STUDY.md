@@ -108,7 +108,7 @@ Basic search for all three workspaces uses the shared token control and applies 
 - Pipeline and Stage tokens remain compatible; the server validates stage membership.
 - The token bar accepts several simultaneous filters. Tags may repeat (up to 50); route-owned scalar choices such as Status, Stage flag, Pipeline and Stage replace the earlier chip for that field so Board, Card and Table keep identical semantics.
 
-Advanced search keeps the existing AND-inside-group / OR-between-groups tree and explicit Search button. The free-text input and explanatory sentence above the tree are removed; joined identity text is handled by Basic search.
+Advanced search keeps the existing AND-inside-group / OR-between-groups tree and explicit submit. The free-text input and explanatory sentence above the tree are removed (and, as of 2026-10-26, their props and dictionary keys too); joined identity text is handled by Basic search. Since 2026-10-26 the card lays one OR group per row with its AND-ed conditions side by side and all actions in the header — see [patterns.md](../design/patterns.md#advanced-search-card).
 
 The Stage/Status bar and Basic tokens are one state:
 

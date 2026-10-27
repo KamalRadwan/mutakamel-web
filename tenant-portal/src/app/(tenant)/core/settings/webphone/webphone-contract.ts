@@ -117,7 +117,6 @@ export interface WebphoneExtension {
   passwordConfigured: boolean;
   displayName: string | null;
   outboundCallerId: string | null;
-  transport: WebphoneTransport;
   enabled: boolean;
 }
 
@@ -224,7 +223,6 @@ export interface ExtensionDraft {
   sipPassword: string;
   displayName: string;
   outboundCallerId: string;
-  transport: WebphoneTransport;
   enabled: boolean;
 }
 
@@ -235,7 +233,6 @@ export interface CreateWebphoneExtensionDto {
   sipPassword?: string | null;
   displayName?: string | null;
   outboundCallerId?: string | null;
-  transport?: WebphoneTransport;
   enabled?: boolean;
 }
 
@@ -245,7 +242,6 @@ export interface UpdateWebphoneExtensionDto {
   sipPassword?: string | null;
   displayName?: string | null;
   outboundCallerId?: string | null;
-  transport?: WebphoneTransport;
   enabled?: boolean;
 }
 
@@ -400,8 +396,7 @@ export function readWebphoneExtension(payload: unknown): WebphoneExtension {
     !nonEmptyString(extension.extension) ||
     !nonEmptyString(extension.sipUsername) ||
     typeof extension.passwordConfigured !== "boolean" ||
-    typeof extension.enabled !== "boolean" ||
-    !isTransport(extension.transport)
+    typeof extension.enabled !== "boolean"
   ) {
     invalidResponse("EXTENSION");
   }
@@ -418,7 +413,6 @@ export function readWebphoneExtension(payload: unknown): WebphoneExtension {
     passwordConfigured: extension.passwordConfigured as boolean,
     displayName: nullableString(extension.displayName),
     outboundCallerId: nullableString(extension.outboundCallerId),
-    transport: extension.transport,
     enabled: extension.enabled as boolean,
   };
 }
@@ -747,7 +741,6 @@ export const EMPTY_EXTENSION_DRAFT: ExtensionDraft = {
   sipPassword: "",
   displayName: "",
   outboundCallerId: "",
-  transport: "wss",
   enabled: false,
 };
 
@@ -783,7 +776,6 @@ export function extensionDraftToDto(
     ownerId: draft.ownerId.trim(),
     extension: draft.extension.trim(),
     sipUsername: draft.sipUsername.trim(),
-    transport: draft.transport,
     enabled: draft.enabled,
     ...(draft.sipPassword ? { sipPassword: draft.sipPassword } : {}),
     ...(displayName ? { displayName } : {}),
@@ -877,10 +869,6 @@ function isIceTransportPolicy(
   value: unknown,
 ): value is WebphoneIceTransportPolicy {
   return value === "all" || value === "relay";
-}
-
-function isTransport(value: unknown): value is WebphoneTransport {
-  return value === "ws" || value === "wss";
 }
 
 function invalidResponse(part: string): never {

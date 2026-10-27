@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLoginCooldown } from "./useLoginCooldown";
 import { useI18n } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
@@ -9,6 +10,7 @@ import { useToast } from "@/components/ui/ToastContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { getAuthErrorCode } from "@/lib/auth/sessionRefresh";
 import { isValidEmailAddress } from "@/shared/validation/email";
+import { useMfaChallenge } from "@/lib/auth/useMfaChallenge";
 
 export function useLogin() {
   const [email, setEmail] = useState("");
@@ -33,9 +35,14 @@ export function useLogin() {
   const forgotErrorRef = useRef<HTMLDivElement>(null);
 
   const { t, lang } = useI18n();
+  const { startCooldown, isCoolingDown, retryMinutes } = useLoginCooldown();
   const copy = (lang === "ar" ? ar : en).login;
   const { login } = useAuth();
   const toast = useToast();
+  const mfa = useMfaChallenge(async (challengeId, code) => {
+    await login({ challengeId, code, rememberMe });
+    toast.success(copy.loginSuccessTitle, copy.loginSuccessDescription);
+  });
 
   const toggleShowPassword = () => setShowPassword((prev) => !prev);
   const toggleRememberMe = () => setRememberMe((prev) => !prev);
@@ -69,6 +76,7 @@ export function useLogin() {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isSubmitting || isCoolingDown) return;
     setError(null);
 
     const trimmedEmail = email.trim();
@@ -96,16 +104,22 @@ export function useLogin() {
     setIsSubmitting(true);
 
     try {
-      await login({ email: trimmedEmail, password, rememberMe });
+      const step = await login({ email: trimmedEmail, password, rememberMe });
+      setPassword("");
+      if (step) { mfa.start(step); return; }
       toast.success(copy.loginSuccessTitle, copy.loginSuccessDescription);
     } catch (err: unknown) {
       // A newer login in another tab owns the shared cookie session. AuthContext
       // adopts it through the session event/bootstrap path without presenting
       // the superseded local submission as a credential failure.
       if (getAuthErrorCode(err) === "AUTH_SESSION_CHANGED") return;
-      const errorPayload = err as { response?: { data?: { message?: string } }; message?: string };
-      const errMsg = errorPayload?.response?.data?.message || errorPayload?.message || copy.credentialsInvalidFallback;
-      setError(errMsg);
+      const seconds = startCooldown(err);
+      const errorPayload = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      const errMsg = seconds !== null ? copy.loginThrottled.replace("{minutes}",
+        new Intl.NumberFormat(lang === "ar" ? "ar-EG-u-nu-latn" : "en").format(Math.ceil(seconds / 60)))
+        : errorPayload?.response?.status === 503 ? copy.temporarilyUnavailable
+        : errorPayload?.response?.data?.message || errorPayload?.message || copy.credentialsInvalidFallback;
+      setError(seconds !== null ? null : errMsg);
       setFocusRequest({ target: "submission" });
       toast.error(copy.authenticationErrorTitle, errMsg);
     } finally {
@@ -143,16 +157,19 @@ export function useLogin() {
       );
       toast.info(copy.resetLinkSentTitle, copy.resetLinkSentDescription);
       setIsForgotModalOpen(false);
-    } catch {
-      setForgotError(copy.sendFailedDescription);
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const message = status === 503 ? copy.temporarilyUnavailable : copy.sendFailedDescription;
+      setForgotError(message);
       setFocusRequest({ target: "forgot-submission" });
-      toast.error(copy.sendFailedTitle, copy.sendFailedDescription);
+      toast.error(copy.sendFailedTitle, message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return {
+    mfa,
     t,
     email,
     setEmail: updateEmail,
@@ -161,7 +178,9 @@ export function useLogin() {
     rememberMe,
     showPassword,
     isSubmitting,
-    error,
+    isCoolingDown,
+    error: isCoolingDown ? copy.loginThrottled.replace("{minutes}",
+      new Intl.NumberFormat(lang === "ar" ? "ar-EG-u-nu-latn" : "en").format(retryMinutes)) : error,
     fieldErrors,
     forgotFieldError,
     forgotError,

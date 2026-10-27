@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from `throw new *Exception` sites and exception factories)
 
-Last source verification: **2026-10-14**
+Last source verification: **2026-10-17**
 
-Codes: **330** across **35** areas
+Codes: **356** across **37** areas
 
 ## Scope
 
@@ -32,7 +32,7 @@ Add an area to `SCOPES` in the generator when a new screen ships.
 
 ## Leads
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 23 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 29 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -44,12 +44,18 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 23 codes
 | `LEAD_CONTACT_NAME_REQUIRED` | 422 |
 | `LEAD_CONTACT_PRIMARY_INVALID` | 422 |
 | `LEAD_CONTACT_REQUIRED` | 422 |
+| `LEAD_CONVERSION_COMPANY_NAME_REQUIRED` | 422 |
+| `LEAD_CONVERSION_CONTACT_INVALID` | 422 |
+| `LEAD_CONVERSION_CONTACT_REQUIRED` | 422 |
+| `LEAD_CONVERSION_DISQUALIFIED` | 422 |
+| `LEAD_CONVERSION_INDIVIDUAL_FIELDS_INVALID` | 422 |
 | `LEAD_CONVERSION_INVALID` | 422 |
 | `LEAD_CONVERSION_OPPORTUNITY_REQUIRED` | 422 |
 | `LEAD_CONVERSION_OPPORTUNITY_STAGE_TERMINAL` | 422 |
 | `LEAD_CONVERSION_OPPORTUNITY_UNEXPECTED` | 422 |
 | `LEAD_CONVERSION_REQUIRED` | 422 |
 | `LEAD_CORPORATE_FIELDS_FORBIDDEN` | 422 |
+| `LEAD_CREATE_DISQUALIFIED` | 422 |
 | `LEAD_DISPLAY_NAME_REQUIRED` | 422 |
 | `LEAD_DUPLICATE_CHECK_EMPTY` | 422 |
 | `LEAD_EXISTING_COMPANY_FIELDS_FORBIDDEN` | 422 |
@@ -62,10 +68,11 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads` · 23 codes
 
 ## Customer profiles
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles` · 9 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles` · 12 codes
 
 | Error code | HTTP |
 | --- | --- |
+| `CUSTOMER_PROFILE_BLACKLISTED` | 409 |
 | `CUSTOMER_PROFILE_CONTACT_INVALID` | 422 |
 | `CUSTOMER_PROFILE_CONTACT_NAME_REQUIRED` | 422 |
 | `CUSTOMER_PROFILE_CONTACT_OUTSIDE_BRANCH` | 403 |
@@ -74,16 +81,20 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles` · 9 codes
 | `CUSTOMER_PROFILE_CORPORATE_FIELDS_FORBIDDEN` | 422 |
 | `CUSTOMER_PROFILE_DISPLAY_NAME_REQUIRED` | 422 |
 | `CUSTOMER_PROFILE_HAS_ACTIVE_OPPORTUNITIES` | 409 |
+| `CUSTOMER_PROFILE_REOPEN_STAGE_UNAVAILABLE` | 409 |
+| `CUSTOMER_PROFILE_SOURCE_LEAD_CONFLICT` | 409 |
 | `PARTY_DUPLICATE_CONTACT_METHOD` | 422 |
 
 ## Opportunities & pipelines
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities` · 8 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities` · 10 codes
 
 | Error code | HTTP |
 | --- | --- |
 | `CRM_BRANCH_MISMATCH` | 422 |
 | `CUSTOMER_PROFILE_BLACKLISTED` | 409 |
+| `OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED` | 422 |
+| `OPPORTUNITY_AMOUNT_SCALE_INVALID` | 422 |
 | `OPPORTUNITY_BOARD_CURSOR_INVALID` | 400 |
 | `OPPORTUNITY_CONTACT_CUSTOMER_MISMATCH` | 422 |
 | `OPPORTUNITY_LEAD_CUSTOMER_MISMATCH` | 422 |
@@ -93,11 +104,12 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities` · 8 codes
 
 ## Pipelines
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/pipelines` · 27 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/pipelines` · 28 codes
 
 | Error code | HTTP |
 | --- | --- |
 | `CRM_MODULE_SEAT_REQUIRED` | 403 |
+| `OPPORTUNITY_OWNER_INELIGIBLE` | 422 |
 | `OPPORTUNITY_STAGE_CATEGORY_INVALID` | 422 |
 | `OPPORTUNITY_STAGE_IN_USE` | 409 |
 | `OPPORTUNITY_STAGE_NOT_FOUND` | 404 |
@@ -127,7 +139,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/pipelines` · 27 codes
 
 ## Lead stages
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/lead-stages` · 6 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/lead-stages` · 7 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -136,6 +148,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/lead-stages` · 6 codes
 | `LEAD_STAGE_DEFAULT_DELETE` | 422 |
 | `LEAD_STAGE_DEFAULT_INACTIVE` | 422 |
 | `LEAD_STAGE_DEFAULT_TERMINAL` | 422 |
+| `LEAD_STAGE_IN_USE` | 409 |
 | `LEAD_STAGE_REORDER_INVALID` | 422 |
 
 ## Acquisition sources
@@ -156,7 +169,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/acquisition-sources` · 9 cod
 
 ## Custom fields
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/custom-fields` · 14 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/custom-fields` · 16 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -165,6 +178,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/custom-fields` · 14 codes
 | `CUSTOM_FIELD_KEY_AMBIGUOUS` | 422 |
 | `CUSTOM_FIELD_KEY_INVALID` | 422 |
 | `CUSTOM_FIELD_NOT_FOUND` | 404 |
+| `CUSTOM_FIELD_OPTION_IN_USE` | 409 |
 | `CUSTOM_FIELD_OPTIONS_INVALID` | 422 |
 | `CUSTOM_FIELD_OPTIONS_REQUIRED` | 422 |
 | `CUSTOM_FIELD_OWNER_BRANCH_MISMATCH` | 422 |
@@ -172,12 +186,22 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/custom-fields` · 14 codes
 | `CUSTOM_FIELD_OWNER_NOT_FOUND` | 404 |
 | `CUSTOM_FIELD_OWNER_TYPE_REQUIRED` | 422 |
 | `CUSTOM_FIELD_REFERENCE_REQUIRED` | 422 |
-| `CUSTOM_FIELD_VALUE_INVALID` | 422 |
+| `CUSTOM_FIELD_REQUIRED` | 422 |
 | `CUSTOM_FIELD_VALUE_REQUIRED` | 422 |
+| `LEAD_ALREADY_CONVERTED` | 409 |
+
+## CRM settings
+
+Source: `../backend/mutakamel-apps/crm-app/src/crm/settings` · 2 codes
+
+| Error code | HTTP |
+| --- | --- |
+| `CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE` | 409 |
+| `CRM_SETTING_INVALID` | 422 |
 
 ## CRM notes & attachments
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/notes-attachments` · 7 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/notes-attachments` · 8 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -187,6 +211,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/notes-attachments` · 7 codes
 | `CRM_ATTACHMENT_FILE_TYPE_UNSUPPORTED` | 415 |
 | `CRM_ATTACHMENT_INVALID` | 422 |
 | `CRM_ATTACHMENT_UPLOAD_COMMAND_REQUIRED` | 422 |
+| `CRM_SCOPED_PERMISSION_DENIED` | 403 |
 | `CRM_SOURCE_BRANCH_MISMATCH` | 422 |
 
 ## CRM outbound email
@@ -199,12 +224,11 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/outbound-emails` · 1 codes
 
 ## CRM dashboards
 
-Source: `../backend/mutakamel-apps/crm-app/src/crm/dashboards` · 33 codes
+Source: `../backend/mutakamel-apps/crm-app/src/crm/dashboards` · 31 codes
 
 | Error code | HTTP |
 | --- | --- |
 | `CRM_DASHBOARD_ACTOR_INVALID` | 401 |
-| `CRM_DASHBOARD_CURRENCY_FILTER_REQUIRED` | 422 |
 | `CRM_DASHBOARD_DATE_RANGE_EXCEEDED` | 422 |
 | `CRM_DASHBOARD_DEFINITION_ACCESS_DENIED` | 403 |
 | `CRM_DASHBOARD_DRILLDOWN_CURRENCY_REQUIRED` | 422 |
@@ -233,18 +257,19 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/dashboards` · 33 codes
 | `CRM_WIDGET_NOT_FOUND` | 404 |
 | `CRM_WIDGET_QUERY_INVALID` | 422 |
 | `CRM_WIDGET_REVISION_CONFLICT` | 409 |
-| `CRM_WIDGET_SERIES_INVALID` | 422 |
 | `CRM_WIDGET_SHAPE_INCOMPATIBLE` | 422 |
 | `PIPELINE_NOT_FOUND` | 404 |
 
 ## Authentication & session
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-auth` · 7 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-auth` and `../backend/mutakamel-apps/core-app/src/common/auth/login-lockout.policy.ts` · 9 codes
 
 | Error code | HTTP |
 | --- | --- |
 | `ACCOUNT_NOT_ACTIVE` | 403 |
+| `AUTH_LOGIN_THROTTLED` | 429 |
 | `AUTH_SESSION_LIMIT_REACHED` | 409 |
+| `CURRENT_PASSWORD_INVALID` | 422 |
 | `INVALID_ACTION_TOKEN` | 400 |
 | `INVALID_CREDENTIALS` | 401 |
 | `INVALID_REFRESH_TOKEN` | 401 |
@@ -274,6 +299,7 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-users` · 15 codes
 | --- | --- |
 | `ACCESS_POLICY_UNAVAILABLE` | 503 |
 | `BRANCH_ACCESS_DENIED` | 403 |
+| `INVALID_CREDENTIALS` | 401 |
 | `INVALID_STATUS_TRANSITION` | 409 |
 | `MANAGER_NOT_FOUND` | 404 |
 | `PRIMARY_TEAM_MEMBERSHIP_PROTECTED` | 409 |
@@ -285,12 +311,11 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-users` · 15 codes
 | `TENANT_OWNER_PROTECTED` | 409 |
 | `TENANT_USER_NOT_FOUND` | 404 |
 | `TENANT_USER_TEAM_QUERY_INVALID` | 422 |
-| `USER_LIMIT_REACHED` | 403 |
 | `USER_SELF_FORBIDDEN` | 403 |
 
 ## Roles
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-roles` · 14 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-roles` · 16 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -301,8 +326,10 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-roles` · 14 codes
 | `BRANCH_OR_ROLE_INVALID` | 422 |
 | `PERMISSION_UNKNOWN` | 422 |
 | `ROLE_IN_USE` | 409 |
+| `ROLE_NAME_RESERVED` | 409 |
 | `ROLE_NOT_FOUND` | 404 |
 | `ROLE_PERMISSION_AUTHORITY_EXCEEDED` | 422 |
+| `ROLE_RESERVED_FOR_OWNER` | 409 |
 | `ROLE_SELF_ASSIGNMENT_FORBIDDEN` | 403 |
 | `TENANT_OWNER_PROTECTED` | 409 |
 | `TENANT_ROLE_ASSIGNMENT_LIMIT_EXCEEDED` | 409, 422 |
@@ -311,10 +338,11 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/tenant-roles` · 14 codes
 
 ## Scope role assignments
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/scope-role-assignments` · 4 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/scope-role-assignments` · 5 codes
 
 | Error code | HTTP |
 | --- | --- |
+| `ROLE_RESERVED_FOR_OWNER` | 409 |
 | `SCOPE_ROLE_ASSIGNMENT_INVALID` | 422 |
 | `SCOPE_ROLE_ASSIGNMENT_LIMIT_EXCEEDED` | 422 |
 | `SCOPE_ROLE_ASSIGNMENT_OWNER_REQUIRED` | 403 |
@@ -322,7 +350,7 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/scope-role-assignments` �
 
 ## User modules
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 12 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 13 codes
 
 | Error code | HTTP |
 | --- | --- |
@@ -337,6 +365,7 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/user-modules` · 12 codes
 | `SUBSCRIPTION_NOT_FOUND` | 404 |
 | `TENANT_CONTEXT_MISSING` | 401 |
 | `TENANT_PERMISSION_SCOPE_UNAVAILABLE` | 403 |
+| `TENANT_USER_ASSIGNMENTS_CHANGED` | 409 |
 | `TENANT_USER_NOT_FOUND` | 404 |
 
 ## Workspace settings
@@ -352,16 +381,18 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/workspace-settings` · 4 
 
 ## Currencies
 
-Source: `../backend/mutakamel-apps/core-app/src/tenant/currencies` · 6 codes
+Source: `../backend/mutakamel-apps/core-app/src/tenant/currencies` · 8 codes
 
 | Error code | HTTP |
 | --- | --- |
 | `CURRENCY_CODE_INVALID` | 422 |
+| `CURRENCY_DECIMAL_PLACES_IMMUTABLE` | 422 |
 | `CURRENCY_DEFAULT_DELETE` | 409 |
 | `CURRENCY_EXCHANGE_RATE_REQUIRED` | 422 |
 | `CURRENCY_IN_USE` | 409 |
 | `CURRENCY_INACTIVE_DEFAULT` | 409 |
 | `CURRENCY_NOT_FOUND` | 404 |
+| `CURRENCY_REBASE_OUT_OF_RANGE` | 422 |
 
 ## Taxes
 
@@ -495,21 +526,21 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/directory` · 18 codes
 | --- | --- |
 | `BRANCH_PERMISSION_DENIED` | 403 |
 | `DIRECTORY_PARTY_CHILD_AUTHORITY_EXCEEDED` | 422 |
+| `DIRECTORY_PARTY_IN_USE` | 409 |
 | `PARTY_ADDRESS_LIMIT_EXCEEDED` | 422 |
 | `PARTY_ADDRESS_NOT_FOUND` | 404 |
+| `PARTY_ALREADY_LINKED` | 409 |
 | `PARTY_CHILD_BATCH_INVALID` | 422 |
 | `PARTY_CONTACT_METHOD_LIMIT_EXCEEDED` | 422 |
 | `PARTY_CONTACT_METHOD_NOT_FOUND` | 404 |
-| `PARTY_IMAGE_INVALID` | 415 |
-| `PARTY_IMAGE_REQUIRED` | 400 |
 | `PARTY_IMAGE_STORAGE_UNAVAILABLE` | 503 |
-| `PARTY_IMAGE_TOO_LARGE` | 413 |
 | `PARTY_NOT_FOUND` | 404 |
 | `PARTY_RELATIONSHIP_INVALID` | 409, 422 |
 | `PARTY_RELATIONSHIP_NOT_FOUND` | 404 |
 | `PARTY_ROLE_ALREADY_EXISTS` | 409 |
 | `PARTY_ROLE_LIMIT_EXCEEDED` | 422 |
 | `PARTY_ROLE_NOT_FOUND` | 404 |
+| `PARTY_TENANT_USER_INVALID` | 422 |
 | `PERMISSION_SCOPE_UNAVAILABLE` | 403 |
 
 ## Templates
@@ -519,6 +550,16 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/template-platform` · 1 c
 | Error code | HTTP |
 | --- | --- |
 | `TENANT_NOT_RESOLVABLE` | 404 |
+
+## Audit
+
+Source: `../backend/mutakamel-apps/core-app/src/tenant/audit` · 3 codes
+
+| Error code | HTTP |
+| --- | --- |
+| `AUDIT_EVENT_NOT_FOUND` | 404 |
+| `AUDIT_QUERY_INVALID` | 400 |
+| `MISSING_REQUIRED_PERMISSIONS` | 403 |
 
 ## Core activities
 
@@ -540,11 +581,10 @@ Source: `../backend/mutakamel-apps/core-app/src/tenant/activities` · 11 codes
 
 ## Trade documents
 
-Source: `../backend/mutakamel-apps/trade-app/src/modules/documents` · 2 codes
+Source: `../backend/mutakamel-apps/trade-app/src/modules/documents` · 1 codes
 
 | Error code | HTTP |
 | --- | --- |
-| `CONFIRMATION_MODE_INVALID` | 503 |
 | `NUMERIC_FACT_OUT_OF_RANGE` | 503 |
 
 ## Trade financial documents

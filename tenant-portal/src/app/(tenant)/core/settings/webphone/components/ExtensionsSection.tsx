@@ -11,22 +11,15 @@ import {
   validateExtensionDraft,
   type ExtensionDraft,
   type WebphoneExtension,
-  type WebphoneTransport,
 } from "../webphone-contract";
 import {
   InlineError,
   SecretField,
   SectionCard,
-  SelectField,
   StateBadge,
   SwitchField,
   TextField,
 } from "./WebphoneFields";
-
-const TRANSPORT_OPTIONS: Array<{ value: WebphoneTransport; label: string }> = [
-  { value: "wss", label: "wss" },
-  { value: "ws", label: "ws" },
-];
 
 export function ExtensionsSection({
   state,
@@ -163,16 +156,6 @@ export function ExtensionsSection({
               setDraft((current) => ({ ...current, outboundCallerId: value }))
             }
           />
-          <SelectField<WebphoneTransport>
-            label={copy.transport}
-            value={draft.transport}
-            disabled={disabled}
-            lang={state.lang}
-            options={TRANSPORT_OPTIONS}
-            onChange={(value) =>
-              setDraft((current) => ({ ...current, transport: value }))
-            }
-          />
         </div>
         <SecretField
           label={copy.sipPassword}
@@ -273,11 +256,7 @@ function ExtensionRow({
           {extension.displayName ? ` · ${extension.displayName}` : ""}
         </span>
       </div>
-      <dl className="grid gap-2 text-xs sm:grid-cols-3">
-        <div>
-          <dt className="font-medium text-muted-foreground">{copy.transport}</dt>
-          <dd dir="ltr">{extension.transport}</dd>
-        </div>
+      <dl className="grid gap-2 text-xs sm:grid-cols-2">
         <div>
           <dt className="font-medium text-muted-foreground">{copy.passwordState}</dt>
           <dd>

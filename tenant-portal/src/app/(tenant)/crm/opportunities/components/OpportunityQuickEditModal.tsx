@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +14,9 @@ import {
   CirclePercent,
   ExternalLink,
   Loader2,
+  MessageCircle,
+  Phone,
+  Send,
   Mail,
   MapPin,
   Pencil,
@@ -24,9 +27,12 @@ import {
   X,
 } from "lucide-react";
 import {
+  Button,
   DOSSIER_HEADER_CARD_COLORS,
+  DOSSIER_KPI_PILL_CLASSES,
   DateTime,
   Money,
+  PermissionGate,
   StatusBadge,
   TagChip,
   cn,
@@ -36,11 +42,17 @@ import {
   type CardColor,
 } from "@/design-system";
 import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
-import { EntityHistoryCard } from "@/components/audit/EntityHistoryCard";
+import { RecordHistoryTab } from "@/components/audit/RecordHistoryTab";
+import { useAuditAccess } from "@/components/audit/hooks/useAuditAccess";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import { canCreateActivities } from "@/components/activities/activity-presentation";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useOpportunityCurrencyOptions } from "../hooks/useCreateOpportunity";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
+import { normalizeApiError } from "@/lib/api/errors";
 import { localizedName, localizedValue } from "@/lib/format/localized";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
@@ -50,7 +62,9 @@ import { CustomFieldsCard } from "../../shared/components/CustomFieldsCard";
 import { RecordAttachmentsSection } from "../../shared/components/RecordAttachmentsSection";
 import { RecordNotesSection } from "../../shared/components/RecordNotesSection";
 import { useCrmRecordCapabilities } from "../../shared/hooks/useCrmRecordCapabilities";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import { isExactMoneyDecimal, toMoneyWireNumber } from "../../shared/money";
+import { buildPartyDocumentHref } from "../../shared/party-document-counts-contract";
 import {
   CRM_TAGS_PATH,
   parseCrmTagCatalogue,
@@ -58,7 +72,7 @@ import {
   type CrmTag,
 } from "../../shared/tag-contract";
 import { CreateTagModal } from "../../leads/components/create-lead/CreateTagModal";
-import { readOwnerOptions } from "../../leads/[id]/hooks/readLeadOwnerOptions";
+import { readAssignableOpportunityOwners } from "../hooks/usePipelineWorkspace";
 import {
   leadDetailsUserName,
   type LeadDetailsUser,
@@ -69,15 +83,13 @@ import {
 } from "../../leads/lead-phone-links";
 import {
   opportunityPath,
-  opportunityStageHistoryPath,
   parseOpportunityDetailResponse,
-  parseOpportunityStageHistory,
   type OpportunityDetail,
-  type OpportunityStageHistoryEntry,
 } from "../opportunity-contract";
+import { useOpportunityStageHistory } from "../hooks/useOpportunityStageHistory";
 import type { OpportunityCardPatch } from "../opportunity-card-contract";
+import { useOpportunityDocumentCounts } from "../hooks/useOpportunityDocumentCounts";
 import type {
-  OpportunityActivityState,
   OpportunityStage,
   OpportunityStatus,
   StageFlag,
@@ -120,15 +132,14 @@ export interface OpportunityQuickEditModalProps {
     opportunityId: string,
     patch: OpportunityCardPatch,
     item: OpportunityQuickEditItem,
-  ) => void;
+  ) => Promise<boolean>;
   onMoveStage: (item: OpportunityQuickEditItem, stageId: string) => void;
   onDelete: (item: OpportunityQuickEditItem) => void;
   onSaved?: () => void;
+  onForbidden?: () => void;
 }
 
 type DossierTab = "activities" | "notes" | "history" | "files";
-
-const CURRENCY_OPTIONS = ["EGP", "USD", "SAR", "AED", "EUR"] as const;
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -137,99 +148,33 @@ function getInitials(name: string): string {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
-function synthesizeOpportunityDetail(
-  item: OpportunityQuickEditItem,
-  branchId: string | null,
-): OpportunityDetail {
-  return {
-    id: item.id,
-    branchId: item.branchId ?? branchId ?? "",
-    customerProfileId: item.customerProfileId ?? "",
-    customerPartyId: item.customerPartyId ?? null,
-    contactPartyId: item.primaryContact?.partyId ?? null,
-    leadId: null,
-    pipelineId: item.pipelineId ?? "",
-    stageId: item.stageId,
-    stageFlag: item.stageFlag,
-    status: item.status,
-    title: item.title,
-    importance: item.importance,
-    amount: item.amount,
-    currencyCode: item.currencyCode,
-    description: item.description ?? null,
-    expectedCloseDate: item.expectedCloseDate ?? null,
-    probabilityPercent: item.probabilityPercent,
-    ownerUserId: item.ownerUserId ?? null,
-    wonAt: null,
-    lostAt: null,
-    lostReason: null,
-    createdAt: item.createdAt ?? new Date().toISOString(),
-    updatedAt: item.updatedAt ?? new Date().toISOString(),
-    cardColor: item.cardColor,
-    customerProfileType: item.customerProfileType,
-    customerDisplayName: item.customerDisplayName,
-    customerCompanyName: item.customerCompanyName,
-    customerPhone: item.customerPhone,
-    customerEmail: item.customerEmail,
-    customerCountry: item.customerCountry,
-    customerCity: item.customerCity,
-    primaryContact: item.primaryContact,
-    leadSourceName: item.leadSourceName,
-    leadSourceIconUrl: item.leadSourceIconUrl,
-    ownerDisplayName: item.ownerDisplayName,
-    ownerAvatarUrl: item.ownerAvatarUrl,
-    openActivityCount: item.openActivityCount,
-    nextOpenActivityAt: item.nextOpenActivityAt,
-    activityState: item.activityState,
-    tags: item.tags ?? [],
-  };
-}
-
-function PhoneActionPills({
+export function OpportunityPhoneActions({
   phone,
   country,
 }: {
   phone: string;
   country: string | null | undefined;
 }) {
+  const { t } = useI18n();
   const callDigits = normalizePhoneDigits(phone);
   const waDigits = normalizeWhatsAppDigits(phone, country ?? "");
+  const links = [
+    { href: callDigits ? `tel:${callDigits}` : null, label: formatTemplate(t.crmLeadDetail.callNumber, { value: phone }), icon: Phone, external: false },
+    { href: waDigits ? `https://wa.me/${waDigits}` : null, label: formatTemplate(t.crmLeadDetail.whatsappNumber, { value: phone }), icon: MessageCircle, external: true },
+    { href: waDigits ? `https://t.me/+${waDigits}` : null, label: formatTemplate(t.crmLeadDetail.telegramNumber, { value: phone }), icon: Send, external: true },
+  ];
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {callDigits && (
-        <a
-          href={`tel:${callDigits}`}
-          onClick={(e) => e.stopPropagation()}
-          className="dossier-comm-btn dossier-comm-call"
-          aria-label={`Call ${phone}`}
-        >
-          📞 Call
-        </a>
-      )}
-      {waDigits && (
-        <a
-          href={`https://wa.me/${waDigits}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="dossier-comm-btn dossier-comm-wa"
-          aria-label={`WhatsApp ${phone}`}
-        >
-          💬 WhatsApp
-        </a>
-      )}
-      {waDigits && (
-        <a
-          href={`https://t.me/+${waDigits}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="dossier-comm-btn dossier-comm-tg"
-          aria-label={`Telegram ${phone}`}
-        >
-          ✈️ Telegram
-        </a>
-      )}
+    <div className="flex shrink-0 items-center gap-1">
+      {links.map(({ href, label, icon: Icon, external }) => href && (
+        <Button key={href} variant="ghost" size="xs" asChild>
+          <a href={href} aria-label={label} title={label}
+            target={external ? "_blank" : undefined}
+            rel={external ? "noopener noreferrer" : undefined}
+            onClick={(event) => event.stopPropagation()}>
+            <Icon className="size-4" aria-hidden="true" />
+          </a>
+        </Button>
+      ))}
     </div>
   );
 }
@@ -253,17 +198,28 @@ export function OpportunityQuickEditModal({
   onMoveStage,
   onDelete,
   onSaved,
+  onForbidden,
 }: OpportunityQuickEditModalProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const canReadHistory = useAuditAccess();
   const router = useRouter();
   const toast = useToast();
+  const errorText = useCrmErrorText();
   const { user: actor } = useTenantAuth();
-  const canReadUsers = actor?.permissions.includes("users.user.read") ?? false;
+  const { canMutate } = useAccessMode();
+  const canOpenActivities = canMutate && canCreateActivities(actor);
+  const canManageTags = actor?.permissions.includes("crm.tags.manage") ?? false;
+  const activeItemId = useRef(item?.id);
+  useEffect(() => {
+    activeItemId.current = item?.id;
+    return () => { activeItemId.current = undefined; };
+  }, [item?.id]);
+  const [isSavingCard, setIsSavingCard] = useState(false);
+  const [isSavingTags, setIsSavingTags] = useState(false);
 
-  const [detail, setDetail] = useState<OpportunityDetail | null>(() =>
-    item ? synthesizeOpportunityDetail(item, branchId) : null,
-  );
+  const [detail, setDetail] = useState<OpportunityDetail | null>(null);
+  const [detailLoadFailed, setDetailLoadFailed] = useState(false);
+  const [detailReload, setDetailReload] = useState(0);
   const [localImportance, setLocalImportance] = useState<number>(
     item?.importance ?? 0,
   );
@@ -271,11 +227,10 @@ export function OpportunityQuickEditModal({
     item?.cardColor ?? null,
   );
   const [localTags, setLocalTags] = useState<CrmTag[]>(item?.tags ?? []);
-  const [stageHistory, setStageHistory] = useState<
-    OpportunityStageHistoryEntry[]
-  >([]);
+  const history = useOpportunityStageHistory(item?.id, detailReload, onForbidden);
 
   const [isEditingDeal, setIsEditingDeal] = useState(false);
+  const currencyOptions = useOpportunityCurrencyOptions(isEditingDeal);
   const [activeDossierTab, setActiveDossierTab] =
     useState<DossierTab>("activities");
   const [isSavingDeal, setIsSavingDeal] = useState(false);
@@ -284,7 +239,7 @@ export function OpportunityQuickEditModal({
   // Deal Edit Drafts
   const [titleDraft, setTitleDraft] = useState("");
   const [amountDraft, setAmountDraft] = useState("");
-  const [currencyDraft, setCurrencyDraft] = useState("EGP");
+  const [currencyDraft, setCurrencyDraft] = useState("");
   const [probabilityDraft, setProbabilityDraft] = useState("");
   const [expectedCloseDraft, setExpectedCloseDraft] = useState("");
   const [ownerUserIdDraft, setOwnerUserIdDraft] = useState("");
@@ -299,25 +254,42 @@ export function OpportunityQuickEditModal({
   const [ownerOptions, setOwnerOptions] = useState<LeadDetailsUser[]>([]);
 
   const effectiveBranchId = detail?.branchId || item?.branchId || branchId || null;
+  const ownerScope = useOrganizationScopeHeaders("BRANCH_REQUIRED", effectiveBranchId);
+  const effectiveCustomerPartyId = detail?.customerPartyId ?? item?.customerPartyId ?? null;
+  const countRecords = useMemo(
+    () => (effectiveCustomerPartyId ? [{ customerPartyId: effectiveCustomerPartyId }] : []),
+    [effectiveCustomerPartyId],
+  );
+  const documentCounts = useOpportunityDocumentCounts(
+    countRecords,
+    effectiveBranchId,
+    Boolean(effectiveCustomerPartyId),
+  );
+  const partyCounts = effectiveCustomerPartyId
+    ? documentCounts.countsByParty.get(effectiveCustomerPartyId)
+    : undefined;
   const attached = useCrmRecordCapabilities(effectiveBranchId);
 
   // Sync and fetch detail when `item` changes
   useEffect(() => {
     const controller = new AbortController();
-    if (!item) {
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      if (!item) {
+        setDetail(null);
+        return;
+      }
       setDetail(null);
+      setDetailLoadFailed(!isUUIDv7(item.id));
+      setLocalImportance(item.importance);
+      setLocalCardColor(item.cardColor);
+      setLocalTags(item.tags ?? []);
+      setIsEditingDeal(false);
+      setSectionError(null);
+    });
+    if (!item || !isUUIDv7(item.id)) {
       return () => controller.abort();
     }
-
-    const seeded = synthesizeOpportunityDetail(item, branchId);
-    setDetail(seeded);
-    setLocalImportance(item.importance);
-    setLocalCardColor(item.cardColor);
-    setLocalTags(item.tags ?? []);
-    setIsEditingDeal(false);
-    setSectionError(null);
-
-    if (!isUUIDv7(item.id)) return () => controller.abort();
 
     void axiosClient
       .get<unknown>(opportunityPath(item.id), {
@@ -333,8 +305,10 @@ export function OpportunityQuickEditModal({
         setLocalCardColor(parsed.cardColor);
         if (parsed.tags.length > 0) setLocalTags(parsed.tags);
       })
-      .catch(() => {
-        // Keep synthesized detail
+      .catch((caught: unknown) => {
+        if (controller.signal.aborted) return;
+        setDetailLoadFailed(true);
+        if (normalizeApiError(caught).status === 403) onForbidden?.();
       });
 
     void axiosClient
@@ -350,45 +324,31 @@ export function OpportunityQuickEditModal({
       })
       .catch(() => {});
 
-    void axiosClient
-      .get<unknown>(opportunityStageHistoryPath(item.id), {
-        signal: controller.signal,
-        cache: "no-store",
-        maxResponseBytes: 256 * 1024,
-      })
-      .then((res) => {
-        if (!controller.signal.aborted) {
-          setStageHistory(parseOpportunityStageHistory(res.data));
-        }
-      })
-      .catch(() => {});
-
     return () => controller.abort();
-  }, [item, branchId]);
+  }, [item, branchId, detailReload, onForbidden]);
 
-  // Load owner options when editing deal
+  const canEditOwner = canMutate && Boolean(item && canUpdate(item));
+
+  // CRM applies assignment scope without granting Core directory access.
   useEffect(() => {
-    if (
-      !isEditingDeal ||
-      !canReadUsers ||
-      !effectiveBranchId ||
-      !isUUIDv7(effectiveBranchId)
-    ) {
-      return;
-    }
+    if (!isEditingDeal || !canEditOwner || !effectiveBranchId || !ownerScope.ready) return;
     const controller = new AbortController();
-    void readOwnerOptions(effectiveBranchId, controller.signal)
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) setOwnerOptions([]);
+    });
+    void readAssignableOpportunityOwners(effectiveBranchId, controller.signal, ownerScope.headers)
       .then((list) => {
         if (!controller.signal.aborted) {
-          const filtered = list.filter(
-            (u) => allowedOwnerIds === null || allowedOwnerIds.includes(u.id),
-          );
-          setOwnerOptions(filtered);
+          setOwnerOptions(list.filter((owner) => allowedOwnerIds === null || allowedOwnerIds.includes(owner.id)));
         }
       })
-      .catch(() => undefined);
+      .catch((caught: unknown) => {
+        if (controller.signal.aborted) return;
+        setOwnerOptions([]);
+        if (normalizeApiError(caught).status === 403) onForbidden?.();
+      });
     return () => controller.abort();
-  }, [allowedOwnerIds, canReadUsers, effectiveBranchId, isEditingDeal]);
+  }, [allowedOwnerIds, canEditOwner, effectiveBranchId, isEditingDeal, onForbidden, ownerScope]);
 
   // Load tag catalogue when tag picker opens
   useEffect(() => {
@@ -409,13 +369,11 @@ export function OpportunityQuickEditModal({
     return () => controller.abort();
   }, [isTagPickerOpen]);
 
-  const fallbackDetail = useMemo(
-    () => (item ? detail ?? synthesizeOpportunityDetail(item, branchId) : null),
-    [item, detail, branchId],
-  );
+  // Never use a previous selection or a partial list row as an edit baseline.
+  const fallbackDetail = detail?.id === item?.id ? detail : null;
 
-  const editable = item ? canUpdate(item) : false;
-  const deletable = item ? canDelete(item) : false;
+  const editable = canMutate && (item ? canUpdate(item) : false);
+  const deletable = canMutate && (item ? canDelete(item) : false);
 
   const currentIndex = item
     ? allItems.findIndex((entry) => entry.id === item.id)
@@ -431,7 +389,7 @@ export function OpportunityQuickEditModal({
     setSectionError(null);
     setTitleDraft(fallbackDetail.title);
     setAmountDraft(fallbackDetail.amount ?? "");
-    setCurrencyDraft(fallbackDetail.currencyCode || "EGP");
+    setCurrencyDraft(fallbackDetail.currencyCode ?? "");
     setProbabilityDraft(
       fallbackDetail.probabilityPercent === null
         ? ""
@@ -448,18 +406,25 @@ export function OpportunityQuickEditModal({
   }, [editable, fallbackDetail]);
 
   async function saveDealEdit() {
-    if (!item || !fallbackDetail) return;
+    if (!item || !fallbackDetail || !editable || !isEditingDeal || isSavingDeal) return;
     setSectionError(null);
     const trimmedTitle = titleDraft.trim();
     if (!trimmedTitle) {
       setSectionError(
-        isAr ? "يرجى إدخال عنوان الفرصة." : "Opportunity title is required.",
+        t.crmOpportunities.titleRequired,
       );
       return;
     }
     const trimmedAmount = amountDraft.trim();
-    if (trimmedAmount.length > 0 && !isExactMoneyDecimal(trimmedAmount)) {
-      setSectionError(t.crmOpportunityDetail.create.amountInvalid);
+    const amountChanged = trimmedAmount !== (fallbackDetail.amount ?? "").trim();
+    const currencyCode = currencyDraft.trim().toUpperCase();
+    const currencyChanged = currencyCode !== (fallbackDetail.currencyCode ?? "").trim().toUpperCase();
+    if ((amountChanged || currencyChanged) && trimmedAmount && !currencyCode) {
+      setSectionError(t.crmShared.refusals.OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED);
+      return;
+    }
+    if (trimmedAmount.length > 0 && !isExactMoneyDecimal(trimmedAmount, currencyDraft)) {
+      setSectionError(t.crmShared.refusals.CRM_AMOUNT_SCALE_INVALID);
       return;
     }
     const trimmedProb = probabilityDraft.trim();
@@ -475,21 +440,34 @@ export function OpportunityQuickEditModal({
 
     setIsSavingDeal(true);
     try {
-      const body: Record<string, unknown> = {
-        title: trimmedTitle,
-        description: descriptionDraft.trim(),
-        probabilityPercent: parsedProb,
-        expectedCloseDate:
-          expectedCloseDraft.trim().length > 0
-            ? expectedCloseDraft.trim()
-            : null,
-      };
-      if (trimmedAmount.length > 0) {
-        body.amount = toMoneyWireNumber(trimmedAmount);
-        body.currencyCode = currencyDraft.trim().toUpperCase();
+      const body: Record<string, unknown> = {};
+      if (trimmedTitle !== fallbackDetail.title.trim()) body.title = trimmedTitle;
+      const description = descriptionDraft.trim();
+      if (description !== (fallbackDetail.description ?? "").trim()) {
+        body.description = description;
       }
-      if (ownerUserIdDraft && isUUIDv7(ownerUserIdDraft)) {
+      if (trimmedProb !== (fallbackDetail.probabilityPercent === null
+        ? ""
+        : String(fallbackDetail.probabilityPercent))) {
+        body.probabilityPercent = parsedProb;
+      }
+      const expectedCloseDate = expectedCloseDraft.trim();
+      if (expectedCloseDate !== (fallbackDetail.expectedCloseDate?.slice(0, 10) ?? "")) {
+        body.expectedCloseDate = expectedCloseDate || null;
+      }
+      if (amountChanged) {
+        body.amount = trimmedAmount ? toMoneyWireNumber(trimmedAmount, currencyDraft) : null;
+      }
+      if (currencyChanged) {
+        body.currencyCode = currencyCode || null;
+        if (!currencyCode) body.amount = null;
+      }
+      if (ownerUserIdDraft !== (fallbackDetail.ownerUserId ?? "") && ownerScope.ready && ownerOptions.some(({ id }) => id === ownerUserIdDraft)) {
         body.ownerUserId = ownerUserIdDraft;
+      }
+      if (Object.keys(body).length === 0) {
+        setIsEditingDeal(false);
+        return;
       }
 
       const attempt = createWriteAttempt();
@@ -514,56 +492,132 @@ export function OpportunityQuickEditModal({
           trimmedTitle,
         );
       } else {
+        if (outcome.error.status === 403) onForbidden?.();
         setSectionError(
-          outcome.error.message ?? t.crmOpportunities.cardUpdateFailed,
+          errorText(outcome.error) ?? t.crmOpportunities.cardUpdateFailed,
         );
       }
-    } catch {
-      setSectionError(t.crmOpportunities.cardUpdateFailed);
+    } catch (caught) {
+      if (normalizeApiError(caught).status === 403) onForbidden?.();
+      setSectionError(errorText(normalizeApiError(caught)) ?? t.crmOpportunities.cardUpdateFailed);
     } finally {
       setIsSavingDeal(false);
     }
   }
 
   async function handleAttachTag(tag: CrmTag) {
-    if (!item) return;
+    if (!item || !editable || isSavingTags) return;
     if (localTags.some((tItem) => tItem.id === tag.id)) return;
     const nextTags = [...localTags, tag];
+    setSectionError(null);
+    setIsSavingTags(true);
     setLocalTags(nextTags);
     try {
       const attempt = createWriteAttempt();
-      await runIdempotentWrite({
+      const outcome = await runIdempotentWrite({
         attempt,
         method: "post",
         path: `${opportunityPath(item.id)}/tags`,
         body: { tagIds: [tag.id] },
         parse: (payload) => payload,
       });
-      onSaved?.();
-    } catch {
+      if (activeItemId.current !== item.id) return;
+      if (outcome.kind === "success" || outcome.kind === "applied_unreadable") {
+        onSaved?.();
+      } else {
+        setLocalTags(localTags);
+        if (outcome.error.status === 403) onForbidden?.();
+        setSectionError(errorText(outcome.error) ?? t.crmOpportunities.cardUpdateFailed);
+      }
+    } catch (caught) {
+      if (activeItemId.current !== item.id) return;
       setLocalTags(localTags);
+      setSectionError(errorText(normalizeApiError(caught)) ?? t.crmOpportunities.cardUpdateFailed);
+    } finally {
+      setIsSavingTags(false);
     }
   }
 
   async function handleRemoveTag(tagId: string) {
-    if (!item) return;
+    if (!item || !editable || isSavingTags) return;
     const prevTags = localTags;
+    setSectionError(null);
+    setIsSavingTags(true);
     setLocalTags(prevTags.filter((tItem) => tItem.id !== tagId));
     try {
       const attempt = createWriteAttempt();
-      await runIdempotentWrite({
+      const outcome = await runIdempotentWrite({
         attempt,
         method: "delete",
         path: `${opportunityPath(item.id)}/tags/${encodeURIComponent(tagId)}`,
         parse: () => null,
       });
-      onSaved?.();
-    } catch {
+      if (activeItemId.current !== item.id) return;
+      if (outcome.kind === "success" || outcome.kind === "applied_unreadable") {
+        onSaved?.();
+      } else {
+        setLocalTags(prevTags);
+        if (outcome.error.status === 403) onForbidden?.();
+        setSectionError(errorText(outcome.error) ?? t.crmOpportunities.cardUpdateFailed);
+      }
+    } catch (caught) {
+      if (activeItemId.current !== item.id) return;
       setLocalTags(prevTags);
+      setSectionError(errorText(normalizeApiError(caught)) ?? t.crmOpportunities.cardUpdateFailed);
+    } finally {
+      setIsSavingTags(false);
     }
   }
 
-  if (!item || !fallbackDetail) return null;
+  async function handleCardChange(patch: OpportunityCardPatch) {
+    if (!item || !editable || isSavingCard) return;
+    const previous = { importance: localImportance, cardColor: localCardColor };
+    setSectionError(null);
+    setIsSavingCard(true);
+    if (patch.importance !== undefined) setLocalImportance(patch.importance);
+    if (patch.cardColor !== undefined) setLocalCardColor(patch.cardColor);
+    try {
+      const updated = await onCardChange(item.id, patch, {
+        ...item,
+        ...previous,
+      });
+      if (activeItemId.current !== item.id) return;
+      if (!updated) {
+        setLocalImportance(previous.importance);
+        setLocalCardColor(previous.cardColor);
+        setSectionError(t.crmOpportunities.cardUpdateFailed);
+      }
+    } catch (caught) {
+      if (activeItemId.current !== item.id) return;
+      setLocalImportance(previous.importance);
+      setLocalCardColor(previous.cardColor);
+      setSectionError(errorText(normalizeApiError(caught)) ?? t.crmOpportunities.cardUpdateFailed);
+    } finally {
+      setIsSavingCard(false);
+    }
+  }
+
+  if (!item) return null;
+  if (!fallbackDetail) {
+    return (
+      <div role="dialog" aria-modal="true" aria-label={item.title}
+        className="fixed inset-0 z-(--z-overlay) flex items-center justify-center bg-foreground/60 p-4">
+        <div className="space-y-4 rounded-lg border border-border bg-background p-5 text-foreground">
+          <p role={detailLoadFailed ? "alert" : "status"} aria-busy={!detailLoadFailed}>
+            {detailLoadFailed ? t.crmOpportunities.loadFailed : t.common.loading}
+          </p>
+          <div className="flex gap-2">
+            {detailLoadFailed && (
+              <Button onClick={() => { setDetailLoadFailed(false); setDetailReload((value) => value + 1); }}>
+                {t.common.retry}
+              </Button>
+            )}
+            <Button onClick={onClose}>{t.common.close}</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const isCorporate = fallbackDetail.customerProfileType === "CORPORATE";
   const customerName =
@@ -591,21 +645,21 @@ export function OpportunityQuickEditModal({
       role="dialog"
       aria-modal="true"
       aria-label={fallbackDetail.title}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-xs sm:p-5"
+      className="fixed inset-0 z-(--z-overlay) flex items-center justify-center bg-foreground/60 p-3 sm:p-5"
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+        className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top 4px Color Filing Bar */}
         <div
-          className="h-1.5 w-full shrink-0 bg-blue-600"
+          className="h-1.5 w-full shrink-0 bg-primary"
           style={topBarHex ? { backgroundColor: topBarHex } : undefined}
         />
 
         {/* Sticky Dossier 360° Header */}
-        <header className="shrink-0 border-b border-slate-200 bg-white px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900">
+        <header className="shrink-0 border-b border-border bg-card px-5 py-3.5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div
@@ -618,14 +672,14 @@ export function OpportunityQuickEditModal({
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-lg font-extrabold text-slate-900 dark:text-slate-100">
+                  <h2 className="truncate text-lg font-semibold text-foreground">
                     {fallbackDetail.title}
                   </h2>
                   <StatusBadge
                     value={fallbackDetail.status}
                     kind="OpportunityStatus"
                   />
-                  <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-2xs font-semibold text-foreground">
                     {isCorporate ? (
                       <Building2 className="size-3" aria-hidden="true" />
                     ) : (
@@ -637,16 +691,16 @@ export function OpportunityQuickEditModal({
                   </span>
                 </div>
 
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {fallbackDetail.customerProfileId ? (
                     <Link
                       href={`/crm/customer-profiles/${fallbackDetail.customerProfileId}`}
-                      className="font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                      className="font-semibold text-primary hover:underline"
                     >
                       {customerName} ↗
                     </Link>
                   ) : (
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="font-semibold text-foreground">
                       {customerName}
                     </span>
                   )}
@@ -666,59 +720,89 @@ export function OpportunityQuickEditModal({
               </div>
             </div>
 
-            {/* Right Header Controls: Prev/Next + Full Page + Close */}
-            <div className="flex items-center gap-1.5">
+            {/* Right Header Controls: Trade Counters + Prev/Next + Full Page + Close */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Link
+                href={buildPartyDocumentHref("quotations", fallbackDetail.customerPartyId)}
+                onClick={() => onClose()}
+                className={DOSSIER_KPI_PILL_CLASSES.quotations}
+              >
+                📄 Quotations <b>{partyCounts?.quotations ?? 0}</b>
+              </Link>
+              <Link
+                href={buildPartyDocumentHref("salesOrders", fallbackDetail.customerPartyId)}
+                onClick={() => onClose()}
+                className={DOSSIER_KPI_PILL_CLASSES.salesOrders}
+              >
+                📦 Orders <b>{partyCounts?.salesOrders ?? 0}</b>
+              </Link>
+              <Link
+                href={buildPartyDocumentHref("invoices", fallbackDetail.customerPartyId)}
+                onClick={() => onClose()}
+                className={DOSSIER_KPI_PILL_CLASSES.invoices}
+              >
+                🧾 Invoices <b>{partyCounts?.invoices ?? 0}</b>
+              </Link>
+
               {allItems.length > 1 && onSelectOpportunity && (
-                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-800 dark:bg-slate-800/60">
-                  <button
+                <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5">
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     disabled={!prevItem}
                     onClick={() => prevItem && onSelectOpportunity(prevItem)}
                     aria-label={t.common.previousPage}
-                    className="flex size-7 items-center justify-center rounded-md text-slate-600 hover:bg-white disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-card disabled:opacity-40"
                   >
                     <ChevronLeft
-                      className="size-4 rtl:rotate-180"
+                      className="size-4 rtl:-scale-x-100"
                       aria-hidden="true"
                     />
-                  </button>
-                  <span className="px-2 text-[11px] font-bold tabular-nums text-slate-500">
+                  </Button>
+                  <span className="px-2 text-2xs font-semibold tabular-nums text-muted-foreground">
                     {currentIndex + 1} / {allItems.length}
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     disabled={!nextItem}
                     onClick={() => nextItem && onSelectOpportunity(nextItem)}
                     aria-label={t.common.nextPage}
-                    className="flex size-7 items-center justify-center rounded-md text-slate-600 hover:bg-white disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-card disabled:opacity-40"
                   >
                     <ChevronRight
-                      className="size-4 rtl:rotate-180"
+                      className="size-4 rtl:-scale-x-100"
                       aria-hidden="true"
                     />
-                  </button>
+                  </Button>
                 </div>
               )}
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() =>
                   router.push(`/crm/opportunities/${fallbackDetail.id}`)
                 }
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted/50"
               >
-                <span>{isAr ? "فتح الملف الكامل" : "Full Dossier"}</span>
+                <span>{t.crmOpportunities.fullDossier}</span>
                 <ExternalLink className="size-3.5" aria-hidden="true" />
-              </button>
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={onClose}
                 aria-label={t.common.cancel}
-                className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                className="flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <X className="size-4" aria-hidden="true" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -727,12 +811,15 @@ export function OpportunityQuickEditModal({
             <div className="mt-3 flex items-center gap-1 overflow-x-auto pb-1">
               {stages.map((st, idx) => {
                 const isCurrent = st.id === fallbackDetail.stageId;
+                if (!editable) return isCurrent ? <span key={st.id}>{localizedName(st, lang)}</span> : null;
                 const isCompleted =
                   currentStageIndex >= 0 && idx < currentStageIndex;
                 return (
-                  <button
+                  <Button
                     key={st.id}
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     disabled={!editable || isCurrent}
                     onClick={() => onMoveStage(item, st.id)}
                     className={cn(
@@ -745,7 +832,7 @@ export function OpportunityQuickEditModal({
                     )}
                   >
                     <span className="truncate">{localizedName(st, lang)}</span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -757,58 +844,58 @@ export function OpportunityQuickEditModal({
           {/* Left Main Column (8 cols) */}
           <div className="space-y-4 lg:col-span-8">
             {/* Card 1: Deal Commercials & Scope */}
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-              <div className="mb-3 flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
+            <section className="rounded-lg border border-border bg-card p-4 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between gap-2 border-b border-border pb-2.5">
                 <div className="flex items-center gap-2">
                   <Banknote
-                    className="size-4 text-emerald-600"
+                    className="size-4 text-success"
                     aria-hidden="true"
                   />
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100">
-                    {isAr
-                      ? "القيمة التجارية ونطاق الصفقة"
-                      : "Deal Commercials & Scope"}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                    {t.crmOpportunities.dealCommercials}
                   </h3>
                 </div>
 
                 {editable && !isEditingDeal && (
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="xs"
                     onClick={startDealEdit}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    className="inline-flex h-auto items-center gap-1 rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
                   >
                     <Pencil className="size-3" aria-hidden="true" />
                     <span>{t.crmLeadDetail.edit}</span>
-                  </button>
+                  </Button>
                 )}
               </div>
 
               {sectionError && (
                 <div
                   role="alert"
-                  className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-700 dark:border-red-900 dark:bg-red-950/60 dark:text-red-300"
+                  className="mb-3 rounded-lg border border-destructive/30 bg-destructive-subtle p-2.5 text-xs font-medium text-destructive-subtle-foreground"
                 >
                   {sectionError}
                 </div>
               )}
 
-              {isEditingDeal ? (
+              {isEditingDeal && editable ? (
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <label className="mb-1 block text-xs font-semibold text-foreground">
                         {t.crmOpportunities.title} *
                       </label>
                       <input
                         type="text"
                         value={titleDraft}
                         onChange={(e) => setTitleDraft(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs font-semibold text-foreground"
                       />
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <label className="mb-1 block text-xs font-semibold text-foreground">
                         {t.crmOpportunityDetail.amount}
                       </label>
                       <div className="flex gap-1.5">
@@ -819,24 +906,30 @@ export function OpportunityQuickEditModal({
                           value={amountDraft}
                           onChange={(e) => setAmountDraft(e.target.value)}
                           placeholder="0.00"
-                          className="h-9 flex-1 rounded-lg border border-slate-300 bg-white px-3 font-mono text-xs font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                          className="h-9 flex-1 rounded-lg border border-input bg-card px-3 font-mono text-xs font-semibold tabular-nums text-foreground"
                         />
                         <select
+                          aria-label={t.crmLeadConvert.currencyCode}
                           value={currencyDraft}
                           onChange={(e) => setCurrencyDraft(e.target.value)}
-                          className="h-9 w-24 rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                          className="h-9 w-24 rounded-lg border border-input bg-card px-2 text-xs font-semibold text-foreground"
                         >
-                          {CURRENCY_OPTIONS.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
+                          {!fallbackDetail.currencyCode && (
+                            <option value="">{t.crmOpportunities.notProvided}</option>
+                          )}
+                          {[...new Set([fallbackDetail.currencyCode, ...currencyOptions])]
+                            .filter((c): c is string => Boolean(c))
+                            .map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
                         </select>
                       </div>
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <label className="mb-1 block text-xs font-semibold text-foreground">
                         {t.crmOpportunityDetail.probability} (%)
                       </label>
                       <input
@@ -846,12 +939,12 @@ export function OpportunityQuickEditModal({
                         dir="ltr"
                         value={probabilityDraft}
                         onChange={(e) => setProbabilityDraft(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs font-semibold text-foreground"
                       />
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <label className="mb-1 block text-xs font-semibold text-foreground">
                         {t.crmOpportunities.expectedClose}
                       </label>
                       <input
@@ -859,23 +952,20 @@ export function OpportunityQuickEditModal({
                         dir="ltr"
                         value={expectedCloseDraft}
                         onChange={(e) => setExpectedCloseDraft(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="h-9 w-full rounded-lg border border-input bg-card px-3 text-xs font-semibold text-foreground"
                       />
                     </div>
 
-                    {ownerOptions.length > 0 && (
+                    {ownerScope.ready && ownerOptions.length > 0 && (
                       <div>
-                        <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        <label className="mb-1 block text-xs font-semibold text-foreground">
                           {t.crmOpportunities.owner}
                         </label>
                         <select
                           value={ownerUserIdDraft}
                           onChange={(e) => setOwnerUserIdDraft(e.target.value)}
-                          className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                          className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-xs font-semibold text-foreground"
                         >
-                          <option value="">
-                            {isAr ? "غير معين" : "Unassigned"}
-                          </option>
                           {ownerOptions.map((u) => (
                             <option key={u.id} value={u.id}>
                               {leadDetailsUserName(u)}
@@ -886,32 +976,36 @@ export function OpportunityQuickEditModal({
                     )}
 
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      <label className="mb-1 block text-xs font-semibold text-foreground">
                         {t.crmOpportunities.advancedSearch.fields.description}
                       </label>
                       <textarea
                         rows={3}
                         value={descriptionDraft}
                         onChange={(e) => setDescriptionDraft(e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="w-full rounded-lg border border-input bg-card p-2.5 text-xs text-foreground"
                       />
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-                    <button
+                  <div className="flex items-center justify-end gap-2 border-t border-border pt-2.5">
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="xs"
                       disabled={isSavingDeal}
                       onClick={() => setIsEditingDeal(false)}
-                      className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                      className="h-8 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-muted-foreground hover:bg-muted/50"
                     >
                       {t.common.cancel}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="primary"
+                      size="xs"
                       disabled={isSavingDeal}
                       onClick={() => void saveDealEdit()}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 text-xs font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                     >
                       {isSavingDeal && (
                         <Loader2
@@ -920,17 +1014,17 @@ export function OpportunityQuickEditModal({
                         />
                       )}
                       <span>{t.common.save}</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
-                      <span className="block text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-400">
+                    <div className="rounded-lg border border-success/30 bg-success-subtle/50 p-3">
+                      <span className="block text-2xs font-semibold uppercase text-success">
                         {t.crmOpportunityDetail.amount}
                       </span>
-                      <div className="mt-1 text-base font-extrabold text-emerald-900 dark:text-emerald-200">
+                      <div className="mt-1 text-base font-semibold text-success-subtle-foreground">
                         {fallbackDetail.amount ? (
                           <Money
                             value={fallbackDetail.amount}
@@ -943,11 +1037,11 @@ export function OpportunityQuickEditModal({
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/50 p-3 dark:border-blue-900/50 dark:bg-blue-950/20">
-                      <span className="block text-[10px] font-bold uppercase text-blue-700 dark:text-blue-400">
+                    <div className="rounded-lg border border-primary/30 bg-primary-subtle/50 p-3">
+                      <span className="block text-2xs font-semibold uppercase text-primary">
                         {t.crmOpportunityDetail.probability}
                       </span>
-                      <div className="mt-1 flex items-center gap-1.5 text-base font-extrabold text-blue-900 dark:text-blue-200">
+                      <div className="mt-1 flex items-center gap-1.5 text-base font-semibold text-primary-subtle-foreground">
                         <CirclePercent className="size-4" aria-hidden="true" />
                         <span>
                           {fallbackDetail.probabilityPercent !== null
@@ -965,13 +1059,13 @@ export function OpportunityQuickEditModal({
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                      <span className="block text-[10px] font-bold uppercase text-slate-500">
+                    <div className="rounded-lg border border-border bg-muted/40 p-3">
+                      <span className="block text-2xs font-semibold uppercase text-muted-foreground">
                         {t.crmOpportunities.expectedClose}
                       </span>
-                      <div className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-900 dark:text-slate-100">
+                      <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-foreground">
                         <Calendar
-                          className="size-3.5 text-slate-400"
+                          className="size-3.5 text-muted-foreground"
                           aria-hidden="true"
                         />
                         {fallbackDetail.expectedCloseDate ? (
@@ -987,20 +1081,20 @@ export function OpportunityQuickEditModal({
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                      <span className="block text-[10px] font-bold uppercase text-slate-500">
+                    <div className="rounded-lg border border-border bg-muted/40 p-3">
+                      <span className="block text-2xs font-semibold uppercase text-muted-foreground">
                         {t.crmOpportunities.owner}
                       </span>
-                      <div className="mt-1 truncate text-xs font-bold text-slate-900 dark:text-slate-100">
+                      <div className="mt-1 truncate text-xs font-semibold text-foreground">
                         {fallbackDetail.ownerDisplayName ||
-                          (isAr ? "غير معين" : "Unassigned")}
+                          t.crmOpportunities.unassigned}
                       </div>
                     </div>
                   </div>
 
                   {fallbackDetail.description && (
-                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
-                      <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400">
+                    <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-foreground">
+                      <span className="mb-1 block text-2xs font-semibold uppercase text-muted-foreground">
                         {t.crmOpportunities.advancedSearch.fields.description}
                       </span>
                       <p className="whitespace-pre-line">
@@ -1010,8 +1104,8 @@ export function OpportunityQuickEditModal({
                   )}
 
                   {fallbackDetail.lostReason && (
-                    <div className="rounded-xl border border-red-200 bg-red-50/70 p-3 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                      <span className="mb-0.5 block text-[10px] font-bold uppercase">
+                    <div className="rounded-lg border border-destructive/30 bg-destructive-subtle p-3 text-xs text-destructive-subtle-foreground">
+                      <span className="mb-0.5 block text-2xs font-semibold uppercase">
                         {t.crmOpportunityDetail.lostReason}
                       </span>
                       <p>{fallbackDetail.lostReason}</p>
@@ -1022,24 +1116,22 @@ export function OpportunityQuickEditModal({
             </section>
 
             {/* Card 2: Customer & Primary Contact Reach Card */}
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-              <div className="mb-3 flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
+            <section className="rounded-lg border border-border bg-card p-4 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between gap-2 border-b border-border pb-2.5">
                 <div className="flex items-center gap-2">
                   <Building2
-                    className="size-4 text-blue-600"
+                    className="size-4 text-primary"
                     aria-hidden="true"
                   />
-                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-100">
-                    {isAr
-                      ? "العميل ومسؤول التواصل"
-                      : "Customer & Primary Contact"}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                    {t.crmOpportunities.customerAndContact}
                   </h3>
                 </div>
 
                 {fallbackDetail.customerProfileId && (
                   <Link
                     href={`/crm/customer-profiles/${fallbackDetail.customerProfileId}`}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                   >
                     <span>{t.crmOpportunities.viewCustomer}</span>
                     <ExternalLink className="size-3" aria-hidden="true" />
@@ -1049,15 +1141,15 @@ export function OpportunityQuickEditModal({
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <span className="block text-[10px] font-bold uppercase text-slate-400">
+                  <span className="block text-2xs font-semibold uppercase text-muted-foreground">
                     {t.crmOpportunities.customer}
                   </span>
-                  <div className="mt-0.5 text-sm font-bold text-slate-900 dark:text-slate-100">
+                  <div className="mt-0.5 text-sm font-semibold text-foreground">
                     {customerName}
                   </div>
                   {(fallbackDetail.customerCity ||
                     fallbackDetail.customerCountry) && (
-                    <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin className="size-3.5" aria-hidden="true" />
                       <span>
                         {[
@@ -1072,25 +1164,25 @@ export function OpportunityQuickEditModal({
                 </div>
 
                 <div>
-                  <span className="block text-[10px] font-bold uppercase text-slate-400">
-                    {isAr ? "جهة الاتصال الأساسية" : "Primary Contact"}
+                  <span className="block text-2xs font-semibold uppercase text-muted-foreground">
+                    {t.crmOpportunities.primaryContact}
                   </span>
-                  <div className="mt-0.5 text-sm font-bold text-slate-900 dark:text-slate-100">
+                  <div className="mt-0.5 text-sm font-semibold text-foreground">
                     {fallbackDetail.primaryContact?.displayName || customerName}
                   </div>
                   {fallbackDetail.primaryContact?.jobTitle && (
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted-foreground">
                       {fallbackDetail.primaryContact.jobTitle}
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 p-3">
                 <div className="space-y-1 text-xs">
                   {primaryPhone && (
                     <div
-                      className="font-mono font-bold text-slate-900 dark:text-slate-100"
+                      className="font-mono font-semibold tabular-nums text-foreground"
                       dir="ltr"
                     >
                       {primaryPhone}
@@ -1099,7 +1191,7 @@ export function OpportunityQuickEditModal({
                   {primaryEmail && (
                     <a
                       href={`mailto:${primaryEmail}`}
-                      className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
                     >
                       <Mail className="size-3.5" aria-hidden="true" />
                       <span>{primaryEmail}</span>
@@ -1108,7 +1200,7 @@ export function OpportunityQuickEditModal({
                 </div>
 
                 {primaryPhone && (
-                  <PhoneActionPills
+                  <OpportunityPhoneActions
                     phone={primaryPhone}
                     country={fallbackDetail.customerCountry}
                   />
@@ -1117,35 +1209,42 @@ export function OpportunityQuickEditModal({
             </section>
 
             {/* Card 3: Tabbed Workspace (Activities | Notes | Stage History | Files) */}
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-              <div className="mb-4 flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-2.5 dark:border-slate-800">
+            <section className="rounded-lg border border-border bg-card p-4 shadow-2xs">
+              <div
+                role="tablist"
+                className="mb-4 flex flex-wrap items-center gap-1.5 border-b border-border pb-2.5"
+              >
                 {(
                   [
                     {
                       id: "activities",
-                      label: isAr ? "الأنشطة والمتابعة" : "Activities",
+                      label: t.crmOpportunities.activitiesTab,
                     },
-                    { id: "notes", label: isAr ? "الملاحظات" : "Notes" },
+                    { id: "notes", label: t.crmOpportunities.notesTab },
                     {
                       id: "history",
                       label: t.crmOpportunityDetail.historyTitle,
                     },
-                    { id: "files", label: isAr ? "المرفقات" : "Files" },
+                    { id: "files", label: t.crmOpportunities.filesTab },
                   ] as const
-                ).map((tab) => (
-                  <button
+                ).filter((tab) => tab.id !== "history" || canReadHistory).map((tab) => (
+                  <Button
                     key={tab.id}
                     type="button"
+                    role="tab"
+                    aria-selected={activeDossierTab === tab.id}
+                    variant="ghost"
+                    size="xs"
                     onClick={() => setActiveDossierTab(tab.id)}
                     className={cn(
-                      "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
+                      "h-auto rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                       activeDossierTab === tab.id
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
                   >
                     {tab.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -1168,16 +1267,16 @@ export function OpportunityQuickEditModal({
                   sourceId={fallbackDetail.id}
                   sourceOwnerUserId={fallbackDetail.ownerUserId}
                   createCapability={attached.capabilities.notesCreate}
-                  deleteCapability={attached.capabilities.notesDelete}
                   readOnly={!editable}
                 />
               )}
 
               {activeDossierTab === "history" && (
-                <div className="space-y-4">
-                  {stageHistory.length > 0 && (
+                <div className="space-y-4" aria-busy={history.loading}>
+                  {history.denied && <PermissionGate require="crm.opportunities.read" scoped denied>{null}</PermissionGate>}
+                  {history.items.length > 0 && (
                     <div className="space-y-2">
-                      {stageHistory.map((entry) => {
+                      {history.items.map((entry) => {
                         const fromName = entry.fromStageSnapshot
                           ? localizedValue(
                               entry.fromStageSnapshot.stageNameAr,
@@ -1195,17 +1294,17 @@ export function OpportunityQuickEditModal({
                         return (
                           <div
                             key={entry.id}
-                            className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-800/40"
+                            className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs"
                           >
                             <div>
-                              <span className="font-bold text-slate-800 dark:text-slate-100">
+                              <span className="font-semibold text-foreground">
                                 {formatTemplate(
                                   t.crmOpportunityDetail.stageMoved,
                                   { from: fromName, to: toName },
                                 )}
                               </span>
                               {entry.reason && (
-                                <p className="mt-0.5 text-[11px] text-slate-500">
+                                <p className="mt-0.5 text-2xs text-muted-foreground">
                                   {entry.reason}
                                 </p>
                               )}
@@ -1215,7 +1314,7 @@ export function OpportunityQuickEditModal({
                                 value={entry.changedAt}
                                 precision="datetime"
                                 language={lang}
-                                className="text-[11px] text-slate-400"
+                                className="text-2xs text-muted-foreground"
                               />
                             )}
                           </div>
@@ -1224,7 +1323,15 @@ export function OpportunityQuickEditModal({
                     </div>
                   )}
 
-                  <EntityHistoryCard
+                  {history.failed && !history.denied && <p role="alert">{t.crmOpportunityDetail.historyLoadFailed}</p>}
+                  {!history.denied && (history.nextCursor || history.failed) && (
+                    <Button variant="outline" size="sm" disabled={history.loading} onClick={() => void history.loadMore()}>
+                      {history.failed ? t.common.retry : t.crmOpportunityDetail.historyLoadMore}
+                    </Button>
+                  )}
+                  {history.loading && <p role="status">{t.common.loading}</p>}
+
+                  <RecordHistoryTab
                     density="compact"
                     entityType="Opportunity"
                     entityId={fallbackDetail.id}
@@ -1252,70 +1359,73 @@ export function OpportunityQuickEditModal({
           {/* Right Sticky Executive Sidebar (4 cols) */}
           <aside className="space-y-4 lg:col-span-4">
             {/* Importance & Card Color Filing Card */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-lg border border-border bg-card p-4 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
                   {t.crmOpportunities.importance}
                 </span>
                 <div className="flex items-center gap-1">
                   {[1, 2, 3].map((st) => {
                     const active = st <= localImportance;
+                    if (!editable) return <Star key={st} className={cn("size-4", active ? "fill-warning text-warning" : "text-muted-foreground")} aria-hidden="true" />;
                     return (
-                      <button
+                      <Button
                         key={st}
                         type="button"
-                        disabled={!editable}
+                        variant="ghost"
+                        size="xs"
+                        disabled={!editable || isSavingCard}
                         onClick={() => {
                           const next = localImportance === st ? 0 : st;
-                          setLocalImportance(next);
-                          onCardChange(item.id, { importance: next }, item);
+                          void handleCardChange({ importance: next });
                         }}
-                        className="p-0.5 disabled:cursor-default"
+                        className="h-auto w-auto p-0.5 hover:bg-transparent disabled:cursor-default"
                       >
                         <Star
                           className={cn(
                             "size-4",
                             active
-                              ? "fill-amber-400 text-amber-500"
-                              : "text-slate-300 dark:text-slate-600",
+                              ? "fill-warning text-warning"
+                              : "text-muted-foreground/40",
                           )}
                         />
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-                <span className="mb-2 block text-[11px] font-bold text-slate-500">
+              <div className="mt-3 border-t border-border pt-3">
+                <span className="mb-2 block text-2xs font-semibold text-muted-foreground">
                   {t.crmLeads.card.cardColor}
                 </span>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {DOSSIER_HEADER_CARD_COLORS.map(({ color, hex }) => {
+                  {editable && DOSSIER_HEADER_CARD_COLORS.map(({ color, hex }) => {
                     const selected = localCardColor === color;
                     return (
-                      <button
+                      <Button
                         key={color ?? "NONE"}
                         type="button"
-                        disabled={!editable}
+                        variant="ghost"
+                        size="xs"
+                        disabled={!editable || isSavingCard}
                         onClick={() => {
                           const next = selected ? null : color;
-                          setLocalCardColor(next);
-                          onCardChange(item.id, { cardColor: next }, item);
+                          void handleCardChange({ cardColor: next });
                         }}
                         style={
                           color !== null ? { backgroundColor: hex } : undefined
                         }
                         className={cn(
-                          "flex size-5 items-center justify-center rounded-full border border-slate-200 transition-transform hover:scale-110 dark:border-slate-700",
+                          "flex size-5 items-center justify-center rounded-full border border-border p-0 transition-transform hover:scale-110",
                           selected &&
-                            "ring-2 ring-slate-900 ring-offset-2 dark:ring-white",
+                            "ring-2 ring-foreground ring-offset-2",
                         )}
                       >
                         {selected && (
                           <Check className="size-3 text-white" aria-hidden="true" />
                         )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -1323,35 +1433,42 @@ export function OpportunityQuickEditModal({
             </div>
 
             {/* Tags Manager Card */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-lg border border-border bg-card p-4 shadow-2xs">
               <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
                   {t.crmLeads.create.tags}
                 </span>
                 {editable && (
                   <div className="flex items-center gap-1">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="xs"
                       onClick={() => setIsTagPickerOpen((v) => !v)}
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      className="inline-flex h-auto items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-2xs font-semibold text-foreground hover:bg-muted"
                     >
                       <Plus className="size-3" aria-hidden="true" />
-                      <span>{t.common.create}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCreateTagOpen(true)}
-                      className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                    >
-                      <span>+ {t.crmTags.add}</span>
-                    </button>
+                      <span>{t.crmOpportunities.selectExistingTags}</span>
+                    </Button>
+                    {canManageTags && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        disabled={isSavingTags}
+                        onClick={() => setCreateTagOpen(true)}
+                        className="inline-flex h-auto items-center gap-1 rounded-md border border-primary/30 bg-primary-subtle px-2 py-0.5 text-2xs font-semibold text-primary-subtle-foreground hover:bg-primary-subtle/80"
+                      >
+                        <span>+ {t.crmTags.add}</span>
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
 
               <div className="flex flex-wrap gap-1.5">
                 {localTags.length === 0 ? (
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-muted-foreground">
                     {t.crmOpportunities.notProvided}
                   </span>
                 ) : (
@@ -1366,34 +1483,40 @@ export function OpportunityQuickEditModal({
                         textColor={tag.textColor}
                       />
                       {editable && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="xs"
+                          disabled={isSavingTags}
                           onClick={() => void handleRemoveTag(tag.id)}
                           aria-label={`Remove ${tag.name}`}
-                          className="rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+                          className="h-auto w-auto rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-destructive"
                         >
                           <X className="size-3" aria-hidden="true" />
-                        </button>
+                        </Button>
                       )}
                     </span>
                   ))
                 )}
               </div>
 
-              {isTagPickerOpen && (
-                <div className="mt-2.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-800">
+              {editable && isTagPickerOpen && (
+                <div className="mt-2.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border bg-muted/40 p-2">
                   {availableTags.map((tag) => {
                     const attachedTag = localTags.some((tItem) => tItem.id === tag.id);
                     return (
-                      <button
+                      <Button
                         key={tag.id}
                         type="button"
+                        variant="ghost"
+                        size="xs"
+                        disabled={!editable || isSavingTags}
                         onClick={() =>
                           attachedTag
                             ? void handleRemoveTag(tag.id)
                             : void handleAttachTag(tag)
                         }
-                        className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs hover:bg-white dark:hover:bg-slate-700"
+                        className="flex h-auto w-full items-center justify-between rounded-md px-2 py-1 text-xs hover:bg-card"
                       >
                         <TagChip
                           label={tag.name}
@@ -1402,11 +1525,11 @@ export function OpportunityQuickEditModal({
                         />
                         {attachedTag && (
                           <Check
-                            className="size-3.5 text-blue-600"
+                            className="size-3.5 text-primary"
                             aria-hidden="true"
                           />
                         )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -1424,13 +1547,13 @@ export function OpportunityQuickEditModal({
             )}
 
             {/* Acquisition Source & Quick Actions Card */}
-            <div className="space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+            <div className="space-y-2.5 rounded-lg border border-border bg-card p-4 shadow-2xs">
               {fallbackDetail.leadSourceName && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-500">
+                  <span className="font-semibold text-muted-foreground">
                     {t.crmAcquisitionSources.source}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
                     <AcquisitionSourceIcon
                       source={{ iconUrl: fallbackDetail.leadSourceIconUrl }}
                     />
@@ -1439,34 +1562,40 @@ export function OpportunityQuickEditModal({
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={() => onOpenActivities(item)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-              >
-                <Activity className="size-3.5" aria-hidden="true" />
-                <span>{t.activities.title}</span>
-              </button>
+              {canOpenActivities && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onOpenActivities(item)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary-subtle py-2 text-xs font-semibold text-primary-subtle-foreground hover:bg-primary-subtle/80"
+                >
+                  <Activity className="size-3.5" aria-hidden="true" />
+                  <span>{t.activities.title}</span>
+                </Button>
+              )}
 
               {deletable && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     onClose();
                     onDelete(item);
                   }}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50/70 py-2 text-xs font-bold text-red-600 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-400"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive-subtle py-2 text-xs font-semibold text-destructive-subtle-foreground hover:bg-destructive-subtle/80"
                 >
                   <Trash2 className="size-3.5" aria-hidden="true" />
                   <span>{t.crmOpportunities.deleteTitle}</span>
-                </button>
+                </Button>
               )}
             </div>
           </aside>
         </div>
 
         <CreateTagModal
-          open={createTagOpen}
+          open={editable && canManageTags && createTagOpen}
           existingTags={availableTags}
           onClose={() => setCreateTagOpen(false)}
           onSuccess={(newTag) => {

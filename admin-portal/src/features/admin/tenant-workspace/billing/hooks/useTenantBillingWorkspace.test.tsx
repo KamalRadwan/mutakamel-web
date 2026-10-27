@@ -3,7 +3,8 @@
 import { StrictMode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TenantBillingPermissions } from "../types";
+import type { TenantBillingPermissions, WalletAdjustmentPreviewView } from "../types";
+import { readWalletConfirmation, saveWalletConfirmation } from "../model/wallet-adjustment-recovery";
 
 const api = vi.hoisted(() => ({
   getSubscription: vi.fn(),
@@ -64,9 +65,11 @@ const tenantId = "019f0000-0000-7000-8000-000000000001";
 
 describe("useTenantBillingWorkspace", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     Object.values(api).forEach((mock) => mock.mockReset());
     Object.values(commercialApi).forEach((mock) => mock.mockReset());
     window.sessionStorage.clear();
+    window.localStorage.clear();
     permissionState.current = { ...NONE };
     authState.current = {
       user: { id: "admin", permissions: [] },
@@ -280,6 +283,136 @@ describe("useTenantBillingWorkspace", () => {
     expect(result.current.ledgerError?.errorCode).toBe("LEDGER_UNAVAILABLE");
   });
 
+  it("recovers one committed adjustment after a lost response, reload and quote expiry", async () => {
+    allowWalletAdjustments();
+    const quote = walletQuote();
+    api.previewWalletAdjustment.mockResolvedValue(quote);
+    const ledger = new Map<string, { id: string }>();
+    api.confirmWalletAdjustment.mockImplementation(async (id: string, quoteId: string, note: string, key: string) => {
+      expect(readWalletConfirmation("admin", tenantId)).toEqual({ actorId: "admin", tenantId: id, quoteId, note, key });
+      if (!ledger.has(key)) {
+        ledger.set(key, { id: "one-ledger-entry" });
+        throw normalizedError(503, "HTTP_503"); // Commit succeeded; response was lost.
+      }
+      return ledger.get(key);
+    });
+    const first = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(first.result.current.walletState).toBe("ready"));
+    await act(async () => { await first.result.current.previewWalletAdjustment(walletDraft); });
+    await act(async () => { await first.result.current.confirmWalletAdjustment("  Original audit note  "); });
+    const originalArgs = api.confirmWalletAdjustment.mock.calls[0];
+    expect(first.result.current.walletConfirmation?.note).toBe("Original audit note");
+    act(() => first.result.current.clearWalletPreview());
+    expect(first.result.current.walletPreview?.quoteId).toBe(quote.quoteId);
+    await act(async () => { await first.result.current.previewWalletAdjustment({ ...walletDraft, sourceAmount: "50" }); });
+    expect(api.previewWalletAdjustment).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse(quote.expiresAt) + 1);
+    const recovered = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(recovered.result.current.walletConfirmation?.quoteId).toBe(quote.quoteId));
+    expect(recovered.result.current.walletPreview).toBeNull();
+    await act(async () => { await recovered.result.current.confirmWalletAdjustment("Attempt to change the note"); });
+    expect(api.confirmWalletAdjustment.mock.calls[1]).toEqual(originalArgs);
+    expect(ledger.size).toBe(1);
+    expect(recovered.result.current.walletConfirmation).toBeNull();
+    expect(readWalletConfirmation("admin", tenantId)).toBeNull();
+    await act(async () => { await recovered.result.current.previewWalletAdjustment(walletDraft); });
+    expect(api.previewWalletAdjustment).toHaveBeenCalledTimes(2);
+  });
+
+  it("serializes confirmation clicks and prevents preview replacement or dismissal in flight", async () => {
+    allowWalletAdjustments();
+    api.previewWalletAdjustment.mockResolvedValue(walletQuote());
+    const response = deferred<{ id: string }>();
+    api.confirmWalletAdjustment.mockReturnValue(response.promise);
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    await act(async () => { await result.current.previewWalletAdjustment(walletDraft); });
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.confirmWalletAdjustment("Original note"); });
+    await act(async () => {
+      await result.current.confirmWalletAdjustment("Changed note");
+      await result.current.previewWalletAdjustment(walletDraft);
+      result.current.clearWalletPreview();
+    });
+    expect(api.confirmWalletAdjustment).toHaveBeenCalledTimes(1);
+    expect(api.previewWalletAdjustment).toHaveBeenCalledTimes(1);
+    expect(result.current.walletPreview).not.toBeNull();
+    await act(async () => { response.resolve({ id: "entry" }); await pending; });
+  });
+
+  it("blocks dispatch when the recovery record cannot be saved", async () => {
+    allowWalletAdjustments();
+    api.previewWalletAdjustment.mockResolvedValue(walletQuote());
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    await act(async () => { await result.current.previewWalletAdjustment(walletDraft); });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("storage unavailable"); });
+    await act(async () => { await result.current.confirmWalletAdjustment("Reviewed note"); });
+    expect(api.confirmWalletAdjustment).not.toHaveBeenCalled();
+    expect(result.current.walletRecoveryUnavailable).toBe(true);
+    expect(result.current.mutation.error?.errorCode).toBe("WALLET_RECOVERY_UNAVAILABLE");
+  });
+
+  it("binds recovery to the actor and tenant and preserves it when permissions are revoked", async () => {
+    allowWalletAdjustments();
+    const command = savedWalletCommand();
+    saveWalletConfirmation(command);
+    const { result, rerender } = renderHook(({ id }) => useTenantBillingWorkspace(id), { initialProps: { id: tenantId } });
+    await waitFor(() => expect(result.current.walletConfirmation).toEqual(command));
+    rerender({ id: "another-tenant" });
+    expect(result.current.walletConfirmation).toBeNull();
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    authState.current = { user: { id: "another-admin", permissions: [] }, isLoading: false };
+    rerender({ id: tenantId });
+    expect(result.current.walletConfirmation).toBeNull();
+    await waitFor(() => expect(result.current.walletRecoveryUnavailable).toBe(false));
+    authState.current = { user: { id: "admin", permissions: ["read-only"] }, isLoading: false };
+    permissionState.current = { ...NONE, canReadWallet: true };
+    rerender({ id: tenantId });
+    await waitFor(() => expect(result.current.walletConfirmation).toEqual(command));
+    await act(async () => { await result.current.confirmWalletAdjustment(""); });
+    expect(api.confirmWalletAdjustment).not.toHaveBeenCalled();
+    expect(readWalletConfirmation("admin", tenantId)).toEqual(command);
+  });
+
+  it.each(["GW.IDEM.IN_FLIGHT", "IDEMPOTENCY_KEY_REUSED", "FX_QUOTE_ALREADY_CONSUMED", "AUTH_SESSION_CHANGED"])(
+    "does not discard unresolved evidence on %s", async (code) => {
+      allowWalletAdjustments();
+      const command = savedWalletCommand();
+      saveWalletConfirmation(command);
+      api.confirmWalletAdjustment.mockRejectedValue(normalizedError(409, code));
+      const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+      await waitFor(() => expect(result.current.walletState).toBe("ready"));
+      await act(async () => { await result.current.confirmWalletAdjustment(""); });
+      expect(readWalletConfirmation("admin", tenantId)).toEqual(command);
+      expect(result.current.walletConfirmation).toEqual(command);
+    },
+  );
+
+  it("unlocks only after Core authoritatively rejects an uncommitted expired quote", async () => {
+    allowWalletAdjustments();
+    saveWalletConfirmation(savedWalletCommand());
+    api.confirmWalletAdjustment.mockRejectedValue(normalizedError(409, "FX_QUOTE_EXPIRED"));
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    await act(async () => { await result.current.confirmWalletAdjustment(""); });
+    expect(readWalletConfirmation("admin", tenantId)).toBeNull();
+    expect(result.current.walletConfirmation).toBeNull();
+  });
+
+  it("does not submit an expired quote that has never been confirmed", async () => {
+    allowWalletAdjustments();
+    api.previewWalletAdjustment.mockResolvedValue({ ...walletQuote(), expiresAt: "2000-01-01T00:00:00Z" });
+    const { result } = renderHook(() => useTenantBillingWorkspace(tenantId));
+    await waitFor(() => expect(result.current.walletState).toBe("ready"));
+    await act(async () => { await result.current.previewWalletAdjustment(walletDraft); });
+    await act(async () => { await result.current.confirmWalletAdjustment("Reviewed note"); });
+    expect(api.confirmWalletAdjustment).not.toHaveBeenCalled();
+    expect(readWalletConfirmation("admin", tenantId)).toBeNull();
+  });
+
   it("blocks lifecycle-invalid financial commands before I/O", async () => {
     allowCommercial();
     const source = commercialFixture(); source.subscription.status = "PAST_DUE";
@@ -367,6 +500,31 @@ describe("useTenantBillingWorkspace", () => {
   });
 
 });
+
+const walletDraft = { direction: "CREDIT", reasonCode: "MANUAL_CREDIT", sourceAmount: "25.00", sourceCurrencyCode: "USD" } as const;
+
+function walletQuote(): WalletAdjustmentPreviewView {
+  return {
+    quoteId: "019f0000-0000-7000-8000-000000000012",
+    purpose: "ADMIN_WALLET_ADJUSTMENT",
+    sourceAmount: "25.00", sourceCurrencyCode: "USD", amountUsd: "25.00",
+    currencyUnitsPerUsd: "1.00", rateRevisionId: null,
+    rateObservedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    direction: "CREDIT", reasonCode: "MANUAL_CREDIT", balanceBeforeUsd: "100.00", balanceAfterUsd: "125.00",
+  };
+}
+
+function savedWalletCommand() {
+  return { actorId: "admin", tenantId, quoteId: walletQuote().quoteId, note: "Original audit note", key: "019f0000-0000-7000-8000-000000000013" };
+}
+
+function allowWalletAdjustments() {
+  permissionState.current = { ...NONE, canReadWallet: true, canPreviewWalletAdjustment: true, canConfirmWalletAdjustment: true };
+  api.getWallet.mockResolvedValue({ status: "ACTIVE" });
+  api.getInputCurrencies.mockResolvedValue({ items: [] });
+  api.getLedger.mockResolvedValue(emptyPage());
+  api.getPayments.mockResolvedValue(emptyPage());
+}
 
 function allowCommercial() {
   authState.current.user.permissions = ["admin.subscriptions.read", "admin.subscriptions.update", "admin.subscriptions.critical"];

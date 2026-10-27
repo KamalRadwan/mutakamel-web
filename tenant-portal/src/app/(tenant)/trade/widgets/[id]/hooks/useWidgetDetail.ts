@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { COMPANY_SCOPE_HEADER } from "@/lib/api/organization-scope";
+import { can } from "@/lib/auth/permission-scope";
 import { tradeDelete, tradeGet, tradeIfMatch, tradePost } from "../../../trade-api";
 import { useTradeScope } from "../../../trade-advanced-scope";
 import {
@@ -30,7 +32,7 @@ import {
 } from "../../../dashboards/analytics-contract";
 import {
   buildBulkSharesRequest,
-  buildWidgetPreviewRequest,
+  buildSavedWidgetPreviewRequest,
   type ShareChangeInput,
 } from "../../../dashboards/analytics-requests";
 
@@ -43,7 +45,7 @@ export function useWidgetDetail(id: string) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchId } = useTenantBranchSelection(user);
+  const { branchId } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [widget, setWidget] = useState<WidgetRecord | null>(null);
@@ -55,6 +57,12 @@ export function useWidgetDetail(id: string) {
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const permissionTarget = scope.headers[COMPANY_SCOPE_HEADER]
+    ? { companyId: scope.headers[COMPANY_SCOPE_HEADER] }
+    : {};
+  const canShare = widget?.accessLevel === "OWNER" &&
+    (user?.isTenantOwner === true || can(user, "trade.widgets.share", permissionTarget));
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -140,15 +148,7 @@ export function useWidgetDetail(id: string) {
         WIDGETS_PREVIEW_PATH,
         // A preview needs the COMPLETE widget definition plus its own
         // requestId — it is not a fragment, and the requestId is required.
-        buildWidgetPreviewRequest(
-          widget.name,
-          widget.visualizationType as Parameters<typeof buildWidgetPreviewRequest>[1],
-          widget.series.map((series) => ({
-            metricKey: series.metricKey,
-            label: series.label ?? "",
-          })),
-          widget.displayTitle ?? "",
-        ),
+        buildSavedWidgetPreviewRequest(widget),
         { headers: scope.headers, maxResponseBytes: PREVIEW_RESPONSE_LIMIT_BYTES },
       );
       const body = response.data as { result?: unknown } | null;
@@ -163,7 +163,7 @@ export function useWidgetDetail(id: string) {
 
   const shareAction = useCallback(
     async (call: () => Promise<unknown>): Promise<void> => {
-      if (pending) return;
+      if (pending || !canShare) return;
       setPending("share");
       setActionError(null);
       try {
@@ -175,13 +175,14 @@ export function useWidgetDetail(id: string) {
         await load();
       }
     },
-    [pending, load, fail],
+    [pending, canShare, load, fail],
   );
 
   return {
     t,
     lang,
     widget,
+    canShare,
     shares,
     shareTargets,
     sharesUnavailable,

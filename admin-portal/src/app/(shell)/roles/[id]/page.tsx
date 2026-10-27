@@ -43,6 +43,8 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
     isSuperAdmin,
     canUpdateMetadata,
     canReplacePermissions,
+    delegablePermissionIds,
+    permissionsDelegationBlocked,
     search,
     setSearch,
     groupedPermissions,
@@ -236,7 +238,11 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
               {t.roles.permissionsMatrixTitle}
             </CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {permissionsReadOnly ? t.roles.permissionsReadOnlyHint : t.roles.permissionsEditableHint}
+              {permissionsDelegationBlocked
+                ? t.roles.protectedPermissionSetHint
+                : permissionsReadOnly
+                  ? t.roles.permissionsReadOnlyHint
+                  : t.roles.permissionsEditableHint}
             </p>
           </div>
           <div className="flex w-full items-center gap-3 sm:w-auto">
@@ -291,7 +297,9 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
         <div className="divide-y divide-border">
           {Object.entries(groupedPermissions).map(([groupName, perms]) => {
             const checkedCount = perms.filter((p) => assignedPermissions.has(p.id)).length;
-            const isAllChecked = perms.length > 0 && checkedCount === perms.length;
+            const delegable = perms.filter((p) => delegablePermissionIds.has(p.id));
+            const isAllChecked =
+              delegable.length > 0 && delegable.every((p) => assignedPermissions.has(p.id));
 
             return (
               <div key={groupName} className="space-y-3 p-3 sm:p-3.5">
@@ -308,6 +316,7 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                       type="button"
                       variant="link"
                       size="sm"
+                      disabled={delegable.length === 0}
                       onClick={() => toggleGroup(groupName, !isAllChecked)}
                       className="h-auto px-1.5 py-1 text-xs font-semibold"
                     >
@@ -320,6 +329,9 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                   {perms.map((p) => {
                     const isChecked = assignedPermissions.has(p.id) || isSuperAdmin;
                     const isCritical = p.key.includes(".critical");
+                    const isDelegable = delegablePermissionIds.has(p.id);
+                    const isDisabled = permissionsReadOnly || !isDelegable;
+                    const reasonId = `permission-delegation-${p.id}`;
                     return (
                       <label
                         key={p.id}
@@ -327,16 +339,23 @@ export default function RoleDetailPage({ params }: { params: Promise<{ id: strin
                           isChecked
                             ? "border-primary/40 bg-selected"
                             : "border-border bg-card"
-                        } ${!permissionsReadOnly ? "cursor-pointer hover:border-primary/50" : "opacity-90"}`}
+                        } ${!isDisabled ? "cursor-pointer hover:border-primary/50" : "cursor-not-allowed opacity-90"}`}
                       >
                         <span className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-foreground">
                           {getPermissionName(p, lang as "ar" | "en")}
                           {isCritical && <Badge tone="danger">{t.roles.criticalBadge}</Badge>}
+                          {!isDelegable && (
+                            <span id={reasonId} className="w-full text-xs font-normal text-muted-foreground">
+                              {t.roles.permissionNotDelegableHint}
+                            </span>
+                          )}
                         </span>
                         <Checkbox
                           checked={isChecked}
                           onCheckedChange={() => togglePermission(p.id)}
-                          disabled={permissionsReadOnly}
+                          disabled={isDisabled}
+                          aria-label={getPermissionName(p, lang as "ar" | "en")}
+                          aria-describedby={!isDelegable ? reasonId : undefined}
                           className="mt-0.5 shrink-0"
                         />
                       </label>

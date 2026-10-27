@@ -3,7 +3,6 @@ import {
   buildCreateLeadRequest,
   emptyCreateLeadForm,
   emptyLeadContact,
-  normalizeLeadPhone,
   usesExistingCompany,
   type CreateLeadForm,
 } from "./lead-create-contract";
@@ -34,16 +33,6 @@ function corporate(overrides: Partial<CreateLeadForm> = {}): CreateLeadForm {
     ...overrides,
   };
 }
-
-describe("normalizeLeadPhone", () => {
-  // Mirrors LeadsService.normalizeMobile — the two spellings below are the
-  // same number to the server, which is what makes them a duplicate.
-  it("collapses the spellings the server treats as one number", () => {
-    expect(normalizeLeadPhone("00 966 537-8990")).toBe("+9665378990");
-    expect(normalizeLeadPhone("+966 53 789 90")).toBe("+9665378990");
-    expect(normalizeLeadPhone("0537 8990")).toBe("05378990");
-  });
-});
 
 describe("buildCreateLeadRequest — corporate", () => {
   it("sends the company, its contacts and nothing the service would drop", () => {
@@ -222,6 +211,7 @@ describe("buildCreateLeadRequest — address and custom fields", () => {
   it("sends the modern address spellings only, and nothing when every box is blank", () => {
     const blank = buildCreateLeadRequest(corporate(), BRANCH_ID);
     expect(blank).not.toHaveProperty("address");
+    expect(emptyCreateLeadForm("x").address).not.toHaveProperty("apartment");
 
     const filled = buildCreateLeadRequest(
       corporate({

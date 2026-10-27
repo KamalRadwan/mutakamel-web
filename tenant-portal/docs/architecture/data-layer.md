@@ -47,8 +47,24 @@ Never construct a Gateway URL in a component. Never call `fetch` outside
 
 ## Request options
 
+Verified **2026-10-17** (CXPORTAL-SHELL-114): ordinary requests have a 30-second
+total deadline. Callers can set `timeoutMs` to a positive integer up to
+2,147,483,647 milliseconds. The deadline includes headers, body consumption,
+activity checkpoints and auth recovery; a replay shares the original deadline.
+Caller cancellation remains an AbortError. Timers and caller listeners are
+removed on settlement. Timeout does not trigger a replay.
+
+Timeout raises the client-only `CLIENT_REQUEST_TIMEOUT` outcome (local status
+504), with Arabic/English recovery copy. Writes are potentially committed;
+their exact outgoing `idempotencyKey` is retained in the error and normalized
+error, including automatically generated keys. Reconcile by refreshing before
+saving again; an explicit retry of the same intent must reuse that key and
+the same body. Existing `runIdempotentWrite` callers retain their attempt and
+classify this outcome as ambiguous.
+
 ```ts
 interface TenantApiRequestConfig extends RequestInit {
+  timeoutMs?: number;            // total deadline; default 30,000 ms
   skipAuthRefresh?: boolean;      // do not attempt refresh on 401
   nonReplayable?: boolean;        // repair session, but NEVER replay this request
   replayAfterRefresh?: boolean;   // allow one replay for a naturally idempotent write

@@ -19,6 +19,7 @@ import {
   Skeleton,
 } from "@/design-system";
 import { wireLabel } from "@/lib/format/wire-label";
+import { auditNotificationText } from "@/lib/audit/notification-text";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { PriorityBadge } from "../components/NotificationList";
 import { useNotificationDetail } from "./hooks/useNotificationDetail";
@@ -33,8 +34,7 @@ export default function NotificationDetailPage() {
     <PermissionGate require="notifications.notification.read">
       <div className="flex flex-col gap-4">
         <PageHeader
-          title={notification?.title ?? t.coreNotifications.detailTitle}
-          description={t.coreNotifications.detailSubtitle}
+          title={notification ? auditNotificationText(notification, t.audit.recordMessages).title : t.coreNotifications.detailTitle}
           leading={
             <Button variant="ghost" size="sm" asChild aria-label={t.common.back}>
               <Link href={TENANT_ROUTES.coreNotifications}>
@@ -98,7 +98,7 @@ export default function NotificationDetailPage() {
                 <CardTitle>{t.coreNotifications.detailBody}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-wrap text-sm text-foreground">{notification.body}</p>
+                <p className="whitespace-pre-wrap text-sm text-foreground">{auditNotificationText(notification, t.audit.recordMessages).body}</p>
                 {notification.actionUrl ? (
                   <Button size="sm" variant="link" asChild className="mt-3">
                     {/* Validated same-origin at the boundary; an unsafe route
@@ -130,10 +130,10 @@ export default function NotificationDetailPage() {
                     {notification.channels.map((channel) => (
                       <Badge key={channel} tone="neutral">
                         {wireLabel(
-                          t.coreNotifications.channelNames,
+                          t.coreNotifications.wireChannelNames,
                           channel,
                           t.common.unknownCode,
-                          "coreNotifications.channelNames",
+                          "coreNotifications.wireChannelNames",
                         )}
                       </Badge>
                     ))}

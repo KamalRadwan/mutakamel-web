@@ -7,7 +7,8 @@ import type {
   CustomerProfileItem,
   CustomerProfileStatus,
 } from "./useCustomerProfiles";
-import { useUpdateCustomerProfileStatus } from "./useUpdateCustomerProfileStatus";
+import { useUpdateCustomerProfileStatus, type StatusUpdateResult } from "./useUpdateCustomerProfileStatus";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 
 /**
  * The board's optimistic status move — MASTER-PLAN 8.7's drag path.
@@ -35,6 +36,7 @@ export function useCustomerProfileBoardMove(
 ) {
   const { t } = useI18n();
   const toast = useToast();
+  const errorText = useCrmErrorText();
   const { updateStatus } = useUpdateCustomerProfileStatus();
   const [overrides, setOverrides] = useState<
     Record<string, CustomerProfileStatus>
@@ -49,14 +51,14 @@ export function useCustomerProfileBoardMove(
   );
 
   const handleCardMove = useCallback(
-    async (move: BoardCardMove) => {
+    async (move: BoardCardMove): Promise<StatusUpdateResult> => {
       const status = move.toColumnId as CustomerProfileStatus;
       const item = items.find((entry) => entry.id === move.itemId);
       if (!item || !canUpdate(item)) {
         // 403 is the honest classification: this is the same refusal the
         // backend's owner scope would have produced, made before the write.
         toast.errorFromApi(t.crmCustomerProfiles.moveFailed, { status: 403 });
-        return;
+        return { ok: false, error: { status: 403 } };
       }
       setOverrides((current) => ({ ...current, [move.itemId]: status }));
       const result = await updateStatus(move.itemId, status);
@@ -76,16 +78,18 @@ export function useCustomerProfileBoardMove(
           );
         }
         await reload();
-        return;
+        return result;
       }
       // 429 and the two idempotency conflicts each need their own surface: a
       // generic "the move failed" tells the user to retry something that must
       // not be retried (S8, S9).
-      if (!toast.outcomeFromApi(result.error)) {
-        toast.errorFromApi(t.crmCustomerProfiles.moveFailed, result.error);
+      const error = { ...result.error, message: undefined };
+      if (!toast.outcomeFromApi(error)) {
+        toast.errorFromApi(errorText(error) ?? t.crmCustomerProfiles.moveFailed, error);
       }
+      return result;
     },
-    [canUpdate, items, reload, t, toast, updateStatus],
+    [canUpdate, errorText, items, reload, t, toast, updateStatus],
   );
 
   return { displayItems, handleCardMove };

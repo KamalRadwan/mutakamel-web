@@ -48,6 +48,7 @@ import {
   PRICING_READ_PERMISSION,
 } from "../price-books/pricing-contract";
 import { usePricingEvaluation, type EvaluateFormValues } from "./hooks/usePricingEvaluation";
+import { pricingDisplayTotals } from "./pricing-display";
 
 export default function PricingEvaluationPage() {
   const {
@@ -60,6 +61,7 @@ export default function PricingEvaluationPage() {
     selectBranch,
     values,
     result,
+    evaluatedInputs,
     activeTab,
     setActiveTab,
     pinnedEvaluations,
@@ -76,13 +78,9 @@ export default function PricingEvaluationPage() {
     evaluate,
   } = usePricingEvaluation();
 
-  const quantityNum = Number(values.quantity) > 0 ? Number(values.quantity) : 1;
-  const baselineNum = result ? Number(result.baselineUnitPrice) : 0;
-  const finalUnitNum = result ? Number(result.unitPrice) : 0;
-  const subtotalStr = result ? (finalUnitNum * quantityNum).toFixed(2) : "0.00";
-  const totalSavingsStr = result
-    ? Math.max(0, (baselineNum - finalUnitNum) * quantityNum).toFixed(2)
-    : "0.00";
+  const totals = result && evaluatedInputs
+    ? pricingDisplayTotals(result.baselineUnitPrice, result.unitPrice, evaluatedInputs.quantity)
+    : { subtotal: "0", savings: "0" };
   const activeCurrency = result?.currencyCode || values.currencyCode.trim().toUpperCase() || "SAR";
 
   const content = (
@@ -202,11 +200,9 @@ export default function PricingEvaluationPage() {
             <div className="text-lg font-semibold text-foreground">
               {result ? (
                 <Money
-                  value={subtotalStr}
+                  value={totals.subtotal}
                   currency={activeCurrency}
                   language={lang}
-                  minimumFractionDigits={2}
-                  maximumFractionDigits={2}
                 />
               ) : (
                 <IdentifierText className="tabular-nums">—</IdentifierText>
@@ -239,11 +235,9 @@ export default function PricingEvaluationPage() {
             <div className="text-lg font-semibold text-foreground">
               {result ? (
                 <Money
-                  value={totalSavingsStr}
+                  value={totals.savings}
                   currency={activeCurrency}
                   language={lang}
-                  minimumFractionDigits={2}
-                  maximumFractionDigits={2}
                 />
               ) : (
                 <IdentifierText className="tabular-nums">—</IdentifierText>

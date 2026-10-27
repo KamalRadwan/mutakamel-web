@@ -21,11 +21,14 @@ import {
   catalogueSearchQuery,
   type CatalogueReach,
 } from "../catalogue-reach";
-import type { TenantAccessController } from "../use-tenant-access";
+import { useTenantRoleCatalogues, type TenantAccessController } from "../use-tenant-access";
+import { useOwnershipTransferCandidates } from "../use-ownership-transfer-candidates";
 import type { TenantAccessCopy, TenantAccessLocale } from "../copy";
 import type {
   BranchRoleAssignmentInput,
   InviteTenantUserInput,
+  PageResult,
+  TenantAccessResource,
   TenantUserView,
   UpdateTenantUserInput,
 } from "../types";
@@ -379,33 +382,50 @@ export function RolesDialog({
 }: SharedDialogProps & { user: TenantUserView }) {
   const [assignments, setAssignments] = useState<BranchRoleAssignmentInput[]>(() =>
     user.roleAssignments.flatMap((assignment) =>
-      assignment.branchId ? [{ branchId: assignment.branchId, roleId: assignment.roleId }] : [],
+      assignment.source === "BRANCH_ROLE" && assignment.branchId
+        ? [{ branchId: assignment.branchId, roleId: assignment.roleId }]
+        : [],
     ),
   );
+  const scopedAssignments = user.roleAssignments.filter((assignment) => assignment.source === "SCOPE_ROLE");
+  const scopeLabels = { TENANT: copy.scopeTenant, COMPANY: copy.scopeCompany, BRANCH: copy.branch };
   const [branchId, setBranchId] = useState(user.organization.branch.id);
   const [roleId, setRoleId] = useState("");
-  const branches = useMemo(
-    () => controller.branches.data?.items ?? [],
-    [controller.branches.data?.items],
+  const catalogues = useTenantRoleCatalogues(controller, user);
+  const { branches, roles } = catalogues;
+  const branchNames = new Map<string, string>([
+    [user.organization.branch.id, user.organization.branch.name ?? user.organization.branch.code ?? copy.branchUnavailable],
+    ...Object.entries(catalogues.assignmentBranches.data ?? {}),
+    ...Object.values(branches.known).map((branch) => [branch.id, `${branch.company.name} · ${branch.name}`] as const),
+  ]);
+  const roleNames = new Map<string, string>([
+    ...user.roleAssignments.map((assignment) => [assignment.roleId, assignment.roleName] as const),
+    ...Object.values(roles.known).map((role) => [role.id, role.name] as const),
+  ]);
+  const branchOptions: Array<readonly [id: string, label: string]> = (branches.resource.data?.items ?? []).map((branch) =>
+    [branch.id, `${branch.company.name} · ${branch.name}`] as const,
   );
-  const roles = useMemo(
-    () => controller.roles.data?.items ?? [],
-    [controller.roles.data?.items],
-  );
-  const roleNames = useMemo(() => new Map(roles.map((role) => [role.id, role.name])), [roles]);
-  const branchNames = useMemo(() => new Map(branches.map((branch) => [branch.id, branch.name])), [branches]);
+  if (branchId && !branchOptions.some(([id]) => id === branchId)) {
+    branchOptions.unshift([branchId, branchNames.get(branchId) ?? copy.branchUnavailable]);
+  }
+  const roleOptions: Array<readonly [id: string, label: string]> = (roles.resource.data?.items ?? []).map((role) => [role.id, role.name] as const);
+  if (roleId && !roleOptions.some(([id]) => id === roleId)) {
+    roleOptions.unshift([roleId, roleNames.get(roleId) ?? roleId]);
+  }
+  const optionsReady = (branches.resource.status === "ready" || branches.resource.status === "empty") &&
+    (roles.resource.status === "ready" || roles.resource.status === "empty");
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     try {
       await controller.replaceRoles(user, { assignments });
-      onSuccess(copy.commandSucceeded);
+      onSuccess(copy.branchRolesSaved);
       onClose();
     } catch {
       // The command error remains visible.
     }
   };
   const add = () => {
-    if (!branchId || !roleId) return;
+    if (!branchId || !roleId || !optionsReady || controller.command.pending) return;
     setAssignments((current) =>
       current.some((entry) => entry.branchId === branchId && entry.roleId === roleId)
         ? current
@@ -415,26 +435,89 @@ export function RolesDialog({
   return (
     <DialogFrame title={copy.manageRoles} onClose={onClose} locale={locale}>
       <form onSubmit={submit} className="grid gap-3">
+        <h3 className="text-sm font-semibold">{copy.branchRoles}</h3>
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <DialogSelectField id="tenant-role-branch" label={copy.branch} value={branchId} onValueChange={setBranchId} options={[
-            ...(!branches.some((row) => row.id === user.organization.branch.id) ? [[user.organization.branch.id, user.organization.branch.name ?? user.organization.branch.id] as const] : []),
-            ...branches.map((branch) => [branch.id, `${branch.company.name} · ${branch.name}`] as const),
-          ]} />
-          <DialogSelectField id="tenant-role-role" label={copy.roles} value={roleId} onValueChange={setRoleId} options={roles.map((role) => [role.id, role.name] as const)} />
-          <div className="flex items-end"><Button size="sm" type="button" variant="outline" onClick={add}>{copy.addAssignment}</Button></div>
+          <div className="space-y-2">
+            <DialogInputField id="tenant-role-branch-search" name="branchSearch" label={copy.searchBranches} type="search" maxLength={120} value={branches.search} onChange={branches.setSearch} disabled={controller.command.pending} />
+            <DialogSelectField id="tenant-role-branch" label={copy.branch} value={branchId} onValueChange={setBranchId} options={branchOptions} disabled={controller.command.pending || !optionsReady} />
+            <RoleCatalogueFeedback label={copy.branch} picker={branches} copy={copy} disabled={controller.command.pending} />
+          </div>
+          <div className="space-y-2">
+            <DialogInputField id="tenant-role-role-search" name="roleSearch" label={copy.searchRoles} type="search" maxLength={120} value={roles.search} onChange={roles.setSearch} disabled={controller.command.pending} />
+            <DialogSelectField id="tenant-role-role" label={copy.roles} value={roleId} onValueChange={setRoleId} options={roleOptions} disabled={controller.command.pending || !optionsReady} />
+            <RoleCatalogueFeedback label={copy.roles} picker={roles} copy={copy} disabled={controller.command.pending} />
+          </div>
+          <div className="flex items-end"><Button size="sm" type="button" variant="outline" onClick={add} disabled={controller.command.pending || !optionsReady || !branchId || !roleId}>{copy.addAssignment}</Button></div>
         </div>
+        {catalogues.assignmentBranches.status === "error" || catalogues.assignmentBranches.status === "forbidden" ? (
+          <div role="alert" className="space-y-2 text-xs text-destructive-subtle-foreground">
+            <p>{copy.catalogueError}</p>
+            {catalogues.assignmentBranches.status === "error" ? <Button type="button" size="sm" variant="outline" onClick={catalogues.retryLabels}>{copy.retry}</Button> : null}
+          </div>
+        ) : null}
         <div className="divide-y divide-border rounded-lg border border-border">
           {assignments.length ? assignments.map((assignment) => (
             <div key={`${assignment.branchId}:${assignment.roleId}`} className="flex items-center justify-between gap-3 p-2 text-sm">
-              <span>{branchNames.get(assignment.branchId) ?? assignment.branchId} · {roleNames.get(assignment.roleId) ?? assignment.roleId}</span>
+              <span>{branchNames.get(assignment.branchId) ?? `${copy.branchUnavailable} (${assignment.branchId})`} · {roleNames.get(assignment.roleId) ?? assignment.roleId}</span>
               <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => setAssignments((current) => current.filter((entry) => entry.branchId !== assignment.branchId || entry.roleId !== assignment.roleId))}>{copy.remove}</Button>
             </div>
           )) : <p className="p-3 text-sm text-muted-foreground">{copy.noAssignments}</p>}
         </div>
+        {scopedAssignments.length ? (
+          <section aria-label={copy.scopedRoles} className="space-y-2">
+            <h3 className="text-sm font-semibold">{copy.scopedRoles}</h3>
+            <p className="text-xs text-muted-foreground">{copy.scopedRolesReadOnly}</p>
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {scopedAssignments.map((assignment) => (
+                <li key={assignment.assignmentId} className="p-2 text-sm">
+                  {assignment.roleName} · {scopeLabels[assignment.scope]}
+                  {assignment.branchId
+                    ? ` · ${branchNames.get(assignment.branchId) ?? `${copy.branchUnavailable} (${assignment.branchId})`}`
+                    : assignment.companyId ? ` · ${assignment.companyId}` : ""}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <DialogError controller={controller} />
         <div className="flex justify-end gap-2"><Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button><Button size="sm" type="submit" variant="primary" disabled={controller.command.pending}>{copy.save}</Button></div>
       </form>
     </DialogFrame>
+  );
+}
+
+function RoleCatalogueFeedback({ label, picker, copy, disabled }: {
+  label: string;
+  picker: {
+    resource: TenantAccessResource<PageResult<{ id: string }>>;
+    page: number;
+    setPage: (page: number) => void;
+    retry: () => void;
+  };
+  copy: TenantAccessCopy;
+  disabled: boolean;
+}) {
+  const { resource } = picker;
+  return (
+    <section aria-label={label} className="space-y-2 text-xs text-muted-foreground">
+      {resource.status === "loading" ? <p role="status" aria-busy="true">{copy.catalogueLoading}</p> : null}
+      {resource.status === "empty" ? <p role="status">{copy.catalogueNoMatches}</p> : null}
+      {resource.status === "forbidden" ? <p role="alert">{copy.catalogueForbidden}</p> : null}
+      {resource.status === "unavailable" || resource.status === "idle" ? <p role="status">{copy.notReady}</p> : null}
+      {resource.status === "error" ? (
+        <div role="alert" className="space-y-2">
+          <p>{copy.catalogueError}</p>
+          <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={picker.retry}>{copy.retry}</Button>
+        </div>
+      ) : null}
+      {resource.data ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button type="button" size="sm" variant="outline" disabled={disabled || !resource.data.hasPrev} onClick={() => picker.setPage(picker.page - 1)}>{copy.previous}</Button>
+          <span>{copy.page} {resource.data.page} {copy.of} {Math.max(1, resource.data.totalPages)}</span>
+          <Button type="button" size="sm" variant="outline" disabled={disabled || !resource.data.hasNext} onClick={() => picker.setPage(picker.page + 1)}>{copy.next}</Button>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -444,8 +527,8 @@ export function RolesDialog({
  * Both ends are on screen because this is the one action whose consequence is
  * not visible from the button: the reader has to see who is losing the seat as
  * well as who is gaining it. Destinations are the tenant's own active,
- * non-owner, non-deleted users — the same set the server accepts, so a choice
- * offered here cannot be refused there.
+ * non-owner, non-deleted users. The server revalidates both users when the
+ * command runs.
  */
 export function TransferOwnershipDialog({
   controller,
@@ -455,23 +538,18 @@ export function TransferOwnershipDialog({
   onClose,
   onSuccess,
 }: SharedDialogProps & { user: TenantUserView }) {
-  const [newOwnerUserId, setNewOwnerUserId] = useState("");
-  const candidates = useMemo(
-    () =>
-      (controller.directory.data?.items ?? []).filter(
-        (candidate: TenantUserView) =>
-          candidate.id !== user.id &&
-          !candidate.isTenantOwner &&
-          candidate.deletedAt === null &&
-          candidate.status === "ACTIVE",
-      ),
-    [controller.directory.data?.items, user.id],
-  );
+  const picker = useOwnershipTransferCandidates(controller, user.id);
+  const { resource, selected } = picker;
+  const candidates = resource.data?.items ?? [];
+  const options = selected && !candidates.some((candidate) => candidate.id === selected.id)
+    ? [selected, ...candidates]
+    : candidates;
+  const candidatesReady = resource.status === "ready" || resource.status === "empty";
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!newOwnerUserId) return;
+    if (!selected || !candidatesReady || controller.command.pending) return;
     try {
-      await controller.transferOwnership(user, newOwnerUserId);
+      await controller.transferOwnership(user, selected.id);
       onSuccess(copy.transferOwnershipSucceeded);
       onClose();
     } catch {
@@ -488,28 +566,60 @@ export function TransferOwnershipDialog({
             {user.firstName} {user.lastName} · {user.email}
           </p>
         </div>
-        {candidates.length ? (
+        <DialogInputField
+          id="tenant-owner-transfer-search"
+          name="ownershipCandidateSearch"
+          label={copy.transferCandidatesSearch}
+          type="search"
+          value={picker.search}
+          maxLength={200}
+          disabled={controller.command.pending}
+          onChange={picker.setSearch}
+        />
+        {resource.status === "loading" ? (
+          <p role="status" aria-busy="true" className="text-sm text-muted-foreground">{copy.transferCandidatesLoading}</p>
+        ) : resource.status === "forbidden" ? (
+          <p role="alert" className="text-sm text-destructive-subtle-foreground">{copy.transferCandidatesForbidden}</p>
+        ) : resource.status === "unavailable" || resource.status === "idle" ? (
+          <p role="status" className="text-sm text-muted-foreground">{copy.notReady}</p>
+        ) : resource.status === "error" ? (
+          <div role="alert" className="grid gap-2 text-sm text-destructive-subtle-foreground">
+            <p>{copy.transferCandidatesError}</p>
+            <Button type="button" size="sm" variant="outline" onClick={picker.retry}>{copy.retry}</Button>
+          </div>
+        ) : null}
+        {options.length ? (
           <DialogSelectField
             id="tenant-owner-transfer-target"
             label={copy.newOwner}
-            value={newOwnerUserId}
-            onValueChange={setNewOwnerUserId}
-            options={[
-              ["", copy.newOwnerPlaceholder] as const,
-              ...candidates.map(
+            value={selected?.id ?? ""}
+            disabled={controller.command.pending || !candidatesReady}
+            onValueChange={picker.select}
+            options={options.map(
                 (candidate: TenantUserView) =>
                   [
                     candidate.id,
                     `${candidate.firstName} ${candidate.lastName} · ${candidate.email}`,
                   ] as const,
-              ),
-            ]}
+              )}
           />
-        ) : (
-          <p className="rounded-lg bg-warning-subtle p-2 text-sm text-warning-subtle-foreground">
-            {copy.transferOwnershipEmpty}
+        ) : null}
+        {resource.status === "empty" ? (
+          <p role="status" className="rounded-lg bg-warning-subtle p-2 text-sm text-warning-subtle-foreground">
+            {picker.search.trim()
+              ? copy.transferCandidatesNoMatches
+              : (resource.data?.totalPages ?? 0) > 1
+                ? copy.transferCandidatesPageEmpty
+                : copy.transferOwnershipEmpty}
           </p>
-        )}
+        ) : null}
+        {resource.data ? (
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <Button type="button" size="sm" variant="outline" disabled={controller.command.pending || !candidatesReady || !resource.data.hasPrev} onClick={() => picker.setPage(picker.page - 1)}>{copy.previous}</Button>
+            <span>{copy.page} {resource.data.page} {copy.of} {Math.max(1, resource.data.totalPages)}</span>
+            <Button type="button" size="sm" variant="outline" disabled={controller.command.pending || !candidatesReady || !resource.data.hasNext} onClick={() => picker.setPage(picker.page + 1)}>{copy.next}</Button>
+          </div>
+        ) : null}
         <DialogError controller={controller} />
         <div className="flex justify-end gap-2">
           <Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
@@ -517,7 +627,7 @@ export function TransferOwnershipDialog({
             size="sm"
             type="submit"
             variant="primary"
-            disabled={controller.command.pending || !newOwnerUserId}
+            disabled={controller.command.pending || !selected || !candidatesReady}
           >
             {copy.transferOwnership}
           </Button>
@@ -554,13 +664,17 @@ export function ConfirmationDialog({
   }[action];
   const confirm = async () => {
     try {
-      if (action === "reset-password") await controller.resetPassword(user);
+      let successMessage: string = action === "resend-invite" ? copy.deliveryQueued : copy.commandSucceeded;
+      if (action === "reset-password") {
+        const result = await controller.resetPassword(user);
+        successMessage = result.delivery === "ALREADY_QUEUED" ? copy.deliveryAlreadyQueued : copy.deliveryQueued;
+      }
       if (action === "resend-invite") await controller.resendInvite(user);
       if (action === "suspend") await controller.suspendUser(user);
       if (action === "activate") await controller.activateUser(user);
       if (action === "delete") await controller.deleteUser(user);
       if (action === "restore") await controller.restoreUser(user);
-      onSuccess(action === "reset-password" || action === "resend-invite" ? copy.deliveryQueued : copy.commandSucceeded);
+      onSuccess(successMessage);
       onClose();
     } catch {
       // The command error remains visible.
@@ -570,7 +684,12 @@ export function ConfirmationDialog({
     <DialogFrame title={definition[0]} onClose={onClose} locale={locale}>
       <p className="text-sm leading-6 text-foreground/90">{definition[1]}</p>
       <p className="mt-2 rounded-lg bg-muted p-2 text-sm font-semibold text-foreground">{user.firstName} {user.lastName} · {user.email}</p>
-      <DialogError controller={controller} />
+      <DialogError
+        controller={controller}
+        localError={action === "reset-password" && controller.command.error?.errorCode === "TENANT_USER_PASSWORD_RESET_UNAVAILABLE"
+          ? copy.resetPasswordUnavailable
+          : undefined}
+      />
       <div className="mt-5 flex justify-end gap-2">
         <Button size="sm" type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>
         <Button size="sm" type="button" variant={action === "delete" ? "destructive" : "primary"} disabled={controller.command.pending} onClick={() => void confirm()}>{copy.confirm}</Button>
@@ -709,7 +828,7 @@ function DialogSelectField({
         </SelectContent>
       </Select>
       {reach?.truncated ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {reach.shown} / {reach.total}
         </p>
       ) : null}

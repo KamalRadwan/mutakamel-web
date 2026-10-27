@@ -28,11 +28,9 @@ import {
   Field,
   Input,
   Checkbox,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  Combobox,
+  ErrorState,
+  DegradedBanner,
 } from "@/design-system";
 import { useUserDetail } from "../hooks/useUserDetail";
 import { useUserPermissions } from "../hooks/useUserPermissions";
@@ -43,6 +41,7 @@ import { WebphoneSummaryCard } from "../components/WebphoneSummaryCard";
 import { WebphoneServerChainCard } from "../components/WebphoneServerChainCard";
 import { UserNotFoundState } from "../components/UserNotFoundState";
 import { UserPermissionDenied } from "../components/UserPermissionDenied";
+import { RoleCatalogueFeedback } from "../components/RoleCatalogueFeedback";
 
 export default function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -53,6 +52,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     router,
     user,
     isLoading,
+    detailLoadState,
+    loadError,
+    reload,
     isSaving,
     notFound,
     permissionDenied,
@@ -67,6 +69,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     assignedRoleId,
     setAssignedRoleId,
     availableRoles,
+    hasAssignableRoles,
+    rolesStatus,
+    reloadRoles,
     status,
 
     identityHasChanges,
@@ -88,6 +93,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     passwordConfigured,
 
     webphoneExtension,
+    webphoneRead,
+    serversRead,
+    chainRead,
+    reloadWebphone,
     extensionError,
     sipUsernameError,
     sipPasswordError,
@@ -109,9 +118,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     saveWebphone,
     handleStatusChange,
     handleDelete,
+    handleResendInvite,
   } = useUserDetail(id);
 
-  const permissions = useUserPermissions(id, status);
+  const permissions = useUserPermissions(id, status, user?.isSuperAdmin);
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [showSipPassword, setShowSipPassword] = useState(false);
@@ -149,8 +159,20 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     );
   }
 
+  if (detailLoadState === "error" || !user || user.id !== id) {
+    return <ErrorState title={t.users.loadError} error={loadError} onRetry={() => void reload()} />;
+  }
+
   return (
     <div className="w-full space-y-3">
+      {detailLoadState === "degraded" && (
+        <DegradedBanner>
+          <p>{t.users.detailRefreshFailed}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void reload()} className="mt-2">
+            {t.users.retryLoad}
+          </Button>
+        </DegradedBanner>
+      )}
       <PageHeader
         title={`${firstName} ${lastName}`}
         description={email}
@@ -168,6 +190,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               {lang === "ar" ? <ArrowRight className="size-3.5" /> : <ArrowLeft className="size-3.5" />}
               {t.users.usersNavLabel}
             </Button>
+            {permissions.canResendInvite && (
+              <Button type="button" variant="outline" size="sm" disabled={isSaving} aria-busy={isSaving} onClick={handleResendInvite}>
+                {isSaving ? t.users.sendingInvite : t.users.resendInvite}
+              </Button>
+            )}
             {permissions.canSuspend && (
               <Button type="button" variant="outline" size="sm" disabled={isSaving} onClick={() => handleStatusChange("SUSPENDED")}>
                 <Ban className="size-3.5" />
@@ -189,6 +216,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         }
       />
+
+      {permissions.isProtectedTarget && (
+        <p className="text-xs text-muted-foreground">{t.users.protectedSuperAdminReason}</p>
+      )}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <div className="space-y-3">
@@ -295,40 +326,52 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               {roleHasChanges && permissions.canAssignRole && <Badge tone="warn">{t.users.unsavedRoleBadge}</Badge>}
             </CardHeader>
             <CardContent className="space-y-3">
-              <Field label={t.users.roleLabel}>
-                {(fieldProps) => (
-                  <Select
-                    value={assignedRoleId ?? ""}
-                    onValueChange={(v) => setAssignedRoleId(v || undefined)}
-                    disabled={!permissions.canAssignRole || permissions.isSelf || isSaving}
-                  >
-                    <SelectTrigger {...fieldProps} size="sm">
-                      <SelectValue placeholder={t.users.selectRolePlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableRoles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.nameI18n?.[lang] || role.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </Field>
+              {permissions.canAssignRole ? (
+                <Field label={t.users.roleLabel}>
+                  {(fieldProps) => (
+                    <Combobox
+                      {...fieldProps}
+                      value={assignedRoleId ?? ""}
+                      onValueChange={(v) => setAssignedRoleId(v || undefined)}
+                      disabled={permissions.isSelf || isSaving || rolesStatus !== "success"}
+                      label={t.users.roleLabel}
+                      placeholder={t.users.selectRolePlaceholder}
+                      searchPlaceholder={t.users.rolesSearchPlaceholder}
+                      emptyLabel={t.users.rolesNoMatches}
+                      options={availableRoles.map((role) => ({
+                        value: role.id,
+                        disabled: role.id === user.roleId,
+                        label: role.nameI18n?.[lang] || role.name,
+                        keywords: [role.name, role.nameI18n?.en ?? "", role.nameI18n?.ar ?? ""],
+                      }))}
+                    />
+                  )}
+                </Field>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{t.users.roleLabel}</p>
+                  <p className="text-sm">{user?.role?.nameI18n?.[lang] || user?.role?.name}</p>
+                </div>
+              )}
+              {permissions.canAssignRole && (
+                <RoleCatalogueFeedback assignable status={rolesStatus} empty={!hasAssignableRoles} onRetry={reloadRoles} />
+              )}
               {assignedRoleId && availableRoles.find((r) => r.id === assignedRoleId)?.description && (
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {availableRoles.find((r) => r.id === assignedRoleId)?.description}
                 </p>
               )}
 
-              <div className="flex gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-warning-subtle-foreground">
-                <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
-                <p className="text-xs leading-relaxed">{t.users.roleChangeWarning}</p>
-              </div>
+              {permissions.canAssignRole && (
+                <div className="flex gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2.5 text-warning-subtle-foreground">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+                  <p className="text-xs leading-relaxed">{t.users.roleChangeWarning}</p>
+                </div>
+              )}
             </CardContent>
             {permissions.canAssignRole && !permissions.isSelf && roleHasChanges && (
               <CardFooter>
-                <Button type="button" variant="primary" size="sm" onClick={saveRole} disabled={isSaving} loading={isSaving}>
+                <Button type="button" variant="primary" size="sm" onClick={saveRole} disabled={isSaving || rolesStatus !== "success"} loading={isSaving}>
                   <Save className="size-3.5" />
                   {t.users.applyRoleAssignment}
                 </Button>
@@ -345,10 +388,48 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             )}
           </Card>
 
+          {permissions.canViewWebphone && [
+            { key: "extension", state: webphoneRead, title: t.users.webphoneConfig, failure: t.users.webphoneLoadFailed },
+            { key: "servers", state: serversRead, title: t.users.webphoneServerCatalogue, failure: t.users.webphoneServersLoadFailed },
+            { key: "chain", state: chainRead, title: t.users.serverChainTitle, failure: t.users.webphoneChainLoadFailed },
+          ].map(({ key, state, title, failure }) =>
+            state.status === "loading" || state.status === "error" ? (
+              <Card key={key}>
+                <CardHeader>
+                  <CardTitle className="text-sm">{title}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2.5">
+                  {state.status === "error" ? (
+                    <div role="alert" className="space-y-1 text-xs text-destructive">
+                      <p>{failure}</p>
+                      <p className="whitespace-pre-line">{state.message}</p>
+                    </div>
+                  ) : (
+                    <p role="status" aria-busy="true" className="text-xs text-muted-foreground">
+                      {t.users.webphoneReadLoading}
+                    </p>
+                  )}
+                  {state.status === "error" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isSaving || [webphoneRead, serversRead, chainRead].some((read) => read.status === "loading")}
+                      onClick={() => void reloadWebphone()}
+                    >
+                      <RefreshCw className="size-3.5" aria-hidden="true" />
+                      {t.users.retryWebphoneReads}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null,
+          )}
+
           {/* Without the WebPhone module's read permission the extension is
               never fetched, so the card would report every user as
               unconfigured — say nothing rather than something false. */}
-          {!permissions.canViewWebphone ? null : !isEditingWebphone ? (
+          {!permissions.canViewWebphone || webphoneRead.status !== "success" ? null : !isEditingWebphone ? (
             <WebphoneSummaryCard
               webphone={webphoneExtension}
               canEdit={permissions.canEditWebphone}
@@ -498,7 +579,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {/* The chain is the user's failover order over the servers from
               Settings → WebPhone, so it is shown wherever the identity is —
               but only to an operator allowed to read the module at all. */}
-          {permissions.canViewWebphone && (
+          {permissions.canViewWebphone && webphoneRead.status === "success" &&
+            serversRead.status === "success" && chainRead.status === "success" && (
             <WebphoneServerChainCard
               servers={webphoneServers}
               rows={serverChainRows}
@@ -518,7 +600,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <DestructiveActionModal
-        isOpen={isDeleteModalOpen}
+        isOpen={isDeleteModalOpen && permissions.canDelete}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={() => {
           setIsDeleteModalOpen(false);

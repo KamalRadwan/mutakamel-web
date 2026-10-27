@@ -79,32 +79,32 @@ export function CustomerContactsSection({
     <section
       id="contacts"
       data-form-section="contacts"
-      className="relative overflow-hidden rounded-xl border border-sky-500/20 bg-card shadow-xs transition-colors dark:border-sky-400/20"
+      className="relative overflow-hidden rounded-lg border border-swatch-blue-soft bg-card shadow-xs transition-colors"
     >
       {/* Top 3px Sky-Blue accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-sky-500 via-blue-500 to-indigo-500"
+        className="h-1 w-full bg-swatch-blue"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-sky-500/[0.03] px-4 py-3 dark:bg-sky-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-swatch-blue-soft px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-600 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-swatch-blue-soft bg-swatch-blue-soft text-swatch-blue-deep">
             <Users className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <span dir="ltr" className="rounded bg-swatch-blue-soft px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-swatch-blue-deep">
                 03
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmCustomerProfiles.create.sections.contacts}
               </h3>
-              <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+              <span dir="ltr" className="rounded-full border border-swatch-blue-soft bg-swatch-blue-soft px-2 py-0.5 font-mono text-2xs font-semibold tabular-nums text-swatch-blue-deep">
                 {form.contacts.length} / {limits.contacts}
               </span>
               <LeadFieldGuide field="contacts" />
@@ -122,7 +122,7 @@ export function CustomerContactsSection({
             size="sm"
             disabled={disabled}
             onClick={onAdd}
-            className="border-sky-500/30 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300"
+            className="border-swatch-blue-soft bg-swatch-blue-soft text-swatch-blue-deep hover:bg-swatch-blue-soft"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             {t.crmLeads.create.addContact}

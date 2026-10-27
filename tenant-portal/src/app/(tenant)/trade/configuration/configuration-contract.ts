@@ -91,6 +91,7 @@ export interface ConfigurationVersion {
   status: string;
   effectiveFrom: string;
   effectiveTo: string | null;
+  supersededAt?: string | null;
   contentHash: string;
 }
 
@@ -266,6 +267,7 @@ function parseConfigurationVersion(payload: unknown): ConfigurationVersion {
     typeof version.scopeTarget !== "string" ||
     typeof version.status !== "string" ||
     !isTimestamp(version.effectiveFrom) ||
+    (version.supersededAt != null && !isTimestamp(version.supersededAt)) ||
     !isNonEmptyString(version.contentHash, 64)
   ) {
     invalidResponse();
@@ -279,6 +281,7 @@ function parseConfigurationVersion(payload: unknown): ConfigurationVersion {
     status: version.status,
     effectiveFrom: version.effectiveFrom,
     effectiveTo: isTimestamp(version.effectiveTo) ? (version.effectiveTo as string) : null,
+    supersededAt: isTimestamp(version.supersededAt) ? version.supersededAt : null,
     contentHash: version.contentHash,
   };
 }

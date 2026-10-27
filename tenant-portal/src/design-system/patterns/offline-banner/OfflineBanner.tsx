@@ -10,6 +10,7 @@ import type { ConnectivityStatus } from "./useConnectivity";
 export interface OfflineBannerLabels {
   offline: string;
   draining: string;
+  retrying: string;
   stopped: string;
   /** Only rendered for `stopped`, which no amount of waiting recovers from. */
   reload: string;
@@ -39,10 +40,11 @@ export interface OfflineBannerProps {
 
 const MESSAGE_KEY: Record<
   Exclude<ConnectivityStatus, "online">,
-  "offline" | "draining" | "stopped"
+  "offline" | "draining" | "retrying" | "stopped"
 > = {
   offline: "offline",
   draining: "draining",
+  retrying: "retrying",
   stopped: "stopped",
 };
 
@@ -62,12 +64,12 @@ function readStopReason(
 /**
  * The connection strip, mounted once in `AppShell`.
  *
- * Three states, three different truths, and collapsing them into one "you are
- * offline" would be wrong in two of the three:
+ * Network loss, retries, draining and permanent stops have separate messages:
  *
  * - **offline** — the browser lost the network. It comes back on its own.
  * - **draining** — the realtime server is shutting down and a reconnect is
  *   coming. Writes still work; live updates pause.
+ * - **retrying** — connection admission or an automatic retry is pending.
  * - **stopped** — the realtime client gave up permanently. Only a reload
  *   restores live updates, so this is the one state that gets an action.
  *

@@ -64,6 +64,24 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("useTradeLineDraft item lookup", () => {
+  it.each([
+    ["1.", "1"],
+    ["0.0", "0"],
+    ["1.2500", "1.25"],
+    ["10.0500", "10.05"],
+    ["", ""],
+    ["invalid", "invalid"],
+    ["1.123456789", "1.123456789"],
+  ])("keeps %j editable and commits it as %j without replacing invalid input", (raw, expected) => {
+    const { result } = renderHook(() =>
+      useTradeLineDraft(HEADERS, "EGP", null, "SALES", false),
+    );
+    act(() => result.current.setQuantity(0, raw));
+    expect(result.current.lines[0]?.quantity).toBe(raw);
+    act(() => result.current.commitQuantity(0));
+    expect(result.current.lines[0]?.quantity).toBe(expected);
+  });
+
   it("searches the server with the document purpose and retains selected-result metadata", async () => {
     const { result } = renderHook(() =>
       useTradeLineDraft(HEADERS, "EGP", null, "SALES", true),

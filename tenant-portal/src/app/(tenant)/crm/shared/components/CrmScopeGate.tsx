@@ -7,8 +7,8 @@ import { useI18n } from "@/i18n/I18nContext";
 /**
  * The in-body 403 for a CRM record the server refused on **scope**.
  *
- * `PermissionGate` cannot serve this case, and the reason is the whole of
- * defect D11. It decides from `/auth/me` permission strings, and a CRM string
+ * Without its `denied` override, `PermissionGate` decides from `/auth/me`
+ * permission strings, and a CRM string
  * carries a scope suffix without saying which records it reaches: an actor
  * holding `crm.leads.read.own` passes `hasPermission("crm.leads.read", true)`
  * for every lead in the tenant, including the ones the server just answered
@@ -21,9 +21,9 @@ import { useI18n } from "@/i18n/I18nContext";
  * that names scope rather than a missing role grant, because a role grant is
  * not the remedy.
  *
- * `OwnerGate` in `core/components/` is the same shape for the same reason on
- * the billing screens. If `PermissionGate` ever gains a caller-supplied
- * `denied` override, both should collapse into it.
+ * `PermissionGate` now supports an authoritative `denied` override. This
+ * surface remains separate because its copy explains record scope rather
+ * than a missing permission grant.
  */
 export function CrmScopeGate({ className }: { className?: string }) {
   const { t } = useI18n();

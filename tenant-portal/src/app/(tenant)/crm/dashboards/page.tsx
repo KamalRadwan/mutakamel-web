@@ -38,6 +38,8 @@ export default function DashboardsPage() {
     catalogFailed,
     hasLoaded,
     isLoading,
+    hasMore,
+    loadMore,
     isSubmitting,
     pendingId,
     queryError,
@@ -105,6 +107,7 @@ export default function DashboardsPage() {
     <PermissionGate require="crm.dashboards.read" scoped>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={t.crmDashboards.title}
           description={t.crmDashboards.subtitle}
           primaryAction={
@@ -120,9 +123,6 @@ export default function DashboardsPage() {
           }
           secondaryActions={
             <>
-              {/* `GET /dashboards/default` PROVISIONS when the actor has none,
-                  so it is bound to an explicit action and never called on
-                  mount. */}
               <Button size="sm"
                 variant="outline"
                 disabled={isSubmitting}
@@ -195,9 +195,6 @@ export default function DashboardsPage() {
           searchPlaceholder={t.crmDashboards.search}
         />
 
-        {/* No pagination: `GET /dashboards` declares no page/limit query and
-            returns every visible dashboard in one array
-            (dashboard-access.service.ts, `accessibleDashboards`). */}
         <DataTable
           columns={columns}
           rows={items}
@@ -227,6 +224,12 @@ export default function DashboardsPage() {
             },
           }}
         />
+
+        {hasMore ? (
+          <Button variant="outline" disabled={isLoading} loading={isLoading} onClick={() => void loadMore()}>
+            {t.crmDashboards.loadMoreDashboards}
+          </Button>
+        ) : null}
 
         <DashboardFormDrawer
           key={isCreateOpen ? "open" : "closed"}

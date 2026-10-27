@@ -16,7 +16,7 @@ export function AddonAssignmentOptions({ userId }: { userId: string }) {
   const labels = useBillingTableLabels(copy.loadFailed, copy.empty);
   return <PermissionGate require={[]} denied={read.denied}>
     <div className="flex min-w-0 flex-col gap-4">
-      <PageHeader title={copy.title} description={copy.description} secondaryActions={
+      <PageHeader className="sr-only" title={copy.title} description={copy.description} secondaryActions={
         <Button size="sm" variant="outline" onClick={read.reload} disabled={read.loading}>{t.coreBilling.reload}</Button>
       } />
       <DetailSection title={t.addonAssignments.user} fields={[{ label: t.addonAssignments.user, value: <IdentifierText>{userId}</IdentifierText> }]} />

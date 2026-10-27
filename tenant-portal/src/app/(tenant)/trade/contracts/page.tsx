@@ -279,6 +279,7 @@ export default function ContractsPage() {
     <TradeGate require={CONTRACT_PERMISSIONS.read}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={td.contracts.title}
           description={td.contracts.subtitle}
           primaryAction={

@@ -1,7 +1,7 @@
 import { isCardColor, type CardColor } from "@/design-system";
 import { isUUIDv7 } from "@/lib/uuid";
 
-export const MAX_CUSTOMER_PROFILE_RATING = 3;
+const MAX_CUSTOMER_PROFILE_RATING = 3;
 
 export interface CustomerProfileCardPatch {
   rating?: number;

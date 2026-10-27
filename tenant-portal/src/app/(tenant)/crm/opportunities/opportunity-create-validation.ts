@@ -11,7 +11,7 @@ import type { CrmFormErrors } from "../shared/hooks/useCrmCreateForm";
 import { isValidOpportunityAmount, type OpportunityForm } from "./opportunity-write-contract";
 
 export interface OpportunityCreateMessages extends CrmFieldMessages {
-  /** `../shared/money`'s exact-decimal rule — the amount must survive as cents. */
+  /** Currency precision plus an exact decimal-to-JSON round trip. */
   amountInvalid: string;
   /** `@IsInt() @Min(0) @Max(3)` and `@Min(0) @Max(100)`, with the bounds filled in. */
   outOfRange: string;
@@ -75,9 +75,8 @@ export function validateCreateOpportunity(
   bag.required("stageId", form.stageId);
   if (bag.required("title", form.title)) bag.maxLength("title", form.title, 180);
 
-  // `@IsNumber({ maxDecimalPlaces: 2 })` on the wire, and `../shared/money`
-  // owns the range where the string-to-number conversion keeps every cent.
-  if (form.amount.trim().length > 0 && !isValidOpportunityAmount(form.amount)) {
+  // The DTO allows three decimals; the service also enforces currency scale.
+  if (form.amount.trim().length > 0 && !isValidOpportunityAmount(form.amount, form.currencyCode)) {
     bag.set("amount", messages.amountInvalid);
   }
 

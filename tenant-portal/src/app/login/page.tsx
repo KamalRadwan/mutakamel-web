@@ -14,11 +14,13 @@ import {
   Input,
   LanguageToggle,
   ThemeToggle,
+  MfaCodeStep,
 } from "@/design-system";
 import { useLogin } from "./hooks/useLogin";
 
 export default function LoginPage() {
   const {
+    mfa,
     t,
     email,
     setEmail,
@@ -27,6 +29,8 @@ export default function LoginPage() {
     rememberMe,
     showPassword,
     isSubmitting,
+    isCoolingDown,
+    throttleMessage,
     isForgotModalOpen,
     setIsForgotModalOpen,
     openForgotModal,
@@ -73,8 +77,10 @@ export default function LoginPage() {
               role="alert"
               className="mb-4 flex flex-col gap-1 rounded-sm border border-negative-200 bg-negative-100 p-3 text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
             >
-              <p className="text-xs font-medium">{t.coreIdentity.loginFailure[failureKind].title}</p>
-              <p className="text-2xs">{t.coreIdentity.loginFailure[failureKind].description}</p>
+              <p className="text-xs font-medium">{failureKind === "temporarilyUnavailable"
+                ? t.auth.signInFailed : t.coreIdentity.loginFailure[failureKind].title}</p>
+              <p className="text-2xs">{isCoolingDown ? throttleMessage : failureKind === "temporarilyUnavailable"
+                ? t.auth.temporarilyUnavailable : t.coreIdentity.loginFailure[failureKind].description}</p>
               {failure?.correlationId ? (
                 <p className="font-mono text-2xs">
                   {t.errors.reference}: {failure.correlationId}
@@ -92,6 +98,7 @@ export default function LoginPage() {
                 `GET /login?email=…&password=…`, which also puts the password in
                 browser history and every proxy log on the way. POSTing keeps it
                 out of the URL even when JavaScript never runs. */}
+          {mfa.step ? <MfaCodeStep flow={mfa} onRestart={mfa.reset} /> : (
           <form method="post" onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Field label={t.auth.emailLabel} required>
               <Input
@@ -160,10 +167,11 @@ export default function LoginPage() {
               <span className="text-xs text-muted-foreground">{t.auth.rememberMe}</span>
             </label>
 
-            <Button type="submit" variant="primary" size="sm" loading={isSubmitting} className="w-full">
+            <Button type="submit" variant="primary" size="sm" loading={isSubmitting} disabled={isCoolingDown} className="w-full">
               {isSubmitting ? t.auth.submitting : t.auth.submit}
             </Button>
           </form>
+          )}
         </div>
       </div>
 

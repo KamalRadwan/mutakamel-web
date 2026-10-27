@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTenantAuth } from "@/context/AuthContext";
+import { readCoreData } from "@/lib/api/envelope";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   createWriteAttempt,
@@ -33,6 +35,14 @@ export interface CreateOpportunityAmbiguity {
   attempt: WriteAttempt;
   error: NormalizedApiError;
   replay: () => Promise<void>;
+}
+
+export interface OpportunityTagRecovery {
+  opportunityId: string;
+  tagIds: string[];
+  attempt: WriteAttempt;
+  status: "failed" | "uncertain";
+  error: NormalizedApiError;
 }
 
 /**
@@ -68,6 +78,11 @@ export function useCreateOpportunity(
   const [ambiguity, setAmbiguity] = useState<CreateOpportunityAmbiguity | null>(
     null,
   );
+  const [tagRecovery, setTagRecovery] = useState<OpportunityTagRecovery | null>(null);
+  const [isRetryingTags, setIsRetryingTags] = useState(false);
+  // Refs also protect same-tick submissions and callbacks from an older render.
+  const activeAttempt = useRef<WriteAttempt | null>(null);
+  const sending = useRef(false);
 
   const validate = useCallback(
     (candidate: OpportunityForm) =>
@@ -96,6 +111,10 @@ export function useCreateOpportunity(
       initialDraft?: Partial<OpportunityForm>,
       defaultPipelineId?: string | null,
     ) => {
+      if (activeAttempt.current) {
+        setOpen(true);
+        return;
+      }
       reset();
       setCustomerLabel("");
       setError(null);
@@ -118,7 +137,7 @@ export function useCreateOpportunity(
 
       setForm((prev) => ({
         ...prev,
-        currencyCode: "EGP",
+        currencyCode: "",
         importance: "2",
         probabilityPercent: "50",
         ...initialDraft,
@@ -131,8 +150,10 @@ export function useCreateOpportunity(
   );
 
   const closeModal = useCallback(() => {
-    reset();
-    setError(null);
+    if (!activeAttempt.current) {
+      reset();
+      setError(null);
+    }
     setOpen(false);
   }, [reset]);
 
@@ -187,6 +208,7 @@ export function useCreateOpportunity(
 
   const submit = useCallback(
     async (options?: { keepOpenAfterSuccess?: boolean }): Promise<boolean> => {
+      if (activeAttempt.current || sending.current || tagRecovery) return false;
       // Every field speaks now, including the ones never focused. Submit is not
       // disabled while the form is invalid: a disabled button gives a keyboard
       // user no way to ask what is wrong, so the press is what reveals it.
@@ -207,8 +229,12 @@ export function useCreateOpportunity(
       }
       const attempt = createWriteAttempt();
       const selectedTagIds = form.tagIds ?? [];
+      activeAttempt.current = attempt;
+      let unresolved = false;
 
       const send = async (): Promise<boolean> => {
+        if (sending.current || activeAttempt.current !== attempt) return false;
+        sending.current = true;
         setIsSubmitting(true);
         setError(null);
         try {
@@ -223,14 +249,65 @@ export function useCreateOpportunity(
           if (outcome.kind === "success") {
             if (selectedTagIds.length > 0) {
               const tagAttempt = createWriteAttempt();
-              await runIdempotentWrite({
-                attempt: tagAttempt,
-                method: "post",
-                path: `${OPPORTUNITIES_PATH}/${encodeURIComponent(outcome.value.id)}/tags`,
-                body: { tagIds: selectedTagIds },
-                parse: (payload) => payload,
-              }).catch(() => undefined);
+              try {
+                const tagOutcome = await runIdempotentWrite({
+                  attempt: tagAttempt,
+                  method: "post",
+                  path: `${OPPORTUNITIES_PATH}/${encodeURIComponent(outcome.value.id)}/tags`,
+                  body: { tagIds: selectedTagIds },
+                  parse: (payload) => payload,
+                });
+                if (tagOutcome.kind !== "success") {
+                  const uncertain = tagOutcome.kind === "ambiguous" || tagOutcome.kind === "applied_unreadable";
+                  setTagRecovery({
+                    opportunityId: outcome.value.id,
+                    tagIds: selectedTagIds,
+                    attempt: tagAttempt,
+                    status: uncertain ? "uncertain" : "failed",
+                    error: tagOutcome.error,
+                  });
+                  activeAttempt.current = null;
+                  setAmbiguity(null);
+                  reset();
+                  setCustomerLabel("");
+                  setForm((prev) => ({
+                    ...prev,
+                    pipelineId: form.pipelineId,
+                    stageId: form.stageId,
+                    currencyCode: "",
+                    importance: "2",
+                    probabilityPercent: "50",
+                  }));
+                  setOpen(true);
+                  onReconcile();
+                  return true;
+                }
+              } catch {
+                setTagRecovery({
+                  opportunityId: outcome.value.id,
+                  tagIds: selectedTagIds,
+                  attempt: tagAttempt,
+                  status: "uncertain",
+                  error: { status: 0 },
+                });
+                activeAttempt.current = null;
+                setAmbiguity(null);
+                reset();
+                setCustomerLabel("");
+                setForm((prev) => ({
+                  ...prev,
+                  pipelineId: form.pipelineId,
+                  stageId: form.stageId,
+                  currencyCode: "",
+                  importance: "2",
+                  probabilityPercent: "50",
+                }));
+                setOpen(true);
+                onReconcile();
+                return true;
+              }
             }
+            activeAttempt.current = null;
             setAmbiguity(null);
             if (options?.keepOpenAfterSuccess) {
               const prevPipelineId = form.pipelineId;
@@ -241,7 +318,7 @@ export function useCreateOpportunity(
                 ...prev,
                 pipelineId: prevPipelineId,
                 stageId: prevStageId,
-                currencyCode: "EGP",
+                currencyCode: "",
                 importance: "2",
                 probabilityPercent: "50",
               }));
@@ -254,6 +331,7 @@ export function useCreateOpportunity(
             return true;
           }
           if (outcome.kind === "ambiguous") {
+            unresolved = true;
             setAmbiguity({
               attempt,
               error: outcome.error,
@@ -264,6 +342,7 @@ export function useCreateOpportunity(
             return false;
           }
           if (outcome.kind === "applied_unreadable") {
+            activeAttempt.current = null;
             setAmbiguity(null);
             setError(null);
             setOpen(false);
@@ -272,9 +351,23 @@ export function useCreateOpportunity(
             onReconcile();
             return true;
           }
+          // A refused replay (for example, expired authentication) does not
+          // prove that the original request failed to commit.
+          if (unresolved) {
+            setAmbiguity({
+              attempt,
+              error: outcome.error,
+              replay: async () => {
+                await send();
+              },
+            });
+          } else {
+            activeAttempt.current = null;
+          }
           setError(outcome.error);
           return false;
         } finally {
+          sending.current = false;
           setIsSubmitting(false);
         }
       };
@@ -291,8 +384,47 @@ export function useCreateOpportunity(
       reset,
       revealAll,
       setForm,
+      tagRecovery,
     ],
   );
+
+  const retryTagAttachment = useCallback(async () => {
+    if (!tagRecovery || sending.current) return;
+    sending.current = true;
+    setIsRetryingTags(true);
+    const attempt = tagRecovery.status === "uncertain"
+      ? tagRecovery.attempt
+      : createWriteAttempt();
+    try {
+      const outcome = await runIdempotentWrite({
+        attempt,
+        method: "post",
+        path: `${OPPORTUNITIES_PATH}/${encodeURIComponent(tagRecovery.opportunityId)}/tags`,
+        body: { tagIds: tagRecovery.tagIds },
+        parse: (payload) => payload,
+      });
+      if (outcome.kind === "success") {
+        setTagRecovery(null);
+        onReconcile();
+      } else {
+        setTagRecovery({
+          ...tagRecovery,
+          attempt,
+          status: outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable"
+            ? "uncertain"
+            : "failed",
+          error: outcome.error,
+        });
+        onReconcile();
+      }
+    } catch {
+      setTagRecovery({ ...tagRecovery, attempt, status: "uncertain", error: { status: 0 } });
+      onReconcile();
+    } finally {
+      sending.current = false;
+      setIsRetryingTags(false);
+    }
+  }, [onReconcile, tagRecovery]);
 
   return {
     ...state,
@@ -303,8 +435,10 @@ export function useCreateOpportunity(
     isSubmitting,
     error,
     ambiguity,
-    dismissAmbiguity: () => setAmbiguity(null),
     appliedUnreadable,
+    tagRecovery,
+    isRetryingTags,
+    retryTagAttachment,
     dismissAppliedUnreadable: () => setAppliedUnreadable(null),
     reconcile: onReconcile,
     openModal,
@@ -315,4 +449,53 @@ export function useCreateOpportunity(
     toggleTag,
     submit,
   };
+}
+
+/** Active tenant currencies are advisory; omission leaves defaulting to CRM. */
+export function useOpportunityCurrencyOptions(enabled: boolean) {
+  const { user } = useTenantAuth();
+  const canRead = user?.permissions.includes("currencies.currency.read") ?? false;
+  const [codes, setCodes] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!enabled || !canRead) return;
+    const controller = new AbortController();
+    void (async () => {
+      const loaded: string[] = [];
+      try {
+        for (let page = 1; ; page += 1) {
+          const payload = await readCoreData(
+            `/api/tenant/core/v1/currencies?status=ACTIVE&limit=100&sortBy=code&sortDir=ASC&page=${page}`,
+            { signal: controller.signal, maxResponseBytes: 200_000 },
+          );
+          const items: unknown = Array.isArray(payload)
+            ? payload
+            : payload && typeof payload === "object" && "items" in payload
+              ? payload.items
+              : null;
+          if (!Array.isArray(items)) throw new Error("Invalid currency list");
+          const entries: unknown[] = items;
+          for (const item of entries) {
+            if (
+              !item || typeof item !== "object" || !("code" in item) ||
+              typeof item.code !== "string" || !/^[A-Z]{3}$/.test(item.code)
+            ) {
+              throw new Error("Invalid currency code");
+            }
+            loaded.push(item.code);
+          }
+          if (controller.signal.aborted) return;
+          if (items.length < 100) break;
+        }
+        setCodes([...new Set(loaded)]);
+      } catch {
+        // No fallback catalogue: free-text editors remain available, and new
+        // opportunities can still inherit the workspace default without a read grant.
+        if (!controller.signal.aborted) setCodes([]);
+      }
+    })();
+    return () => controller.abort();
+  }, [enabled, canRead]);
+
+  return enabled && canRead ? codes : [];
 }

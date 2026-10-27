@@ -68,7 +68,7 @@ session, or accepting the invite from the email. See
 | A3 | Toggle theme | Light ⇄ dark. The primary `#1d4ed8` (`--color-brand-600`) reads as a saturated cobalt, not navy and not violet |
 | A4 | Submit an empty form | Inline field errors, focus moves to the first invalid field. **Not** a toast |
 | A5 | Wrong password | A message distinguishable from a suspended account, a suspended tenant, a 429 and an offline failure (task 4.31) |
-| A6 | Rate-limit — 6 failed logins in a minute | A 429 surface distinct from "wrong password". Login is throttled 5/min |
+| A6 | On a fresh device/account budget, send 10 rapid login attempts, then an 11th before 90 seconds elapse | The 11th returns `429 AUTH_LOGIN_THROTTLED` with `Retry-After` in seconds and translated retry copy, distinct from wrong password. All attempts consume slots; one slot refills every 90 s. Unknown devices also share a per-email ceiling of 50/15 min; a trusted device has an independent budget. Gateway and Core route/IP defaults are separately 300/min (D-001/D-002; source-checked 2026-10-17) |
 | A7 | Forgot password with a **different** address than the login field | The dialog's own address reaches the request body. This is defect **D1** — the field is currently unbound |
 | A8 | Correct password | Lands on `/`. Session cookie set; **no token in `localStorage` or `sessionStorage`** — only non-secret metadata |
 | A9 | Password manager | `autocomplete` attributes let it save and refill (audit B9) |
@@ -221,7 +221,7 @@ super-admin session, or activating the account through the invite email.
 | A3 theme toggle | **PASS** | dark → light, no flash, strings unaffected |
 | A4 empty submit | **PASS** | Native `required` blocks it and focus lands on the first invalid field. Note: satisfied by the browser, not by `Field` — the design system's own error path is untested here |
 | A5 wrong password | **PASS** | Real backend message: "Sign-in failed / Invalid email or password." Surfaced **only as a toast**; there is no in-body error. **Not** discriminated from suspended-account / suspended-tenant / 429 / offline — that is task 4.31, still open |
-| A6 rate limit | not run | Needs 6 attempts; deferred so as not to throttle the shared dev tenant |
+| A6 rate limit | not run | Current procedure needs a fresh budget and an 11th rapid attempt after the initial 10; deferred to a dedicated test account/device so the shared dev tenant is unaffected. This row records no runtime verification of D-001/D-002 |
 | A7 forgot-password address | **PASS — and D1 is stale** | Typed `LOGIN-FIELD@…` into the login field and `DIALOG-FIELD@…` into the dialog, then captured the wire: the body carried `{"email":"DIALOG-FIELD@mersany.com"}`. The dialog's field **is** bound. `DEFECTS.md` D1 describes a bug that no longer exists |
 | A8–A11 session, cross-tab | **BLOCKED** | P4 |
 | B, C, D, E, F, H | **BLOCKED** | P4 |

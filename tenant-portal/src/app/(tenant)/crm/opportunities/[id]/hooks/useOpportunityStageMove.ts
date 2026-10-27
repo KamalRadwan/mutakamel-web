@@ -2,7 +2,9 @@
 
 import { useCallback, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
 import { useI18n } from "@/i18n/I18nContext";
+import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import type { OpportunityDetail } from "../../opportunity-contract";
 import type { OpportunityStage } from "../../hooks/pipeline-types";
 import { buildStageMoveRequest } from "../../hooks/usePipelineWorkspace";
@@ -21,6 +23,7 @@ export function useOpportunityStageMove(
   reload: () => void,
 ): OpportunityStageMove {
   const { t } = useI18n();
+  const describeError = useCrmErrorText();
   const [isMoving, setIsMoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,13 +50,14 @@ export function useOpportunityStageMove(
         reload();
         return true;
       } catch (caught) {
-        setError(caught instanceof Error && caught.message ? caught.message : t.crmOpportunityDetail.historyUnavailable);
+        const description = describeError(normalizeApiError(caught));
+        setError(`${t.crmOpportunities.moveFailed} ${description ?? ""}`.trim());
         return false;
       } finally {
         setIsMoving(false);
       }
     },
-    [opportunity, isMoving, canUpdate, stages, reload, t],
+    [opportunity, isMoving, canUpdate, stages, reload, t, describeError],
   );
 
   return {

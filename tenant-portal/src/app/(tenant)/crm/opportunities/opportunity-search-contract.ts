@@ -55,6 +55,7 @@ import {
   EMPTY_OPPORTUNITY_BASIC_SEARCH,
   appendOpportunityBasicQuery,
   compileOpportunityBasicSearch,
+  opportunityBasicSearchForCustomerParty,
   type OpportunityBasicSearch,
 } from "./opportunity-basic-search-contract";
 
@@ -358,6 +359,15 @@ export function opportunitySearchWithBasic(
   basic: OpportunityBasicSearch,
 ): OpportunitySearchState {
   return { ...state, mode: "basic", basic };
+}
+
+export function opportunitySearchForCustomerParty(
+  partyId: string,
+): OpportunitySearchState {
+  return opportunitySearchWithBasic(
+    EMPTY_OPPORTUNITY_SEARCH,
+    opportunityBasicSearchForCustomerParty(partyId),
+  );
 }
 
 /** Advanced mode's groups, replaced wholesale by the card's editors. */

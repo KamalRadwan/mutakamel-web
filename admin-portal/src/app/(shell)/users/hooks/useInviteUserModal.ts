@@ -1,12 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastContext";
-import {
-  inviteAdminUser,
-  isForbiddenError,
-  listRoles,
-} from "../api/adminUsersApi";
+import { inviteAdminUser } from "../api/adminUsersApi";
 import { getErrorMessageAndDetails } from "../utils/errorMapping";
 import {
   claimAdminUserWriteIntent,
@@ -14,7 +10,9 @@ import {
   type AdminUserWriteIntent,
 } from "../model/writeIntent";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
-import type { AdminRole, CreateAdminUserDto } from "../types";
+import type { CreateAdminUserDto } from "../types";
+import { useAdminRoleCatalogue } from "./useAdminRoleCatalogue";
+import { getUserRowPermissions } from "./useUserPermissions";
 
 interface UseInviteUserModalOptions {
   onClose: () => void;
@@ -38,40 +36,19 @@ export function useInviteUserModal({ onClose, onSuccess }: UseInviteUserModalOpt
     null,
   );
 
-  const [roles, setRoles] = useState<AdminRole[]>([]);
-  const [isLoadingRoles, setIsLoadingRoles] = useState(true);
-  const [rolesForbidden, setRolesForbidden] = useState(false);
+  const canInvite = getUserRowPermissions(user).canInvite;
+  const { roles, rolesStatus, reloadRoles } = useAdminRoleCatalogue(
+    "invite", canInvite, JSON.stringify([user?.id, user?.isSuperAdmin, user?.permissions]),
+  );
+  const isLoadingRoles = rolesStatus === "loading";
+  const rolesForbidden = rolesStatus === "forbidden";
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    async function loadRolesData() {
-      try {
-        setRolesForbidden(false);
-        const res = await listRoles({ page: 1, limit: 100, sortBy: "name", sortDir: "ASC" });
-        const items = res?.data;
-        if (Array.isArray(items)) {
-          setRoles(items);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } else if ((items as any)?.items) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setRoles((items as any).items);
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        if (isForbiddenError(err)) {
-          setRolesForbidden(true);
-        } else {
-          toast.error(t.users.rolesLoadFailed);
-        }
-      } finally {
-        setIsLoadingRoles(false);
-      }
-    }
-    loadRolesData();
-  }, [t, toast]);
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault();
+    if (!canInvite || isSubmitting) return;
+    if (!inviteIntentRef.current?.ambiguous &&
+      (rolesStatus !== "success" || !roles.some((role) => role.id === roleId))) return;
     if (!email.trim() || !firstName.trim() || !lastName.trim() || !roleId) return;
 
     const command: CreateAdminUserDto = {
@@ -161,6 +138,8 @@ export function useInviteUserModal({ onClose, onSuccess }: UseInviteUserModalOpt
     roles,
     isLoadingRoles,
     rolesForbidden,
+    rolesStatus,
+    reloadRoles,
     fieldErrors,
     setFieldErrors,
     isDirty,

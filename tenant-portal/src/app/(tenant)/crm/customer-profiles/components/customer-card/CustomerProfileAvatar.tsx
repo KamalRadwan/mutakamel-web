@@ -40,7 +40,7 @@ function ProfileAvatar({
       {imageUrl && (
         <AvatarImage src={imageUrl} alt="" className="object-cover" />
       )}
-      <AvatarFallback className="bg-brand-500/10 text-2xs text-brand-700 dark:text-brand-300">
+      <AvatarFallback className="bg-primary/10 text-2xs text-primary">
         {letters || fallback}
       </AvatarFallback>
     </Avatar>

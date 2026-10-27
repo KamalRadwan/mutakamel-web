@@ -9,12 +9,13 @@ import { coreGet, corePut } from "../../core-api";
 import {
   NOTIFICATIONS_CONFIG_PATH,
   NOTIFICATION_PREFERENCES_PATH,
+  effectiveNotificationPreferences,
   parseChannelConfig,
   parseNotificationPreference,
   parseNotificationPreferences,
-  type NotificationChannel,
+  parsePreferenceCatalogue,
+  type EffectiveNotificationPreference,
   type NotificationChannelConfig,
-  type NotificationPreference,
   type UpsertPreferenceRequest,
 } from "../notification-contract";
 
@@ -27,7 +28,7 @@ export function useNotificationPreferences() {
   const canRead = user?.permissions.includes("notifications.preference.read") ?? false;
   const canManage = user?.permissions.includes("notifications.preference.manage") ?? false;
 
-  const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
+  const [preferences, setPreferences] = useState<EffectiveNotificationPreference[]>([]);
   const [channelConfig, setChannelConfig] = useState<NotificationChannelConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -42,11 +43,24 @@ export function useNotificationPreferences() {
       setIsLoading(true);
       setError(null);
       try {
-        const result = await coreGet(NOTIFICATION_PREFERENCES_PATH, {
-          signal,
-          maxResponseBytes: PREFERENCES_RESPONSE_LIMIT_BYTES,
-        });
-        setPreferences(parseNotificationPreferences(result.data));
+        const [result, configResult] = await Promise.all([
+          coreGet(NOTIFICATION_PREFERENCES_PATH, {
+            signal,
+            maxResponseBytes: PREFERENCES_RESPONSE_LIMIT_BYTES,
+          }),
+          coreGet(NOTIFICATIONS_CONFIG_PATH, {
+            signal,
+            maxResponseBytes: 40_000,
+          }),
+        ]);
+        const config = parseChannelConfig(configResult.data);
+        const effective = effectiveNotificationPreferences(
+          parsePreferenceCatalogue(configResult.data),
+          parseNotificationPreferences(result.data),
+        );
+        if (signal?.aborted) return;
+        setChannelConfig(config);
+        setPreferences(effective);
       } catch (loadError) {
         if (isAbortError(loadError)) return;
         setError(normalizeApiError(loadError));
@@ -57,34 +71,18 @@ export function useNotificationPreferences() {
     [canRead],
   );
 
-  const loadChannelConfig = useCallback(async (signal?: AbortSignal): Promise<void> => {
-    try {
-      const result = await coreGet(NOTIFICATIONS_CONFIG_PATH, {
-        signal,
-        maxResponseBytes: 40_000,
-      });
-      setChannelConfig(parseChannelConfig(result.data));
-    } catch {
-      // Advisory: without it every channel stays offerable, and the server is
-      // still the authority on what it will actually deliver.
-      setChannelConfig(null);
-    }
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
       void load(controller.signal);
-      void loadChannelConfig(controller.signal);
     });
     return () => controller.abort();
-  }, [load, loadChannelConfig]);
+  }, [load]);
 
   const toggle = useCallback(
     async (
-      preference: NotificationPreference,
-      channel: NotificationChannel,
+      preference: EffectiveNotificationPreference,
       enabled: boolean,
     ): Promise<void> => {
       if (!canManage || pendingType) return;
@@ -93,9 +91,7 @@ export function useNotificationPreferences() {
       // current value server-side (UpsertNotificationPreferenceDto).
       const request: UpsertPreferenceRequest = {
         notificationType: preference.notificationType,
-        ...(channel === "inApp" ? { inAppEnabled: enabled } : {}),
-        ...(channel === "push" ? { pushEnabled: enabled } : {}),
-        ...(channel === "email" ? { emailEnabled: enabled } : {}),
+        inAppEnabled: enabled,
       };
       try {
         const result = await corePut(NOTIFICATION_PREFERENCES_PATH, request, {

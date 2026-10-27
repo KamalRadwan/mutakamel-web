@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -41,6 +41,12 @@ export function useBillingSummary() {
   const [isToppingUp, setIsToppingUp] = useState(false);
   const [topup, setTopup] = useState<TopupResult | null>(null);
   const [topupError, setTopupError] = useState<string | null>(null);
+  const topupInFlight = useRef(false);
+  const unresolvedTopup = useRef<{
+    readonly amount: string;
+    readonly currencyCode: string;
+    readonly key: string;
+  } | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
     setIsLoading(true);
@@ -86,16 +92,25 @@ export function useBillingSummary() {
    */
   const submitTopup = useCallback(
     async (amount: string, currencyCode: string): Promise<boolean> => {
-      if (isToppingUp) return false;
+      if (topupInFlight.current) return false;
       const trimmed = amount.trim();
       if (!TOPUP_AMOUNT.test(trimmed)) {
         setTopupError(t.coreBilling.topupAmountInvalid);
         return false;
       }
+      // Keep the exact payload with its key after any failure: even a response
+      // validation error can follow a successfully created checkout.
+      if (unresolvedTopup.current?.amount !== trimmed ||
+          unresolvedTopup.current.currencyCode !== currencyCode) {
+        unresolvedTopup.current = { amount: trimmed, currencyCode, key: generateUUIDv7() };
+      }
+      const intent = unresolvedTopup.current;
+      topupInFlight.current = true;
       setIsToppingUp(true);
       setTopupError(null);
       try {
-        const result = await createWalletTopup(trimmed, currencyCode, generateUUIDv7());
+        const result = await createWalletTopup(intent.amount, intent.currencyCode, intent.key);
+        unresolvedTopup.current = null;
         setTopup(result);
         toast.success(
           t.coreBilling.topupStartedTitle,
@@ -111,10 +126,11 @@ export function useBillingSummary() {
         setTopupError(t.coreBilling.topupFailed);
         return false;
       } finally {
+        topupInFlight.current = false;
         setIsToppingUp(false);
       }
     },
-    [isToppingUp, t, toast],
+    [t, toast],
   );
 
   return {

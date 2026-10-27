@@ -95,6 +95,9 @@ export function PrebuiltWidgetCard({ spec, value }: PrebuiltWidgetCardProps) {
   );
 
   function renderValue() {
+    if (value.kind === "RETIRED") {
+      return <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.metricRetired}</p>;
+    }
     if (value.kind === "UNAVAILABLE") {
       return <p className="text-xs text-muted-foreground">{t.crmDashboardReports.unavailable}</p>;
     }
@@ -120,24 +123,6 @@ export function PrebuiltWidgetCard({ spec, value }: PrebuiltWidgetCardProps) {
               converted: value.converted,
               total: value.total,
             })}
-          </p>
-        </div>
-      );
-    }
-    if (value.kind === "CALENDAR") {
-      return (
-        <div className="flex flex-col gap-1">
-          <StatCard
-            label={t.crmDashboardReports.calendarMinutes}
-            value={formatNumber(value.minutes, lang, {
-              style: "unit",
-              unit: "minute",
-              unitDisplay: "short",
-              maximumFractionDigits: 0,
-            })}
-          />
-          <p className="text-2xs text-muted-foreground">
-            {formatTemplate(t.crmDashboardReports.eventCount, { count: value.count })}
           </p>
         </div>
       );

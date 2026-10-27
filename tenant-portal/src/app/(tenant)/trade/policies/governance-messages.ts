@@ -1,14 +1,8 @@
 import type { NormalizedApiError } from "@/lib/api/errors";
 import type { Dictionary } from "@/i18n/dictionaries/ar";
 
-// Policy Studio rejections. Two are worth their own note:
-//
-//   TRADE.POLICY.TEST_FAILED is 422 *and* 409, so a failed test and a refused
-//   test share one code.
-//   TRADE.AUTH.TARGET_DENIED is a **422** here — policy-studio.service.ts
-//   throws UnprocessableEntity when the request's resolved target does not
-//   equal the definition's scopeTarget. The same code is a 403 from the guard,
-//   which is why S7's 403-to-PermissionGate rule alone would miss it.
+// Policy test failures, publication conflicts and invalid execution scopes
+// have distinct codes; the selected locale supplies every message.
 
 export function governanceMessage(
   error: NormalizedApiError,
@@ -26,6 +20,7 @@ export function governanceMessage(
     case "TRADE.POLICY.OUTPUT_INVALID":
       return t.tradeGovernance.errorOutputInvalid;
     case "TRADE.POLICY.TEST_FAILED":
+    case "TRADE.POLICY.TEST_CONFLICT":
       return t.tradeGovernance.errorTestFailed;
     case "TRADE.POLICY.PUBLISH_NOT_ALLOWED":
       return t.tradeGovernance.errorPublishNotAllowed;
@@ -38,6 +33,7 @@ export function governanceMessage(
     case "TRADE.APPROVAL.MAKER_CHECKER_REQUIRED":
       return t.tradeGovernance.errorMakerChecker;
     case "TRADE.AUTH.TARGET_DENIED":
+    case "TRADE.AUTH.TARGET_INVALID":
       return t.tradeCommon.errorTargetDenied;
     case "TRADE.CONCURRENCY.STALE_VERSION":
       return t.tradeCommon.errorStaleVersion;

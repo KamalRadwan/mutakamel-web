@@ -27,7 +27,7 @@ interface WidgetDataTableProps {
  * The text equivalent of a chart, and the renderer for every visualization the
  * design system cannot draw.
  *
- * It is a real `<table>` with a `<caption>`, not an `aria-label` on an SVG: a
+ * It is a real `Table` with a `caption`, not an `aria-label` on an SVG: a
  * screen reader can move through a table cell by cell, and cannot read a
  * canvas of shapes at all (docs/design/accessibility.md).
  */

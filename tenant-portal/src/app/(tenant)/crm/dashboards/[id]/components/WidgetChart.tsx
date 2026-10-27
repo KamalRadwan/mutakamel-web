@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -42,7 +41,6 @@ import {
   type SwatchHue,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient } from "@/lib/api/axiosClient";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import type { CrmVisualization } from "../../widget-contract";
@@ -65,149 +63,6 @@ interface WidgetChartProps {
 }
 
 const CHART_HEIGHT = 220;
-
-interface ActionCenterEnrichment {
-  tasksById: Record<string, { title: string; dueAt?: string }>;
-  opportunitiesById: Record<string, { title: string; value?: number; currencyCode?: string }>;
-  leadsById: Record<string, { displayName: string; createdAt?: string }>;
-  activitiesById: Record<
-    string,
-    { subject: string; type: string; outcome?: string | null; sourceType?: string | null }
-  >;
-  ownerName: string;
-  branchName: string;
-}
-
-const EMPTY_ENRICHMENT: ActionCenterEnrichment = {
-  tasksById: {},
-  opportunitiesById: {},
-  leadsById: {},
-  activitiesById: {},
-  ownerName: "Kamal Radwan",
-  branchName: "Mersany Solutions",
-};
-
-let cachedEnrichmentPromise: Promise<ActionCenterEnrichment> | null = null;
-let cachedEnrichmentAt = 0;
-
-function loadDashboardEnrichment(): Promise<ActionCenterEnrichment> {
-  const now = Date.now();
-  if (cachedEnrichmentPromise && now - cachedEnrichmentAt < 15_000) {
-    return cachedEnrichmentPromise;
-  }
-  cachedEnrichmentAt = now;
-  cachedEnrichmentPromise = (async (): Promise<ActionCenterEnrichment> => {
-    const next: ActionCenterEnrichment = {
-      tasksById: {},
-      opportunitiesById: {},
-      leadsById: {},
-      activitiesById: {},
-      ownerName: "Kamal Radwan",
-      branchName: "Mersany Solutions",
-    };
-
-    try {
-      const actionRes = await axiosClient.get<unknown>(
-        "/api/tenant/crm/v1/dashboards/action-center",
-        { cache: "no-store" },
-      );
-      const payload = (actionRes.data ?? {}) as Record<string, unknown>;
-      const widgets = (payload.widgets ?? {}) as Record<string, unknown>;
-      const scope = (payload.scope ?? {}) as Record<string, unknown>;
-      const branches = Array.isArray(scope.branches)
-        ? (scope.branches as Array<Record<string, unknown>>)
-        : [];
-      const firstBranchId =
-        typeof branches[0]?.branchId === "string" ? branches[0].branchId : null;
-
-      if (Array.isArray(widgets.overdueTasks)) {
-        for (const item of widgets.overdueTasks as Array<Record<string, unknown>>) {
-          if (typeof item.id === "string" && typeof item.title === "string") {
-            next.tasksById[item.id] = {
-              title: item.title,
-              dueAt: typeof item.dueAt === "string" ? item.dueAt : undefined,
-            };
-          }
-        }
-      }
-
-      if (Array.isArray(widgets.staleOpportunities)) {
-        for (const item of widgets.staleOpportunities as Array<Record<string, unknown>>) {
-          if (typeof item.id === "string" && typeof item.title === "string") {
-            next.opportunitiesById[item.id] = {
-              title: item.title,
-              value: typeof item.value === "number" ? item.value : undefined,
-              currencyCode: typeof item.currencyCode === "string" ? item.currencyCode : undefined,
-            };
-          }
-        }
-      }
-
-      if (Array.isArray(widgets.untouchedLeads)) {
-        for (const item of widgets.untouchedLeads as Array<Record<string, unknown>>) {
-          if (typeof item.id === "string" && typeof item.displayName === "string") {
-            next.leadsById[item.id] = {
-              displayName: item.displayName,
-              createdAt: typeof item.createdAt === "string" ? item.createdAt : undefined,
-            };
-          }
-        }
-      }
-
-      if (firstBranchId) {
-        try {
-          const actRes = await axiosClient.get<unknown>(
-            `/api/tenant/crm/v1/activities?branchId=${encodeURIComponent(firstBranchId)}&limit=25`,
-            {
-              headers: { "x-branch-id": firstBranchId },
-              cache: "no-store",
-            },
-          );
-          const actData = (actRes.data ?? {}) as Record<string, unknown>;
-          const items = Array.isArray(actData.items)
-            ? (actData.items as Array<Record<string, unknown>>)
-            : Array.isArray(actData.data)
-              ? (actData.data as Array<Record<string, unknown>>)
-              : [];
-          for (const act of items) {
-            if (typeof act.id === "string" && typeof act.subject === "string") {
-              next.activitiesById[act.id] = {
-                subject: act.subject,
-                type: typeof act.type === "string" ? act.type : "ACTIVITY",
-                outcome: typeof act.outcome === "string" ? act.outcome : null,
-                sourceType: typeof act.sourceType === "string" ? act.sourceType : null,
-              };
-            }
-          }
-        } catch {
-          // Ignore activity enrichment errors
-        }
-      }
-    } catch {
-      // Ignore enrichment errors in test or restricted environments
-    }
-
-    return next;
-  })();
-
-  return cachedEnrichmentPromise;
-}
-
-function useDashboardEnrichment(): ActionCenterEnrichment {
-  const [enrichment, setEnrichment] = useState<ActionCenterEnrichment>(EMPTY_ENRICHMENT);
-
-  useEffect(() => {
-    let active = true;
-    void loadDashboardEnrichment().then((data) => {
-      if (active) setEnrichment(data);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  return enrichment;
-}
 
 export function WidgetChart({
   mode,
@@ -419,7 +274,11 @@ function GaugeChartView({
   const deltaFromTarget = Number((value - target).toFixed(1));
   const deltaBadgeText =
     result.unit === "PERCENT" && deltaFromTarget >= 0
-      ? `+${formatNumber(deltaFromTarget, lang, { maximumFractionDigits: 1 })}% vs target`
+      ? formatTemplate(t.crmDashboards.aboveTarget, {
+          value: formatNumber(deltaFromTarget, lang, {
+            style: "unit", unit: "percent", maximumFractionDigits: 1,
+          }),
+        })
       : formatNumber(targetProgress, lang, {
           style: "unit",
           unit: "percent",
@@ -834,14 +693,16 @@ function HeatmapChartView({
                   gridTemplateColumns: `2.75rem repeat(${allSeries.length}, minmax(0, 1fr))`,
                 }}
               >
-                <span className="text-xs font-medium text-muted-foreground">{day}</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t.crmDashboards.weekdays[day] ?? day}
+                </span>
                 {allSeries.map((col) => {
                   const val = valueMatrix.get(`${day}::${col.key}`) ?? 0;
                   return (
                     <div
                       key={`${day}-${col.key}`}
                       className={`flex h-8 items-center justify-center rounded-sm text-xs font-semibold tabular-nums transition-colors ${cellClasses(val)}`}
-                      title={`${day} ${col.label}: ${val}`}
+                      title={`${t.crmDashboards.weekdays[day] ?? day} ${col.label}: ${formatNumber(val, lang, { maximumFractionDigits: 0 })}`}
                     >
                       {formatNumber(val, lang, { maximumFractionDigits: 0 })}
                     </div>
@@ -951,7 +812,10 @@ function HistogramChartView({
       : result.currency;
 
   const data = rawBins.map((bin, index) => {
-    const rawLabel = typeof bin.label === "string" ? bin.label : `Bin ${index + 1}`;
+    const rawLabel = typeof bin.label === "string" ? bin.label : formatTemplate(
+      t.crmDashboards.histogramBin,
+      { index: formatNumber(index + 1, lang, { maximumFractionDigits: 0 }) },
+    );
     const count = typeof bin.count === "number" ? bin.count : 0;
     return {
       label: formatCompactBinRange(
@@ -1050,13 +914,12 @@ function AlertListView({
   label: string;
 }) {
   const { t } = useI18n();
-  const enrichment = useDashboardEnrichment();
   const rawRows = Array.isArray(result.typedResult?.rows)
     ? (result.typedResult.rows as Array<Record<string, unknown>>)
     : result.rows;
 
   const isCriticalSeverity = (severity: unknown): boolean =>
-    typeof severity === "string" && severity.toUpperCase() === "CRITICAL";
+    typeof severity === "string" && severity.toLowerCase() === "critical";
 
   const criticalCount = rawRows.filter((row) => isCriticalSeverity(row.severity)).length;
   const warningCount = rawRows.length - criticalCount;
@@ -1080,7 +943,7 @@ function AlertListView({
         {rawRows.slice(0, 8).map((row, index) => {
           const isCritical = isCriticalSeverity(row.severity);
           const palette = swatchSurfacePalette(isCritical ? "red" : "amber");
-          const baseTitle = typeof row.title === "string" ? row.title : "—";
+          const title = typeof row.title === "string" ? row.title : "—";
           const reason =
             typeof row.reasonCode === "string"
               ? row.reasonCode
@@ -1097,35 +960,9 @@ function AlertListView({
               : typeof row.entityType === "string"
                 ? row.entityType
                 : null;
-          const entityId = typeof entityRef?.id === "string" ? entityRef.id : null;
           const occurredAt = typeof row.occurredAt === "string" ? row.occurredAt : null;
-
-          const matchedTask = entityId ? enrichment.tasksById[entityId] : undefined;
-          const matchedOpp = entityId ? enrichment.opportunitiesById[entityId] : undefined;
-          const matchedLead = entityId ? enrichment.leadsById[entityId] : undefined;
-
-          const enrichedTitle = matchedTask
-            ? `${baseTitle}: ${matchedTask.title}`
-            : matchedOpp
-              ? `${baseTitle}: ${matchedOpp.title}`
-              : matchedLead
-                ? `${baseTitle}: ${matchedLead.displayName}`
-                : baseTitle;
-
-          const amount =
-            typeof row.amount === "number"
-              ? row.amount
-              : typeof matchedOpp?.value === "number"
-                ? matchedOpp.value
-                : null;
-          const currencyCode =
-            typeof row.currencyCode === "string"
-              ? row.currencyCode
-              : typeof matchedOpp?.currencyCode === "string"
-                ? matchedOpp.currencyCode
-                : null;
-
-          const hasEnrichment = Boolean(matchedTask || matchedOpp || matchedLead);
+          const amount = typeof row.amount === "number" ? row.amount : null;
+          const currencyCode = typeof row.currencyCode === "string" ? row.currencyCode : null;
 
           return (
             <div
@@ -1141,26 +978,20 @@ function AlertListView({
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Badge tone={isCritical ? "negative" : "caution"}>
-                      {isCritical ? "CRITICAL" : "WARNING"}
+                      {isCritical ? t.crmDashboards.severityCritical : t.crmDashboards.severityWarning}
                     </Badge>
-                    <p className="text-xs font-semibold text-foreground">{enrichedTitle}</p>
+                    <p className="text-xs font-semibold text-foreground">{title}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
                     {entityType && (
                       <span className={`inline-flex items-center rounded-xs border px-1.5 py-0.2 text-2xs font-medium ${palette.badge}`}>
-                        {t.crmDashboardReports.statusValues[entityType] ?? entityType}
+                        {t.crmDashboardReports.statusValues[entityType] ?? t.crmDashboards.unknownEntityType}
                       </span>
                     )}
                     {reason && (
                       <span>
-                        {t.crmDashboardReports.statusValues[reason] ?? reason}
+                        {t.crmDashboardReports.statusValues[reason] ?? t.crmDashboards.unknownAlertReason}
                       </span>
-                    )}
-                    {hasEnrichment && (
-                      <>
-                        <span>{`• ${enrichment.ownerName}`}</span>
-                        <span>{`• ${enrichment.branchName}`}</span>
-                      </>
                     )}
                     {occurredAt && <DateTime value={occurredAt} />}
                   </div>
@@ -1187,7 +1018,6 @@ function ActivityFeedView({
   label: string;
 }) {
   const { t } = useI18n();
-  const enrichment = useDashboardEnrichment();
   const events = Array.isArray(result.typedResult?.events)
     ? (result.typedResult.events as Array<Record<string, unknown>>)
     : [];
@@ -1212,12 +1042,6 @@ function ActivityFeedView({
     <div role="region" aria-label={label} className="space-y-2.5">
       <div className="flex items-center justify-between gap-2 text-2xs">
         <span className="text-muted-foreground">{label}</span>
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-semibold ${swatchSurfacePalette("green").badge}`}
-        >
-          <span className={`size-1.5 rounded-full ${swatchSurfacePalette("green").dot}`} />
-          <span>Real-time</span>
-        </span>
       </div>
       <div className="max-h-64 space-y-2 overflow-y-auto pe-1">
         {events.slice(0, 8).map((event, index) => {
@@ -1227,26 +1051,8 @@ function ActivityFeedView({
               : typeof event.eventType === "string"
                 ? event.eventType
                 : "ACTIVITY";
-          const baseTitle = typeof event.title === "string" ? event.title : "—";
-          const entityRef =
-            event.entityRef && typeof event.entityRef === "object"
-              ? (event.entityRef as Record<string, unknown>)
-              : null;
-          const rawEventId = typeof event.id === "string" ? event.id : "";
-          const activityId =
-            typeof entityRef?.id === "string"
-              ? entityRef.id
-              : rawEventId.startsWith("activity:")
-                ? rawEventId.slice("activity:".length)
-                : null;
-          const matchedActivity = activityId ? enrichment.activitiesById[activityId] : undefined;
-          const displayTitle = matchedActivity?.subject ? matchedActivity.subject : baseTitle;
-          const actorName =
-            typeof event.actorName === "string"
-              ? event.actorName
-              : matchedActivity
-                ? enrichment.ownerName
-                : null;
+          const title = typeof event.title === "string" ? event.title : "—";
+          const actorName = typeof event.actorName === "string" ? event.actorName : null;
           const occurredAt = typeof event.occurredAt === "string" ? event.occurredAt : null;
           const { hue, Icon } = eventVisual(eventType);
           const palette = swatchSurfacePalette(hue);
@@ -1263,19 +1069,13 @@ function ActivityFeedView({
                   <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
                 <div className="min-w-0 space-y-0.5">
-                  <p className="text-xs font-semibold text-foreground">{displayTitle}</p>
+                  <p className="text-xs font-semibold text-foreground">{title}</p>
                   <div className="flex flex-wrap items-center gap-1.5 text-2xs text-muted-foreground">
                     <span
                       className={`inline-flex items-center rounded-sm border px-1.5 py-0.5 text-2xs font-medium ${palette.badge}`}
                     >
-                      {t.crmDashboardReports.statusValues[eventType] ?? eventType}
+                      {t.crmDashboardReports.statusValues[eventType] ?? t.crmDashboards.unknownActivityType}
                     </span>
-                    {matchedActivity?.sourceType && (
-                      <span>
-                        {t.crmDashboardReports.statusValues[matchedActivity.sourceType] ??
-                          matchedActivity.sourceType}
-                      </span>
-                    )}
                     {actorName && <span>{`• ${actorName}`}</span>}
                   </div>
                 </div>

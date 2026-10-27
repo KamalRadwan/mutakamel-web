@@ -14,7 +14,6 @@ import {
   listWebphoneExtensions,
   getAdminUser,
   isForbiddenError,
-  listRoles,
   suspendAdminUser,
   activateAdminUser,
   deleteAdminUser,
@@ -22,7 +21,8 @@ import {
   type ListUsersParams,
 } from "../api/adminUsersApi";
 import { getErrorMessageAndDetails } from "../utils/errorMapping";
-import type { AdminUser, AdminRole, AdminUserErrorCode } from "../types";
+import type { AdminUser, AdminUserErrorCode } from "../types";
+import { useAdminRoleCatalogue } from "./useAdminRoleCatalogue";
 import {
   claimAdminUserWriteIntent,
   retainAdminUserWriteIntent,
@@ -74,8 +74,11 @@ export function useUsers() {
   const [webphoneExtensions, setWebphoneExtensions] = useState(
     new Map<string, string>(),
   );
-  const [roles, setRoles] = useState<AdminRole[]>([]);
-  const [rolesForbidden, setRolesForbidden] = useState(false);
+  const { roles, rolesStatus, reloadRoles } = useAdminRoleCatalogue(
+    "management", adminCan(currentUser, "admin.roles.read"),
+    JSON.stringify([currentUser?.id, currentUser?.isSuperAdmin, currentUser?.permissions]),
+  );
+  const rolesForbidden = rolesStatus === "forbidden";
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -117,27 +120,6 @@ export function useUsers() {
   useEffect(() => {
     queueMicrotask(() => setPage(1));
   }, [statusFilter, roleFilter, isSuperAdminFilter, sortBy, sortDir, limit]);
-
-  // Fetch roles for filter dropdown
-  useEffect(() => {
-    async function loadRolesData() {
-      try {
-        setRolesForbidden(false);
-        const res = await listRoles({ page: 1, limit: 100, sortBy: "name", sortDir: "ASC" });
-        const items = res?.data;
-        if (Array.isArray(items)) {
-          setRoles(items);
-        } else if ((items as any)?.items) {
-          setRoles((items as any).items);
-        }
-      } catch (err: any) {
-        if (err?.response?.status === 403) {
-          setRolesForbidden(true);
-        }
-      }
-    }
-    loadRolesData();
-  }, []);
 
   /**
    * UI-012. Every completion wrote users, metrics and loading unconditionally,
@@ -381,6 +363,8 @@ export function useUsers() {
     errorCode,
     permissionDenied,
     rolesForbidden,
+    rolesStatus,
+    reloadRoles,
     users,
     webphoneExtensions,
     roles,

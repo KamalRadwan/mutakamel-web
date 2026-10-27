@@ -435,7 +435,7 @@ export default function RegisterTenantWizardPage() {
                     <>
                       <div
                         className={cn(
-                          "flex items-center rounded-md border border-input bg-card h-(--size-control-sm) text-xs overflow-hidden transition-colors w-full min-w-0 focus-within:ring-2 focus-within:ring-ring focus-within:border-input",
+                          "flex items-center rounded-md border border-input bg-card h-(--size-control-sm) text-xs overflow-hidden transition-colors motion-reduce:transition-none w-full min-w-0 focus-within:ring-2 focus-within:ring-ring focus-within:border-input",
                           field["aria-invalid"] && "border-destructive focus-within:ring-destructive",
                         )}
                       >
@@ -491,7 +491,7 @@ export default function RegisterTenantWizardPage() {
                             !formData.name.trim() ||
                             !formData.companyName.trim()
                           }
-                          className="flex items-center gap-1.5 shrink-0 h-full rounded-none border-s border-border px-3 text-xs font-medium text-primary hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                          className="flex items-center gap-1.5 shrink-0 h-full rounded-none border-s border-border px-3 text-xs font-medium text-primary hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none transition-colors motion-reduce:transition-none cursor-pointer"
                         >
                           {isValidatingIdentity ? (
                             <Loader2

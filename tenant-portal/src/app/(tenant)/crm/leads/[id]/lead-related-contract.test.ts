@@ -4,6 +4,7 @@ import { QUOTATION_PERMISSIONS } from "../../../trade/quotations/quotation-contr
 import { SALES_ORDER_PERMISSIONS } from "../../../trade/sales-orders/sales-order-contract";
 import {
   LEAD_RELATED_PERMISSIONS,
+  buildLeadRelatedHref,
   leadInvoicesCountPath,
   leadOpportunitySearch,
   leadQuotationsCountPath,
@@ -11,7 +12,6 @@ import {
   parseRelatedTotal,
 } from "./lead-related-contract";
 
-const LEAD_ID = "01900100-0000-7000-8000-0000000000a1";
 const PARTY_ID = "01900100-0000-7000-8000-0000000000b1";
 const BRANCH_ID = "01900100-0000-7000-8000-0000000000c1";
 
@@ -32,13 +32,28 @@ describe("the related-record permissions", () => {
 });
 
 describe("the related-record requests", () => {
-  it("asks the opportunity search for this LEAD, in its own branch", () => {
-    expect(leadOpportunitySearch(LEAD_ID, BRANCH_ID)).toEqual({
+  it("asks the opportunity search for this lead's PARTY, in its own branch", () => {
+    expect(leadOpportunitySearch(PARTY_ID, BRANCH_ID)).toEqual({
       branchId: BRANCH_ID,
-      filterTree: { field: "leadId", operator: "eq", value: LEAD_ID },
+      filterTree: { field: "customerPartyId", operator: "eq", value: PARTY_ID },
       page: 1,
       limit: 1,
     });
+  });
+
+  it("builds party-scoped destination hrefs for all four related document kinds", () => {
+    expect(buildLeadRelatedHref("opportunities", PARTY_ID)).toBe(
+      `/crm/opportunities?partyId=${PARTY_ID}`,
+    );
+    expect(buildLeadRelatedHref("quotations", PARTY_ID)).toBe(
+      `/trade/quotations?partyId=${PARTY_ID}`,
+    );
+    expect(buildLeadRelatedHref("salesOrders", PARTY_ID)).toBe(
+      `/trade/sales-orders?partyId=${PARTY_ID}`,
+    );
+    expect(buildLeadRelatedHref("invoices", PARTY_ID)).toBe(
+      `/trade/invoices?partyId=${PARTY_ID}`,
+    );
   });
 
   it("asks each trade list for this lead's PARTY, one row deep", () => {

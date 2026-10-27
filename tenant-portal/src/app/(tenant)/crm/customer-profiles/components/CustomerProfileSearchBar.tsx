@@ -48,8 +48,7 @@ export function CustomerProfileSearchBar({
   resetKey,
   disabled,
 }: CustomerProfileSearchBarProps) {
-  const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t } = useI18n();
 
   const activeAdvancedConditions = value.groups.reduce(
     (sum, group) =>
@@ -86,7 +85,7 @@ export function CustomerProfileSearchBar({
           className={cn(
             "gap-1.5 font-semibold transition-all",
             value.mode === "advanced" &&
-              "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+              "border-swatch-blue bg-swatch-blue-soft text-swatch-blue-deep",
           )}
           onClick={() =>
             onChange(
@@ -103,7 +102,7 @@ export function CustomerProfileSearchBar({
           />
           <span>{t.crmCustomerProfiles.searchMode.advanced}</span>
           {value.mode === "advanced" && activeAdvancedConditions > 0 && (
-            <span className="inline-flex size-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+            <span className="inline-flex size-4 items-center justify-center rounded-full bg-swatch-blue text-xs font-semibold text-primary-foreground">
               {activeAdvancedConditions}
             </span>
           )}
@@ -111,36 +110,34 @@ export function CustomerProfileSearchBar({
       </PageActions>
 
       {value.mode === "advanced" && (
-        <div className="overflow-hidden rounded-xl border border-blue-500/25 bg-card shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-swatch-blue-soft bg-card shadow-sm">
           {/* Executive Advanced Search Header Bar with Quick Filter Presets */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-gradient-to-r from-blue-500/[0.06] via-indigo-500/[0.04] to-transparent px-3.5 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 bg-swatch-blue-soft/30 px-3.5 py-2">
             <div className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400">
+              <span className="flex size-6 items-center justify-center rounded-md bg-swatch-blue-soft text-swatch-blue-deep">
                 <Filter className="size-3.5" aria-hidden="true" />
               </span>
               <div>
-                <h3 className="text-xs font-bold text-foreground">
-                  {isAr
-                    ? "منشئ شجرة الفلاتر المتقدمة (AND / OR)"
-                    : "Advanced Filter Tree Builder (AND / OR)"}
+                <h3 className="text-xs font-semibold text-foreground">
+                  {t.crmCustomerProfiles.ui.search.advancedTreeTitle}
                 </h3>
-                <p className="text-[11px] text-muted-foreground">
-                  {isAr
-                    ? "ادمج عدة شروط أو اختر فلترًا سريعًا ثم اضغط تطبيق"
-                    : "Combine multi-group conditions or pick a quick preset, then click Apply"}
+                <p className="text-xs text-muted-foreground">
+                  {t.crmCustomerProfiles.ui.search.advancedTreeDescription}
                 </p>
               </div>
             </div>
 
             {/* Quick Advanced Preset Chips */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                <Sparkles className="size-3 text-amber-500" />
-                {isAr ? "قوالب سريعة:" : "Quick Presets:"}
+              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Sparkles className="size-3 text-swatch-amber" />
+                {t.crmCustomerProfiles.ui.search.quickPresets}
               </span>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 disabled={disabled}
                 onClick={() => {
                   onChange(
@@ -158,14 +155,16 @@ export function CustomerProfileSearchBar({
                     ]),
                   );
                 }}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-blue-500/40 hover:bg-blue-500/10 hover:text-blue-700 dark:hover:text-blue-300"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:border-swatch-blue hover:bg-swatch-blue-soft hover:text-swatch-blue-deep"
               >
-                <Building2 className="size-3 text-blue-500" />
-                {isAr ? "شركات فقط (B2B)" : "Corporate Only (B2B)"}
-              </button>
+                <Building2 className="size-3 text-swatch-blue" />
+                {t.crmCustomerProfiles.ui.search.corporateOnly}
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 disabled={disabled}
                 onClick={() => {
                   onChange(
@@ -183,14 +182,16 @@ export function CustomerProfileSearchBar({
                     ]),
                   );
                 }}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-300"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:border-swatch-green hover:bg-swatch-green-soft hover:text-swatch-green-deep"
               >
-                <CheckCircle2 className="size-3 text-emerald-500" />
-                {isAr ? "عملاء نشطون" : "Active Customers"}
-              </button>
+                <CheckCircle2 className="size-3 text-swatch-green" />
+                {t.crmCustomerProfiles.ui.search.activeCustomers}
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 disabled={disabled}
                 onClick={() => {
                   onChange(
@@ -208,21 +209,23 @@ export function CustomerProfileSearchBar({
                     ]),
                   );
                 }}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-700 dark:hover:text-amber-300"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:border-swatch-amber hover:bg-swatch-amber-soft hover:text-swatch-amber-deep"
               >
-                <Star className="size-3 fill-amber-400 text-amber-400" />
-                {isAr ? "تقييم مرتفع (2★+)" : "High Priority (2★+)"}
-              </button>
+                <Star className="size-3 fill-warning text-warning" />
+                {t.crmCustomerProfiles.ui.search.highPriority}
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 disabled={disabled}
                 onClick={() => onChange(customerProfileSearchCleared(value))}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <RotateCcw className="size-3" />
-                {isAr ? "تصفير الشجرة" : "Clear Tree"}
-              </button>
+                {t.crmCustomerProfiles.ui.search.clearTree}
+              </Button>
             </div>
           </div>
 

@@ -4,6 +4,7 @@ const { axiosMock } = vi.hoisted(() => ({
   axiosMock: {
     post: vi.fn(),
     patch: vi.fn(),
+    put: vi.fn(),
     delete: vi.fn(),
     get: vi.fn(),
   },
@@ -23,6 +24,9 @@ import {
   createUserWebphone,
   deleteAdminUser,
   inviteAdminUser,
+  listAssignableRoles,
+  putExtensionServers,
+  resendAdminInvite,
   suspendAdminUser,
   updateAdminUser,
   updateUserWebphone,
@@ -51,10 +55,17 @@ const EXTENSION = {
 };
 
 describe("adminUsersApi write contracts", () => {
+  it.each(["invite", "assignment"] as const)("reads the narrow %s role projection with pagination and no cache", async (purpose) => {
+    const envelope = { data: [{ id: "role", name: "Support" }], meta: { page: 2, total: 101 } };
+    axiosMock.get.mockResolvedValueOnce({ data: envelope });
+    await expect(listAssignableRoles(purpose, { page: 2, limit: 100 })).resolves.toEqual(envelope);
+    expect(axiosMock.get).toHaveBeenCalledWith(`/api/admin/core/v1/roles/assignable-for-${purpose}?page=2&limit=100&sortBy=name&sortDir=ASC`, { cache: "no-store" });
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     axiosMock.post.mockResolvedValue({ data: { data: EXTENSION } });
     axiosMock.patch.mockResolvedValue({ data: { data: EXTENSION } });
+    axiosMock.put.mockResolvedValue({ status: 200 });
     axiosMock.delete.mockResolvedValue({ status: 204 });
   });
 
@@ -66,6 +77,7 @@ describe("adminUsersApi write contracts", () => {
       roleId: "019f0000-0000-7000-8000-000000000002",
     };
     await inviteAdminUser(dto, KEY);
+    await resendAdminInvite("user", KEY);
     await updateAdminUser("user", { firstName: "Grace" }, KEY);
     await assignUserRole("user", { roleId: dto.roleId }, KEY);
     await suspendAdminUser("user", KEY);
@@ -76,14 +88,46 @@ describe("adminUsersApi write contracts", () => {
       KEY,
     );
     await updateUserWebphone("extension", { enabled: false }, KEY);
+    await putExtensionServers("extension", [], KEY);
 
     for (const call of [
       ...axiosMock.post.mock.calls,
       ...axiosMock.patch.mock.calls,
+      ...axiosMock.put.mock.calls,
       ...axiosMock.delete.mock.calls,
     ]) {
       expect(call.at(-1)).toEqual(WRITE_CONFIG);
     }
+  });
+
+  it.each([
+    ["add", ["019f0000-0000-7000-8000-000000000005"]],
+    ["reorder", ["019f0000-0000-7000-8000-000000000006", "019f0000-0000-7000-8000-000000000005"]],
+    ["clear", []],
+  ] as const)("sends the strict PUT object for %s and its exact retry", async (_operation, serverIds) => {
+    const chain = serverIds.map((serverId, priority) => ({
+      serverId,
+      priority,
+      timeoutSeconds: priority === 0 ? null : 30,
+      maxRetries: priority === 0 ? null : 2,
+    }));
+    const body = {
+      servers: chain.map(({ serverId, timeoutSeconds, maxRetries }) => ({
+        serverId,
+        timeoutSeconds,
+        maxRetries,
+      })),
+    };
+    axiosMock.put.mockRejectedValueOnce(new Error("network unavailable"));
+
+    await expect(putExtensionServers("extension/id", chain, KEY)).rejects.toThrow("network unavailable");
+    await putExtensionServers("extension/id", chain, KEY);
+
+    expect(axiosMock.put.mock.calls).toEqual([
+      ["/api/admin/webphone/v1/extensions/extension%2Fid/servers", body, WRITE_CONFIG],
+      ["/api/admin/webphone/v1/extensions/extension%2Fid/servers", body, WRITE_CONFIG],
+    ]);
+    expect(axiosMock.patch).not.toHaveBeenCalled();
   });
 
   // A user's WebPhone identity is an extension owned by the WebPhone module.
@@ -110,5 +154,12 @@ describe("adminUsersApi write contracts", () => {
       "INVALID_IDEMPOTENCY_KEY",
     );
     expect(axiosMock.post).not.toHaveBeenCalled();
+  });
+
+  it("resends through the canonical administrator route with a caller-owned key", async () => {
+    await resendAdminInvite("user/id", KEY);
+    expect(axiosMock.post).toHaveBeenCalledWith(
+      "/api/admin/core/v1/users/user%2Fid/resend-invite", {}, WRITE_CONFIG,
+    );
   });
 });

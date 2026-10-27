@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { notifyWebphoneChanged } from "@mutakamel/webphone";
+import { notifyWebphoneChanged } from "@mutakamel/webphone-ui";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient, unwrapCoreData } from "@/lib/api/axiosClient";

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   CREATABLE_DOCUMENT_TYPES,
-  DOCUMENT_PROFILE_ALLOWED_SCOPES,
   DOCUMENT_PROFILE_REGISTRIES,
   FILTERABLE_DOCUMENT_TYPES,
   MANDATORY_COMPILED_CASE_CODES,
@@ -21,7 +20,7 @@ const VALID_ID = "0195b5d0-1234-7000-8000-000000000001";
 const VALID_VERSION_ID = "0195b5d0-1234-7000-8000-000000000002";
 
 describe("document-profile-contract", () => {
-  it("exposes the canonical document types, scope guards, server-owned fields, and 4 compiled cases", () => {
+  it("exposes the canonical document types, server-owned fields, and 4 compiled cases", () => {
     expect(CREATABLE_DOCUMENT_TYPES).toEqual(["QUOTATION", "SALES_ORDER", "PURCHASE_ORDER"]);
     expect(FILTERABLE_DOCUMENT_TYPES).toEqual([
       "QUOTATION",
@@ -31,7 +30,6 @@ describe("document-profile-contract", () => {
       "PURCHASE_RETURN",
       "POS_SALE",
     ]);
-    expect(DOCUMENT_PROFILE_ALLOWED_SCOPES).toEqual(["TENANT", "COMPANY"]);
     expect(SERVER_OWNED_FIELDS).toEqual(["status", "totals", "version", "audit", "taxes"]);
     expect(MANDATORY_COMPILED_CASE_CODES).toEqual([
       "MINIMAL_VALID",

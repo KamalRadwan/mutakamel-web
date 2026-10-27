@@ -38,6 +38,18 @@ Worker admin: /api/admin/worker/v1/<route>
 Do not call unversioned controller-relative `/admin/*` paths from frontend
 code.
 
+## Database migrations permissions
+
+Source verified: **2026-10-17** (Gateway route contracts and Worker controller).
+
+The migration screens require `admin.migrations.read` to load. Starting a run
+(dry run or apply, for one tenant or the fleet), pausing, resuming, aborting and
+retrying failed tenants require only `admin.migrations.manage`. Abort retains
+its audit reason and typed run-ID confirmation. Blocks, downgrade and FORCE
+windows retain the additional `admin.migrations.critical` requirement; they
+are not exposed by these run-control screens. Read-only feedback names only
+the missing manage permission. Gateway and Worker enforce authorization again.
+
 ## Scripts
 
 ```powershell

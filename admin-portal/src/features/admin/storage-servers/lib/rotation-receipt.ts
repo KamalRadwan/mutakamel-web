@@ -2,38 +2,16 @@ import { safeStorage } from "@/lib/safeStorage";
 import type { StorageCredentialRotationView } from "../types";
 
 /**
- * Durable handle on an in-progress safe credential rotation.
- *
- * Starting a rotation returns a receipt naming the rotation record. Revoking
- * the old key needs that record's id, and cannot happen until the grace
- * window closes — between one and twenty-four hours later. Core exposes no
- * read route for rotations and the storage-server projection carries none of
- * this, so the receipt from the POST is the only handle that exists.
- *
- * Holding it in React state alone meant a reload, a navigation away and back,
- * or simply coming back after the grace window it was waiting out lost it,
- * and with it the portal's only way to finish the rotation: the server
- * refuses to revoke without the record's id, and rejects it before the grace
- * expires. The rotation stayed open, counted as overdue, and had to be
- * completed outside the portal.
- *
- * So the handle is written to this browser, in the same shape the recovery
- * marker for a pending command uses: a narrow, explicitly listed projection,
- * validated on the way back in, verified by reading back what was written.
- *
- * Nothing secret is stored. The rotation view is secret-free by construction
- * — Core never returns key material — and this narrows it further, to the
- * record's identity, its lifecycle status, and the two timestamps the card
- * shows. The new access key, the old one, and the reason are not part of it.
- * This is a browser-local stopgap and it is scoped like one: it survives a
- * reload on this machine and nothing more. The durable answer is a rotation
- * projection on the storage-server read route.
+ * Safe temporary cache of an open rotation's identity and display timestamps.
+ * Core's current-rotation read is authoritative before recovery actions.
+ * Credentials, request bodies and audit reasons are never persisted here.
+ * Terminal revoked/aborted handles are retired immediately.
  */
 export interface StorageCredentialRotationReceipt {
   version: 1;
   storageServerId: string;
   rotationId: string;
-  status: "STAGED" | "ACTIVATED" | "REVOKED";
+  status: "STAGED" | "ACTIVATED" | "REVOKED" | "ABORTED";
   graceExpiresAt: string | null;
   revokedAt: string | null;
   /** When this browser wrote the receipt, for retention only. */
@@ -43,10 +21,8 @@ export interface StorageCredentialRotationReceipt {
 export interface RememberedStorageRotation {
   receipt: StorageCredentialRotationReceipt;
   /**
-   * Whether this browser actually kept the receipt. A private window with
-   * storage disabled, or a full quota, leaves the receipt in memory only —
-   * and the operator has to be told, because then the old rule still holds:
-   * finish the revoke from this page or lose the handle.
+   * Whether this browser kept the optional display cache. Recovery remains
+   * available from Core even when local storage is disabled or full.
    */
   durable: boolean;
 }
@@ -61,7 +37,7 @@ const RECEIPT_KEYS = new Set([
   "revokedAt",
   "savedAt",
 ]);
-const STATUSES = new Set(["STAGED", "ACTIVATED", "REVOKED"]);
+const STATUSES = new Set(["STAGED", "ACTIVATED", "REVOKED", "ABORTED"]);
 /**
  * A grace window is at most twenty-four hours, so a receipt older than a
  * month is not evidence about anything still open — it is a record of a
@@ -102,7 +78,7 @@ export function readStorageRotationReceipt(
       return null;
     }
     // A revoked rotation is finished; it has no action left to recover.
-    if (parsed.status === "REVOKED") {
+    if (parsed.status === "REVOKED" || parsed.status === "ABORTED") {
       forgetStorageRotationReceipt(storageServerId);
       return null;
     }
@@ -128,7 +104,7 @@ export function rememberStorageRotation(
     savedAt: new Date(now).toISOString(),
   };
 
-  if (receipt.status === "REVOKED") {
+  if (receipt.status === "REVOKED" || receipt.status === "ABORTED") {
     // Nothing left to recover, and nothing left to keep.
     forgetStorageRotationReceipt(storageServerId);
     return { receipt, durable: true };

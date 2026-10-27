@@ -1,11 +1,10 @@
 "use client";
 
-import * as React from "react";
 import { FilterX } from "lucide-react";
 import { Button, IdentifierText } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 
-export type TradeFunnelTone = "blue" | "emerald" | "amber" | "rose" | "violet";
+type TradeFunnelTone = "blue" | "emerald" | "amber" | "rose" | "violet";
 
 export interface TradeFunnelStepItem {
   status: string;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ar } from "@/i18n/dictionaries/ar";
 import { TradeScopeProvider } from "./useTradeScope";
+import { TradeScopeBar } from "./TradeScopeBar";
 
 
 // Segment-level title. It flows through the root layout's
@@ -14,5 +15,12 @@ export const metadata: Metadata = { title: ar.nav.appTrade };
 // user moves between. A per-screen selector would let two Trade screens
 // disagree about the company they are reading.
 export default function TradeLayout({ children }: { children: React.ReactNode }) {
-  return <TradeScopeProvider>{children}</TradeScopeProvider>;
+  return (
+    <TradeScopeProvider>
+      <div className="space-y-3">
+        <TradeScopeBar />
+        {children}
+      </div>
+    </TradeScopeProvider>
+  );
 }

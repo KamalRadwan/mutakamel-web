@@ -242,6 +242,7 @@ export function availableUpdate(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
+    lastOperationId: OPERATION_ID,
     componentId: COMPONENT_ID,
     componentKey: "core.foundation",
     ownerApp: "core",
@@ -362,6 +363,10 @@ export function prerequisiteEvidenceRecord(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
+    recovery: {
+      attempts: 0, alerted: false, releaseEvidenceExists: false, stuck: false,
+      nextRetryAt: null, canResendRelease: false, canCloseFailed: false,
+    },
     ...prerequisiteRequest({ status: "SUCCEEDED", completedAt: NOW }),
     maintenanceFence: {
       fenceId: FENCE_ID,

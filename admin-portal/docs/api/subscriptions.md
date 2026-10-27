@@ -1,6 +1,6 @@
 # Subscriptions API
 
-Status: PARTIAL SOURCE INTEGRATION. Last source verification: 2026-09-09; amended 2026-10-11 for the release-upgrade refusal of a preparation (Core commit `77447fb9`).
+Status: PARTIAL SOURCE INTEGRATION. Last source verification: 2026-09-09; amended 2026-10-11 for the release-upgrade refusal of a preparation (Core commit `77447fb9`); subscription loader and independent detail-route permissions reverified 2026-10-18 (CXADMIN-110, CXCORE-ADM-112).
 Owner: Core. No authenticated runtime, financial execution or package-adoption acceptance is claimed by this change.
 
 ## Routes
@@ -9,7 +9,7 @@ Owner: Core. No authenticated runtime, financial execution or package-adoption a
 | --- | --- | --- |
 | `GET /api/admin/core/v1/subscriptions` | `admin.subscriptions.read` | Canonical paginated directory |
 | `GET /api/admin/core/v1/tenants/:tenantId/subscription` | `admin.subscriptions.read` | Canonical detail |
-| `GET /api/admin/core/v1/tenants/:tenantId/subscription/items` | `admin.subscriptions.read` | Canonical selections |
+| `GET /api/admin/core/v1/tenants/:tenantId/subscription/items` | `admin.subscriptions.read` | Available selections projection; not requested by tenant billing |
 | `GET /api/admin/core/v1/subscriptions/:id/plan-change-previews/:previewId/receipt` | `admin.subscriptions.read` | Original receipt recovery and explicit lookup |
 | `GET /api/admin/core/v1/tenants/:tenantId/subscription/operations/:operationId` | `admin.subscriptions.read` | Durable operation progress and original receipt lookup |
 | `POST /api/admin/core/v1/subscriptions/:id/preparations` | `admin.subscriptions.update` | Prepare complete Application/Addon changes;202 operation |
@@ -46,7 +46,7 @@ Browser paths keep `/api/admin/core/v1`. Commercial HTTP payloads carry no `cont
 
 Billing cycles are `MONTHLY|ANNUAL`; lifecycle values are `TRIAL|PENDING_ACTIVATION|ACTIVE|PAST_DUE|CANCELLED`. Money and bigint revisions remain decimal strings.
 
-Detail is exactly `{subscription,subscriptionRevision,baseItems,addonSelections,baseAllowance,totals,projection}`. Items is exactly `{subscriptionId,subscriptionRevision,baseItems,addonSelections}`. The billing workspace compares the two reads' subscription/revision and complete collections before rendering either.
+Detail is exactly `{subscription,subscriptionRevision,baseItems,addonSelections,baseAllowance,totals,projection}`. Items is exactly `{subscriptionId,subscriptionRevision,baseItems,addonSelections}`. Tenant billing loads the complete detail once with no-store handling and does not request the redundant items projection. Each Core request owns an independent repeatable snapshot, so a commit between requests is valid rather than contract corruption. The detail reader still rejects a foreign tenant, malformed identities, invalid parent/selection relationships and inconsistent allowance or totals within that response. Regression specs cover a revision/selection change between loads and malformed responses; automated checks and authenticated runtime remain pending lead verification.
 
 Each base item includes required `tierRank`, the actual integer rank from its joined catalogue tier, bounded to signed int32. Missing/corrupt rank is rejected; no default or price-direction inference is supplied.
 
@@ -85,6 +85,21 @@ The tenant billing empty state mounts the canonical initial commercial workspace
 The14-field seed receipt represents original TRIAL/revision1 state and original identity mappings, totals and dates. It is not current subscription/payment/installation evidence. A confirmed seed triggers the billing wrapper's authoritative refresh once per receipt; the standalone component still displays original receipt evidence. Uncertain attempts retain only actor/tenant/route/intent hash metadata in session storage. A same-session retry uses the original in-memory request even after quote expiry; reload cannot invent a lost original request or replace the unresolved command.
 
 ## Cancellation and verification
+
+The directory links to `/subscriptions/[tenantId]`, where the identifier is the
+tenant UUIDv7 used by the detail and cancellation APIs. This route requires
+`admin.subscriptions.read` before mounting the existing billing workspace. It
+does not mount the tenant workspace or request tenant-management detail, so an
+operator with subscription read, cancel and critical permissions can inspect the
+complete commercial detail and confirm cancellation without `admin.tenants.read`.
+Wallet, payment and invoice panels retain their independent billing permissions;
+missing permissions issue no corresponding reads. Tenant profile, lifecycle,
+domains, access, provisioning and placement controls remain in the separately
+guarded tenant workspace. Both languages provide a return link to subscriptions.
+Regression specs cover the directory destination, this narrow permission set,
+confirmed cancellation and refresh, missing cancel/critical/read permissions,
+and detail-request 403 handling. These specs have not been executed in the
+implementer sandbox; typecheck/lint and runtime verification remain with the lead.
 
 Cancellation stays a bodyless keyed POST with ALL cancel+critical permissions, eligible-state checks, exact-intent retries and authoritative refresh. Its owner preserves child financial history.
 

@@ -46,6 +46,8 @@ export function useTemplatePreview(template: TemplateDetail | null, canPreview: 
   const [jobId, setJobId] = useState<string | null>(null);
   const [artifactExpired, setArtifactExpired] = useState(false);
   const [pollFailed, setPollFailed] = useState(false);
+  const [isPollingExhausted, setIsPollingExhausted] = useState(false);
+  const [pollGeneration, setPollGeneration] = useState(0);
   const [fixtureKey, setFixtureKey] = useState("");
   const pollCount = useRef(0);
 
@@ -100,6 +102,8 @@ export function useTemplatePreview(template: TemplateDetail | null, canPreview: 
     if (!template || !canPreview || !request) return;
     setArtifactExpired(false);
     setPollFailed(false);
+    setIsPollingExhausted(false);
+    setJobId(null);
     setJob(null);
     pollCount.current = 0;
     try {
@@ -109,12 +113,20 @@ export function useTemplatePreview(template: TemplateDetail | null, canPreview: 
     }
   }, [buildRequest, template, canPreview, copy, report]);
 
-  // Only `jobId` may appear here. `toast` is a fresh object on every render, so
-  // a poll effect that depended on it would restart the polling loop on every
-  // render — the failure is reported through state instead.
+  const resumePolling = useCallback((): void => {
+    if (!jobId || !canPreview || !isPollingExhausted) return;
+    pollCount.current = 0;
+    setIsPollingExhausted(false);
+    setPollGeneration((generation) => generation + 1);
+  }, [jobId, canPreview, isPollingExhausted]);
+
+  // Only the job and an explicit resume restart monitoring. `toast` is a fresh
+  // object on every render, so depending on it would restart the polling loop
+  // on every render — the failure is reported through state instead.
   useEffect(() => {
     if (!jobId) return;
     let cancelled = false;
+    let timer: ReturnType<Window["setTimeout"]> | undefined;
     const poll = async () => {
       if (cancelled) return;
       try {
@@ -124,7 +136,9 @@ export function useTemplatePreview(template: TemplateDetail | null, canPreview: 
         if (next.status === "PENDING" || next.status === "RETRYING") {
           pollCount.current += 1;
           if (pollCount.current < MAX_POLLS) {
-            window.setTimeout(() => void poll(), POLL_INTERVAL_MS);
+            timer = window.setTimeout(() => void poll(), POLL_INTERVAL_MS);
+          } else {
+            setIsPollingExhausted(true);
           }
         }
       } catch (error) {
@@ -139,8 +153,9 @@ export function useTemplatePreview(template: TemplateDetail | null, canPreview: 
     void poll();
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [jobId]);
+  }, [jobId, pollGeneration]);
 
   const jobStatus: AsyncJobStatus | null = artifactExpired
     ? "ARTIFACT_EXPIRED"
@@ -165,11 +180,13 @@ export function useTemplatePreview(template: TemplateDetail | null, canPreview: 
     email,
     job,
     jobStatus,
+    isPollingExhausted,
     isRendering,
     fixtureKey,
     setFixtureKey,
     render,
     requestPdf,
+    resumePolling,
     artifactHref: jobId && job?.artifact ? previewArtifactHref(jobId) : null,
     failureCode: job?.failureCode ?? (pollFailed ? copy.pdfPollFailed : null),
   };

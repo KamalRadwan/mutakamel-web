@@ -113,6 +113,27 @@ function fqdnFixture(
 }
 
 describe("tenant profile and lifecycle panels", () => {
+  it.each([
+    ["en", "Storage draining"],
+    ["ar", "خادم التخزين قيد الإفراغ"],
+  ] as const)("labels draining storage placement in %s", (locale, label) => {
+    const tenant = tenantFixture();
+    tenant.storageServer!.status = "DRAINING";
+    render(
+      <TenantProfilePanel
+        locale={locale}
+        workspace={workspaceFixture("ACTIVE", { tenant })}
+      />,
+    );
+
+    expect(screen.getByText(label, { exact: false })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: locale === "en" ? "Save profile" : "حفظ الملف",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("handles a null address and updates all profile fields through one draft", () => {
     const tenant = tenantFixture("ACTIVE", { address: null, phone: null });
     const updateProfileDraft = vi.fn();

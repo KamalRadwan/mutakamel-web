@@ -23,8 +23,6 @@ import {
   listAdminNotifications,
   performAdminNotificationBulkAction,
   performAdminNotificationItemAction,
-  registerAdminNotificationDeviceToken,
-  revokeAdminNotificationDeviceToken,
   upsertAdminNotificationPreference,
 } from "./api";
 
@@ -42,7 +40,7 @@ describe("admin notifications API", () => {
     deleteMock.mockReset().mockResolvedValue({ data: undefined });
     getMock.mockReset();
     postMock.mockReset().mockImplementation((url: string) => Promise.resolve(
-      envelope(/\/(?:read-all|mark-all-read)$/.test(url) ? { updated: 3 } : undefined),
+      envelope(url.endsWith("/read-all") ? { updated: 3 } : undefined),
     ));
     putMock.mockReset().mockResolvedValue(envelope(preferenceFixture()));
   });
@@ -83,10 +81,9 @@ describe("admin notifications API", () => {
     });
   });
 
-  it("makes every write and compatibility-alias route a direct naturally-idempotent call", async () => {
+  it("uses exactly one naturally-idempotent route per notification action", async () => {
     postMock.mockImplementation((url: string) => {
-      if (url.endsWith("/device-tokens")) return Promise.resolve(envelope(deviceReceiptFixture()));
-      if (/\/(?:read-all|mark-all-read)$/.test(url)) {
+      if (url.endsWith("/read-all")) {
         return Promise.resolve(envelope({ updated: 3 }));
       }
       return Promise.resolve(envelope(undefined));
@@ -95,58 +92,44 @@ describe("admin notifications API", () => {
     await expect(upsertAdminNotificationPreference({
       notificationType: "tenant.user.invited",
       inAppEnabled: true,
-      pushEnabled: false,
-      emailEnabled: true,
-      quietHours: {},
     })).resolves.toEqual(preferenceFixture());
-    await expect(registerAdminNotificationDeviceToken({
-      provider: "web-push",
-      token: "provider-token",
-      deviceId: "browser-1",
-      platform: "web",
-      enabled: true,
-    })).resolves.toEqual(deviceReceiptFixture());
-    await revokeAdminNotificationDeviceToken(ID);
     await expect(performAdminNotificationBulkAction("read-all")).resolves.toBe(3);
-    await expect(
-      performAdminNotificationBulkAction("mark-all-read-compatibility"),
-    ).resolves.toBe(3);
     await performAdminNotificationItemAction(ID, "read");
     await performAdminNotificationItemAction(ID, "acknowledge");
-    await performAdminNotificationItemAction(ID, "ack-compatibility");
     await performAdminNotificationItemAction(ID, "dismiss");
-    await performAdminNotificationItemAction(ID, "dismiss-post-compatibility");
 
     expect(putMock).toHaveBeenCalledWith(
       `${BASE}/preferences`,
       {
         notificationType: "tenant.user.invited",
         inAppEnabled: true,
-        pushEnabled: false,
-        emailEnabled: true,
-        quietHours: {},
       },
       WRITE_OPTIONS,
     );
-    expect(postMock).toHaveBeenCalledWith(
-      `${BASE}/device-tokens`,
-      {
-        provider: "web-push",
-        token: "provider-token",
-        deviceId: "browser-1",
-        platform: "web",
-        enabled: true,
-      },
-      WRITE_OPTIONS,
-    );
-    expect(deleteMock).toHaveBeenCalledWith(`${BASE}/device-tokens/${ID}`, WRITE_OPTIONS);
     expect(postMock).toHaveBeenCalledWith(`${BASE}/read-all`, undefined, WRITE_OPTIONS);
-    expect(postMock).toHaveBeenCalledWith(`${BASE}/mark-all-read`, undefined, WRITE_OPTIONS);
     expect(postMock).toHaveBeenCalledWith(`${BASE}/${ID}/read`, undefined, WRITE_OPTIONS);
     expect(postMock).toHaveBeenCalledWith(`${BASE}/${ID}/acknowledge`, undefined, WRITE_OPTIONS);
-    expect(postMock).toHaveBeenCalledWith(`${BASE}/${ID}/ack`, undefined, WRITE_OPTIONS);
     expect(deleteMock).toHaveBeenCalledWith(`${BASE}/${ID}`, WRITE_OPTIONS);
-    expect(postMock).toHaveBeenCalledWith(`${BASE}/${ID}/dismiss`, undefined, WRITE_OPTIONS);
+    expect(postMock).toHaveBeenCalledTimes(3);
+    expect(deleteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("allowlists preference fields before sending a strict Core DTO", async () => {
+    const command = {
+      notificationType: "tenant.user.invited",
+      inAppEnabled: false,
+      pushEnabled: true,
+      emailEnabled: true,
+      quietHours: { from: "22:00" },
+    };
+    putMock.mockResolvedValue(envelope({ ...preferenceFixture(), inAppEnabled: false }));
+    await expect(upsertAdminNotificationPreference(command)).resolves.toEqual({
+      ...preferenceFixture(), inAppEnabled: false,
+    });
+    expect(putMock).toHaveBeenCalledWith(`${BASE}/preferences`, {
+      notificationType: command.notificationType,
+      inAppEnabled: false,
+    }, WRITE_OPTIONS);
   });
 
   it("rejects a non-UUIDv7 route id before transport", async () => {
@@ -190,23 +173,8 @@ function runtimeFixture() {
     enabled: true,
     inAppEnabled: true,
     realtimeEnabled: false,
-    pushEnabled: false,
-    emailEnabled: true,
-    provider: "none" as const,
     previewLimit: 10,
     pollIntervalMs: 30_000,
-    firebase: {
-      apiKey: "",
-      appId: "",
-      authDomain: "",
-      projectId: "",
-      messagingSenderId: "",
-      storageBucket: "",
-      measurementId: "",
-      webPushVapidPublicKey: "",
-      messagingServiceWorkerPath: "/firebase-messaging-sw.js",
-      messagingServiceWorkerScope: "/",
-    },
   };
 }
 
@@ -214,22 +182,6 @@ function preferenceFixture() {
   return {
     notificationType: "tenant.user.invited",
     inAppEnabled: true,
-    pushEnabled: false,
-    emailEnabled: true,
-    quietHours: {},
     updatedAt: "2026-08-12T10:00:00.000Z",
-  };
-}
-
-function deviceReceiptFixture() {
-  return {
-    id: "019f0000-0000-7000-8000-000000000003",
-    provider: "web-push",
-    tokenHash: "a".repeat(64),
-    deviceId: "browser-1",
-    platform: "web",
-    enabled: true,
-    lastSeenAt: "2026-08-12T10:00:00.000Z",
-    revokedAt: null,
   };
 }

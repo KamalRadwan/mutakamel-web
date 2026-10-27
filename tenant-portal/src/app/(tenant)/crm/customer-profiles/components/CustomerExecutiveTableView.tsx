@@ -1,5 +1,7 @@
 "use client";
 
+import { escapeCsvCell } from "@/lib/export/csv-cell";
+
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -22,13 +24,21 @@ import {
   X,
 } from "lucide-react";
 import {
+  Button,
   Pagination,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   cn,
   useToast,
   type CardColor,
   type PageInfo,
   type SortState,
 } from "@/design-system";
+import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { localizedValue } from "@/lib/format/localized";
@@ -69,7 +79,7 @@ export interface CustomerExecutiveTableViewProps {
   onOpen: (item: CustomerProfileItem) => void;
   onOpenQuickModal?: (item: CustomerProfileItem) => void;
   onDelete?: (item: CustomerProfileItem) => void;
-  onOpenActivities: (item: CustomerProfileItem) => void;
+  onOpenActivities?: (item: CustomerProfileItem) => void;
   onCardChange: (
     item: CustomerProfileItem,
     patch: CustomerProfileCardPatch,
@@ -99,24 +109,24 @@ const ACTIVITY_PILL_STYLE: Record<
   { bg: string; text: string; dot: string }
 > = {
   OVERDUE: {
-    bg: "bg-red-500/12 border-red-500/30 hover:bg-red-500/20",
-    text: "text-red-700 dark:text-red-300",
-    dot: "bg-red-500",
+    bg: "bg-swatch-red-soft border-swatch-red hover:bg-swatch-red-soft/80",
+    text: "text-swatch-red-deep",
+    dot: "bg-swatch-red",
   },
   TODAY: {
-    bg: "bg-amber-500/12 border-amber-500/30 hover:bg-amber-500/20",
-    text: "text-amber-700 dark:text-amber-300",
-    dot: "bg-amber-500",
+    bg: "bg-swatch-amber-soft border-swatch-amber hover:bg-swatch-amber-soft/80",
+    text: "text-swatch-amber-deep",
+    dot: "bg-swatch-amber",
   },
   FUTURE: {
-    bg: "bg-emerald-500/12 border-emerald-500/30 hover:bg-emerald-500/20",
-    text: "text-emerald-700 dark:text-emerald-300",
-    dot: "bg-emerald-500",
+    bg: "bg-swatch-green-soft border-swatch-green hover:bg-swatch-green-soft/80",
+    text: "text-swatch-green-deep",
+    dot: "bg-swatch-green",
   },
   NONE: {
     bg: "bg-muted/60 border-border/70 hover:bg-muted",
     text: "text-muted-foreground",
-    dot: "bg-slate-400",
+    dot: "bg-swatch-slate",
   },
 };
 
@@ -138,7 +148,8 @@ export function CustomerExecutiveTableView({
   onPageChange,
 }: CustomerExecutiveTableViewProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { user } = useTenantAuth();
+  const canExport = user?.permissions.includes("crm.customer_profiles.export") ?? false;
   const toast = useToast();
   const card = t.crmLeads.card;
   const statusLabels: Record<string, string | undefined> = t.statusValues;
@@ -207,20 +218,14 @@ export function CustomerExecutiveTableView({
     if (!trimmed || savingPhoneId) return;
     setSavingPhoneId(item.id);
     try {
-      let body: Record<string, unknown>;
-      if (item.profileType === "CORPORATE") {
-        body = { companyPhones: [trimmed] };
-      } else {
-        const parts = item.displayName.trim().split(/\s+/);
-        body = {
-          primaryContact: {
-            firstName: parts[0] ?? item.displayName,
-            ...(parts.length > 1 ? { lastName: parts.slice(1).join(" ") } : {}),
-            ...(item.email ? { email: item.email } : {}),
-            phones: [trimmed],
-          },
-        };
-      }
+      const phones =
+        item.phones.length > 0
+          ? item.phones.map((phone, index) => (index === 0 ? trimmed : phone))
+          : [trimmed];
+      const body =
+        item.profileType === "CORPORATE"
+          ? { companyPhones: phones }
+          : { primaryContact: { phones } };
       await axiosClient.patch(customerProfilePath(item.id), body, {
         nonReplayable: true,
         skipAutoIdempotency: true,
@@ -239,37 +244,35 @@ export function CustomerExecutiveTableView({
     }
   };
 
+  const exportRows = displayedItems.filter((item) => selectedIds.has(item.id));
+
   const handleExportCsv = () => {
-    const rows =
-      selectedIds.size > 0
-        ? displayedItems.filter((item) => selectedIds.has(item.id))
-        : displayedItems;
+    if (!canExport || exportRows.length === 0) return;
+    const rows = exportRows;
+    const csv = t.crmCustomerProfiles.csvExport;
     const headers = [
-      "Customer Name",
-      "Profile Type",
-      "Status",
-      "Primary Contact",
-      "Phone",
-      "Email",
-      "Country",
-      "City",
-      "Rating",
-      "Salesperson",
+      csv.headers.name,
+      csv.headers.profileType,
+      csv.headers.status,
+      csv.headers.primaryContact,
+      csv.headers.phone,
+      csv.headers.email,
+      csv.headers.country,
+      csv.headers.city,
+      csv.headers.rating,
+      csv.headers.salesperson,
     ];
     const csvLines = [
-      headers.join(","),
+      headers.map(escapeCsvCell).join(","),
       ...rows.map((item) => {
         const ownerName = item.owner
           ? [item.owner.firstName, item.owner.lastName].filter(Boolean).join(" ")
           : "";
-        const phone =
-          item.profileType === "CORPORATE"
-            ? item.primaryContact?.phones[0] || item.phone
-            : item.phone;
+        const phone = item.phones[0] ?? item.phone;
         return [
           item.displayName,
-          item.profileType,
-          item.status,
+          t.crmCustomerProfiles.profileTypes[item.profileType],
+          statusLabels[`CustomerStatus.${item.status}`] ?? t.crmCustomerProfiles.unavailable,
           item.primaryContactName ?? "",
           phone,
           item.email ?? "",
@@ -278,7 +281,7 @@ export function CustomerExecutiveTableView({
           String(item.rating ?? 0),
           ownerName,
         ]
-          .map((val) => `"${String(val).replace(/"/g, '""')}"`)
+          .map((value) => escapeCsvCell(String(value ?? "")))
           .join(",");
       }),
     ];
@@ -296,55 +299,60 @@ export function CustomerExecutiveTableView({
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
       {/* Top Batch & Quick Status Sub-Toolbar */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={toggleSelectAll}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
           >
             {allSelected ? (
-              <CheckSquare className="size-3.5 text-blue-600 dark:text-blue-400" />
+              <CheckSquare className="size-3.5 text-primary" />
             ) : (
               <Square className="size-3.5 text-muted-foreground" />
             )}
             <span>
               {selectedIds.size > 0
-                ? isAr
-                  ? `${selectedIds.size} محدد`
-                  : `${selectedIds.size} selected`
-                : isAr
-                  ? "تحديد الكل"
-                  : "Select all"}
+                  ? t.crmCustomerProfiles.ui.table.selectedCount.replace(
+                      "{count}",
+                      String(selectedIds.size),
+                    )
+                  : t.crmCustomerProfiles.ui.table.selectAll}
             </span>
-          </button>
+          </Button>
 
           <div className="hidden items-center gap-1 sm:flex">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => setLocalStatusFilter(null)}
               className={cn(
-                "rounded-lg px-2 py-1 text-[11px] font-bold transition-colors",
+                "rounded-lg px-2 py-1 text-xs font-semibold transition-colors",
                 localStatusFilter === null
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              {isAr ? "الكل" : "All"} ({items.length})
-            </button>
+              {t.crmCustomerProfiles.ui.table.all} ({items.length})
+            </Button>
             {CUSTOMER_PROFILE_BOARD_STATUSES.map((status) => {
               const count = items.filter((i) => i.status === status).length;
               const isSelected = localStatusFilter === status;
               const visual = getCustomerStatusVisual(status);
               return (
-                <button
+                <Button
                   key={status}
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() =>
                     setLocalStatusFilter(isSelected ? null : status)
                   }
                   className={cn(
-                    "inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-colors",
+                    "inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-colors",
                     isSelected
                       ? visual.badgeClass
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -357,88 +365,98 @@ export function CustomerExecutiveTableView({
                     {statusLabels[`CustomerStatus.${status}`] ?? status}
                   </span>
                   <span className="opacity-75">({count})</span>
-                </button>
+                </Button>
               );
             })}
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleExportCsv}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
-        >
-          <Download className="size-3.5 text-muted-foreground" />
-          <span>{isAr ? "تصدير CSV" : "Export CSV"}</span>
-        </button>
+        {canExport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            disabled={exportRows.length === 0}
+            title={t.crmCustomerProfiles.csvExport.selectionHint}
+          >
+            <Download className="size-3.5" aria-hidden="true" />
+            {formatTemplate(t.crmCustomerProfiles.csvExport.selected, {
+              count: exportRows.length,
+            })}
+          </Button>
+        )}
       </div>
 
       {/* High-Density 10-Column Spreadsheet Table */}
-      <div className="min-h-0 overflow-auto rounded-2xl border border-border/80 bg-card shadow-xs">
+      <div className="min-h-0 overflow-auto rounded-lg border border-border/80 bg-card shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-start text-xs">
-            <thead>
-              <tr className="border-b border-border/80 bg-muted/45 text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                <th className="w-10 px-3 py-2.5 text-center">
-                  <button
+          <Table className="w-full border-collapse text-start text-xs">
+            <TableHeader>
+              <TableRow className="border-b border-border/80 bg-muted/45 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <TableHead className="w-10 px-3 py-2.5 text-center">
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={toggleSelectAll}
-                    aria-label={isAr ? "تحديد الكل" : "Select all"}
-                    className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+                    aria-label={t.crmCustomerProfiles.ui.table.selectAll}
+                    className="inline-flex size-5 items-center justify-center p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
                   >
                     {allSelected ? (
-                      <CheckSquare className="size-3.5 text-blue-600 dark:text-blue-400" />
+                      <CheckSquare className="size-3.5 text-primary" />
                     ) : (
                       <Square className="size-3.5" />
                     )}
-                  </button>
-                </th>
-                <th className="min-w-[230px] px-3 py-2.5 text-start">
-                  <button
+                  </Button>
+                </TableHead>
+                <TableHead className="min-w-[230px] px-3 py-2.5 text-start">
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={toggleNameSort}
-                    className="inline-flex items-center gap-1 font-extrabold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                    className="inline-flex h-auto items-center gap-1 p-0 font-semibold uppercase tracking-wider text-muted-foreground hover:bg-transparent hover:text-foreground"
                   >
                     <span>{t.crmCustomerProfiles.name}</span>
                     {sort?.id === "displayName" ? (
                       sort.direction === "asc" ? (
-                        <ArrowUp className="size-3 text-blue-500" />
+                        <ArrowUp className="size-3 text-primary" />
                       ) : (
-                        <ArrowDown className="size-3 text-blue-500" />
+                        <ArrowDown className="size-3 text-primary" />
                       )
                     ) : (
                       <ArrowUpDown className="size-3 opacity-50" />
                     )}
-                  </button>
-                </th>
-                <th className="min-w-[190px] px-3 py-2.5 text-start">
+                  </Button>
+                </TableHead>
+                <TableHead className="min-w-[190px] px-3 py-2.5 text-start">
                   {t.crmCustomerProfiles.contact}
-                </th>
-                <th className="min-w-[195px] px-3 py-2.5 text-start">
+                </TableHead>
+                <TableHead className="min-w-[195px] px-3 py-2.5 text-start">
                   {t.crmLeads.phone}
-                </th>
-                <th className="min-w-[125px] px-3 py-2.5 text-start">
+                </TableHead>
+                <TableHead className="min-w-[125px] px-3 py-2.5 text-start">
                   {t.crmLeads.create.country}
-                </th>
-                <th className="min-w-[145px] px-3 py-2.5 text-start">
+                </TableHead>
+                <TableHead className="min-w-[145px] px-3 py-2.5 text-start">
                   {t.common.status}
-                </th>
-                <th className="min-w-[95px] px-3 py-2.5 text-start">
+                </TableHead>
+                <TableHead className="min-w-[95px] px-3 py-2.5 text-start">
                   {card.rating}
-                </th>
-                <th className="min-w-[130px] px-3 py-2.5 text-start">
+                </TableHead>
+                <TableHead className="min-w-[130px] px-3 py-2.5 text-start">
                   {t.crmCustomerProfiles.source}
-                </th>
-                <th className="min-w-[140px] px-3 py-2.5 text-start">
+                </TableHead>
+                <TableHead className="min-w-[140px] px-3 py-2.5 text-start">
                   {t.crmLeads.salesperson}
-                </th>
-                <th className="min-w-[175px] px-3 py-2.5 text-end">
+                </TableHead>
+                <TableHead className="min-w-[175px] px-3 py-2.5 text-end">
                   {t.crmLeads.followUp} / {t.common.actions}
-                </th>
-              </tr>
-            </thead>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
 
-            <tbody className="divide-y divide-border/60">
+            <TableBody className="divide-y divide-border/60">
               {displayedItems.map((item) => {
                 const isSelected = selectedIds.has(item.id);
                 const isCorporate = item.profileType === "CORPORATE";
@@ -447,9 +465,7 @@ export function CustomerExecutiveTableView({
                 const visual = getCustomerStatusVisual(item.status);
                 const StatusIcon = visual.icon;
 
-                const primaryPhone = isCorporate
-                  ? item.primaryContact?.phones[0] || item.phone
-                  : item.phone;
+                const primaryPhone = item.phones[0] ?? item.phone;
                 const contactName = isCorporate
                   ? item.primaryContact?.displayName ||
                     item.primaryContactName ||
@@ -486,15 +502,15 @@ export function CustomerExecutiveTableView({
                 const activityLabel = card.activityStates[activityState];
 
                 return (
-                  <tr
+                  <TableRow
                     key={item.id}
                     className={cn(
                       "group transition-colors hover:bg-muted/40",
-                      isSelected && "bg-blue-500/[0.04]",
+                      isSelected && "bg-swatch-blue-soft/30",
                     )}
                   >
                     {/* Col 1: Selection Checkbox + Card Color Indicator */}
-                    <td className="relative px-3 py-2.5 text-center">
+                    <TableCell className="relative px-3 py-2.5 text-center">
                       {item.cardColor && (
                         <span
                           aria-hidden="true"
@@ -504,22 +520,24 @@ export function CustomerExecutiveTableView({
                           }}
                         />
                       )}
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => toggleSelectOne(item.id)}
                         aria-label={item.displayName}
-                        className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+                        className="inline-flex size-5 items-center justify-center p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
                       >
                         {isSelected ? (
-                          <CheckSquare className="size-3.5 text-blue-600 dark:text-blue-400" />
+                          <CheckSquare className="size-3.5 text-primary" />
                         ) : (
                           <Square className="size-3.5 opacity-60 group-hover:opacity-100" />
                         )}
-                      </button>
-                    </td>
+                      </Button>
+                    </TableCell>
 
                     {/* Col 2: Customer Name + Type Badge + Compact Tags */}
-                    <td className="px-3 py-2.5">
+                    <TableCell className="px-3 py-2.5">
                       <div className="flex items-start gap-2">
                         <CustomerProfileAvatar
                           imageUrl={item.imageUrl}
@@ -531,16 +549,16 @@ export function CustomerExecutiveTableView({
                           <div className="flex items-center gap-1.5">
                             <Link
                               href={`/crm/customer-profiles/${encodeURIComponent(item.id)}`}
-                              className="truncate font-bold text-foreground hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                              className="truncate font-semibold text-foreground hover:text-primary hover:underline"
                             >
                               {item.displayName}
                             </Link>
                             <span
                               className={cn(
-                                "inline-flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5 text-[9px] font-bold leading-none",
+                                "inline-flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5 text-xs font-semibold leading-none",
                                 isCorporate
-                                  ? "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300"
-                                  : "border-violet-500/25 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+                                  ? "border-swatch-blue bg-swatch-blue-soft text-swatch-blue-deep"
+                                  : "border-swatch-purple bg-swatch-purple-soft text-swatch-purple-deep",
                               )}
                             >
                               {isCorporate ? (
@@ -565,10 +583,10 @@ export function CustomerExecutiveTableView({
                           )}
                         </div>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Col 3: Primary Contact */}
-                    <td className="px-3 py-2.5">
+                    <TableCell className="px-3 py-2.5">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1">
                           <Link
@@ -578,13 +596,13 @@ export function CustomerExecutiveTableView({
                             {contactName}
                           </Link>
                           {item.primaryContact?.isPrimary && (
-                            <span className="rounded bg-blue-500/12 px-1 py-0.5 text-[9px] font-bold text-blue-700 dark:text-blue-300">
+                            <span className="rounded bg-swatch-blue-soft px-1 py-0.5 text-xs font-semibold text-swatch-blue-deep">
                               {card.primary}
                             </span>
                           )}
                         </div>
                         {(jobTitle || contactEmail) && (
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             {jobTitle && (
                               <span className="max-w-[90px] truncate">
                                 {jobTitle}
@@ -595,7 +613,7 @@ export function CustomerExecutiveTableView({
                               <a
                                 href={`mailto:${contactEmail}`}
                                 dir="ltr"
-                                className="inline-flex max-w-[110px] items-center gap-0.5 truncate text-blue-600 hover:underline dark:text-blue-400"
+                                className="inline-flex max-w-[110px] items-center gap-0.5 truncate text-primary hover:underline"
                               >
                                 <Mail className="size-2.5 shrink-0" />
                                 <span className="truncate">{contactEmail}</span>
@@ -604,10 +622,10 @@ export function CustomerExecutiveTableView({
                           </div>
                         )}
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Col 4: Phone & Instant Channels + Inline Phone Edit */}
-                    <td className="px-3 py-2.5">
+                    <TableCell className="px-3 py-2.5">
                       {editingPhoneId === item.id ? (
                         <div className="flex items-center gap-1">
                           <input
@@ -615,34 +633,37 @@ export function CustomerExecutiveTableView({
                             dir="ltr"
                             value={phoneDraft}
                             onChange={(e) => setPhoneDraft(e.target.value)}
-                            className="h-7 w-32 rounded border border-blue-500 bg-background px-2 text-xs text-foreground focus:outline-none"
+                            className="h-7 w-32 rounded border border-primary bg-background px-2 text-xs text-foreground focus:outline-none"
                           />
-                          <button
+                          <Button
                             type="button"
+                            size="xs"
                             disabled={savingPhoneId === item.id}
                             onClick={() => void handleSaveInlinePhone(item)}
-                            className="inline-flex size-6 items-center justify-center rounded bg-blue-600 text-white hover:bg-blue-700"
+                            className="inline-flex size-6 items-center justify-center rounded bg-primary text-primary-foreground hover:bg-primary/90"
                           >
                             {savingPhoneId === item.id ? (
                               <Loader2 className="size-3 animate-spin" />
                             ) : (
                               <Check className="size-3" />
                             )}
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="xs"
                             onClick={() => setEditingPhoneId(null)}
                             className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted"
                           >
                             <X className="size-3" />
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <Link
                             href={`/crm/customer-profiles/${encodeURIComponent(item.id)}`}
                             dir="ltr"
-                            className="max-w-[115px] truncate font-mono font-medium text-foreground hover:underline"
+                            className="max-w-[115px] truncate font-mono font-medium tabular-nums text-foreground hover:underline"
                           >
                             {primaryPhone || t.crmCustomerProfiles.unavailable}
                           </Link>
@@ -654,24 +675,26 @@ export function CustomerExecutiveTableView({
                             />
                           )}
                           {editable && (
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
+                              size="xs"
                               onClick={() => {
                                 setEditingPhoneId(item.id);
                                 setPhoneDraft(primaryPhone ?? "");
                               }}
                               title={t.crmTags.edit}
-                              className="inline-flex size-5 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                              className="inline-flex size-5 items-center justify-center rounded p-0 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
                             >
                               <Pencil className="size-2.5" />
-                            </button>
+                            </Button>
                           )}
                         </div>
                       )}
-                    </td>
+                    </TableCell>
 
                     {/* Col 5: Country & City */}
-                    <td className="px-3 py-2.5">
+                    <TableCell className="px-3 py-2.5">
                       <div className="flex items-start gap-1.5">
                         {flag && (
                           <span
@@ -688,27 +711,29 @@ export function CustomerExecutiveTableView({
                               t.crmCustomerProfiles.unavailable}
                           </span>
                           {storedCountry && city && (
-                            <span className="max-w-[110px] truncate text-[10px] text-muted-foreground">
+                            <span className="max-w-[110px] truncate text-xs text-muted-foreground">
                               {city}
                             </span>
                           )}
                         </div>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Col 6: Status with Inline Popover Menu */}
-                    <td className="relative px-3 py-2.5">
+                    <TableCell className="relative px-3 py-2.5">
                       {editable ? (
                         <div className="relative inline-block">
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="xs"
                             onClick={() =>
                               setOpenStatusMenuId((cur) =>
                                 cur === item.id ? null : item.id,
                               )
                             }
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold transition-colors",
+                              "inline-flex h-auto items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
                               visual.badgeClass,
                             )}
                           >
@@ -718,19 +743,21 @@ export function CustomerExecutiveTableView({
                                 item.status}
                             </span>
                             <ChevronDown className="size-2.5 opacity-75" />
-                          </button>
+                          </Button>
 
                           {openStatusMenuId === item.id && (
-                            <div className="absolute start-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-xl">
+                            <div className="absolute start-0 top-full z-(--z-dropdown) mt-1 w-44 overflow-hidden rounded-lg border border-border bg-card p-1 shadow-xl">
                               {CUSTOMER_PROFILE_BOARD_STATUSES.map(
                                 (candidate) => {
                                   const candVisual =
                                     getCustomerStatusVisual(candidate);
                                   const CandIcon = candVisual.icon;
                                   return (
-                                    <button
+                                    <Button
                                       key={candidate}
                                       type="button"
+                                      variant="ghost"
+                                      size="xs"
                                       onClick={() => {
                                         setOpenStatusMenuId(null);
                                         if (candidate !== item.status) {
@@ -738,9 +765,9 @@ export function CustomerExecutiveTableView({
                                         }
                                       }}
                                       className={cn(
-                                        "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start text-xs font-semibold transition-colors hover:bg-muted",
+                                        "flex w-full items-center justify-start gap-2 rounded-lg px-2 py-1.5 text-start text-xs font-semibold transition-colors hover:bg-muted",
                                         candidate === item.status &&
-                                          "bg-muted/70 font-bold",
+                                          "bg-muted/70",
                                       )}
                                     >
                                       <CandIcon
@@ -752,7 +779,7 @@ export function CustomerExecutiveTableView({
                                           `CustomerStatus.${candidate}`
                                         ] ?? candidate}
                                       </span>
-                                    </button>
+                                    </Button>
                                   );
                                 },
                               )}
@@ -762,7 +789,7 @@ export function CustomerExecutiveTableView({
                       ) : (
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold",
+                            "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
                             visual.badgeClass,
                           )}
                         >
@@ -773,10 +800,10 @@ export function CustomerExecutiveTableView({
                           </span>
                         </span>
                       )}
-                    </td>
+                    </TableCell>
 
                     {/* Col 7: Rating */}
-                    <td className="px-3 py-2.5">
+                    <TableCell className="px-3 py-2.5">
                       <CrmRating
                         value={item.rating}
                         onChange={(rating) => onCardChange(item, { rating })}
@@ -787,10 +814,10 @@ export function CustomerExecutiveTableView({
                           clear: card.clearRating,
                         }}
                       />
-                    </td>
+                    </TableCell>
 
                     {/* Col 8: Source */}
-                    <td className="px-3 py-2.5">
+                    <TableCell className="px-3 py-2.5">
                       <div className="flex items-center gap-1.5 whitespace-nowrap">
                         <AcquisitionSourceIcon
                           source={{ iconUrl: item.sourceIconUrl }}
@@ -799,10 +826,10 @@ export function CustomerExecutiveTableView({
                           {sourceName || t.crmCustomerProfiles.unavailable}
                         </span>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Col 9: Salesperson */}
-                    <td className="px-3 py-2.5">
+                    <TableCell className="px-3 py-2.5">
                       <div className="flex items-center gap-1.5">
                         {item.owner && (
                           <CustomerOwnerAvatar
@@ -814,70 +841,74 @@ export function CustomerExecutiveTableView({
                           {ownerName || t.crmCustomerProfiles.unavailable}
                         </span>
                       </div>
-                    </td>
+                    </TableCell>
 
                     {/* Col 10: Follow-up & Quick Actions */}
-                    <td className="px-3 py-2.5 text-end">
+                    <TableCell className="px-3 py-2.5 text-end">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => onOpenActivities(item)}
-                          title={formatTemplate(card.activityOpen, {
-                            state: activityLabel,
-                          })}
-                          aria-label={formatTemplate(card.activityOpen, {
-                            state: activityLabel,
-                          })}
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold transition-colors",
-                            activityPill.bg,
-                            activityPill.text,
-                          )}
-                        >
-                          <Activity className="size-2.5 shrink-0" />
-                          <span className="max-w-[75px] truncate">
-                            {activityLabel}
-                          </span>
-                        </button>
+                {onOpenActivities && item.status !== "BLACKLISTED" && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => onOpenActivities(item)}
+                    title={formatTemplate(card.activityOpen, {
+                      state: activityLabel,
+                    })}
+                    aria-label={formatTemplate(card.activityOpen, {
+                      state: activityLabel,
+                    })}
+                    className={cn(
+                      "inline-flex h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold transition-colors",
+                      activityPill.bg,
+                      activityPill.text,
+                    )}
+                  >
+                    <Activity className="size-2.5 shrink-0" />
+                    <span className="max-w-[75px] truncate">
+                      {activityLabel}
+                    </span>
+                  </Button>
+                )}
 
                         {onOpenQuickModal && (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="xs"
                             onClick={() => onOpenQuickModal(item)}
                             title={
-                              isAr
-                                ? "معاينة وتعديل سريع 360°"
-                                : "Quick 360° Inspect & Edit"
+                              t.crmCustomerProfiles.ui.table.quickInspect
                             }
                             aria-label={
-                              isAr
-                                ? "معاينة وتعديل سريع 360°"
-                                : "Quick 360° Inspect & Edit"
+                              t.crmCustomerProfiles.ui.table.quickInspect
                             }
-                            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400"
+                            className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-swatch-blue-soft hover:text-swatch-blue-deep"
                           >
                             <Eye className="size-3.5" />
-                          </button>
+                          </Button>
                         )}
 
                         {deletable && onDelete && (
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="xs"
                             onClick={() => onDelete(item)}
                             aria-label={`${t.common.delete}: ${item.displayName}`}
                             title={t.common.delete}
                             className="inline-flex size-6 items-center justify-center rounded-md text-destructive/80 transition-colors hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="size-3.5" />
-                          </button>
+                          </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
 

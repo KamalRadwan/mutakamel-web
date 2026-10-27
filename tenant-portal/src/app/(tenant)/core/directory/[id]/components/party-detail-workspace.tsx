@@ -15,7 +15,7 @@ import {
 import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import { EntityHistoryPanel } from "../../../components/EntityHistoryPanel";
+import { RecordHistoryTab } from "@/components/audit/RecordHistoryTab";
 import { useCoreOperationsErrorText } from "../../../hooks/useCoreOperationsErrorText";
 import { PARTY_READ_PERMISSION } from "../../directory-contract";
 import { usePartyDetail } from "../hooks/usePartyDetail";
@@ -120,7 +120,7 @@ export function PartyDetailWorkspace({ id }: { id: string }) {
 
             <PartyChildSections party={party} setParty={detail.setParty} grants={grants} />
 
-            <EntityHistoryPanel entityType={PARTY_AUDIT_ENTITY_TYPE} entityId={party.id} />
+            <RecordHistoryTab entityType={PARTY_AUDIT_ENTITY_TYPE} entityId={party.id} />
 
             <EditPartyDrawer
               key={party.updatedAt}

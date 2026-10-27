@@ -1,122 +1,100 @@
 "use client";
 
-import { useState } from "react";
 import {
-  Activity,
   ArrowUpRight,
   Star,
-  Tag,
   Trash2,
   UserCheck,
   X,
 } from "lucide-react";
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
+import { useLeadBulkControls } from "../hooks/useLeadMutations";
 import type { LeadStage } from "../hooks/useLeads";
 
-export interface LeadBulkActionsBarProps {
+interface LeadBulkActionsBarProps {
   selectedIds: ReadonlySet<string>;
   stages: readonly LeadStage[];
   canUpdateAny: boolean;
   canDeleteAny: boolean;
+  deleteEligibleCount: number;
+  isDeleting: boolean;
   onBulkMoveStage: (stageId: string) => Promise<void>;
   onBulkSetRating: (rating: number) => Promise<void>;
-  onBulkDelete: () => Promise<void>;
+  onBulkDelete: () => void;
   onClearSelection: () => void;
-  onOpenFirstSelectedModal?: () => void;
-  onOpenFirstSelectedActivities?: () => void;
+  owners: readonly { id: string; firstName: string; lastName: string }[];
+  ownersLoading: boolean;
+  ownersFailed: boolean;
+  onBulkAssignOwner: (ownerUserId: string) => Promise<void>;
 }
 
 /**
- * Floating dark bottom command bar matching Screen `07-table-view-bulk-actions.png`:
- * `[5] Leads Selected | [↗ Move Stage (5) ▾] [👤 Assign Salesperson ▾] [🏷 Add / Remove Tags ▾] [📈 Schedule Call Campaign] [🗑 Delete (5)]`
+ * Selected-lead stage, owner, rating and delete actions.
  */
 export function LeadBulkActionsBar({
   selectedIds,
   stages,
   canUpdateAny,
   canDeleteAny,
+  deleteEligibleCount,
+  isDeleting,
   onBulkMoveStage,
   onBulkSetRating,
   onBulkDelete,
   onClearSelection,
-  onOpenFirstSelectedModal,
-  onOpenFirstSelectedActivities,
+  owners,
+  ownersLoading,
+  ownersFailed,
+  onBulkAssignOwner,
 }: LeadBulkActionsBarProps) {
-  const { lang } = useI18n();
-  const isAr = lang === "ar";
-  const [isBusy, setIsBusy] = useState(false);
-  const [stageSelect, setStageSelect] = useState("");
-  const [ratingSelect, setRatingSelect] = useState("");
+  const { lang, t } = useI18n();
+  const { isBusy, stageSelect, ratingSelect, handleMove, handleRating, handleOwner } = useLeadBulkControls({
+    isDeleting, owners, onBulkMoveStage, onBulkSetRating, onBulkAssignOwner,
+  });
 
   const count = selectedIds.size;
   if (count === 0) return null;
 
-  async function handleMove(stageId: string) {
-    if (!stageId || isBusy) return;
-    setIsBusy(true);
-    try {
-      await onBulkMoveStage(stageId);
-    } finally {
-      setStageSelect("");
-      setIsBusy(false);
-    }
-  }
-
-  async function handleRating(value: string) {
-    if (!value || isBusy) return;
-    const parsed = Number(value);
-    if (Number.isNaN(parsed)) return;
-    setIsBusy(true);
-    try {
-      await onBulkSetRating(parsed);
-    } finally {
-      setRatingSelect("");
-      setIsBusy(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (isBusy) return;
-    setIsBusy(true);
-    try {
-      await onBulkDelete();
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
   return (
     <div
       role="region"
-      aria-label={isAr ? "إجراءات جماعية للعملاء المحددين" : "Bulk lead actions"}
-      className="fixed inset-x-0 bottom-5 z-40 mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-700 bg-slate-950/95 px-4 py-2.5 text-white shadow-2xl backdrop-blur-md"
+      aria-label={t.crmLeads.executive.bulkActions}
+      className="fixed inset-x-0 bottom-5 z-(--z-sticky-header) mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border bg-popover px-4 py-2.5 text-popover-foreground shadow-lg"
     >
-      <div className="flex items-center gap-2 text-xs font-bold">
-        <span className="inline-flex size-6 items-center justify-center rounded-lg bg-blue-600 text-xs font-extrabold tabular-nums text-white">
+      <div className="flex items-center gap-2 text-xs font-semibold">
+        <span className="inline-flex size-6 items-center justify-center rounded-lg bg-primary text-xs font-semibold tabular-nums text-primary-foreground">
           {count}
         </span>
-        <span>{isAr ? "عملاء محددين" : "Leads Selected"}</span>
+        <span>{t.crmLeads.executive.leadsSelected}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {canUpdateAny && stages.length > 0 && (
           <div className="relative inline-flex items-center">
-            <ArrowUpRight className="pointer-events-none absolute start-2.5 size-3.5 text-white" aria-hidden="true" />
+            <ArrowUpRight className="pointer-events-none absolute start-2.5 size-3.5 text-primary-foreground" aria-hidden="true" />
             <select
-              aria-label={isAr ? "نقل المرحلة جماعياً" : "Bulk move stage"}
+              aria-label={t.crmLeads.executive.bulkMoveStage}
               value={stageSelect}
-              disabled={isBusy}
+              disabled={isBusy || isDeleting}
               onChange={(e) => void handleMove(e.target.value)}
-              className="h-8 cursor-pointer rounded-lg bg-blue-600 ps-7 pe-3 text-xs font-bold text-white shadow-xs transition-colors hover:bg-blue-500 disabled:opacity-50"
+              className="h-8 cursor-pointer rounded-lg bg-primary ps-7 pe-3 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               <option value="">
-                {isAr ? `نقل المرحلة (${count}) ▾` : `Move Stage (${count}) ▾`}
+                {t.crmLeads.executive.moveStageCount(count)}
               </option>
               {stages
                 .filter((st) => st.flag !== "CONVERTED")
                 .map((stage) => (
-                  <option key={stage.id} value={stage.id} className="bg-slate-900 text-white">
+                  <option key={stage.id} value={stage.id} className="bg-popover text-popover-foreground">
                     {localizedName(stage, lang)}
                   </option>
                 ))}
@@ -125,29 +103,37 @@ export function LeadBulkActionsBar({
         )}
 
         {canUpdateAny && (
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={onOpenFirstSelectedModal}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
-          >
-            <UserCheck className="size-3.5 text-slate-400" aria-hidden="true" />
-            <span>{isAr ? "تعيين مسؤول ▾" : "Assign Salesperson ▾"}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <Select value="" onValueChange={(value) => void handleOwner(value)} disabled={isBusy || isDeleting || ownersLoading || owners.length === 0}>
+              <SelectTrigger aria-label={t.crmLeads.bulkAssignOwner} aria-busy={ownersLoading || isBusy}>
+                <UserCheck className="size-3.5" aria-hidden="true" />
+                <SelectValue placeholder={ownersLoading ? t.common.loading : t.crmLeads.bulkAssignOwner} />
+              </SelectTrigger>
+              <SelectContent>
+                {owners.map((owner) => (
+                  <SelectItem key={owner.id} value={owner.id}>
+                    {[owner.firstName, owner.lastName].filter(Boolean).join(" ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {ownersFailed && <span role="alert" className="text-xs">{t.crmLeads.bulkOwnersUnavailable}</span>}
+            {!ownersFailed && !ownersLoading && owners.length === 0 && <span role="status" className="text-xs">{t.crmLeads.bulkNoOwners}</span>}
+          </div>
         )}
 
         {canUpdateAny && (
           <div className="relative inline-flex items-center">
-            <Star className="pointer-events-none absolute start-2.5 size-3.5 text-amber-400" aria-hidden="true" />
+            <Star className="pointer-events-none absolute start-2.5 size-3.5 text-warning" aria-hidden="true" />
             <select
-              aria-label={isAr ? "تعيين التقييم جماعياً" : "Bulk set rating"}
+              aria-label={t.crmLeads.executive.bulkSetRating}
               value={ratingSelect}
-              disabled={isBusy}
+              disabled={isBusy || isDeleting}
               onChange={(e) => void handleRating(e.target.value)}
-              className="h-8 cursor-pointer rounded-lg border border-slate-700 bg-slate-900 ps-7 pe-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+              className="h-8 cursor-pointer rounded-lg border border-border bg-card ps-7 pe-2.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
             >
               <option value="">
-                {isAr ? "تعديل التقييم / الوسوم ▾" : "Add / Remove Tags & Rating ▾"}
+                {t.crmLeads.bulkSetRating}
               </option>
               <option value="3">★★★ (3)</option>
               <option value="2">★★☆ (2)</option>
@@ -157,38 +143,32 @@ export function LeadBulkActionsBar({
           </div>
         )}
 
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={onOpenFirstSelectedActivities}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
-        >
-          <Activity className="size-3.5 text-emerald-400" aria-hidden="true" />
-          <span>{isAr ? "جدولة حملة اتصال" : "Schedule Call Campaign"}</span>
-        </button>
-
         {canDeleteAny && (
-          <button
+          <Button
             type="button"
-            disabled={isBusy}
-            onClick={() => void handleDelete()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-bold text-white shadow-xs transition-colors hover:bg-red-500 disabled:opacity-50"
+            variant="destructive"
+            size="sm"
+            disabled={isBusy || isDeleting}
+            onClick={onBulkDelete}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold shadow-xs"
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
-            <span>{isAr ? `حذف (${count})` : `Delete (${count})`}</span>
-          </button>
+            <span>{t.crmLeads.bulkDeleteLabel(deleteEligibleCount, count)}</span>
+          </Button>
         )}
 
-        <button
+        <Button
           type="button"
-          disabled={isBusy}
+          variant="outline"
+          size="xs"
+          disabled={isBusy || isDeleting}
           onClick={onClearSelection}
-          title={isAr ? "إلغاء التحديد" : "Clear selection"}
-          aria-label={isAr ? "إلغاء التحديد" : "Clear selection"}
-          className="flex size-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white"
+          title={t.crmLeads.executive.clearSelection}
+          aria-label={t.crmLeads.executive.clearSelection}
+          className="flex size-8 items-center justify-center rounded-lg p-0 text-muted-foreground hover:text-foreground"
         >
           <X className="size-3.5" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
     </div>
   );

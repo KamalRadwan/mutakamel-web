@@ -35,6 +35,9 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void,
   const selectableStages = (selectedPipeline?.stages ?? []).filter(({ isActive, flag }) => isActive && flag !== "WON" && flag !== "LOST");
   const unresolved = Boolean(ambiguous || appliedUnreadable);
   const locked = isSubmitting || unresolved || Boolean(result);
+  const createsOrganization = lead?.leadProfileType === "INDIVIDUAL" && form?.profileType === "CORPORATE";
+  const usesContactPerson = lead?.leadProfileType === "CORPORATE" && form?.profileType === "INDIVIDUAL";
+  const primaryContact = lead?.contacts.find(({ isPrimary }) => isPrimary);
 
   function openModal() {
     if (inFlight.current) return;
@@ -53,8 +56,18 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void,
     setError(null); setErrors({}); setReviewing(false);
   }
   function setField<K extends keyof LeadConversionForm>(key: K, value: LeadConversionForm[K]) {
-    if (locked || key === "profileType") return;
-    setForm((current) => current ? { ...current, [key]: value, ...(key === "pipelineId" ? { stageId: "" } : {}) } : current);
+    if (locked) return;
+    setForm((current) => {
+      if (!current) return current;
+      if (key === "profileType" && value !== current.profileType) {
+        // A different destination must never inherit the source Party's name.
+        return { ...current, [key]: value,
+          displayName: lead && value === lead.leadProfileType ? lead.displayName : "",
+          companyName: lead && value === lead.leadProfileType && value === "CORPORATE" ? lead.companyName ?? "" : "",
+          newContact: false };
+      }
+      return { ...current, [key]: value, ...(key === "pipelineId" ? { stageId: "" } : {}) };
+    });
     setPending(null); setError(null); setReviewing(false); setErrors({});
   }
   function addMethod() {
@@ -63,9 +76,12 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void,
   function validate() {
     if (!form || !lead) return false;
     const labels = { required: t.crmShared.fieldRequired, invalid: t.crmLeadConvert.invalidValue,
-      email: t.crmShared.fieldEmail, amount: t.crmLeadConvert.amountInvalid, duplicate: t.crmLeadConvert.duplicateMethod };
+      email: t.crmShared.fieldEmail, amount: t.crmShared.refusals.CRM_AMOUNT_SCALE_INVALID, duplicate: t.crmLeadConvert.duplicateMethod };
     const next = Object.fromEntries(Object.entries(validateLeadConversion(form, customFields.requiredFieldKeys)).map(([key, issue]) => [key, labels[issue]]));
-    if (form.profileType !== lead.leadProfileType) next.profileType = t.crmLeadConvert.profileTypeFixed;
+    if (createsOrganization && !form.displayName.trim() && !form.companyName.trim()) {
+      next.displayName = next.companyName = t.crmLeadConvert.serverErrors.LEAD_CONVERSION_COMPANY_NAME_REQUIRED;
+    }
+    if (usesContactPerson && !primaryContact) next.profileType = t.crmLeadConvert.serverErrors.LEAD_CONVERSION_CONTACT_REQUIRED;
     if (form.createOpportunity) {
       if (!opportunityCapability) next.createOpportunity = t.crmLeadConvert.opportunityNotPermitted;
       if (options.loading || options.pipelinesFailed || !selectedPipeline) next.pipelineId = t.crmLeadConvert.pipelinesFailed;
@@ -113,6 +129,7 @@ export function useLeadConvert(lead: LeadDetail | null, onConverted: () => void,
   }
   return {
     open, form, reviewing, errors, options, customFields, selectableStages, lead,
+    createsOrganization, usesContactPerson, primaryContact,
     canCreateOpportunity: Boolean(opportunityCapability), canConvert, isSubmitting, locked,
     isDirty: !result && !unresolved && JSON.stringify(form) !== JSON.stringify(baseline),
     error, ambiguous, appliedUnreadable, result, attempt: pending?.attempt,

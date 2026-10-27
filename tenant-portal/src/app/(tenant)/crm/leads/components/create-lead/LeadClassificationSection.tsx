@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Building2, Compass, Layers, Search, Tag, User } from "lucide-react";
+import { Building2, Compass, Search, Tag, User } from "lucide-react";
 import {
+  Button,
   DegradedBanner,
   Field,
   Input,
@@ -30,15 +31,15 @@ import { LeadFieldGuide } from "./LeadFieldGuide";
 const DEFAULT_STAGE_VALUE = "__default_stage__";
 
 const STAGE_DOT_BY_FLAG: Record<string, string> = {
-  NEW: "bg-indigo-500 ring-indigo-500/25",
-  IN_PROGRESS: "bg-sky-500 ring-sky-500/25",
-  QUALIFIED: "bg-emerald-500 ring-emerald-500/25",
-  UNQUALIFIED: "bg-amber-500 ring-amber-500/25",
-  LOST: "bg-rose-500 ring-rose-500/25",
-  CONVERTED: "bg-teal-500 ring-teal-500/25",
+  NEW: "bg-primary ring-primary/25",
+  IN_PROGRESS: "bg-info ring-info/25",
+  QUALIFIED: "bg-success ring-success/25",
+  UNQUALIFIED: "bg-warning ring-warning/25",
+  LOST: "bg-destructive ring-destructive/25",
+  CONVERTED: "bg-success ring-success/25",
 };
 
-export interface LeadClassificationSectionProps {
+interface LeadClassificationSectionProps {
   companyIds: readonly string[];
   companyId: string | null;
   branchIds: readonly string[];
@@ -153,28 +154,28 @@ export function LeadClassificationSection({
   return (
     <section
       data-form-section="classification"
-      className="relative overflow-hidden rounded-xl border border-indigo-500/20 bg-card shadow-xs transition-colors dark:border-indigo-400/20"
+      className="relative overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors"
     >
-      {/* Top 3px colorful accent bar */}
+      {/* Top 3px accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-indigo-600 via-violet-500 to-sky-500"
+        className="h-1 w-full bg-primary"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-indigo-500/[0.03] px-4 py-3 dark:bg-indigo-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-muted/20 px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/25 bg-indigo-500/10 text-indigo-600 dark:border-indigo-400/30 dark:bg-indigo-500/20 dark:text-indigo-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
             <Compass className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">
                 01
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmLeads.create.leadClassificationTitle}
               </h3>
@@ -192,36 +193,40 @@ export function LeadClassificationSection({
             aria-label={t.crmLeads.create.leadType}
             className="inline-flex items-center rounded-lg border border-border bg-muted/60 p-0.5"
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               disabled={disabled}
               onClick={() => onProfileTypeChange("INDIVIDUAL")}
               aria-pressed={leadProfileType === "INDIVIDUAL"}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
                 leadProfileType === "INDIVIDUAL"
-                  ? "bg-emerald-600 text-white shadow-2xs"
+                  ? "bg-primary text-primary-foreground shadow-2xs"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               <User className="size-3.5" aria-hidden="true" />
               {t.crmLeads.create.types.INDIVIDUAL}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               disabled={disabled}
               onClick={() => onProfileTypeChange("CORPORATE")}
               aria-pressed={leadProfileType === "CORPORATE"}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
                 leadProfileType === "CORPORATE"
-                  ? "bg-violet-600 text-white shadow-2xs"
+                  ? "bg-primary text-primary-foreground shadow-2xs"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Building2 className="size-3.5" aria-hidden="true" />
               {t.crmLeads.create.types.CORPORATE}
-            </button>
+            </Button>
           </div>
           <LeadFieldGuide field="leadProfileType" />
         </div>
@@ -234,7 +239,7 @@ export function LeadClassificationSection({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {showCompanyPicker && (
               <div className="relative">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <div className="absolute end-0 top-0 flex items-center gap-1.5">
                   <LeadFieldGuide field="companyId" />
                 </div>
                 <Field
@@ -264,7 +269,7 @@ export function LeadClassificationSection({
 
             {showBranchPicker && (
               <div className="relative">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <div className="absolute end-0 top-0 flex items-center gap-1.5">
                   <LeadFieldGuide field="branchId" />
                 </div>
                 <Field
@@ -299,8 +304,8 @@ export function LeadClassificationSection({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
           {/* Pipeline Stage */}
           <div className={cn("relative", showTags ? "md:col-span-4" : "md:col-span-6")}>
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-              <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+            <div className="absolute end-0 top-0 flex items-center gap-1.5">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
                 Pipeline
               </span>
               <LeadFieldGuide field="stageId" />
@@ -345,7 +350,7 @@ export function LeadClassificationSection({
                     <span className="inline-flex items-center gap-2">
                       <span
                         aria-hidden="true"
-                        className="size-2 shrink-0 rounded-full bg-indigo-500 ring-2 ring-indigo-500/25"
+                        className="size-2 shrink-0 rounded-full bg-primary ring-2 ring-primary/25"
                       />
                       <span>{t.crmLeads.defaultStage}</span>
                     </span>
@@ -353,7 +358,7 @@ export function LeadClassificationSection({
                   {filteredStages.map((stage) => {
                     const dotClass =
                       STAGE_DOT_BY_FLAG[stage.flag ?? "NEW"] ??
-                      "bg-indigo-500 ring-indigo-500/25";
+                      "bg-primary ring-primary/25";
                     return (
                       <SelectItem key={stage.id} value={stage.id}>
                         <span className="inline-flex items-center gap-2">
@@ -373,8 +378,8 @@ export function LeadClassificationSection({
 
           {/* Acquisition Source */}
           <div className={cn("relative", showTags ? "md:col-span-4" : "md:col-span-6")}>
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-              <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-600 dark:bg-rose-500/20 dark:text-rose-300">
+            <div className="absolute end-0 top-0 flex items-center gap-1.5">
+              <span className="rounded bg-destructive-subtle px-1.5 py-0.5 text-xs font-semibold text-destructive-subtle-foreground">
                 {t.crmLeads.create.requiredFields.split(" ")[0]}
               </span>
               <LeadFieldGuide field="acquisitionSourceId" />
@@ -430,8 +435,8 @@ export function LeadClassificationSection({
           {/* Classification Tags (MultiSelect with Search & Inline Create) */}
           {showTags && (
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
                   <Tag className="size-2.5" aria-hidden="true" />
                   {tagIds.length}/{LEAD_CREATE_LIMITS.tags}
                 </span>

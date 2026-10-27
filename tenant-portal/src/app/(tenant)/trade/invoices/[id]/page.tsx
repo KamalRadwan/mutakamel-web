@@ -13,6 +13,7 @@ import {
   IdentifierText,
   Money,
   NotFoundState,
+  PermissionGate,
   type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -86,6 +87,10 @@ export default function InvoiceDetailPage({
         <TradeScopeRequired />
       </TradeGate>
     );
+  }
+
+  if (detail.loadError?.status === 403) {
+    return <PermissionGate require={INVOICE_PERMISSIONS.read} denied>{null}</PermissionGate>;
   }
 
   if (detail.isMissing) {

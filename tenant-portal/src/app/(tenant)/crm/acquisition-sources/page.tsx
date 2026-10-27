@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, ImagePlus, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ImagePlus, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
@@ -21,10 +21,12 @@ import { formatTemplate } from "@/lib/format/template";
 import { AcquisitionSourceIcon } from "../shared/components/AcquisitionSourceIcon";
 import type { AcquisitionSource } from "./acquisition-source-contract";
 import { AcquisitionSourceIconDrawer } from "./components/AcquisitionSourceIconDrawer";
+import { AcquisitionSourceEditDrawer } from "./components/AcquisitionSourceEditDrawer";
 import { CreateAcquisitionSourcesModal } from "./components/CreateAcquisitionSourcesModal";
 import { DeleteAcquisitionSourcesConfirmModal } from "./components/DeleteAcquisitionSourcesConfirmModal";
 import { useAcquisitionSourceIcon } from "./hooks/useAcquisitionSourceIcon";
 import { useAcquisitionSources } from "./hooks/useAcquisitionSources";
+import { useAcquisitionSourceEdit } from "./hooks/useAcquisitionSourceEdit";
 
 const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
@@ -57,6 +59,7 @@ export default function AcquisitionSourcesPage() {
     applyUpdatedSource,
   } = useAcquisitionSources();
   const icon = useAcquisitionSourceIcon(canManage, applyUpdatedSource);
+  const editor = useAcquisitionSourceEdit(canManage, applyUpdatedSource, reload);
 
   const columns: ColumnDef<AcquisitionSource>[] = [
     {
@@ -94,56 +97,94 @@ export default function AcquisitionSourcesPage() {
             sticky: "end" as const,
             cell: (item: AcquisitionSource) => (
               <div className="flex items-center justify-end gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={editor.isSaving ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.editTitle}: ${localizedName(item, lang)}`}>
+                    <Button variant="ghost" size="sm" onClick={() => editor.select(item)} disabled={editor.isSaving}
+                      className="disabled:pointer-events-none"
+                      aria-label={`${t.crmAcquisitionSources.editTitle}: ${localizedName(item, lang)}`}>
+                      <Pencil className="size-4" aria-hidden="true" />
+                    </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{editor.isSaving ? t.crmConfigActionHints.pending : t.crmAcquisitionSources.editTitle}</TooltipContent>
+                </Tooltip>
                 {/* Reorder is earlier/later controls, not drag-only — the
                     same rule the column header follows. Each press sends the
                     COMPLETE ordered id list, so it is suppressed while a
                     search narrows the view: the visible order would not be
                     the order being written. */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isFiltered || reorderingId !== null || item.sortOrder <= 1 ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.moveEarlier}: ${localizedName(item, lang)}`}>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => void handleMove(item, -1)}
                   disabled={isFiltered || reorderingId !== null || item.sortOrder <= 1}
+                  className="disabled:pointer-events-none"
                   aria-label={`${t.crmAcquisitionSources.moveEarlier}: ${localizedName(item, lang)}`}
                 >
                   <ChevronUp className="size-4" aria-hidden="true" />
                 </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{isFiltered ? t.crmConfigActionHints.filteredReorder
+                    : reorderingId !== null ? t.crmConfigActionHints.pending
+                    : item.sortOrder <= 1 ? t.crmConfigActionHints.firstSource : t.crmAcquisitionSources.moveEarlier}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isFiltered || reorderingId !== null || item.sortOrder >= items.length ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.moveLater}: ${localizedName(item, lang)}`}>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => void handleMove(item, 1)}
                   disabled={isFiltered || reorderingId !== null || item.sortOrder >= items.length}
+                  className="disabled:pointer-events-none"
                   aria-label={`${t.crmAcquisitionSources.moveLater}: ${localizedName(item, lang)}`}
                 >
                   <ChevronDown className="size-4" aria-hidden="true" />
                 </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{isFiltered ? t.crmConfigActionHints.filteredReorder
+                    : reorderingId !== null ? t.crmConfigActionHints.pending
+                    : item.sortOrder >= items.length ? t.crmConfigActionHints.lastSource : t.crmAcquisitionSources.moveLater}</TooltipContent>
+                </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={icon.isUploading ? 0 : undefined} aria-label={`${t.crmAcquisitionSources.iconTitle}: ${localizedName(item, lang)}`}>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => icon.select(item)}
                       disabled={icon.isUploading}
+                      className="disabled:pointer-events-none"
                       aria-label={`${t.crmAcquisitionSources.iconTitle}: ${localizedName(item, lang)}`}
                     >
                       <ImagePlus className="size-4" aria-hidden="true" />
                     </Button>
+                    </span>
                   </TooltipTrigger>
-                  <TooltipContent>{t.crmAcquisitionSources.iconTitle}</TooltipContent>
+                  <TooltipContent>{icon.isUploading ? t.crmConfigActionHints.pending : t.crmAcquisitionSources.iconTitle}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isDeleting ? 0 : undefined} aria-label={`${t.common.delete}: ${localizedName(item, lang)}`}>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => selectForDelete(item)}
                       disabled={isDeleting}
+                      className="disabled:pointer-events-none"
                       aria-label={`${t.common.delete}: ${localizedName(item, lang)}`}
                     >
                       <Trash2 className="size-4 text-destructive" aria-hidden="true" />
                     </Button>
+                    </span>
                   </TooltipTrigger>
-                  <TooltipContent>{t.common.delete}</TooltipContent>
+                  <TooltipContent>{isDeleting ? t.crmConfigActionHints.pending : t.common.delete}</TooltipContent>
                 </Tooltip>
               </div>
             ),
@@ -157,21 +198,31 @@ export default function AcquisitionSourcesPage() {
   // load error — AGENTS.md, docs/design/states.md. Permission string and
   // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
   return (
-    <PermissionGate require="crm.acquisition_sources.read">
+    <PermissionGate require="crm.acquisition_sources.read" denied={queryError?.status === 403}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={t.crm.acquisitionSourcesAndMarket}
           description={t.crmAcquisitionSources.subtitle}
           primaryAction={canManage ? { label: t.crmAcquisitionSources.add, onClick: openCreate } : undefined}
           secondaryActions={
-            <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring" tabIndex={isLoading ? 0 : undefined} aria-label={t.crmAcquisitionSources.reload}>
+            <Button size="sm" variant="outline" className="disabled:pointer-events-none" onClick={() => void reload()} disabled={isLoading}>
               <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
               {t.crmAcquisitionSources.reload}
             </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{isLoading ? t.crmConfigActionHints.loading : t.crmAcquisitionSources.reload}</TooltipContent>
+            </Tooltip>
           }
         />
 
         <SubNav items={CRM_SETUP_ITEMS} />
+
+        {editor.error && !editor.selected ? <p role="alert" className="text-xs text-destructive">{editor.error}</p> : null}
 
         <FilterBar
           filters={[]}
@@ -182,6 +233,10 @@ export default function AcquisitionSourcesPage() {
           onSearchChange={setSearchQuery}
           searchPlaceholder={t.crmAcquisitionSources.search}
         />
+
+        {canManage && isFiltered && (
+          <p role="note" className="text-xs text-muted-foreground">{t.crmConfigActionHints.filteredReorder}</p>
+        )}
 
         {mutationError && !selectedForDelete && !isCreateOpen ? (
           <p role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
@@ -239,6 +294,8 @@ export default function AcquisitionSourcesPage() {
           onClose={icon.close}
           onSubmit={icon.upload}
         />
+
+        <AcquisitionSourceEditDrawer editor={editor} />
 
         <DeleteAcquisitionSourcesConfirmModal
           isOpen={!!selectedForDelete}

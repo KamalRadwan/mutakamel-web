@@ -3,6 +3,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCreateStorageServerScreen } from "./useCreateStorageServerScreen";
+import { en } from "@/i18n/dictionaries/en";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -180,6 +181,36 @@ describe("useCreateStorageServerScreen", () => {
       correlationId: "runtime-correlation-1",
     });
     expect(mocks.resetCreateKey).not.toHaveBeenCalled();
+  });
+
+  it.each(["9007199254740993", "9223372036854775807", ""])("creates with exact byte limit %s", async (value) => {
+    mocks.createServer.mockResolvedValueOnce({ id: "stg-123" });
+    const { result } = renderHook(() => useCreateStorageServerScreen());
+    setValidForm(result.current);
+    act(() => result.current.byteLimit.setValue(value));
+    await submit(result.current.handleSubmit);
+    expect(mocks.createServer).toHaveBeenCalledWith(
+      expect.objectContaining({ maxBytes: value || null }), "create-key",
+    );
+  });
+
+  it.each(["0", "-1", "1.5", "1e3", "01", "9223372036854775808"])("rejects invalid byte limit %s before registration", async (value) => {
+    const { result } = renderHook(() => useCreateStorageServerScreen());
+    setValidForm(result.current);
+    act(() => result.current.byteLimit.setValue(value));
+    await submit(result.current.handleSubmit);
+    expect(result.current.byteLimit.error).toBe(en.storageByteCapacity.invalidLimit);
+    expect(result.current.formError).toBe(en.storageByteCapacity.invalidLimit);
+    expect(mocks.createServer).not.toHaveBeenCalled();
+  });
+
+  it("does not register a limit without create authority", async () => {
+    mocks.permissions.create = false;
+    const { result } = renderHook(() => useCreateStorageServerScreen());
+    setValidForm(result.current);
+    act(() => result.current.byteLimit.setValue("9007199254740993"));
+    await submit(result.current.handleSubmit);
+    expect(mocks.createServer).not.toHaveBeenCalled();
   });
 
   it("resets the create intent after the definitive runtime-not-configured rejection", async () => {

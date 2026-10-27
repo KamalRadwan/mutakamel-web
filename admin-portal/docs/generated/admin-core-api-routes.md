@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run `npm run docs:routes` from
 > `admin-portal`.
 
-Generated at: **2026-10-11T01:32:03.648Z**
+Generated at: **2026-10-17T18:32:01.827Z**
 
-Frontend revision: `52ce61ba74fa+dirty`
+Frontend revision: `0f84e3fbe923+dirty`
 
-Backend revision: `805710806ce9+dirty`
+Backend revision: `a51c1d6ccf36+dirty`
 
 ## Coverage
 
@@ -18,10 +18,10 @@ feature flags, deployment, or current frontend implementation.
 
 | Route class | Routes |
 | --- | ---: |
-| AUTHENTICATED | 103 |
+| AUTHENTICATED | 104 |
 | PUBLIC | 6 |
 | READ_HEAVY | 23 |
-| WRITE_SENSITIVE | 157 |
+| WRITE_SENSITIVE | 156 |
 | **Total** | **289** |
 
 Machine-readable source:
@@ -40,14 +40,14 @@ Machine-readable source:
 | database-servers | 20 |
 | invoices | 7 |
 | logging | 6 |
-| notifications | 14 |
+| notifications | 12 |
 | payments | 5 |
 | permissions | 1 |
 | provisioning | 35 |
 | reports | 5 |
 | roles | 6 |
 | storage-migrations | 3 |
-| storage-servers | 11 |
+| storage-servers | 13 |
 | subscriptions | 12 |
 | system-settings | 11 |
 | tenant-fqdns | 1 |
@@ -163,18 +163,16 @@ Machine-readable source:
 | GET | `/api/admin/core/v1/logging/level-overrides/history` | AUTHENTICATED | yes | ALL | admin.logging.read | `core.admin.logging.level-overrides.history` |
 | GET | `/api/admin/core/v1/logging/level-overrides/live` | AUTHENTICATED | no | ALL | admin.logging.read + admin.logging.critical | `core.admin.logging.live` |
 | GET | `/api/admin/core/v1/notifications` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.get` |
-| DELETE | `/api/admin/core/v1/notifications/:id` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.by.id.delete` |
-| POST | `/api/admin/core/v1/notifications/:id/ack` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.by.id.ack.post` |
-| POST | `/api/admin/core/v1/notifications/:id/acknowledge` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.by.id.acknowledge.post` |
-| POST | `/api/admin/core/v1/notifications/:id/dismiss` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.by.id.dismiss.post` |
-| POST | `/api/admin/core/v1/notifications/:id/read` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.by.id.read.post` |
+| DELETE | `/api/admin/core/v1/notifications/:id` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.delete` |
+| POST | `/api/admin/core/v1/notifications/:id/ack` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.ack.post` |
+| POST | `/api/admin/core/v1/notifications/:id/acknowledge` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.acknowledge.post` |
+| POST | `/api/admin/core/v1/notifications/:id/dismiss` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.dismiss.post` |
+| POST | `/api/admin/core/v1/notifications/:id/read` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.by.id.read.post` |
 | GET | `/api/admin/core/v1/notifications/config` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.config.get` |
-| POST | `/api/admin/core/v1/notifications/device-tokens` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.device-tokens.post` |
-| DELETE | `/api/admin/core/v1/notifications/device-tokens/:id` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.device-tokens.delete` |
-| POST | `/api/admin/core/v1/notifications/mark-all-read` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.mark-all-read.post` |
+| POST | `/api/admin/core/v1/notifications/mark-all-read` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.mark-all-read.post` |
 | GET | `/api/admin/core/v1/notifications/preferences` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.preferences.get` |
-| PUT | `/api/admin/core/v1/notifications/preferences` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.preferences.put` |
-| POST | `/api/admin/core/v1/notifications/read-all` | WRITE_SENSITIVE | yes | ALL | admin.notifications.manage | `core.admin.notifications.read-all.post` |
+| PUT | `/api/admin/core/v1/notifications/preferences` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.preferences.put` |
+| POST | `/api/admin/core/v1/notifications/read-all` | WRITE_SENSITIVE | no | ALL | admin.notifications.manage | `core.admin.notifications.read-all.post` |
 | GET | `/api/admin/core/v1/notifications/unread-count` | AUTHENTICATED | yes | ALL | admin.notifications.read | `core.admin.notifications.unread-count.get` |
 | GET | `/api/admin/core/v1/payments/:paymentId/reconciliations` | AUTHENTICATED | yes | ALL | admin.billing.reconcile | `core.admin.payments.reconciliations.list` |
 | POST | `/api/admin/core/v1/payments/:paymentId/reconciliations` | WRITE_SENSITIVE | yes | ALL | admin.billing.reconcile | `core.admin.payments.reconciliations.propose` |
@@ -236,7 +234,9 @@ Machine-readable source:
 | PATCH | `/api/admin/core/v1/storage-servers/:id` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.update` |
 | POST | `/api/admin/core/v1/storage-servers/:id/activate` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.activate` |
 | POST | `/api/admin/core/v1/storage-servers/:id/credential-rotations` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.credentials.rotate` |
+| POST | `/api/admin/core/v1/storage-servers/:id/credential-rotations/:rotationId/abort` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.credentials.abort` |
 | POST | `/api/admin/core/v1/storage-servers/:id/credential-rotations/:rotationId/revoke` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.credentials.revoke` |
+| GET | `/api/admin/core/v1/storage-servers/:id/credential-rotations/current` | AUTHENTICATED | yes | ALL | admin.storage_servers.read | `core.admin.storage-servers.credentials.current` |
 | POST | `/api/admin/core/v1/storage-servers/:id/drain` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.drain` |
 | POST | `/api/admin/core/v1/storage-servers/:id/offline` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.offline` |
 | POST | `/api/admin/core/v1/storage-servers/:id/probe` | WRITE_SENSITIVE | yes | ALL | admin.storage_servers.update + admin.storage_servers.critical | `core.admin.storage-servers.probe` |

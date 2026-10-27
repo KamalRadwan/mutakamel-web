@@ -26,6 +26,7 @@ vi.mock("../hooks/useActionTokenPassword", async (importOriginal) => {
     ...original,
     useActionTokenPassword: () => ({
       t: dictionary,
+      mfa: { step: null },
       state: "ready" as const,
       error: undefined,
       newPassword: "",

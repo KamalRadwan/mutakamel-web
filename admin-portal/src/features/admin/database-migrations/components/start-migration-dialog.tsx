@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { FlaskConical, Loader2, ShieldAlert } from "lucide-react";
 import {
   Button,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -382,11 +383,10 @@ export function StartMigrationDialog({
 
             <div className="flex items-end">
               <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={failFast}
-                  onChange={(event) => setFailFast(event.target.checked)}
-                  className="mt-1 size-4 rounded"
+                  onCheckedChange={(checked) => setFailFast(checked === true)}
+                  className="mt-1"
                 />
                 <span>
                   <span className="font-semibold">{copy.failFastLabel}</span>
@@ -521,13 +521,13 @@ function ModeCard({
           : "border-border hover:border-input"
       }`}
     >
-      <input
+      <Input
         type="radio"
         name={name}
         value={value}
         checked={checked}
         onChange={onChange}
-        className="mt-1 size-4 shrink-0"
+        className="mt-1 size-4 shrink-0 px-0"
       />
       <span>
         <span className="block text-sm font-semibold">{title}</span>

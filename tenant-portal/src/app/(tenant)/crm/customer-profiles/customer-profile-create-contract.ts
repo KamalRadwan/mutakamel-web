@@ -11,11 +11,10 @@
 //  1. **There is no `address`.** Unlike `CreateLeadDto`, this DTO exposes no
 //     address input at all, so sending one is a 400 rather than a silent drop.
 //     An address is added afterwards through the Core Directory.
-//  2. `assertCorporateOnlyFields` rejects all nine company keys on an
+//  2. `assertCorporateOnlyFields` rejects company keys on an
 //     INDIVIDUAL profile — 422 CUSTOMER_PROFILE_CORPORATE_FIELDS_FORBIDDEN.
 //  3. `companyPhones` is a **destructive full replace** of the party's PHONE
-//     methods, applied AFTER `companyPhone` was written. Sending both creates
-//     the singular and immediately soft-deletes it, so only the array is sent.
+//     methods and is the only company-phone write field.
 //     The same trap exists between `primaryContact.contactMethods` (MOBILE) and
 //     `primaryContact.phones`; only `phones` is used.
 //  4. `contacts` present — **even as `[]`** — discards `primaryContact`
@@ -24,13 +23,12 @@
 import type { CrmProfileType } from "../leads/lead-contract";
 import type { LeadAddressForm } from "../leads/lead-create-contract";
 
-export function emptyCustomerAddress(): LeadAddressForm {
+function emptyCustomerAddress(): LeadAddressForm {
   return {
     street1: "",
     street2: "",
     buildingNo: "",
     floor: "",
-    apartment: "",
     city: "",
     state: "",
     postalCode: "",
@@ -113,6 +111,7 @@ export interface CreateCustomerProfileForm {
   companyWebsite: string;
   companyPhones: string[];
   contacts: CustomerContactRowForm[];
+  /** Internal form state only; CRM has no address write field or create input. */
   address: LeadAddressForm;
   description: string;
   interestSummary: string;
@@ -283,9 +282,7 @@ export function buildCreateCustomerProfileFullRequest(
       optional("companyEmail", form.companyEmail),
       optional("companyWebsite", form.companyWebsite),
     );
-    // `companyPhone` is deliberately never sent beside this: `synchronizePhoneNumbers`
-    // replaces the party's whole PHONE set from this array afterwards, so the
-    // singular would be created and then soft-deleted in the same request.
+    // `synchronizePhoneNumbers` replaces the party's whole PHONE set.
     const companyPhones = filledPhones(form.companyPhones);
     if (companyPhones.length > 0) request.companyPhones = companyPhones;
 

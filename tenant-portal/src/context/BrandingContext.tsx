@@ -1,11 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { applyBrandingTokens } from "@/lib/branding/apply-branding";
 import { fetchPublicBranding, type PublicBranding } from "@/lib/branding/public-branding";
+import { generateUUIDv7 } from "@/lib/uuid";
 
 /**
- * The tenant's own name and logo, fetched once for the whole document.
+ * The tenant's own name and logo, shared for the whole document and updated
+ * from successful settings writes.
  *
  * This replaces `app/TenantBrandingTokens.tsx`, which ran the same fetch and
  * threw the response away after writing the colour tokens. The global nav's
@@ -28,23 +30,40 @@ export interface TenantBranding {
   appName: string | null;
   /**
    * A same-origin path to Core's logo route, never a free-form URL —
-   * `parsePublicBranding` rejects anything that is not the exact constant.
+   * `parsePublicBranding` validates the path before a local cache key is added.
    */
   logoUrl: string | null;
+  updateBranding: (branding: Omit<PublicBranding, "loginHtml">) => void;
 }
 
-const EMPTY: TenantBranding = { appName: null, logoUrl: null };
+const EMPTY: TenantBranding = { appName: null, logoUrl: null, updateBranding: () => undefined };
 
 const BrandingContext = createContext<TenantBranding>(EMPTY);
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
-  const [branding, setBranding] = useState<TenantBranding>(EMPTY);
+  const [branding, setBranding] = useState<Pick<TenantBranding, "appName" | "logoUrl">>(EMPTY);
+  const revision = useRef(0);
+
+  const updateBranding = useCallback((saved: Omit<PublicBranding, "loginHtml">) => {
+    revision.current += 1;
+    // Public asset routes cache for five minutes; each write needs fresh bytes.
+    const version = generateUUIDv7();
+    const response: PublicBranding = {
+      ...saved,
+      loginHtml: null,
+      logoUrl: saved.logoUrl ? `${saved.logoUrl}?v=${version}` : null,
+      iconUrl: saved.iconUrl ? `${saved.iconUrl}?v=${version}` : null,
+    };
+    applyBrandingTokens(response);
+    setBranding({ appName: response.appName, logoUrl: response.logoUrl });
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    const requestedRevision = revision.current;
     void fetchPublicBranding(controller.signal)
       .then((response: PublicBranding) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || revision.current !== requestedRevision) return;
         applyBrandingTokens(response);
         setBranding({ appName: response.appName, logoUrl: response.logoUrl });
       })
@@ -53,8 +72,8 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ appName: branding.appName, logoUrl: branding.logoUrl }),
-    [branding.appName, branding.logoUrl],
+    () => ({ appName: branding.appName, logoUrl: branding.logoUrl, updateBranding }),
+    [branding.appName, branding.logoUrl, updateBranding],
   );
 
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;

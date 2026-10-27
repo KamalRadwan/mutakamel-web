@@ -2,7 +2,7 @@
 
 Status: **verified**
 
-Last source verification: **2026-09-18**
+Last source verification: **2026-10-18**
 
 Owning app: **crm-app**
 
@@ -94,6 +94,15 @@ races.
 Deleting from the catalogue removes the definition everywhere; deleting a
 pipeline stage removes that stage from that one pipeline. They are not
 interchangeable, and the second is what a pipeline editor calls.
+
+Pipeline editor safeguards (verified **2026-10-17**, FE-CRM-PIPE-001):
+NEW stays first; earlier/later controls cannot move NEW or swap another stage
+ahead of it. NEW, WON and LOST have no detach control. Other stage detaches
+require confirmation naming the stage; an in-use stage can still be rejected
+by the server. Make default is disabled unless the pipeline is active and its
+access mode is ALL. The default pipeline's access selector is locked with an
+explanation, and a pending RESTRICTED edit cannot be saved if that pipeline
+becomes the default.
 
 **`POST /pipelines/:id/reset` is destructive** — it returns the pipeline to its
 default stage configuration. Anything that depends on the removed stages is
@@ -302,6 +311,40 @@ The ordinary opportunity update route persists the two card controls:
 - Optimistic clients update only the changed presentation/rank keys and keep
   the remaining rich Board/Card/Table row intact.
 
+### Detail workspace writes
+
+Verified against the Gateway routes, opportunity controller and DTOs on
+**2026-10-17** (FE-OPP-001).
+
+- The detail colour picker uses `PATCH /opportunities/:id` with `{ cardColor }`.
+- Tag attachment uses `POST /opportunities/:id/tags` with `{ tagIds: [tagId] }`;
+  removal uses `DELETE /opportunities/:id/tags/:tagId`. Both use the shared
+  write-outcome handler and report refusals in the workspace.
+- Inline commercial editing captures the original form when Edit opens and
+  uses `buildUpdateOpportunityRequest` to send changed fields only. A title-only
+  edit sends `{ title }`, including when amount or currency is absent. Currency
+  has no client default, and amount conversion uses the shared exact-money guard.
+- Amount clearing (source reviewed **2026-10-17**, CLXAPP-119): emptying the
+  amount sends `amount: null` and preserves an unchanged currency. A currency
+  cannot be cleared while an amount remains, including zero. Clearing both sends
+  `{ amount: null, currencyCode: null }`; clearing currency when the amount was
+  already empty also sends the explicit null amount required by the DTO. The
+  portal translates `OPPORTUNITY_AMOUNT_CURRENCY_REQUIRED` and
+  `OPPORTUNITY_AMOUNT_SCALE_INVALID` in Arabic and English.
+- Validation and 4xx refusals keep the draft open with a localized error.
+  Unknown outcomes keep the draft and expose a retry of the original payload
+  and idempotency key. A confirmed write with an unreadable response reconciles
+  by reload. Successful writes also reload the rich detail projection rather
+  than replacing it with a command's persisted entity.
+
+Detail failure feedback verified by source review on **2026-10-17** (FE-OPP-007):
+importance and delete use the same localized write-outcome handling. Clicking the
+selected importance star clears it to `0`; rejected changes leave the displayed
+value intact. Delete feedback closes the confirmation to expose the localized
+refusal or unknown-outcome panel; retries reuse the original idempotency key.
+Stage-move errors identify the failed move and use translated CRM error text,
+including for terminal moves, rather than raw exceptions or history-load copy.
+
 ## POST /opportunities/:id/stage — move stage
 
 The board's drag target. Success **`201`**.
@@ -309,6 +352,15 @@ The board's drag target. Success **`201`**.
 The backend derives `status` from the destination stage's semantic flag.
 **Do not send `status`.** Stages flagged `WON` or `LOST` are terminal and
 require confirmation before the request.
+
+List stage moves (source reviewed **2026-10-17**, FE-OPP-005): refused
+Card/Table moves display localized feedback. Bulk moves inspect every write
+outcome and remove only confirmed successes from the selection; refused,
+uncertain and skipped rows stay selected. Uncertain writes refresh the list
+and warn the user to review it before another attempt. Bulk Won uses the
+terminal confirmation dialog with the eligible count and optional closing
+notes before sending any writes; scope is rechecked at confirmation. The card
+toolbar Move Stage control is disabled unless a selected row is updatable.
 
 ## PUT /opportunities/:id/pipeline — transfer
 
@@ -335,9 +387,38 @@ before crm-app sees the request.
 
 See [README.md](README.md#capabilities-endpoints).
 
+## Stage history
+
+Stage history reviewed **2026-10-18** (CRM-OPP-010):
+`GET /opportunities/:id/stage-history` returns `{ items, nextCursor }`, with
+optional `limit` (1–100, default 100) and opaque `cursor` query parameters.
+Rows are ordered by `changedAt DESC, id DESC`; preserve both row order and
+cursor bytes. Quick edit loads the first page and offers older changes, with
+loading and retry feedback. Restricted historical pipeline sides have null
+stage IDs and snapshots. Creation and lead conversion now include an initial
+transition; older records are not backfilled. Invalid cursors return
+400 `OPPORTUNITY_HISTORY_CURSOR_INVALID`; malformed stored evidence returns
+422 `OPPORTUNITY_HISTORY_INTEGRITY_INVALID`.
+
 ## Amounts are decimal strings
 
 Opportunity amount arrives as an **exact decimal string**.
+
+Verified **2026-10-17** (CXCRM-SALES-102): the current column is
+`numeric(20,3)`. Board cards, stage pages and server aggregates accept and
+preserve three-decimal strings, including `1.234` and padded `1.230`. Display
+formatting groups the integer digits without converting the amount to a number
+or discarding its third decimal.
+
+Create, edit, quick create/edit and lead conversion validate against the selected
+currency before building the numeric write DTO: KWD, BHD, OMR, JOD, TND, LYD and
+IQD allow three significant fractional digits; JPY, KRW, VND, CLP and ISK allow
+zero; other currencies allow two. Stored padding does not consume precision
+(`EGP 1.230` is valid). `KWD 1.234` is submitted as `1.234`; `EGP 1.234` produces
+an amount error. Changing only the currency also validates the retained amount.
+The existing 13-integer-digit client limit and canonical JSON-number round-trip
+check remain in place: amounts that would round are refused rather than changed.
+The backend remains authoritative for currency requirements and validation.
 
 ```ts
 // ❌ loses precision
@@ -350,7 +431,89 @@ const display = formatCurrency(opportunity.amount, currency, locale);
 Never sum a column in the browser. Pipeline totals come from the server or
 they do not exist.
 
+## Workspace access and stage funnel
+
+Source reviewed **2026-10-17** (FE-OPP-010): route admission requires both
+`crm.opportunities.read` (scoped) and `crm.pipelines.read`, matching navigation.
+A server 403 from pipeline, board-summary or list reads renders `CrmScopeGate`;
+other pipeline read failures stay retryable in every view. An empty pipeline
+response means none are accessible to the caller, not that none are configured.
+
+Card/Table funnels request the existing board projection with the current
+branch, pipeline and basic search filters, omitting the selected stage. Counts
+come from each lane's server `summary.totalCount`, including rows beyond its
+50-item page. All is the sum of the same stage totals; it stays the all-stage
+count when a stage is selected, while the list paginator counts selected rows.
+Changing branch, pipeline, search or refreshing after a write reloads summaries.
+Pending, failed or obsolete summaries show an em dash, never page-derived counts.
+Advanced search continues to hide the basic stage funnel. This uses the existing
+board read contract and fetches its first lane pages alongside the summaries.
+
 ## Frontend notes
+
+- Create recovery (source reviewed **2026-10-17**, CXCRM-SALES-106): an unknown
+  create outcome retains the original request body and idempotency key. Create
+  and Create-and-new are blocked until the attempt resolves. Closing the modal
+  or dismissing its uncertainty panel only hides it; reopening restores the
+  pending draft and retry action rather than accepting a new draft. Retry sends
+  the original body and key, even if form fields changed. Repeated retry clicks
+  cannot send concurrently, and a resolved attempt cannot be replayed again by
+  an old callback. A refused replay retains uncertainty because it cannot prove
+  the original request did not commit. A confirmed success or applied-but-unreadable
+  response clears the pending attempt and reconciles through the existing flow.
+  This state lasts for the mounted opportunity workspace; it is not persisted
+  across a browser reload or navigation away.
+
+- Create scope (source reviewed **2026-10-17**, FE-OPP-009): the full create
+  form offers only salespeople permitted by `opportunities.create.ownerUserIds`,
+  including the signed-in user as the default only when allowed. Both full create
+  and Board quick-add filter customer search results by the same create capability
+  and the customer profile owner, independently of customer read scope. Restricted
+  scopes exclude unowned customers; all scope retains them. Missing create
+  capability offers no owner/customer choices. The server remains authoritative.
+
+- Card toolbar and bulk actions (source reviewed **2026-10-17**, FE-OPP-011):
+  CSV export requires `crm.opportunities.export` in the signed-in user's
+  permissions and at least one selected row on the current page. The label
+  explicitly limits the export to this page; off-page IDs and unselected rows
+  are excluded. Every data cell is CSV-quoted with embedded quotes doubled;
+  formula prefixes (`=`, `+`, `-`, `@`), including after whitespace, and leading
+  tab/line-break cells (also after whitespace) are prefixed with an apostrophe.
+  Source reviewed **2026-10-17** (CRM-PERM-001): cell escaping is shared with
+  customer and lead exports. The permission is in the normal CRM catalogue and
+  seed (bound 103); deploy the approved common package and seed grants before
+  enabling the portal gate. A UTF-8 BOM preserves
+  Arabic in spreadsheet readers, and exact amount strings are retained.
+  Misleading bulk assign, tags and follow-up shortcuts were removed; the
+  remaining bulk importance control names only importance. Per-record quick
+  edit and activities remain available, and its tag picker is labelled
+  "Select existing tags". Card range labels use the server page and limit,
+  starting at zero when the page is empty. The toolbar identifies the page as
+  Card view; the importance selector names importance only.
+
+- Currency selection (verified 2026-10-17): create and Board quick-add leave
+  `currencyCode` out unless a user supplies a code, including after Create another
+  and when moving a quick-add draft into the full form. CRM resolves the workspace
+  default. Create, Board, quick edit and detail use active tenant currencies from
+  Core settings (`currencies.currency.read`), with no built-in currency catalogue.
+  Missing read access or a failed catalogue read leaves the optional default path
+  available; the existing free-text editors remain usable. Editing preserves the
+  stored currency unless explicitly changed, even when it is no longer active.
+
+- Quick-edit write outcomes (verified 2026-10-17): rejected tag attach/detach
+  restores the previous tags and displays `useCrmErrorText` feedback. Only
+  successful or applied writes trigger the saved callback. Tag creation also
+  requires `crm.tags.manage`; attaching existing tags uses the opportunity's
+  update capability. Stars and colour await the workspace's boolean result and
+  restore their previous values on refusal. Owner editing offers only actual
+  users, with no unsupported "Unassigned" option.
+
+- Quick-edit detail safety (2026-10-17): Card/Table quick edit waits for the
+  validated detail GET before offering Edit. Failed reads show an error with
+  retry and close controls; list rows never become edit baselines. Saving sends
+  only fields changed from the loaded detail, preserving an untouched description
+  and other values even when another user edits them concurrently.
+
 
 - **The board axis is the selected pipeline's stages**, ordered by
   `sortOrder`. The board is meaningless without a pipeline, so the pipeline
@@ -377,5 +540,58 @@ they do not exist.
 | Create | live — `POST /opportunities` against an existing customer, plus the lead-conversion route |
 | Update | live — `PATCH /:id`, changed keys only; no pipeline or stage, which the DTO does not carry |
 | Pipeline transfer | live — `PUT /:id/pipeline`, confirmed, terminal target stages filtered out |
-| Stage history | live — `GET /:id/stage-history` on `Timeline`, in the server order |
+| Stage history | live — cursor-paged `GET /:id/stage-history`, in server order, with older-change and retry controls |
 | Detail route | live — `/crm/opportunities/[id]`; the Gateway admits the CRM detail path |
+
+The create form attaches selected tags through the separate scoped
+`POST /opportunities/:id/tags` route after the opportunity is created. Tag
+selection is shown only when the caller's update capability includes the new
+opportunity owner. If attachment fails or its result is uncertain, the form
+keeps the created opportunity ID and offers a tag-only retry; it never repeats
+the create request.
+
+## Consistent list actions (FE-OPP-013)
+
+Source reviewed **2026-10-17**. Board drag and menus, Card stage selection and
+menus, Table stage selection, and quick edit all permit moving a WON/LOST
+opportunity back into an open stage. They share an explicit reopen confirmation;
+cancel sends no write, and confirmation rechecks current update capability.
+Bulk moves into an open stage also require confirmation when closed rows are
+included. Terminal destinations retain their Won/Lost confirmation.
+
+Opportunity action gates combine owner-scoped CRM capabilities with
+`useAccessMode().canMutate`. Read-only mode removes creation, stage, importance,
+colour, tag, delete and activity-create controls. Activity shortcuts additionally
+require Core's `activities.create` grant; the shared activities panel keeps its
+own action checks. Capabilities reload on window focus and after scoped 403
+responses, clearing stale authority while refreshing and remaining unavailable
+on failure. Denied deletes also refresh capability authority. The backend remains
+authoritative; unresolved access mode follows the existing portal access-mode
+policy documented in `useAccessMode` (Q16).
+
+Quick edit loads all owner pages from
+`GET /api/tenant/crm/v1/assignable-owners` with `resource=opportunities`,
+`action=update`, the current `branchId`, and the required organization headers.
+The picker validates each cursor page and needs no Core `users.user.read` grant.
+Board, Card, Table and quick edit reuse the same phone actions, passing customer
+country into WhatsApp/Telegram normalization, so local numbers produce identical
+links in every view. Pipeline configuration hides delete for the default pipeline
+and omits management actions in read-only mode.
+
+## Opportunity translations (FE-OPP-014)
+
+Opportunity-stage catalogue loading reviewed **2026-10-18**
+(FE-CRM-CONFIG-DEAD-001): the pipeline creation picker, pipeline detail and
+stage management share `useOpportunityStageCatalogue`. It owns the bounded
+request, response validation, cancellation, reload and normalized errors.
+Catalogue errors degrade the picker and attach control independently of the
+pipeline; stage management retains its loaded rows and local mutation updates.
+`CrmScopeGate` retains scope-specific denial copy; `PermissionGate` also
+supports authoritative denials through its `denied` prop.
+
+Source reviewed **2026-10-17**. Opportunity list, board, create, quick edit,
+bulk actions and detail text, including tooltips and accessible names, resolve
+through the Arabic and English dictionaries. Age and selection templates use
+locale-formatted counts with Western digits. The detail status and board activity
+filter use translated enum labels. Stage-page and stage-move failures use localized
+fallbacks; API refusals use the shared CRM error translator.

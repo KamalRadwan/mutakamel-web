@@ -439,7 +439,7 @@ export function ItemsWorkspace() {
           kind={item.itemKind}
           image={item.image}
           alt=""
-          className={`size-12 rounded-xl shadow-2xs ${startPicSurfaceClass(item)}`}
+          className={`size-12 rounded-lg shadow-2xs ${startPicSurfaceClass(item)}`}
           iconClassName="size-6"
         />
 

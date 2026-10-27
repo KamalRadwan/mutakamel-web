@@ -14,6 +14,7 @@ vi.mock("./hooks/useLogin", async () => {
   return {
     useLogin: () => ({
       t: en,
+      mfa: { step: null },
       email: "admin@example.com",
       setEmail: vi.fn(),
       password: "",
@@ -21,6 +22,7 @@ vi.mock("./hooks/useLogin", async () => {
       rememberMe: false,
       showPassword: false,
       isSubmitting: false,
+      isCoolingDown: false,
       error: null,
       fieldErrors: {},
       forgotFieldError: null,

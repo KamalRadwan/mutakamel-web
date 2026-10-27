@@ -11,6 +11,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Button,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
@@ -64,24 +65,26 @@ export function LeadIndividualContactCard({
             aria-label={t.crmLeadDetail.editContact}
             className="dossier-contact-card editing min-w-0"
           >
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-cyan-500/25 pb-2.5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <span
-                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-cyan-500/35 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300"
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-foreground"
                   aria-hidden="true"
                 >
                   <Pencil className="size-3.5" />
                 </span>
-                <span className="text-xs font-extrabold text-foreground">
+                <span className="text-xs font-semibold text-foreground">
                   {t.crmLeadDetail.editContact}
                 </span>
-                <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold text-cyan-700 dark:text-cyan-300">
+                <span className="rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
                   {lead.displayName}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   className="dossier-btn dossier-btn-cancel"
                   aria-label={t.common.cancel}
                   disabled={edit.saving}
@@ -89,9 +92,11 @@ export function LeadIndividualContactCard({
                 >
                   <X className="size-3.5" aria-hidden="true" />
                   <span>{t.common.cancel}</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   className="dossier-btn dossier-btn-save"
                   aria-label={t.common.save}
                   disabled={edit.saving}
@@ -99,7 +104,7 @@ export function LeadIndividualContactCard({
                 >
                   <Check className="size-3.5" aria-hidden="true" />
                   <span>{t.common.save}</span>
-                </button>
+                </Button>
               </div>
             </div>
 

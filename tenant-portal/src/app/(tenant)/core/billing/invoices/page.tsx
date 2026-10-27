@@ -93,7 +93,7 @@ function InvoicesWorkspace() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={t.coreBilling.invoicesTitle}
         description={t.coreBilling.invoicesSubtitle}
         breadcrumbs={[

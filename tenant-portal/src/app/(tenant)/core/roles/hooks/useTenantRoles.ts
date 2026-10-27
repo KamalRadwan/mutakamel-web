@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useTenantAuth } from "@/context/AuthContext";
-import { useRealtimeResync } from "@/design-system";
+import { useCan, useRealtimeResync } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
@@ -16,11 +15,9 @@ import {
 
 export function useTenantRoles() {
   const { t, lang } = useI18n();
-  const { user } = useTenantAuth();
-  // Memoised, not inlined: `?? []` mints a fresh array on every render whenever
-  // the user has no permissions yet, and the view memo below depends on it --
-  // so the memo recomputed on every render and bought nothing.
-  const permissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
+  const canCreate = useCan("roles.role.create", { tenantWide: true });
+  const canUpdate = useCan("roles.role.update", { tenantWide: true });
+  const canDelete = useCan("roles.role.delete", { tenantWide: true });
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,6 +95,7 @@ export function useTenantRoles() {
 
   const handleCreate = useCallback(
     async (body: { name: string; description?: string }): Promise<boolean> => {
+      if (!canCreate) return false;
       setIsSubmitting(true);
       setMutationError(null);
       try {
@@ -112,12 +110,12 @@ export function useTenantRoles() {
         setIsSubmitting(false);
       }
     },
-    [reload],
+    [canCreate, reload],
   );
 
   const handleDelete = useCallback(async () => {
     const target = pendingDelete;
-    if (!target) return;
+    if (!target || !canDelete) return;
     setIsSubmitting(true);
     setMutationError(null);
     try {
@@ -130,15 +128,15 @@ export function useTenantRoles() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [pendingDelete, reload]);
+  }, [canDelete, pendingDelete, reload]);
 
   return useMemo(
     () => ({
       t,
       lang,
-      canCreate: permissions.includes("roles.role.create"),
-      canUpdate: permissions.includes("roles.role.update"),
-      canDelete: permissions.includes("roles.role.delete"),
+      canCreate,
+      canUpdate,
+      canDelete,
       rows,
       pageInfo,
       page,
@@ -157,6 +155,7 @@ export function useTenantRoles() {
       setSort,
       isCreateOpen,
       openCreate: () => {
+        if (!canCreate) return;
         setMutationError(null);
         setIsCreateOpen(true);
       },
@@ -164,14 +163,14 @@ export function useTenantRoles() {
       isSubmitting,
       mutationError,
       pendingDelete,
-      requestDelete: setPendingDelete,
+      requestDelete: (role: TenantRole) => canDelete && setPendingDelete(role),
       cancelDelete: () => setPendingDelete(null),
       handleCreate,
       handleDelete,
     }),
     [
       handleCreate, handleDelete, isCreateOpen, isLoading, isSubmitting, isSystemFilter,
-      lang, mutationError, page, pageInfo, pendingDelete, permissions, queryError,
+      lang, mutationError, page, pageInfo, pendingDelete, canCreate, canUpdate, canDelete, queryError,
       reload, rows, searchQuery, setSort, sort, t,
     ],
   );

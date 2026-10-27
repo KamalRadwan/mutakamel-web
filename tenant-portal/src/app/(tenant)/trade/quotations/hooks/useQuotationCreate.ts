@@ -54,25 +54,25 @@ export function useQuotationCreate(
   const customers = useQuotationCustomers(headers, isOpen && canCreate);
 
   const submit = useCallback(async (): Promise<void> => {
-    if (!selected) return;
+    if (!selected || write.isBlocked) return;
     setFormError(null);
     try {
       const request = buildCreateQuotation(selected, currencyCode, draftReference);
-      const created = await write.runWrite({
+      await write.runWrite({
         operation: t.tradeDocuments.quotations.createTitle,
         send: (idempotency) =>
           tradePost(QUOTATIONS_PATH, request, {
             headers: { ...headers, ...idempotency },
             maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
           }),
+        onSuccess: async () => {
+          setIsOpen(false);
+          setSelected(null);
+          setCurrencyCode("");
+          setDraftReference("");
+          await onCreated();
+        },
       });
-      if (created) {
-        setIsOpen(false);
-        setSelected(null);
-        setCurrencyCode("");
-        setDraftReference("");
-        await onCreated();
-      }
     } catch (error) {
       const reason = error instanceof Error ? error.message : "";
       setFormError(
@@ -86,11 +86,12 @@ export function useQuotationCreate(
   return {
     isOpen,
     open: () => {
+      if (write.isBlocked) return;
       setFormError(null);
       setIsOpen(true);
     },
     close: () => {
-      if (write.isWriting) return;
+      if (write.isBlocked) return;
       setIsOpen(false);
     },
     customers,
@@ -103,7 +104,7 @@ export function useQuotationCreate(
     setDraftReference,
     formError,
     write,
-    canSubmit: selected !== null && selected.quotationSelectable && currencyCode.trim().length === 3,
+    canSubmit: !write.isBlocked && selected !== null && selected.quotationSelectable && currencyCode.trim().length === 3,
     submit,
   };
 }

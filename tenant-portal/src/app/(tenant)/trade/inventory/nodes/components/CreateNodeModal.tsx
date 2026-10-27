@@ -71,7 +71,7 @@ export function CreateNodeModal({
         </Badge>
       }
       footerLeading={
-        <span className="font-mono text-2xs text-muted-foreground">
+        <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
           COMPANY • {INVENTORY_NODES_MANAGE_PERMISSION}
         </span>
       }

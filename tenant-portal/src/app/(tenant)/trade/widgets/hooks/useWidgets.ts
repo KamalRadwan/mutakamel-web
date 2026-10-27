@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isTradeReplay, tradeDelete, tradeGet, tradeIfMatch, tradePost } from "../../trade-api";
 import { useTradeScope } from "../../trade-advanced-scope";
@@ -45,7 +45,7 @@ export function useWidgets() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [items, setItems] = useState<WidgetRecord[]>([]);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FormInput, RefreshCw, ShieldCheck } from "lucide-react";
+import { FormInput, Pencil, RefreshCw, ShieldCheck } from "lucide-react";
 import {
   Badge,
   Button,
@@ -20,6 +20,7 @@ import {
 import { formatTemplate } from "@/lib/format/template";
 import { CreateCrmCustomFieldsModal } from "./components/CreateCrmCustomFieldsModal";
 import { CustomFieldRequirementsDrawer } from "./components/CustomFieldRequirementsDrawer";
+import { CustomFieldEditDrawer } from "./components/CustomFieldEditDrawer";
 import { CustomFieldValuesPanel } from "./components/CustomFieldValuesPanel";
 import type { CustomFieldItem } from "./custom-field-contract";
 import { useCrmCustomFields } from "./hooks/useCrmCustomFields";
@@ -30,6 +31,7 @@ const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup"
 export default function CrmCustomFieldsPage() {
   const {
     t,
+    editor,
     items,
     searchQuery,
     setSearchQuery,
@@ -126,6 +128,16 @@ export default function CrmCustomFieldsPage() {
       align: "end",
       sticky: "end",
       cell: (item) => (
+        <div className="flex items-center justify-end gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="sm" disabled={editor.isSaving} onClick={() => editor.select(item)}
+                aria-label={`${t.crmCustomFields.editTitle}: ${item.fieldKey}`}>
+                <Pencil className="size-4" aria-hidden="true" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t.crmCustomFields.editTitle}</TooltipContent>
+          </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -142,6 +154,7 @@ export default function CrmCustomFieldsPage() {
           </TooltipTrigger>
           <TooltipContent>{t.crmCustomFields.requirementsTitle}</TooltipContent>
         </Tooltip>
+        </div>
       ),
     });
   }
@@ -151,11 +164,12 @@ export default function CrmCustomFieldsPage() {
   // load error — AGENTS.md, docs/design/states.md. Permission string and
   // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
   return (
-    <PermissionGate require="crm.custom_fields.read">
+    <PermissionGate require="crm.custom_fields.read" denied={error?.status === 403}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={t.crm.cRMFormCustomFieldsCustom}
-          description={t.crmCustomFields.subtitle}
+          description={t.crmCustomFields.managementSubtitle}
           primaryAction={canCreate ? { label: t.crm.addACustomField, onClick: openCreate } : undefined}
           secondaryActions={
             <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isLoading}>
@@ -166,6 +180,8 @@ export default function CrmCustomFieldsPage() {
         />
 
         <SubNav items={CRM_SETUP_ITEMS} />
+
+        {editor.error && !editor.selected ? <p role="alert" className="text-xs text-destructive">{editor.error}</p> : null}
 
         {createError && !isCreateOpen ? (
           <div role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
@@ -224,6 +240,8 @@ export default function CrmCustomFieldsPage() {
           onClose={closeCreate}
           onSubmit={handleCreate}
         />
+
+        <CustomFieldEditDrawer key={`edit-${editor.selected?.id ?? "closed"}`} editor={editor} />
 
         <CustomFieldRequirementsDrawer
           key={`requirements-${requirementsField?.id ?? "closed"}`}

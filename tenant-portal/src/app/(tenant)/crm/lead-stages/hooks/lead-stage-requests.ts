@@ -1,6 +1,6 @@
 import { TenantApiClientError } from "@/lib/api/axiosClient";
+import { LEAD_STAGES_PATH } from "../lead-stage-contract";
 
-export const LEAD_STAGES_PATH = "/api/tenant/crm/v1/lead-stages";
 export const LEAD_STAGES_REORDER_PATH = `${LEAD_STAGES_PATH}/reorder`;
 
 export const NON_REPLAYABLE_MUTATION = {
@@ -18,10 +18,6 @@ export const REPLAYABLE_MUTATION = {
   cache: "no-store",
   maxResponseBytes: 256 * 1024,
 } as const;
-
-export function leadStageErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
 
 export function isAmbiguousLeadStageMutation(error: unknown): boolean {
   return (

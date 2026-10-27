@@ -14,14 +14,11 @@ import {
   listAdminNotifications,
   performAdminNotificationBulkAction,
   performAdminNotificationItemAction,
-  registerAdminNotificationDeviceToken,
-  revokeAdminNotificationDeviceToken,
   upsertAdminNotificationPreference,
 } from "./api";
 import { NotificationContractError } from "./contracts";
 import type {
   AdminNotificationPage,
-  DeviceTokenReceipt,
   NotificationActionState,
   NotificationActionStatus,
   NotificationBulkAction,
@@ -30,7 +27,6 @@ import type {
   NotificationPreferenceCommand,
   NotificationRequestState,
   NotificationRuntimeConfig,
-  RegisterDeviceTokenCommand,
 } from "./types";
 
 const EMPTY_ACTION: NotificationActionStatus = {
@@ -59,8 +55,6 @@ export function useAdminNotifications() {
     useState<NotificationActionStatus>(EMPTY_ACTION);
   const [actionOwnerId, setActionOwnerId] = useState<string | null>(null);
   const [lastUpdatedCount, setLastUpdatedCount] = useState<number | null>(null);
-  const [deviceReceipt, setDeviceReceipt] = useState<DeviceTokenReceipt | null>(null);
-  const [deviceReceiptOwnerId, setDeviceReceiptOwnerId] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
   const requestSequence = useRef(0);
   const identityRef = useRef<string | null>(user?.id ?? null);
@@ -248,25 +242,6 @@ export function useAdminNotifications() {
       "preferenceSaved",
     ), [runAction]);
 
-  const registerDevice = useCallback((command: RegisterDeviceTokenCommand) =>
-    runAction(
-      "device-register",
-      () => registerAdminNotificationDeviceToken(command),
-      (receipt) => {
-        setDeviceReceipt(receipt);
-        setDeviceReceiptOwnerId(user?.id ?? null);
-      },
-      "deviceRegistered",
-    ), [runAction, user?.id]);
-
-  const revokeDevice = useCallback((id: string) =>
-    runAction(
-      `device-revoke:${id}`,
-      () => revokeAdminNotificationDeviceToken(id),
-      () => setDeviceReceipt((current) => current?.id === id ? null : current),
-      "deviceRevoked",
-    ), [runAction]);
-
   const retryLastAction = useCallback(() => {
     if (actionOwnerId !== user?.id || !canManage) return;
     return retryActionRef.current?.();
@@ -312,18 +287,12 @@ export function useAdminNotifications() {
     performItemAction,
     performBulkAction,
     savePreference,
-    registerDevice,
-    revokeDevice,
-    deviceReceipt: deviceReceiptOwnerId === currentOwnerId ? deviceReceipt : null,
   }), [
     actionStatus,
     canManage,
     canRead,
     clearActionStatus,
     config,
-    currentOwnerId,
-    deviceReceiptOwnerId,
-    deviceReceipt,
     effectiveRequestState,
     exposesAction,
     exposesData,
@@ -337,9 +306,7 @@ export function useAdminNotifications() {
     performItemAction,
     preferences,
     refresh,
-    registerDevice,
     retryLastAction,
-    revokeDevice,
     savePreference,
     unreadCount,
     unreadOnly,

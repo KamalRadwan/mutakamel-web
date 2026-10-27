@@ -18,7 +18,11 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { tradeStatusLabel } from "../../trade-advanced-validation";
-import { WEBHOOK_MANAGE_PERMISSION } from "../webhook-contract";
+import {
+  WEBHOOK_MANAGE_PERMISSION,
+  WEBHOOK_ROTATION_MAX_OVERLAP_HOURS,
+  WEBHOOK_ROTATION_MIN_OVERLAP_HOURS,
+} from "../webhook-contract";
 import { useWebhookSubscription } from "./hooks/useWebhookSubscription";
 
 export default function WebhookSubscriptionPage({
@@ -28,7 +32,7 @@ export default function WebhookSubscriptionPage({
 }) {
   const { id } = use(params);
   const { t } = useI18n();
-  const [overlapHours, setOverlapHours] = useState("24");
+  const [overlapHours, setOverlapHours] = useState(String(WEBHOOK_ROTATION_MIN_OVERLAP_HOURS));
   const {
     canManage,
     subscription,
@@ -173,8 +177,9 @@ export default function WebhookSubscriptionPage({
               >
                 <Input size="sm" placeholder={t.tradeAutomation.overlapHours}
                   type="number"
-                  min={0}
-                  max={168}
+                  min={WEBHOOK_ROTATION_MIN_OVERLAP_HOURS}
+                  max={WEBHOOK_ROTATION_MAX_OVERLAP_HOURS}
+                  step={1}
                   value={overlapHours}
                   disabled={!canManage || pending !== null}
                   onChange={(event) => setOverlapHours(event.target.value)}

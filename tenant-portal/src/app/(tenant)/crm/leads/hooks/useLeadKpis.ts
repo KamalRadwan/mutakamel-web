@@ -10,7 +10,7 @@ import {
   parseLeadKpisResponse,
   type LeadKpis,
 } from "../lead-bulk-contract";
-import { buildLeadBoardRequest } from "../lead-board-contract";
+import { buildLeadKpisRequest } from "../lead-board-contract";
 import type { LeadSearchState } from "../lead-search-contract";
 
 /** The request body as a string, or "" when there is nothing that may be asked. */
@@ -18,7 +18,7 @@ function kpiBodyKey(search: LeadSearchState, branchId: string, actorId: string |
   if (search.mode === "basic" && search.basic.myLeads && !isUUIDv7(actorId)) return "";
   try {
     return JSON.stringify(
-      buildLeadBoardRequest(search, { branchId, page: 1, limit: 50, sortBy: "createdAt", sortDir: "DESC" }, actorId),
+      buildLeadKpisRequest(search, { branchId, page: 1, limit: 50, sortBy: "createdAt", sortDir: "DESC" }, actorId),
     );
   } catch {
     // The list refuses the same search and reports it; the strip stays empty.
@@ -29,8 +29,8 @@ function kpiBodyKey(search: LeadSearchState, branchId: string, actorId: string |
 /**
  * The KPI strip's figures over EVERY lead the current search selects, from
  * `POST /api/tenant/crm/v1/leads/kpis` — not a count of the 50 rows a page or
- * a board lane happened to load. The body is the board's search body (the
- * backend ignores its paging), so the strip and the list always describe the
+ * a board lane happened to load. The body contains the board's predicates
+ * without paging or sorting, so the strip and the list always describe the
  * same selection. `null` until the first answer and after a failed read: the
  * strip then shows no figures rather than counting the loaded rows.
  */

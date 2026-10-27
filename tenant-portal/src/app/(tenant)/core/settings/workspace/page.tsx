@@ -52,7 +52,7 @@ export default function WorkspaceSettingsPage() {
   return (
     <PermissionGate require="workspace.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.coreSettings.workspaceTitle}
           description={t.coreSettings.workspaceSubtitle}
           primaryAction={

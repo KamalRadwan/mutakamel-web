@@ -7,7 +7,10 @@ import {
   axiosClient,
   commitTenantSessionResponse,
   readWebAuthSessionResponse,
+  withTenantAuthLock,
 } from "@/lib/api/axiosClient";
+import { readMfaStep, mfaRequestOptions } from "@/lib/auth/mfaApi";
+import { useMfaChallenge } from "@/lib/auth/useMfaChallenge";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 
 export type ActionTokenFlow = "accept-invite" | "reset-password";
@@ -79,6 +82,16 @@ export function useActionTokenPassword(flow: ActionTokenFlow) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  const mfa = useMfaChallenge(async (challengeId, code) => {
+    await withTenantAuthLock(async (signal) => {
+      const response = await axiosClient.post("/api/tenant/core/v1/auth/mfa/verify",
+        { challengeId, code }, { ...mfaRequestOptions, signal });
+      const auth = readWebAuthSessionResponse(response.data);
+      if (!auth) throw new Error("INVALID_AUTH_RESPONSE");
+      commitTenantSessionResponse(auth, { remember: false, notifyCurrentTab: true });
+    });
+    router.replace("/");
+  });
 
   useEffect(() => {
     // Deferred past the effect body: a synchronous setState there cascades an
@@ -111,6 +124,10 @@ export function useActionTokenPassword(flow: ActionTokenFlow) {
       setState("succeeded");
       setNewPassword("");
       setConfirmPassword("");
+      if (flow === "accept-invite") {
+        const step = readMfaStep(response.data);
+        if (step) { mfa.start(step); setToken(null); return; }
+      }
       // Accepting an invite issues a session; a reset deliberately does not, so
       // one lands in the workspace and the other on the sign-in form.
       if (flow === "accept-invite") {
@@ -130,10 +147,17 @@ export function useActionTokenPassword(flow: ActionTokenFlow) {
       router.replace(flow === "accept-invite" ? "/" : "/login");
     } catch (caught) {
       const normalized = normalizeApiError(caught);
-      setError(normalized);
-      setState(normalized.status === 400 ? "rejected" : "ready");
+      const invalidToken = normalized.code === "INVALID_ACTION_TOKEN";
+      const weakPassword = !invalidToken && (
+        normalized.code === "WEAK_PASSWORD" ||
+        normalized.status === 400 || normalized.status === 422
+      );
+      setError(weakPassword
+        ? { ...normalized, message: t.coreIdentity.actionToken.passwordPolicy }
+        : normalized);
+      setState(invalidToken ? "rejected" : "ready");
     }
-  }, [confirmPassword, flow, newPassword, router, token]);
+  }, [confirmPassword, flow, mfa, newPassword, router, t, token]);
 
   return {
     t,
@@ -148,5 +172,7 @@ export function useActionTokenPassword(flow: ActionTokenFlow) {
     isPasswordValid: meetsPasswordPolicy(newPassword),
     isConfirmed: newPassword.length > 0 && newPassword === confirmPassword,
     submit,
+    mfa,
+    restartMfa: () => router.replace("/login"),
   };
 }

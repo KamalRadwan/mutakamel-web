@@ -64,25 +64,23 @@ describe("Trade imports contract", () => {
     expect(() => buildPreviewRequest(mappingId, "x")).toThrow("IMPORT_FORM_SOURCE");
   });
 
-  it("discriminates FILE_UNSAFE on status, because the code cannot", () => {
-    // One code, five statuses, six throw sites: only the status separates them.
-    const code = "TRADE.IMPORT.FILE_UNSAFE";
-    const messages = [400, 409, 413, 415, 422].map(
-      (status) => importMessage({ status, code }, ar) ?? "",
+  it("distinguishes import file outcomes by stable code", () => {
+    const codes = ["FILE_UNSAFE", "FILE_SCAN_PENDING", "FILE_TOO_LARGE", "FILE_TYPE_UNSUPPORTED", "FILE_REJECTED"];
+    const messages = codes.map(
+      (code) => importMessage({ status: 400, code: `TRADE.IMPORT.${code}` }, ar) ?? "",
     );
     expect(new Set(messages).size).toBe(5);
-    expect(importMessage({ status: 413, code }, ar)).toBe(ar.tradeAutomation.errorFileTooLarge);
-    expect(importMessage({ status: 415, code }, ar)).toBe(
+    expect(importMessage({ status: 413, code: "TRADE.IMPORT.FILE_TOO_LARGE" }, ar)).toBe(ar.tradeAutomation.errorFileTooLarge);
+    expect(importMessage({ status: 415, code: "TRADE.IMPORT.FILE_TYPE_UNSUPPORTED" }, ar)).toBe(
       ar.tradeAutomation.errorFileWrongType,
     );
   });
 
-  it("separates a missing mapping from an invalid one by status", () => {
-    const code = "TRADE.IMPORT.MAPPING_INVALID";
-    expect(importMessage({ status: 404, code }, ar)).toBe(
+  it("separates a missing mapping from an invalid one by code", () => {
+    expect(importMessage({ status: 404, code: "TRADE.IMPORT.MAPPING_NOT_FOUND" }, ar)).toBe(
       ar.tradeAutomation.errorMappingNotFound,
     );
-    expect(importMessage({ status: 422, code }, ar)).toBe(
+    expect(importMessage({ status: 422, code: "TRADE.IMPORT.MAPPING_INVALID" }, ar)).toBe(
       ar.tradeAutomation.errorMappingInvalid,
     );
   });

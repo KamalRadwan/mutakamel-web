@@ -13,6 +13,7 @@ import {
   shouldResetStorageServerWriteKey,
 } from "../lib/storage-server-contract";
 import type { CreateStorageServerDto } from "../types";
+import { useStorageByteLimit } from "./useStorageByteLimit";
 
 const initialForm: CreateStorageServerDto = {
   code: "",
@@ -45,6 +46,7 @@ export function useCreateStorageServerScreen() {
 
   const [form, setForm] = useState<CreateStorageServerDto>(initialForm);
   const [maxTenants, setMaxTenants] = useState("");
+  const byteLimit = useStorageByteLimit();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [storageRuntimeSetupRequired, setStorageRuntimeSetupRequired] =
@@ -64,10 +66,15 @@ export function useCreateStorageServerScreen() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (isAuthLoading || !canCreate) return;
     setFormError(null);
     setStorageRuntimeSetupRequired(null);
     if (pendingActivationId) {
       await activateCreatedServer(pendingActivationId);
+      return;
+    }
+    if (!byteLimit.validate()) {
+      setFormError(byteLimit.copy.invalidLimit);
       return;
     }
     const endpoint = form.endpoint.trim();
@@ -84,6 +91,7 @@ export function useCreateStorageServerScreen() {
       region: form.region.trim().toLowerCase(),
       bucketName: form.bucketName.trim().toLowerCase(),
       maxTenants: maxTenants ? Number(maxTenants) : null,
+      maxBytes: byteLimit.value === "" ? null : byteLimit.value,
       credentials: {
         accessKeyId: form.credentials.accessKeyId.trim(),
         secretAccessKey: form.credentials.secretAccessKey,
@@ -194,6 +202,7 @@ export function useCreateStorageServerScreen() {
     setForm,
     maxTenants,
     setMaxTenants,
+    byteLimit,
     isSubmitting,
     formError,
     handleSubmit,

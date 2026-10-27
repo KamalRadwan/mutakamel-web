@@ -7,6 +7,7 @@ import {
   type DashboardShareSubjectType,
   type DashboardShareableAccessLevel,
   type DashboardVisualizationType,
+  type WidgetRecord,
 } from "./analytics-contract";
 
 // Request bodies for the dashboard and widget writes. Kept beside the
@@ -191,19 +192,17 @@ export function buildWidgetRequest(
   };
 }
 
-/** A preview is the full widget definition plus its own `requestId`. */
-export function buildWidgetPreviewRequest(
-  name: string,
-  visualizationType: DashboardVisualizationType,
-  series: readonly WidgetSeriesInput[],
-  displayTitle: string,
-) {
-  return {
-    ...buildWidgetRequest(name, visualizationType, series, displayTitle),
-    requestId: generateUUIDv7(),
-  };
-}
-
 export function buildCloneWidgetRequest(name: string) {
   return buildFromTemplateRequest(name);
+}
+
+/** A preview is the validated saved definition plus its own `requestId`. */
+export function buildSavedWidgetPreviewRequest(widget: WidgetRecord) {
+  return {
+    name: widget.name,
+    visualizationType: widget.visualizationType,
+    querySpec: widget.querySpec,
+    displaySpec: widget.displaySpec,
+    requestId: generateUUIDv7(),
+  };
 }

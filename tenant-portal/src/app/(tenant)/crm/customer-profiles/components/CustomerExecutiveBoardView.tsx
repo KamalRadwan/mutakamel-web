@@ -41,6 +41,7 @@ import {
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { localizedName, localizedValue } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
@@ -123,7 +124,7 @@ export interface CustomerExecutiveBoardViewProps {
     draft?: QuickCreateCustomerDraft,
   ) => void;
   onDelete?: (item: CustomerProfileItem) => void;
-  onOpenActivities: (item: CustomerProfileItem) => void;
+  onOpenActivities?: (item: CustomerProfileItem) => void;
   onCardChange: (
     item: CustomerProfileItem,
     patch: CustomerProfileCardPatch,
@@ -135,17 +136,17 @@ export interface CustomerExecutiveBoardViewProps {
 }
 
 const CARD_BORDER_ACCENT: Partial<Record<CardColor, string>> = {
-  RED: "border-red-300 border-s-4 border-s-red-500 dark:border-red-800 dark:border-s-red-500",
-  ORANGE: "border-amber-300 border-s-4 border-s-amber-500 dark:border-amber-800",
-  AMBER: "border-amber-300 border-s-4 border-s-amber-500 dark:border-amber-800",
-  YELLOW: "border-yellow-300 border-s-4 border-s-yellow-500 dark:border-yellow-800",
-  GREEN: "border-emerald-300 border-s-4 border-s-emerald-500 dark:border-emerald-800",
-  TEAL: "border-teal-300 border-s-4 border-s-teal-500 dark:border-teal-800",
-  BLUE: "border-blue-300 border-s-4 border-s-blue-600 dark:border-blue-800",
-  INDIGO: "border-indigo-300 border-s-4 border-s-indigo-500 dark:border-indigo-800",
-  PURPLE: "border-purple-300 border-s-4 border-s-purple-500 dark:border-purple-800",
-  PINK: "border-pink-300 border-s-4 border-s-pink-500 dark:border-pink-800",
-  SLATE: "border-slate-300 border-s-4 border-s-slate-500 dark:border-slate-700",
+  RED: "border-swatch-red-soft border-s-4 border-s-swatch-red",
+  ORANGE: "border-swatch-orange-soft border-s-4 border-s-swatch-orange",
+  AMBER: "border-swatch-amber-soft border-s-4 border-s-swatch-amber",
+  YELLOW: "border-swatch-yellow-soft border-s-4 border-s-swatch-yellow",
+  GREEN: "border-swatch-green-soft border-s-4 border-s-swatch-green",
+  TEAL: "border-swatch-teal-soft border-s-4 border-s-swatch-teal",
+  BLUE: "border-swatch-blue-soft border-s-4 border-s-swatch-blue",
+  INDIGO: "border-swatch-indigo-soft border-s-4 border-s-swatch-indigo",
+  PURPLE: "border-swatch-purple-soft border-s-4 border-s-swatch-purple",
+  PINK: "border-swatch-pink-soft border-s-4 border-s-swatch-pink",
+  SLATE: "border-swatch-slate-soft border-s-4 border-s-swatch-slate",
 };
 
 function customerOwnerInitials(owner: CustomerProfileOwner): string {
@@ -168,16 +169,29 @@ function customerCardHeading(item: CustomerProfileItem): {
   };
 }
 
-function formatRelativeAge(isoDate?: string, isAr?: boolean): string {
-  if (!isoDate) return isAr ? "الآن" : "Just now";
+function formatRelativeAge(
+  isoDate: string | undefined,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  if (!isoDate) return t.crmCustomerProfiles.ui.board.just_now;
   const time = new Date(isoDate).getTime();
   if (Number.isNaN(time)) return "";
   const diffMinutes = Math.max(1, Math.floor((Date.now() - time) / (1000 * 60)));
-  if (diffMinutes < 60) return isAr ? `منذ ${diffMinutes} د` : `${diffMinutes}m ago`;
+  if (diffMinutes < 60) {
+    return formatTemplate(t.crmCustomerProfiles.ui.board.value_m_ago, {
+      diffMinutes,
+    });
+  }
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return isAr ? `منذ ${diffHours} س` : `${diffHours}h in stage`;
+  if (diffHours < 24) {
+    return formatTemplate(t.crmCustomerProfiles.ui.board.value_h_in_stage, {
+      diffHours,
+    });
+  }
   const diffDays = Math.floor(diffHours / 24);
-  return isAr ? `${diffDays} يوم بالمرحلة` : `${diffDays}d in stage`;
+  return formatTemplate(t.crmCustomerProfiles.ui.board.value_d_in_stage, {
+    diffDays,
+  });
 }
 
 export function CustomerExecutiveBoardView({
@@ -200,8 +214,7 @@ export function CustomerExecutiveBoardView({
   onCardMove,
   onRefreshBoard,
 }: CustomerExecutiveBoardViewProps) {
-  const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t } = useI18n();
   const statusLabels: Record<string, string | undefined> = t.statusValues;
 
   // Drag & Drop State
@@ -277,7 +290,7 @@ export function CustomerExecutiveBoardView({
       {/* Horizontal Kanban Board Container */}
       <div
         role="region"
-        aria-label={isAr ? "لوحة حالات العملاء" : "Customer Status Board"}
+        aria-label={t.crmCustomerProfiles.ui.board.customer_status_board}
         className="flex h-full min-h-0 flex-1 items-stretch gap-3 overflow-x-auto pb-3"
       >
         {CUSTOMER_PROFILE_BOARD_STATUSES.map((status) => {
@@ -317,48 +330,48 @@ export function CustomerExecutiveBoardView({
           }> = [
             {
               state: "FUTURE",
-              label: isAr ? "مجدول مستقبلاً" : "Future",
+              label: t.crmCustomerProfiles.ui.board.future,
               count: allStatusItems.filter(
                 (c) => crmActivityState(c.nextActivity) === "FUTURE",
               ).length,
-              barClass: "bg-emerald-500 hover:bg-emerald-600",
-              dotClass: "bg-emerald-500",
+              barClass: "bg-swatch-green hover:bg-swatch-green/90",
+              dotClass: "bg-swatch-green",
               badgeClass:
-                "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+                "border-swatch-green bg-swatch-green-soft text-swatch-green-deep",
             },
             {
               state: "TODAY",
-              label: isAr ? "اليوم" : "Today",
+              label: t.crmCustomerProfiles.ui.board.today,
               count: allStatusItems.filter(
                 (c) => crmActivityState(c.nextActivity) === "TODAY",
               ).length,
-              barClass: "bg-orange-500 hover:bg-orange-600",
-              dotClass: "bg-orange-500",
+              barClass: "bg-swatch-orange hover:bg-swatch-orange/90",
+              dotClass: "bg-swatch-orange",
               badgeClass:
-                "border-orange-200 bg-orange-50 text-orange-800 dark:border-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+                "border-swatch-orange bg-swatch-orange-soft text-swatch-orange-deep",
             },
             {
               state: "OVERDUE",
-              label: isAr ? "متأخر" : "Overdue",
+              label: t.crmCustomerProfiles.ui.board.overdue,
               count: allStatusItems.filter(
                 (c) => crmActivityState(c.nextActivity) === "OVERDUE",
               ).length,
-              barClass: "bg-red-500 hover:bg-red-600",
-              dotClass: "bg-red-500",
+              barClass: "bg-swatch-red hover:bg-swatch-red/90",
+              dotClass: "bg-swatch-red",
               badgeClass:
-                "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300",
+                "border-swatch-red bg-swatch-red-soft text-swatch-red-deep",
             },
             {
               state: "NONE",
-              label: isAr ? "بدون مهام" : "None",
+              label: t.crmCustomerProfiles.ui.board.none,
               count: allStatusItems.filter(
                 (c) => crmActivityState(c.nextActivity) === "NONE",
               ).length,
               barClass:
-                "bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500",
-              dotClass: "bg-slate-400",
+                "bg-swatch-slate/60 hover:bg-swatch-slate",
+              dotClass: "bg-swatch-slate",
               badgeClass:
-                "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                "border-swatch-slate-soft bg-swatch-slate-soft text-swatch-slate-deep",
             },
           ];
           const visibleActivitySegments = activitySegments.filter(
@@ -369,12 +382,12 @@ export function CustomerExecutiveBoardView({
             null;
 
           const topBorderClass = isActiveCustomer
-            ? "border-t-4 border-t-emerald-500"
+            ? "border-t-4 border-t-swatch-green"
             : isBlacklisted
-              ? "border-t-4 border-t-red-500"
+              ? "border-t-4 border-t-swatch-red"
               : isInactive
-                ? "border-t-4 border-t-amber-500"
-                : "border-t-4 border-t-blue-600";
+                ? "border-t-4 border-t-swatch-amber"
+                : "border-t-4 border-t-swatch-blue";
 
           if (isCollapsed) {
             return (
@@ -396,14 +409,16 @@ export function CustomerExecutiveBoardView({
                   }
                 }}
                 className={cn(
-                  "flex h-full min-h-0 w-11 shrink-0 flex-col items-center gap-2.5 rounded-xl border border-slate-200/90 bg-white py-2.5 shadow-2xs transition-all dark:border-slate-800 dark:bg-slate-900",
+                  "flex h-full min-h-0 w-11 shrink-0 flex-col items-center gap-2.5 rounded-lg border border-border bg-card py-2.5 shadow-2xs transition-all",
                   topBorderClass,
                   draggingItem &&
-                    "border-dashed border-blue-400 bg-blue-50/30 dark:bg-blue-950/20",
+                    "border-dashed border-swatch-blue bg-swatch-blue-soft/30",
                 )}
               >
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() =>
                     setCollapsedStatuses((prev) => {
                       const next = new Set(prev);
@@ -413,25 +428,25 @@ export function CustomerExecutiveBoardView({
                   }
                   aria-label={`${t.views.expandColumn}: ${statusTitle}`}
                   title={`${t.views.expandColumn}: ${statusTitle}`}
-                  className="flex size-7 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800"
+                  className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <ChevronsRight
-                    className="size-4 rtl:rotate-180"
+                    className="size-4 rtl:-scale-x-100"
                     aria-hidden="true"
                   />
-                </button>
+                </Button>
 
-                <span className="inline-flex size-6 items-center justify-center rounded-full bg-blue-50 text-xs font-bold tabular-nums text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                <span className="inline-flex size-6 items-center justify-center rounded-full bg-swatch-blue-soft text-xs font-semibold tabular-nums text-swatch-blue-deep">
                   {totalInStatus}
                 </span>
 
-                <span className="min-h-0 truncate text-xs font-semibold tracking-wide text-slate-700 [writing-mode:vertical-rl] dark:text-slate-300">
+                <span className="min-h-0 truncate text-xs font-semibold tracking-wide text-foreground [writing-mode:vertical-rl]">
                   {statusTitle}
                 </span>
 
                 {draggingItem && (
-                  <span className="mt-auto px-1 text-center text-[10px] font-medium text-blue-600 [writing-mode:vertical-rl]">
-                    {isAr ? "مرر للتوسيع" : "Hover to peek"}
+                  <span className="mt-auto px-1 text-center text-xs font-medium text-primary [writing-mode:vertical-rl]">
+                    {t.crmCustomerProfiles.ui.board.hover_to_peek}
                   </span>
                 )}
               </div>
@@ -466,30 +481,30 @@ export function CustomerExecutiveBoardView({
                 setDraggingItem(null);
               }}
               className={cn(
-                "flex h-full min-h-0 w-[300px] max-w-[300px] shrink-0 flex-col rounded-xl border bg-slate-50/70 shadow-2xs transition-all dark:bg-slate-900/60",
+                "flex h-full min-h-0 w-[300px] max-w-[300px] shrink-0 flex-col rounded-lg border bg-muted/40 shadow-2xs transition-all",
                 topBorderClass,
                 isDropTarget
                   ? isBlacklisted
-                    ? "border-2 border-red-500 bg-red-50/25 dark:bg-red-950/20"
-                    : "border-2 border-emerald-500 bg-emerald-50/25 dark:bg-emerald-950/20"
-                  : "border-slate-200/90 dark:border-slate-800",
+                    ? "border-2 border-swatch-red bg-swatch-red-soft/25"
+                    : "border-2 border-swatch-green bg-swatch-green-soft/25"
+                  : "border-border",
               )}
             >
               {/* Status Column Header (Matches LeadExecutiveBoardView Column Header) */}
-              <div className="flex shrink-0 flex-col gap-2 rounded-t-xl border-b border-slate-200/80 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex shrink-0 flex-col gap-2 rounded-t-lg border-b border-border bg-card px-3 py-2.5">
                 <div className="flex items-center justify-between gap-1.5">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <span className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+                    <span className="truncate text-sm font-semibold text-foreground">
                       {statusTitle}
                     </span>
                     <span
                       className={cn(
-                        "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-bold tabular-nums",
+                        "inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums",
                         isActiveCustomer
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          ? "bg-swatch-green-soft text-swatch-green-deep"
                           : isBlacklisted
-                            ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                            : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+                            ? "bg-swatch-red-soft text-swatch-red-deep"
+                            : "bg-swatch-blue-soft text-swatch-blue-deep",
                       )}
                     >
                       {totalInStatus}
@@ -498,8 +513,8 @@ export function CustomerExecutiveBoardView({
 
                   <div className="flex shrink-0 items-center gap-1">
                     {isQuickAddOpen && (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                        {isAr ? "+ إضافة سريعة..." : "+ Quick Adding..."}
+                      <span className="inline-flex items-center gap-1 rounded-md border border-swatch-blue bg-swatch-blue-soft px-1.5 py-0.5 text-xs font-semibold text-swatch-blue-deep">
+                        {t.crmCustomerProfiles.ui.board.quick_adding}
                       </span>
                     )}
 
@@ -507,27 +522,33 @@ export function CustomerExecutiveBoardView({
                       branchId &&
                       status !== BLACKLISTED_STATUS &&
                       !isQuickAddOpen && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="xs"
                           onClick={() => setQuickAddStatus(status)}
                           aria-label={
-                            isAr
-                              ? `إضافة عميل سريع في ${statusTitle}`
-                              : `Quick-add customer in ${statusTitle}`
+                            formatTemplate(
+                              t.crmCustomerProfiles.ui.board.quick_add_in_status,
+                              { statusTitle },
+                            )
                           }
                           title={
-                            isAr
-                              ? `إضافة عميل سريع في ${statusTitle}`
-                              : `Quick-add customer in ${statusTitle}`
+                            formatTemplate(
+                              t.crmCustomerProfiles.ui.board.quick_add_in_status,
+                              { statusTitle },
+                            )
                           }
-                          className="flex size-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800"
+                          className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-swatch-blue-soft hover:text-swatch-blue-deep"
                         >
                           <Plus className="size-4" aria-hidden="true" />
-                        </button>
+                        </Button>
                       )}
 
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() =>
                         setCollapsedStatuses((prev) =>
                           new Set(prev).add(status),
@@ -535,13 +556,13 @@ export function CustomerExecutiveBoardView({
                       }
                       aria-label={`${t.views.collapseColumn}: ${statusTitle}`}
                       title={`${t.views.collapseColumn}: ${statusTitle}`}
-                      className="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                      className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       <ChevronsLeft
-                        className="size-3.5 rtl:rotate-180"
+                        className="size-3.5 rtl:-scale-x-100"
                         aria-hidden="true"
                       />
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -550,20 +571,22 @@ export function CustomerExecutiveBoardView({
                   <div
                     role="group"
                     aria-label={
-                      isAr
-                        ? `تصفية مهام الحالة (${statusTitle})`
-                        : `Filter column tasks by status (${statusTitle})`
+                      formatTemplate(
+                        t.crmCustomerProfiles.ui.board.filter_tasks_by_status,
+                        { statusTitle },
+                      )
                     }
-                    className="flex h-2 w-full items-stretch gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+                    className="flex h-2 w-full items-stretch gap-0.5 overflow-hidden rounded-full bg-muted"
                   >
                     {visibleActivitySegments.map((seg) => {
                       const isSelected = activeActivityState === seg.state;
                       const isDimmed =
                         activeActivityState !== null && !isSelected;
                       return (
-                        <button
+                        <Button
                           key={seg.state}
                           type="button"
+                          variant="ghost"
                           onClick={() =>
                             toggleColumnActivityFilter(status, seg.state)
                           }
@@ -571,15 +594,16 @@ export function CustomerExecutiveBoardView({
                           aria-pressed={isSelected}
                           aria-label={`${seg.label}: ${seg.count}`}
                           title={
-                            isAr
-                              ? `${seg.label}: ${seg.count} — اضغط للتصفية`
-                              : `${seg.label} tasks: ${seg.count} — Click to filter`
+                            formatTemplate(
+                              t.crmCustomerProfiles.ui.board.tasks_click_to_filter,
+                              { seg_label: seg.label, seg_count: seg.count },
+                            )
                           }
                           className={cn(
-                            "h-full min-w-4 cursor-pointer transition-all",
+                            "h-full min-w-4 cursor-pointer rounded-none p-0 transition-all",
                             seg.barClass,
                             isSelected &&
-                              "ring-1 ring-slate-900 dark:ring-white",
+                              "ring-1 ring-foreground",
                             isDimmed && "opacity-30 hover:opacity-75",
                           )}
                         />
@@ -593,7 +617,7 @@ export function CustomerExecutiveBoardView({
                   <div className="flex items-center justify-between gap-1.5 pt-0.5">
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-bold",
+                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold",
                         activeSegment.badgeClass,
                       )}
                     >
@@ -607,19 +631,21 @@ export function CustomerExecutiveBoardView({
                         {activeSegment.label} ({activeSegment.count})
                       </span>
                     </span>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() =>
                         setColumnActivityFilter((prev) => ({
                           ...prev,
                           [status]: null,
                         }))
                       }
-                      className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                      className="inline-flex h-auto items-center gap-0.5 p-0 text-xs font-semibold text-muted-foreground hover:bg-transparent hover:text-foreground"
                     >
                       <X className="size-3" aria-hidden="true" />
-                      <span>{isAr ? "إلغاء الفلتر" : "Clear"}</span>
-                    </button>
+                      <span>{t.crmCustomerProfiles.ui.board.clear}</span>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -628,7 +654,7 @@ export function CustomerExecutiveBoardView({
               <div
                 className={cn(
                   "flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5",
-                  isDropTarget && "bg-blue-50/40 dark:bg-blue-950/20",
+                  isDropTarget && "bg-swatch-blue-soft/30",
                 )}
               >
                 {/* In-Column Quick-Add Customer Composer Card */}
@@ -651,23 +677,23 @@ export function CustomerExecutiveBoardView({
                 )}
 
                 {visibleItems.length === 0 && !isQuickAddOpen ? (
-                  <div className="flex min-h-32 flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200/90 bg-white/50 p-4 text-center dark:border-slate-800 dark:bg-slate-900/40">
-                    <span className="text-xs text-slate-400 dark:text-slate-500">
-                      {isAr
-                        ? "لا يوجد عملاء في هذه الحالة"
-                        : "No customers in this status"}
+                  <div className="flex min-h-32 flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card/50 p-4 text-center">
+                    <span className="text-xs text-muted-foreground">
+                      {t.crmCustomerProfiles.ui.board.no_customers_in_this_status}
                     </span>
                     {canCreate && branchId && status !== BLACKLISTED_STATUS && (
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="xs"
                         onClick={() => setQuickAddStatus(status)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-600 shadow-2xs hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400"
+                        className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-primary shadow-2xs hover:bg-swatch-blue-soft/40"
                       >
                         <Plus className="size-3" aria-hidden="true" />
                         <span>
-                          {isAr ? "إضافة عميل سريع" : "Quick Add Customer"}
+                          {t.crmCustomerProfiles.ui.board.quick_add_customer}
                         </span>
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ) : (
@@ -698,7 +724,11 @@ export function CustomerExecutiveBoardView({
                             ? () => onOpenQuickModal(item)
                             : undefined
                         }
-                        onOpenActivities={() => onOpenActivities(item)}
+               onOpenActivities={
+                 onOpenActivities && item.status !== "BLACKLISTED"
+                   ? () => onOpenActivities(item)
+                   : undefined
+               }
                         onDelete={onDelete ? () => onDelete(item) : undefined}
                         onMove={(targetStatus) =>
                           onCardMove({
@@ -727,7 +757,11 @@ export function CustomerExecutiveBoardView({
                             ? () => onOpenQuickModal(item)
                             : undefined
                         }
-                        onOpenActivities={() => onOpenActivities(item)}
+               onOpenActivities={
+                 onOpenActivities && item.status !== "BLACKLISTED"
+                   ? () => onOpenActivities(item)
+                   : undefined
+               }
                         onDelete={onDelete ? () => onDelete(item) : undefined}
                         onMove={(targetStatus) =>
                           onCardMove({
@@ -748,7 +782,7 @@ export function CustomerExecutiveBoardView({
 
               {/* Load More Button */}
               {lane?.hasMore && (
-                <div className="shrink-0 border-t border-slate-200/80 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+                <div className="shrink-0 border-t border-border bg-card p-2">
                   <Button
                     variant="ghost"
                     size="xs"
@@ -772,10 +806,10 @@ export function CustomerExecutiveBoardView({
 
       {/* Floating Bottom Quick-Drop Status Dock when dragging */}
       {draggingItem && (
-        <div className="fixed inset-x-0 bottom-4 z-40 mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-700 bg-slate-950/95 px-4 py-2.5 text-white shadow-2xl backdrop-blur-md">
-          <div className="flex items-center gap-2 text-xs font-semibold text-amber-400">
+        <div className="fixed inset-x-0 bottom-4 z-(--z-overlay) mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-foreground shadow-2xl">
+          <div className="flex items-center gap-2 text-xs font-semibold text-warning">
             <Sparkles className="size-4" aria-hidden="true" />
-            <span>{isAr ? "نقل سريع للحالة:" : "Quick Drop Status:"}</span>
+            <span>{t.crmCustomerProfiles.ui.board.quick_drop_status}</span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {CUSTOMER_PROFILE_BOARD_STATUSES.map((status) => {
@@ -784,9 +818,11 @@ export function CustomerExecutiveBoardView({
               const StatusIcon = visual.icon;
               const title = statusLabels[`CustomerStatus.${status}`] ?? status;
               return (
-                <button
+                <Button
                   key={status}
                   type="button"
+                  variant="outline"
+                  size="xs"
                   disabled={isCurrent}
                   onDragOver={(e) => {
                     if (isCurrent) return;
@@ -817,12 +853,12 @@ export function CustomerExecutiveBoardView({
                   className={cn(
                     "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all",
                     isCurrent
-                      ? "border-slate-700 bg-slate-800/50 text-slate-500"
+                      ? "border-border bg-muted/50 text-muted-foreground"
                       : status === "ACTIVE_CUSTOMER"
-                        ? "border-emerald-500 bg-emerald-950/80 text-emerald-300 hover:bg-emerald-900"
+                        ? "border-swatch-green bg-swatch-green-soft text-swatch-green-deep hover:bg-swatch-green-soft/80"
                         : status === BLACKLISTED_STATUS
-                          ? "border-red-500/70 bg-red-950/60 text-red-300 hover:bg-red-900"
-                          : "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800",
+                          ? "border-swatch-red bg-swatch-red-soft text-swatch-red-deep hover:bg-swatch-red-soft/80"
+                          : "border-border bg-muted text-foreground hover:bg-muted/80",
                   )}
                 >
                   <StatusIcon
@@ -830,7 +866,7 @@ export function CustomerExecutiveBoardView({
                     style={{ color: visual.accentHex }}
                   />
                   <span>{title}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -859,7 +895,7 @@ interface ExecutiveBoardCustomerCardProps {
   onOpen: () => void;
   onExpandView: () => void;
   onOpenQuickModal?: () => void;
-  onOpenActivities: () => void;
+  onOpenActivities?: () => void;
   onDelete?: () => void;
   onMove: (status: string) => void;
   onCardChange: (patch: CustomerProfileCardPatch) => void;
@@ -885,8 +921,7 @@ function ExecutiveBoardCustomerCard({
   onDragStart,
   onDragEnd,
 }: ExecutiveBoardCustomerCardProps) {
-  const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t } = useI18n();
   const cardDict = t.crmLeads.card;
 
   const { title, contactName } = customerCardHeading(item);
@@ -899,27 +934,25 @@ function ExecutiveBoardCustomerCard({
     : "";
 
   const borderAccent = item.cardColor
-    ? CARD_BORDER_ACCENT[item.cardColor] ?? "border-slate-200/90 dark:border-slate-800"
+    ? CARD_BORDER_ACCENT[item.cardColor] ?? "border-border"
     : item.status === "ACTIVE_CUSTOMER"
-      ? "border-emerald-200/90 border-s-4 border-s-emerald-500 dark:border-emerald-900/70"
+      ? "border-swatch-green-soft border-s-4 border-s-swatch-green"
       : activityState === "OVERDUE"
-        ? "border-amber-300/90 border-s-4 border-s-amber-500 dark:border-amber-800"
-        : "border-slate-200/90 dark:border-slate-800";
+        ? "border-swatch-amber-soft border-s-4 border-s-swatch-amber"
+        : "border-border";
 
   const activityBadgeTone =
     activityState === "OVERDUE"
-      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/60 dark:text-red-300"
+      ? "border-swatch-red bg-swatch-red-soft text-swatch-red-deep"
       : activityState === "TODAY"
-        ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/60 dark:text-amber-300"
+        ? "border-swatch-amber bg-swatch-amber-soft text-swatch-amber-deep"
         : activityState === "FUTURE"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/60 dark:text-emerald-300"
-          : "border-slate-200 bg-slate-100/80 text-slate-600 dark:border-slate-800 dark:bg-slate-800/70 dark:text-slate-400";
+          ? "border-swatch-green bg-swatch-green-soft text-swatch-green-deep"
+          : "border-border bg-muted text-muted-foreground";
 
   const activityLabelText =
     item.status === BLACKLISTED_STATUS
-      ? isAr
-        ? "مغلق"
-        : "Closed"
+      ? t.crmCustomerProfiles.ui.board.closed
       : cardDict.activityStates[activityState];
 
   return (
@@ -932,24 +965,24 @@ function ExecutiveBoardCustomerCard({
       }}
       onDragEnd={onDragEnd}
       className={cn(
-        "group relative flex flex-col gap-2 rounded-xl border bg-white p-3 shadow-2xs transition-all hover:border-blue-300 hover:shadow-md dark:bg-slate-900",
+        "group relative flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-2xs transition-all hover:border-swatch-blue hover:shadow-md",
         borderAccent,
         canUpdate && "cursor-grab active:cursor-grabbing",
         isDragging &&
-          "rotate-1 scale-[1.02] border-2 border-blue-600 shadow-2xl ring-4 ring-blue-500/15",
+          "rotate-1 scale-[1.02] border-2 border-primary shadow-2xl ring-4 ring-primary/15",
       )}
     >
       {/* Floating Dragging Header Banner */}
       {isDragging && (
-        <div className="-mx-3 -mt-3 mb-1 flex items-center justify-between rounded-t-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white">
+        <div className="-mx-3 -mt-3 mb-1 flex items-center justify-between rounded-t-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
           <span className="flex items-center gap-1 truncate">
             <GripVertical className="size-3.5 shrink-0" aria-hidden="true" />
             <span>
-              {isAr ? "جاري نقل العميل" : "DRAGGING CUSTOMER"} ·{" "}
+              {t.crmCustomerProfiles.ui.board.dragging_customer} ·{" "}
               {draggingFromLabel} → {draggingToLabel || draggingFromLabel}
             </span>
           </span>
-          <span className="rounded-xs bg-white/20 px-1.5 py-0.5 text-[10px]">
+          <span className="rounded-xs bg-primary-foreground/20 px-1.5 py-0.5 text-xs">
             Space / Drop
           </span>
         </div>
@@ -957,40 +990,43 @@ function ExecutiveBoardCustomerCard({
 
       {/* Row 1: Icon + Bold Title + Expand ChevronDown + Menu */}
       <div className="flex items-center justify-between gap-1.5">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={onOpen}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-start hover:text-blue-600"
+          className="flex h-auto min-w-0 flex-1 items-center justify-start gap-1.5 p-0 text-start hover:bg-transparent hover:text-primary"
         >
           {isCompany ? (
             <Building2
-              className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400"
+              className="size-3.5 shrink-0 text-swatch-blue"
               aria-hidden="true"
             />
           ) : (
             <UserRound
-              className="size-3.5 shrink-0 text-slate-500 dark:text-slate-400"
+              className="size-3.5 shrink-0 text-muted-foreground"
               aria-hidden="true"
             />
           )}
-          <span className="truncate text-sm font-bold text-slate-900 group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-400">
+          <span className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
             {title}
           </span>
-        </button>
+        </Button>
 
         <div
           className="flex shrink-0 items-center gap-1"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={onExpandView}
-            title={isAr ? "عرض تفاصيل البطاقة" : "Expand Card Details"}
-            aria-label={isAr ? "عرض تفاصيل البطاقة" : "Expand Card Details"}
-            className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-blue-700 dark:hover:bg-blue-950/50 dark:hover:text-blue-400"
+            title={t.crmCustomerProfiles.ui.board.expand_card_details}
+            aria-label={t.crmCustomerProfiles.ui.board.expand_card_details}
+            className="flex size-6 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground transition-colors hover:border-swatch-blue hover:bg-swatch-blue-soft hover:text-swatch-blue-deep"
           >
             <ChevronDown className="size-3.5" aria-hidden="true" />
-          </button>
+          </Button>
 
           <CustomerProfileCardMenu
             cardColor={item.cardColor}
@@ -1021,20 +1057,20 @@ function ExecutiveBoardCustomerCard({
 
       {/* Row 2: Contact Person (Corporate only — Individual name is already shown once in Row 1) */}
       {isCompany && (
-        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="flex min-w-0 items-center gap-1 truncate">
             <UserRound
-              className="size-3 shrink-0 text-slate-400"
+              className="size-3 shrink-0 text-muted-foreground"
               aria-hidden="true"
             />
-            <span className="truncate font-medium text-slate-700 dark:text-slate-300">
+            <span className="truncate font-medium text-foreground">
               {contactName ||
                 item.primaryContact?.displayName ||
                 item.primaryContactName ||
                 title}
             </span>
             {item.primaryContact?.jobTitle && (
-              <span className="truncate text-slate-400">
+              <span className="truncate text-muted-foreground">
                 · {item.primaryContact.jobTitle}
               </span>
             )}
@@ -1057,29 +1093,29 @@ function ExecutiveBoardCustomerCard({
                   : undefined
               }
               className={cn(
-                "inline-flex max-w-28 items-center truncate rounded-md px-2 py-0.5 text-[11px] font-semibold",
+                "inline-flex max-w-28 items-center truncate rounded-md px-2 py-0.5 text-xs font-semibold",
                 !tag.backgroundColor &&
-                  "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+                  "border border-swatch-green bg-swatch-green-soft text-swatch-green-deep",
               )}
             >
               {tag.name}
             </span>
           ))}
           {item.tags.length > 2 && (
-            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
               +{item.tags.length - 2}
             </span>
           )}
         </div>
 
-        <span className="ms-auto shrink-0 text-[11px] font-medium tabular-nums text-slate-400 dark:text-slate-500">
-          {formatRelativeAge(undefined, isAr)}
+        <span className="ms-auto shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+          {formatRelativeAge(undefined, t)}
         </span>
       </div>
 
       {/* Row 4: Footer Strip (3 Stars + Activity Badge + Quick 360° Trigger + Owner Initials) */}
       <div
-        className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800/80"
+        className="flex items-center justify-between gap-2 border-t border-border/60 pt-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -1092,65 +1128,73 @@ function ExecutiveBoardCustomerCard({
             {[1, 2, 3].map((star) => {
               const filled = star <= item.rating;
               return (
-                <button
+                <Button
                   key={star}
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   disabled={!canUpdate}
                   onClick={() =>
                     onCardChange({ rating: item.rating === star ? 0 : star })
                   }
                   aria-label={`Rate ${star} of 3`}
-                  className="p-0.5 transition-transform hover:scale-110 disabled:cursor-default"
+                  className="size-5 p-0.5 transition-transform hover:scale-110 hover:bg-transparent disabled:cursor-default"
                 >
                   <Star
                     className={cn(
                       "size-3.5",
                       filled
-                        ? "fill-amber-400 text-amber-500"
-                        : "text-slate-300 dark:text-slate-600",
+                        ? "fill-warning text-warning"
+                        : "text-muted-foreground/40",
                     )}
                     aria-hidden="true"
                   />
-                </button>
+                </Button>
               );
             })}
           </div>
 
           {/* Colored Activity Pill Trigger */}
-          <button
-            type="button"
-            onClick={onOpenActivities}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-opacity hover:opacity-85",
-              activityBadgeTone,
-            )}
-          >
-            <Activity className="size-3 shrink-0" aria-hidden="true" />
-            <span className="max-w-28 truncate">{activityLabelText}</span>
-          </button>
+          {onOpenActivities && item.status !== "BLACKLISTED" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={onOpenActivities}
+              className={cn(
+                "inline-flex h-auto items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-85",
+                activityBadgeTone,
+              )}
+            >
+              <Activity className="size-3 shrink-0" aria-hidden="true" />
+              <span className="max-w-28 truncate">{activityLabelText}</span>
+            </Button>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
           {onOpenQuickModal && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={onOpenQuickModal}
               title={
-                isAr ? "معاينة وتعديل سريع 360°" : "Open 360° Quick-Edit Modal"
+                t.crmCustomerProfiles.ui.board.open_360_quick_edit_modal
               }
               aria-label={
-                isAr ? "معاينة وتعديل سريع 360°" : "Open 360° Quick-Edit Modal"
+                t.crmCustomerProfiles.ui.board.open_360_quick_edit_modal
               }
-              className="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
             >
               <Eye className="size-3.5" aria-hidden="true" />
-            </button>
+            </Button>
           )}
 
           {initials && (
             <span
               title={formatTemplate(cardDict.owner, { name: ownerFullName })}
-              className="flex size-6 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-[11px] font-bold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
+              className="flex size-6 items-center justify-center rounded-md border border-swatch-blue bg-swatch-blue-soft text-xs font-semibold text-swatch-blue-deep"
             >
               {initials}
             </span>
@@ -1168,28 +1212,27 @@ function ExecutiveBoardCustomerCard({
 function PhoneActionRow({
   phone,
   country,
-  isAr,
 }: {
   phone: string;
   country: string;
-  isAr: boolean;
 }) {
+  const { t } = useI18n();
   const callDigits = phone ? normalizePhoneDigits(phone) : "";
   const waDigits = phone ? normalizeWhatsAppDigits(phone, country) : null;
   const tgDigits = waDigits;
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 bg-slate-50/90 px-2.5 py-1.5 dark:border-slate-800 dark:bg-slate-800/50">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/50 px-2.5 py-1.5">
       {phone ? (
         <span
           dir="ltr"
-          className="truncate font-mono text-xs font-bold tracking-tight text-slate-800 dark:text-slate-100"
+          className="truncate font-mono text-xs font-semibold tabular-nums tracking-tight text-foreground"
         >
           {phone}
         </span>
       ) : (
-        <span className="text-xs text-slate-400 dark:text-slate-500">
-          {isAr ? "لا يوجد رقم هاتف" : "No phone number"}
+        <span className="text-xs text-muted-foreground">
+          {t.crmCustomerProfiles.ui.board.no_phone_number}
         </span>
       )}
 
@@ -1199,12 +1242,12 @@ function PhoneActionRow({
             href={`tel:${callDigits}`}
             title={`Call ${phone}`}
             aria-label={`Call ${phone}`}
-            className="flex size-6 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
+            className="flex size-6 items-center justify-center rounded-md border border-swatch-green bg-swatch-green-soft text-swatch-green-deep transition-colors hover:bg-swatch-green-soft/80"
           >
             <Phone className="size-3" aria-hidden="true" />
           </a>
         ) : (
-          <span className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-300 dark:border-slate-700 dark:bg-slate-800">
+          <span className="flex size-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground/40">
             <Phone className="size-3" aria-hidden="true" />
           </span>
         )}
@@ -1216,12 +1259,12 @@ function PhoneActionRow({
             rel="noopener noreferrer"
             title={`WhatsApp ${phone}`}
             aria-label={`WhatsApp ${phone}`}
-            className="flex size-6 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300"
+            className="flex size-6 items-center justify-center rounded-md border border-swatch-green bg-swatch-green-soft text-swatch-green-deep transition-colors hover:bg-swatch-green-soft/80"
           >
             <MessageCircle className="size-3" aria-hidden="true" />
           </a>
         ) : (
-          <span className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-300 dark:border-slate-700 dark:bg-slate-800">
+          <span className="flex size-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground/40">
             <MessageCircle className="size-3" aria-hidden="true" />
           </span>
         )}
@@ -1233,12 +1276,12 @@ function PhoneActionRow({
             rel="noopener noreferrer"
             title={`Telegram ${phone}`}
             aria-label={`Telegram ${phone}`}
-            className="flex size-6 items-center justify-center rounded-md border border-sky-200 bg-sky-50 text-sky-600 transition-colors hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/70 dark:text-sky-300"
+            className="flex size-6 items-center justify-center rounded-md border border-swatch-blue bg-swatch-blue-soft text-swatch-blue-deep transition-colors hover:bg-swatch-blue-soft/80"
           >
             <Send className="size-3" aria-hidden="true" />
           </a>
         ) : (
-          <span className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-300 dark:border-slate-700 dark:bg-slate-800">
+          <span className="flex size-6 items-center justify-center rounded-md border border-border bg-card text-muted-foreground/40">
             <Send className="size-3" aria-hidden="true" />
           </span>
         )}
@@ -1264,7 +1307,7 @@ interface CustomerBoardCardExpandedViewProps {
   onCollapse: () => void;
   onOpen: () => void;
   onOpenQuickModal?: () => void;
-  onOpenActivities: () => void;
+  onOpenActivities?: () => void;
   onDelete?: () => void;
   onMove: (status: string) => void;
   onCardChange: (patch: CustomerProfileCardPatch) => void;
@@ -1285,7 +1328,6 @@ function CustomerBoardCardExpandedView({
   onCardChange,
 }: CustomerBoardCardExpandedViewProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
   const cardDict = t.crmLeads.card;
   const isCompany = item.profileType === "CORPORATE";
   const { title, contactName } = customerCardHeading(item);
@@ -1435,58 +1477,59 @@ function CustomerBoardCardExpandedView({
 
   const activityBadgeTone =
     activityState === "OVERDUE"
-      ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/60 dark:text-red-300"
+      ? "border-swatch-red bg-swatch-red-soft text-swatch-red-deep"
       : activityState === "TODAY"
-        ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/60 dark:text-amber-300"
+        ? "border-swatch-amber bg-swatch-amber-soft text-swatch-amber-deep"
         : activityState === "FUTURE"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/60 dark:text-emerald-300"
-          : "border-slate-200 bg-slate-100/80 text-slate-600 dark:border-slate-800 dark:bg-slate-800/70 dark:text-slate-400";
+          ? "border-swatch-green bg-swatch-green-soft text-swatch-green-deep"
+          : "border-border bg-muted text-muted-foreground";
 
   const activityLabelText =
     item.status === BLACKLISTED_STATUS
-      ? isAr
-        ? "مغلق"
-        : "Closed"
+      ? t.crmCustomerProfiles.ui.board.closed
       : cardDict.activityStates[activityState];
 
   return (
     <div
-      className="flex flex-col gap-2.5 rounded-xl border-2 border-blue-600 bg-white p-3 shadow-lg dark:bg-slate-900"
+      className="flex flex-col gap-2.5 rounded-lg border-2 border-primary bg-card p-3 shadow-lg"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header Row: Icon + Title + Collapse ChevronUp + Menu */}
       <div className="flex items-center justify-between gap-1.5">
-        <button
+        <Button
           type="button"
+          variant="ghost"
           onClick={onOpen}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-start hover:text-blue-600"
+          className="flex h-auto min-w-0 flex-1 items-center justify-start gap-1.5 p-0 text-start hover:bg-transparent hover:text-primary"
         >
           {isCompany ? (
             <Building2
-              className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400"
+              className="size-3.5 shrink-0 text-swatch-blue"
               aria-hidden="true"
             />
           ) : (
             <UserRound
-              className="size-3.5 shrink-0 text-slate-500 dark:text-slate-400"
+              className="size-3.5 shrink-0 text-muted-foreground"
               aria-hidden="true"
             />
           )}
-          <span className="truncate text-sm font-bold text-slate-900 hover:text-blue-600 dark:text-slate-100 dark:hover:text-blue-400">
+          <span className="truncate text-sm font-semibold text-foreground hover:text-primary">
             {title}
           </span>
-        </button>
+        </Button>
 
         <div className="flex shrink-0 items-center gap-1">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={onCollapse}
-            title={isAr ? "طي البطاقة" : "Collapse Card"}
-            aria-label={isAr ? "طي البطاقة" : "Collapse Card"}
-            className="flex size-6 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-800/70 dark:bg-blue-950/60 dark:text-blue-300"
+            title={t.crmCustomerProfiles.ui.board.collapse_card}
+            aria-label={t.crmCustomerProfiles.ui.board.collapse_card}
+            className="flex size-6 items-center justify-center rounded-md border border-swatch-blue bg-swatch-blue-soft text-swatch-blue-deep transition-colors hover:bg-swatch-blue-soft/80"
           >
             <ChevronUp className="size-3.5" aria-hidden="true" />
-          </button>
+          </Button>
 
           <CustomerProfileCardMenu
             cardColor={item.cardColor}
@@ -1516,9 +1559,9 @@ function CustomerBoardCardExpandedView({
       </div>
 
       {/* Subheader: Stage Age */}
-      <div className="flex items-center justify-end gap-2 text-xs text-slate-500 dark:text-slate-400">
-        <span className="shrink-0 text-[11px] font-medium tabular-nums text-slate-400 dark:text-slate-500">
-          {formatRelativeAge(detail?.createdAt, isAr)}
+      <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+        <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+          {formatRelativeAge(detail?.createdAt, t)}
         </span>
       </div>
 
@@ -1526,8 +1569,8 @@ function CustomerBoardCardExpandedView({
       {!isCompany ? (
         /* INDIVIDUAL: Show mobile numbers up to 2 at most + action icons */
         <div className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {isAr ? "أرقام الهاتف (بحد أقصى ٢)" : "Phone Numbers (up to 2)"}
+          <span className="text-xs font-medium text-muted-foreground">
+            {t.crmCustomerProfiles.ui.board.phone_numbers_up_to_2}
           </span>
           {individualPhones.length > 0 ? (
             individualPhones.map((ph, idx) => (
@@ -1535,23 +1578,22 @@ function CustomerBoardCardExpandedView({
                 key={`ind-ph-${idx}-${ph}`}
                 phone={ph}
                 country={item.country}
-                isAr={isAr}
               />
             ))
           ) : (
-            <PhoneActionRow phone="" country={item.country} isAr={isAr} />
+            <PhoneActionRow phone="" country={item.country} />
           )}
         </div>
       ) : (
         <>
           {/* COMPANY PHONE SECTION */}
           <div className="flex flex-col gap-1.5">
-            <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
               <Building2
-                className="size-3 shrink-0 text-blue-600 dark:text-blue-400"
+                className="size-3 shrink-0 text-swatch-blue"
                 aria-hidden="true"
               />
-              <span>{isAr ? "هاتف الشركة" : "Company Phone"}</span>
+              <span>{t.crmCustomerProfiles.ui.board.company_phone}</span>
             </span>
             {companyPhones.length > 0 ? (
               companyPhones.map((ph, idx) => (
@@ -1559,52 +1601,57 @@ function CustomerBoardCardExpandedView({
                   key={`corp-company-ph-${idx}-${ph}`}
                   phone={ph}
                   country={item.country}
-                  isAr={isAr}
                 />
               ))
             ) : (
-              <PhoneActionRow phone="" country={item.country} isAr={isAr} />
+              <PhoneActionRow phone="" country={item.country} />
             )}
           </div>
 
           {hasMultipleCorporateContacts ? (
             /* COMPANY WITH > 1 CONTACT: Show up to 3 contacts at most, each with their first phone only + icons */
             <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                {isAr
-                  ? `جهات الاتصال (${Math.min(corporateContacts.length, 3)} من ${corporateContacts.length})`
-                  : `Contacts (${Math.min(corporateContacts.length, 3)} of ${corporateContacts.length})`}
+              <span className="text-xs font-medium text-muted-foreground">
+                {formatTemplate(
+                  t.crmCustomerProfiles.ui.board.contact_count,
+                  {
+                    Math_min_corporateContacts_length_3: Math.min(
+                      corporateContacts.length,
+                      3,
+                    ),
+                    corporateContacts_length: corporateContacts.length,
+                  },
+                )}
               </span>
               {corporateContacts.slice(0, 3).map((contact, idx) => {
                 const firstPhone = contact.phones[0] ?? "";
                 return (
                   <div
                     key={contact.partyId || `corp-contact-${idx}`}
-                    className="flex flex-col gap-1 rounded-lg border border-slate-200/80 bg-slate-50/40 p-2 dark:border-slate-800 dark:bg-slate-800/30"
+                    className="flex flex-col gap-1 rounded-lg border border-border bg-muted/40 p-2"
                   >
                     <div className="flex items-center justify-between gap-1.5 text-xs">
-                      <span className="flex min-w-0 items-center gap-1 truncate font-semibold text-slate-800 dark:text-slate-200">
+                      <span className="flex min-w-0 items-center gap-1 truncate font-semibold text-foreground">
                         <UserRound
-                          className="size-3 shrink-0 text-blue-600 dark:text-blue-400"
+                          className="size-3 shrink-0 text-swatch-blue"
                           aria-hidden="true"
                         />
                         <span className="truncate">{contact.displayName}</span>
                         {contact.jobTitle && (
-                          <span className="truncate text-[11px] font-normal text-slate-400">
+                          <span className="truncate text-xs font-normal text-muted-foreground">
                             · {contact.jobTitle}
                           </span>
                         )}
                       </span>
                       {contact.isPrimary && (
-                        <span className="shrink-0 rounded-xs bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/70 dark:text-blue-300">
-                          {isAr ? "أساسي" : "Primary"}
+                        <span className="shrink-0 rounded-xs bg-swatch-blue-soft px-1.5 py-0.5 text-xs font-semibold text-swatch-blue-deep">
+                          {t.crmCustomerProfiles.ui.board.primary}
                         </span>
                       )}
                     </div>
                     <PhoneActionRow
                       phone={firstPhone}
                       country={item.country}
-                      isAr={isAr}
                     />
                   </div>
                 );
@@ -1614,9 +1661,9 @@ function CustomerBoardCardExpandedView({
             /* COMPANY WITH 1 PRIMARY CONTACT: Show primary contact + 1 or at most 2 phones + icons */
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-1.5 text-xs">
-                <span className="flex min-w-0 items-center gap-1 truncate font-semibold text-slate-800 dark:text-slate-200">
+                <span className="flex min-w-0 items-center gap-1 truncate font-semibold text-foreground">
                   <UserRound
-                    className="size-3 shrink-0 text-blue-600 dark:text-blue-400"
+                    className="size-3 shrink-0 text-swatch-blue"
                     aria-hidden="true"
                   />
                   <span className="truncate">
@@ -1628,15 +1675,15 @@ function CustomerBoardCardExpandedView({
                   </span>
                   {(singleCorporateContact?.jobTitle ||
                     item.primaryContact?.jobTitle) && (
-                    <span className="truncate text-[11px] font-normal text-slate-400">
+                    <span className="truncate text-xs font-normal text-muted-foreground">
                       ·{" "}
                       {singleCorporateContact?.jobTitle ||
                         item.primaryContact?.jobTitle}
                     </span>
                   )}
                 </span>
-                <span className="shrink-0 rounded-xs bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950/70 dark:text-blue-300">
-                  {isAr ? "أساسي" : "Primary"}
+                <span className="shrink-0 rounded-xs bg-swatch-blue-soft px-1.5 py-0.5 text-xs font-semibold text-swatch-blue-deep">
+                  {t.crmCustomerProfiles.ui.board.primary}
                 </span>
               </div>
               {singleCorporateContactPhones.length > 0 ? (
@@ -1645,11 +1692,10 @@ function CustomerBoardCardExpandedView({
                     key={`corp-single-ph-${idx}-${ph}`}
                     phone={ph}
                     country={item.country}
-                    isAr={isAr}
                   />
                 ))
               ) : (
-                <PhoneActionRow phone="" country={item.country} isAr={isAr} />
+                <PhoneActionRow phone="" country={item.country} />
               )}
             </div>
           )}
@@ -1659,21 +1705,21 @@ function CustomerBoardCardExpandedView({
       {/* Owner & Acquisition Source (Read-Only View Mode) */}
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {isAr ? "مسؤول المبيعات" : "Salesperson"}
+          <span className="text-xs font-medium text-muted-foreground">
+            {t.crmCustomerProfiles.ui.board.salesperson}
           </span>
-          <div className="flex h-7 items-center rounded-md border border-slate-200/80 bg-slate-50 px-2 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
+          <div className="flex h-7 items-center rounded-md border border-border bg-muted/50 px-2 text-xs font-medium text-foreground">
             <span className="truncate">
-              {ownerFullName || (isAr ? "غير معين" : "Unassigned")}
+              {ownerFullName || (t.crmCustomerProfiles.ui.board.unassigned)}
             </span>
           </div>
         </div>
 
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {isAr ? "مصدر الاستقطاب" : "Acquisition Source"}
+          <span className="text-xs font-medium text-muted-foreground">
+            {t.crmCustomerProfiles.ui.board.acquisition_source}
           </span>
-          <div className="flex h-7 items-center gap-1.5 rounded-md border border-slate-200/80 bg-slate-50 px-2 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
+          <div className="flex h-7 items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 text-xs font-medium text-foreground">
             {sourceLabel ? (
               <>
                 <AcquisitionSourceIcon
@@ -1682,8 +1728,8 @@ function CustomerBoardCardExpandedView({
                 <span className="truncate">{sourceLabel}</span>
               </>
             ) : (
-              <span className="truncate text-slate-400">
-                {isAr ? "غير محدد" : "Not set"}
+              <span className="truncate text-muted-foreground">
+                {t.crmCustomerProfiles.ui.board.not_set}
               </span>
             )}
           </div>
@@ -1693,8 +1739,8 @@ function CustomerBoardCardExpandedView({
       {/* Tags (All tags shown in Expanded View Mode) */}
       {item.tags.length > 0 && (
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {isAr ? "الوسوم" : "Tags"}
+          <span className="text-xs font-medium text-muted-foreground">
+            {t.crmCustomerProfiles.ui.board.tags}
           </span>
           <div className="flex flex-wrap items-center gap-1">
             {item.tags.map((tag) => (
@@ -1709,9 +1755,9 @@ function CustomerBoardCardExpandedView({
                     : undefined
                 }
                 className={cn(
-                  "inline-flex items-center truncate rounded-md px-2 py-0.5 text-[11px] font-semibold",
+                  "inline-flex items-center truncate rounded-md px-2 py-0.5 text-xs font-semibold",
                   !tag.backgroundColor &&
-                    "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+                    "border border-swatch-green bg-swatch-green-soft text-swatch-green-deep",
                 )}
               >
                 {tag.name}
@@ -1722,7 +1768,7 @@ function CustomerBoardCardExpandedView({
       )}
 
       {/* Footer Strip (3 Stars + Activity Badge + Quick 360° Trigger + Owner Initials) */}
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800/80">
+      <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-2">
         <div className="flex min-w-0 items-center gap-2">
           <div
             className="flex items-center gap-0.5"
@@ -1732,64 +1778,72 @@ function CustomerBoardCardExpandedView({
             {[1, 2, 3].map((star) => {
               const filled = star <= item.rating;
               return (
-                <button
+                <Button
                   key={star}
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   disabled={!canUpdate}
                   onClick={() =>
                     onCardChange({ rating: item.rating === star ? 0 : star })
                   }
                   aria-label={`Rate ${star} of 3`}
-                  className="p-0.5 transition-transform hover:scale-110 disabled:cursor-default"
+                  className="size-5 p-0.5 transition-transform hover:scale-110 hover:bg-transparent disabled:cursor-default"
                 >
                   <Star
                     className={cn(
                       "size-3.5",
                       filled
-                        ? "fill-amber-400 text-amber-500"
-                        : "text-slate-300 dark:text-slate-600",
+                        ? "fill-warning text-warning"
+                        : "text-muted-foreground/40",
                     )}
                     aria-hidden="true"
                   />
-                </button>
+                </Button>
               );
             })}
           </div>
 
-          <button
-            type="button"
-            onClick={onOpenActivities}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-opacity hover:opacity-85",
-              activityBadgeTone,
-            )}
-          >
-            <Activity className="size-3 shrink-0" aria-hidden="true" />
-            <span className="max-w-28 truncate">{activityLabelText}</span>
-          </button>
+          {onOpenActivities && item.status !== "BLACKLISTED" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={onOpenActivities}
+              className={cn(
+                "inline-flex h-auto items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-85",
+                activityBadgeTone,
+              )}
+            >
+              <Activity className="size-3 shrink-0" aria-hidden="true" />
+              <span className="max-w-28 truncate">{activityLabelText}</span>
+            </Button>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
           {onOpenQuickModal && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={onOpenQuickModal}
               title={
-                isAr ? "معاينة وتعديل سريع 360°" : "Open 360° Quick-Edit Modal"
+                t.crmCustomerProfiles.ui.board.open_360_quick_edit_modal
               }
               aria-label={
-                isAr ? "معاينة وتعديل سريع 360°" : "Open 360° Quick-Edit Modal"
+                t.crmCustomerProfiles.ui.board.open_360_quick_edit_modal
               }
-              className="flex size-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800"
+              className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
             >
               <Eye className="size-3.5" aria-hidden="true" />
-            </button>
+            </Button>
           )}
 
           {initials && (
             <span
               title={formatTemplate(cardDict.owner, { name: ownerFullName })}
-              className="flex size-6 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-[11px] font-bold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
+              className="flex size-6 items-center justify-center rounded-md border border-swatch-blue bg-swatch-blue-soft text-xs font-semibold text-swatch-blue-deep"
             >
               {initials}
             </span>
@@ -1814,21 +1868,6 @@ interface BoardColumnQuickAddCustomerCardProps {
   onCreated: () => void;
 }
 
-function findDefaultFacebookSourceId(
-  sources: ReadonlyArray<AcquisitionSource>,
-): string {
-  const fb = sources.find((src) => {
-    const en = (src.nameEn ?? "").trim().toLowerCase();
-    const ar = (src.nameAr ?? "").trim().toLowerCase();
-    return (
-      en.includes("facebook") ||
-      ar.includes("فيسبوك") ||
-      ar.includes("فيس بوك")
-    );
-  });
-  return fb?.id ?? sources[0]?.id ?? "";
-}
-
 function BoardColumnQuickAddCustomerCard({
   status,
   statusTitle,
@@ -1839,7 +1878,6 @@ function BoardColumnQuickAddCustomerCard({
   onCreated,
 }: BoardColumnQuickAddCustomerCardProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
   const toast = useToast();
   const fieldMessages = useCrmFieldMessages();
 
@@ -1863,9 +1901,8 @@ function BoardColumnQuickAddCustomerCard({
   const [companyPhones, setCompanyPhones] = useState<string[]>([""]);
   const [contactPhones, setContactPhones] = useState<string[]>([""]);
 
-  // Shared fields: Source (default Facebook) + Rating
+  // Shared fields: optional source + rating
   const [sourceId, setSourceId] = useState("");
-  const resolvedSourceId = sourceId || findDefaultFacebookSourceId(sources);
   const [rating, setRating] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1923,7 +1960,7 @@ function BoardColumnQuickAddCustomerCard({
     onOpenFullModal({
       profileType,
       status,
-      acquisitionSourceId: resolvedSourceId,
+      acquisitionSourceId: sourceId,
       firstName,
       lastName,
       phones: individualPhones.length > 0 ? [...individualPhones] : [""],
@@ -1946,7 +1983,7 @@ function BoardColumnQuickAddCustomerCard({
 
     const bag = new CrmErrorBag(fieldMessages);
     if (sources.length > 0) {
-      bag.required("acquisitionSourceId", resolvedSourceId);
+      bag.required("acquisitionSourceId", sourceId);
     }
 
     if (profileType === "CORPORATE") {
@@ -2005,7 +2042,7 @@ function BoardColumnQuickAddCustomerCard({
       const draft = emptyCreateCustomerProfileForm("quick-contact-1");
       draft.profileType = profileType;
       draft.status = status;
-      draft.acquisitionSourceId = resolvedSourceId;
+      draft.acquisitionSourceId = sourceId;
 
       if (profileType === "CORPORATE") {
         const resolvedCompanyName =
@@ -2054,9 +2091,10 @@ function BoardColumnQuickAddCustomerCard({
       });
 
       if (outcome.kind === "success") {
+        let ratingFollowUpFailed = false;
         if (rating > 0) {
-          await axiosClient
-            .patch(
+          try {
+            await axiosClient.patch(
               customerProfilePath(outcome.value.id),
               { rating },
               {
@@ -2064,17 +2102,25 @@ function BoardColumnQuickAddCustomerCard({
                 skipAutoIdempotency: true,
                 cache: "no-store",
               },
-            )
-            .catch(() => undefined);
+            );
+          } catch (error) {
+            ratingFollowUpFailed = normalizeApiError(error).status !== 403;
+          }
         }
         toast.success(
-          isAr ? "تمت إضافة العميل بنجاح" : "Customer Created",
+          t.crmCustomerProfiles.ui.board.customer_created,
           outcome.value.displayName,
         );
+        if (ratingFollowUpFailed) {
+          toast.warning(
+            t.crmCustomerProfiles.followUpWarningTitle,
+            t.crmCustomerProfiles.followUpWarningMessage,
+          );
+        }
         onCreated();
       } else {
         toast.errorFromApi(
-          isAr ? "تعذّر إنشاء العميل" : "Unable to create customer",
+          t.crmCustomerProfiles.ui.board.unable_to_create_customer,
           outcome.error,
         );
       }
@@ -2090,7 +2136,7 @@ function BoardColumnQuickAddCustomerCard({
       error={errors.acquisitionSourceId}
     >
       <Select
-        value={resolvedSourceId || undefined}
+        value={sourceId || undefined}
         onValueChange={(value) => {
           setSourceId(value);
           clearError("acquisitionSourceId");
@@ -2116,31 +2162,33 @@ function BoardColumnQuickAddCustomerCard({
   );
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/20 p-3 shadow-md dark:bg-emerald-950/20">
+    <div className="flex flex-col gap-2.5 rounded-lg border-2 border-swatch-green bg-swatch-green-soft/20 p-3 shadow-md">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-          <Sparkles className="size-3.5 text-emerald-600" aria-hidden="true" />
+        <span className="flex items-center gap-1 text-xs font-semibold text-swatch-green-deep">
+          <Sparkles className="size-3.5 text-swatch-green" aria-hidden="true" />
           <span>
-            {isAr
-              ? `إضافة سريعة في "${statusTitle}"`
-              : `Quick Add Customer in "${statusTitle}"`}
+            {formatTemplate(t.crmCustomerProfiles.ui.board.quick_add_in_status_2, { statusTitle: statusTitle })}
           </span>
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={handleOpenFullModal}
-          className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+          className="inline-flex h-auto items-center gap-0.5 p-0 text-xs font-semibold text-swatch-green-deep hover:bg-transparent hover:underline"
         >
-          <span>{isAr ? "النموذج الكامل" : "Full Modal"}</span>
+          <span>{t.crmCustomerProfiles.ui.board.full_modal}</span>
           <ExternalLink className="size-2.5" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
 
       {/* Individual vs Company segmented toggle (Individual first & default) */}
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-        <button
+      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => {
             setProfileType("INDIVIDUAL");
             setErrors({});
@@ -2148,15 +2196,17 @@ function BoardColumnQuickAddCustomerCard({
           className={cn(
             "flex items-center justify-center gap-1 rounded-md py-1 text-xs font-semibold transition-all",
             profileType === "INDIVIDUAL"
-              ? "bg-white text-blue-700 shadow-2xs dark:bg-slate-900 dark:text-blue-400"
-              : "text-slate-600 dark:text-slate-400",
+              ? "bg-card text-primary shadow-2xs hover:bg-card"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           <UserRound className="size-3.5" aria-hidden="true" />
-          <span>{isAr ? "فرد" : "Individual"}</span>
-        </button>
-        <button
+          <span>{t.crmCustomerProfiles.ui.board.individual}</span>
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => {
             setProfileType("CORPORATE");
             setErrors({});
@@ -2164,13 +2214,13 @@ function BoardColumnQuickAddCustomerCard({
           className={cn(
             "flex items-center justify-center gap-1 rounded-md py-1 text-xs font-semibold transition-all",
             profileType === "CORPORATE"
-              ? "bg-white text-blue-700 shadow-2xs dark:bg-slate-900 dark:text-blue-400"
-              : "text-slate-600 dark:text-slate-400",
+              ? "bg-card text-primary shadow-2xs hover:bg-card"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           <Building2 className="size-3.5" aria-hidden="true" />
-          <span>{isAr ? "شركة" : "Company"}</span>
-        </button>
+          <span>{t.crmCustomerProfiles.ui.board.company}</span>
+        </Button>
       </div>
 
       {/* ====================================================================
@@ -2195,7 +2245,7 @@ function BoardColumnQuickAddCustomerCard({
                   setFirstName(e.target.value);
                   clearError("firstName");
                 }}
-                placeholder={isAr ? "الاسم الأول" : "First name"}
+                placeholder={t.crmCustomerProfiles.ui.board.first_name}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void handleQuickSave();
                   if (e.key === "Escape") onCancel();
@@ -2215,7 +2265,7 @@ function BoardColumnQuickAddCustomerCard({
                   setLastName(e.target.value);
                   clearError("lastName");
                 }}
-                placeholder={isAr ? "اسم العائلة" : "Last name"}
+                placeholder={t.crmCustomerProfiles.ui.board.last_name}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") void handleQuickSave();
                   if (e.key === "Escape") onCancel();
@@ -2263,9 +2313,11 @@ function BoardColumnQuickAddCustomerCard({
          * 5) Contact Phone
          * ==================================================================== */
         <>
-          <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-200/80 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-900">
-            <button
+          <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-card p-0.5">
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => {
                 setCompanyMode("new");
                 setExistingCompanyPartyId("");
@@ -2275,29 +2327,31 @@ function BoardColumnQuickAddCustomerCard({
                 setErrors({});
               }}
               className={cn(
-                "rounded-md py-1 text-[11px] font-semibold transition-all",
+                "rounded-md py-1 text-xs font-semibold transition-all",
                 companyMode === "new"
-                  ? "bg-emerald-600 text-white shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400",
+                  ? "bg-swatch-green text-primary-foreground shadow-2xs hover:bg-swatch-green/90 hover:text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {isAr ? "شركة جديدة" : "New Company"}
-            </button>
-            <button
+              {t.crmCustomerProfiles.ui.board.new_company}
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => {
                 setCompanyMode("existing");
                 setErrors({});
               }}
               className={cn(
-                "rounded-md py-1 text-[11px] font-semibold transition-all",
+                "rounded-md py-1 text-xs font-semibold transition-all",
                 companyMode === "existing"
-                  ? "bg-emerald-600 text-white shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400",
+                  ? "bg-swatch-green text-primary-foreground shadow-2xs hover:bg-swatch-green/90 hover:text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {isAr ? "شركة حالية" : "Existing Company"}
-            </button>
+              {t.crmCustomerProfiles.ui.board.existing_company}
+            </Button>
           </div>
 
           {/* 1) Company Name (or Existing Company selector) */}
@@ -2324,7 +2378,7 @@ function BoardColumnQuickAddCustomerCard({
             </Field>
           ) : (
             <Field
-              label={isAr ? "شركة حالية" : "Existing Company"}
+              label={t.crmCustomerProfiles.ui.board.existing_company}
               required
               error={errors.existingCompanyPartyId}
             >
@@ -2353,7 +2407,7 @@ function BoardColumnQuickAddCustomerCard({
                 loading={companyLookup.isLoadingCompanies}
                 loadingLabel={t.common.loading}
                 placeholder={
-                  isAr ? "اختر شركة حالية..." : "Select existing company..."
+                  t.crmCustomerProfiles.ui.board.select_existing_company
                 }
                 searchPlaceholder={t.crmShared.searchCompanies}
                 emptyLabel={t.crmShared.noMatchingCompanies}
@@ -2409,7 +2463,7 @@ function BoardColumnQuickAddCustomerCard({
                   setContactFirstName(e.target.value);
                   clearError("contactFirstName");
                 }}
-                placeholder={isAr ? "الاسم الأول" : "First name"}
+                placeholder={t.crmCustomerProfiles.ui.board.first_name}
               />
             </Field>
             <Field
@@ -2424,14 +2478,14 @@ function BoardColumnQuickAddCustomerCard({
                   setContactLastName(e.target.value);
                   clearError("contactLastName");
                 }}
-                placeholder={isAr ? "اسم العائلة" : "Last name"}
+                placeholder={t.crmCustomerProfiles.ui.board.last_name}
               />
             </Field>
           </div>
 
           {/* 5) Contact Phone */}
           <CrmPhoneListField
-            label={isAr ? "هاتف جهة الاتصال" : "Contact Phone"}
+            label={t.crmCustomerProfiles.ui.board.contact_phone}
             phones={contactPhones}
             path="contactPhones"
             errors={errors}
@@ -2467,47 +2521,52 @@ function BoardColumnQuickAddCustomerCard({
           aria-label={t.crmLeads.card.rating}
         >
           {[1, 2, 3].map((st) => (
-            <button
+            <Button
               key={st}
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={() => setRating((prev) => (prev === st ? 0 : st))}
               aria-label={`Rate ${st} of 3`}
-              className="p-0.5 transition-transform hover:scale-110"
+              className="size-5 p-0.5 transition-transform hover:scale-110 hover:bg-transparent"
             >
               <Star
                 className={cn(
                   "size-3.5",
                   st <= rating
-                    ? "fill-amber-400 text-amber-500"
-                    : "text-slate-300 dark:text-slate-600",
+                    ? "fill-warning text-warning"
+                    : "text-muted-foreground/40",
                 )}
               />
-            </button>
+            </Button>
           ))}
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
           >
-            {isAr ? "إلغاء" : "Cancel"}
-          </button>
-          <button
+            {t.crmCustomerProfiles.ui.board.cancel}
+          </Button>
+          <Button
             type="button"
+            size="xs"
             disabled={isSubmitting}
             onClick={() => void handleQuickSave()}
-            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded-lg bg-swatch-green px-3 py-1 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-swatch-green/90 disabled:opacity-50"
           >
             {isSubmitting ? (
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
             ) : (
               <Check className="size-3.5" aria-hidden="true" />
             )}
-            <span>{isAr ? "حفظ" : "Save"}</span>
-          </button>
+            <span>{t.crmCustomerProfiles.ui.board.save}</span>
+          </Button>
         </div>
       </div>
     </div>

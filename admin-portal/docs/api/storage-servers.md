@@ -2,7 +2,7 @@
 
 Status: **SOURCE-INTEGRATED**
 
-Last source verification: **2026-08-25**
+Last source verification: **2026-10-18** (CXADMIN-113 byte capacity; CXADMIN-112 credential action eligibility; CXCORE-ADM-103 rotation recovery)
 
 Core owns the Storage Server registry, encrypted Garage/S3 credentials,
 lifecycle, connection evidence, placement eligibility, and durable probe
@@ -28,8 +28,8 @@ Credentials are write-only. A browser response must never contain an access
 key, secret, ciphertext, IV, tag, master key, provider body, presigned URL, or
 internal credential reference. The UI does not persist form values in local or
 session storage. The one thing it does keep in the browser is a credential
-rotation's record identity, for the reason set out under
-[Credential rotation has no read projection](#credential-rotation-has-no-read-projection);
+rotation's record identity, as described under
+[Credential rotation recovery](#credential-rotation-recovery);
 it carries no key material, no reason text, and nothing from a form.
 
 Core success envelope:
@@ -79,13 +79,22 @@ Permission arrays use ALL semantics.
 | `POST /storage-servers/:id/probe` | update + critical | 200 | `ProbeStorageServerDto` |
 | `POST /storage-servers/:id/offline` | update + critical | 200 | `{}` |
 | `POST /storage-servers/:id/credential-rotations` | update + critical | 200 | `RotateStorageCredentialsDto` |
+| `GET /storage-servers/:id/credential-rotations/current` | read | 200 | none |
+| `POST /storage-servers/:id/credential-rotations/:rotationId/abort` | update + critical | 200 | `{ reason }` |
 | `POST /storage-servers/:id/credential-rotations/:rotationId/revoke` | update + critical | 200 | `{}` |
 | `DELETE /storage-servers/:id` | `admin.storage_servers.delete` + critical | 204 | none |
 
 `id` is UUIDv7. There is no public hard-destroy, credential-read, topology,
 routing-profile, attestation, or migration control in this module.
 
-### Credential rotation has no read projection
+### Credential rotation recovery
+
+The detail screen offers safe rotation for an `ACTIVE` or `DRAINING`
+platform-default server even when `assignedTenants` is zero. It never offers
+credential PATCH for the platform default. Non-default servers retain credential
+PATCH when unassigned or `OFFLINE`; assigned servers in `ACTIVE` or `DRAINING`
+use safe rotation. Other lifecycle states cannot start safe rotation. These
+credential rules are separate from ordinary connection-field edit restrictions.
 
 Safe rotation is two commands separated by hours. The first stages and
 activates the new key and opens a grace window of one to twenty-four hours
@@ -93,24 +102,26 @@ during which both keys work; the second proves the old key is now rejected and
 records the rotation as revoked. Core refuses the second before the grace
 expires, and refuses it without the rotation record's id.
 
-That id is returned once, by the first command. There is no route that lists
-or reads rotations, and `StorageServerView` carries no rotation id, status, or
-grace detail — so the response to the first command is the only place the
-handle has ever existed. Holding it in component state meant a reload, a
-navigation, or simply coming back after the grace window it was waiting out
-destroyed it, and the rotation could no longer be completed from the portal:
-it stayed `ACTIVATED` past its grace and showed up as overdue.
+The detail screen now reads `/credential-rotations/current` alongside server
+detail, including after a failed stage/probe request. Core returns the open
+`STAGED` or `ACTIVATED` command, or `null`; credential material and audit reasons
+are never returned. The browser-local receipt is only a safe temporary cache.
+A fresh Core read supplies the actionable state after reload or from another
+operator's browser. A failed read disables rotation recovery actions.
 
-Until Core exposes the rotation on a read route, the portal keeps the handle in
-this browser, in the shape [a pending command's recovery marker](../architecture/permissions-idempotency-and-state.md#stable-uuidv7-intent)
-uses: a narrow, explicitly listed projection — record id, storage server id,
-lifecycle status, grace expiry, revocation time — validated on the way back in,
-verified by reading back what was written, scoped per storage server, retired
-on revocation, and discarded after thirty days. No key material and no request
-body is part of it. If the browser refuses to store it, the card says so and
-the old rule applies again: finish the revoke from that page or lose the
-handle. This is a browser-local stopgap, not durable server state: it does not
-survive clearing site data and was never visible to another operator.
+A `STAGED` command can be aborted with a trimmed 1–500 character audit reason,
+the exact server-name confirmation and a separate UUIDv7 mutation intent. The
+abort response is `ABORTED` with `abortedAt`; Core retains the command, actor,
+reason and timestamp while leaving active credentials unchanged. Provider keys
+are not revoked. Abort and activation serialize through the same locks and
+stored generation fences; an activated credential returns 409
+`STORAGE_CREDENTIAL_ROTATION_ABORT_FORBIDDEN` rather than rolling back.
+
+An aborted receipt is retired and the screen refreshes authoritative state.
+The operator can then start a corrected rotation or request drain/migration,
+subject to their normal prerequisites. Activated commands continue through the
+existing grace/revocation path. Core database package `0.0.89` must be published,
+adopted with a regenerated lockfile and migrated before this source is deployed.
 
 ## DTOs
 
@@ -131,6 +142,7 @@ interface CreateStorageServerDto {
   bucketName: string;        // lowercase S3 bucket shape, 3..63
   credentials: StorageCredentialsDto;
   maxTenants?: number | null; // 1..1,000,000; null means unlimited
+  maxBytes?: string | null;  // 1..9223372036854775807; null means unlimited
 }
 
 interface UpdateStorageServerDto {
@@ -140,6 +152,7 @@ interface UpdateStorageServerDto {
   bucketName?: string;
   credentials?: StorageCredentialsDto;
   maxTenants?: number | null;
+  maxBytes?: string | null;
   isPlatformDefault?: boolean;
 }
 
@@ -226,6 +239,10 @@ interface StorageServerView {
   bucketName: string;
   status: StorageServerStatus;
   maxTenants: number | null;
+  maxBytes: string | null;
+  reservedBytes: string;
+  committedBytes: string;
+  availableBytes: string | null;
   isPlatformDefault: boolean;
   assignedTenants: number;
   credentialsConfigured: boolean;
@@ -265,6 +282,24 @@ interface StorageServerListQuery {
 Search, filtering, sorting, totals, and pagination are server-authoritative.
 Summary values derived from `items` must be labelled “on this page”; do not
 present page counts as global metrics.
+
+## Byte capacity
+
+Core returns byte capacities as exact decimal strings. `maxBytes: null` and
+`availableBytes: null` mean unlimited; `availableBytes: "0"` means exhausted.
+The list and detail screens display byte limits and availability independently
+of tenant-slot capacity, with explicit bilingual exhaustion feedback. Detail
+also shows reserved and committed bytes. Localized integer formatting uses
+BigInt without rounding through Number.
+
+Create and configuration editing accept an empty field as `maxBytes: null`.
+A finite limit must match `[1-9][0-9]{0,18}` and be at most
+`9223372036854775807`, matching Core's PostgreSQL bigint bound. The form keeps
+the exact input string in the request and idempotency intent. Invalid values
+remain in the form with associated inline feedback before any request. Creation
+requires create + critical; configuration editing requires update + critical.
+Read-only operators can inspect byte capacity but cannot edit it. Core remains
+authoritative for conflicts with existing reserved and committed allocations.
 
 ## Connection evidence and lifecycle
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { useToast } from "@/design-system";
 import { tradeGet } from "../../trade-api";
@@ -41,7 +41,7 @@ export function useInventoryAvailability() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("BRANCH", branchId);
 
   const [values, setValues] = useState<AvailabilityFormValues>(EMPTY_AVAILABILITY_FORM);

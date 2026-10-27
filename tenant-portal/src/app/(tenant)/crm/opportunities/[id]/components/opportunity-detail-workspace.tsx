@@ -32,6 +32,7 @@ import {
   XCircle,
 } from "lucide-react";
 import {
+  AmbiguousOutcomePanel,
   Button,
   ConfirmActionModal,
   CopyButton,
@@ -55,13 +56,20 @@ import {
   type CardColor,
 } from "@/design-system";
 import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
-import { EntityHistoryCard } from "@/components/audit/EntityHistoryCard";
+import { RecordHistoryTab } from "@/components/audit/RecordHistoryTab";
+import { useAuditAccess } from "@/components/audit/hooks/useAuditAccess";
 import { UserProfileLink } from "@/components/people/UserProfileLink";
 import { useAccessMode } from "@/hooks/useAccessMode";
 import { useUserProfiles } from "@/hooks/useUserProfiles";
 import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient } from "@/lib/api/axiosClient";
-import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
+import type { NormalizedApiError } from "@/lib/api/errors";
+import {
+  createWriteAttempt,
+  expectNoContent,
+  runIdempotentWrite,
+  type WriteAttempt,
+  type WriteOptions,
+} from "@/lib/api/idempotent-write";
 import { formatDate } from "@/lib/format/date";
 import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
@@ -72,8 +80,13 @@ import { CrmScopeGate } from "../../../shared/components/CrmScopeGate";
 import { CustomFieldsCard } from "../../../shared/components/CustomFieldsCard";
 import { RecordAttachmentsSection } from "../../../shared/components/RecordAttachmentsSection";
 import { RecordNotesSection } from "../../../shared/components/RecordNotesSection";
+import {
+  useAmbiguousOutcomeLabels,
+  useAppliedUnreadableLabels,
+} from "../../../shared/hooks/useAmbiguousOutcomeLabels";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import { useCrmRecordCapabilities } from "../../../shared/hooks/useCrmRecordCapabilities";
+import { parseCrmTags } from "../../../shared/tag-contract";
 import { TerminalMoveDialog } from "../../components/TerminalMoveDialog";
 import { useOpportunityCapabilities } from "../../hooks/useOpportunityCapabilities";
 import { opportunityCapabilityAllowsOwner } from "../../hooks/usePipelineWorkspace";
@@ -81,6 +94,13 @@ import {
   opportunityPath,
   parseOpportunityDetailResponse,
 } from "../../opportunity-contract";
+import {
+  buildUpdateOpportunityRequest,
+  toOpportunityForm,
+  type OpportunityForm,
+  type UpdateOpportunityRequest,
+} from "../../opportunity-write-contract";
+import { useOpportunityCurrencyOptions } from "../../hooks/useCreateOpportunity";
 import { useOpportunityDetail } from "../hooks/useOpportunityDetail";
 import { useOpportunityEdit } from "../hooks/useOpportunityEdit";
 import { useOpportunityStageMove } from "../hooks/useOpportunityStageMove";
@@ -96,7 +116,13 @@ const STAGE_BAR_TONE: Record<string, "positive" | "negative" | undefined> = {
 
 type DossierWorkspaceTab = "activities" | "notes" | "history" | "attachments";
 
-const CURRENCY_PRESETS = ["USD", "SAR", "EUR", "AED", "GBP"] as const;
+interface DetailWriteFeedback {
+  operation: string;
+  attempt: WriteAttempt;
+  error: NormalizedApiError;
+  replay?: () => Promise<void>;
+}
+
 const PROBABILITY_PRESETS = [10, 25, 50, 75, 90] as const;
 
 function getInitials(title: string): string {
@@ -132,8 +158,10 @@ function OpportunityDetailContent({
   opportunityId: string;
 }) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const canReadHistory = useAuditAccess();
   const describeError = useCrmErrorText();
+  const ambiguousLabels = useAmbiguousOutcomeLabels();
+  const appliedLabels = useAppliedUnreadableLabels();
   const detail = useOpportunityDetail(opportunityId);
   const item = detail.item;
   const { capabilities, error: capabilitiesError } = useOpportunityCapabilities(
@@ -180,16 +208,25 @@ function OpportunityDetailContent({
 
   // Header quick-patch state (importance stars & card color & tags)
   const [savingQuickPatch, setSavingQuickPatch] = useState(false);
+  const [quickPatchError, setQuickPatchError] =
+    useState<NormalizedApiError | null>(null);
+  const [writeFeedback, setWriteFeedback] =
+    useState<DetailWriteFeedback | null>(null);
   const [tagMenuOpen, setTagMenuOpen] = useState(false);
   const [createTagOpen, setCreateTagOpen] = useState(false);
   const tagsCatalogue = useCreateLeadTags(true);
 
   // Inline Commercials Card edit state
   const [isEditingCommercials, setIsEditingCommercials] = useState(false);
+  const currencyOptions = useOpportunityCurrencyOptions(isEditingCommercials);
   const [savingCommercials, setSavingCommercials] = useState(false);
+  const [commercialsBaseline, setCommercialsBaseline] =
+    useState<OpportunityForm | null>(null);
+  const [commercialsError, setCommercialsError] =
+    useState<NormalizedApiError | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftAmount, setDraftAmount] = useState("");
-  const [draftCurrency, setDraftCurrency] = useState("USD");
+  const [draftCurrency, setDraftCurrency] = useState("");
   const [draftProbability, setDraftProbability] = useState("");
   const [draftExpectedClose, setDraftExpectedClose] = useState("");
   const [draftImportance, setDraftImportance] = useState(2);
@@ -201,10 +238,12 @@ function OpportunityDetailContent({
   const [visitedAttachments, setVisitedAttachments] = useState(false);
 
   const startEditingCommercials = () => {
-    if (!item || !canUpdate) return;
+    if (!item || !canUpdate || writeFeedback) return;
+    setCommercialsBaseline(toOpportunityForm(item));
+    setCommercialsError(null);
     setDraftTitle(item.title);
     setDraftAmount(item.amount ?? "");
-    setDraftCurrency(item.currencyCode ?? "USD");
+    setDraftCurrency(item.currencyCode ?? "");
     setDraftProbability(
       item.probabilityPercent !== null ? String(item.probabilityPercent) : "",
     );
@@ -214,143 +253,160 @@ function OpportunityDetailContent({
     setIsEditingCommercials(true);
   };
 
+  const writeDetailChange = async (
+    options: Omit<WriteOptions<unknown>, "attempt">,
+    setSaving: (saving: boolean) => void,
+    setError: (error: NormalizedApiError | null) => void,
+    onApplied?: () => void,
+    operation: string = t.crmOpportunityDetail.editOperation,
+  ) => {
+    const attempt = createWriteAttempt();
+    const send = async (): Promise<void> => {
+      setSaving(true);
+      setError(null);
+      setWriteFeedback(null);
+      try {
+        const outcome = await runIdempotentWrite({ ...options, attempt });
+        if (outcome.kind === "failed") {
+          setError(outcome.error);
+        } else if (outcome.kind === "ambiguous") {
+          setWriteFeedback({ operation, attempt, error: outcome.error, replay: send });
+        } else {
+          if (outcome.kind === "applied_unreadable") {
+            setWriteFeedback({ operation, attempt, error: outcome.error });
+          }
+          onApplied?.();
+          // Commands return persisted entities; reload the enriched detail projection.
+          detail.reload();
+        }
+      } finally {
+        setSaving(false);
+      }
+    };
+    await send();
+  };
+
   const handleSaveCommercials = async () => {
-    if (!item || !canUpdate || savingCommercials) return;
-    setSavingCommercials(true);
+    if (
+      !item || !canUpdate || !commercialsBaseline ||
+      savingCommercials || writeFeedback
+    ) return;
+    let body: UpdateOpportunityRequest;
     try {
-      const parsedAmount =
-        draftAmount.trim().length > 0 ? Number(draftAmount.trim()) : null;
-      const parsedProb =
-        draftProbability.trim().length > 0
-          ? Math.max(0, Math.min(100, Math.round(Number(draftProbability.trim()))))
-          : null;
-      const body: Record<string, unknown> = {
-        title: draftTitle.trim() || item.title,
-        amount:
-          parsedAmount !== null && Number.isFinite(parsedAmount)
-            ? parsedAmount
-            : null,
-        currencyCode:
-          draftCurrency.trim().length === 3
-            ? draftCurrency.trim().toUpperCase()
-            : null,
-        probabilityPercent:
-          parsedProb !== null && Number.isFinite(parsedProb) ? parsedProb : null,
-        expectedCloseDate: draftExpectedClose.trim() || null,
-        importance: draftImportance,
-        description: draftDescription.trim() || null,
-      };
-      const outcome = await runIdempotentWrite({
-        attempt: createWriteAttempt(),
+      body = buildUpdateOpportunityRequest(
+        {
+          ...commercialsBaseline,
+          title: draftTitle,
+          amount: draftAmount,
+          currencyCode: draftCurrency,
+          probabilityPercent: draftProbability,
+          expectedCloseDate: draftExpectedClose,
+          importance: String(draftImportance),
+          description: draftDescription,
+        },
+        commercialsBaseline,
+      );
+    } catch (caught) {
+      setCommercialsError({
+        status: 422,
+        code: caught instanceof Error ? caught.message : undefined,
+      });
+      return;
+    }
+    if (Object.keys(body).length === 0) {
+      setIsEditingCommercials(false);
+      return;
+    }
+    await writeDetailChange(
+      {
         method: "patch",
         path: opportunityPath(item.id),
         body,
         parse: parseOpportunityDetailResponse,
-      });
-      if (outcome.kind === "success") {
-        detail.setItem(outcome.value);
-        setIsEditingCommercials(false);
-      } else if (outcome.kind !== "failed") {
-        setIsEditingCommercials(false);
-        detail.reload();
-      }
-    } finally {
-      setSavingCommercials(false);
-    }
+      },
+      setSavingCommercials,
+      setCommercialsError,
+      () => setIsEditingCommercials(false),
+    );
   };
 
   const handleSaveImportance = async (nextImportance: number) => {
-    if (!item || !canUpdate || savingQuickPatch) return;
-    const clamped = Math.max(1, Math.min(3, nextImportance));
+    if (!item || !canUpdate || savingQuickPatch || writeFeedback) return;
+    const clamped = Math.max(0, Math.min(3, nextImportance));
     if (clamped === item.importance) return;
-    setSavingQuickPatch(true);
-    try {
-      const outcome = await runIdempotentWrite({
-        attempt: createWriteAttempt(),
+    await writeDetailChange(
+      {
         method: "patch",
         path: opportunityPath(item.id),
         body: { importance: clamped },
         parse: parseOpportunityDetailResponse,
-      });
-      if (outcome.kind === "success") {
-        detail.setItem(outcome.value);
-      } else if (outcome.kind !== "failed") {
-        detail.reload();
-      }
-    } finally {
-      setSavingQuickPatch(false);
-    }
+      },
+      setSavingQuickPatch,
+      setQuickPatchError,
+    );
   };
 
   const handleSaveCardColor = async (nextColor: CardColor | null) => {
-    if (!item || !canUpdate || savingQuickPatch) return;
-    setSavingQuickPatch(true);
-    try {
-      const outcome = await runIdempotentWrite({
-        attempt: createWriteAttempt(),
+    if (!item || !canUpdate || savingQuickPatch || writeFeedback) return;
+    await writeDetailChange(
+      {
         method: "patch",
-        path: `${opportunityPath(item.id)}/card-color`,
+        path: opportunityPath(item.id),
         body: { cardColor: nextColor },
         parse: parseOpportunityDetailResponse,
-      });
-      if (outcome.kind === "success") {
-        detail.setItem(outcome.value);
-      } else if (outcome.kind !== "failed") {
-        detail.reload();
-      }
-    } finally {
-      setSavingQuickPatch(false);
-    }
+      },
+      setSavingQuickPatch,
+      setQuickPatchError,
+    );
   };
 
   const handleToggleTag = async (tagId: string, currentlyAttached: boolean) => {
-    if (!item || !canUpdate) return;
-    try {
-      if (currentlyAttached) {
-        await axiosClient.delete(
-          `/api/tenant/crm/v1/opportunities/${encodeURIComponent(item.id)}/tags/${encodeURIComponent(tagId)}`,
-        );
-      } else {
-        await axiosClient.post(
-          `/api/tenant/crm/v1/opportunities/${encodeURIComponent(item.id)}/tags`,
-          { tagId },
-        );
-      }
-      detail.reload();
-    } catch {
-      detail.reload();
-    }
+    if (!item || !canUpdate || savingQuickPatch || writeFeedback) return;
+    await writeDetailChange(
+      currentlyAttached ? {
+        method: "delete",
+        path: `${opportunityPath(item.id)}/tags/${encodeURIComponent(tagId)}`,
+        parse: expectNoContent,
+      } : {
+        method: "post",
+        path: `${opportunityPath(item.id)}/tags`,
+        body: { tagIds: [tagId] },
+        parse: (payload) => parseCrmTags(payload),
+      },
+      setSavingQuickPatch,
+      setQuickPatchError,
+    );
   };
 
   const handleDeleteOpportunity = async () => {
-    if (!item || !canDelete || deleting) return;
-    setDeleting(true);
-    try {
-      const outcome = await runIdempotentWrite({
-        attempt: createWriteAttempt(),
+    if (!item || !canDelete || deleting || writeFeedback) return;
+    await writeDetailChange(
+      {
         method: "delete",
         path: opportunityPath(item.id),
-        parse: () => true,
-      });
-      if (outcome.kind === "success") {
-        setConfirmDeleteOpen(false);
+        parse: expectNoContent,
+      },
+      setDeleting,
+      setQuickPatchError,
+      () => {
         if (typeof window !== "undefined") {
           window.location.assign("/crm/opportunities");
         }
-      }
-    } finally {
-      setDeleting(false);
-    }
+      },
+      t.common.delete,
+    );
+    // Feedback lives in the workspace; dismiss the modal so it can be read.
+    setConfirmDeleteOpen(false);
   };
 
   if (detail.isLoading) {
     return (
       <div className="flex flex-col gap-3">
         <Skeleton className="h-14 rounded-lg" />
-        <Skeleton className="h-28 rounded-xl" />
+        <Skeleton className="h-28 rounded-lg" />
         <div className="grid gap-3 lg:grid-cols-2">
-          <Skeleton className="h-72 rounded-xl" />
-          <Skeleton className="h-72 rounded-xl" />
+          <Skeleton className="h-72 rounded-lg" />
+          <Skeleton className="h-72 rounded-lg" />
         </div>
       </div>
     );
@@ -437,6 +493,33 @@ function OpportunityDetailContent({
 
   return (
     <div className="flex flex-col gap-3 pb-8">
+      {quickPatchError && (
+        <p role="alert" className="text-sm text-destructive">
+          {describeError(quickPatchError)}
+        </p>
+      )}
+      {writeFeedback && (
+        <AmbiguousOutcomePanel
+          operation={writeFeedback.operation}
+          idempotencyKey={writeFeedback.attempt.idempotencyKey}
+          description={
+            writeFeedback.replay
+              ? t.crmOpportunityDetail.ambiguousDescription
+              : t.crmShared.appliedUnreadableDescription
+          }
+          correlationId={writeFeedback.error.correlationId}
+          onRetry={() => {
+            if (writeFeedback.replay) void writeFeedback.replay();
+            else detail.reload();
+          }}
+          onDismiss={() => {
+            setWriteFeedback(null);
+            detail.reload();
+          }}
+          retrying={savingCommercials || savingQuickPatch || deleting}
+          labels={writeFeedback.replay ? ambiguousLabels : appliedLabels}
+        />
+      )}
       <PageActions slot="related">
         <OpportunityRelatedNav item={item} />
       </PageActions>
@@ -472,10 +555,10 @@ function OpportunityDetailContent({
       />
 
       {/* Top Sub-Toolbar: Back to Opportunities + Breadcrumb + Quick Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-muted-foreground">
           <Link href="/crm/opportunities" className="dossier-btn">
-            <ArrowLeft className="size-3.5 rtl:rotate-180" aria-hidden="true" />
+            <ArrowLeft className="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
             <span>{t.crmOpportunityDetail.backToOpportunities}</span>
           </Link>
           <span aria-hidden="true">/</span>
@@ -483,7 +566,7 @@ function OpportunityDetailContent({
           <span aria-hidden="true">›</span>
           <span>{t.crmOpportunities.title}</span>
           <span aria-hidden="true">›</span>
-          <span className="max-w-xs truncate font-bold text-foreground">
+          <span className="max-w-xs truncate font-semibold text-foreground">
             {item.title}
           </span>
         </div>
@@ -491,34 +574,40 @@ function OpportunityDetailContent({
         <div className="flex flex-wrap items-center gap-2">
           {canUpdate && (
             <>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 onClick={transfer.openDialog}
                 disabled={detail.pipelines.length < 2}
                 className="dossier-btn disabled:opacity-50"
               >
                 <ArrowRightLeft className="size-3.5" aria-hidden="true" />
                 <span>{t.crmOpportunityDetail.transferAction}</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 onClick={edit.openDrawer}
                 className="dossier-btn"
               >
                 <Pencil className="size-3.5" aria-hidden="true" />
                 <span>{t.crmLeadDetail.edit}</span>
-              </button>
+              </Button>
             </>
           )}
           {canDelete && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               className="dossier-btn dossier-btn-cancel"
               onClick={() => setConfirmDeleteOpen(true)}
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
               <span>{t.common.delete}</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -554,7 +643,7 @@ function OpportunityDetailContent({
                     : "dossier-badge-status-open",
                 )}
               >
-                ● {isAr ? "الحالة" : "Status"}: {item.status}
+                ● {t.crmOpportunities.statusLabel}: {t.statusValues[`OpportunityStatus.${item.status}`]}
               </span>
               {currentStageName && (
                 <span className="dossier-badge dossier-badge-stage">
@@ -578,34 +667,39 @@ function OpportunityDetailContent({
                 {[1, 2, 3].map((starIndex) => {
                   const active = starIndex <= item.importance;
                   return (
-                    <button
+                    <Button
                       key={starIndex}
                       type="button"
-                      disabled={!canUpdate || savingQuickPatch}
-                      onClick={() => void handleSaveImportance(starIndex)}
+                      variant="ghost"
+                      size="xs"
+                      disabled={!canUpdate || savingQuickPatch || Boolean(writeFeedback)}
+                      onClick={() => void handleSaveImportance(
+                        starIndex === item.importance ? 0 : starIndex,
+                      )}
+                      aria-pressed={starIndex === item.importance}
                       aria-label={formatTemplate(
                         t.crmOpportunities.importanceValue,
-                        { level: starIndex },
+                        { level: starIndex === item.importance ? 0 : starIndex },
                       )}
                       title={formatTemplate(
                         t.crmOpportunities.importanceValue,
-                        { level: starIndex },
+                        { level: starIndex === item.importance ? 0 : starIndex },
                       )}
-                      className="rounded p-0.5 transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100"
+                      className="h-auto w-auto rounded p-0.5 transition-transform hover:scale-110 hover:bg-transparent disabled:cursor-default disabled:hover:scale-100"
                     >
                       <Star
                         className={cn(
                           "size-3.5 transition-colors",
                           active
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-slate-300 dark:text-slate-600",
+                            ? "fill-warning text-warning"
+                            : "text-muted-foreground/40",
                         )}
                         aria-hidden="true"
                       />
-                    </button>
+                    </Button>
                   );
                 })}
-                <span className="ms-1 font-extrabold">{item.importance}/3</span>
+                <span className="ms-1 font-semibold">{item.importance}/3</span>
               </div>
 
               <div
@@ -623,10 +717,12 @@ function OpportunityDetailContent({
                       ? t.crmLeads.card.colorNone
                       : t.crmLeads.card.colors[swatch.color];
                   return (
-                    <button
+                    <Button
                       key={swatch.color ?? "NONE"}
                       type="button"
-                      disabled={!canUpdate || savingQuickPatch}
+                      variant="ghost"
+                      size="xs"
+                      disabled={!canUpdate || savingQuickPatch || writeFeedback !== null}
                       onClick={() => {
                         if (!isSelected) void handleSaveCardColor(swatch.color);
                       }}
@@ -638,7 +734,7 @@ function OpportunityDetailContent({
                           : undefined
                       }
                       className={cn(
-                        "dossier-color-dot transition-transform hover:scale-115 disabled:cursor-default disabled:hover:scale-100",
+                        "dossier-color-dot h-auto w-auto p-0 transition-transform hover:scale-115 disabled:cursor-default disabled:hover:scale-100",
                         swatch.color === null && "none",
                         isSelected && "active",
                       )}
@@ -652,7 +748,7 @@ function OpportunityDetailContent({
                 {item.tags.map((tag) => (
                   <span
                     key={tag.id}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-card/90 px-2 py-0.5 text-[11px] font-semibold text-foreground"
+                    className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-card/90 px-2 py-0.5 text-2xs font-semibold text-foreground"
                   >
                     <span
                       className="size-2 rounded-full"
@@ -662,54 +758,64 @@ function OpportunityDetailContent({
                     />
                     <span>{tag.name}</span>
                     {canUpdate && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => void handleToggleTag(tag.id, true)}
-                        className="ms-0.5 rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                        disabled={savingQuickPatch || writeFeedback !== null}
+                        className="ms-0.5 h-auto w-auto rounded-full p-0.5 text-muted-foreground hover:bg-transparent hover:text-destructive"
                         aria-label={`Remove ${tag.name}`}
                       >
                         <X className="size-2.5" />
-                      </button>
+                      </Button>
                     )}
                   </span>
                 ))}
                 {canUpdate && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={() => setTagMenuOpen((prev) => !prev)}
-                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-card/80 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                    className="inline-flex h-auto items-center gap-1 rounded-full border border-dashed border-border bg-card/80 px-2 py-0.5 text-2xs font-semibold text-muted-foreground hover:border-foreground/40 hover:bg-card hover:text-foreground"
                   >
                     <Tag className="size-3" aria-hidden="true" />
-                    <span>+ {isAr ? "وسم" : "Tag"}</span>
-                  </button>
+                    <span>+ {t.crmOpportunities.tag}</span>
+                  </Button>
                 )}
 
                 {tagMenuOpen && canUpdate && (
-                  <div className="absolute top-full start-0 z-30 mt-1.5 w-56 rounded-xl border border-border bg-popover p-2 shadow-lg">
+                  <div className="absolute top-full start-0 z-(--z-dropdown) mt-1.5 w-56 rounded-lg border border-border bg-popover p-2 shadow-lg">
                     <div className="mb-1.5 flex items-center justify-between px-1">
-                      <span className="text-[11px] font-bold text-muted-foreground">
-                        {isAr ? "إدارة الوسوم" : "Manage Tags"}
+                      <span className="text-2xs font-semibold text-muted-foreground">
+                        {t.crmOpportunities.manageTags}
                       </span>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => setTagMenuOpen(false)}
-                        className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                        className="h-auto w-auto rounded p-0.5 text-muted-foreground hover:bg-transparent hover:text-foreground"
                       >
                         <X className="size-3" />
-                      </button>
+                      </Button>
                     </div>
                     <div className="max-h-44 space-y-1 overflow-y-auto">
                       {tagsCatalogue.items.map((tag) => {
                         const attachedTag = attachedTagIds.has(tag.id);
                         return (
-                          <button
+                          <Button
                             key={tag.id}
                             type="button"
+                            variant="ghost"
+                            size="xs"
+                            disabled={savingQuickPatch || writeFeedback !== null}
                             onClick={() =>
                               void handleToggleTag(tag.id, attachedTag)
                             }
                             className={cn(
-                              "flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-muted",
+                              "flex h-auto w-full items-center justify-between rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-muted",
                               attachedTag && "bg-primary/10 font-semibold",
                             )}
                           >
@@ -726,24 +832,26 @@ function OpportunityDetailContent({
                             {attachedTag && (
                               <Check className="size-3.5 text-primary" />
                             )}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
                     {tagsCatalogue.canManage && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => {
                           setTagMenuOpen(false);
                           setCreateTagOpen(true);
                         }}
-                        className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-1 text-[11px] font-semibold text-primary hover:bg-primary/5"
+                        className="mt-1.5 flex h-auto w-full items-center justify-center gap-1 rounded-lg border border-dashed border-border py-1 text-2xs font-semibold text-primary hover:bg-primary/5"
                       >
                         <Plus className="size-3" />
                         <span>
-                          {isAr ? "إنشاء وسم جديد" : "Create New Tag"}
+                          {t.crmOpportunities.createTag}
                         </span>
-                      </button>
+                      </Button>
                     )}
                   </div>
                 )}
@@ -756,7 +864,7 @@ function OpportunityDetailContent({
                 href={`/crm/customer-profiles/${encodeURIComponent(item.customerProfileId)}`}
                 className="inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary hover:underline"
               >
-                <Building2 className="size-3.5 text-indigo-500" aria-hidden="true" />
+                <Building2 className="size-3.5 text-swatch-indigo" aria-hidden="true" />
                 <span>
                   {item.customerDisplayName ?? t.crmOpportunities.viewCustomer}
                 </span>
@@ -784,10 +892,10 @@ function OpportunityDetailContent({
                   <span className="dossier-dot">·</span>
                   <Link
                     href={`/crm/leads/${encodeURIComponent(item.leadId)}`}
-                    className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                    className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success-subtle px-2 py-0.5 text-2xs font-semibold text-success-subtle-foreground hover:bg-success-subtle/80"
                   >
                     <span>
-                      {isAr ? "محوّل من عميل محتمل" : "Origin Lead"}
+                      {t.crmOpportunities.originLead}
                     </span>
                     <ExternalLink className="size-3" aria-hidden="true" />
                   </Link>
@@ -805,12 +913,12 @@ function OpportunityDetailContent({
 
       {/* Executive 4-KPI Deal Commercial Strip */}
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        <div className="rounded-xl border border-indigo-500/25 bg-indigo-500/5 px-3.5 py-2.5">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+        <div className="rounded-lg border border-swatch-indigo/25 bg-swatch-indigo/5 px-3.5 py-2.5">
+          <div className="flex items-center justify-between text-2xs font-semibold text-muted-foreground">
             <span>{t.crmOpportunityDetail.amount}</span>
-            <DollarSign className="size-3.5 text-indigo-500" aria-hidden="true" />
+            <DollarSign className="size-3.5 text-swatch-indigo" aria-hidden="true" />
           </div>
-          <div className="mt-1 text-base font-extrabold text-foreground">
+          <div className="mt-1 text-base font-semibold text-foreground">
             {item.amount ? (
               <Money
                 value={item.amount}
@@ -824,13 +932,13 @@ function OpportunityDetailContent({
           </div>
         </div>
 
-        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3.5 py-2.5">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+        <div className="rounded-lg border border-success/25 bg-success-subtle/40 px-3.5 py-2.5">
+          <div className="flex items-center justify-between text-2xs font-semibold text-muted-foreground">
             <span>{t.crmOpportunityDetail.probability}</span>
-            <Percent className="size-3.5 text-emerald-500" aria-hidden="true" />
+            <Percent className="size-3.5 text-success" aria-hidden="true" />
           </div>
           <div className="mt-1 flex items-center gap-2">
-            <span className="text-base font-extrabold text-foreground">
+            <span className="text-base font-semibold text-foreground">
               {item.probabilityPercent === null
                 ? t.detail.notRecorded
                 : formatTemplate(t.crmOpportunityDetail.probabilityValue, {
@@ -838,9 +946,9 @@ function OpportunityDetailContent({
                   })}
             </span>
             {item.probabilityPercent !== null && (
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-emerald-500/20">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-success/20">
                 <div
-                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  className="h-full rounded-full bg-success transition-all"
                   style={{
                     width: `${Math.max(0, Math.min(100, item.probabilityPercent))}%`,
                   }}
@@ -850,12 +958,12 @@ function OpportunityDetailContent({
           </div>
         </div>
 
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+        <div className="rounded-lg border border-warning/25 bg-warning-subtle/40 px-3.5 py-2.5">
+          <div className="flex items-center justify-between text-2xs font-semibold text-muted-foreground">
             <span>{t.crmOpportunities.expectedClose}</span>
-            <Calendar className="size-3.5 text-amber-500" aria-hidden="true" />
+            <Calendar className="size-3.5 text-warning" aria-hidden="true" />
           </div>
-          <div className="mt-1 text-sm font-bold text-foreground">
+          <div className="mt-1 text-sm font-semibold text-foreground">
             {item.expectedCloseDate ? (
               <DateTime value={item.expectedCloseDate} precision="date" />
             ) : (
@@ -866,12 +974,12 @@ function OpportunityDetailContent({
           </div>
         </div>
 
-        <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 px-3.5 py-2.5">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+        <div className="rounded-lg border border-info/25 bg-info-subtle/40 px-3.5 py-2.5">
+          <div className="flex items-center justify-between text-2xs font-semibold text-muted-foreground">
             <span>{t.crmOpportunities.owner}</span>
-            <UserRound className="size-3.5 text-sky-500" aria-hidden="true" />
+            <UserRound className="size-3.5 text-info" aria-hidden="true" />
           </div>
-          <div className="mt-1 truncate text-sm font-bold text-foreground">
+          <div className="mt-1 truncate text-sm font-semibold text-foreground">
             {item.ownerUserId ? (
               <UserProfileLink
                 result={ownerResult}
@@ -891,26 +999,22 @@ function OpportunityDetailContent({
         <div
           role="status"
           className={cn(
-            "flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-xs",
+            "flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-2.5 text-xs",
             isWon
-              ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
-              : "border-red-500/35 bg-red-500/10 text-red-800 dark:text-red-200",
+              ? "border-success/35 bg-success-subtle text-success-subtle-foreground"
+              : "border-destructive/35 bg-destructive-subtle text-destructive-subtle-foreground",
           )}
         >
-          <div className="flex items-center gap-2 font-bold">
+          <div className="flex items-center gap-2 font-semibold">
             {isWon ? (
-              <Trophy className="size-4 text-emerald-600" aria-hidden="true" />
+              <Trophy className="size-4 text-success" aria-hidden="true" />
             ) : (
-              <XCircle className="size-4 text-red-600" aria-hidden="true" />
+              <XCircle className="size-4 text-destructive" aria-hidden="true" />
             )}
             <span>
               {isWon
-                ? isAr
-                  ? "تم الفوز بهذه الفرصة البيعية بنجاح"
-                  : "Opportunity Won"
-                : isAr
-                  ? "تم إغلاق الفرصة البيعية كخاسرة"
-                  : "Opportunity Lost"}
+                ? t.crmOpportunities.opportunityWon
+                : t.crmOpportunities.opportunityLost}
             </span>
             {isLost && item.lostReason && (
               <span className="font-normal">
@@ -919,7 +1023,7 @@ function OpportunityDetailContent({
               </span>
             )}
           </div>
-          <div className="text-[11px] font-medium">
+          <div className="text-2xs font-medium">
             {isWon && item.wonAt && (
               <span>
                 {t.crmOpportunityDetail.wonAt}:{" "}
@@ -966,9 +1070,11 @@ function OpportunityDetailContent({
                 !canUpdate || stageMove.isMoving || isCurrent;
 
               return (
-                <button
+                <Button
                   key={entry.id}
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   disabled={stageDisabled}
                   onClick={() => {
                     if (!isCurrent) setPendingStageId(entry.id);
@@ -991,7 +1097,7 @@ function OpportunityDetailContent({
                     <span aria-hidden="true">★</span>
                   ) : null}
                   <span className="truncate">{localizedName(entry, lang)}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -1081,20 +1187,23 @@ function OpportunityDetailContent({
             <div className="dossier-card-header">
               <div className="dossier-card-title">
                 <DollarSign
-                  className="size-4 text-indigo-600 dark:text-indigo-400"
+                  className="size-4 text-swatch-indigo"
                   aria-hidden="true"
                 />
                 <span>{t.crmOpportunityDetail.factsTitle}</span>
               </div>
               {canUpdate && !isEditingCommercials && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={writeFeedback !== null}
                   onClick={startEditingCommercials}
                   className="dossier-btn"
                 >
                   <Pencil className="size-3" aria-hidden="true" />
                   <span>{t.crmLeadDetail.edit}</span>
-                </button>
+                </Button>
               )}
             </div>
 
@@ -1134,6 +1243,7 @@ function OpportunityDetailContent({
                       <div className="flex items-center gap-1.5">
                         <Input
                           size="sm"
+                          aria-label={t.crmLeadConvert.currencyCode}
                           value={draftCurrency}
                           onChange={(e) =>
                             setDraftCurrency(e.target.value.toUpperCase())
@@ -1143,20 +1253,22 @@ function OpportunityDetailContent({
                           className="w-20"
                         />
                         <div className="flex flex-wrap gap-1">
-                          {CURRENCY_PRESETS.map((curr) => (
-                            <button
+                          {currencyOptions.map((curr) => (
+                            <Button
                               key={curr}
                               type="button"
+                              variant="ghost"
+                              size="xs"
                               onClick={() => setDraftCurrency(curr)}
                               className={cn(
-                                "rounded border px-1.5 py-0.5 text-[10px] font-bold transition-colors",
+                                "h-auto rounded border px-1.5 py-0.5 text-2xs font-semibold transition-colors",
                                 draftCurrency === curr
                                   ? "border-primary bg-primary/10 text-primary"
                                   : "border-border bg-muted/40 text-muted-foreground hover:text-foreground",
                               )}
                             >
                               {curr}
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       </div>
@@ -1179,19 +1291,21 @@ function OpportunityDetailContent({
                         />
                         <div className="flex flex-wrap gap-1">
                           {PROBABILITY_PRESETS.map((pct) => (
-                            <button
+                            <Button
                               key={pct}
                               type="button"
+                              variant="ghost"
+                              size="xs"
                               onClick={() => setDraftProbability(String(pct))}
                               className={cn(
-                                "rounded border px-1.5 py-0.5 text-[10px] font-bold transition-colors",
+                                "h-auto rounded border px-1.5 py-0.5 text-2xs font-semibold transition-colors",
                                 draftProbability === String(pct)
-                                  ? "border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                  ? "border-success bg-success-subtle text-success-subtle-foreground"
                                   : "border-border bg-muted/40 text-muted-foreground hover:text-foreground",
                               )}
                             >
                               {pct}%
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       </div>
@@ -1217,14 +1331,16 @@ function OpportunityDetailContent({
                     </label>
                     <div className="flex items-center gap-1.5">
                       {[1, 2, 3].map((lvl) => (
-                        <button
+                        <Button
                           key={lvl}
                           type="button"
+                          variant="ghost"
+                          size="xs"
                           onClick={() => setDraftImportance(lvl)}
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors",
+                            "inline-flex h-auto items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors",
                             draftImportance === lvl
-                              ? "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                              ? "border-warning/50 bg-warning-subtle text-warning-subtle-foreground"
                               : "border-border bg-card text-muted-foreground hover:text-foreground",
                           )}
                         >
@@ -1232,12 +1348,12 @@ function OpportunityDetailContent({
                             className={cn(
                               "size-3.5",
                               lvl <= draftImportance
-                                ? "fill-amber-400 text-amber-400"
+                                ? "fill-warning text-warning"
                                 : "text-muted-foreground/40",
                             )}
                           />
                           <span>{lvl}★</span>
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   </div>
@@ -1254,23 +1370,32 @@ function OpportunityDetailContent({
                     />
                   </div>
 
+                  {commercialsError && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {describeError(commercialsError)}
+                    </p>
+                  )}
                   <div className="flex items-center justify-end gap-2 pt-1">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       disabled={savingCommercials}
                       onClick={() => setIsEditingCommercials(false)}
                       className="dossier-btn"
                     >
                       {t.common.cancel}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      disabled={savingCommercials}
+                      variant="ghost"
+                      size="xs"
+                      disabled={savingCommercials || writeFeedback !== null}
                       onClick={() => void handleSaveCommercials()}
                       className="dossier-btn dossier-btn-primary"
                     >
                       {t.common.save}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -1288,7 +1413,7 @@ function OpportunityDetailContent({
                     <span className="dossier-field-label">
                       {t.crmOpportunityDetail.amount}
                     </span>
-                    <span className="dossier-field-value font-bold">
+                    <span className="dossier-field-value font-semibold">
                       {item.amount ? (
                         <Money
                           value={item.amount}
@@ -1395,7 +1520,7 @@ function OpportunityDetailContent({
             <div className="dossier-card-header">
               <div className="dossier-card-title">
                 <Building2
-                  className="size-4 text-emerald-600 dark:text-emerald-400"
+                  className="size-4 text-success"
                   aria-hidden="true"
                 />
                 <span>{t.crmLeadDetail.ownershipTitle}</span>
@@ -1417,7 +1542,7 @@ function OpportunityDetailContent({
                   </span>
                   <Link
                     href={`/crm/customer-profiles/${encodeURIComponent(item.customerProfileId)}`}
-                    className="dossier-field-value inline-flex items-center gap-1 font-bold text-primary hover:underline"
+                    className="dossier-field-value inline-flex items-center gap-1 font-semibold text-primary hover:underline"
                   >
                     <span>
                       {item.customerDisplayName ??
@@ -1481,9 +1606,9 @@ function OpportunityDetailContent({
 
               {/* Primary Contact Direct Reach Channels */}
               {(primaryContactPhone || item.primaryContact?.email || item.customerEmail) && (
-                  <div className="rounded-xl border border-border/70 bg-muted/25 p-3">
-                    <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                      {isAr ? "قنوات التواصل السريع" : "Direct Contact Channels"}
+                  <div className="rounded-lg border border-border/70 bg-muted/25 p-3">
+                    <div className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t.crmOpportunities.directContactChannels}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {primaryContactPhone && (
@@ -1493,7 +1618,7 @@ function OpportunityDetailContent({
                             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
                           >
                             <Phone
-                              className="size-3.5 text-emerald-600"
+                              className="size-3.5 text-success"
                               aria-hidden="true"
                             />
                             <span dir="ltr">{primaryContactPhone}</span>
@@ -1504,7 +1629,7 @@ function OpportunityDetailContent({
                                 href={`https://wa.me/${contactDigits}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+                                className="inline-flex items-center gap-1 rounded-lg border border-success/30 bg-success-subtle px-2.5 py-1 text-xs font-semibold text-success-subtle-foreground hover:bg-success-subtle/80"
                               >
                                 <MessageCircle
                                   className="size-3.5"
@@ -1516,7 +1641,7 @@ function OpportunityDetailContent({
                                 href={`https://t.me/+${contactDigits}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-500/20 dark:text-sky-300"
+                                className="inline-flex items-center gap-1 rounded-lg border border-info/30 bg-info-subtle px-2.5 py-1 text-xs font-semibold text-info-subtle-foreground hover:bg-info-subtle/80"
                               >
                                 <Send className="size-3.5" aria-hidden="true" />
                                 <span>Telegram</span>
@@ -1532,7 +1657,7 @@ function OpportunityDetailContent({
                           className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-muted"
                         >
                           <Mail
-                            className="size-3.5 text-indigo-600"
+                            className="size-3.5 text-swatch-indigo"
                             aria-hidden="true"
                           />
                           <span dir="ltr">
@@ -1546,7 +1671,7 @@ function OpportunityDetailContent({
 
               {/* Record Metadata */}
               <div className="border-t border-border/60 pt-3">
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <div className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t.crmLeadDetail.recordTitle}
                 </div>
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -1555,7 +1680,7 @@ function OpportunityDetailContent({
                       {t.crmOpportunityDetail.opportunityId}
                     </span>
                     <span className="dossier-field-value flex items-center gap-1">
-                      <span className="break-all font-mono text-xs" dir="ltr">
+                      <span className="wrap-anywhere font-mono text-xs tabular-nums" dir="ltr">
                         {item.id}
                       </span>
                       <CopyButton
@@ -1630,12 +1755,14 @@ function OpportunityDetailContent({
                     Icon: Paperclip,
                   },
                 ] as const
-              ).map(({ id, label, Icon }) => {
+              ).filter(({ id }) => id !== "history" || canReadHistory).map(({ id, label, Icon }) => {
                 const isActive = activeInlineTab === id;
                 return (
-                  <button
+                  <Button
                     key={id}
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => {
@@ -1646,7 +1773,7 @@ function OpportunityDetailContent({
                   >
                     <Icon className="size-3.5 shrink-0" aria-hidden="true" />
                     <span className="truncate">{label}</span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -1674,7 +1801,6 @@ function OpportunityDetailContent({
                     sourceId={item.id}
                     sourceOwnerUserId={item.ownerUserId}
                     createCapability={attached.capabilities.notesCreate}
-                    deleteCapability={attached.capabilities.notesDelete}
                     readOnly={!canMutate}
                   />
                 </div>
@@ -1682,7 +1808,7 @@ function OpportunityDetailContent({
 
               {activeInlineTab === "history" && (
                 <div role="tabpanel">
-                  <EntityHistoryCard
+                  <RecordHistoryTab
                     density="compact"
                     entityType="Opportunity"
                     entityId={item.id}

@@ -19,7 +19,7 @@ import {
 import {
   ConfirmActionModal,
   type ConfirmActionModalProps,
-} from "@/design-system/patterns/confirm-action/ConfirmActionModal";
+} from "@/design-system";
 
 export interface DestructiveActionModalProps {
   isOpen: boolean;

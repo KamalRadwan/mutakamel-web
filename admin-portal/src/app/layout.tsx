@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
-import { plexArabic, plexLatin, plexMono } from "./fonts";
+import { uiArabic, uiLatin, uiMono } from "./fonts";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { DirectionBridge } from "@/i18n/DirectionBridge";
 import { ToastProvider } from "@/components/ui/ToastContext";
@@ -33,7 +33,7 @@ export default function RootLayout({
     <html
       lang="ar"
       dir="rtl"
-      className={`${plexLatin.variable} ${plexArabic.variable} ${plexMono.variable}`}
+      className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable}`}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>

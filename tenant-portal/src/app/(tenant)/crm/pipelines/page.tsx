@@ -21,7 +21,7 @@ import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { CreatePipelineModal } from "./components/CreatePipelineModal";
-import { useOpportunityStageCatalogue } from "./hooks/useOpportunityStageCatalogue";
+import { useOpportunityStageCatalogue } from "../shared/hooks/useOpportunityStageCatalogue";
 import { usePipelineColumns } from "./components/usePipelineColumns";
 import { usePipelines, type PipelineWriteResult } from "./hooks/usePipelines";
 import type { Pipeline } from "./pipeline-contract";
@@ -90,9 +90,9 @@ export default function PipelinesPage() {
   });
 
   return (
-    <PermissionGate require="crm.pipelines.read">
+    <PermissionGate require="crm.pipelines.read" denied={queryError?.status === 403}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.crmPipelines.title}
           description={t.crmPipelines.subtitle}
           primaryAction={

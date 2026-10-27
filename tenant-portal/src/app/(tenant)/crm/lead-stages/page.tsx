@@ -17,6 +17,7 @@ import {
   type ColumnDef,
 } from "@/design-system";
 import { localizedName } from "@/lib/format/localized";
+import { useAccessMode } from "@/hooks/useAccessMode";
 import { formatTemplate } from "@/lib/format/template";
 import { CreateLeadStagesModal } from "./components/CreateLeadStagesModal";
 import { DeleteLeadStagesConfirmModal } from "./components/DeleteLeadStagesConfirmModal";
@@ -30,6 +31,7 @@ import {
 const CRM_SETUP_ITEMS = NAV_SECTIONS.find((section) => section.id === "crmSetup")?.items ?? [];
 
 export default function LeadStagesPage() {
+  const { canMutate } = useAccessMode();
   const {
     t,
     items,
@@ -38,7 +40,7 @@ export default function LeadStagesPage() {
     settingDefaultId,
     error,
     loadError,
-    canManage,
+    canManage: capabilityCanManage,
     searchQuery,
     setSearchQuery,
     isCreateOpen,
@@ -66,6 +68,7 @@ export default function LeadStagesPage() {
     handleReorder,
     lang,
   } = useLeadStages();
+  const canManage = canMutate && capabilityCanManage;
 
   const columns: ColumnDef<LeadStageItem>[] = [
     {
@@ -121,57 +124,101 @@ export default function LeadStagesPage() {
               <div className="flex items-center justify-end gap-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                      tabIndex={isProtectedLeadStage(item) || isUpdating ? 0 : undefined}
+                      role={isProtectedLeadStage(item) || isUpdating ? "group" : undefined}
+                      aria-disabled={isProtectedLeadStage(item) || isUpdating || undefined}
+                      aria-label={isProtectedLeadStage(item) || isUpdating
+                        ? `${t.crmLeadStages.editTitle}: ${localizedName(item, lang)}. ${isProtectedLeadStage(item) ? t.crmLeadStages.protectedHint : t.crmConfigActionHints.pending}`
+                        : undefined}
+                    >
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => openEdit(item)}
                       disabled={isProtectedLeadStage(item) || isUpdating}
+                      className="disabled:pointer-events-none"
                       aria-label={`${t.crmLeadStages.editTitle}: ${item.nameEn}`}
                     >
                       <Pencil className="size-4" aria-hidden="true" />
                     </Button>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     {isProtectedLeadStage(item)
                       ? t.crmLeadStages.protectedHint
-                      : t.crmLeadStages.editTitle}
+                      : isUpdating ? t.crmConfigActionHints.pending : t.crmLeadStages.editTitle}
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                      tabIndex={!canBeDefaultLeadStage(item) || item.isDefault || settingDefaultId !== null ? 0 : undefined}
+                      role={!canBeDefaultLeadStage(item) || item.isDefault || settingDefaultId !== null ? "group" : undefined}
+                      aria-disabled={!canBeDefaultLeadStage(item) || item.isDefault || settingDefaultId !== null || undefined}
+                      aria-label={!canBeDefaultLeadStage(item) || item.isDefault || settingDefaultId !== null
+                        ? `${t.crmLeadStages.setDefault}: ${localizedName(item, lang)}. ${item.flag === "DISQUALIFIED" || item.flag === "CONVERTED"
+                          ? t.crmLeadStages.terminalDefaultHint
+                          : !item.isActive ? t.crmConfigActionHints.inactiveStage
+                          : item.isDefault ? t.crmConfigActionHints.alreadyDefault
+                          : t.crmConfigActionHints.pending}`
+                        : undefined}
+                    >
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => void handleSetDefault(item)}
                       disabled={!canBeDefaultLeadStage(item) || item.isDefault || settingDefaultId !== null}
+                      className="disabled:pointer-events-none"
                       loading={settingDefaultId === item.id}
                       aria-label={`${t.crmLeadStages.setDefault}: ${item.nameEn}`}
                     >
                       <Star className="size-4" aria-hidden="true" />
                     </Button>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     {item.flag === "DISQUALIFIED" || item.flag === "CONVERTED"
                       ? t.crmLeadStages.terminalDefaultHint
+                      : !item.isActive ? t.crmConfigActionHints.inactiveStage
+                      : item.isDefault ? t.crmConfigActionHints.alreadyDefault
+                      : settingDefaultId !== null ? t.crmConfigActionHints.pending
                       : t.crmLeadStages.setDefault}
                   </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
+                    <span
+                      className="inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+                      tabIndex={isProtectedLeadStage(item) || item.isDefault || isDeleting ? 0 : undefined}
+                      role={isProtectedLeadStage(item) || item.isDefault || isDeleting ? "group" : undefined}
+                      aria-disabled={isProtectedLeadStage(item) || item.isDefault || isDeleting || undefined}
+                      aria-label={isProtectedLeadStage(item) || item.isDefault || isDeleting
+                        ? `${t.common.delete}: ${localizedName(item, lang)}. ${isProtectedLeadStage(item)
+                          ? t.crmLeadStages.protectedHint
+                          : item.isDefault ? t.crmConfigActionHints.defaultStageDelete
+                          : t.crmConfigActionHints.pending}`
+                        : undefined}
+                    >
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => openDelete(item)}
                       disabled={isProtectedLeadStage(item) || item.isDefault || isDeleting}
+                      className="disabled:pointer-events-none"
                       aria-label={`${t.common.delete}: ${item.nameEn}`}
                     >
                       <Trash2 className="size-4 text-destructive" aria-hidden="true" />
                     </Button>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     {isProtectedLeadStage(item)
                       ? t.crmLeadStages.protectedHint
-                      : t.common.delete}
+                      : item.isDefault ? t.crmConfigActionHints.defaultStageDelete
+                      : isDeleting ? t.crmConfigActionHints.pending : t.common.delete}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -186,9 +233,9 @@ export default function LeadStagesPage() {
   // load error — AGENTS.md, docs/design/states.md. Permission string and
   // scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
   return (
-    <PermissionGate require="crm.lead_stages.read">
+    <PermissionGate require="crm.lead_stages.read" denied={loadError?.status === 403}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.crm.salesFunnelStagesLeadStag}
           description={t.crm.preparingAndSequencingTheS}
           primaryAction={canManage ? { label: t.crm.addANewStage, onClick: openCreate } : undefined}
@@ -277,7 +324,7 @@ export default function LeadStagesPage() {
             is entitled to treat the pair as one child. */}
         <CreateLeadStagesModal
           key={isCreateOpen ? "create-open" : "create-closed"}
-          isOpen={isCreateOpen}
+          isOpen={canManage && isCreateOpen}
           isSubmitting={isCreating}
           error={createError}
           onClose={closeCreate}
@@ -286,7 +333,7 @@ export default function LeadStagesPage() {
 
         <EditLeadStageModal
           key={`edit-${selectedForEdit?.id ?? "closed"}`}
-          stage={selectedForEdit}
+          stage={canManage ? selectedForEdit : null}
           isSubmitting={isUpdating}
           error={editError}
           onClose={closeEdit}
@@ -294,7 +341,7 @@ export default function LeadStagesPage() {
         />
 
         <DeleteLeadStagesConfirmModal
-          isOpen={selectedForDelete !== null}
+          isOpen={canManage && selectedForDelete !== null}
           isSubmitting={isDeleting}
           item={selectedForDelete}
           error={deleteError}

@@ -1,9 +1,47 @@
 # Trade — Advanced and Analytics
 
+Action admission reviewed **2026-10-24** (AUD24-FE-TENANT-04): the advanced
+`useTradeScope` filters its permission keys through `permissionScopes` and
+`can()` for the request's selected company/branch, or tenant-wide target.
+All `hasTradePermission` callers consume this filtered list. Unresolved
+selections disable admission, including the owner bypass until selection is
+complete. The server's exact-target guard remains authoritative; the auth
+projection cannot distinguish every exact grant target.
+
+Error contract reviewed **2026-10-18** (SHARED-I18N-DEAD-001): Trade retains
+its HTTP statuses and uses common's bilingual error envelope. Import size,
+type, scan, validation and missing-mapping failures now use distinct codes;
+the portal maps those codes directly to its dictionaries. Inventory missing
+records, extension conflicts, policy publication test conflicts and dashboard
+scope/widget refusals also have distinct codes, defined in Trade's
+`src/common/i18n/trade-error-splits.ts`. Arabic and English feedback remains
+available. Runtime verification is pending.
+
+Pricing successor publication verified **2026-10-18**: the existing
+`POST /api/tenant/trade/v1/price-book-versions/:id/publish` accepts optional
+`supersedesVersionId` (UUIDv7). The version page provides a labeled predecessor
+field for eligible publishers. The server verifies the same Price Book, passing
+test evidence, maker/checker and If-Match, then atomically records eligibility
+ending at the successor's effectiveFrom. The successor may start immediately or
+in the future. Original dates/content and historical pins remain unchanged;
+new evaluations use the half-open eligibility interval. Leaving the field empty
+preserves ordinary publication. Requires coordinated Trade schema-release-002.
+
 Status: **verified**
 
 Last source verification: **2026-08-31** (re-verified during the Phase 12
 build: Q90, Q91 and Q92 below were found then and are corrected inline)
+
+Control Tower evidence permissions re-verified: **2026-10-17** (CLXAPP-134).
+
+Price-book publish eligibility re-verified: **2026-10-18** (CXPORTAL-TRADE-118).
+The version detail exposes `version.createdByUserId` from the stored creator.
+Publish requires the existing `trade.policy.publish` grant (or tenant owner),
+TESTED status, passing latest evidence for the current checksum, and a signed-in
+user different from the creator. Missing identities, loading/errors and pending
+actions disable publishing. The portal lists localized reasons linked to the
+button with `aria-describedby`; its handler also refuses ineligible publication.
+Server lifecycle and maker-checker enforcement remain authoritative.
 
 Owning app: **trade-app**
 
@@ -88,8 +126,8 @@ and apply unchanged here, **with two exceptions on this page**:
 
 | Dialect | Parameters | Where |
 | --- | --- | --- |
-| **Offset page** | `page` (≥ 1) + `limit` | policies, workflows, document profiles, extension profiles and versions, import mappings, import runs, import results, webhook subscriptions, webhook deliveries, control-tower exceptions |
-| **Limit only** | `limit` only — **no `page`** | inventory periods, inventory UOM conversions, inventory serials, inventory decisions, share-targets |
+| **Offset page** | `page` (≥ 1) + `limit` | inventory periods, inventory UOM conversions, inventory serials, inventory decisions, policies, workflows, document profiles, extension profiles and versions, import mappings, import runs, import results, webhook subscriptions, webhook deliveries, control-tower exceptions |
+| **Limit only** | `limit` only — **no `page`** | share-targets |
 | **Limit + offset** | `limit` + **`offset`** (≥ 0) | `GET /dashboards` |
 | **None** | no query DTO at all | `GET /widgets`, `GET /dashboards/catalog` |
 
@@ -111,6 +149,39 @@ No route on this page is cursor-paged. The only cursor in Trade is on
 ## Inventory — 26 routes
 
 Feature gate: **`trade.inventory`** on every route.
+
+Governance pagination source reviewed **2026-10-26** (AUD26-TRADE-03).
+The four COMPANY-scoped GET lists `/inventory/periods`, `/inventory/uom-conversions`,
+`/inventory/serials` and `/inventory/decisions` accept integer `page` (≥ 1, default 1)
+and `limit` (1–100, default 50), returning `{ items, total, page, limit }` inside
+the Trade `data` envelope. `total` counts all rows matching the existing scope
+and filters, including when the requested page is empty. Invalid pagination
+returns 400. Permissions and feature checks are unchanged.
+
+Ordering is periods by `startsOn DESC, id ASC`, UOM revisions by
+`itemCompanyProfileId ASC, revisionNumber DESC, id ASC`, serials by
+`lastTransitionAt DESC, id ASC`, and decisions by `evaluatedAt DESC, id DESC`.
+These are offset pages over current data, not a snapshot across requests.
+The live portal validates the envelope and provides bilingual pagination in
+all views, resetting to page 1 when Company/Branch or server filters change.
+Searches performed locally on a loaded page still apply only to that page.
+Gateway routes forward these query parameters without a separate list caller.
+Runtime verification is pending lead checks.
+
+Movement node picker source reviewed **2026-10-24** (AUD24-TRADE-03): node
+lists use the resolved BRANCH headers, including the selected branch, and
+require `trade.inventory.read`. Changing scope clears the previous nodes;
+aborted requests cannot restore them. Load failures appear through the existing
+localized movement form error display instead of leaving an unexplained empty picker.
+
+Reservation responses re-verified **2026-10-18** (CXPORTAL-TRADE-116): creation
+and release return the reservation entity with `id`, `fulfillmentNodeId`, `version`,
+`status`, `quantity`, `releasedQuantity` and `consumedQuantity`. The portal
+validates these fields and calculates remaining reserved quantity exactly as
+`quantity - releasedQuantity - consumedQuantity`. Both the session ledger and
+dossier show remaining and cumulative released quantities. Status is authoritative:
+`ACTIVE`, `PARTIALLY_RELEASED`, `PARTIALLY_CONSUMED`, `RELEASED`, `CONSUMED`,
+`CLOSED` or `BACKORDERED`; it is never inferred from a successful release request.
 
 | Method | Canonical path | Permission | Scope target |
 | --- | --- | --- | --- |
@@ -169,25 +240,76 @@ route.**
 
 | DTO | Fields |
 | --- | --- |
+| `InventoryPeriodListQueryDto` | `page`, `limit`; `status?` (`OPEN`/`CLOSED`), `effectiveAt?` (strict ISO 8601) |
+| `InventoryUomConversionListQueryDto` | `page`, `limit`; `itemCompanyProfileId?`, `fromUomId?`, `toUomId?` (UUIDv7), `status?` (`DRAFT`/`PUBLISHED`/`RETIRED`) |
+| `InventorySerialListQueryDto` | `page`, `limit`; `itemId?`, `itemCompanyProfileId?` (UUIDv7), `serialKey?` (exact match, ≤ 120), `state?` (`ON_HAND`/`RESERVED`/`DELIVERED`/`VOIDED`) |
+| `InventoryDecisionListQueryDto` | `page`, `limit`; `aggregateId?` (UUIDv7), `policyKind?` (`INVENTORY_RESERVATION`/`INVENTORY_NEGATIVE`/`INVENTORY_OVER_RECEIPT`) |
 | `AvailabilityQueryDto` | `nodeId` **required**, `itemId` **required**, `uomId?`, `lotKey?` (≤ 120), `serialKey?` (≤ 120) — **not a list; one item at one node per call** |
 | `CreateNodeDto` | `code` (≤ 80), `name` (≤ 160), `nodeType` (`WAREHOUSE`/`STORE`/`VIRTUAL`), `timezone` (≤ 64), `branchIds[]` (1–100 UUID v7) |
 | `UpdateNodeDto` | `name?`, `status?` (`ACTIVE`/`INACTIVE`), `timezone?`, `branchIds?` (1–100) |
 | `OpeningBalanceDto` | `nodeId`, `itemId`, `uomId`, `quantity` (**positive** decimal string), `itemProfileVersion` (int ≥ 1), `businessEffectiveAt` (ISO 8601 strict), `operationKey` (UUID v7), `tracking?` (**defaults to `{}`**) |
 | `CreateReservationDto` | `nodeId`, `itemId`, `uomId`, `quantity`, `sourceDocumentId`, `sourceLineId`, `sourceDocumentVersion` (int ≥ 1), `sourceLineVersion` (int ≥ 1), `intentKey` (UUID v7), `expiresAt?`, `tracking?` |
-| `ReleaseReservationDto` | `quantity?` (positive; omit for a full release), `reasonCode?` (≤ 80) |
+| `ReleaseReservationDto` | `quantity?` (positive), `serialKeys?` (explicit subset; quantity defaults to selected count), `reasonCode?` (≤ 80); omit quantity and selection for a full release |
 | `CreateReceiptDto` | `nodeId`, `purchaseOrderId`, `operationKey` (UUID v7), `sourceDocumentVersion` (int ≥ 1), `businessEffectiveAt`, `lines[]` (1–500) |
 | `ReceiptLineDto` | `purchaseOrderLineId`, `sourceLineVersion`, `uomId`, `quantity`, `tracking?` |
 | `CreateDeliveryDto` | `nodeId`, `salesOrderId`, `operationKey`, `sourceDocumentVersion`, `businessEffectiveAt`, `lines[]` (1–500) |
 | `DeliveryLineDto` | `salesOrderLineId`, `reservationId?`, `sourceLineVersion`, `uomId`, `quantity`, `tracking?` |
-| `ReverseMovementDto` | `reasonCode` (≤ 80) **required**, `businessEffectiveAt` **required**, `lines?` (1–500 `{ lineId, quantity }` — omit for a full reversal) |
+| `ReverseMovementDto` | `reasonCode` (≤ 80) **required**, `businessEffectiveAt` **required**, `lines?` (1–500 `{ lineId, quantity, serialKeys? }` — omit for a full reversal) |
 | `CreateInventoryPeriodDto` | `code` (`^[A-Z][A-Z0-9_.-]{1,79}$`), `startsOn` / `endsOn` (`YYYY-MM-DD`, **not ISO date-time**), `maxBackdateDays` (0–366) |
 | `InventoryPeriodTransitionDto` | `reasonCode` — must match the same `^[A-Z][A-Z0-9_.-]{1,79}$` code pattern, **not free text** |
 | `CreateInventoryUomConversionDto` | `itemCompanyProfileId`, `fromUomId`, `toUomId`, `factorNumerator` / `factorDenominator` (**`^[1-9]\d{0,17}$` — positive integers as strings, not decimals**), `effectiveFrom` |
 | `InventoryUomConversionActionDto` | `reasonCode` — same uppercase code pattern |
 
+#### Portal serial and expiry tracking
+
+Source reviewed **2026-10-26** (SR004-PORTAL-SERIAL) against inventory DTOs,
+`inventory-serial.ts` and `inventory.service.ts`, after release 004 activation.
+Opening balance, reservation, receipt and delivery forms send `tracking.serialKeys`
+arrays. Enter one serial per line; surrounding whitespace is trimmed and internal
+spaces are preserved. Serials must be unique, 1–120 characters, not the reserved
+value `none`, with a count equal to quantity. Blank lines are rejected. Quantities
+remain editable and decimal strings are preserved; serial count comparison is exact.
+The backend checks the item profile, UOM conversion and serial availability.
+Reservation creation also exposes `lotKey`. Stock expiry stays date-only in
+`tracking.expiryDate`; reservation-level `expiresAt` stays an ISO timestamp.
+
+Partial releases send top-level `serialKeys`; omitted quantity uses the selected
+count, and omitting both releases all remaining units. Partial reversals send
+`lines[].lineId`, `quantity` and an explicit `serialKeys` subset. Omitting lines
+reverses all remaining units. The portal retains validated movement line IDs and
+original serials from create responses in the session, and displays them beside
+the reversal editor. These are historical identities, not an availability claim:
+the server rejects selections already consumed, released or reversed. Manual line
+IDs remain usable for records outside this session; there is still no movement GET.
+Reversal status is taken from the response, including `PARTIALLY_REVERSED`.
+All new guidance and local validation are bilingual. Runtime verification pending.
+
+#### Portal UOM ratio assistance
+
+Reviewed **2026-10-17** (CXPORTAL-TRADE-115). The create-conversion modal
+normalizes the complete numerator/denominator expression using exact `BigInt`
+arithmetic and reduces it before offering Apply. It displays the original and
+equivalent ratios together: `1 / 2.5 = 2 / 5`, `2 / 2.5 = 4 / 5`, and
+`1.5 / 2 = 3 / 4`. Apply replaces both fields with those equivalent integers.
+Both operands must be valid positive decimal or integer strings; incomplete,
+zero, negative, and non-decimal operands produce no suggestion. Suggestions
+whose reduced factors exceed the DTO's 18-digit limit are also withheld.
+Decimal inputs are never rounded or sent directly to the API.
+
 `operationKey` and `intentKey` are **caller-supplied UUID v7 idempotency
 tokens inside the body**, in addition to the `x-idempotency-key` header. They
 are the movement's business identity; reuse them on a retry.
+
+Inventory movement writes retain the exact request, scope headers and HTTP key
+in the mounted page after an uncertain outcome (source reviewed **2026-10-26**,
+AUD26-FE-TENANT-01; runtime verification pending). An unchanged
+submission reuses both identities. Changed payloads, branches and other operations
+are blocked while a transport failure (status 0), server failure (5xx), or an
+unparseable success response leaves the outcome unknown. Every definitive client
+rejection (4xx, including 409/412/413) releases the fence, even on an unchanged
+retry, so corrected inputs or If-Match values use fresh request identities.
+A page reload loses this recovery state,
+just as it loses the session ledger; resolve an uncertain write before leaving.
 
 ### Statuses
 
@@ -204,7 +326,7 @@ All six are inline `@IsIn` lists on query DTOs, **not exported enums**. There
 is no separate receipt or delivery status enum anywhere in source.
 
 **Periods and UOM conversions have no `GET` by id either.** Each has a
-limit-only list and two transitions, and nothing that reads one row. MASTER-PLAN
+paged list and two transitions, and nothing that reads one row. MASTER-PLAN
 12.27 names periods among the detail pages to build; there is no route behind
 that one either. Recorded as **Q90**. Both rows do carry `version`, so the
 `If-Match` a transition needs is available from the list without a second read.
@@ -213,14 +335,16 @@ that one either. Recorded as **Q90**. Both rows do carry `version`, so the
 
 | `code` | Status | When |
 | --- | --- | --- |
-| `TRADE.INVENTORY.SCOPE_INVALID` | **422**, also **404** | node not reachable from the scope |
+| `TRADE.INVENTORY.SCOPE_INVALID` | **422** | scope validation failed |
+| `TRADE.INVENTORY.SCOPE_NOT_FOUND` | **404** | scope record not found |
 | `TRADE.INVENTORY.NODE_INVALID` | 422 | |
 | `TRADE.INVENTORY.ITEM_NOT_STOCK_TRACKED` | 422 | the item's company profile has `trackInventory: false` |
 | `TRADE.INVENTORY.QUANTITY_INVALID` | 422 | |
 | `TRADE.INVENTORY.TRACKING_REQUIRED` | 422 | a `LOT`/`SERIAL` item was moved without `tracking` |
 | `TRADE.INVENTORY.TRACKING_UNSUPPORTED` | 422 | `tracking` sent for a `NONE` item |
 | `TRADE.INVENTORY.INSUFFICIENT_AVAILABILITY` | 422 | |
-| `TRADE.INVENTORY.PERIOD_CLOSED` | **422**, also **409** | `businessEffectiveAt` falls in a closed period |
+| `TRADE.INVENTORY.PERIOD_CLOSED` | **422** | `businessEffectiveAt` falls in a closed period |
+| `TRADE.INVENTORY.PERIOD_CONFLICT` | **409** | period transition refused |
 | `TRADE.INVENTORY.POLICY_REJECTED` | 422 | an inventory policy refused the movement |
 | `TRADE.INVENTORY.UOM_CONVERSION_INVALID` | 422 | |
 | `TRADE.INVENTORY.UOM_CONVERSION_UNAVAILABLE` | 422 | no published conversion for the pair |
@@ -236,7 +360,8 @@ exception:
 | --- | --- | --- |
 | `TRADE.INVENTORY.RECEIPT_NOT_ALLOWED` | **409** | duplicate `purchaseOrderLineId` in the request, and every refused receipt precondition |
 | `TRADE.INVENTORY.DELIVERY_NOT_ALLOWED` | **409** | duplicate `salesOrderLineId` or duplicate `reservationId`, and every refused delivery precondition |
-| `TRADE.INVENTORY.RELEASE_NOT_ALLOWED` | **409**, also **404** | 404 when the reservation is not found in the company scope, 409 for a refused release |
+| `TRADE.INVENTORY.RELEASE_NOT_ALLOWED` | **409** | release refused |
+| `TRADE.INVENTORY.RELEASE_NOT_FOUND` | **404** | reservation not found in company scope |
 | `TRADE.INVENTORY.REVERSAL_NOT_ALLOWED` | **409** | more than the per-post line cap, duplicate `lineId`, or a refused reversal |
 | `TRADE.INVENTORY.NODE_IN_USE` | **409** | deactivating a node that still carries stock or references |
 | `TRADE.INVENTORY.SERIAL_CONFLICT` | **409** | three sites in `inventory.service.ts` |
@@ -255,6 +380,15 @@ indistinguishably.
 ## Price books — 7 routes
 
 Feature gate: **`trade.pricing`**. All target **`COMPANY`**.
+
+Price-book test reporting re-verified: **2026-10-17** (CXPORTAL-TRADE-117).
+The test action returns HTTP 200 for both passed and failed validation. The
+portal validates `passed`, `entryCount`, `promotionCount`, `conflicts` and
+`promotionConflicts` before showing the result. Only `passed: true` announces
+success. A failed report remains visible on the version page after the detail
+refresh, with separate entry and promotion conflict lists containing the exact
+server diagnostics; an empty version also displays the no-entries explanation.
+The report shown here belongs to the test run in the current page session.
 
 | Method | Canonical path | Permission |
 | --- | --- | --- |
@@ -298,6 +432,18 @@ Decimal-string fields on this page: `minimumQuantity`, `maximumQuantity`,
 
 ### Pricing evaluation — 1 route
 
+Simulator behavior reviewed **2026-10-18**: each decision retains an immutable
+snapshot of the evaluated inputs and company/branch scope headers. Editing any
+input (including presets) or changing scope hides the previous result and disables
+pinning it until a matching evaluation succeeds. Summary calculations use the
+evaluated quantity. Subtotal and savings use the shared bigint decimal helpers
+(eight-decimal half-up multiplication), with savings floored at zero. The exact
+decimal strings reach `Money` unchanged; totals use the currency's Intl fraction
+precision, including three decimals for KWD. Verified **2026-10-18** (CXPORTAL-TRADE-120).
+Comparisons retain the original evaluated inputs and scope,
+even after later form edits. A response arriving after inputs or scope change
+cannot appear as a decision for the new inputs.
+
 `POST /pricing/evaluate` is a `READ_HEAVY` **200** POST. It takes **no
 idempotency key** — the handler has no `@Headers("x-idempotency-key")` and the
 Gateway route class is `READ_HEAVY`, not `WRITE_SENSITIVE`.
@@ -312,7 +458,8 @@ Failures that matter to the line editor:
 | `code` | Status | Meaning for the UI |
 | --- | --- | --- |
 | `TRADE.PRICE.NO_ELIGIBLE_PRICE` | **404** | no price applies. **404, not 422** — do not render it as a not-found page |
-| `TRADE.PRICE.AMBIGUOUS_RULES` | **422**, also **409** | two rules tie; a human must resolve it |
+| `TRADE.PRICE.AMBIGUOUS_RULES` | **409** | pricing rules conflict |
+| `TRADE.PRICE.RULE_SELECTION_INVALID` | **422** | selected rules are ambiguous |
 | `TRADE.PRICE.TIER_OVERLAP` | 422 | |
 | `TRADE.PRICE.VERSION_OVERLAP` | 409 | |
 | `TRADE.PRICE.BOOK_NOT_FOUND` | 404 | |
@@ -451,13 +598,15 @@ unvalidated `@IsObject()` at the pipe and is checked by
 | `TRADE.POLICY.DEFINITION_INVALID` | 422 |
 | `TRADE.POLICY.EXPRESSION_INVALID` | 422 |
 | `TRADE.POLICY.OUTPUT_INVALID` | 422 |
-| `TRADE.POLICY.TEST_FAILED` | **422**, also **409** |
+| `TRADE.POLICY.TEST_FAILED` | **422** |
+| `TRADE.POLICY.TEST_CONFLICT` | **409** |
 | `TRADE.POLICY.PUBLISH_NOT_ALLOWED` | 409 |
 | `TRADE.POLICY.EFFECTIVE_OVERLAP` | 409 |
 | `TRADE.POLICY.DECISION_UNAVAILABLE` | **503** |
 | `TRADE.WORKFLOW.DEFINITION_INVALID` | 422 |
 | `TRADE.APPROVAL.MAKER_CHECKER_REQUIRED` | 409 |
-| `TRADE.AUTH.TARGET_DENIED` | **422** here — `policy-studio.service.ts` throws `UnprocessableEntityException` when the request's resolved target does not equal the definition's `scopeTarget`. The same code is a 403 from the guard |
+| `TRADE.AUTH.TARGET_INVALID` | **422** — the request's execution target does not match the definition's scope |
+| `TRADE.AUTH.TARGET_DENIED` | **403** — permission refused at this scope |
 
 `TRADE.POLICY.VIEW_SENSITIVE_FACTS` is a permission
 (`trade.policy.view_sensitive_facts`) that **gates no route**.
@@ -509,7 +658,8 @@ pointer. Both must be current or the call fails.
 | `TRADE.DOCUMENT_PROFILE.IDENTITY_TAKEN` | 409 |
 | `TRADE.DOCUMENT_PROFILE.SCHEMA_INVALID` | 422 |
 | `TRADE.DOCUMENT_PROFILE.SCOPE_NOT_ALLOWED` | 422 |
-| `TRADE.DOCUMENT_PROFILE.COMPATIBILITY_FAILED` | **422**, also **409** |
+| `TRADE.DOCUMENT_PROFILE.COMPATIBILITY_FAILED` | **422** |
+| `TRADE.DOCUMENT_PROFILE.COMPATIBILITY_CHANGED` | **409** |
 | `TRADE.DOCUMENT_PROFILE.REQUIRED_CASES_FAILED` | 422 |
 | `TRADE.DOCUMENT_PROFILE.VALIDATION_LIMIT_EXCEEDED` | 422 |
 | `TRADE.DOCUMENT_PROFILE.PUBLISH_NOT_READY` | 409 |
@@ -558,8 +708,11 @@ owning document's route, not from an extensions route.
 
 | `code` | Status |
 | --- | --- |
-| `TRADE.EXTENSION.DEFINITION_INVALID` | **404**, **409** and **422** — three distinct failures, one code |
-| `TRADE.EXTENSION.PROFILE_INCOMPATIBLE` | **422**, also **409** |
+| `TRADE.EXTENSION.DEFINITION_INVALID` | **422** — invalid definition |
+| `TRADE.EXTENSION.DEFINITION_NOT_FOUND` | **404** — missing definition |
+| `TRADE.EXTENSION.DEFINITION_CONFLICT` | **409** — definition conflicts |
+| `TRADE.EXTENSION.PROFILE_INCOMPATIBLE` | **422** |
+| `TRADE.EXTENSION.PROFILE_CONFLICT` | **409** |
 | `TRADE.EXTENSION.VALUE_INVALID` | 422 |
 | `TRADE.EXTENSION.RESERVED_FIELD` | **422** — `extension-profiles.service.ts` catches a `RangeError` from field validation and maps it to this code; anything else becomes `DEFINITION_INVALID`. The two are the same 422 and differ only in the code |
 
@@ -648,8 +801,13 @@ list and nothing else. Recorded as **Q39**.
 
 | `code` | Status | Note |
 | --- | --- | --- |
-| `TRADE.IMPORT.FILE_UNSAFE` | **400**, **409**, **413**, **415** and **422** | **five statuses on one code**, from six throw sites. The only way to tell "too big" from "wrong type" from "virus-scan pending" is the HTTP status |
-| `TRADE.IMPORT.MAPPING_INVALID` | **422**, also **404** | |
+| `TRADE.IMPORT.FILE_UNSAFE` | **400** | missing upload |
+| `TRADE.IMPORT.FILE_SCAN_PENDING` | **409** | safety check incomplete |
+| `TRADE.IMPORT.FILE_TOO_LARGE` | **413** | size exceeds limit |
+| `TRADE.IMPORT.FILE_TYPE_UNSUPPORTED` | **415** | unsupported media type |
+| `TRADE.IMPORT.FILE_REJECTED` | **422** | source validation failed |
+| `TRADE.IMPORT.MAPPING_INVALID` | **422** | invalid mapping |
+| `TRADE.IMPORT.MAPPING_NOT_FOUND` | **404** | missing mapping |
 | `TRADE.IMPORT.SCOPE_MISMATCH` | 422 | the mapping's scope does not match the request context |
 | `TRADE.IMPORT.SOURCE_RELEASE_FORBIDDEN` | **403** | **not in `TRADE_ERROR_CODES`** |
 | `TRADE.STORAGE.UNAVAILABLE` | **503** | **not in `TRADE_ERROR_CODES`** |
@@ -658,6 +816,8 @@ list and nothing else. Recorded as **Q39**.
 ---
 
 ## Webhooks — 11 routes
+
+Rotation overlap source verification: **2026-10-17** (CLWORKER-102).
 
 Feature gate: `allOf: [trade.automation]` + `anyOf: [catalog, sales,
 purchasing, inventory]`. All target `OPERATING_CONTEXT`.
@@ -685,10 +845,19 @@ webhook grant.
 | `CreateWebhookSubscriptionDto` | `code`, `scopeTarget` (`TENANT`/`COMPANY` — **not `BRANCH`**), `endpointUri` (≤ 2048), `retryPolicyCode` (`EXPONENTIAL_STANDARD`/`EXPONENTIAL_CONSERVATIVE`), `maxAttempts` (**int 1–10**), `branchIds?` (≤ 100, **defaults to `[]`**), `events[]` (1–30) |
 | `WebhookEventDto` | `eventType` (≤ 160), `eventVersion` (int 1–10), `fields[]` (1–40 strings, each ≤ 100) |
 | `UpdateWebhookSubscriptionDto` | all optional; `status?` — `@IsIn(["ACTIVE","DISABLED"])` |
-| `RotateWebhookSecretDto` | `overlapHours` (**int 0–168, default 24**) |
+| `RotateWebhookSecretDto` | `overlapHours` (**int 30–168, default 30**; null and fractional values are rejected) |
 | `WebhookSubscriptionListQueryDto` | `page`, `limit` (default 50), `status?` — `@IsIn(["DRAFT","ACTIVE","DISABLED"])` |
 | `WebhookDeliveryListQueryDto` | `page`, `limit` (default 50), `status?` |
 | `RetryWebhookDeliveryDto` | `reasonCode` **required**, matching a safe-reason-code pattern |
+
+The 30-hour minimum covers the longest configured ten-attempt conservative
+retry schedule (106,860 seconds of waits plus bounded attempt durations).
+The portal defaults to 30 and rejects values outside 30–168 before sending
+a rotation. Each Worker dispatch/retry resolves the subscription's current
+`ACTIVE` secret, so deliveries queued before an already accepted zero-overlap
+rotation use the new key. The original delivery pin stays immutable; each
+attempt and result records the reference actually used for signing. Revoking
+the last active key still prevents signing until a new active key exists.
 
 Subscription status: **`DRAFT`** · **`ACTIVE`** · **`DISABLED`** on the list
 filter, but `UpdateWebhookSubscriptionDto` can only set **`ACTIVE`** or
@@ -710,7 +879,8 @@ secret, the API cannot supply it.
 | `code` | Status |
 | --- | --- |
 | `TRADE.WEBHOOK.ENDPOINT_FORBIDDEN` | 422 — the endpoint failed the SSRF/host policy |
-| `TRADE.WEBHOOK.PAYLOAD_FORBIDDEN` | **404**, also **422** |
+| `TRADE.WEBHOOK.PAYLOAD_FORBIDDEN` | **404** |
+| `TRADE.WEBHOOK.PAYLOAD_INVALID` | **422** |
 | `TRADE.WEBHOOK.SECRET_VERSION_INVALID` | 409 |
 | `TRADE.WEBHOOK.DELIVERY_NOT_RETRYABLE` | 409 |
 | `TRADE.DEPENDENCY.TIMEOUT` | 503 |
@@ -787,12 +957,19 @@ rows.
 | `TRADE.CONTROL_TOWER.RETRY_NOT_ALLOWED` | 409 |
 | `TRADE.CONTROL_TOWER.RETRY_IN_PROGRESS` | 409 |
 | `TRADE.CONTROL_TOWER.TARGET_STALE` | 409 |
-| `TRADE.CONTROL_TOWER.RESOLUTION_INVALID` | **409**, also **422** |
+| `TRADE.CONTROL_TOWER.RESOLUTION_INVALID` | **422** |
+| `TRADE.CONTROL_TOWER.RESOLUTION_CONFLICT` | **409** |
 | `TRADE.CONTROL_TOWER.PROJECTION_UNAVAILABLE` | **503** |
 | `TRADE.CONTROL_TOWER.OWNER_UNAVAILABLE` | **503** |
 | `TRADE.CONTROL_TOWER.QUERY_INVALID` | — no throw site found |
 
-`trade.control_tower.view_sensitive` is a permission that **gates no route**.
+`trade.control_tower.view_sensitive` is a separate **field permission**:
+list/detail include `resolutionEvidence` only for a `RESOLVED` exception
+when the actor holds the grant in the current exact operating scope (or is
+the active tenant owner). Otherwise the field is omitted; the rest of the
+exception remains readable under `trade.control_tower.read`. Resolve write
+acknowledgements omit evidence for all callers, including idempotent
+replays. Open list/detail with the sensitive grant to inspect stored proof.
 
 ---
 
@@ -843,6 +1020,18 @@ only `trade.dashboards.read`, not `.update`.
 `DASHBOARD_CONTEXT`, sending nothing resolves to `TENANT` and is legal.
 
 ### Dashboards and widgets are shaped differently
+
+Action admission re-verified **2026-10-18** (CXPORTAL-TRADE-121): dashboard
+layout and placement mutations require OWNER or EDIT resource access together
+with `trade.dashboards.update`. Dashboard and widget share mutations require
+OWNER resource access together with `trade.dashboards.share` or
+`trade.widgets.share`, respectively. The detail hooks enforce these checks
+before sending mutations, and the screens hide unavailable controls and show
+bilingual explanations. Grants must cover the company sent in the scope
+headers; without a company header, any accessible grant scope suffices, matching
+`TradeDashboardAuthorizationService.assertAnyPermission`. Tenant owners bypass
+the grant check but still need the required resource access. Server checks
+remain authoritative.
 
 Three departures from every other Trade family:
 
@@ -972,9 +1161,12 @@ company scopes, ≤ 100 share targets, ≤ 24-month sync range, widget height
 | `code` | Status |
 | --- | --- |
 | `TRADE.DASHBOARD.NOT_FOUND` | 404 |
-| `TRADE.DASHBOARD.SCOPE_DENIED` | **403**, also **422** |
+| `TRADE.DASHBOARD.SCOPE_DENIED` | **403** |
+| `TRADE.DASHBOARD.SCOPE_INVALID` | **422** |
 | `TRADE.DASHBOARD.SOURCE_PERMISSION_REQUIRED` | **403** |
-| `TRADE.DASHBOARD.WIDGET_UNAVAILABLE` | **403**, **404** and **422** — three statuses, one code |
+| `TRADE.DASHBOARD.WIDGET_UNAVAILABLE` | **404** — missing widget |
+| `TRADE.DASHBOARD.WIDGET_ACCESS_DENIED` | **403** — access refused |
+| `TRADE.DASHBOARD.WIDGET_INVALID` | **422** — widget cannot execute |
 | `TRADE.DASHBOARD.REVISION_CONFLICT` | 409 |
 | `TRADE.DASHBOARD.NAME_CONFLICT` | 409 |
 | `TRADE.DASHBOARD.LAYOUT_OVERLAP` | 409 |
@@ -1017,6 +1209,13 @@ them; the portal must treat those two 422 codes as permission states.
 ---
 
 ## Widgets — 11 routes
+
+Saved-widget preview re-verified **2026-10-18** (CXPORTAL-TRADE-122): the
+portal validates and retains the complete `querySpec` and `displaySpec` from
+the saved record. Preview sends those specs unchanged, including filters,
+dimension, grain, comparison, series axis/aggregation and display options,
+with the saved name and visualization type and a fresh UUIDv7 `requestId`.
+Backend metric permissions and company/branch scope checks still apply.
 
 Feature gate: **`trade.analytics`**. All target `DASHBOARD_CONTEXT`, with the
 same guard bypass and the same `revision`-based concurrency as dashboards.
@@ -1118,10 +1317,6 @@ widget code family.
   above, but the full envelope of a run result (per-placement structure,
   freshness metadata, drill-through payload) was not enumerated field by
   field.
-- **`DashboardWidgetQuerySpecDto` and `DashboardDisplaySpecDto` field lists.**
-  They are large nested DTOs in `dto/dashboard.dto.ts` (658 lines) and were
-  read only far enough to confirm they are required and validated. The widget
-  editor will need a dedicated pass over them.
 - **The `GET /decisions/:id` response shape.** `DecisionType` and
   `PolicyOutputKind` are exhaustive; the receipt body was not read.
 - **Codes in `TRADE_ERROR_CODES` with no reference anywhere in

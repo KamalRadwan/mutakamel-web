@@ -21,6 +21,8 @@ const note = {
   sourceId: SOURCE,
   body: "Customer asked for pricing by branch.",
   createdByUserId: AUTHOR,
+  canEdit: true,
+  canDelete: false,
   createdAt: "2026-06-24T15:00:00.000Z",
   updatedAt: "2026-06-24T15:15:00.000Z",
 };
@@ -45,7 +47,7 @@ describe("CRM notes contract", () => {
     expect(CRM_NOTE_SOURCE_TYPES).toHaveLength(5);
   });
 
-  it("reads a note row off the raw entity", () => {
+  it("reads a note row with server action flags", () => {
     expect(parseCrmNote(note)).toEqual({
       id: NOTE_ID,
       branchId: BRANCH,
@@ -53,6 +55,8 @@ describe("CRM notes contract", () => {
       sourceId: SOURCE,
       body: note.body,
       createdByUserId: AUTHOR,
+      canEdit: true,
+      canDelete: false,
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
     });
@@ -60,6 +64,17 @@ describe("CRM notes contract", () => {
 
   it("treats a missing author as null rather than as invalid", () => {
     expect(parseCrmNote({ ...note, createdByUserId: null }).createdByUserId).toBeNull();
+  });
+
+  it.each([undefined, null, 1, "true"])("rejects non-boolean action flags: %s", (value) => {
+    expect(() => parseCrmNote({ ...note, canEdit: value })).toThrow();
+    expect(() => parseCrmNote({ ...note, canDelete: value })).toThrow();
+  });
+
+  it("preserves denied edit and permitted delete independently", () => {
+    expect(parseCrmNote({ ...note, canEdit: false, canDelete: true })).toMatchObject({
+      canEdit: false, canDelete: true,
+    });
   });
 
   it("rejects an empty body, an over-long body and a malformed id", () => {

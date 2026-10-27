@@ -22,9 +22,10 @@ import {
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
 import { formatNumber } from "@/lib/format/number";
-import type {
-  OpportunityStageDefinition,
-  PipelineStage,
+import {
+  moveStageOrder,
+  type OpportunityStageDefinition,
+  type PipelineStage,
 } from "../pipeline-contract";
 
 interface PipelineStagesSectionProps {
@@ -78,7 +79,7 @@ export function PipelineStagesSection({
           />
         ) : (
           <ol className="flex flex-col gap-1.5">
-            {stages.map((stage, index) => (
+            {stages.map((stage) => (
               <li
                 key={stage.id}
                 aria-busy={pendingStageId === stage.id || undefined}
@@ -109,7 +110,7 @@ export function PipelineStagesSection({
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled={index === 0 || pendingStageId !== null}
+                      disabled={moveStageOrder(stages, stage.id, -1) === null || pendingStageId !== null}
                       aria-label={`${t.crmPipelines.moveEarlier}: ${localizedName(stage, lang)}`}
                       onClick={() => onMove(stage.id, -1)}
                     >
@@ -119,32 +120,34 @@ export function PipelineStagesSection({
                       variant="ghost"
                       size="sm"
                       disabled={
-                        index === stages.length - 1 || pendingStageId !== null
+                        moveStageOrder(stages, stage.id, 1) === null || pendingStageId !== null
                       }
                       aria-label={`${t.crmPipelines.moveLater}: ${localizedName(stage, lang)}`}
                       onClick={() => onMove(stage.id, 1)}
                     >
                       <ChevronDown className="size-4" aria-hidden="true" />
                     </Button>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={pendingStageId !== null}
-                          aria-label={`${t.crmPipelines.detachStage}: ${localizedName(stage, lang)}`}
-                          onClick={() => onDetach(stage.id)}
-                        >
-                          <Trash2
-                            className="size-4 text-destructive"
-                            aria-hidden="true"
-                          />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {t.crmPipelines.detachStage}
-                      </TooltipContent>
-                    </Tooltip>
+                    {stage.flag !== "NEW" && stage.flag !== "WON" && stage.flag !== "LOST" ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={pendingStageId !== null}
+                            aria-label={`${t.crmPipelines.detachStage}: ${localizedName(stage, lang)}`}
+                            onClick={() => onDetach(stage.id)}
+                          >
+                            <Trash2
+                              className="size-4 text-destructive"
+                              aria-hidden="true"
+                            />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {t.crmPipelines.detachStage}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
                   </div>
                 ) : null}
               </li>

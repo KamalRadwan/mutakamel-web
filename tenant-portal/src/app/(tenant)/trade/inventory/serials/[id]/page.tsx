@@ -107,7 +107,7 @@ export default function InventorySerialPage({
                   <ScanBarcode className="size-4" aria-hidden="true" />
                 </span>
               </div>
-              <span className="font-mono text-lg font-semibold text-foreground">
+              <span dir="ltr" className="font-mono text-lg font-semibold text-foreground">
                 {tradeStatusLabel(
                   t.tradeStatus,
                   serial.state,
@@ -136,7 +136,7 @@ export default function InventorySerialPage({
                   <Warehouse className="size-4" aria-hidden="true" />
                 </span>
               </div>
-              <span className="font-mono text-sm font-semibold text-foreground">
+              <span dir="ltr" className="font-mono text-sm font-semibold text-foreground">
                 {serial.currentFulfillmentNodeId
                   ? `${serial.currentFulfillmentNodeId.slice(0, 12)}…`
                   : isAr
@@ -165,7 +165,7 @@ export default function InventorySerialPage({
                   <History className="size-4" aria-hidden="true" />
                 </span>
               </div>
-              <span className="font-mono text-xl font-semibold text-foreground">
+              <span dir="ltr" className="font-mono text-xl font-semibold tabular-nums text-foreground">
                 {serial.lifecycle.length} {isAr ? "حدث" : "events"}
               </span>
             </div>

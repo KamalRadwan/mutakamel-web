@@ -31,14 +31,20 @@ export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNa
   return (
     <aside
       className={cn(
-        "h-full flex-col bg-sidebar text-sidebar-foreground",
+        "h-full flex-col bg-surface-column text-foreground",
         variant === "desktop"
-          ? "fixed inset-y-0 start-0 z-40 hidden border-e border-sidebar-border transition-[width] duration-150 motion-reduce:transition-none lg:flex"
+          ? "fixed inset-y-0 start-0 z-40 hidden border-e border-line-column transition-[width] duration-150 motion-reduce:transition-none lg:flex"
           : "flex",
       )}
       style={variant === "desktop" ? { width: isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_EXPANDED_WIDTH } : undefined}
     >
-      <div className={cn("flex h-12 shrink-0 items-center border-b border-sidebar-border", isCollapsed ? "justify-center px-2" : "gap-2.5 px-3")}>
+      <div
+        className={cn(
+          "flex h-12 shrink-0 items-center border-b border-line-column",
+          isCollapsed ? "justify-center px-2" : "gap-2.5 px-3",
+          variant === "mobile" && "pe-10",
+        )}
+      >
         <Link
           // Not "/dashboard": that route is gated on admin.reports.read, and
           // the brand is always visible. Staff without it could reach every
@@ -51,16 +57,16 @@ export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNa
           className={cn(
             "flex min-w-0 items-center gap-2.5 rounded-md outline-none",
             focusRing,
-            "focus-visible:ring-sidebar-ring focus-visible:ring-offset-sidebar",
+            "focus-visible:ring-offset-surface-column",
             hitArea,
           )}
         >
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-            <ShieldCheck className="size-4" aria-hidden="true" />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-logo text-white">
+            <ShieldCheck className="size-4 text-white" aria-hidden="true" />
           </span>
           {!isCollapsed && (
             <span className="flex min-w-0 flex-col leading-none">
-              <span className="truncate text-sm font-semibold text-sidebar-foreground">
+              <span className="truncate text-sm font-semibold text-foreground">
                 {lang === "ar" ? "متكامل" : "Mutakamel"}
               </span>
               <span className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -78,7 +84,7 @@ export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNa
       </nav>
 
       {pinnedSections.length > 0 && (
-        <div className="shrink-0 border-t border-sidebar-border px-2 py-3">
+        <div className="shrink-0 border-t border-line-column px-2 py-3">
           {pinnedSections.map((section) => (
             <SidebarGroup key={section.key} section={section} collapsed={isCollapsed} activeItem={activeItem} lang={lang} onNavigate={onNavigate} />
           ))}
@@ -86,7 +92,7 @@ export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNa
       )}
 
       {variant === "desktop" && (
-        <div className="shrink-0 border-t border-sidebar-border p-2">
+        <div className="shrink-0 border-t border-line-column p-2">
           <Button
             type="button"
             variant="ghost"
@@ -100,7 +106,7 @@ export function Sidebar({ collapsed, onToggleCollapse, variant = "desktop", onNa
             title={`${lang === "ar" ? "تبديل الشريط الجانبي" : "Toggle sidebar"} (Ctrl/⌘+B)`}
             aria-keyshortcuts="Control+B Meta+B"
             className={cn(
-              "h-8 w-full justify-start gap-2 px-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring focus-visible:ring-offset-sidebar",
+              "h-8 w-full justify-start gap-2 px-2 text-foreground-secondary hover:bg-surface-subtle hover:text-foreground focus-visible:ring-offset-surface-column",
               isCollapsed && "justify-center",
             )}
           >
@@ -135,8 +141,8 @@ function SidebarGroup({
       {!collapsed && section.labelKey && (
         <p
           className={cn(
-            "px-2.5 pb-1 text-xs font-semibold text-muted-foreground/80",
-            lang === "ar" ? "tracking-normal" : "uppercase tracking-wider",
+            "px-2.5 pb-1 text-badge font-bold uppercase text-muted-foreground",
+            lang === "ar" ? "tracking-normal" : "tracking-wider",
           )}
         >
           {lang === "ar" ? section.labelKey.ar : section.labelKey.en}
@@ -172,23 +178,16 @@ function SidebarLink({
       aria-label={collapsed ? label : undefined}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex h-8 items-center gap-2.5 rounded-md text-xs outline-none transition-colors motion-reduce:transition-none",
+        "relative flex h-8 items-center gap-2.5 rounded-lg text-xs outline-none transition-colors motion-reduce:transition-none",
         collapsed ? "justify-center px-0" : "px-2.5",
         active
-          ? "bg-sidebar-selected font-medium text-sidebar-selected-foreground"
-          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        "motion-reduce:transition-none",
+          ? "bg-gradient-primary font-semibold text-white shadow-nav-active"
+          : "text-foreground-secondary hover:bg-surface-subtle hover:text-foreground",
         focusRing,
-        "focus-visible:ring-sidebar-ring focus-visible:ring-offset-sidebar",
+        "focus-visible:ring-offset-surface-column",
         hitArea,
       )}
     >
-      {active && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-1 start-0 w-0.5 rounded-full bg-sidebar-primary"
-        />
-      )}
       <Icon className="size-4 shrink-0 text-current" aria-hidden="true" />
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>

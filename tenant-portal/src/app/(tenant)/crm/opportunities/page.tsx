@@ -9,7 +9,7 @@ import { OpportunitiesWorkspace } from "./components/opportunities-workspace";
 // its scoping mirror CRM_ENTRY_ROUTES in src/lib/navigation/tenant-routes.ts.
 export default function OpportunitiesPage() {
   return (
-    <PermissionGate require="crm.opportunities.read" scoped>
+    <PermissionGate require={["crm.opportunities.read", "crm.pipelines.read"]} scoped>
       <OpportunitiesWorkspace />
     </PermissionGate>
   );

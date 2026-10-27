@@ -1,65 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Activity,
-  ArrowUpRight,
-  Star,
-  Trash2,
-  UserCheck,
-  X,
-} from "lucide-react";
+import { ArrowUpRight, Star, Trash2, X } from "lucide-react";
+import { Button } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
+import { formatNumber } from "@/lib/format/number";
 import type { OpportunityStage } from "../hooks/pipeline-types";
 
 export interface OpportunityBulkActionsBarProps {
   selectedIds: ReadonlySet<string>;
   stages: readonly OpportunityStage[];
   canUpdateAny: boolean;
-  canDeleteAny: boolean;
+  deletableCount: number;
+  isBulkDeleting: boolean;
   onBulkMoveStage: (stageId: string) => Promise<void>;
   onBulkSetImportance: (importance: number) => Promise<void>;
-  onBulkDelete: () => Promise<void>;
+  onBulkDelete: () => void;
   onClearSelection: () => void;
-  onOpenFirstSelectedModal?: () => void;
-  onOpenFirstSelectedActivities?: () => void;
 }
 
 /**
- * Floating dark bottom command bar for Opportunities matching LeadBulkActionsBar & CustomerBulkActionsBar:
- * `[N] Opportunities Selected | [↗ Move Stage (N) ▾] [👤 Assign Salesperson ▾] [★ Importance & Tags ▾] [📈 Schedule Follow-up] [🗑 Delete (N)]`
+ * Bulk controls operate on the selection; per-record edits stay on each card.
  */
 export function OpportunityBulkActionsBar({
   selectedIds,
   stages,
   canUpdateAny,
-  canDeleteAny,
+  deletableCount,
+  isBulkDeleting,
   onBulkMoveStage,
   onBulkSetImportance,
   onBulkDelete,
   onClearSelection,
-  onOpenFirstSelectedModal,
-  onOpenFirstSelectedActivities,
 }: OpportunityBulkActionsBarProps) {
-  const { lang } = useI18n();
-  const isAr = lang === "ar";
-  const [isBusy, setIsBusy] = useState(false);
+  const { t, lang } = useI18n();
+  const [isActionBusy, setIsBusy] = useState(false);
+  const isBusy = isActionBusy || isBulkDeleting;
   const [stageSelect, setStageSelect] = useState("");
   const [importanceSelect, setImportanceSelect] = useState("");
 
   const count = selectedIds.size;
   if (count === 0) return null;
 
-  async function handleMove(stageId: string) {
-    if (!stageId || isBusy) return;
-    setIsBusy(true);
-    try {
-      await onBulkMoveStage(stageId);
-    } finally {
-      setStageSelect("");
-      setIsBusy(false);
-    }
+  function handleMove(stageId: string) {
+    if (!stageId || isBusy || !canUpdateAny) return;
+    setStageSelect("");
+    void onBulkMoveStage(stageId);
   }
 
   async function handleImportance(value: string) {
@@ -75,47 +62,41 @@ export function OpportunityBulkActionsBar({
     }
   }
 
-  async function handleDelete() {
-    if (isBusy) return;
-    setIsBusy(true);
-    try {
-      await onBulkDelete();
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
   return (
     <div
       role="region"
-      aria-label={isAr ? "إجراءات جماعية للفرص المحددة" : "Bulk opportunity actions"}
-      className="fixed inset-x-0 bottom-5 z-40 mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-slate-700 bg-slate-950/95 px-4 py-2.5 text-white shadow-2xl backdrop-blur-md"
+      aria-label={t.crmOpportunities.bulkActions}
+      className="fixed inset-x-0 bottom-5 z-(--z-overlay) mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2.5 rounded-lg border border-border bg-popover px-4 py-2.5 text-popover-foreground shadow-2xl"
     >
-      <div className="flex items-center gap-2 text-xs font-bold">
-        <span className="inline-flex size-6 items-center justify-center rounded-lg bg-blue-600 text-xs font-extrabold tabular-nums text-white">
+      <div className="flex items-center gap-2 text-xs font-semibold">
+        <span className="inline-flex size-6 items-center justify-center rounded-lg bg-primary text-xs font-semibold tabular-nums text-primary-foreground">
           {count}
         </span>
-        <span>{isAr ? "فرص محددة" : "Opportunities Selected"}</span>
+        <span>{t.crmOpportunities.selectedOpportunities}</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {canUpdateAny && stages.length > 0 && (
           <div className="relative inline-flex items-center">
-            <ArrowUpRight className="pointer-events-none absolute start-2.5 size-3.5 text-white" aria-hidden="true" />
+            <ArrowUpRight className="pointer-events-none absolute start-2.5 size-3.5 text-primary-foreground" aria-hidden="true" />
             <select
-              aria-label={isAr ? "نقل المرحلة جماعياً" : "Bulk move stage"}
+              aria-label={t.crmOpportunities.bulkMoveStage}
               value={stageSelect}
               disabled={isBusy}
-              onChange={(e) => void handleMove(e.target.value)}
-              className="h-8 cursor-pointer rounded-lg bg-blue-600 ps-7 pe-3 text-xs font-bold text-white shadow-xs transition-colors hover:bg-blue-500 disabled:opacity-50"
+              onChange={(e) => {
+                const nextStageId = e.target.value;
+                e.currentTarget.value = "";
+                handleMove(nextStageId);
+              }}
+              className="h-8 cursor-pointer rounded-lg bg-primary ps-7 pe-3 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               <option value="">
-                {isAr ? `نقل المرحلة (${count}) ▾` : `Move Stage (${count}) ▾`}
+                {t.crmOpportunities.moveStageCount.replace("{count}", formatNumber(count, lang))}
               </option>
               {stages
                 .filter((st) => st.flag !== "LOST")
                 .map((stage) => (
-                  <option key={stage.id} value={stage.id} className="bg-slate-900 text-white">
+                  <option key={stage.id} value={stage.id} className="bg-popover text-popover-foreground">
                     {localizedName(stage, lang)}
                   </option>
                 ))}
@@ -124,29 +105,17 @@ export function OpportunityBulkActionsBar({
         )}
 
         {canUpdateAny && (
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={onOpenFirstSelectedModal}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
-          >
-            <UserCheck className="size-3.5 text-slate-400" aria-hidden="true" />
-            <span>{isAr ? "تعيين مسؤول ▾" : "Assign Salesperson ▾"}</span>
-          </button>
-        )}
-
-        {canUpdateAny && (
           <div className="relative inline-flex items-center">
-            <Star className="pointer-events-none absolute start-2.5 size-3.5 text-amber-400" aria-hidden="true" />
+            <Star className="pointer-events-none absolute start-2.5 size-3.5 text-warning" aria-hidden="true" />
             <select
-              aria-label={isAr ? "تعيين الأهمية جماعياً" : "Bulk set importance"}
+              aria-label={t.crmOpportunities.bulkSetImportance}
               value={importanceSelect}
               disabled={isBusy}
               onChange={(e) => void handleImportance(e.target.value)}
-              className="h-8 cursor-pointer rounded-lg border border-slate-700 bg-slate-900 ps-7 pe-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+              className="h-8 cursor-pointer rounded-lg border border-border bg-muted ps-7 pe-2.5 text-xs font-semibold text-foreground hover:bg-accent disabled:opacity-50"
             >
               <option value="">
-                {isAr ? "تعديل الأهمية / الوسوم ▾" : "Importance & Tags ▾"}
+                {t.crmOpportunities.bulkSetImportance}
               </option>
               <option value="3">★★★ (3)</option>
               <option value="2">★★☆ (2)</option>
@@ -156,38 +125,32 @@ export function OpportunityBulkActionsBar({
           </div>
         )}
 
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={onOpenFirstSelectedActivities}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-800"
-        >
-          <Activity className="size-3.5 text-emerald-400" aria-hidden="true" />
-          <span>{isAr ? "جدولة متابعة" : "Schedule Follow-up"}</span>
-        </button>
-
-        {canDeleteAny && (
-          <button
+        {deletableCount > 0 && (
+          <Button
             type="button"
+            variant="destructive"
+            size="sm"
             disabled={isBusy}
-            onClick={() => void handleDelete()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-xs font-bold text-white shadow-xs transition-colors hover:bg-red-500 disabled:opacity-50"
+            onClick={onBulkDelete}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-destructive px-3 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-destructive/90 disabled:opacity-50"
           >
             <Trash2 className="size-3.5" aria-hidden="true" />
-            <span>{isAr ? `حذف (${count})` : `Delete (${count})`}</span>
-          </button>
+            <span>{t.crmOpportunities.bulkDeleteAction(deletableCount)}</span>
+          </Button>
         )}
 
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={isBusy}
           onClick={onClearSelection}
-          title={isAr ? "إلغاء التحديد" : "Clear selection"}
-          aria-label={isAr ? "إلغاء التحديد" : "Clear selection"}
-          className="flex size-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white"
+          title={t.crmOpportunities.clearSelection}
+          aria-label={t.crmOpportunities.clearSelection}
+          className="flex size-8 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <X className="size-3.5" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
     </div>
   );

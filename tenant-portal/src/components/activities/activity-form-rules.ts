@@ -21,11 +21,11 @@ import { activityFormEnd, activityFormStart, type ActivityFormValues } from "./a
 import { activityTypeTraits } from "./activity-presentation";
 
 export type ActivityFormField =
-  | "subject" | "target" | "start" | "end" | "location" | "meetingUrl" | "description" | "outcome";
+  | "subject" | "target" | "start" | "end" | "location" | "meetingUrl" | "description" | "outcome" | "reminderOffsetMinutes";
 
 type ActivityValidationCode =
   | "required" | "maxLength" | "startInPast" | "doneInFuture" | "endBeforeStart" | "endTooLong"
-  | "invalidUrl" | "targetRequired";
+  | "invalidUrl" | "targetRequired" | "invalidReminderOffset";
 
 export type ActivityFormErrors = Partial<Record<ActivityFormField, ActivityValidationCode>>;
 
@@ -77,6 +77,11 @@ export function validateActivityForm(values: ActivityFormValues, context: Activi
   else if (activityTextLength(subject) > ACTIVITY_SUBJECT_MAX) errors.subject = "maxLength";
 
   if (creating && !values.target) errors.target = "targetRequired";
+  if ((!creating || values.status !== "DONE") && values.reminderOffsetMinutes !== "" && (
+    !/^\d+$/u.test(values.reminderOffsetMinutes)
+    || !Number.isSafeInteger(Number(values.reminderOffsetMinutes))
+    || Number(values.reminderOffsetMinutes) > 2147483647
+  )) errors.reminderOffsetMinutes = "invalidReminderOffset";
 
   const start = activityFormStart(values);
   if (!start) errors.start = "required";
@@ -146,6 +151,8 @@ export function buildCreateActivityBody(values: ActivityFormValues): Record<stri
     subject: values.subject.trim(),
     priority: values.priority,
     dueAt: start.toISOString(),
+    ...(values.status !== "DONE" && values.reminderOffsetMinutes !== ""
+      ? { reminderOffsetMinutes: Number(values.reminderOffsetMinutes) } : {}),
     ...Object.fromEntries(Object.entries(optional).filter(([, value]) => value !== null)),
   };
 }
@@ -178,6 +185,9 @@ export function buildUpdateActivityBody(
   if (values.subject.trim() !== seed.subject.trim()) body.subject = values.subject.trim();
   if (values.description.trim() !== seed.description.trim()) body.description = values.description.trim() || null;
   if (values.priority !== seed.priority) body.priority = values.priority;
+  if (values.reminderOffsetMinutes !== seed.reminderOffsetMinutes) {
+    body.reminderOffsetMinutes = values.reminderOffsetMinutes === "" ? null : Number(values.reminderOffsetMinutes);
+  }
   const start = activityFormStart(values);
   if (start && startChanged(values, seed)) body.dueAt = start.toISOString();
   optional("direction", traits.hasDirection, activity.direction);

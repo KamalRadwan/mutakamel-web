@@ -8,7 +8,7 @@
 // Row shape verified against crm-app `LeadListReadModel`
 // (src/common/party-read-model.ts): the lead entity, the Party-backed identity
 // (`displayName`, `primaryMobile`, `companyPhone`, `phones`, …), the board
-// fields (`owner`, `nextActivity`, `primaryContactName`, `tags`), the Party's
+// fields (`owner`, `nextActivity`, `tags`), the Party's
 // primary `address` and `primaryContact`. Tax and registration numbers exist
 // only on the nested `party` summary.
 
@@ -73,18 +73,12 @@ export interface LeadItem {
   cardColor: CardColor | null;
   owner: LeadOwner | null;
   nextActivity: LeadNextActivity | null;
-  /**
-   * The primary contact behind a CORPORATE lead — the card's second line.
-   * Empty on an individual lead; `leadProfileType` is the authoritative type.
-   */
-  primaryContactName: string;
   tags: CrmTag[];
   primaryMobile?: string;
   firstName?: string;
   lastName?: string;
   companyWebsite?: string;
   acquisitionSourceId?: string;
-  contactsCount?: number;
   city?: string;
   taxNumber?: string;
   commercialRegistrationNumber?: string;
@@ -220,7 +214,6 @@ export function parseLeadResponse(value: unknown, expectedBranchId: string): Lea
     cardColor: parseLeadCardColor(lead.cardColor),
     owner: parseLeadOwner(lead.owner),
     nextActivity: parseLeadNextActivity(lead.nextActivity),
-    primaryContactName: text(lead.primaryContactName),
     tags: parseCrmTags(lead.tags, INVALID_LEADS),
     primaryMobile: optionalText(lead.primaryMobile),
     firstName: optionalText(lead.firstName),
@@ -230,10 +223,6 @@ export function parseLeadResponse(value: unknown, expectedBranchId: string): Lea
       ? lead.acquisitionSourceId
       : isUUIDv7(source?.id)
         ? source.id
-        : undefined,
-    contactsCount:
-      typeof lead.contactsCount === "number" && Number.isSafeInteger(lead.contactsCount)
-        ? lead.contactsCount
         : undefined,
     city: optionalText(address?.city),
     taxNumber: optionalText(party?.taxNumber),

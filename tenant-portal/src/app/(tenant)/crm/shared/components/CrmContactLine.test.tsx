@@ -127,7 +127,7 @@ describe("CrmContactLine", () => {
     renderLine({ contact: { ...EMPTY, phones: ["+201000000000", "+201111111111"] } });
     // Both numbers live under the one Phone label. Laid out across the line
     // they began under the honorific, which is not where a phone is looked for.
-    const phoneCell = screen.getByText("Phone").parentElement as HTMLElement;
+    const phoneCell = screen.getByText("Phone").parentElement?.parentElement as HTMLElement;
     expect(phoneCell.querySelectorAll('input[type="tel"]')).toHaveLength(2);
     expect(screen.getByLabelText("Remove phone 2")).toBeInTheDocument();
     // And the line itself still has its six labels, with no seventh column.

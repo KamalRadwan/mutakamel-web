@@ -38,6 +38,7 @@ export interface TenantUserManagerRef {
 
 export interface TenantUserRoleAssignment {
   assignmentId: string;
+  source: "BRANCH_ROLE" | "SCOPE_ROLE";
   roleId: string;
   roleName: string;
   scope: TenantUserRoleScope;

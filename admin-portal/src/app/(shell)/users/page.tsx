@@ -22,6 +22,7 @@ import { DestructiveActionModal } from "@/components/shared/DestructiveActionMod
 import { useUserPermissions, getUserRowPermissions } from "./hooks/useUserPermissions";
 import { useAuth } from "@/context/AuthContext";
 import { InviteUserModal } from "./components/InviteUserModal";
+import { RoleCatalogueFeedback } from "./components/RoleCatalogueFeedback";
 import type { AdminUser } from "./types/adminUser";
 
 export default function UsersDirectoryPage() {
@@ -44,6 +45,8 @@ export default function UsersDirectoryPage() {
     webphoneExtensions,
     roles,
     rolesForbidden,
+    rolesStatus,
+    reloadRoles,
     summaryMetrics,
     isInviteModalOpen,
     setIsInviteModalOpen,
@@ -82,7 +85,7 @@ export default function UsersDirectoryPage() {
       headerEn: t.users.staffMember,
       headerAr: t.users.staffMember,
       cell: (usr) => {
-        const rowPermissions = getUserRowPermissions(currentUser, usr.id, usr.status);
+        const rowPermissions = getUserRowPermissions(currentUser, usr.id, usr.status, usr.isSuperAdmin);
         return (
           <Link href={`/users/${usr.id}`} className="flex items-center gap-2 font-semibold hover:underline">
             <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
@@ -165,7 +168,10 @@ export default function UsersDirectoryPage() {
       headerAr: t.users.actions,
       align: "end",
       cell: (usr) => {
-        const rowPermissions = getUserRowPermissions(currentUser, usr.id, usr.status);
+        const rowPermissions = getUserRowPermissions(currentUser, usr.id, usr.status, usr.isSuperAdmin);
+        if (rowPermissions.isProtectedTarget) {
+          return <span className="text-xs text-muted-foreground">{t.users.protectedSuperAdminReason}</span>;
+        }
         const hasActions = rowPermissions.canSuspend || rowPermissions.canActivate || rowPermissions.canDelete;
         if (!hasActions) return <span aria-hidden="true" className="text-muted-foreground">—</span>;
 
@@ -257,6 +263,9 @@ export default function UsersDirectoryPage() {
           )}
 
           <div className="rounded-lg border border-border bg-card">
+            <div className="px-3 pt-2">
+              <RoleCatalogueFeedback status={rolesStatus} empty={roles.length === 0} onRetry={reloadRoles} />
+            </div>
             <FilterBar
               fields={[
                 { key: "search", type: "search", placeholderEn: t.users.searchPlaceholder, placeholderAr: t.users.searchPlaceholder },

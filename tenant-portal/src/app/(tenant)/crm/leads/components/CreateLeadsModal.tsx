@@ -30,17 +30,22 @@ import {
   type FormModalSection,
 } from "@/design-system";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
 import { useI18n } from "@/i18n/I18nContext";
 import { resolveCompanyForBranch } from "@/lib/api/organization-scope";
+import type { NormalizedApiError } from "@/lib/api/errors";
 import { getHonorificOptions } from "@/lib/catalogues/contact-titles";
 import { localizedName } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import { isUUIDv7 } from "@/lib/uuid";
 import { CrmCustomFieldsFormSection } from "../../shared/components/CrmCustomFieldsFormSection";
+import { CrmScopeGate } from "../../shared/components/CrmScopeGate";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
-import { readOwnerOptions } from "../[id]/hooks/readLeadOwnerOptions";
+import { crmCapabilityAllowsOwner, type CrmActionCapability } from "../../shared/crm-capabilities";
+import { CRM_RATING_STARS } from "../../shared/crm-rating-contract";
+import { readAssignableLeadOwners } from "../[id]/hooks/readLeadOwnerOptions";
 import {
   leadDetailsUserName,
   type LeadDetailsUser,
@@ -49,6 +54,7 @@ import { useCreateLeadForm } from "../hooks/useCreateLeadForm";
 import { useCreateLeadTags } from "../hooks/useCreateLeadTags";
 import { useLeadCompanyOptions } from "../hooks/useLeadCompanyOptions";
 import { useLeadDuplicateCheck } from "../hooks/useLeadDuplicateCheck";
+import { useLeadCreateCapabilities } from "../hooks/useLeadCapabilities";
 import {
   LEAD_CREATE_LIMITS,
   isCorporateLead,
@@ -71,16 +77,19 @@ import { LeadFieldGuide } from "./create-lead/LeadFieldGuide";
 import { LeadPersonSection } from "./create-lead/LeadPersonSection";
 import { LeadQualificationSection } from "./create-lead/LeadQualificationSection";
 
-const DEFAULT_OWNER_VALUE = "__default_owner__";
 const TERMINAL_STAGE_FLAG = "CONVERTED";
 
-export interface CreateLeadsModalProps {
+interface CreateLeadsModalProps {
   isOpen?: boolean;
   stages: readonly LeadStage[];
   branchId: string | null;
   initialStageId?: string;
   initialDraft?: QuickCreateLeadDraft | null;
-  onSubmit: (form: CreateLeadForm, initialRating?: number) => Promise<boolean>;
+  onSubmit: (
+    form: CreateLeadForm,
+    initialRating?: number,
+    onValidationError?: (error: NormalizedApiError) => void,
+  ) => Promise<boolean>;
   error: string | null;
   onClose: () => void;
 }
@@ -89,7 +98,7 @@ export interface CreateLeadsModalProps {
  * Full-viewport Create New Lead Modal (Redesigned v2).
  *
  * Features:
- * - Multi-toned semantic section cards (Indigo, Emerald, Violet, Sky, Amber, Teal)
+ * - Semantic section cards using the shared design-system tokens
  * - Interactive `!` Field Guide hover/focus tooltips on every field and selector
  * - Smart Left Rail with Individual (B2C) vs. Corporate (B2B) mode switcher,
  *   live section status stepper, real-time Kanban Board Card Preview, and
@@ -111,6 +120,7 @@ export function CreateLeadsModal({
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
   const scope = useTenantBranchSelection(user);
+  const createAccess = useLeadCreateCapabilities(scope.branchIds, isOpen);
   const sharedFieldMessages = useCrmFieldMessages();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,7 +128,11 @@ export function CreateLeadsModal({
   const [createTagDraftName, setCreateTagDraftName] = useState<string | null>(
     null,
   );
-  const [ownerOptions, setOwnerOptions] = useState<LeadDetailsUser[]>([]);
+  const [ownerPage, setOwnerPage] = useState<{
+    branchId: string;
+    capability: CrmActionCapability;
+    items: LeadDetailsUser[];
+  } | null>(null);
   const [selectedCompanyOverride, setSelectedCompanyOverride] = useState<
     string | null
   >(null);
@@ -175,7 +189,17 @@ export function CreateLeadsModal({
   );
   const { form, errors, allErrors } = state;
 
-  const effectiveBranchId = form.branchId || branchId || scope.branchId || "";
+  const requestedBranchId = form.branchId || branchId || scope.branchId || "";
+  const effectiveBranchId = createAccess.branchIds.includes(requestedBranchId)
+    ? requestedBranchId : createAccess.branchIds[0] ?? "";
+  const ownerScope = useOrganizationScopeHeaders("BRANCH_REQUIRED", effectiveBranchId || null);
+  const createCapability = createAccess.capabilities?.get(effectiveBranchId) ?? null;
+  const ownerOptions = ownerPage?.branchId === effectiveBranchId
+    && ownerPage.capability === createCapability && isOpen && ownerScope.ready
+    ? ownerPage.items.filter((owner) => crmCapabilityAllowsOwner(createCapability, owner.id)) : [];
+  const effectiveOwnerUserId = ownerOptions.some((owner) => owner.id === form.ownerUserId)
+    ? form.ownerUserId : ownerOptions.find((owner) => owner.id === user?.id)?.id ?? "";
+  const canSubmit = createCapability !== null && effectiveOwnerUserId !== "";
   const companyIds = useMemo(
     () => user?.accessibleCompanies ?? [],
     [user?.accessibleCompanies],
@@ -203,17 +227,17 @@ export function CreateLeadsModal({
 
   // Load branch salesperson options for ownerUserId selector
   useEffect(() => {
-    if (!isOpen || !isUUIDv7(effectiveBranchId)) return;
+    if (!isOpen || !isUUIDv7(effectiveBranchId) || !createCapability || !ownerScope.ready) return;
     const controller = new AbortController();
-    void readOwnerOptions(effectiveBranchId, controller.signal)
+    void readAssignableLeadOwners(effectiveBranchId, "create", controller.signal, ownerScope.headers)
       .then((users) => {
-        if (!controller.signal.aborted) setOwnerOptions(users);
+        if (!controller.signal.aborted) setOwnerPage({ branchId: effectiveBranchId, capability: createCapability, items: users });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setOwnerOptions([]);
+        if (!controller.signal.aborted) setOwnerPage(null);
       });
     return () => controller.abort();
-  }, [isOpen, effectiveBranchId]);
+  }, [isOpen, effectiveBranchId, createCapability, ownerScope]);
 
   // Client-side check: did the user type a new company name that already exists in the directory?
   const matchingDirectoryCompany = useMemo(() => {
@@ -315,20 +339,23 @@ export function CreateLeadsModal({
   );
 
   const errorCount = Object.keys(errors).length;
-  const isReadyToSubmit = Object.keys(allErrors).length === 0;
+  const isReadyToSubmit = canSubmit && Object.keys(allErrors).length === 0;
 
   async function handleFormSubmit(keepOpenAfterSuccess = false) {
     state.revealAll();
-    if (Object.keys(state.allErrors).length > 0 || isSubmitting) return;
+    if (Object.keys(state.allErrors).length > 0 || isSubmitting || !canSubmit) return;
+    state.clearServerErrors();
     setIsSubmitting(true);
     try {
       const payloadForm: CreateLeadForm = {
         ...form,
         branchId: effectiveBranchId,
+        ownerUserId: effectiveOwnerUserId,
       };
       const saved = await onSubmit(
         payloadForm,
         initialRating > 0 ? initialRating : undefined,
+        state.reportServerError,
       );
       if (saved && keepOpenAfterSuccess) {
         state.reset();
@@ -367,10 +394,11 @@ export function CreateLeadsModal({
         }
         isDirty={state.isDirty}
         isSubmitting={isSubmitting}
+        submitDisabled={!canSubmit}
         onSubmit={() => void handleFormSubmit(false)}
         error={error ?? undefined}
         headerIcon={
-          <div className="flex size-10 items-center justify-center rounded-xl bg-linear-to-br from-indigo-600 via-violet-600 to-sky-500 text-white shadow-sm">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <UserPlus className="size-5" aria-hidden="true" />
           </div>
         }
@@ -380,8 +408,8 @@ export function CreateLeadsModal({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
                 corporate
-                  ? "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/20 dark:text-violet-300"
-                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-300",
+                  ? "border-border/60 bg-muted text-foreground"
+                  : "border-success/30 bg-success-subtle text-success-subtle-foreground",
               )}
             >
               {corporate ? (
@@ -394,13 +422,11 @@ export function CreateLeadsModal({
                 : `${t.crmLeads.create.types.INDIVIDUAL} · B2C`}
             </span>
 
-            <span className="hidden items-center gap-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-0.5 text-[11px] font-medium text-indigo-700 sm:inline-flex dark:border-indigo-400/30 dark:bg-indigo-500/20 dark:text-indigo-300">
-              <span className="inline-flex size-3.5 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-extrabold text-white">
+            <span className="hidden items-center gap-1 rounded-full border border-border/60 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground sm:inline-flex">
+              <span className="inline-flex size-3.5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
                 !
               </span>
-              {lang === "ar"
-                ? "دليل الحقول التفاعلي مفعّل"
-                : "Interactive Field Guide"}
+              {{ ar: "دليل الحقول التفاعلي مفعّل", en: "Interactive Field Guide" }[lang]}
             </span>
           </div>
         }
@@ -412,12 +438,14 @@ export function CreateLeadsModal({
                 {t.crmLeads.card.rating}:
               </span>
               <div className="flex items-center gap-0.5">
-                {[1, 2, 3].map((star) => {
+                {CRM_RATING_STARS.map((star) => {
                   const active = star <= initialRating;
                   return (
-                    <button
+                    <Button
                       key={star}
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       disabled={isSubmitting}
                       aria-label={formatTemplate(t.crmLeads.card.rateStars, {
                         count: star,
@@ -426,18 +454,18 @@ export function CreateLeadsModal({
                       onClick={() =>
                         setInitialRating((curr) => (curr === star ? 0 : star))
                       }
-                      className="cursor-pointer rounded p-0.5 transition-transform hover:scale-110"
+                      className="h-auto cursor-pointer rounded p-0.5 transition-transform hover:scale-110"
                     >
                       <Star
                         className={cn(
                           "size-4 transition-colors",
                           active
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-muted-foreground/40 hover:text-amber-400/70",
+                            ? "fill-warning text-warning"
+                            : "text-muted-foreground/40 hover:text-warning/70",
                         )}
                         aria-hidden="true"
                       />
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -448,25 +476,14 @@ export function CreateLeadsModal({
               <div className="flex items-center gap-1.5">
                 <div className="w-44">
                   <Select
-                    value={form.ownerUserId || DEFAULT_OWNER_VALUE}
+                    value={effectiveOwnerUserId}
                     disabled={isSubmitting}
-                    onValueChange={(val) =>
-                      state.setField(
-                        "ownerUserId",
-                        val === DEFAULT_OWNER_VALUE ? "" : val,
-                      )
-                    }
+                    onValueChange={(val) => state.setField("ownerUserId", val)}
                   >
                     <SelectTrigger size="sm" aria-label={t.crmLeads.salesperson}>
                       <SelectValue placeholder={t.crmLeads.salesperson} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={DEFAULT_OWNER_VALUE}>
-                        {user
-                          ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
-                            user.email
-                          : t.crmLeads.salesperson}
-                      </SelectItem>
                       {ownerOptions.map((owner) => (
                         <SelectItem key={owner.id} value={owner.id}>
                           {leadDetailsUserName(owner)}
@@ -486,7 +503,7 @@ export function CreateLeadsModal({
             <div className="space-y-4">
               {/* Interactive Form Sections Navigation */}
               <div className="space-y-1.5">
-                <span className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                   {t.crmShared.formSectionsNav}
                 </span>
                 <nav
@@ -499,24 +516,26 @@ export function CreateLeadsModal({
                       section.id as LeadCreateSectionId,
                     );
                     return (
-                      <button
+                      <Button
                         key={section.id}
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={() => scrollToSection(section.id)}
                         className={cn(
-                          "flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-start text-xs font-medium transition-colors",
+                          "flex h-auto w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-start text-xs font-medium transition-colors",
                           secErrors > 0
                             ? "border-destructive/40 bg-destructive/10 text-destructive"
-                            : "border-border/70 bg-card text-foreground hover:border-indigo-500/40 hover:bg-indigo-500/[0.04]",
+                            : "border-border/70 bg-card text-foreground hover:border-border hover:bg-muted/40",
                         )}
                       >
                         <span className="flex items-center gap-2 truncate">
                           <span
                             className={cn(
-                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold",
+                              "inline-flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold tabular-nums",
                               secErrors > 0
-                                ? "bg-destructive text-white"
-                                : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-300",
+                                ? "bg-destructive text-destructive-foreground"
+                                : "bg-muted text-foreground",
                             )}
                           >
                             0{idx + 1}
@@ -525,24 +544,24 @@ export function CreateLeadsModal({
                         </span>
 
                         {secErrors > 0 ? (
-                          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">
+                          <span className="shrink-0 rounded-full bg-destructive px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-destructive-foreground">
                             {secErrors}
                           </span>
                         ) : section.id === "contacts" ? (
-                          <span className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+                          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
                             {form.contacts.length}/{LEAD_CREATE_LIMITS.contacts}
                           </span>
                         ) : section.id === "address" ||
                           section.id === "qualification" ? (
-                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                          <span className="shrink-0 text-xs text-muted-foreground">
                             {t.crmLeads.create.optionalBadge}
                           </span>
                         ) : (
-                          <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                          <span className="shrink-0 rounded bg-success-subtle px-1.5 py-0.5 text-xs font-semibold text-success-subtle-foreground">
                             {t.crmLeads.create.readyBadge}
                           </span>
                         )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </nav>
@@ -552,21 +571,19 @@ export function CreateLeadsModal({
             {/* 3. Live Board Card Preview & Duplicate Radar Status */}
             <div className="space-y-3">
               {/* Live Board Card Preview */}
-              <div className="rounded-xl border border-indigo-500/25 bg-card p-3 shadow-xs">
+              <div className="rounded-lg border border-border bg-card p-3 shadow-xs">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="text-[10px] font-bold tracking-wider text-indigo-600 uppercase dark:text-indigo-300">
-                    {lang === "ar"
-                      ? "معاينة بطاقة اللوحة"
-                      : "Live Card Preview"}
+                  <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                    {{ ar: "معاينة بطاقة اللوحة", en: "Live Card Preview" }[lang]}
                   </span>
-                  <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-foreground">
                     {previewStage}
                   </span>
                 </div>
 
                 <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-2.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="truncate text-xs font-bold text-foreground">
+                    <p className="truncate text-xs font-semibold text-foreground">
                       {previewName}
                     </p>
                     {initialRating > 0 && (
@@ -574,7 +591,7 @@ export function CreateLeadsModal({
                         {Array.from({ length: initialRating }).map((_, i) => (
                           <Star
                             key={i}
-                            className="size-3 fill-amber-400 text-amber-400"
+                            className="size-3 fill-warning text-warning"
                             aria-hidden="true"
                           />
                         ))}
@@ -585,7 +602,7 @@ export function CreateLeadsModal({
                   {previewPhone && (
                     <div
                       dir="ltr"
-                      className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground"
                     >
                       <Phone className="size-3 shrink-0" aria-hidden="true" />
                       <span className="truncate">{previewPhone}</span>
@@ -594,7 +611,7 @@ export function CreateLeadsModal({
 
                   <div className="flex flex-wrap items-center gap-1 pt-1">
                     {previewSource && (
-                      <span className="rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      <span className="rounded border border-border bg-card px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                         {previewSource}
                       </span>
                     )}
@@ -613,34 +630,30 @@ export function CreateLeadsModal({
               {/* Live Duplicate Radar Status */}
               <div
                 className={cn(
-                  "flex items-center gap-2.5 rounded-xl border p-2.5 text-xs",
+                  "flex items-center gap-2.5 rounded-lg border p-2.5 text-xs",
                   duplicateMatches.length > 0 || matchingDirectoryCompany
-                    ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-                    : "border-emerald-500/25 bg-emerald-500/[0.06] text-emerald-700 dark:text-emerald-300",
+                    ? "border-warning/40 bg-warning-subtle text-warning-subtle-foreground"
+                    : "border-success/25 bg-success-subtle text-success-subtle-foreground",
                 )}
               >
                 {duplicateMatches.length > 0 || matchingDirectoryCompany ? (
                   <ShieldAlert
-                    className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                    className="size-4 shrink-0 text-warning"
                     aria-hidden="true"
                   />
                 ) : (
                   <ShieldCheck
-                    className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    className="size-4 shrink-0 text-success"
                     aria-hidden="true"
                   />
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold">
+                  <div className="font-semibold">
                     {duplicateMatches.length > 0 || matchingDirectoryCompany
-                      ? lang === "ar"
-                        ? "تنبيه رادار التكرار"
-                        : "Duplicate Radar Alert"
-                      : lang === "ar"
-                        ? "رادار التكرار: سليم"
-                        : "Duplicate Radar: Clear"}
+                      ? { ar: "تنبيه رادار التكرار", en: "Duplicate Radar Alert" }[lang]
+                      : { ar: "رادار التكرار: سليم", en: "Duplicate Radar: Clear" }[lang]}
                   </div>
-                  <div className="truncate text-[10px] opacity-80">
+                  <div className="truncate text-xs opacity-80">
                     {duplicateMatches.length > 0
                       ? `${duplicateMatches.length} potential match(es)`
                       : matchingDirectoryCompany
@@ -665,7 +678,7 @@ export function CreateLeadsModal({
                 })}
               </p>
             ) : isReadyToSubmit ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-subtle px-3 py-1 text-xs font-semibold text-success-subtle-foreground">
                 <CheckCircle2 className="size-3.5" aria-hidden="true" />
                 {t.crmLeads.create.readyBadge}
               </span>
@@ -675,20 +688,16 @@ export function CreateLeadsModal({
               type="button"
               size="sm"
               variant="outline"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canSubmit}
               onClick={() => void handleFormSubmit(true)}
             >
               <Plus className="size-3.5" aria-hidden="true" />
-              {lang === "ar" ? "إنشاء وإضافة آخر" : "Create & Add Another"}
+              {{ ar: "إنشاء وإضافة آخر", en: "Create & Add Another" }[lang]}
             </Button>
           </div>
         }
         submitIcon={<CheckCircle2 className="size-4" aria-hidden="true" />}
-        submitClassName={
-          corporate
-            ? "bg-linear-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white border-0"
-            : "bg-linear-to-r from-indigo-600 to-emerald-600 hover:from-indigo-700 hover:to-emerald-700 text-white border-0"
-        }
+        submitClassName="bg-primary text-primary-foreground hover:bg-primary/90 border-0"
         labels={{
           submit: isSubmitting ? t.crmLeads.creating : t.common.create,
           cancel: t.common.cancel,
@@ -701,6 +710,9 @@ export function CreateLeadsModal({
           close: t.common.close,
         }}
       >
+        {createAccess.isLoading && <p role="status">{t.common.loading}</p>}
+        {createAccess.degraded && <DegradedBanner message={t.crmShared.errorGeneric} />}
+        {!createAccess.isLoading && !createAccess.degraded && createAccess.branchIds.length === 0 && <CrmScopeGate />}
         {/* Degraded Catalogue Banners */}
         {sources.degraded && (
           <DegradedBanner message={t.crmLeads.create.sourcesUnavailable} />
@@ -713,23 +725,29 @@ export function CreateLeadsModal({
         {matchingDirectoryCompany && (
           <div
             role="status"
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:border-amber-400/35 dark:bg-amber-500/15 dark:text-amber-200"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning-subtle p-3.5 text-xs text-warning-subtle-foreground"
           >
             <div className="flex items-center gap-2.5">
               <AlertTriangle
-                className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+                className="size-4 shrink-0 text-warning"
                 aria-hidden="true"
               />
               <div>
-                <p className="font-bold">
-                  {lang === "ar"
-                    ? `توجد شركة بنفس الاسم في الدليل: "${matchingDirectoryCompany.displayName}"`
-                    : `A company named "${matchingDirectoryCompany.displayName}" already exists in the directory.`}
+                <p className="font-semibold">
+                  {
+                    {
+                      ar: `توجد شركة بنفس الاسم في الدليل: "${matchingDirectoryCompany.displayName}"`,
+                      en: `A company named "${matchingDirectoryCompany.displayName}" already exists in the directory.`,
+                    }[lang]
+                  }
                 </p>
-                <p className="text-[11px] opacity-85">
-                  {lang === "ar"
-                    ? "يمكنك ربط العميل المحتمل بالشركة المسجلة بدلاً من إنشاء سجل مكرر."
-                    : "Link to the existing directory organization instead of creating a duplicate party."}
+                <p className="text-xs opacity-85">
+                  {
+                    {
+                      ar: "يمكنك ربط العميل المحتمل بالشركة المسجلة بدلاً من إنشاء سجل مكرر.",
+                      en: "Link to the existing directory organization instead of creating a duplicate party.",
+                    }[lang]
+                  }
                 </p>
               </div>
             </div>
@@ -744,7 +762,7 @@ export function CreateLeadsModal({
                 );
                 void companyOptions.selectCompany(matchingDirectoryCompany.id);
               }}
-              className="border-amber-500/50 bg-amber-500/20 text-amber-900 hover:bg-amber-500/30 dark:text-amber-100"
+              className="border-warning/50 bg-warning/20 text-warning-subtle-foreground hover:bg-warning/30"
             >
               {t.crmLeads.existingCompany}
             </Button>
@@ -755,17 +773,20 @@ export function CreateLeadsModal({
         {duplicateMatches.length > 0 && (
           <div
             role="status"
-            className="space-y-2 rounded-xl border border-rose-500/35 bg-rose-500/[0.08] p-3.5 text-xs text-rose-900 dark:border-rose-400/35 dark:bg-rose-500/15 dark:text-rose-200"
+            className="space-y-2 rounded-lg border border-destructive/35 bg-destructive-subtle p-3.5 text-xs text-destructive-subtle-foreground"
           >
-            <div className="flex items-center gap-2 font-bold">
+            <div className="flex items-center gap-2 font-semibold">
               <ShieldAlert
-                className="size-4 shrink-0 text-rose-600 dark:text-rose-400"
+                className="size-4 shrink-0 text-destructive"
                 aria-hidden="true"
               />
               <span>
-                {lang === "ar"
-                  ? `رادار التكرار: تم العثور على ${duplicateMatches.length} تطابق محتمل`
-                  : `Duplicate Radar detected ${duplicateMatches.length} potential match(es)`}
+                {
+                  {
+                    ar: `رادار التكرار: تم العثور على ${duplicateMatches.length} تطابق محتمل`,
+                    en: `Duplicate Radar detected ${duplicateMatches.length} potential match(es)`,
+                  }[lang]
+                }
               </span>
             </div>
             <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -774,20 +795,20 @@ export function CreateLeadsModal({
                 return (
                   <li
                     key={match.partyId}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-rose-500/25 bg-card/90 px-3 py-2 text-foreground"
+                    className="flex items-center justify-between gap-2 rounded-lg border border-destructive/25 bg-card/90 px-3 py-2 text-foreground"
                   >
                     <div className="min-w-0">
                       <div className="truncate font-semibold">
                         {match.displayName ?? match.partyId}
                       </div>
                       <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                        <span className="rounded bg-rose-500/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-rose-600 dark:text-rose-300">
+                        <span className="rounded bg-destructive/15 px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-destructive">
                           {match.partyType}
                         </span>
                         {match.matchTypes.map((field) => (
                           <span
                             key={field}
-                            className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                            className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs tabular-nums text-muted-foreground"
                           >
                             {field}
                           </span>
@@ -808,11 +829,11 @@ export function CreateLeadsModal({
           </div>
         )}
 
-        {/* Section 01: Classification (Indigo Card) */}
+        {/* Section 01: Classification */}
         <LeadClassificationSection
           companyIds={companyIds}
           companyId={effectiveCompanyId}
-          branchIds={scope.branchIds}
+          branchIds={createAccess.branchIds}
           branchId={effectiveBranchId}
           leadProfileType={form.leadProfileType}
           stageId={form.stageId}
@@ -833,6 +854,7 @@ export function CreateLeadsModal({
           }
           onBranchChange={(nextBranchId) => {
             state.setField("branchId", nextBranchId);
+            state.setField("ownerUserId", "");
             state.selectCompany("", "");
             companyOptions.reset();
           }}
@@ -897,7 +919,7 @@ export function CreateLeadsModal({
           />
         )}
 
-        {/* Section 03 & 04: Address (Amber) & Qualification (Violet) */}
+        {/* Section 03 & 04: Address & Qualification */}
         <div
           className={cn(
             "grid grid-cols-1 gap-4",
@@ -927,10 +949,10 @@ export function CreateLeadsModal({
 
         {/* Section 05: Tenant Custom Fields (Teal Card) */}
         {customFields.definitions.length > 0 && (
-          <div className="relative overflow-hidden rounded-xl border border-teal-500/20 bg-card shadow-xs dark:border-teal-400/20">
+          <div className="relative overflow-hidden rounded-lg border border-border bg-card shadow-xs">
             <div
               aria-hidden="true"
-              className="h-1 w-full bg-linear-to-r from-teal-500 via-emerald-500 to-cyan-500"
+              className="h-1 w-full bg-primary"
             />
             <div className="p-4">
               <div className="mb-2 flex justify-end">

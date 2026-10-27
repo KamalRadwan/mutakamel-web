@@ -9,13 +9,13 @@ Status: **verified** (Gateway exposure and transport policy only)
 
 Last source verification: **2026-10-17**
 
-Generated at: **2026-10-17T03:04:55.398Z**
+Generated at: **2026-10-17T17:51:44.816Z**
 
-Backend revision: `0d665ae5d9b6+dirty`
+Backend revision: `a51c1d6ccf36+dirty`
 
 Owning app: **trade-app**
 
-Routes: **251**
+Routes: **252**
 
 ## What this page is
 
@@ -264,6 +264,7 @@ browser code.
 | POST | `/api/tenant/trade/v1/webhooks/subscriptions` | `trading.webhooks.subscriptions.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | GET | `/api/tenant/trade/v1/webhooks/subscriptions/:id` | `trading.webhooks.subscriptions.by-id.get` | AUTHENTICATED | yes | TENANT_PORTAL |
 | PATCH | `/api/tenant/trade/v1/webhooks/subscriptions/:id` | `trading.webhooks.subscriptions.by-id.patch` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
+| POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/reveal-secret` | `trading.webhooks.subscriptions.by-id.reveal.secret.post` | WRITE_SENSITIVE | no | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/revoke-secret` | `trading.webhooks.subscriptions.by-id.revoke.secret.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/rotate-secret` | `trading.webhooks.subscriptions.by-id.rotate.secret.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |
 | POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/test` | `trading.webhooks.subscriptions.by-id.test.post` | WRITE_SENSITIVE | yes | TENANT_PORTAL |

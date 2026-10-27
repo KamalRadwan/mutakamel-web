@@ -114,6 +114,7 @@ export default function InventoryNodesPage() {
       cell: (node) => (
         <Link
           href={`${TENANT_ROUTES.tradeInventoryNodes}/${node.id}`}
+          dir="ltr"
           className="font-mono font-semibold text-foreground underline-offset-2 hover:underline"
         >
           {node.code}
@@ -465,6 +466,7 @@ export default function InventoryNodesPage() {
                     <div className="min-w-0">
                       <Link
                         href={`${TENANT_ROUTES.tradeInventoryNodes}/${node.id}`}
+                        dir="ltr"
                         className="font-mono text-xs font-semibold text-primary underline-offset-2 hover:underline"
                       >
                         {node.code}
@@ -574,6 +576,7 @@ export default function InventoryNodesPage() {
                       <div>
                         <Link
                           href={`${TENANT_ROUTES.tradeInventoryNodes}/${node.id}`}
+                          dir="ltr"
                           className="font-mono text-xs font-semibold text-foreground hover:underline"
                         >
                           {node.code}
@@ -699,7 +702,7 @@ export default function InventoryNodesPage() {
                   <span className="block text-2xs text-muted-foreground">
                     {t.tradeCommon.version}
                   </span>
-                  <span className="font-mono font-semibold">
+                  <span dir="ltr" className="font-mono font-semibold">
                     v{formatNumber(inspectedNode.version, lang)}
                   </span>
                 </div>

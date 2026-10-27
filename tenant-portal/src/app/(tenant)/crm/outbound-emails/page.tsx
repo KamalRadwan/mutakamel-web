@@ -9,6 +9,7 @@ import {
   DataTable,
   DateTime,
   DegradedBanner,
+  ErrorState,
   FilterBar,
   IdentifierText,
   PageHeader,
@@ -106,10 +107,22 @@ export default function OutboundEmailsPage() {
     },
   ];
 
+  if (queryError?.status === 403 && queryError.code === "CRM_FEATURE_DISABLED") {
+    return (
+      <PermissionGate require="crm.activities.read" scoped>
+        <ErrorState
+          title={t.crmOutboundEmails.featureDisabledTitle}
+          description={t.crmOutboundEmails.featureDisabledDescription}
+        />
+      </PermissionGate>
+    );
+  }
+
   return (
-    <PermissionGate require="crm.activities.read" scoped>
+    <PermissionGate require="crm.activities.read" scoped denied={queryError?.status === 403}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={t.crmOutboundEmails.title}
           description={t.crmOutboundEmails.subtitle}
           primaryAction={
@@ -145,6 +158,7 @@ export default function OutboundEmailsPage() {
         <DegradedBanner message={t.crmOutboundEmails.eventualConsistency} />
 
         <FilterBar
+          hideSearch
           filters={[
             {
               id: "status",

@@ -1,20 +1,14 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId } from "react";
 import { Check, Plus, UserRound, Users, X } from "lucide-react";
-import { Checkbox, Field, Input, cn } from "@/design-system";
+import { Button, Checkbox, Field, Input, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { CrmJobTitleField } from "../../../shared/components/CrmJobTitleField";
 import { CrmPhoneListField } from "../../../shared/components/CrmPhoneListField";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
-import {
-  leadPath,
-  parseLeadDetailResponse,
-  type LeadContact,
-  type LeadDetail,
-} from "../../lead-contract";
-import { CONTACT_MODAL_LIMITS } from "../contact-modal-contract";
+import type { LeadDetail } from "../../lead-contract";
+import { LEAD_CONTACT_EDIT_LIMITS } from "../lead-contacts-edit-contract";
 import { useLeadContactModal } from "../hooks/useLeadContactModal";
 import { LeadContactEditModal } from "./LeadContactEditModal";
 import { HonorificSelect, LeadContactFields, LeadContactList } from "./LeadContactList";
@@ -26,28 +20,6 @@ export interface LeadContactsCardProps {
   onSaved: (lead: LeadDetail) => void;
   onReconcile: () => void;
 }
-
-interface NewContactDraft {
-  honorificTitle: string;
-  firstName: string;
-  lastName: string;
-  displayName: string;
-  jobTitle: string;
-  email: string;
-  phones: string[];
-  isPrimary: boolean;
-}
-
-const EMPTY_NEW_CONTACT: NewContactDraft = {
-  honorificTitle: "",
-  firstName: "",
-  lastName: "",
-  displayName: "",
-  jobTitle: "",
-  email: "",
-  phones: [""],
-  isPrimary: false,
-};
 
 export function LeadContactsCard(props: LeadContactsCardProps) {
   const { lead, canEdit, onSaved, onReconcile } = props;
@@ -61,113 +33,9 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
     (contact) => !edit.open || contact.partyId !== edit.form?.partyId,
   );
 
-  const [addingContact, setAddingContact] = useState(false);
-  const [newContact, setNewContact] = useState<NewContactDraft>(EMPTY_NEW_CONTACT);
-  const [newContactErrors, setNewContactErrors] = useState<Record<string, string>>({});
-  const [actionBusy, setActionBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const handleSetPrimary = async (target: LeadContact) => {
-    if (!editable || actionBusy || target.isPrimary) return;
-    setActionBusy(true);
-    setActionError(null);
-    try {
-      const contactsPayload = lead.contacts.map((c) => ({
-        partyId: c.partyId,
-        displayName: c.displayName,
-        firstName: c.firstName,
-        lastName: c.lastName,
-        honorificTitle: c.honorificTitle,
-        jobTitle: c.jobTitle,
-        email: c.email,
-        phones: c.phones,
-        isPrimary: c.partyId === target.partyId,
-      }));
-      const outcome = await runIdempotentWrite({
-        attempt: createWriteAttempt(),
-        method: "patch",
-        path: leadPath(lead.id),
-        body: { contacts: contactsPayload },
-        parse: parseLeadDetailResponse,
-      });
-      if (outcome.kind === "success") {
-        onSaved(outcome.value);
-      } else {
-        setActionError(describeError(outcome.error) ?? t.crmShared.errorValidation);
-        if (outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable") {
-          onReconcile();
-        }
-      }
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const handleSaveNewContact = async () => {
-    if (!editable || actionBusy) return;
-    const computedDisplayName =
-      newContact.displayName.trim() ||
-      [newContact.firstName.trim(), newContact.lastName.trim()]
-        .filter(Boolean)
-        .join(" ");
-    const errs: Record<string, string> = {};
-    if (!computedDisplayName) {
-      errs.displayName = t.crmLeads.create.errors.required;
-    }
-    setNewContactErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-
-    setActionBusy(true);
-    setActionError(null);
-    try {
-      const shouldBePrimary = lead.contacts.length === 0 || newContact.isPrimary;
-      const existingPayload = lead.contacts.map((c) => ({
-        partyId: c.partyId,
-        displayName: c.displayName,
-        firstName: c.firstName,
-        lastName: c.lastName,
-        honorificTitle: c.honorificTitle,
-        jobTitle: c.jobTitle,
-        email: c.email,
-        phones: c.phones,
-        isPrimary: shouldBePrimary ? false : c.isPrimary,
-      }));
-      const cleanPhones = newContact.phones.map((p) => p.trim()).filter(Boolean);
-      const nextPayload = [
-        ...existingPayload,
-        {
-          displayName: computedDisplayName,
-          firstName: newContact.firstName.trim() || null,
-          lastName: newContact.lastName.trim() || null,
-          honorificTitle: newContact.honorificTitle.trim() || null,
-          jobTitle: newContact.jobTitle.trim() || null,
-          email: newContact.email.trim() || null,
-          phones: cleanPhones,
-          isPrimary: shouldBePrimary,
-        },
-      ];
-      const outcome = await runIdempotentWrite({
-        attempt: createWriteAttempt(),
-        method: "patch",
-        path: leadPath(lead.id),
-        body: { contacts: nextPayload },
-        parse: parseLeadDetailResponse,
-      });
-      if (outcome.kind === "success") {
-        onSaved(outcome.value);
-        setAddingContact(false);
-        setNewContact(EMPTY_NEW_CONTACT);
-        setNewContactErrors({});
-      } else {
-        setActionError(describeError(outcome.error) ?? t.crmShared.errorValidation);
-        if (outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable") {
-          onReconcile();
-        }
-      }
-    } finally {
-      setActionBusy(false);
-    }
-  };
+  const { addingContact, newContact, newContactErrors, actionBusy } = edit;
+  const actionError = edit.actionError ? describeError(edit.actionError) ?? t.crmShared.errorValidation : null;
+  const canStartAction = editable && !edit.open && !actionBusy && !edit.actionMustReload;
 
   return (
     <section
@@ -201,22 +69,17 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
             {t.crmCustomerProfiles.profileTypes[lead.leadProfileType]}
           </span>
           {isCorporate && editable && !addingContact && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               className="dossier-btn dossier-btn-cyan"
-              onClick={() => {
-                setAddingContact(true);
-                setNewContact({
-                  ...EMPTY_NEW_CONTACT,
-                  isPrimary: lead.contacts.length === 0,
-                });
-                setNewContactErrors({});
-                setActionError(null);
-              }}
+              disabled={!canStartAction}
+              onClick={edit.startAddingContact}
             >
               <Plus className="size-3.5" aria-hidden="true" />
               <span>{t.crmLeads.create.addContact}</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -231,6 +94,14 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
           </div>
         </div>
       )}
+      {edit.actionMustReload && (
+        <div className="px-3.5 pt-3">
+          <p role="alert" className="text-sm text-destructive">{t.crmLeadDetail.contactReloadRequired}</p>
+          <Button variant="outline" size="sm" disabled={actionBusy} onClick={() => void edit.reloadContacts()}>
+            {t.common.retry}
+          </Button>
+        </div>
+      )}
 
       <div className="dossier-card-body grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2">
         {isCorporate ? (
@@ -238,41 +109,41 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
             <LeadContactEditModal edit={edit} />
             {addingContact && (
               <div className="dossier-contact-card editing min-w-0 sm:col-span-2">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-cyan-500/25 pb-2.5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5">
                   <div className="flex items-center gap-2">
                     <span
-                      className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-cyan-500/35 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300"
+                      className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-foreground"
                       aria-hidden="true"
                     >
                       <Plus className="size-3.5" />
                     </span>
-                    <span className="text-xs font-extrabold text-foreground">
+                    <span className="text-xs font-semibold text-foreground">
                       {t.crmLeads.create.addContact}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       className="dossier-btn dossier-btn-cancel"
                       disabled={actionBusy}
-                      onClick={() => {
-                        setAddingContact(false);
-                        setNewContact(EMPTY_NEW_CONTACT);
-                        setNewContactErrors({});
-                      }}
+                      onClick={edit.cancelAddingContact}
                     >
                       <X className="size-3.5" aria-hidden="true" />
                       <span>{t.common.cancel}</span>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       className="dossier-btn dossier-btn-save"
                       disabled={actionBusy}
-                      onClick={() => void handleSaveNewContact()}
+                      onClick={() => void edit.saveNewContact()}
                     >
                       <Check className="size-3.5" aria-hidden="true" />
                       <span>{t.common.save}</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <LeadContactFields
@@ -280,13 +151,13 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                     {
                       label: t.crmLeadDetail.honorificTitle,
                       value: (
-                        <Field label={t.crmLeadDetail.honorificTitle}>
+                        <Field label={t.crmLeadDetail.honorificTitle} error={newContactErrors.honorificTitle}>
                           <HonorificSelect
                             value={newContact.honorificTitle}
                             disabled={actionBusy}
                             placeholder={t.crmLeadDetail.honorificTitle}
                             onChange={(value) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 honorificTitle: value,
                               }))
@@ -307,9 +178,9 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                             placeholder={t.crmLeadDetail.fullName}
                             value={newContact.displayName}
                             disabled={actionBusy}
-                            maxLength={CONTACT_MODAL_LIMITS.displayName}
+                            maxLength={LEAD_CONTACT_EDIT_LIMITS.displayName}
                             onChange={(e) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 displayName: e.target.value,
                               }))
@@ -321,15 +192,15 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                     {
                       label: t.crmLeadDetail.firstName,
                       value: (
-                        <Field label={t.crmLeadDetail.firstName}>
+                        <Field label={t.crmLeadDetail.firstName} error={newContactErrors.firstName}>
                           <Input
                             size="sm"
                             placeholder={t.crmLeadDetail.firstName}
                             value={newContact.firstName}
                             disabled={actionBusy}
-                            maxLength={CONTACT_MODAL_LIMITS.name}
+                            maxLength={LEAD_CONTACT_EDIT_LIMITS.name}
                             onChange={(e) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 firstName: e.target.value,
                               }))
@@ -341,15 +212,15 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                     {
                       label: t.crmLeadDetail.lastName,
                       value: (
-                        <Field label={t.crmLeadDetail.lastName}>
+                        <Field label={t.crmLeadDetail.lastName} error={newContactErrors.lastName}>
                           <Input
                             size="sm"
                             placeholder={t.crmLeadDetail.lastName}
                             value={newContact.lastName}
                             disabled={actionBusy}
-                            maxLength={CONTACT_MODAL_LIMITS.name}
+                            maxLength={LEAD_CONTACT_EDIT_LIMITS.name}
                             onChange={(e) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 lastName: e.target.value,
                               }))
@@ -361,12 +232,12 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                     {
                       label: t.crmLeadConvert.contactJobTitle,
                       value: (
-                        <Field label={t.crmLeadConvert.contactJobTitle}>
+                        <Field label={t.crmLeadConvert.contactJobTitle} error={newContactErrors.jobTitle}>
                           <CrmJobTitleField
                             value={newContact.jobTitle}
                             disabled={actionBusy}
                             onChange={(value) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 jobTitle: value,
                               }))
@@ -379,7 +250,7 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                     {
                       label: t.crmLeads.email,
                       value: (
-                        <Field label={t.crmLeads.email}>
+                        <Field label={t.crmLeads.email} error={newContactErrors.email}>
                           <Input
                             size="sm"
                             type="email"
@@ -387,9 +258,9 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                             placeholder={t.crmLeads.email}
                             value={newContact.email}
                             disabled={actionBusy}
-                            maxLength={CONTACT_MODAL_LIMITS.value}
+                            maxLength={LEAD_CONTACT_EDIT_LIMITS.email}
                             onChange={(e) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 email: e.target.value,
                               }))
@@ -410,7 +281,7 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                             errors={newContactErrors}
                             disabled={actionBusy}
                             onChange={(idx, val) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 phones: prev.phones.map((p, i) =>
                                   i === idx ? val : p,
@@ -418,13 +289,13 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                               }))
                             }
                             onAdd={() =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 phones: [...prev.phones, ""],
                               }))
                             }
                             onRemove={(idx) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 phones:
                                   prev.phones.length === 1
@@ -446,7 +317,7 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                             checked={newContact.isPrimary}
                             disabled={actionBusy || lead.contacts.length === 0}
                             onCheckedChange={(checked) =>
-                              setNewContact((prev) => ({
+                              edit.changeNewContact((prev) => ({
                                 ...prev,
                                 isPrimary: checked === true,
                               }))
@@ -457,14 +328,17 @@ export function LeadContactsCard(props: LeadContactsCardProps) {
                     },
                   ]}
                 />
+                {newContactErrors.phones && (
+                  <p role="alert" className="text-sm text-destructive">{newContactErrors.phones}</p>
+                )}
               </div>
             )}
             {lead.contacts.length > 0 ? (
               <LeadContactList
                 contacts={visibleContacts}
                 country={lead.address?.country ?? undefined}
-                onEdit={editable ? edit.openContact : undefined}
-                onSetPrimary={editable ? handleSetPrimary : undefined}
+                onEdit={editable && !addingContact && !actionBusy && !edit.actionMustReload ? edit.openContact : undefined}
+                onSetPrimary={canStartAction && !addingContact ? edit.setPrimaryContact : undefined}
               />
             ) : (
               !addingContact && (

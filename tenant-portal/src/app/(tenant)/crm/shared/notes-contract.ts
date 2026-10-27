@@ -12,10 +12,8 @@
 //   UpdateNoteDto { body }                                    body 1..20000
 // `forbidNonWhitelisted` is on, so those four keys are the whole payload.
 //
-// The response row is `CrmNoteEntity`, returned raw — no envelope, no
-// projection (`notes-attachments.service.ts` returns the repository result).
-// Its columns are id / createdAt / updatedAt / deletedAt from BaseTenantEntity
-// plus branchId, sourceType, sourceId, body, createdByUserId.
+// The raw CRM response has no envelope. Each note includes server-computed
+// canEdit/canDelete flags (authorship or source moderation plus route admission).
 
 import { isUUIDv7 } from "@/lib/uuid";
 import { crmRecord } from "./crm-capabilities";
@@ -45,6 +43,8 @@ export interface CrmNote {
   sourceId: string;
   body: string;
   createdByUserId: string | null;
+  canEdit: boolean;
+  canDelete: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -79,6 +79,8 @@ export function parseCrmNote(payload: unknown): CrmNote {
     !isUUIDv7(note.sourceId) ||
     !CRM_NOTE_SOURCE_TYPES.includes(note.sourceType as CrmNoteSourceType) ||
     typeof note.body !== "string" ||
+    typeof note.canEdit !== "boolean" ||
+    typeof note.canDelete !== "boolean" ||
     note.body.length === 0 ||
     note.body.length > CRM_NOTE_BODY_MAX_LENGTH ||
     (note.createdByUserId !== null &&
@@ -93,6 +95,8 @@ export function parseCrmNote(payload: unknown): CrmNote {
     sourceType: note.sourceType as CrmNoteSourceType,
     sourceId: note.sourceId,
     body: note.body,
+    canEdit: note.canEdit,
+    canDelete: note.canDelete,
     createdByUserId: isUUIDv7(note.createdByUserId) ? note.createdByUserId : null,
     createdAt: requiredIsoTimestamp(note.createdAt),
     updatedAt: requiredIsoTimestamp(note.updatedAt),

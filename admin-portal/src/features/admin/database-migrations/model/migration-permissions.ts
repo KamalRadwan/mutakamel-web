@@ -23,12 +23,9 @@ export function readMigrationPermissions(
     canRead,
     hasExecute,
     hasCritical,
-    // ALL semantics: the Gateway declares both permissions on every mutating
-    // `/migrations/runs*` route, including pause, resume and retry-failed.
-    canExecute: hasExecute && hasCritical,
-    // The destructive tier the LLD calls out separately. It coincides with
-    // `canExecute` under today's route contract and stays correct if the
-    // Gateway later relaxes the non-destructive routes to `execute` alone.
+    // Start, pause, resume, abort and retry-failed require manage alone.
+    canExecute: hasExecute,
+    // Blocks, downgrade and FORCE windows retain the critical tier.
     canDestroy: hasExecute && hasCritical,
   };
 }
@@ -42,6 +39,5 @@ export function missingExecutePermissions(
 ): string[] {
   const missing: string[] = [];
   if (!permissions.hasExecute) missing.push(MIGRATION_EXECUTE_PERMISSION);
-  if (!permissions.hasCritical) missing.push(MIGRATION_CRITICAL_PERMISSION);
   return missing;
 }

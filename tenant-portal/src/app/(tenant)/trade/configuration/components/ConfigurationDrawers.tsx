@@ -789,7 +789,7 @@ export function ConfigurationInspectModal({
                         ? t.trade[`scopeTarget_${ver.scopeTarget}`]
                         : ver.scopeTarget}
                     </Badge>
-                    <span className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground">
+                    <span dir="ltr" className="rounded border border-border bg-card px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground">
                       {formatPolicyValueHumanReadable(ver.value, lang)}
                     </span>
                     <span className="text-muted-foreground">

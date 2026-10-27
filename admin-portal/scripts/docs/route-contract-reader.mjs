@@ -64,6 +64,11 @@ export function readRouteContracts(filePath, exportName) {
       if (typeof operand !== "number") return fail(node);
       return node.operator === ts.SyntaxKind.MinusToken ? -operand : operand;
     }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AsteriskToken) {
+      const left = value(node.left), right = value(node.right);
+      if (typeof left !== "number" || typeof right !== "number") return fail(node);
+      return left * right;
+    }
     if (ts.isTemplateExpression(node)) {
       let result = node.head.text;
       for (const span of node.templateSpans) {

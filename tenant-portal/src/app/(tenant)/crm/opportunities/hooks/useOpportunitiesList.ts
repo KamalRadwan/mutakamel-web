@@ -10,6 +10,7 @@ import {
   EMPTY_OPPORTUNITY_SEARCH,
   buildOpportunitiesListQuery,
   buildOpportunitySearchRequest,
+  opportunitySearchForCustomerParty,
   type OpportunitySearchState,
   type OpportunitySortBy,
 } from "../opportunity-search-contract";
@@ -97,7 +98,7 @@ function enumValue<T extends string>(value: unknown, options: readonly T[]): T {
 
 function nullableEnumValue<T extends string>(value: unknown, options: readonly T[]): T | null {
   if (value === null || value === undefined) return null;
-  return enumValue(value, options);
+  return typeof value === "string" && options.includes(value as T) ? (value as T) : null;
 }
 
 function parseItem(value: unknown, expectedBranchId: string): OpportunityListItem {
@@ -174,7 +175,9 @@ export function useOpportunitiesList(
   pipelineId: string | null,
   stageId: string | null,
   actorUserId?: string,
+  initialPartyId?: string,
 ) {
+  const normalizedPartyId = initialPartyId?.trim() ?? "";
   const [items, setItems] = useState<OpportunityListItem[]>([]);
   const [pageInfo, setPageInfo] = useState<OpportunitiesListPageInfo>({ page: 1, limit: 25, total: 0 });
   const [sort, setSort] = useState<OpportunitiesSort>({ id: "createdAt", direction: "desc" });
@@ -186,9 +189,11 @@ export function useOpportunitiesList(
   // in advanced mode it is a draft the user is still building, and only the
   // card's Search button promotes it. `opportunity-search-contract` owns every
   // wire name either mode may produce.
-  const initialSearch = isUUIDv7(actorUserId)
-    ? DEFAULT_OPPORTUNITY_SEARCH
-    : EMPTY_OPPORTUNITY_SEARCH;
+  const initialSearch = normalizedPartyId
+    ? opportunitySearchForCustomerParty(normalizedPartyId)
+    : isUUIDv7(actorUserId)
+      ? DEFAULT_OPPORTUNITY_SEARCH
+      : EMPTY_OPPORTUNITY_SEARCH;
   const [search, setSearch] = useState<OpportunitySearchState>(() => initialSearch);
   // The question ON THE WIRE. Split from the draft because a filter tree is
   // built one control at a time and every intermediate state is a different
@@ -202,8 +207,9 @@ export function useOpportunitiesList(
     ...EMPTY_OPPORTUNITY_SEARCH,
     mode: "advanced",
   });
-  const searchTouchedRef = useRef(false);
+  const searchTouchedRef = useRef(Boolean(normalizedPartyId));
   const actorDefaultAppliedRef = useRef(isUUIDv7(actorUserId));
+  const prevPartyIdRef = useRef(normalizedPartyId);
   const requestEpochRef = useRef(0);
   const pageRef = useRef(1);
   // 0 for every fetch key that changes once per gesture — a branch, a pipeline,
@@ -211,6 +217,21 @@ export function useOpportunitiesList(
   // microtask exactly as they always have. 250 only while the basic text box is
   // being typed into, which is the one control that changes per keystroke.
   const fetchDelayRef = useRef(0);
+
+  useEffect(() => {
+    if (prevPartyIdRef.current === normalizedPartyId) return;
+    prevPartyIdRef.current = normalizedPartyId;
+    searchTouchedRef.current = Boolean(normalizedPartyId);
+    const next = normalizedPartyId
+      ? opportunitySearchForCustomerParty(normalizedPartyId)
+      : isUUIDv7(actorUserId)
+        ? DEFAULT_OPPORTUNITY_SEARCH
+        : EMPTY_OPPORTUNITY_SEARCH;
+    fetchDelayRef.current = 0;
+    appliedSearchRef.current = next;
+    setSearch(next);
+    setAppliedSearch(next);
+  }, [actorUserId, normalizedPartyId]);
 
   useEffect(() => {
     if (
@@ -301,7 +322,7 @@ export function useOpportunitiesList(
         if (!signal?.aborted && requestEpoch === requestEpochRef.current) setIsLoading(false);
       }
     },
-    [actorUserId, appliedSearch, branchId, scopedPipelineId, sort, scopedStageId],
+    [actorUserId, appliedSearch, branchId, scopedPipelineId, scopedStageId, setError, setIsLoading, setItems, setPageInfo, sort],
   );
 
   // Every change to the fetch key — branch, pipeline, stage, sort or the

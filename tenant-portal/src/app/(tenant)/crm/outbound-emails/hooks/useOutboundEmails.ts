@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { hasPermission } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -14,6 +15,10 @@ import {
 } from "../outbound-email-contract";
 
 const READ_CONFIG = { cache: "no-store", maxResponseBytes: 1_000_000 } as const;
+
+export function canSendOutboundEmail(permissions: readonly string[] | undefined): boolean {
+  return hasPermission(permissions ?? [], "crm.email.send", true);
+}
 
 /**
  * `GET /outbound-emails` — cursor-paginated, and NOT branch-scoped.
@@ -33,28 +38,47 @@ export function useOutboundEmails() {
   // POST /outbound-emails and /retry require `crm.email.send`; the reads
   // require `crm.activities.read`. There is no capabilities endpoint for this
   // family, so the send permission is the only signal available.
-  const canSend = user?.permissions.includes("crm.email.send") ?? false;
+  const canSend = canSendOutboundEmail(user?.permissions);
   const [items, setItems] = useState<OutboundEmailListItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasNext, setHasNext] = useState(false);
-  const [status, setStatus] = useState<OutboundEmailStatus | "">("");
+  const [status, setStatusState] = useState<OutboundEmailStatus | "">("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
+  const generation = useRef(0);
+  const requests = useRef(new Set<AbortController>());
+
+  const invalidate = useCallback(() => {
+    generation.current += 1;
+    for (const controller of requests.current) controller.abort();
+    requests.current.clear();
+  }, []);
 
   const fetchPage = useCallback(
-    async (nextCursor: string | null, signal?: AbortSignal) => {
+    async (nextCursor: string | null) => {
       const isFirstPage = nextCursor === null;
-      if (isFirstPage) setIsLoading(true);
-      else setIsLoadingMore(true);
+      if (isFirstPage) invalidate();
+      const requestGeneration = generation.current;
+      const controller = new AbortController();
+      requests.current.add(controller);
+      const isCurrent = () =>
+        requestGeneration === generation.current && !controller.signal.aborted;
+      if (isFirstPage) {
+        setIsLoading(true);
+        setIsLoadingMore(false);
+        setCursor(null);
+        setHasNext(false);
+      } else setIsLoadingMore(true);
       setQueryError(null);
       try {
         const query = buildOutboundEmailListQuery({ status }, nextCursor);
         const response = await axiosClient.get<unknown>(
           `${OUTBOUND_EMAILS_PATH}?${query}`,
-          { ...READ_CONFIG, signal },
+          { ...READ_CONFIG, signal: controller.signal },
         );
+        if (!isCurrent()) return;
         const parsed = parseListResponse(response.data);
         setItems((current) =>
           isFirstPage ? parsed.items : [...current, ...parsed.items],
@@ -63,26 +87,27 @@ export function useOutboundEmails() {
         setHasNext(parsed.hasNext);
         setHasLoaded(true);
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (!isCurrent() || isAbortError(error)) return;
         if (isFirstPage) setItems([]);
         setQueryError(normalizeApiError(error));
       } finally {
-        if (!signal?.aborted) {
+        requests.current.delete(controller);
+        if (isCurrent()) {
           setIsLoading(false);
           setIsLoadingMore(false);
         }
       }
     },
-    [status],
+    [status, invalidate],
   );
 
   useEffect(() => {
-    const controller = new AbortController();
+    const effectGeneration = generation.current;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void fetchPage(null, controller.signal);
+      if (generation.current === effectGeneration) void fetchPage(null);
     });
-    return () => controller.abort();
-  }, [fetchPage]);
+    return invalidate;
+  }, [fetchPage, invalidate]);
 
   return {
     t,
@@ -95,11 +120,15 @@ export function useOutboundEmails() {
     queryError,
     canSend,
     status,
-    setStatus,
+    setStatus: (nextStatus: OutboundEmailStatus | "") => {
+      if (nextStatus === status) return;
+      invalidate();
+      setStatusState(nextStatus);
+    },
     // The cursor is handed back exactly as received — filter-bound and opaque,
     // never parsed or rebuilt.
     loadMore: () => {
-      if (cursor) void fetchPage(cursor);
+      if (cursor && !isLoading && !isLoadingMore) void fetchPage(cursor);
     },
     reload: () => fetchPage(null),
   };

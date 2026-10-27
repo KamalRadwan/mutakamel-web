@@ -10,10 +10,7 @@
 // `GET /:id` returns the Party-backed identity plus the primary address and
 // corporate contacts required by the detail workspace.
 //
-// Two pairs of legacy aliases exist on the write DTOs and only one of each is
-// sent: `CustomerProfilesService` resolves `taxNumber ?? taxCardNumber` and
-// `commercialRegistrationNumber ?? commercialRegisterNumber`, so the canonical
-// name wins and sending both would be redundant.
+// Registration writes use `taxNumber` and `commercialRegistrationNumber`.
 
 import { isUUIDv7 } from "@/lib/uuid";
 import type {
@@ -42,7 +39,7 @@ export interface CustomerProfileAddress {
   street: string | null;
 }
 
-export interface CustomerProfileContact {
+interface CustomerProfileContact {
   partyId: string;
   relationshipId: string | null;
   displayName: string;

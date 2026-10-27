@@ -11,7 +11,21 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { DestructiveActionModal } from "@/components/shared/DestructiveActionModal";
-import { Button, Input } from "@/design-system";
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHeader as DsTableHeader,
+  TableRow,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useMigrationRunDetail } from "../hooks/use-migration-run-detail";
 import { missingExecutePermissions } from "../model/migration-permissions";
@@ -45,7 +59,6 @@ import {
   RunProgressBar,
   RunStatusChip,
   TableHeader,
-  migrationInputClass,
   migrationLabelClass,
   type MigrationsCopy,
 } from "./migrations-shared";
@@ -150,7 +163,7 @@ function RunSummaryCard({
   lang: "ar" | "en";
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-xs">
+    <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5">
       <div className="flex flex-wrap items-center gap-2">
         <RunStatusChip status={run.status} copy={copy} />
         <RunModeChip dryRun={run.progress.dryRun} copy={copy} />
@@ -235,7 +248,7 @@ function RunControls({
   const pending = detail.mutation.phase === "PENDING";
   const reasonReady = reason.trim().length >= 3;
 
-  if (!detail.permissions.canExecute && !detail.permissions.canDestroy) {
+  if (!detail.permissions.canExecute) {
     return null;
   }
 
@@ -245,7 +258,7 @@ function RunControls({
   );
 
   return (
-    <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-xs">
+    <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5">
       <h2 className="text-xs font-semibold">{copy.controlsTitle}</h2>
 
       <label className="mt-2.5 block">
@@ -303,7 +316,7 @@ function RunControls({
           </>
         ) : null}
 
-        {detail.permissions.canDestroy ? (
+        {detail.permissions.canExecute ? (
           <Button
             type="button"
             variant="destructive"
@@ -362,7 +375,7 @@ function OutcomeSection({
   const summary = summarizeTenantOutcomes(results);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
+    <section className="overflow-hidden rounded-lg border border-border bg-card">
       <header className="px-3 py-2 sm:px-3.5">
         <h2 className="text-xs font-semibold">{copy.outcomesTitle}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">{copy.outcomesHelp}</p>
@@ -402,25 +415,29 @@ function OutcomeSection({
       ) : null}
 
       <div className="border-t border-border px-4 py-3">
-        <label className="block max-w-xs">
+        <div className="block max-w-xs">
           <span className={migrationLabelClass}>{copy.filterOutcome}</span>
-          <select
-            value={detail.outcomeFilter}
-            onChange={(event) =>
+          <Select
+            value={detail.outcomeFilter || "__all__"}
+            onValueChange={(value) =>
               detail.setOutcomeFilter(
-                event.target.value as MigrationTenantOutcome | "",
+                value === "__all__" ? "" : (value as MigrationTenantOutcome),
               )
             }
-            className={migrationInputClass}
           >
-            <option value="">{copy.allOutcomes}</option>
-            {MIGRATION_TENANT_OUTCOMES.map((outcome) => (
-              <option key={outcome} value={outcome}>
-                {`${outcomeLabel(outcome, copy)} · ${outcome}`}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger size="sm" aria-label={copy.filterOutcome}>
+              <SelectValue placeholder={copy.allOutcomes} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{copy.allOutcomes}</SelectItem>
+              {MIGRATION_TENANT_OUTCOMES.map((outcome) => (
+                <SelectItem key={outcome} value={outcome}>
+                  {`${outcomeLabel(outcome, copy)} · ${outcome}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {results.length === 0 ? (
@@ -430,19 +447,19 @@ function OutcomeSection({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-xs">
-              <caption className="sr-only">{copy.outcomesTitle}</caption>
-              <thead className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
-                <tr>
+            <Table className="w-full min-w-[1000px] text-xs">
+              <TableCaption className="sr-only">{copy.outcomesTitle}</TableCaption>
+              <DsTableHeader className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
+                <TableRow>
                   <TableHeader>{copy.tenant}</TableHeader>
                   <TableHeader>{copy.status}</TableHeader>
                   <TableHeader>{copy.migration}</TableHeader>
                   <TableHeader align="end">{copy.appliedCount}</TableHeader>
                   <TableHeader align="end">{copy.duration}</TableHeader>
                   <TableHeader>{copy.finishedAt}</TableHeader>
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </DsTableHeader>
+              <TableBody>
                 {results.map((result) => (
                   <OutcomeRow
                     key={`${result.tenantId}:${result.migrationName ?? ""}`}
@@ -451,8 +468,8 @@ function OutcomeSection({
                     lang={lang}
                   />
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           <MigrationPager
             page={detail.page}
@@ -510,7 +527,7 @@ function OutcomeGroupCard({
           >
             <dt className="min-w-0">
               <span className="font-semibold">{outcomeLabel(outcome, copy)}</span>{" "}
-              <code dir="ltr" className="font-mono text-2xs text-muted-foreground">
+              <code dir="ltr" className="font-mono text-xs text-muted-foreground">
                 {outcome}
               </code>
             </dt>
@@ -534,14 +551,14 @@ function OutcomeRow({
   const disclosure = readSkipDisclosure(result);
 
   return (
-    <tr className="border-t border-border align-top">
-      <td className="px-3 py-2 text-start text-xs">
+    <TableRow className="border-t border-border align-top">
+      <TableCell className="px-3 py-2 text-start text-xs">
         <p className="font-semibold">{result.tenantName ?? result.tenantId}</p>
         <code dir="ltr" className="mt-0.5 block font-mono text-xs text-muted-foreground">
           {result.tenantId}
         </code>
-      </td>
-      <td className="px-3 py-2 text-start text-xs">
+      </TableCell>
+      <TableCell className="px-3 py-2 text-start text-xs">
         <OutcomeChip outcome={result.outcome} copy={copy} />
         <p className="mt-0.5 max-w-sm text-xs leading-5 text-muted-foreground">
           {outcomeHelp(result.outcome, copy)}
@@ -571,27 +588,27 @@ function OutcomeRow({
             {result.errorDetail}
           </p>
         ) : null}
-      </td>
-      <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
+      </TableCell>
+      <TableCell dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
         {result.migrationName ?? copy.none}
         {result.migrationChecksum ? (
-          <span className="mt-0.5 block break-all text-2xs text-muted-foreground">
+          <span className="mt-0.5 block break-all text-xs text-muted-foreground">
             {result.migrationChecksum}
           </span>
         ) : null}
-      </td>
-      <td className="px-3 py-2 text-end font-mono text-xs">
+      </TableCell>
+      <TableCell className="px-3 py-2 text-end font-mono text-xs">
         {result.appliedCount}
         {result.pendingCount > 0 ? (
           <span className="block text-muted-foreground">/{result.pendingCount}</span>
         ) : null}
-      </td>
-      <td className="px-3 py-2 text-end font-mono text-xs">
+      </TableCell>
+      <TableCell className="px-3 py-2 text-end font-mono text-xs">
         {formatDuration(result.durationMs, lang)}
-      </td>
-      <td className="px-3 py-2 text-start text-xs text-muted-foreground">
+      </TableCell>
+      <TableCell className="px-3 py-2 text-start text-xs text-muted-foreground">
         {formatMigrationDate(result.finishedAt, lang)}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }

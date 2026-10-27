@@ -13,6 +13,7 @@ const KINDS: TradeStatusKind[] = [
   "TradeFulfillmentStatus",
   "TradeBillingStatus",
   "TradePurchaseOrderStatus",
+  "TradePurchaseDispatchStatus",
   "TradeApprovalStatus",
   "TradePurchaseQuotationStatus",
   "TradeInvoiceStatus",
@@ -91,7 +92,19 @@ describe("error codes", () => {
 
   it("treats a numbering failure as retryable even though it is a 422", () => {
     expect(isRetryableTradeCode("TRADE.FINALIZED_DOCUMENT.NUMBERING_UNAVAILABLE")).toBe(true);
+    expect(isRetryableTradeCode("TRADE.DEPENDENCY.NUMBERING_UNAVAILABLE")).toBe(true);
   });
+
+  it.each(["TRADE.DEPENDENCY.NUMBERING_UNAVAILABLE", "TRADE.QUOTE.NOT_FOUND", "TRADE.QUOTE.PDF_TEMPLATE_CHANGED", "TRADE.BUSINESS_DOCUMENT.PDF_TEMPLATE_CHANGED"])(
+    "resolves the split document code %s in the selected language",
+    (code) => {
+      const english = tradeDocumentMessage(code, en.tradeDocuments.errors);
+      const arabic = tradeDocumentMessage(code, ar.tradeDocuments.errors);
+      expect(english).toBeTruthy();
+      expect(arabic).toBeTruthy();
+      expect(arabic).not.toBe(english);
+    },
+  );
 
   it("does not offer a retry for a refused transition", () => {
     expect(isRetryableTradeCode("TRADE.QUOTE.TRANSITION_NOT_ALLOWED")).toBe(false);

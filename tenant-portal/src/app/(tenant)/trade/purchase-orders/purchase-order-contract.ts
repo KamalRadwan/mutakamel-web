@@ -37,11 +37,11 @@ export const PURCHASE_ORDER_PERMISSIONS = {
  * page lists: `lifecycle_status`, `approval_status` and `dispatch_status`,
  * which defaults to `NOT_REQUESTED` on `TradePurchaseOrderEntity`.
  *
- * `dispatch_status` has no exported enum, no check constraint and no writer in
- * `trade-app/src` — only the column default is proven — so it is carried here
- * and rendered as an unknown-tolerant value rather than mapped.
+ * PurchasingService records REQUESTED with a durable intent. Worker evidence
+ * advances it to SENT or FAILED independently of commercial confirmation.
  */
 export interface PurchaseOrder extends TradeDocumentHeader {
+  approvalReady: boolean;
   dispatchStatus: string;
   supplierAccountId: string | null;
   receivingNodeId: string | null;
@@ -64,6 +64,11 @@ interface PurchaseOrderLine {
 
 export interface PurchaseOrderDetail extends PurchaseOrder {
   lines: PurchaseOrderLine[];
+  delivery?: {
+    status: "PDF_REQUESTED" | "EMAIL_REQUESTED" | "COMPLETED" | "FAILED";
+    attemptCount: number;
+    lastErrorCode: string | null;
+  } | null;
 }
 
 /** The six ladder steps, in the order `PurchasingService` allows them. */
@@ -100,6 +105,7 @@ export function purchaseOrderLadder(
     reject: isPending && !isMaker && canWrite(PURCHASE_ORDER_PERMISSIONS.approve),
     confirm:
       isDraft &&
+      order.approvalReady &&
       ["APPROVED", "NOT_REQUIRED"].includes(order.approvalStatus) &&
       canWrite(PURCHASE_ORDER_PERMISSIONS.confirm),
     cancel:
@@ -120,8 +126,12 @@ export function parsePurchaseOrder(payload: unknown): PurchaseOrder {
   const header = parseTradeDocumentHeader(payload);
   const row = record(payload);
   if (!row || !isTradeStatus(row.dispatchStatus)) tradeInvalidResponse();
+  if (row.approvalReady !== undefined && typeof row.approvalReady !== "boolean") {
+    tradeInvalidResponse();
+  }
   return {
     ...header,
+    approvalReady: row.approvalReady === true,
     dispatchStatus: row.dispatchStatus,
     supplierAccountId: optionalUuid(row.supplierAccountId),
     receivingNodeId: optionalUuid(row.receivingNodeId),
@@ -133,7 +143,21 @@ export function parsePurchaseOrderDetail(payload: unknown): PurchaseOrderDetail 
   const order = parsePurchaseOrder(payload);
   const row = record(payload);
   if (!row || !Array.isArray(row.lines)) tradeInvalidResponse();
-  return { ...order, lines: row.lines.map(parsePurchaseOrderLine) };
+  const delivery = record(row.delivery);
+  if (row.delivery != null && (
+    !delivery || typeof delivery.status !== "string" ||
+    !["PDF_REQUESTED", "EMAIL_REQUESTED", "COMPLETED", "FAILED"].includes(delivery.status) ||
+    !Number.isSafeInteger(delivery.attemptCount) || Number(delivery.attemptCount) < 0 ||
+    (delivery.lastErrorCode !== null && typeof delivery.lastErrorCode !== "string")
+  )) tradeInvalidResponse();
+  return {
+    ...order, lines: row.lines.map(parsePurchaseOrderLine),
+    delivery: delivery ? {
+      status: delivery.status as "PDF_REQUESTED" | "EMAIL_REQUESTED" | "COMPLETED" | "FAILED",
+      attemptCount: Number(delivery.attemptCount),
+      lastErrorCode: delivery.lastErrorCode as string | null,
+    } : null,
+  };
 }
 
 function parsePurchaseOrderLine(payload: unknown): PurchaseOrderLine {

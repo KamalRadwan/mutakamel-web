@@ -12,6 +12,10 @@ import {
   NotFoundState,
   PermissionGate,
   Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "@/design-system";
 import { useLanguage } from "@/i18n/useLanguage";
 import { localizedValue } from "@/lib/format/localized";
@@ -76,7 +80,7 @@ export function RoleEditorWorkspace({ id }: { id: string }) {
               : {
                   label: copy.savePermissions,
                   onClick: screen.openConfirm,
-                  disabled: !screen.isDirty || screen.isOverCap || screen.isSubmitting,
+                  disabled: !screen.isDirty || !screen.canSavePermissions || screen.isSubmitting,
                   loading: screen.isSubmitting,
                 }
           }
@@ -120,6 +124,12 @@ export function RoleEditorWorkspace({ id }: { id: string }) {
           </p>
         ) : null}
 
+        {screen.hasUngrantablePermissions ? (
+          <p role="alert" className="rounded-sm border border-caution-200 bg-caution-100 p-2.5 text-xs text-caution-800 dark:border-caution-800 dark:bg-caution-950 dark:text-caution-300">
+            {copy.outsideGrantAuthority}
+          </p>
+        ) : null}
+
         {writeText ? (
           <p
             role="alert"
@@ -147,7 +157,7 @@ export function RoleEditorWorkspace({ id }: { id: string }) {
           </p>
         ) : null}
 
-        {screen.catalogueError ? (
+        {screen.catalogueError && screen.catalogueError.status !== 403 ? (
           <ErrorState
             title={copy.catalogueFailed}
             description={describeError(screen.catalogueError)}
@@ -156,37 +166,54 @@ export function RoleEditorWorkspace({ id }: { id: string }) {
           />
         ) : null}
 
-        {screen.groups.map((group) => (
-          <Card key={group.key}>
-            <CardContent className="flex flex-col gap-2 py-4">
-              <h2 className="text-xs font-semibold text-foreground">{group.label}</h2>
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {group.permissions.map((permission) => (
-                  <li key={permission.id}>
-                    <label className="flex items-start gap-2">
-                      <Checkbox
-                        checked={screen.selectedIds.includes(permission.id)}
-                        onCheckedChange={() => screen.toggle(permission.id)}
-                        disabled={isReadOnly || screen.isSubmitting}
-                        aria-label={localizedValue(permission.nameAr, permission.nameEn, lang)}
-                      />
-                      <span className="flex flex-col">
-                        {/* The catalogue ships localized labels; never write a
-                            second description for a permission key here. */}
-                        <span className="text-xs text-foreground">
-                          {localizedValue(permission.nameAr, permission.nameEn, lang)}
-                        </span>
-                        <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
-                          {permission.key}
-                        </span>
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        ))}
+        <PermissionGate
+          require="roles.permission.read"
+          denied={!screen.canReadPermissions || screen.catalogueError?.status === 403}
+        >
+          <TooltipProvider>
+            {screen.groups.map((group) => (
+              <Card key={group.key}>
+                <CardContent className="flex flex-col gap-2 py-4">
+                  <h2 className="text-xs font-semibold text-foreground">{group.label}</h2>
+                  <ul className="grid gap-2 sm:grid-cols-2">
+                    {group.permissions.map((permission) => (
+                      <li key={permission.id}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <label
+                              className="flex items-start gap-2"
+                              tabIndex={screen.canGrantPermission(permission.id) ? undefined : 0}
+                            >
+                              <Checkbox
+                                checked={screen.selectedIds.includes(permission.id)}
+                                onCheckedChange={() => screen.toggle(permission.id)}
+                                disabled={!screen.canEditPermissions || !screen.canGrantPermission(permission.id) || screen.isSubmitting}
+                                aria-label={localizedValue(permission.nameAr, permission.nameEn, lang)}
+                              />
+                              <span className="flex flex-col">
+                                {/* The catalogue ships localized labels; never write a
+                                    second description for a permission key here. */}
+                                <span className="text-xs text-foreground">
+                                  {localizedValue(permission.nameAr, permission.nameEn, lang)}
+                                </span>
+                                <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
+                                  {permission.key}
+                                </span>
+                              </span>
+                            </label>
+                          </TooltipTrigger>
+                          {!screen.canGrantPermission(permission.id) ? (
+                            <TooltipContent>{copy.permissionNotGrantable}</TooltipContent>
+                          ) : null}
+                        </Tooltip>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </TooltipProvider>
+        </PermissionGate>
 
         <ConfirmActionModal
           open={screen.isConfirmOpen}

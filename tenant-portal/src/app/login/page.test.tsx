@@ -30,6 +30,7 @@ beforeAll(() => {
 vi.mock("./hooks/useLogin", () => ({
   useLogin: () => ({
     t: ar,
+    mfa: { step: null },
     email: "",
     setEmail: () => undefined,
     password: "",
@@ -37,6 +38,8 @@ vi.mock("./hooks/useLogin", () => ({
     rememberMe: true,
     showPassword: false,
     isSubmitting: false,
+    isCoolingDown: false,
+    throttleMessage: "",
     isForgotModalOpen: false,
     setIsForgotModalOpen: () => undefined,
     openForgotModal: () => undefined,

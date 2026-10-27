@@ -41,7 +41,7 @@ export const CUSTOMER_PROFILES_PATH = "/api/tenant/crm/v1/customer-profiles";
 const CUSTOMER_PROFILES_SEARCH_PATH = CUSTOMER_PROFILES_PATH + "/search";
 export const CUSTOMER_PROFILES_PAGE_SIZE = 25;
 
-export const CUSTOMER_PROFILE_TYPES = ["INDIVIDUAL", "CORPORATE"] as const;
+const CUSTOMER_PROFILE_TYPES = ["INDIVIDUAL", "CORPORATE"] as const;
 const CUSTOMER_PROFILE_STATUSES = [
   "PROSPECT",
   "ACTIVE_CUSTOMER",
@@ -62,12 +62,12 @@ export interface CustomerProfileOwner {
   avatarUrl: string | null;
 }
 
-export interface CustomerProfileNextActivity {
+interface CustomerProfileNextActivity {
   activityAt: string;
   bucket: "OVERDUE" | "TODAY" | "FUTURE";
 }
 
-export interface CustomerProfilePrimaryContact {
+interface CustomerProfilePrimaryContact {
   partyId: string;
   displayName: string;
   jobTitle: string;

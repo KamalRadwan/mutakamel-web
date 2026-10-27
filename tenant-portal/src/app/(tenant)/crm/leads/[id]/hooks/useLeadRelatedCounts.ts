@@ -99,7 +99,7 @@ export function useLeadRelatedCounts(
           if (kind === "opportunities") {
             const response = await axiosClient.post<unknown>(
               OPPORTUNITY_SEARCH_PATH,
-              leadOpportunitySearch(leadId as string, branchId as string),
+              leadOpportunitySearch(partyId as string, branchId as string),
               // A POST that READS: nothing to make idempotent, and safe to
               // replay after a token refresh for the same reason a GET is.
               { ...config, skipAutoIdempotency: true, replayAfterRefresh: true },

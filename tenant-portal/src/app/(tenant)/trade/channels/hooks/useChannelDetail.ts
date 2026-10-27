@@ -33,11 +33,11 @@ export function useChannelDetail(id: string) {
   const runWrite = useTradeWrite();
   const { context } = useTradeScope();
   const canManage = canPerformTradeAction(user, TRADE_PERMISSIONS.itemsManage);
-  const { headers, gap } = useTradeScopeRequest("COMPANY");
+  const { headers, gap } = useTradeScopeRequest("COMPANY", { includeChannel: false });
   // Every branch mapping route is `BRANCH`-targeted, and the service refuses
   // any `branchId` other than the one in the operating context, so this screen
   // can only ever map the branch the user has selected.
-  const branchScope = useTradeScopeRequest("BRANCH");
+  const branchScope = useTradeScopeRequest("BRANCH", { includeChannel: false });
 
   const [channel, setChannel] = useState<ChannelDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);

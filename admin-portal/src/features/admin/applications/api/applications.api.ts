@@ -61,9 +61,9 @@ function getWithSignal<T>(url: string, signal?: AbortSignal) {
 
 export const applicationsApi = {
   // --- Application Identity, Publication & Lifecycle Routes ---
-  list: async (query?: ApplicationListQueryDto) => {
+  list: async (query?: ApplicationListQueryDto, signal?: AbortSignal) => {
     const qs = toQueryString(query);
-    const response = await axiosClient.get<SuccessResponse<ApplicationView[]>>(`${BASE_URL}${qs}`);
+    const response = await getWithSignal<SuccessResponse<ApplicationView[]>>(`${BASE_URL}${qs}`, signal);
     return {
       data: extractCoreData(response),
       meta: extractCoreMeta(response)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -20,11 +20,9 @@ import {
   Button,
   Card,
   DegradedBanner,
-  IdentifierText,
   Progress,
   StatCard,
   swatchSurfacePalette,
-  type SwatchHue,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
@@ -96,56 +94,6 @@ function WidgetHeaderIcon({
   return <BarChart3 className="size-4" aria-hidden="true" />;
 }
 
-function ScalarSparkline({
-  accentHue,
-  currentValue,
-  previousValue,
-  inverse,
-}: {
-  accentHue: SwatchHue;
-  currentValue: number;
-  previousValue: number | null;
-  inverse: boolean;
-}) {
-  const gradientId = useId();
-  const strokeColor = `var(--swatch-${accentHue})`;
-  const prev = previousValue ?? currentValue * 0.75;
-  const isRising = currentValue >= prev;
-
-  const linePath = inverse
-    ? "M 0 34 C 35 30, 55 12, 95 28 C 135 40, 165 10, 200 24 C 220 32, 230 34, 240 36"
-    : isRising
-      ? "M 0 36 C 40 34, 70 26, 110 28 C 150 30, 175 14, 205 16 C 222 17, 232 8, 240 6"
-      : "M 0 14 C 40 16, 75 22, 115 20 C 155 18, 185 28, 215 30 C 228 31, 235 34, 240 35";
-
-  const areaPath = `${linePath} L 240 44 L 0 44 Z`;
-
-  return (
-    <svg
-      viewBox="0 0 240 44"
-      className="mt-auto h-11 w-full overflow-visible pt-1"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity={0.28} />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity={0.0} />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${gradientId})`} />
-      <path
-        d={linePath}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth={2.25}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function WidgetTile({
   widget,
   result,
@@ -177,12 +125,14 @@ export function WidgetTile({
 
   const canDrilldown =
     result !== undefined &&
+    result.state !== "RETIRED" &&
     result.errorCode === null &&
     result.typedResult === null &&
     widget.querySpec.series.length === 1;
 
   const showTableToggle =
     result !== undefined &&
+    result.state !== "RETIRED" &&
     result.errorCode === null &&
     mode !== "TABLE" &&
     mode !== "SCALAR" &&
@@ -238,6 +188,8 @@ export function WidgetTile({
 
         {result === undefined ? (
           <p className="text-xs text-muted-foreground">{t.crmDashboards.widgetNotExecuted}</p>
+        ) : result.state === "RETIRED" ? (
+          <p role="note" className="text-xs text-muted-foreground">{t.crmDashboards.metricRetired}</p>
         ) : result.errorCode !== null ? (
           <div
             role="note"
@@ -250,9 +202,6 @@ export function WidgetTile({
             <p className="text-2xs text-muted-foreground">
               {t.crmDashboards.widgetErrors[result.errorCode] ?? t.crmDashboards.widgetFailedGeneric}
             </p>
-            <IdentifierText className="text-2xs text-muted-foreground">
-              {result.errorCode}
-            </IdentifierText>
           </div>
         ) : mode === "SCALAR" && result.value !== null ? (
           <div className="flex flex-1 flex-col justify-between gap-2 pt-1">
@@ -285,14 +234,7 @@ export function WidgetTile({
                   target: formatNumber(result.target, lang, { maximumFractionDigits: 2 }),
                 })}
               />
-            ) : (
-              <ScalarSparkline
-                accentHue={accentHue}
-                currentValue={result.value}
-                previousValue={result.previousValue}
-                inverse={inverseDelta}
-              />
-            )}
+            ) : null}
           </div>
         ) : mode === "MULTI_KPI" ? (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -340,7 +282,7 @@ export function WidgetTile({
         {warnings.length > 0 ? (
           <DegradedBanner
             message={warnings
-              .map((warning) => t.crmDashboards.widgetWarnings[warning] ?? warning)
+              .map((warning) => t.crmDashboards.widgetWarnings[warning] ?? t.crmDashboards.widgetWarningGeneric)
               .join(" · ")}
           />
         ) : null}

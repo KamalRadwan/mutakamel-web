@@ -60,7 +60,7 @@ export function CreateCurrencyModal({
         onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
         isSubmitting={isSubmitting}
         codeReadOnly={false}
-        rateLocked={values.isDefault}
+        rateLocked={false}
         showDefaultToggle
       />
     </FormDrawer>

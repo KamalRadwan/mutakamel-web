@@ -540,6 +540,40 @@ interface PatchStorageRuntimeConfigDto {
 - The Portal retains an idempotency key only when retrying the exact same
   ambiguous mutation intent.
 
+## Platform email suppressions (source verified 2026-10-23)
+
+The SMTP settings page includes an independent look-up-and-lift form.
+Both actions require ALL of `admin.settings.update` and
+`admin.settings.critical`, with the existing super-admin bypass.
+
+- POST `/api/admin/core/v1/email-suppressions/lookup`, body `{ address }`.
+- POST `/api/admin/core/v1/email-suppressions/lift`, same body, explicit
+  confirmation and a caller-owned UUIDv7 `x-idempotency-key`.
+
+Core's success/data envelope wraps lookup `{ suppressed: false }` or
+`{ suppressed: true, reasonCode, firstOccurredAt, lastOccurredAt }`.
+Reasons are `HARD_BOUNCE` and `COMPLAINT`; lift returns
+`{ suppressed: false, lifted: boolean }`. Local DTOs and runtime validators
+avoid depending on a newly published contracts package.
+
+There is no address list: storage is hash-only. Addresses exist only in form
+memory and POST bodies; no URLs, query strings, logs or persistent storage.
+Requests use no-store. Edits invalidate lookup evidence and confirmation;
+account changes unmount the form, cancelling requests. Failed lifts retain
+their exact key only in memory for confirmed retries of the same address.
+Success distinguishes lifted from already absent and does not resend mail or
+alter tenant suppressions. All labels, reasons, dates and errors are bilingual.
+
+403 disables commands and shows access denied. 400/422 use
+`emailSuppression.errors.invalidAddress`; 429 uses `rateLimited`;
+network/other failures and local `INVALID_SUPPRESSION_RESPONSE` use `failed`.
+Server error text is never rendered, since it may echo the submitted address.
+The local response code is not a backend error code.
+
+Source: Gateway `core-email-suppression.route-contracts.ts`; Core
+`tenant/email-suppression/email-suppression.controller.ts` and DTOs.
+Typecheck, lint, specs and authenticated live verification remain lead gates.
+
 ## Error catalogue
 
 | HTTP | Code | Frontend behavior |

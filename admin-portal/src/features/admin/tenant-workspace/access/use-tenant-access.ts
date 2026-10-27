@@ -505,19 +505,24 @@ export function useTenantAccess({
 
   const resetPassword = useCallback(
     async (target: TenantUserView) => {
-      assertUserState(
-        !isDeletedTenantUser(target) && target.status === "ACTIVE",
-        "TENANT_USER_PASSWORD_RESET_UNAVAILABLE",
-      );
-      return execute(
+      const result = await execute(
         "reset-password",
         target,
         permissions.canResetPassword,
         null,
-        (key) => tenantAccessApi.resetPassword(tenantId, target.id, key, locale),
+        (key) => {
+          assertUserState(
+            !isDeletedTenantUser(target) && target.status !== "DEACTIVATED",
+            "TENANT_USER_PASSWORD_RESET_UNAVAILABLE",
+          );
+          return tenantAccessApi.resetPassword(tenantId, target.id, key, locale);
+        },
       );
+      await refreshAfterWrite();
+      if (selectedUser.data?.id === target.id) await loadUser(target.id);
+      return result;
     },
-    [execute, locale, permissions.canResetPassword, tenantId],
+    [execute, loadUser, locale, permissions.canResetPassword, refreshAfterWrite, selectedUser.data?.id, tenantId],
   );
 
   const resendInvite = useCallback(
@@ -808,3 +813,123 @@ function assertUserState(condition: boolean, errorCode: string): asserts conditi
 }
 
 export type TenantAccessController = ReturnType<typeof useTenantAccess>;
+
+/** Dialog-owned queries must not replace the directory/editor catalogues. */
+export function useTenantRoleCatalogues(controller: TenantAccessController, user: TenantUserView) {
+  const { tenantId, enabled, ready, isAuthLoading, permissions } = controller;
+  const allowed = permissions.canRead && permissions.canReadRoles && permissions.canAssignRoles;
+  const canLoad = enabled && ready && !isAuthLoading && allowed;
+  const context = JSON.stringify([tenantId, user.id]);
+  const gate = !enabled ? "idle" : !ready ? "unavailable" :
+    !isAuthLoading && !allowed ? "forbidden" : "loading";
+  const roles = useAssignmentCatalogue(tenantId, context, canLoad, gate, tenantAccessApi.listRoles);
+  const branches = useAssignmentCatalogue(tenantId, context, canLoad, gate, tenantAccessApi.listBranches);
+  const [revision, setRevision] = useState(0);
+  const [labels, setLabels] = useState<{
+    key: string;
+    resource: TenantAccessResource<Record<string, string>>;
+  } | null>(null);
+  const missingBranchIds = JSON.stringify([...new Set(user.roleAssignments.flatMap((assignment) =>
+    assignment.branchId && assignment.branchId !== user.organization.branch.id ? [assignment.branchId] : [],
+  ))].sort());
+  const labelKey = JSON.stringify([context, missingBranchIds, revision, canLoad]);
+
+  useEffect(() => {
+    if (!canLoad) return;
+    const abort = new AbortController();
+    const timer = window.setTimeout(async () => {
+      const missing = new Set<string>(JSON.parse(missingBranchIds) as string[]);
+      const found: Record<string, string> = {};
+      try {
+        // There is no branch-by-id endpoint. Scan bounded pages only until
+        // the assigned ids are found, independently of the selector's search.
+        let lastPage = 1;
+        for (let page = 1; missing.size && page <= lastPage; page++) {
+          const result = await tenantAccessApi.listBranches(tenantId, { page, limit: 100 }, abort.signal);
+          if (abort.signal.aborted) return;
+          if (page === 1) lastPage = result.totalPages;
+          for (const branch of result.items) {
+            if (missing.delete(branch.id)) found[branch.id] = `${branch.company.name} · ${branch.name}`;
+          }
+          if (!result.hasNext) break;
+        }
+        if (abort.signal.aborted) return;
+        setLabels({ key: labelKey, resource: { status: "ready", data: found, error: null } });
+      } catch (caught) {
+        if (abort.signal.aborted) return;
+        setLabels({ key: labelKey, resource: { ...resourceError<Record<string, string>>(caught), data: found } });
+      }
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      abort.abort();
+    };
+  }, [canLoad, labelKey, missingBranchIds, tenantId]);
+
+  const assignmentBranches: TenantAccessResource<Record<string, string>> =
+    !canLoad ? { status: gate, data: null, error: null } : labels?.key === labelKey
+      ? labels.resource : { status: "loading", data: null, error: null };
+  return { roles, branches, assignmentBranches, retryLabels: () => setRevision((value) => value + 1) };
+}
+
+function useAssignmentCatalogue<T extends { id: string }>(
+  tenantId: string,
+  context: string,
+  canLoad: boolean,
+  gate: "idle" | "unavailable" | "forbidden" | "loading",
+  load: (tenantId: string, query: CatalogueQuery, signal?: AbortSignal) => Promise<PageResult<T>>,
+) {
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [revision, setRevision] = useState(0);
+  const [response, setResponse] = useState<{
+    context: string;
+    key: string;
+    resource: TenantAccessResource<PageResult<T>>;
+    known: Record<string, T>;
+  } | null>(null);
+  const q = search.trim().slice(0, 120);
+  const key = JSON.stringify([context, q, page, revision, canLoad]);
+
+  useEffect(() => {
+    if (!canLoad) return;
+    const abort = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await load(tenantId, { page, limit: 50, ...(q ? { q } : {}) }, abort.signal);
+        if (abort.signal.aborted) return;
+        setResponse((previous) => ({
+          context,
+          key,
+          resource: { status: result.items.length ? "ready" : "empty", data: result, error: null },
+          known: {
+            ...(previous?.context === context ? previous.known : {}),
+            ...Object.fromEntries(result.items.map((item) => [item.id, item])),
+          },
+        }));
+      } catch (caught) {
+        if (abort.signal.aborted) return;
+        setResponse((previous) => ({
+          context, key, resource: resourceError<PageResult<T>>(caught),
+          known: previous?.context === context ? previous.known : {},
+        }));
+      }
+    }, q ? 250 : 0);
+    return () => {
+      window.clearTimeout(timer);
+      abort.abort();
+    };
+  }, [canLoad, context, key, load, page, q, tenantId]);
+
+  const resource: TenantAccessResource<PageResult<T>> = !canLoad
+    ? { status: gate, data: null, error: null }
+    : response?.key === key ? response.resource : { status: "loading", data: null, error: null };
+  const known: Record<string, T> = canLoad && response?.context === context ? response.known : {};
+  return {
+    search, page, resource,
+    known,
+    setSearch: (value: string) => { setSearch(value); setPage(1); },
+    setPage,
+    retry: () => setRevision((value) => value + 1),
+  };
+}

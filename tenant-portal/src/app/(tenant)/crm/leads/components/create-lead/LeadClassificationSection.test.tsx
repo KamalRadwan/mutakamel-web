@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { en } from "@/i18n/dictionaries/en";
-import {
-  LeadClassificationSection,
-  type LeadClassificationSectionProps,
-} from "./LeadClassificationSection";
+import { LeadClassificationSection } from "./LeadClassificationSection";
+
+type LeadClassificationSectionProps = ComponentProps<typeof LeadClassificationSection>;
 
 afterEach(cleanup);
 

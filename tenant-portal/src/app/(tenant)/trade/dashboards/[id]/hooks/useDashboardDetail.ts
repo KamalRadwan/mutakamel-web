@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { COMPANY_SCOPE_HEADER } from "@/lib/api/organization-scope";
+import { can } from "@/lib/auth/permission-scope";
 import { tradeDelete, tradeGet, tradeIfMatch, tradePatch, tradePost } from "../../../trade-api";
 import { useTradeScope } from "../../../trade-advanced-scope";
 import {
@@ -45,7 +47,7 @@ export function useDashboardDetail(id: string) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchId } = useTenantBranchSelection(user);
+  const { branchId } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [dashboard, setDashboard] = useState<DashboardDetail | null>(null);
@@ -57,6 +59,16 @@ export function useDashboardDetail(id: string) {
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Mirrors assertAnyPermission: a supplied company must match the grant;
+  // without one, any accessible grant scope is sufficient.
+  const permissionTarget = scope.headers[COMPANY_SCOPE_HEADER]
+    ? { companyId: scope.headers[COMPANY_SCOPE_HEADER] }
+    : {};
+  const canEdit = (dashboard?.accessLevel === "OWNER" || dashboard?.accessLevel === "EDIT") &&
+    (user?.isTenantOwner === true || can(user, "trade.dashboards.update", permissionTarget));
+  const canShare = dashboard?.accessLevel === "OWNER" &&
+    (user?.isTenantOwner === true || can(user, "trade.dashboards.share", permissionTarget));
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -128,6 +140,7 @@ export function useDashboardDetail(id: string) {
   const act = useCallback(
     async (action: PendingAction, call: () => Promise<unknown>, refresh = true): Promise<void> => {
       if (pending) return;
+      if (action === "share" ? !canShare : !canEdit) return;
       setPending(action);
       setActionError(null);
       try {
@@ -142,7 +155,7 @@ export function useDashboardDetail(id: string) {
         if (refresh) await load();
       }
     },
-    [pending, toast, t, load],
+    [pending, canEdit, canShare, toast, t, load],
   );
 
   const execute = useCallback(async (): Promise<void> => {
@@ -176,6 +189,8 @@ export function useDashboardDetail(id: string) {
     t,
     lang,
     dashboard,
+    canEdit,
+    canShare,
     run,
     shares,
     shareTargets,

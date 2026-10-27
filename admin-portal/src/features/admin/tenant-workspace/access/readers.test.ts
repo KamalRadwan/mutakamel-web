@@ -22,10 +22,30 @@ import {
   roleFixture,
   summaryFixture,
   teamFixture,
+  userFixture,
   userPayload,
 } from "./__tests__/fixtures";
 
 describe("tenant access response readers", () => {
+  it("preserves assignment provenance even when both sources have the same scope and role", () => {
+    const branch = userFixture().roleAssignments[0];
+    const scoped = { ...branch, source: "SCOPE_ROLE", assignmentId: "019ff251-3000-7000-8000-000000000003" };
+    expect(readTenantUserView(userPayload({ roleAssignments: [branch, scoped] })).roleAssignments).toEqual([branch, scoped]);
+  });
+
+  it.each([undefined, "UNKNOWN"])("rejects missing or unknown assignment source %s", (source) => {
+    const assignment = { ...userFixture().roleAssignments[0], source };
+    expect(() => readTenantUserView(userPayload({ roleAssignments: [assignment] }))).toThrow("INVALID_TENANT_USER_RESPONSE");
+  });
+
+  it.each([
+    { scope: "TENANT", branchId: null },
+    { scope: "BRANCH", branchId: null },
+  ])("rejects invalid branch-role placement %j", (placement) => {
+    const assignment = { ...userFixture().roleAssignments[0], ...placement };
+    expect(() => readTenantUserView(userPayload({ roleAssignments: [assignment] }))).toThrow("INVALID_TENANT_USER_RESPONSE");
+  });
+
   it("reads the safe user projection from the Core envelope and allowlists fields", () => {
     const source = userPayload({ internalNote: "do-not-copy" });
     const parsed = readTenantUserView({ success: true, data: source });

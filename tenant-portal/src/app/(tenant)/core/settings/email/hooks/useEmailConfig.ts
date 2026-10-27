@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useToast } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
+import { useCan, useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { coreGet, corePatch, corePost } from "../../../core-api";
@@ -34,8 +33,7 @@ export type EmailConflictKind = "preconditionRequired" | "staleRevision";
 export function useEmailConfig() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("workspace.email.manage") ?? false;
+  const canManage = useCan("workspace.email.manage", { tenantWide: true });
 
   const [config, setConfig] = useState<EmailConfig | null>(null);
   const [revision, setRevision] = useState<number | null>(null);

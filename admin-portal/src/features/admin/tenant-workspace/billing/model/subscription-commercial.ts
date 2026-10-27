@@ -16,8 +16,6 @@ const baseItem = object({ id: uuid, applicationId: uuid, applicationKey: key, ap
 const addonSelection = object({ id: uuid, parentItemId: uuid, addonId: uuid, addonKey: text(65, /^[a-z][a-z0-9_]{0,31}\.[a-z][a-z0-9_]{0,31}$/u),
   definitionVersionId: uuid, seats: integer(1, 100000), acceptedPricing: pricing, effectiveState: object({ applicationLifecycleStatus: lifecycle, addonLifecycleStatus: lifecycle,
     definitionState: oneOf(["PUBLISHED", "REVOKED", "UNAVAILABLE"]), operationalUse: oneOf(["NOT_EVALUATED"]) }) });
-const itemsFields = { subscriptionId: uuid, subscriptionRevision: positiveRevision, baseItems: array(baseItem), addonSelections: array(addonSelection) };
-export const readSubscriptionItems = object(itemsFields);
 const view = object({ subscription: header, subscriptionRevision: positiveRevision, baseItems: array(baseItem), addonSelections: array(addonSelection),
   baseAllowance: object({ allowedUsers: integer(1, 2147483647), effectiveAllowedUsers: integer(1, 10000000), enabledApplications: array(key) }),
   totals: object({ baseRecurringUsd: money, addonRecurringUsd: money, combinedRecurringUsd: money }),

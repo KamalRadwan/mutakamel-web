@@ -236,31 +236,23 @@ export function parseImportSourceId(payload: unknown): string {
   return row.id;
 }
 
-/**
- * `TRADE.IMPORT.FILE_UNSAFE` is emitted at **five** statuses from six throw
- * sites, so the code alone does not say what happened — the HTTP status is the
- * only separator, and this is the one place that discriminates on it.
- */
+/** Import refusals have distinct stable codes for each HTTP outcome. */
 export function importMessage(error: NormalizedApiError, t: Dictionary): string | undefined {
-  if (error.code === "TRADE.IMPORT.FILE_UNSAFE") {
-    switch (error.status) {
-      case 413:
-        return t.tradeAutomation.errorFileTooLarge;
-      case 415:
-        return t.tradeAutomation.errorFileWrongType;
-      case 409:
-        return t.tradeAutomation.errorFileScanPending;
-      case 422:
-        return t.tradeAutomation.errorFileRejected;
-      default:
-        return t.tradeAutomation.errorFileMissing;
-    }
-  }
   switch (error.code) {
+    case "TRADE.IMPORT.FILE_TOO_LARGE":
+      return t.tradeAutomation.errorFileTooLarge;
+    case "TRADE.IMPORT.FILE_TYPE_UNSUPPORTED":
+      return t.tradeAutomation.errorFileWrongType;
+    case "TRADE.IMPORT.FILE_SCAN_PENDING":
+      return t.tradeAutomation.errorFileScanPending;
+    case "TRADE.IMPORT.FILE_REJECTED":
+      return t.tradeAutomation.errorFileRejected;
+    case "TRADE.IMPORT.FILE_UNSAFE":
+      return t.tradeAutomation.errorFileMissing;
+    case "TRADE.IMPORT.MAPPING_NOT_FOUND":
+      return t.tradeAutomation.errorMappingNotFound;
     case "TRADE.IMPORT.MAPPING_INVALID":
-      return error.status === 404
-        ? t.tradeAutomation.errorMappingNotFound
-        : t.tradeAutomation.errorMappingInvalid;
+      return t.tradeAutomation.errorMappingInvalid;
     case "TRADE.IMPORT.SCOPE_MISMATCH":
       return t.tradeAutomation.errorImportScopeMismatch;
     case "TRADE.IMPORT.SOURCE_RELEASE_FORBIDDEN":

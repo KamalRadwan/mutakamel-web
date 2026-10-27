@@ -9,7 +9,6 @@ import {
   History,
   Lock,
   PackageCheck,
-  ShieldCheck,
   Truck,
 } from "lucide-react";
 import {
@@ -40,6 +39,7 @@ import type { SessionMovementEntry } from "./movements-contract";
 import { MovementPanel } from "./components/MovementPanel";
 import { OpeningBalanceForm } from "./components/OpeningBalanceForm";
 import { ReservationPanel } from "./components/ReservationPanel";
+import { ReservationLedgerQuantities } from "./components/ReservationLedgerQuantities";
 import { useInventoryMovements } from "./hooks/useInventoryMovements";
 
 type PillarTab = "openingBalance" | "reservation" | "receipt" | "delivery";
@@ -75,8 +75,10 @@ export default function InventoryMovementsPage() {
 
   const isAr = lang === "ar";
   const [activeTab, setActiveTab] = useState<PillarTab>("openingBalance");
-  const [selectedEntry, setSelectedEntry] = useState<SessionMovementEntry | null>(null);
-  const [dossierEntry, setDossierEntry] = useState<SessionMovementEntry | null>(null);
+  const [selectedHandle, setSelectedEntry] = useState<SessionMovementEntry | null>(null);
+  const [dossierHandle, setDossierEntry] = useState<SessionMovementEntry | null>(null);
+  const selectedEntry = sessionLedger.find((entry) => entry.id === selectedHandle?.id) ?? selectedHandle;
+  const dossierEntry = sessionLedger.find((entry) => entry.id === dossierHandle?.id) ?? dossierHandle;
 
   const canUseAny = canOpeningBalance || canReserve || canReceive || canDeliver;
 
@@ -135,43 +137,15 @@ export default function InventoryMovementsPage() {
         className="sr-only"
         title={t.tradeInventory.movementsTitle}
         description={t.tradeInventory.movementsSubtitle}
-      />
-
-      {/* Colorful Header Banner */}
-      <Card className="flex flex-wrap items-center justify-between gap-3 border border-border/70 bg-gradient-to-r from-card via-card to-brand/5 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg border border-brand/30 bg-brand-subtle text-brand-subtle-foreground">
-            <Truck className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-foreground">
-                {t.tradeInventory.movementsTitle}
-              </h1>
-              <Badge tone="brand">
-                BRANCH Scope · 9 Write Endpoints
-              </Badge>
-              {canAdjust ? (
-                <Badge tone="positive">
-                  <ShieldCheck className="size-3" aria-hidden="true" />
-                  trade.inventory.adjust
-                </Badge>
-              ) : null}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t.tradeInventory.movementsSubtitle}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+        secondaryActions={
           <TenantBranchSelect
             branchIds={branchIds}
             branchId={branchId}
             onChange={selectBranch}
             disabled={pending !== null}
           />
-        </div>
-      </Card>
+        }
+      />
 
       {/* Not a warning about this screen's health — a statement about the API:
           receipts, deliveries, reservations and opening balances expose no GET
@@ -311,6 +285,7 @@ export default function InventoryMovementsPage() {
                 onCreate={submitReceipt}
                 onPost={postReceipt}
                 onReverse={reverseReceipt}
+                sessionEntries={sessionLedger}
                 pending={pending}
                 disabled={!canReceive || pending !== null}
                 canReverse={canAdjust && pending === null}
@@ -339,6 +314,7 @@ export default function InventoryMovementsPage() {
                 onCreate={submitDelivery}
                 onPost={postDelivery}
                 onReverse={reverseDelivery}
+                sessionEntries={sessionLedger}
                 pending={pending}
                 disabled={!canDeliver || pending !== null}
                 canReverse={canAdjust && pending === null}
@@ -399,9 +375,9 @@ export default function InventoryMovementsPage() {
                               : "caution"
                         }
                       >
-                        {entry.kind.toUpperCase()} · {entry.status}
+                        {entry.kind.toUpperCase()} · {t.tradeStatus[entry.status]}
                       </Badge>
-                      <span className="font-mono text-2xs text-muted-foreground">
+                      <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
                         If-Match v{entry.version}
                       </span>
                     </div>
@@ -414,6 +390,8 @@ export default function InventoryMovementsPage() {
                         {entry.summary}
                       </span>
                     </div>
+
+                    {entry.reservation ? <ReservationLedgerQuantities reservation={entry.reservation} /> : null}
 
                     <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-2">
                       <Button
@@ -484,9 +462,11 @@ export default function InventoryMovementsPage() {
                         : "neutral"
                   }
                 >
-                  {dossierEntry.status} (v{dossierEntry.version})
+                  {t.tradeStatus[dossierEntry.status]} (v{dossierEntry.version})
                 </Badge>
               </div>
+
+              {dossierEntry.reservation ? <ReservationLedgerQuantities reservation={dossierEntry.reservation} /> : null}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
@@ -501,7 +481,7 @@ export default function InventoryMovementsPage() {
                   <span className="text-2xs text-muted-foreground">
                     {isAr ? "ملخص الحركة" : "Movement Summary"}
                   </span>
-                  <span className="mt-1 block font-mono text-xs font-semibold text-foreground">
+                  <span dir="ltr" className="mt-1 block font-mono text-xs font-semibold text-foreground">
                     {dossierEntry.summary}
                   </span>
                 </div>
@@ -509,7 +489,7 @@ export default function InventoryMovementsPage() {
                   <span className="text-2xs text-muted-foreground">
                     {isAr ? "نسخة التزامن" : "If-Match Version"}
                   </span>
-                  <span className="mt-1 block font-mono text-xs font-semibold text-foreground">
+                  <span dir="ltr" className="mt-1 block font-mono text-xs font-semibold text-foreground">
                     v{dossierEntry.version}
                   </span>
                 </div>

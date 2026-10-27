@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, MoreHorizontal } from "lucide-react";
+import { Ban, Maximize2, MoreHorizontal } from "lucide-react";
 import {
   Button,
   CARD_COLORS,
@@ -15,6 +15,7 @@ import {
   iconSize,
   type CardColor,
 } from "@/design-system";
+import { useI18n } from "@/i18n/I18nContext";
 
 // Twelve swatches, "none" first — the one that clears the colour is the one a
 // user reaches for after a mistake, so it leads rather than trails.
@@ -28,6 +29,7 @@ export interface LeadCardMoveTarget {
 interface LeadCardMenuLabels {
   trigger: string;
   open: string;
+  expand?: string;
   delete: string;
   moveTo: string;
   cardColor: string;
@@ -37,9 +39,11 @@ interface LeadCardMenuLabels {
   selected: string;
 }
 
-export interface LeadCardMenuProps {
+interface LeadCardMenuProps {
   cardColor: CardColor | null;
   onOpen: () => void;
+  /** Omitted when inline card expansion does not apply (already expanded, or grid view). */
+  onExpand?: () => void;
   /** Omitted when the user may not delete this lead. */
   onDelete?: () => void;
   /** Omitted when the user may not update this lead. */
@@ -51,7 +55,7 @@ export interface LeadCardMenuProps {
 }
 
 /**
- * The card's overflow menu: open it, move it, delete it, colour it.
+ * The card's overflow menu: open it, expand it, move it, delete it, colour it.
  *
  * It replaces three separate affordances the card used to carry — a selection
  * checkbox, a "Move to…" trigger and a bin icon — and it sits in
@@ -73,23 +77,39 @@ export interface LeadCardMenuProps {
 export function LeadCardMenu({
   cardColor,
   onOpen,
+  onExpand,
   onDelete,
   onColorChange,
   moveTargets,
   onMove,
   labels,
 }: LeadCardMenuProps) {
+  const { t } = useI18n();
   const canMove = Boolean(onMove) && (moveTargets?.length ?? 0) > 0;
+  const expandLabel = labels.expand ?? t.crmLeads.executive.expandCard;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="xs" aria-label={labels.trigger}>
+        <Button
+          variant="ghost"
+          size="xs"
+          aria-label={labels.trigger}
+          className="size-[26px] shrink-0 rounded-md border border-line-card bg-surface-subtle p-0 text-muted-foreground hover:text-foreground"
+        >
           <MoreHorizontal className={iconSize({ size: "sm" })} aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={onOpen}>{labels.open}</DropdownMenuItem>
+
+        {onExpand && (
+          <DropdownMenuItem onSelect={onExpand}>
+            <Maximize2 className={iconSize({ size: "sm" })} aria-hidden="true" />
+            <span>{expandLabel}</span>
+          </DropdownMenuItem>
+        )}
 
         {canMove && onMove && (
           <>

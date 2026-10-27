@@ -12,6 +12,7 @@ import {
   IdentifierText,
   Money,
   NotFoundState,
+  PermissionGate,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
@@ -78,6 +79,10 @@ export default function ContractDetailPage({
         <TradeScopeRequired />
       </TradeGate>
     );
+  }
+
+  if (detail.loadError?.status === 403) {
+    return <PermissionGate require={CONTRACT_PERMISSIONS.read} denied>{null}</PermissionGate>;
   }
 
   if (detail.isMissing) {

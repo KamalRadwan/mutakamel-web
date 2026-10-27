@@ -501,6 +501,12 @@ export function moveStageOrder(
   const index = stages.findIndex(({ id }) => id === stageId);
   const target = index + direction;
   if (index < 0 || target < 0 || target >= stages.length) return null;
+  // pipelines.service.ts assertValidReorder requires exactly one NEW, first.
+  if (
+    stages[0]?.flag !== "NEW" ||
+    stages.filter(({ flag }) => flag === "NEW").length !== 1
+  ) return null;
+  if (index === 0 || target === 0) return null;
   const ordered = stages.map(({ id }) => id);
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
   return ordered;

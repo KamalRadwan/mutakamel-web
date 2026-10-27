@@ -58,12 +58,13 @@ export type PromotionBenefitType = (typeof PROMOTION_BENEFIT_TYPES)[number];
 // `GovernedVersionStatus` the policy ladder uses; it is rendered through
 // `t.tradeStatus`, which holds every value, and is not narrowed here.
 
-export interface PriceBookVersionSummary {
+interface PriceBookVersionSummary {
   id: string;
   versionNumber: number;
   status: string;
   effectiveFrom: string;
   effectiveTo: string | null;
+  supersededAt?: string | null;
   version: number;
 }
 
@@ -112,6 +113,14 @@ export interface PromotionRow {
   discountValue?: string | null;
 }
 
+export interface PriceBookVersionTestReport {
+  passed: boolean;
+  entryCount: number;
+  promotionCount: number;
+  conflicts: string[];
+  promotionConflicts: string[];
+}
+
 export interface PriceBookVersionDetail {
   book: { id: string; code: string; purpose: string; currencyCode: string; status: string; version: number };
   version: PriceBookVersionSummary & { checksum: string; createdByUserId?: string | null };
@@ -121,19 +130,19 @@ export interface PriceBookVersionDetail {
   latestTestEvidence: { passed: boolean; testedAt: string } | null;
 }
 
-export interface PricingDecisionComponent {
+interface PricingDecisionComponent {
   type: string;
   code: string;
   amount: string;
 }
 
-export interface PricingRejectedPromotion {
+interface PricingRejectedPromotion {
   promotionId?: string;
   code: string;
   reason: string;
 }
 
-export interface PricingRejectedCandidate {
+interface PricingRejectedCandidate {
   entryId: string;
   reason: string;
 }
@@ -271,6 +280,7 @@ function parseVersionSummary(payload: unknown): PriceBookVersionSummary {
     !isBoundedInteger(row.versionNumber, 1, Number.MAX_SAFE_INTEGER) ||
     !isNonEmptyString(row.status, 32) ||
     !isTimestamp(row.effectiveFrom) ||
+    (row.supersededAt != null && !isTimestamp(row.supersededAt)) ||
     !isBoundedInteger(row.version, 0, Number.MAX_SAFE_INTEGER)
   ) {
     invalidPricingResponse();
@@ -281,6 +291,7 @@ function parseVersionSummary(payload: unknown): PriceBookVersionSummary {
     status: row.status,
     effectiveFrom: row.effectiveFrom,
     effectiveTo: isTimestamp(row.effectiveTo) ? row.effectiveTo : null,
+    supersededAt: isTimestamp(row.supersededAt) ? row.supersededAt : null,
     version: row.version,
   };
 }
@@ -307,6 +318,31 @@ function parsePriceBook(payload: unknown): PriceBook {
     status: row.status,
     version: row.version,
     versions: Array.isArray(row.versions) ? row.versions.map(parseVersionSummary) : [],
+  };
+}
+
+export function parsePriceBookVersionTestReport(payload: unknown): PriceBookVersionTestReport {
+  const row = record(payload);
+  if (
+    !row ||
+    typeof row.passed !== "boolean" ||
+    !isBoundedInteger(row.entryCount, 0, Number.MAX_SAFE_INTEGER) ||
+    !isBoundedInteger(row.promotionCount, 0, Number.MAX_SAFE_INTEGER) ||
+    !Array.isArray(row.conflicts) ||
+    !Array.isArray(row.promotionConflicts)
+  ) {
+    invalidPricingResponse();
+  }
+  const parseConflict = (value: unknown): string => {
+    if (typeof value !== "string" || value.length === 0) invalidPricingResponse();
+    return value;
+  };
+  return {
+    passed: row.passed,
+    entryCount: row.entryCount,
+    promotionCount: row.promotionCount,
+    conflicts: row.conflicts.map(parseConflict),
+    promotionConflicts: row.promotionConflicts.map(parseConflict),
   };
 }
 
@@ -340,7 +376,7 @@ export function parsePriceBookVersionDetail(payload: unknown): PriceBookVersionD
     version: {
       ...parseVersionSummary(version),
       checksum: version.checksum,
-      ...(typeof version.createdByUserId === "string" ? { createdByUserId: version.createdByUserId } : {}),
+      createdByUserId: isUuidV7(version.createdByUserId) ? version.createdByUserId : null,
     },
     entries: body.entries.map(parsePriceEntry),
     promotions: body.promotions.map(parsePromotionRow),

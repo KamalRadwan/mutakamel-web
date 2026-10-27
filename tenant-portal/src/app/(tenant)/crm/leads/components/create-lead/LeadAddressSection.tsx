@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, MapPin } from "lucide-react";
 import { AddressPlaceFields } from "@/components/address/AddressPlaceFields";
 import {
+  Button,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
@@ -16,7 +17,7 @@ import type { CrmFormErrors } from "../../../shared/hooks/useCrmCreateForm";
 import { LEAD_CREATE_LIMITS, type LeadAddressForm } from "../../lead-create-contract";
 import { LeadFieldGuide } from "./LeadFieldGuide";
 
-export interface LeadAddressSectionProps {
+interface LeadAddressSectionProps {
   address: LeadAddressForm;
   errors: CrmFormErrors;
   disabled: boolean;
@@ -33,7 +34,7 @@ export interface LeadAddressSectionProps {
  *
  * Collapsible card with cascading Country → State/Region → City selectors
  * (`AddressPlaceFields`) and a compact 12-column grid for Street 1, Street 2,
- * Building No., Floor, Apartment/Suite, Landmark, and Postal Code.
+ * Building No., Floor, Landmark, and Postal Code.
  */
 export function LeadAddressSection({
   address,
@@ -55,31 +56,33 @@ export function LeadAddressSection({
   return (
     <section
       data-form-section="address"
-      className="relative overflow-hidden rounded-xl border border-amber-500/20 bg-card shadow-xs transition-colors dark:border-amber-400/20"
+      className="relative overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors"
     >
-      {/* Top 3px Amber-Orange accent bar */}
+      {/* Top 3px accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-amber-500 via-orange-500 to-yellow-500"
+        className="h-1 w-full bg-primary"
       />
 
       <Collapsible open={isOpen} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             tabIndex={0}
-            className="flex w-full cursor-pointer items-center justify-between gap-3 border-b border-border/60 bg-amber-500/[0.03] px-4 py-3 text-start transition-colors hover:bg-amber-500/[0.06] dark:bg-amber-500/[0.06]"
+            className="flex h-auto w-full cursor-pointer items-center justify-between gap-3 rounded-none border-b border-border/60 bg-muted/20 px-4 py-3 text-start transition-colors hover:bg-muted/40"
           >
             <div className="flex items-center gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-600 dark:border-amber-400/30 dark:bg-amber-500/20 dark:text-amber-300">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
                 <MapPin className="size-4" aria-hidden="true" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-foreground">
+                  <span className="text-sm font-semibold text-foreground">
                     {t.crmLeads.create.sections.address}
                   </span>
-                  <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                  <span className="rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                     {t.crmLeads.create.optionalBadge}
                   </span>
                 </div>
@@ -96,15 +99,15 @@ export function LeadAddressSection({
               )}
               aria-hidden="true"
             />
-          </button>
+          </Button>
         </CollapsibleTrigger>
 
         <CollapsibleContent>
           <div className="space-y-4 p-4">
             {/* Cascading Country → State → City with Field Guides */}
-            <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.02] p-3">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                <span className="text-xs font-semibold text-muted-foreground">
                   {t.crmLeads.create.country} → {t.crmLeads.create.state} →{" "}
                   {t.crmLeads.create.city}
                 </span>
@@ -147,8 +150,8 @@ export function LeadAddressSection({
             <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12">
               {/* Street 1 (6 cols) */}
               <div className="relative md:col-span-6">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-                  <span className="font-mono text-[10px] text-muted-foreground">
+                <div className="absolute end-0 top-0 flex items-center gap-1">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {address.street1.length}/{limits.addressLong}
                   </span>
                   <LeadFieldGuide field="street1" />
@@ -174,8 +177,8 @@ export function LeadAddressSection({
 
               {/* Street 2 (6 cols) */}
               <div className="relative md:col-span-6">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-                  <span className="font-mono text-[10px] text-muted-foreground">
+                <div className="absolute end-0 top-0 flex items-center gap-1">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {address.street2.length}/{limits.addressLong}
                   </span>
                   <LeadFieldGuide field="street2" />
@@ -201,7 +204,7 @@ export function LeadAddressSection({
 
               {/* Building No (4 cols) */}
               <div className="relative md:col-span-4">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+                <div className="absolute end-0 top-0 flex items-center gap-1">
                   <LeadFieldGuide field="buildingNo" />
                 </div>
                 <Field
@@ -225,7 +228,7 @@ export function LeadAddressSection({
 
               {/* Floor (4 cols) */}
               <div className="relative md:col-span-4">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+                <div className="absolute end-0 top-0 flex items-center gap-1">
                   <LeadFieldGuide field="floor" />
                 </div>
                 <Field
@@ -245,36 +248,10 @@ export function LeadAddressSection({
                 </Field>
               </div>
 
-              {/* Apartment / Suite (4 cols) */}
-              {address.apartment !== undefined && (
-                <div className="relative md:col-span-4">
-                  <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-                    <LeadFieldGuide field="apartment" />
-                  </div>
-                  <Field
-                    label={t.crmLeads.create.apartment}
-                    error={errors["address.apartment"]}
-                    showLabel
-                  >
-                    <Input
-                      size="sm"
-                      placeholder={t.crmLeads.create.apartment}
-                      value={address.apartment}
-                      maxLength={limits.addressShort}
-                      disabled={disabled}
-                      onChange={(event) =>
-                        onChange("apartment", event.target.value)
-                      }
-                      onBlur={() => onBlur("address.apartment")}
-                    />
-                  </Field>
-                </div>
-              )}
-
               {/* Landmark (8 cols) */}
               <div className="relative md:col-span-8">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-                  <span className="font-mono text-[10px] text-muted-foreground">
+                <div className="absolute end-0 top-0 flex items-center gap-1">
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
                     {address.landmark.length}/{limits.addressLong}
                   </span>
                   <LeadFieldGuide field="landmark" />
@@ -300,7 +277,7 @@ export function LeadAddressSection({
 
               {/* Postal Code (4 cols) */}
               <div className="relative md:col-span-4">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+                <div className="absolute end-0 top-0 flex items-center gap-1">
                   <LeadFieldGuide field="postalCode" />
                 </div>
                 <Field

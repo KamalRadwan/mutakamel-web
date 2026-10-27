@@ -9,6 +9,7 @@ import {
   companyDefaultPriceBookUpsertPath,
   parseCompanyDefaultPriceBook,
   parsePriceBookVersionDetail,
+  parsePriceBookVersionTestReport,
   parsePriceBooksResponse,
   parsePricingDecision,
   priceBookVersionActionPath,
@@ -31,6 +32,34 @@ const decisionId = "01902001-3000-7000-8000-000000000006";
 const branchId = "01902001-3000-7000-8000-000000000007";
 
 describe("Trade pricing contract", () => {
+  const testReport = {
+    passed: false,
+    entryCount: 2,
+    promotionCount: 1,
+    conflicts: [`${entryId}:${itemId}`],
+    promotionConflicts: [`INVALID_BENEFIT:${decisionId}`],
+  };
+
+  it("preserves a failed test's entry and promotion diagnostics", () => {
+    expect(parsePriceBookVersionTestReport(testReport)).toEqual(testReport);
+  });
+
+  it.each([true, false])("retains the explicit passed=%s validation outcome", (passed) => {
+    expect(parsePriceBookVersionTestReport({
+      passed, entryCount: passed ? 1 : 0, promotionCount: 0,
+      conflicts: [], promotionConflicts: [],
+    }).passed).toBe(passed);
+  });
+
+  it.each([
+    { passed: "false" }, { passed: undefined }, { entryCount: -1 },
+    { promotionCount: 1.5 }, { conflicts: null }, { conflicts: [42] },
+    { promotionConflicts: undefined }, { promotionConflicts: [{}] },
+  ])("rejects malformed test reports: %j", (invalidFields) => {
+    expect(() => parsePriceBookVersionTestReport({ ...testReport, ...invalidFields }))
+      .toThrow("Invalid Trade pricing response.");
+  });
+
   it("builds every path from a canonical prefix", () => {
     expect(priceBooksListPath(1, "SALES")).toBe(
       `${PRICE_BOOKS_PATH}?page=1&limit=25&purpose=SALES`,
@@ -229,6 +258,7 @@ describe("Trade pricing contract", () => {
               status: "PUBLISHED",
               effectiveFrom: "2026-09-01T00:00:00.000Z",
               effectiveTo: null,
+              supersededAt: "2026-10-18T12:00:00.000Z",
               version: 1,
             },
           ],
@@ -239,6 +269,7 @@ describe("Trade pricing contract", () => {
       limit: 25,
     });
     expect(page.items[0].versions[0].status).toBe("PUBLISHED");
+    expect(page.items[0].versions[0].supersededAt).toBe("2026-10-18T12:00:00.000Z");
   });
 
   it("keeps every money field on a version detail an exact string", () => {
@@ -259,6 +290,7 @@ describe("Trade pricing contract", () => {
         effectiveTo: null,
         version: 3,
         checksum: "a".repeat(64),
+        createdByUserId: itemId,
       },
       entries: [
         {
@@ -279,6 +311,7 @@ describe("Trade pricing contract", () => {
     expect(detail.entries[0].unitPrice).toBe("10.50");
     expect(detail.latestTestEvidence?.passed).toBe(true);
     expect(detail.version.version).toBe(3);
+    expect(detail.version.createdByUserId).toBe(itemId);
   });
 
   it("reads an evaluation and keeps the decision id that reaches the receipt", () => {

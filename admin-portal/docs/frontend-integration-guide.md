@@ -230,8 +230,8 @@ The tenant workspace now uses the exact current contracts:
 | FQDN directory | Calls exact `GET /tenants/:id/fqdns` and reconciles mutations by refresh |
 | Tenant-user lifecycle | Uses `POST` for suspend, activate, and restore |
 | Add/set-primary FQDN | Sends `{ fqdn }` and uses the exact `POST` commands |
-| Subscription items/cancel | Calls exact items read and `/subscriptions/:tenantId/cancel` |
-| Wallet adjustment/ledger | Uses server preview/confirm and exact wallet-ID ledger |
+| Subscription detail/cancel | Loads complete detail once (including selections) and uses `/subscriptions/:tenantId/cancel`; loader reverified 2026-10-18 |
+| Wallet adjustment/ledger | Uses server preview/confirm and one tenant-scoped ledger read with within-response wallet checks; loader reverified 2026-10-18 |
 | Access catalogues | Loads role, branch, department, and team resources independently |
 
 Tenant creation has no hardcoded Database Server, Application, tier, or country

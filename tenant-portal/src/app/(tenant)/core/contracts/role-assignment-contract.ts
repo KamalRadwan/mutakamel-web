@@ -157,10 +157,12 @@ export async function removeBranchRoleAssignment(
 export async function fetchScopeRoleAssignments(
   userId: string,
   signal?: AbortSignal,
+  options: { suppressForbiddenToast?: boolean } = {},
 ): Promise<ScopeRoleAssignment[]> {
   return parseCoreArray(
     await readCoreData(userPath(userId, "/scope-role-assignments"), {
       signal,
+      suppressForbiddenToast: options.suppressForbiddenToast,
       cache: "no-store",
       maxResponseBytes: CORE_LIST_RESPONSE_LIMIT_BYTES,
     }),

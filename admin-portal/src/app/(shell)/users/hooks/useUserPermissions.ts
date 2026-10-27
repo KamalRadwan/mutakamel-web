@@ -5,6 +5,7 @@ import type { AdminUserStatus } from "../types";
 export interface UserPermissionsResult {
   canView: boolean;
   canInvite: boolean;
+  canResendInvite: boolean;
   canEdit: boolean;
   canAssignRole: boolean;
   canSuspend: boolean;
@@ -15,30 +16,33 @@ export interface UserPermissionsResult {
   canViewRoles: boolean;
   isSelf: boolean;
   isCurrentSuperAdmin: boolean;
+  isProtectedTarget: boolean;
 }
 
 export function getUserRowPermissions(
   currentUser: (AdminAuthorizationContext & { id?: string }) | null | undefined,
   targetUserId?: string | null,
-  targetStatus?: AdminUserStatus | null
+  targetStatus?: AdminUserStatus | null,
+  targetIsSuperAdmin?: boolean | null
 ): UserPermissionsResult {
   const isCurrentSuperAdmin = currentUser?.isSuperAdmin === true;
+  const isProtectedTarget = targetIsSuperAdmin === true && !isCurrentSuperAdmin;
   const isSelf = Boolean(
     currentUser && targetUserId && currentUser.id === targetUserId
   );
 
   const canView = adminCan(currentUser, "admin.users.read");
   const canInvite = adminCanAll(currentUser, ADMIN_RBAC_CRITICAL.USERS_INVITE);
-  const canEdit = adminCanAll(currentUser, ADMIN_RBAC_CRITICAL.USERS_UPDATE);
-  const canAssignRole = adminCanAll(
+  const canEdit = !isProtectedTarget && adminCanAll(currentUser, ADMIN_RBAC_CRITICAL.USERS_UPDATE);
+  const canAssignRole = !isProtectedTarget && targetStatus === "ACTIVE" && adminCanAll(
     currentUser,
     ADMIN_RBAC_CRITICAL.USERS_ASSIGN_ROLES
   );
-  const canSuspendBase = adminCanAll(
+  const canSuspendBase = !isProtectedTarget && adminCanAll(
     currentUser,
     ADMIN_RBAC_CRITICAL.USERS_SUSPEND
   );
-  const canDeleteBase = adminCanAll(
+  const canDeleteBase = !isProtectedTarget && adminCanAll(
     currentUser,
     ADMIN_RBAC_CRITICAL.USERS_DELETE
   );
@@ -58,6 +62,7 @@ export function getUserRowPermissions(
   return {
     canView,
     canInvite,
+    canResendInvite: canInvite && isInvited && !isSelf && !isProtectedTarget,
     canEdit,
     canAssignRole,
     canSuspend,
@@ -68,13 +73,15 @@ export function getUserRowPermissions(
     canViewRoles,
     isSelf,
     isCurrentSuperAdmin,
+    isProtectedTarget,
   };
 }
 
 export function useUserPermissions(
   targetUserId?: string | null,
-  targetStatus?: AdminUserStatus | null
+  targetStatus?: AdminUserStatus | null,
+  targetIsSuperAdmin?: boolean | null
 ): UserPermissionsResult {
   const { user: currentUser } = useAuth();
-  return getUserRowPermissions(currentUser, targetUserId, targetStatus);
+  return getUserRowPermissions(currentUser, targetUserId, targetStatus, targetIsSuperAdmin);
 }

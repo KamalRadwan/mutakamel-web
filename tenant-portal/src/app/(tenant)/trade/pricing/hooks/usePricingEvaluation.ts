@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import { tradePost } from "../../trade-api";
@@ -33,9 +33,10 @@ export interface EvaluateFormValues {
 }
 
 export interface PinnedEvaluationItem {
-  id: string;
-  inputs: EvaluateFormValues;
-  decision: PricingDecisionResult;
+  readonly id: string;
+  readonly inputs: Readonly<EvaluateFormValues>;
+  readonly scopeHeaders: Readonly<Record<string, string>>;
+  readonly decision: PricingDecisionResult;
 }
 
 export type EvaluationTab = "waterfall" | "candidates" | "comparison" | "receipt";
@@ -70,11 +71,12 @@ export function usePricingEvaluation() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("BRANCH", branchId);
 
   const [values, setValues] = useState<EvaluateFormValues>(readInitialEvaluateForm);
-  const [result, setResult] = useState<PricingDecisionResult | null>(null);
+  const [evaluation, setEvaluation] = useState<PinnedEvaluationItem | null>(null);
+  const [responseKey, setResponseKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<EvaluationTab>("waterfall");
   const [pinnedEvaluations, setPinnedEvaluations] = useState<PinnedEvaluationItem[]>([]);
   const [noPrice, setNoPrice] = useState(false);
@@ -87,6 +89,12 @@ export function usePricingEvaluation() {
     scope.isTenantOwner,
     PRICING_READ_PERMISSION,
   );
+  // Include scope so a decision cannot follow the form into another branch/company.
+  const inputKey = JSON.stringify([values, scope.headers]);
+  const matchesInputs = responseKey === inputKey && scope.isResolved && canRead;
+  const currentEvaluation = matchesInputs ? evaluation : null;
+  const result = currentEvaluation?.decision ?? null;
+  const currentQueryError = matchesInputs ? queryError : null;
 
   const evaluate = useCallback(async (): Promise<void> => {
     if (isEvaluating) return;
@@ -98,19 +106,28 @@ export function usePricingEvaluation() {
       setFormError(pricingFormMessage(error, t));
       return;
     }
+    const inputs = Object.freeze({
+      ...values,
+      ...request,
+      priceBookId: request.priceBookId ?? "",
+      partyId: request.partyId ?? "",
+    });
+    const scopeHeaders = Object.freeze({ ...scope.headers });
+    setResponseKey(inputKey);
+    setEvaluation(null);
     setIsEvaluating(true);
     setQueryError(null);
     setNoPrice(false);
     try {
       const response = await tradePost(PRICING_EVALUATE_PATH, request, {
-        headers: scope.headers,
+        headers: scopeHeaders,
         maxResponseBytes: EVALUATE_RESPONSE_LIMIT_BYTES,
       });
       const parsed = parsePricingDecision(response.data);
-      setResult(parsed);
+      setEvaluation({ id: parsed.decisionId, inputs, scopeHeaders, decision: parsed });
     } catch (error) {
       const normalized = normalizeApiError(error);
-      setResult(null);
+      setEvaluation(null);
       if (normalized.code === "TRADE.PRICE.NO_ELIGIBLE_PRICE") {
         setNoPrice(true);
         return;
@@ -119,22 +136,15 @@ export function usePricingEvaluation() {
     } finally {
       setIsEvaluating(false);
     }
-  }, [isEvaluating, values, scope.headers, toast, t]);
+  }, [isEvaluating, values, scope.headers, inputKey, toast, t]);
 
   const pinCurrentResult = useCallback(() => {
-    if (!result) return;
+    if (!currentEvaluation) return;
     setPinnedEvaluations((current) => {
-      if (current.some((item) => item.id === result.decisionId)) return current;
-      return [
-        {
-          id: result.decisionId,
-          inputs: { ...values },
-          decision: result,
-        },
-        ...current,
-      ].slice(0, 8);
+      if (current.some((item) => item.id === currentEvaluation.id)) return current;
+      return [currentEvaluation, ...current].slice(0, 8);
     });
-  }, [result, values]);
+  }, [currentEvaluation]);
 
   const clearPinnedEvaluations = useCallback(() => {
     setPinnedEvaluations([]);
@@ -164,22 +174,24 @@ export function usePricingEvaluation() {
     selectBranch,
     values,
     result,
+    evaluatedInputs: currentEvaluation?.inputs ?? null,
     activeTab,
     setActiveTab,
     pinnedEvaluations,
     pinCurrentResult,
     clearPinnedEvaluations,
     applyPreset,
-    noPrice,
+    noPrice: matchesInputs && noPrice,
     isEvaluating,
-    queryError,
-    queryErrorMessage: queryError ? pricingMessage(queryError, t) : undefined,
+    queryError: currentQueryError,
+    queryErrorMessage: currentQueryError ? pricingMessage(currentQueryError, t) : undefined,
     formError,
     setValue: (patch: Partial<EvaluateFormValues>) =>
       setValues((current) => ({ ...current, ...patch })),
     reset: () => {
       setValues(EMPTY_EVALUATE_FORM);
-      setResult(null);
+      setEvaluation(null);
+      setResponseKey(null);
       setNoPrice(false);
       setQueryError(null);
       setFormError(null);

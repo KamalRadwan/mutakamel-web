@@ -25,7 +25,7 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "-mx-3 -mt-3 md:-mx-[15px] md:-mt-[15px] mb-3 min-h-11 border-b border-border bg-card px-3 py-2 md:px-[15px] flex flex-wrap items-center justify-between gap-2.5 shadow-xs",
+        "-mx-3 -mt-3 md:-mx-[15px] md:-mt-[15px] mb-3 min-h-11 border-b border-border bg-card px-3 py-2 md:px-[15px] flex flex-wrap items-center justify-between gap-2.5",
         className,
       )}
     >

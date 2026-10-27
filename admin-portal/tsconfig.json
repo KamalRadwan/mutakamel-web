@@ -22,7 +22,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@mutakamel/webphone": ["../packages/webphone/src/index.ts"]
+      "@mutakamel/webphone-ui": ["../packages/webphone/src/index.ts"]
     }
   },
   "include": [

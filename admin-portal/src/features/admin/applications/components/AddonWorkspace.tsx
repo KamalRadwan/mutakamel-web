@@ -1,6 +1,6 @@
 "use client";
 import { RefreshCw } from "lucide-react";
-import { Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system";
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAddonWorkspace } from "../hooks/useAddonWorkspace";
 import type { AddonAction } from "../hooks/useAddonDefinitionDialog";
@@ -70,10 +70,10 @@ export function AddonWorkspace(props: Props) {
           <HistoryPaging page={state.historyPage} hasPrev={state.versions.meta.hasPrev} hasNext={state.versions.meta.hasNext} loading={state.loading} onPage={state.setHistoryPage} copy={copy} />
         </>}{state.version && <DefinitionComparison draft={null} published={state.version} copy={copy} />}</TabsContent>
         <TabsContent value="audit" className="space-y-4 pt-3">{state.audit && <>
-          {state.audit.items.length ? <div className="overflow-x-auto rounded-md border border-border"><table className="w-full text-start text-sm"><thead className="bg-muted text-xs"><tr>
-            <th className="p-3 text-start font-medium">{copy.action}</th><th className="p-3 text-start font-medium">{copy.actor}</th><th className="p-3 text-start font-medium">{copy.occurred}</th></tr></thead>
-            <tbody className="divide-y divide-border">{state.audit.items.map(event => <tr key={event.id}><td className="p-3"><span>{addonAuditLabel(event.action, copy)}</span><p className="font-mono text-xs text-muted-foreground" dir="ltr">{event.action} · {event.operationId}</p></td>
-              <td className="p-3">{event.actorLabel ?? event.actorAdminId ?? copy.none}</td><td className="whitespace-nowrap p-3 font-mono text-xs"><bdi>{event.occurredAt}</bdi></td></tr>)}</tbody></table></div> : <p className="text-sm text-muted-foreground">{copy.noAudit}</p>}
+          {state.audit.items.length ? <div className="overflow-x-auto rounded-md border border-border"><Table className="w-full text-start text-sm"><TableHeader className="bg-muted text-xs"><TableRow>
+            <TableHead className="p-3 text-start font-medium">{copy.action}</TableHead><TableHead className="p-3 text-start font-medium">{copy.actor}</TableHead><TableHead className="p-3 text-start font-medium">{copy.occurred}</TableHead></TableRow></TableHeader>
+            <TableBody className="divide-y divide-border">{state.audit.items.map(event => <TableRow key={event.id}><TableCell className="p-3"><span>{addonAuditLabel(event.action, copy)}</span><p className="font-mono text-xs text-muted-foreground" dir="ltr">{event.action} · {event.operationId}</p></TableCell>
+              <TableCell className="p-3">{event.actorLabel ?? event.actorAdminId ?? copy.none}</TableCell><TableCell className="whitespace-nowrap p-3 font-mono text-xs"><bdi>{event.occurredAt}</bdi></TableCell></TableRow>)}</TableBody></Table></div> : <p className="text-sm text-muted-foreground">{copy.noAudit}</p>}
           <HistoryPaging page={state.historyPage} hasPrev={state.audit.meta.hasPrev} hasNext={state.audit.meta.hasNext} loading={state.loading} onPage={state.setHistoryPage} copy={copy} />
         </>}</TabsContent>
       </Tabs>
@@ -93,12 +93,12 @@ function DefinitionComparison({ draft, published, copy }: { draft: AddonDefiniti
     { label: copy.dependencies, value: item => item.dependencies.map(dependency => [dependency.applicationId, dependency.addonId, dependency.minimumDefinitionVersionId].filter(Boolean).join(" · ")).join("\n") || copy.none },
     { label: copy.schema, value: item => item.schemaRef ? `${item.schemaRef.key}@${item.schemaRef.version}\n${item.schemaRef.checksum}` : copy.none },
   ];
-  return <div className="overflow-x-auto rounded-md border border-border"><table className="w-full table-fixed text-sm"><thead className="bg-muted text-xs"><tr><th className="w-1/5 p-3 text-start font-medium">{copy.definition}</th>
-    <th className="p-3 text-start font-medium">{copy.published}</th><th className="p-3 text-start font-medium">{copy.draft}</th></tr></thead><tbody className="divide-y divide-border">{rows.map(row => {
+  return <div className="overflow-x-auto rounded-md border border-border"><Table className="w-full table-fixed text-sm"><TableHeader className="bg-muted text-xs"><TableRow><TableHead className="w-1/5 p-3 text-start font-medium">{copy.definition}</TableHead>
+    <TableHead className="p-3 text-start font-medium">{copy.published}</TableHead><TableHead className="p-3 text-start font-medium">{copy.draft}</TableHead></TableRow></TableHeader><TableBody className="divide-y divide-border">{rows.map(row => {
       const before = published ? row.value(published) : copy.emptySnapshot; const after = draft ? row.value(draft) : copy.noDraft;
-      return <tr key={row.label} className={draft && before !== after ? "bg-info-subtle/30" : undefined}><th className="p-3 text-start align-top text-xs font-medium text-muted-foreground">{row.label}{draft && before !== after && <span className="mt-1 block text-info-subtle-foreground">{copy.changed}</span>}</th>
-        <td className="wrap-anywhere whitespace-pre-wrap p-3 align-top"><bdi>{before}</bdi></td><td className="wrap-anywhere whitespace-pre-wrap p-3 align-top"><bdi>{after}</bdi></td></tr>;
-    })}</tbody></table></div>;
+      return <TableRow key={row.label} className={draft && before !== after ? "bg-info-subtle/30" : undefined}><th scope="row" className="p-3 text-start align-top text-xs font-medium text-muted-foreground">{row.label}{draft && before !== after && <span className="mt-1 block text-info-subtle-foreground">{copy.changed}</span>}</th>
+        <TableCell className="wrap-anywhere whitespace-pre-wrap p-3 align-top"><bdi>{before}</bdi></TableCell><TableCell className="wrap-anywhere whitespace-pre-wrap p-3 align-top"><bdi>{after}</bdi></TableCell></TableRow>;
+    })}</TableBody></Table></div>;
 }
 function HistoryPaging({ page, hasPrev, hasNext, loading, onPage, copy }: { page: number; hasPrev: boolean; hasNext: boolean; loading: boolean; onPage: (page: number) => void; copy: AddonCopy }) {
   return <div className="flex items-center justify-end gap-3 text-sm"><Button type="button" variant="outline" size="sm" disabled={!hasPrev || loading} onClick={() => onPage(page - 1)}>{copy.previous}</Button>

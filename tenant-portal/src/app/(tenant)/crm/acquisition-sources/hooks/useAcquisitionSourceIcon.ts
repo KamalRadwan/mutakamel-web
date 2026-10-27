@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import {
   ACQUISITION_SOURCE_ICON_FIELD,
   acquisitionSourceIconPath,
@@ -32,6 +34,7 @@ export function useAcquisitionSourceIcon(
   onUploaded: (source: AcquisitionSource) => void,
 ) {
   const { t } = useI18n();
+  const crmErrorText = useCrmErrorText();
   const [selected, setSelected] = useState<AcquisitionSource | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,10 +88,10 @@ export function useAcquisitionSourceIcon(
       if (status === 413) return t.crmAcquisitionSources.iconTooLarge;
       if (status === 415) return t.crmAcquisitionSources.iconUnsupportedType;
       if (status === 400) return t.crmAcquisitionSources.iconMissing;
+      const { code } = normalizeApiError(caught);
+      return crmErrorText({ status, code }) ?? t.crmAcquisitionSources.iconFailed;
     }
-    return caught instanceof Error && caught.message
-      ? caught.message
-      : t.crmAcquisitionSources.iconFailed;
+    return t.crmAcquisitionSources.iconFailed;
   }
 
   return {

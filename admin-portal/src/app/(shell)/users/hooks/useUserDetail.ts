@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/I18nContext";
 import { useToast } from "@/components/ui/ToastContext";
 import { useAuth } from "@/context/AuthContext";
-import { notifyWebphoneChanged } from "@mutakamel/webphone";
+import { notifyWebphoneChanged } from "@mutakamel/webphone-ui";
 import { adminCan } from "@/lib/auth/rbac";
 import {
   WEBPHONE_EXTENSIONS_PATH,
@@ -16,7 +16,6 @@ import {
   getExtensionServers,
   getUserWebphone,
   isForbiddenError,
-  listRoles,
   listWebphoneServers,
   putExtensionServers,
   updateAdminUser,
@@ -26,6 +25,7 @@ import {
   userWebphoneServersPath,
   suspendAdminUser,
   activateAdminUser,
+  resendAdminInvite,
   deleteAdminUser,
   normalizeErrorCode,
 } from "../api/adminUsersApi";
@@ -42,7 +42,6 @@ import {
 import { getErrorMessageAndDetails, type MappedErrorDetails } from "../utils/errorMapping";
 import type {
   AdminUser,
-  AdminRole,
   AdminWebphoneExtension,
   AdminUserStatus,
 } from "../types";
@@ -52,6 +51,8 @@ import {
   type AdminUserWriteIntent,
 } from "../model/writeIntent";
 import { normalizeApiError } from "@/shared/api/normalized-api-error";
+import { getUserRowPermissions } from "./useUserPermissions";
+import { useAdminRoleCatalogue } from "./useAdminRoleCatalogue";
 
 /**
  * The user's WebPhone identity.
@@ -97,6 +98,18 @@ export type WebphoneSaveOutcome = {
   focusField?: WebphoneFieldName;
 };
 
+export type WebphoneReadState =
+  | { status: "idle" | "loading" | "success" }
+  | { status: "error"; message: string };
+
+export type UserDetailLoadState =
+  | "loading"
+  | "ready"
+  | "degraded"
+  | "error"
+  | "not-found"
+  | "forbidden";
+
 function toastErrorMessage(details: MappedErrorDetails) {
   return details.correlationId
     ? `${details.message}\nCorrelation ID: ${details.correlationId}`
@@ -114,7 +127,16 @@ export function useUserDetail(id: string) {
   const canReadWebphone = adminCan(currentUser, "admin.webphone.read");
 
   const [user, setUser] = useState<AdminUser>();
-  const [availableRoles, setAvailableRoles] = useState<AdminRole[]>([]);
+  const rolePermissions = getUserRowPermissions(currentUser, user?.id, user?.status, user?.isSuperAdmin);
+  const canAssignRole = user?.id === id && rolePermissions.canAssignRole && !rolePermissions.isSelf;
+  const { roles, rolesStatus, reloadRoles } = useAdminRoleCatalogue(
+    "assignment", canAssignRole, JSON.stringify([id, currentUser?.id, currentUser?.isSuperAdmin, currentUser?.permissions]),
+  );
+  const availableRoles = useMemo(() => {
+    const assignedRole = user?.role;
+    return assignedRole && !roles.some((role) => role.id === assignedRole.id)
+      ? [assignedRole, ...roles] : roles;
+  }, [roles, user]);
   const [assignedRoleId, setAssignedRoleId] = useState<string | undefined>();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -128,11 +150,20 @@ export function useUserDetail(id: string) {
   const [serverChainRows, setServerChainRows] = useState<ExtensionServerRow[]>(
     [],
   );
+  const [webphoneRead, setWebphoneRead] = useState<WebphoneReadState>({ status: "idle" });
+  const [serversRead, setServersRead] = useState<WebphoneReadState>({ status: "idle" });
+  const [chainRead, setChainRead] = useState<WebphoneReadState>({ status: "idle" });
+  const webphoneReadVersion = useRef(0);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [detailLoad, setDetailLoad] = useState<{ id: string; status: UserDetailLoadState }>({ id, status: "loading" });
+  const detailLoadState = detailLoad.id === id ? detailLoad.status : "loading";
+  const isLoading = detailLoadState === "loading";
+  const notFound = detailLoadState === "not-found";
+  const permissionDenied = detailLoadState === "forbidden";
+  const loadedUserId = useRef<string | undefined>(undefined);
+  const userReadVersion = useRef(0);
+  const [loadError, setLoadError] = useState<ReturnType<typeof normalizeApiError> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [notFound, setNotFound] = useState(false);
-  const [permissionDenied, setPermissionDenied] = useState(false);
 
   const [extensionError, setExtensionError] = useState<string | null>(null);
   const [sipUsernameError, setSipUsernameError] = useState<string | null>(null);
@@ -140,11 +171,12 @@ export function useUserDetail(id: string) {
   const writeIntentsRef = useRef(
     new Map<string, AdminUserWriteIntent<unknown>>(),
   );
+  const resendInFlight = useRef(false);
 
   const runWrite = useCallback(
     async <T,>(
       slot: string,
-      method: "POST" | "PATCH" | "DELETE",
+      method: "POST" | "PUT" | "PATCH" | "DELETE",
       path: string,
       command: T,
       invoke: (intent: AdminUserWriteIntent<T>) => Promise<unknown>,
@@ -179,64 +211,128 @@ export function useUserDetail(id: string) {
     [],
   );
 
+  const loadServerChain = useCallback(async (extensionId: string, version: number) => {
+    if (version !== webphoneReadVersion.current) return false;
+    setChainRead({ status: "loading" });
+    try {
+      const chain = await getExtensionServers(extensionId);
+      if (version !== webphoneReadVersion.current) return false;
+      setServerChain(chain);
+      setServerChainRows(extensionServersToRows(chain));
+      setChainRead({ status: "success" });
+      return true;
+    } catch (error) {
+      if (version === webphoneReadVersion.current) {
+        setChainRead({
+          status: "error",
+          message: toastErrorMessage(getErrorMessageAndDetails(error, lang)),
+        });
+      }
+      return false;
+    }
+  }, [lang]);
+
+  // Retry only the WebPhone resources, leaving unrelated user edits intact.
+  // A generation prevents an old read from restoring an editable baseline.
+  const reloadWebphone = useCallback(async () => {
+    const version = ++webphoneReadVersion.current;
+    if (!canReadWebphone) {
+      setWebphoneRead({ status: "idle" });
+      setServersRead({ status: "idle" });
+      setChainRead({ status: "idle" });
+      return;
+    }
+    setWebphoneRead({ status: "loading" });
+    setServersRead({ status: "loading" });
+    setChainRead({ status: "idle" });
+    await Promise.all([
+      (async () => {
+        try {
+          const extension = await getUserWebphone(id);
+          if (version !== webphoneReadVersion.current) return;
+          setWebphone(extension);
+          setWebphoneForm(webphoneFormFromExtension(extension));
+          setWebphoneRead({ status: "success" });
+          if (extension) {
+            await loadServerChain(extension.id, version);
+          } else {
+            // Only a successful owner lookup can establish an absent extension.
+            setServerChain([]);
+            setServerChainRows([]);
+            setChainRead({ status: "success" });
+          }
+        } catch (error) {
+          if (version === webphoneReadVersion.current) {
+            setWebphoneRead({
+              status: "error",
+              message: toastErrorMessage(getErrorMessageAndDetails(error, lang)),
+            });
+          }
+        }
+      })(),
+      (async () => {
+        try {
+          const servers = await listWebphoneServers();
+          if (version !== webphoneReadVersion.current) return;
+          setWebphoneServers(servers);
+          setServersRead({ status: "success" });
+        } catch (error) {
+          if (version === webphoneReadVersion.current) {
+            setServersRead({
+              status: "error",
+              message: toastErrorMessage(getErrorMessageAndDetails(error, lang)),
+            });
+          }
+        }
+      })(),
+    ]);
+  }, [canReadWebphone, id, lang, loadServerChain]);
+
   const loadUser = useCallback(async () => {
-    setIsLoading(true);
-    setNotFound(false);
-    setPermissionDenied(false);
+    const version = ++userReadVersion.current;
+    setDetailLoad({ id, status: "loading" });
+    setLoadError(null);
 
     try {
-      const [loadedUser, loadedWebphone, loadedServers, rolesData] =
+      const [loadedUser] =
         await Promise.all([
           getAdminUser(id),
-          canReadWebphone ? getUserWebphone(id).catch(() => undefined) : undefined,
-          canReadWebphone ? listWebphoneServers().catch(() => []) : [],
-          listRoles({ page: 1, limit: 100, sortBy: "name", sortDir: "ASC" }).catch(() => undefined),
+          reloadWebphone(),
         ]);
 
-      // The chain hangs off the extension, so it can only be read once the
-      // extension id is known — a user with no extension has no chain, which
-      // is an empty list rather than a failed read.
-      const loadedChain = loadedWebphone
-        ? await getExtensionServers(loadedWebphone.id).catch(() => [])
-        : [];
-
-      const assignedRoles = loadedUser.role ? [loadedUser.role] : [];
-      const rolesList = rolesData?.data ?? assignedRoles;
-
+      if (version !== userReadVersion.current) return;
       setUser(loadedUser);
+      loadedUserId.current = id;
       setFirstName(loadedUser.firstName);
       setLastName(loadedUser.lastName);
       setIsSuperAdmin(loadedUser.isSuperAdmin);
       setStatus(loadedUser.status);
-      setAvailableRoles(rolesList);
       setAssignedRoleId(loadedUser.roleId ?? loadedUser.role?.id ?? undefined);
-
-      // Set unconditionally: a user with no extension is a real state, and a
-      // reload after one is removed elsewhere must clear the panel, not keep
-      // showing the extension that no longer exists.
-      setWebphone(loadedWebphone);
-      setWebphoneForm(webphoneFormFromExtension(loadedWebphone));
-      setWebphoneServers(loadedServers);
-      setServerChain(loadedChain);
-      setServerChainRows(extensionServersToRows(loadedChain));
+      setDetailLoad({ id, status: "ready" });
     } catch (requestError: any) {
+      if (version !== userReadVersion.current) return;
       const code = normalizeErrorCode(requestError);
 
       if (requestError?.response?.status === 404 || code === "ADMIN_USER_NOT_FOUND") {
-        setNotFound(true);
+        setDetailLoad({ id, status: "not-found" });
       } else if (isForbiddenError(requestError) || code === "MISSING_REQUIRED_PERMISSIONS") {
-        setPermissionDenied(true);
+        setDetailLoad({ id, status: "forbidden" });
       } else {
         const details = getErrorMessageAndDetails(requestError, lang);
-        toast.error(t.users.loadFailedTitle, toastErrorMessage(details));
+        setLoadError({ ...normalizeApiError(requestError), message: details.message });
+        setDetailLoad({ id, status: loadedUserId.current === id ? "degraded" : "error" });
       }
-    } finally {
-      setIsLoading(false);
     }
-  }, [id, lang, t, toast, canReadWebphone]);
+  }, [id, lang, reloadWebphone]);
 
   useEffect(() => {
-    queueMicrotask(() => loadUser());
+    let active = true;
+    queueMicrotask(() => { if (active) void loadUser(); });
+    return () => {
+      active = false;
+      userReadVersion.current++;
+      webphoneReadVersion.current++;
+    };
   }, [loadUser]);
 
   const identityHasChanges = useMemo(() => {
@@ -267,6 +363,11 @@ export function useUserDetail(id: string) {
     () => extensionServerRowsChanged(serverChainRows, serverChain),
     [serverChain, serverChainRows],
   );
+
+  const canEditServerChain = Boolean(webphone) && user?.id === id &&
+    canReadWebphone && adminCan(currentUser, "admin.webphone.update") &&
+    webphoneRead.status === "success" && serversRead.status === "success" &&
+    chainRead.status === "success";
 
   const moveServerChainRow = useCallback((from: number, to: number) => {
     setServerChainRows((current) => moveInList(current, from, to));
@@ -308,19 +409,20 @@ export function useUserDetail(id: string) {
   }, [serverChain]);
 
   const saveServerChain = async () => {
-    if (!webphone || !serverChainHasChanges || isSaving) return;
+    if (!canEditServerChain || !webphone || !serverChainHasChanges || isSaving) return;
     if (Object.keys(serverChainErrors).length > 0) {
       toast.error(t.users.validationErrorTitle, t.users.serverChainInvalidMsg);
       return;
     }
 
+    const readVersion = webphoneReadVersion.current;
     setIsSaving(true);
 
     try {
       const chain = rowsToExtensionServers(serverChainRows);
       await runWrite(
         "webphone:servers",
-        "PATCH",
+        "PUT",
         userWebphoneServersPath(webphone.id),
         chain,
         (intent) =>
@@ -332,7 +434,7 @@ export function useUserDetail(id: string) {
           const fresh = await getExtensionServers(webphone.id).catch(() => null);
           if (!fresh) return false;
           const matches = chainsMatch(chain, fresh);
-          if (matches) {
+          if (matches && readVersion === webphoneReadVersion.current) {
             setServerChain(fresh);
             setServerChainRows(extensionServersToRows(fresh));
           }
@@ -340,13 +442,11 @@ export function useUserDetail(id: string) {
         },
       );
 
-      const fresh = await getExtensionServers(webphone.id);
-      setServerChain(fresh);
-      setServerChainRows(extensionServersToRows(fresh));
+      const refreshed = await loadServerChain(webphone.id, readVersion);
       // The dock resolves its failover order from `/me`, so a reordered chain
       // is stale there until this signal makes it read again.
       notifyWebphoneChanged();
-      toast.success(t.users.serverChainSavedTitle, t.users.serverChainSavedDesc);
+      if (refreshed) toast.success(t.users.serverChainSavedTitle, t.users.serverChainSavedDesc);
     } catch (requestError: any) {
       const details = getErrorMessageAndDetails(requestError, lang);
       toast.error(t.users.saveErrorTitle, toastErrorMessage(details));
@@ -409,7 +509,8 @@ export function useUserDetail(id: string) {
   };
 
   const saveRole = async () => {
-    if (!user || !roleHasChanges || !assignedRoleId || isSaving) return;
+    if (!canAssignRole || !user || !roleHasChanges || !assignedRoleId || isSaving) return;
+    if (rolesStatus !== "success" || !roles.some((role) => role.id === assignedRoleId)) return;
 
     setIsSaving(true);
 
@@ -444,7 +545,9 @@ export function useUserDetail(id: string) {
   };
 
   const saveWebphone = async (): Promise<WebphoneSaveOutcome> => {
-    if (!user || !webphoneHasChanges || isSaving) return { ok: false };
+    if (!user || user.id !== id || !canReadWebphone ||
+        !adminCan(currentUser, "admin.webphone.update") ||
+        webphoneRead.status !== "success" || !webphoneHasChanges || isSaving) return { ok: false };
 
     // A rejected form is reported on the fields themselves, not only as a
     // toast: an inline error is the persistent, programmatically associated
@@ -463,6 +566,7 @@ export function useUserDetail(id: string) {
       return { ok: false, focusField: invalidField };
     }
 
+    const readVersion = webphoneReadVersion.current;
     setIsSaving(true);
     setExtensionError(null);
     setSipUsernameError(null);
@@ -479,7 +583,7 @@ export function useUserDetail(id: string) {
         const fresh = await getUserWebphone(user.id).catch(() => null);
         if (!fresh) return false;
         const matches = webphoneFieldsMatch(fields, fresh);
-        if (matches) setWebphone(fresh);
+        if (matches && readVersion === webphoneReadVersion.current) setWebphone(fresh);
         return matches;
       };
 
@@ -506,15 +610,14 @@ export function useUserDetail(id: string) {
           )) as AdminWebphoneExtension | undefined;
       updated ??= await getUserWebphone(user.id);
 
+      if (readVersion !== webphoneReadVersion.current) return { ok: false };
       setWebphone(updated);
       setWebphoneForm(webphoneFormFromExtension(updated));
       // A first save creates the extension, and only then does it have an id
       // to hang a chain off — so the chain is read here rather than left empty
       // until the next full page load.
       if (!existing && updated) {
-        const chain = await getExtensionServers(updated.id).catch(() => []);
-        setServerChain(chain);
-        setServerChainRows(extensionServersToRows(chain));
+        await loadServerChain(updated.id, readVersion);
       }
       // The dock in the root layout read `/me` when the shell mounted. If this
       // save was the admin giving themselves a phone, that read is now stale
@@ -539,6 +642,31 @@ export function useUserDetail(id: string) {
             : undefined,
       };
     } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResendInvite = async () => {
+    if (!user || isSaving || resendInFlight.current ||
+        !getUserRowPermissions(currentUser, user.id, user.status, user.isSuperAdmin).canResendInvite) return;
+    resendInFlight.current = true;
+    setIsSaving(true);
+    try {
+      const updated = await runWrite(
+        "resend-invite",
+        "POST",
+        `/api/admin/core/v1/users/${encodeURIComponent(user.id)}/resend-invite`,
+        {},
+        (intent) => resendAdminInvite(user.id, intent.idempotencyKey),
+      ) as AdminUser;
+      setUser(updated);
+      setStatus(updated.status);
+      toast.success(t.users.inviteResentTitle, t.users.inviteResentDesc);
+    } catch (requestError: unknown) {
+      const details = getErrorMessageAndDetails(requestError, lang);
+      toast.error(t.users.updateErrorTitle, toastErrorMessage(details));
+    } finally {
+      resendInFlight.current = false;
       setIsSaving(false);
     }
   };
@@ -616,10 +744,13 @@ export function useUserDetail(id: string) {
     router,
     user,
     isLoading,
+    detailLoadState,
+    loadError,
     isSaving,
     notFound,
     permissionDenied,
     reload: loadUser,
+    handleResendInvite,
 
     firstName,
     setFirstName,
@@ -631,6 +762,9 @@ export function useUserDetail(id: string) {
     assignedRoleId,
     setAssignedRoleId,
     availableRoles,
+    hasAssignableRoles: roles.length > 0,
+    rolesStatus,
+    reloadRoles,
     status,
 
     identityHasChanges,
@@ -664,6 +798,10 @@ export function useUserDetail(id: string) {
     passwordConfigured: Boolean(webphone?.passwordConfigured),
 
     webphoneExtension: webphone,
+    webphoneRead,
+    serversRead,
+    chainRead,
+    reloadWebphone,
     extensionError,
     sipUsernameError,
     sipPasswordError,
@@ -672,8 +810,7 @@ export function useUserDetail(id: string) {
     serverChainRows,
     serverChainErrors,
     serverChainHasChanges,
-    // A chain hangs off an extension, so it can only be edited once one exists.
-    canEditServerChain: Boolean(webphone),
+    canEditServerChain,
     moveServerChainRow,
     updateServerChainRow,
     addServerToChain,

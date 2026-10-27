@@ -1,20 +1,117 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTenantAuth } from "@/context/AuthContext";
 import {
   SCOPE_UNRESOLVED_ERROR,
   useOrganizationScopeHeaders,
 } from "@/hooks/useOrganizationScope";
-import { axiosClient } from "@/lib/api/axiosClient";
+import { axiosClient, subscribePermissionDenials } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { resolveCompanyForBranch, resolveOrganizationScope } from "@/lib/api/organization-scope";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
+  CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES,
   crmRecord,
   parseCrmActionCapability,
   type CrmActionCapability,
 } from "../../shared/crm-capabilities";
 
 const LEADS_CAPABILITIES_PATH = "/api/tenant/crm/v1/leads/capabilities";
+
+/** Capability reads must not invalidate themselves when permission is denied. */
+export function useLeadCapabilityRefresh(
+  load: (signal: AbortSignal) => void | Promise<void>,
+  initialLoad = true,
+) {
+  useEffect(() => {
+    let controller = new AbortController();
+    const refresh = () => {
+      controller.abort();
+      controller = new AbortController();
+      void load(controller.signal);
+    };
+    const initialSignal = controller.signal;
+    if (initialLoad) queueMicrotask(() => { if (!initialSignal.aborted) void load(initialSignal); });
+    window.addEventListener("focus", refresh);
+    const unsubscribe = subscribePermissionDenials((event) => {
+      if (event.code === "CRM_SCOPED_PERMISSION_DENIED"
+        && event.endpoint.split("?")[0] !== LEADS_CAPABILITIES_PATH) refresh();
+    });
+    return () => {
+      controller.abort();
+      window.removeEventListener("focus", refresh);
+      unsubscribe();
+    };
+  }, [load, initialLoad]);
+}
+
+export function parseLeadCreateCapability(payload: unknown, branchId: string): CrmActionCapability | null {
+  const response = crmRecord(payload);
+  const leads = response && crmRecord(response.leads);
+  if (!response || response.branchId !== branchId || !leads || !("create" in leads)) {
+    throw new Error("Invalid leads capabilities response.");
+  }
+  return parseCrmActionCapability(leads.create, "leads");
+}
+
+/** Create admission is resolved independently for every candidate branch. */
+export function useLeadCreateCapabilities(branchIds: readonly string[], enabled: boolean) {
+  const { user } = useTenantAuth();
+  const requests = useMemo(() => enabled ? branchIds.map((branchId) => ({
+    branchId,
+    scope: resolveOrganizationScope("BRANCH_REQUIRED", {
+      branchId,
+      companyId: resolveCompanyForBranch(user, branchId),
+    }),
+  })) : [], [branchIds, user, enabled]);
+  const [loaded, setLoaded] = useState<{
+    requests: typeof requests;
+    capabilities: ReadonlyMap<string, CrmActionCapability>;
+    degraded: boolean;
+  } | null>(null);
+  const [revision, setRevision] = useState(0);
+  const invalidate = useCallback(() => {
+    if (!enabled) return;
+    setLoaded(null);
+    setRevision((current) => current + 1);
+  }, [enabled]);
+  useLeadCapabilityRefresh(invalidate, false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    void Promise.all(requests.map(async ({ branchId, scope }) => {
+      if (!scope.ok) return { branchId, capability: null, degraded: true };
+      try {
+        const response = await axiosClient.get<unknown>(
+          `${LEADS_CAPABILITIES_PATH}?${new URLSearchParams({ branchId })}`,
+          { signal: controller.signal, cache: "no-store", maxResponseBytes: CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES, headers: scope.headers },
+        );
+        return { branchId, capability: parseLeadCreateCapability(response.data, branchId), degraded: false };
+      } catch (error) {
+        return { branchId, capability: null, degraded: normalizeApiError(error).status !== 403 };
+      }
+    })).then((results) => {
+      if (controller.signal.aborted) return;
+      const capabilities = new Map<string, CrmActionCapability>();
+      for (const { branchId, capability } of results) {
+        if (capability) capabilities.set(branchId, capability);
+      }
+      setLoaded({ requests, capabilities, degraded: results.some((result) => result.degraded) });
+    });
+    return () => controller.abort();
+  }, [requests, enabled, revision]);
+
+  // Neither another actor's answer nor a previous modal opening grants access.
+  const current = enabled && loaded?.requests === requests ? loaded : null;
+  return {
+    capabilities: current?.capabilities,
+    branchIds: current ? [...current.capabilities.keys()] : [],
+    isLoading: enabled && current === null,
+    degraded: current?.degraded ?? false,
+  };
+}
 
 export interface LeadDetailCapabilities {
   update: CrmActionCapability | null;
@@ -87,16 +184,19 @@ function isAbortError(error: unknown): boolean {
  */
 export function useLeadCapabilities(branchId: string | null) {
   const scope = useOrganizationScopeHeaders("BRANCH_REQUIRED", branchId);
-  const [capabilities, setCapabilities] = useState<LeadDetailCapabilities>(
-    NO_LEAD_DETAIL_CAPABILITIES,
-  );
+  const [loaded, setLoaded] = useState<{
+    branchId: string;
+    scope: typeof scope;
+    capabilities: LeadDetailCapabilities;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      setLoaded(null);
       if (!isUUIDv7(branchId) || !scope.ready) {
-        setCapabilities(NO_LEAD_DETAIL_CAPABILITIES);
+        setIsLoading(false);
         // D4: an unresolved organization scope is a gap on THIS side, so the
         // request is not sent at all. It used to go out with no headers and
         // come back 400 from the Gateway, which reads as a server refusal.
@@ -112,14 +212,15 @@ export function useLeadCapabilities(branchId: string | null) {
           {
             signal,
             cache: "no-store",
-            maxResponseBytes: 64 * 1024,
+            maxResponseBytes: CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES,
             headers: scope.headers,
           },
         );
-        setCapabilities(parseLeadDetailCapabilities(response.data, branchId));
+        if (signal?.aborted) return;
+        setLoaded({ branchId, scope, capabilities: parseLeadDetailCapabilities(response.data, branchId) });
       } catch (caught) {
-        if (isAbortError(caught)) return;
-        setCapabilities(NO_LEAD_DETAIL_CAPABILITIES);
+        if (signal?.aborted || isAbortError(caught)) return;
+        setLoaded(null);
         const normalized = normalizeApiError(caught);
         setError(normalized.status === 403 ? null : normalized);
       } finally {
@@ -129,13 +230,8 @@ export function useLeadCapabilities(branchId: string | null) {
     [branchId, scope],
   );
 
-  useEffect(() => {
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
-    });
-    return () => controller.abort();
-  }, [load]);
+  useLeadCapabilityRefresh(load);
 
-  return { capabilities, isLoading, error };
+  const current = loaded?.branchId === branchId && loaded.scope === scope ? loaded : null;
+  return { capabilities: current?.capabilities ?? NO_LEAD_DETAIL_CAPABILITIES, isLoading, error };
 }

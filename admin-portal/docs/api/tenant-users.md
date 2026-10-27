@@ -2,7 +2,12 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-11**
+Last source verification: **2026-10-17** (assignment provenance and branch-role editor; other sections retain their earlier evidence)
+
+Ownership candidate search source review: **2026-10-18** (CXADMIN-106).
+
+Password-reset eligibility and feedback source review: **2026-10-18**
+(CXADMIN-105); automated checks and authenticated runtime remain pending.
 
 This is the frontend contract for the tenant **Users / Access** area in Admin
 Portal. It covers the 18 Gateway routes that read or mutate tenant users and
@@ -90,6 +95,7 @@ interface AdminTenantUserView {
   } | null;
   roleAssignments: Array<{
     assignmentId: string;
+    source: 'BRANCH_ROLE' | 'SCOPE_ROLE';
     roleId: string;
     roleName: string;
     scope: AdminTenantUserRoleScope;
@@ -196,6 +202,26 @@ interface AccessCatalogueQuery {
 ```
 
 ### The selectors must be able to reach past one page
+
+Role-assignment dialog source verification: **2026-10-18** (CXADMIN-114).
+The Manage roles dialog owns independent role and branch queries with 50-item
+pages, Previous/Next controls, and search capped at 120 characters. Search is
+debounced by 250 ms, resets to page one, and omits `q` when cleared. Loading,
+empty, forbidden, and failed/retry states are bilingual. Superseded requests
+and requests from a closed dialog are aborted; their results cannot replace
+the current options. Selections and added assignment labels survive paging
+and searching without changing the workspace directory or editor catalogues.
+
+Existing role labels come from each assignment's `roleName`. Existing branch
+labels use the user's placement plus a separate catalogue scan in pages of
+100, stopping when the assigned branch IDs are found or the initial page count
+is exhausted. This API has no branch-by-ID lookup. The scan retains only
+matched labels and never changes the selector page/search. Inactive/deleted
+branches and branches with inactive ancestors are absent from this catalogue;
+unresolvable labels show a bilingual unavailable label and the ID, with retry
+for failed reads. Scoped grants retain their separate read-only section.
+Automated tests, typecheck/lint, and authenticated UI verification remain
+pending lead verification.
 
 The editor loads one page — roles and branches at 50, departments and teams at
 100 — and `q` is how anything beyond it is reached. Each selector renders a
@@ -356,11 +382,22 @@ remain active, but their stale access JWTs must refresh and reload `/auth/me`.
 
 `POST /api/admin/core/v1/tenants/:id/users/:userId/reset-password`
 
-- Only an `ACTIVE` user is eligible.
+- Non-deleted `ACTIVE`, `INVITED` and `SUSPENDED` users are eligible,
+  including tenant owners. Deleted or `DEACTIVATED` users have a disabled
+  reset control with a bilingual explanation; deleted users must be restored first.
 - The endpoint rotates a single-use reset token and queues email.
-- It does not change the current password or revoke current sessions yet.
+- The password changes only when the user consumes the link. After email is
+  durably queued, Core activates an `INVITED` or `SUSPENDED` account and ends
+  its sessions. An already `ACTIVE` account keeps its sessions until the link
+  is consumed. Delivery failure leaves account status and sessions unchanged;
+  a concurrent deactivation wins over recovery activation.
 - Success is `202` with `{ userId, delivery }`.
-- An `INVITED` user returns `TENANT_USER_INVITE_PENDING`.
+- The confirmation reports `QUEUED` or `ALREADY_QUEUED` in Arabic/English and
+  refreshes the directory, summary and open user detail from the server.
+- Local eligibility failures are recorded in command state and shown in the
+  focused dialog error alert. Delivery failures stay visible with their
+  correlation id and do not close the confirmation or report success. An
+  ambiguous failure retains the existing idempotency key for an exact retry.
 
 ### Resend invitation
 
@@ -408,6 +445,29 @@ provided SIP password are all required. Empty/null `sipPassword` removes the
 stored secret. Extension and SIP username must be unique inside the tenant.
 Only send `sipPassword` when creating, clearing, or rotating the secret.
 
+## Ownership transfer candidate picker
+
+The transfer dialog retains the source owner passed from user detail, independently
+of the directory's search, filters, and page. Its own user-list requests use
+`GET /api/admin/core/v1/tenants/:id/users` with `status=ACTIVE`,
+`visibility=ACTIVE`, `limit=20`, email ascending order, and independent `q`/`page`.
+Search is debounced by 250 ms and resets to page one. Clearing search omits `q`.
+Owners, deleted users, and inactive users are excluded from the displayed options.
+The list endpoint has no non-owner filter, so pagination keeps the server's
+active-user page metadata; an owner-only page still offers Next when available.
+No directory filters are copied, and no complete-directory fetch is needed.
+
+The current owner and selected destination remain identifiable across searches
+and pages. Loading, forbidden, failed/retry, empty search/page, and genuinely
+empty results have separate bilingual feedback. Requests are aborted on query
+change or dialog close; superseded results cannot replace the current options.
+Reads require `admin.tenant_users.read`; the picker additionally requires the
+existing transfer permission pair (`admin.tenant_users.transfer_ownership` and
+`admin.tenant_users.critical`). Submission uses the existing ownership command
+and is disabled until candidate loading succeeds. Core revalidates both users
+at transfer time. Automated checks and authenticated runtime remain pending lead
+verification.
+
 ## Roles
 
 `PATCH /api/admin/core/v1/tenants/:id/users/:userId/roles`
@@ -424,6 +484,19 @@ interface SetUserBranchRolesDto {
 This is complete replacement, not a delta. Pairs must be unique. An empty
 array removes all replaceable branch-role assignments. The action returns the
 refreshed `AdminTenantUserView`.
+
+Each returned assignment carries `source`: `BRANCH_ROLE` identifies a
+`tenant_user_branch_roles` grant owned by this replacement operation;
+`SCOPE_ROLE` identifies a `tenant_user_scope_roles` grant. `scope=BRANCH` and a
+non-null `branchId` do not imply `source=BRANCH_ROLE`.
+
+The role editor seeds and submits only `BRANCH_ROLE` assignments. Scoped grants
+at tenant, company and branch scope appear in a separate read-only section and
+remain effective after this save, including when the same role and branch also
+has a branch-role grant. They have no removal control here; success reports
+only that branch roles were saved. Missing or unknown provenance is rejected
+by the response reader rather than inferred from scope. No schema or permission
+change is needed.
 
 ## Lifecycle
 
@@ -486,9 +559,8 @@ tab until the tenant reaches an eligible state.
 | `TENANT_USER_SEARCH_AMBIGUOUS` | Conflicting `q` and legacy `search`. |
 | `TENANT_USER_VISIBILITY_AMBIGUOUS` | Conflicting `visibility` and legacy `includeDeleted`. |
 | `TENANT_USER_STATUS_TRANSITION_INVALID` | Lifecycle action is invalid for the current status. |
-| `TENANT_USER_INVITE_PENDING` | Use invitation acceptance/resend, not reset password. |
 | `TENANT_USER_INVITE_NOT_PENDING` | Resend is only for invited users. |
-| `TENANT_USER_PASSWORD_RESET_UNAVAILABLE` | Reset is only for active users. |
+| `TENANT_USER_PASSWORD_RESET_UNAVAILABLE` | Reset is unavailable for deleted or deactivated users; restore deleted users before retrying. |
 | `TENANT_USER_PASSWORD_CHANGE_UNAVAILABLE` | Direct change is blocked for invited/deactivated users. |
 | `PASSWORD_CONFIRMATION_MISMATCH` | Password fields differ. |
 | `WEAK_PASSWORD` | Password does not satisfy the strong-password policy. |
@@ -522,8 +594,8 @@ partial email-delivery outcomes are represented explicitly.
 - Load directory and summary with identical filters.
 - Keep active/deleted visibility separate from `UserStatus`.
 - Implement dependent organization selectors from the access catalogue APIs.
-- Disable owner profile, password, role, lifecycle, and delete mutations based
-  on `isTenantOwner`.
+- Apply owner protections per action; password reset remains available to
+  eligible owners under the same status and permission rules as other users.
 - Reuse the same idempotency key for an exact retry; create a new key for a new
   user intent.
 - Refresh rows from mutation responses instead of patching local guesses.

@@ -16,6 +16,7 @@ import {
   IdentifierText,
   Money,
   NotFoundState,
+  PermissionGate,
   ReasonDialog,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -75,6 +76,10 @@ export default function SalesOrderDetailPage({
         <TradeScopeRequired />
       </TradeGate>
     );
+  }
+
+  if (detail.loadError?.status === 403) {
+    return <PermissionGate require={SALES_ORDER_PERMISSIONS.read} denied>{null}</PermissionGate>;
   }
 
   if (detail.isMissing) {

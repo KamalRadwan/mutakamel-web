@@ -75,7 +75,7 @@ const globalsPath = join(here, "..", "..", "src", "app", "globals.css");
 const css = readFileSync(globalsPath, "utf8");
 
 const RAMP_TOKEN =
-  /--color-(ink|brand|positive|caution|negative)-(\d+):\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/g;
+  /--color-(ink|brand|positive|caution|negative|accent|aqua|ember|navy)-(\d+):\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/g;
 
 const T = { white: [1, 0, 0] };
 for (const m of css.matchAll(RAMP_TOKEN)) {
@@ -84,7 +84,17 @@ for (const m of css.matchAll(RAMP_TOKEN)) {
 
 // A silent parse failure would validate an empty palette and report success,
 // which is worse than a wrong colour. Pin the expected shape.
-const RAMP_STEPS = { ink: 13, brand: 11, positive: 11, caution: 11, negative: 11 };
+const RAMP_STEPS = {
+  ink: 13,
+  brand: 11,
+  positive: 11,
+  caution: 11,
+  negative: 11,
+  accent: 11,
+  aqua: 11,
+  ember: 11,
+  navy: 3,
+};
 for (const [ramp, expected] of Object.entries(RAMP_STEPS)) {
   const found = Object.keys(T).filter((k) => k.startsWith(`${ramp}-`)).length;
   if (found !== expected) {
@@ -94,20 +104,6 @@ for (const [ramp, expected] of Object.entries(RAMP_STEPS)) {
     process.exit(1);
   }
 }
-
-/* ---------- The nav chrome ----------
-   One colour, outside every ramp on purpose (see globals.css), and the light
-   theme's global-nav surface. It is parsed separately so the ramp step counts
-   above keep meaning what they say, and so the pairs the bar actually renders
-   can be claimed below like any other. */
-
-const chrome =
-  /--color-chrome:\s*oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)/.exec(css);
-if (!chrome) {
-  process.stderr.write("Palette parse failed: no --color-chrome in globals.css.\n");
-  process.exit(1);
-}
-T.chrome = [Number(chrome[1]), Number(chrome[2]), Number(chrome[3])];
 
 /* ---------- The card swatches, both themes ----------
    Unlike a ramp step, a swatch is declared TWICE under the same name — once on
@@ -194,25 +190,13 @@ const CLAIMS = [
   ["badge positive · dark", "positive-300", "positive-950", 4.5, 10.61],
   ["badge caution · dark", "caution-300", "caution-950", 4.5, 10.46],
   ["badge negative · dark", "negative-300", "negative-950", 4.5, 9.24],
-
-  // The global nav, light theme. It is the one inverted surface in the product,
-  // so every pair on it answers to --color-chrome instead of to a card. Dark
-  // mode is unchanged and already covered by the rows above: `.nav-surface`
-  // resolves to the card values there.
-  ["nav text · light", "white", "chrome", 4.5, 17.5],
-  ["nav muted text · light", "ink-400", "chrome", 4.5, null],
-  ["nav active marker · light (non-text)", "brand-300", "chrome", 3.0, null],
-  ["nav focus ring · light (non-text)", "white", "chrome", 3.0, null],
-  ["nav unread bell · light (non-text)", "negative-400", "chrome", 3.0, null],
-  ["nav unread dot · light (non-text)", "negative-500", "chrome", 3.0, null],
-  // Separation, not legibility — the zebra reasoning above, applied to the bar:
-  // the hairline between the brand zone and the nav, and the hover lift under a
-  // trigger, are both meant to be barely there. 1.05 is chosen so an identical
-  // colour (1.00) fails; anything higher would be a legibility bar these two
-  // are not asking to clear.
-  ["nav hairline vs chrome · light (non-text)", "brand-800", "chrome", 1.05, null],
-  ["nav hover lift vs chrome · light (non-text)", "brand-900", "chrome", 1.05, null],
 ];
+
+// GlobalNav paints fixed navy in both themes. Its semantic text, active marker,
+// hairline and hover claims below resolve against the actual header stops.
+for (const stop of ["navy-950", "navy-800"]) {
+  CLAIMS.push([`nav focus ring vs ${stop} (non-text)`, "white", stop, 3.0, null]);
+}
 
 // The eleven card swatches, against the card they paint the border of, in both
 // themes. 3.0 and not 4.5: a card colour is a non-text graphic that never
@@ -328,6 +312,290 @@ for (const [, key, background, text] of tagPresets) {
   process.stdout.write(
     `  ${pass ? "OK " : "FAIL"} ${ratio.toFixed(2).padStart(6)}  ${key.padEnd(14)} #${background} / #${text}\n`,
   );
+}
+
+/* ---------- CRM Leads v3 semantic roles (:root & .dark) ----------
+   Parses custom properties directly from top-level :root and .dark blocks so
+   every new foreground/surface pair (including low-alpha dark pills composited
+   over their host surface and named gradient stops) is verified on every run. */
+
+function parseCustomProps(blockMatch, blockName) {
+  if (!blockMatch) {
+    process.stderr.write(`Palette parse failed: no top-level ${blockName} block in globals.css.\n`);
+    process.exit(1);
+  }
+  const props = {};
+  for (const m of blockMatch[1].matchAll(/^\s*(--[a-z0-9-]+):\s*([^;]+);/gm)) {
+    props[m[1]] = m[2].trim();
+  }
+  return props;
+}
+
+const rootProps = parseCustomProps(/^:root\s*\{([\s\S]*?)^\}/m.exec(css), ":root");
+const darkProps = parseCustomProps(/^\.dark\s*\{([\s\S]*?)^\}/m.exec(css), ".dark");
+
+function linearToSrgbUnit(v) {
+  const c = clamp01(v);
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+}
+
+function srgbUnitToLinear(v) {
+  const c = clamp01(v);
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+function resolveCssColor(rawExpr, themeProps, backdropLinear = rgb.white) {
+  const expr = rawExpr?.trim();
+  if (!expr) {
+    process.stderr.write("Role color parse failed: empty expression.\n");
+    process.exit(1);
+  }
+  if (expr === "white") return rgb.white;
+
+  const varMatch = /^var\(\s*(--[a-z0-9-]+)\s*\)$/.exec(expr);
+  if (varMatch) {
+    const varName = varMatch[1];
+    if (varName.startsWith("--color-")) {
+      const rampKey = varName.slice("--color-".length);
+      if (rgb[rampKey]) return rgb[rampKey];
+    }
+    const next = themeProps[varName] ?? rootProps[varName];
+    if (!next) {
+      process.stderr.write(`Role color parse failed: unresolved ${varName}.\n`);
+      process.exit(1);
+    }
+    return resolveCssColor(next, themeProps, backdropLinear);
+  }
+
+  const hexMatch = /^#([0-9a-fA-F]{6})$/.exec(expr);
+  if (hexMatch) {
+    const h = hexMatch[1];
+    return {
+      r: srgbUnitToLinear(Number.parseInt(h.slice(0, 2), 16) / 255),
+      g: srgbUnitToLinear(Number.parseInt(h.slice(2, 4), 16) / 255),
+      b: srgbUnitToLinear(Number.parseInt(h.slice(4, 6), 16) / 255),
+    };
+  }
+
+  const oklchMatch = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/.exec(expr);
+  if (oklchMatch) {
+    return oklchToLinearSrgb(
+      Number(oklchMatch[1]),
+      Number(oklchMatch[2]),
+      Number(oklchMatch[3]),
+    );
+  }
+
+  const rgbAlphaMatch =
+    /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)\s*(?:[,/]\s*([\d.]+))?\s*\)$/.exec(expr);
+  if (rgbAlphaMatch) {
+    const alpha = rgbAlphaMatch[4] === undefined ? 1 : Number(rgbAlphaMatch[4]);
+    const fgR = Number(rgbAlphaMatch[1]) / 255;
+    const fgG = Number(rgbAlphaMatch[2]) / 255;
+    const fgB = Number(rgbAlphaMatch[3]) / 255;
+    const bgR = linearToSrgbUnit(backdropLinear.r);
+    const bgG = linearToSrgbUnit(backdropLinear.g);
+    const bgB = linearToSrgbUnit(backdropLinear.b);
+    return {
+      r: srgbUnitToLinear(alpha * fgR + (1 - alpha) * bgR),
+      g: srgbUnitToLinear(alpha * fgG + (1 - alpha) * bgG),
+      b: srgbUnitToLinear(alpha * fgB + (1 - alpha) * bgB),
+    };
+  }
+
+  process.stderr.write(`Role color parse failed: unsupported color syntax "${expr}".\n`);
+  process.exit(1);
+}
+
+function resolveGradientStops(gradientVar, themeProps) {
+  const raw = themeProps[gradientVar] ?? rootProps[gradientVar];
+  if (!raw) {
+    process.stderr.write(`Gradient parse failed: missing ${gradientVar}.\n`);
+    process.exit(1);
+  }
+  const stops = [];
+  for (const m of raw.matchAll(/(var\(--[a-z0-9-]+\)|#[0-9a-fA-F]{6}|oklch\([^)]+\))/g)) {
+    stops.push(resolveCssColor(m[1], themeProps));
+  }
+  if (stops.length === 0) {
+    process.stderr.write(`Gradient parse failed: no color stops in ${gradientVar}.\n`);
+    process.exit(1);
+  }
+  return stops;
+}
+
+process.stdout.write("\nCRM LEADS V3 SEMANTIC ROLES (:root & .dark)\n");
+process.stdout.write("  ratio    need  role\n");
+
+for (const [themeName, themeProps] of [["light", rootProps], ["dark", darkProps]]) {
+  const cardBg = resolveCssColor("var(--card)", themeProps);
+  const toolbarBg = resolveCssColor("var(--surface-toolbar)", themeProps);
+  const columnHeaderBg = resolveCssColor("var(--surface-column-header)", themeProps);
+  const columnBg = resolveCssColor("var(--surface-column)", themeProps);
+  const subtleBg = resolveCssColor("var(--surface-subtle)", themeProps);
+  const headerStops = resolveGradientStops("--gradient-header", themeProps);
+  const chipStops = resolveGradientStops("--gradient-chip-active", themeProps);
+
+  const pairs = [
+    [
+      `nav unread dot vs gradient-header · ${themeName} (non-text)`,
+      resolveCssColor("var(--activity-overdue)", themeProps),
+      headerStops,
+      3.0,
+    ],
+    [
+      `nav-foreground vs gradient-header · ${themeName}`,
+      resolveCssColor("var(--nav-foreground)", themeProps),
+      headerStops,
+      4.5,
+    ],
+    [
+      `nav-foreground-strong vs gradient-header · ${themeName}`,
+      resolveCssColor("var(--nav-foreground-strong)", themeProps),
+      headerStops,
+      4.5,
+    ],
+    [
+      `nav-switcher-fg vs switcher-surface · ${themeName}`,
+      resolveCssColor("var(--nav-switcher-fg)", themeProps),
+      [resolveCssColor("var(--nav-switcher-surface)", themeProps, rgb["navy-800"])],
+      4.5,
+    ],
+    [
+      `nav-active vs gradient-header · ${themeName} (non-text)`,
+      resolveCssColor("var(--nav-active)", themeProps),
+      headerStops,
+      3.0,
+    ],
+    [
+      `foreground vs surface-column · ${themeName}`,
+      resolveCssColor("var(--foreground)", themeProps),
+      [columnBg],
+      4.5,
+    ],
+    [
+      `foreground-secondary vs surface-column · ${themeName}`,
+      resolveCssColor("var(--foreground-secondary)", themeProps),
+      [columnBg],
+      4.5,
+    ],
+    [
+      `foreground-secondary vs surface-subtle · ${themeName}`,
+      resolveCssColor("var(--foreground-secondary)", themeProps),
+      [subtleBg],
+      4.5,
+    ],
+    [
+      `muted-foreground vs card · ${themeName}`,
+      resolveCssColor("var(--muted-foreground)", themeProps),
+      [cardBg],
+      4.5,
+    ],
+    [
+      `muted-foreground vs surface-subtle · ${themeName}`,
+      resolveCssColor("var(--muted-foreground)", themeProps),
+      [subtleBg],
+      4.5,
+    ],
+  ];
+
+  // These gradients carry small white labels in both themes. Check every stop
+  // separately so adding a bright stop cannot hide behind a passing endpoint.
+  for (const kind of ["primary", "avatar", "logo"]) {
+    resolveGradientStops(`--gradient-${kind}`, themeProps).forEach((stop, index) => {
+      pairs.push([
+        `white vs gradient-${kind} stop ${index + 1} · ${themeName}`,
+        rgb.white,
+        [stop],
+        4.5,
+      ]);
+    });
+  }
+
+  // 1.05 checks subtle separation, not text or control legibility.
+  for (const stop of headerStops) {
+    pairs.push(
+      [
+        `nav hairline vs gradient-header · ${themeName} (non-text separation)`,
+        resolveCssColor("var(--nav-chrome-line)", themeProps, stop),
+        [stop],
+        1.05,
+      ],
+      [
+        `nav hover lift vs gradient-header · ${themeName} (non-text separation)`,
+        resolveCssColor("rgb(255 255 255 / 0.15)", themeProps, stop),
+        [stop],
+        1.05,
+      ],
+    );
+  }
+
+  for (const state of ["none", "future", "today", "overdue"]) {
+    pairs.push([
+      `activity-${state}-text vs surface · ${themeName}`,
+      resolveCssColor(`var(--activity-${state}-text)`, themeProps),
+      [resolveCssColor(`var(--activity-${state}-surface)`, themeProps, cardBg)],
+      4.5,
+    ]);
+  }
+
+  for (const kind of ["total", "new", "rated", "qualified", "overdue"]) {
+    pairs.push([
+      `kpi-${kind}-text vs surface · ${themeName}`,
+      resolveCssColor(`var(--kpi-${kind}-text)`, themeProps),
+      [resolveCssColor(`var(--kpi-${kind}-surface)`, themeProps, toolbarBg)],
+      4.5,
+    ]);
+    pairs.push([
+      `white vs kpi-${kind}-count · ${themeName}`,
+      rgb.white,
+      [resolveCssColor(`var(--kpi-${kind}-count)`, themeProps, toolbarBg)],
+      4.5,
+    ]);
+  }
+
+  for (const kind of ["active", "zero", "danger"]) {
+    pairs.push([
+      `count-${kind}-fg vs surface · ${themeName}`,
+      resolveCssColor(`var(--count-${kind}-fg)`, themeProps),
+      [resolveCssColor(`var(--count-${kind}-surface)`, themeProps, columnHeaderBg)],
+      4.5,
+    ]);
+  }
+
+  for (const kind of ["person", "company"]) {
+    pairs.push([
+      `entity-${kind}-fg vs surface · ${themeName} (non-text)`,
+      resolveCssColor(`var(--entity-${kind}-fg)`, themeProps),
+      [resolveCssColor(`var(--entity-${kind}-surface)`, themeProps, cardBg)],
+      3.0,
+    ]);
+  }
+
+  pairs.push([
+    `chip-active-fg vs gradient-chip-active · ${themeName}`,
+    resolveCssColor("var(--chip-active-fg)", themeProps),
+    chipStops,
+    4.5,
+  ]);
+
+  if (themeName === "dark") {
+    pairs.push([
+      "line-control vs surface-subtle · dark (non-text)",
+      resolveCssColor("var(--line-control)", themeProps),
+      [subtleBg],
+      3.0,
+    ]);
+  }
+
+  for (const [label, fgColor, bgStops, need] of pairs) {
+    const ratio = Math.min(...bgStops.map((bgColor) => contrast(fgColor, bgColor)));
+    const pass = ratio >= need;
+    if (!pass) failures += 1;
+    process.stdout.write(
+      `  ${pass ? "OK " : "FAIL"} ${ratio.toFixed(2).padStart(6)}  ${need.toFixed(2).padStart(4)}  ${label}\n`,
+    );
+  }
 }
 
 process.stdout.write("\nRESOLVED HEX (for eyeballing / design tools)\n");

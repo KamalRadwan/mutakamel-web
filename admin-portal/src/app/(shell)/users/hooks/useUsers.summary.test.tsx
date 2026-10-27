@@ -58,12 +58,14 @@ const FIRST_PAGE = {
  */
 describe("useUsers summary cards", () => {
   beforeEach(() => {
+    authMock.user.isSuperAdmin = true;
+    authMock.user.permissions = [];
     Object.values(apiMock).forEach((mock) => {
       if (typeof mock === "function" && "mockReset" in mock) mock.mockReset();
     });
     apiMock.isForbiddenError.mockReturnValue(false);
     apiMock.normalizeErrorCode.mockReturnValue("UNKNOWN");
-    apiMock.listRoles.mockResolvedValue({ data: [] });
+    apiMock.listRoles.mockResolvedValue({ data: [], meta: { page: 1, limit: 100, total: 0, totalPages: 0, hasNext: false, hasPrev: false } });
     apiMock.listWebphoneExtensions.mockResolvedValue([]);
     apiMock.listAdminUsers.mockResolvedValue(FIRST_PAGE);
     apiMock.countAdminUsers.mockImplementation(
@@ -75,6 +77,29 @@ describe("useUsers summary cards", () => {
         return null;
       },
     );
+  });
+
+  it("does not request the management catalogue without role-read permission", async () => {
+    authMock.user.isSuperAdmin = false;
+    authMock.user.permissions = ["admin.users.read"];
+    const { result } = renderHook(() => useUsers());
+    await waitFor(() => expect(result.current.summaryMetrics.active).toBe(61));
+    expect(result.current.rolesStatus).toBe("unavailable");
+    expect(apiMock.listRoles).not.toHaveBeenCalled();
+  });
+
+  it("loads roles beyond page one for the directory filter", async () => {
+    apiMock.listRoles.mockImplementation(async ({ page }: { page: number }) => ({
+      data: page === 1
+        ? Array.from({ length: 100 }, (_, index) => ({ id: `role-${index}`, name: `Role ${index}` }))
+        : [{ id: "later-role", name: "Later role" }],
+      meta: { page, limit: 100, total: 101, totalPages: 2, hasNext: page === 1, hasPrev: page > 1 },
+    }));
+    const { result } = renderHook(() => useUsers());
+    await waitFor(() => expect(result.current.rolesStatus).toBe("success"));
+    expect(result.current.roles).toHaveLength(101);
+    act(() => result.current.setRoleFilter("later-role"));
+    await waitFor(() => expect(apiMock.listAdminUsers).toHaveBeenCalledWith(expect.objectContaining({ roleId: "later-role" })));
   });
 
   it("counts the whole filtered directory, not the rows on the page", async () => {

@@ -39,6 +39,7 @@ export default function PrebuiltReportsPage() {
     <PermissionGate require="crm.dashboards.read" scoped>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={t.crmDashboardReports.title}
           description={t.crmDashboardReports.subtitle}
           secondaryActions={

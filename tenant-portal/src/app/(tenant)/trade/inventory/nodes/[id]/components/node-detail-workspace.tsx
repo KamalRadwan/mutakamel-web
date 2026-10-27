@@ -210,7 +210,7 @@ export function NodeDetailWorkspace({ nodeId }: { nodeId: string }) {
                   </span>
                 </div>
               </div>
-              <span className="shrink-0 font-mono text-base font-semibold text-foreground">
+              <span dir="ltr" className="shrink-0 font-mono tabular-nums text-base font-semibold text-foreground">
                 {`${formatNumber(activeBranches, lang)}/${formatNumber(node.branches.length, lang)}`}
               </span>
             </div>
@@ -240,7 +240,7 @@ export function NodeDetailWorkspace({ nodeId }: { nodeId: string }) {
                   </span>
                 </div>
               </div>
-              <span className="shrink-0 font-mono text-xs font-semibold text-foreground">
+              <span dir="ltr" className="shrink-0 font-mono text-xs font-semibold text-foreground">
                 {node.timezone} • v{formatNumber(node.version, lang)}
               </span>
             </div>

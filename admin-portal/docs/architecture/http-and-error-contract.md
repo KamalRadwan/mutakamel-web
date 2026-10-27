@@ -2,9 +2,21 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-07-30**
+Last source verification: **2026-10-17**
 
 Owner: **API Gateway and Core**
+
+## Public authentication feedback
+
+Login handles `429 AUTH_LOGIN_THROTTLED` with translated remaining minutes and
+blocks submit until the deadline. `Retry-After` (seconds or HTTP date) takes
+precedence over `details.retryAfterSeconds`, including Core's string-array form.
+Malformed timing falls back to 60 seconds; elapsed wall time drives the countdown.
+Login and forgot-password `503` failures show translated temporary-unavailability
+copy. The client also localizes public reset/invite/login/forgot `503` messages
+while retaining their codes, headers, details and correlation IDs. Reset/invite
+screens retain their existing translated unavailable boundary. Public writes are
+never automatically retried.
 
 ## Browser transport
 

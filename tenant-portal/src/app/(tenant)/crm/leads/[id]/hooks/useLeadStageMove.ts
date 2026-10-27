@@ -36,15 +36,6 @@ function isAmbiguousMutationError(error: unknown): boolean {
  * requirement asks for, and a keyboard one for free.
  */
 export interface LeadStageMove {
-  /**
-   * The stage a press asked for, held until the confirmation answers: a press
-   * ASKS rather than moves, because the move is seen by everyone on the
-   * pipeline and pressing the old stage again is a second entry, not a reversal.
-   */
-  pendingStageId: string | null;
-  request: (stageId: string) => void;
-  dismiss: () => void;
-  confirm: () => void;
   move: (stageId: string) => Promise<void>;
   isMoving: boolean;
   error: string | null;
@@ -63,7 +54,6 @@ export function useLeadStageMove(
   const { t } = useI18n();
   const [isMoving, setIsMoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingStageId, setPendingStageId] = useState<string | null>(null);
 
   const move = useCallback(
     async (stageId: string) => {
@@ -114,14 +104,6 @@ export function useLeadStageMove(
   );
 
   return {
-    pendingStageId,
-    request: setPendingStageId,
-    dismiss: () => setPendingStageId(null),
-    confirm: () => {
-      const target = pendingStageId;
-      setPendingStageId(null);
-      if (target) void move(target);
-    },
     move,
     isMoving,
     error,

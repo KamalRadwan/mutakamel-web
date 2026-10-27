@@ -13,22 +13,18 @@ import { isMigrationContractError } from "./migration-readers";
 export const PROJECTION_UNAVAILABLE = "PROJECTION_UNAVAILABLE";
 
 /**
- * Precondition failures a start request answers with, each of which explains
- * exactly why a run will not begin.
+ * Safety preconditions returned by migration commands. Match full Worker
+ * codes so unrelated errors with the same suffix cannot enter this surface.
  */
 export const MIGRATION_PRECONDITION_CODES = [
-  "MIGRATION_RUN_ALREADY_ACTIVE",
-  "MIGRATION_UNTESTED",
-  "MIGRATION_TEST_EXPIRED",
-  "MIGRATION_TEST_CHECKSUM_MISMATCH",
-  "MIGRATION_NOT_APPROVED",
-  "MIGRATION_BLOCKED",
-  "MIGRATION_LINT_FAILED",
-  "MIGRATION_BACKUP_REQUIRED",
-  "TENANT_CLAIM_HELD",
-  "TENANT_INELIGIBLE",
-  "MAINTENANCE_WINDOW_CLOSED",
-  "BASELINE_AHEAD_OF_APPLICATION",
+  "WORKER.MIGRATION.RUN_ALREADY_ACTIVE",
+  "WORKER.MIGRATION.UNTESTED",
+  "WORKER.MIGRATION.BLOCKED",
+  "WORKER.MIGRATION.LINT_FAILED",
+  "WORKER.MIGRATION.BACKUP_REQUIRED",
+  "WORKER.TENANT_CLAIM.HELD",
+  "WORKER.MIGRATION.TENANT_INELIGIBLE",
+  "WORKER.MIGRATION.MAINTENANCE_WINDOW_CLOSED",
 ] as const;
 export type MigrationPreconditionCode =
   (typeof MIGRATION_PRECONDITION_CODES)[number];
@@ -36,7 +32,7 @@ export type MigrationPreconditionCode =
 export function readPreconditionCode(
   error: NormalizedApiError,
 ): MigrationPreconditionCode | null {
-  const code = error.errorCode.split(".").pop() ?? error.errorCode;
+  const code = error.errorCode;
   return (MIGRATION_PRECONDITION_CODES as readonly string[]).includes(code)
     ? (code as MigrationPreconditionCode)
     : null;

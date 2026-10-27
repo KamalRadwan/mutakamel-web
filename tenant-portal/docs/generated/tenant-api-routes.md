@@ -3,11 +3,11 @@
 > GENERATED FILE. Do not edit by hand. Run
 > `npm run docs:routes` from `tenant-portal`.
 
-Generated at: **2026-10-17T03:04:55.398Z**
+Generated at: **2026-10-17T18:31:47.531Z**
 
-Frontend revision: `dcaedbb1562a+dirty`
+Frontend revision: `0f84e3fbe923+dirty`
 
-Backend revision: `0d665ae5d9b6+dirty`
+Backend revision: `a51c1d6ccf36+dirty`
 
 Extraction method: Gateway route contracts filtered through the current
 `masterOwnsRoute` policy for `tenant`, then converted with the current
@@ -17,11 +17,11 @@ canonical Gateway path mappings.
 
 | App | Routes |
 | --- | ---: |
-| core | 228 |
-| crm | 171 |
-| trade | 251 |
+| core | 236 |
+| crm | 157 |
+| trade | 252 |
 | webphone | 20 |
-| **Total** | **670** |
+| **Total** | **665** |
 
 This inventory proves tenant-master Gateway method/path and edge-policy
 coverage. It does not replace controller, DTO, permission, response, or
@@ -49,9 +49,12 @@ Machine-readable source:
 | core | GET | `/api/tenant/core/v1/activities/targets` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.targets` |
 | core | GET | `/api/tenant/core/v1/activity-types` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.activities.types` |
 | core | GET | `/api/tenant/core/v1/audit` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.list` |
+| core | GET | `/api/tenant/core/v1/audit/deleted` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.deleted` |
 | core | GET | `/api/tenant/core/v1/audit/entities/:entityType/:entityId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.entity-history` |
+| core | GET | `/api/tenant/core/v1/audit/events/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.audit.event` |
 | core | POST | `/api/tenant/core/v1/auth/accept-invite` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.accept-invite` |
 | core | POST | `/api/tenant/core/v1/auth/activity` | TENANT_PORTAL | AUTHENTICATED | no | `core.tenant.auth.activity` |
+| core | POST | `/api/tenant/core/v1/auth/change-password` | TENANT_PORTAL | WRITE_SENSITIVE | no | `core.tenant.auth.change-password` |
 | core | POST | `/api/tenant/core/v1/auth/forgot-password` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.forgot-password` |
 | core | POST | `/api/tenant/core/v1/auth/login` | TENANT_PORTAL | PUBLIC | no | `core.tenant.auth.login` |
 | core | POST | `/api/tenant/core/v1/auth/logout` | TENANT_PORTAL | PUBLIC | yes | `core.tenant.auth.logout` |
@@ -129,8 +132,6 @@ Machine-readable source:
 | core | POST | `/api/tenant/core/v1/notifications/:id/dismiss` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.by.id.dismiss.post` |
 | core | POST | `/api/tenant/core/v1/notifications/:id/read` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.by.id.read.post` |
 | core | GET | `/api/tenant/core/v1/notifications/config` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.notifications.config.get` |
-| core | POST | `/api/tenant/core/v1/notifications/device-tokens` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.device-tokens.post` |
-| core | DELETE | `/api/tenant/core/v1/notifications/device-tokens/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.device-tokens.delete` |
 | core | POST | `/api/tenant/core/v1/notifications/mark-all-read` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.mark-all-read.post` |
 | core | GET | `/api/tenant/core/v1/notifications/preferences` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.notifications.preferences.get` |
 | core | PUT | `/api/tenant/core/v1/notifications/preferences` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.notifications.preferences.put` |
@@ -164,6 +165,9 @@ Machine-readable source:
 | core | GET | `/api/tenant/core/v1/payments` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.payments.list` |
 | core | POST | `/api/tenant/core/v1/payments/topup` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.payments.topup` |
 | core | GET | `/api/tenant/core/v1/permissions` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.permissions.list` |
+| core | DELETE | `/api/tenant/core/v1/profile/avatar` | TENANT_PORTAL | WRITE_SENSITIVE | no | `core.tenant.profile.avatar.delete` |
+| core | GET | `/api/tenant/core/v1/profile/avatar` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.profile.avatar.get` |
+| core | PUT | `/api/tenant/core/v1/profile/avatar` | TENANT_PORTAL | WRITE_SENSITIVE | no | `core.tenant.profile.avatar.put` |
 | core | GET | `/api/tenant/core/v1/provisioning/operations/:operationId` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.provisioning.operations.get` |
 | core | GET | `/api/tenant/core/v1/provisioning/updates` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.provisioning.updates.list` |
 | core | POST | `/api/tenant/core/v1/provisioning/updates/apply` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.provisioning.updates.apply` |
@@ -240,6 +244,8 @@ Machine-readable source:
 | core | GET | `/api/tenant/core/v1/users/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.get` |
 | core | PATCH | `/api/tenant/core/v1/users/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.update` |
 | core | POST | `/api/tenant/core/v1/users/:id/activate` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.activate` |
+| core | POST | `/api/tenant/core/v1/users/:id/resend-invite` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.resend-invite` |
+| core | POST | `/api/tenant/core/v1/users/:id/sessions/revoke` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.sessions.revoke` |
 | core | POST | `/api/tenant/core/v1/users/:id/suspend` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.suspend` |
 | core | GET | `/api/tenant/core/v1/users/:id/team-memberships` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.team-memberships.get` |
 | core | POST | `/api/tenant/core/v1/users/:id/team-memberships` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.team-memberships.add` |
@@ -249,6 +255,7 @@ Machine-readable source:
 | core | GET | `/api/tenant/core/v1/users/:userId/addon-assignments` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.application-access.addon-assignments.list` |
 | core | POST | `/api/tenant/core/v1/users/:userId/addon-assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.application-access.addon.assign` |
 | core | DELETE | `/api/tenant/core/v1/users/:userId/addon-assignments/:assignmentId` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.application-access.addon.unassign` |
+| core | GET | `/api/tenant/core/v1/users/:userId/assignment-options` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.assignment-options.list` |
 | core | GET | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.assignments.list` |
 | core | POST | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.assignments.add` |
 | core | PUT | `/api/tenant/core/v1/users/:userId/assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.assignments.set` |
@@ -258,6 +265,7 @@ Machine-readable source:
 | core | DELETE | `/api/tenant/core/v1/users/:userId/modules/:moduleKey` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.modules.unassign` |
 | core | GET | `/api/tenant/core/v1/users/:userId/scope-role-assignments` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.scope-role-assignments.list` |
 | core | PUT | `/api/tenant/core/v1/users/:userId/scope-role-assignments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.scope-role-assignments.set` |
+| core | PATCH | `/api/tenant/core/v1/users/me` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.me.update` |
 | core | GET | `/api/tenant/core/v1/users/me/profile` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.users.profile.get` |
 | core | PUT | `/api/tenant/core/v1/users/me/profile` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `core.tenant.users.profile.update` |
 | core | GET | `/api/tenant/core/v1/wallet` | TENANT_PORTAL | AUTHENTICATED | yes | `core.tenant.wallets.list` |
@@ -274,14 +282,12 @@ Machine-readable source:
 | crm | PATCH | `/api/tenant/crm/v1/acquisition-sources/reorder` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.acquisition.sources.reorder.patch` |
 | crm | GET | `/api/tenant/crm/v1/activities` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.activities.get` |
 | crm | POST | `/api/tenant/crm/v1/activities` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.activities.post` |
+| crm | GET | `/api/tenant/crm/v1/assignable-owners` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.assignable.owners.get` |
 | crm | GET | `/api/tenant/crm/v1/attachments` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.attachments.get` |
 | crm | POST | `/api/tenant/crm/v1/attachments` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.attachments.post` |
 | crm | DELETE | `/api/tenant/crm/v1/attachments/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.attachments.by.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/attachments/:id/download` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.attachments.by.id.download.get` |
 | crm | POST | `/api/tenant/crm/v1/attachments/upload` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.attachments.upload.post` |
-| crm | GET | `/api/tenant/crm/v1/calendar/events` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.calendar.events.get` |
-| crm | POST | `/api/tenant/crm/v1/calendar/events` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.calendar.events.post` |
-| crm | PATCH | `/api/tenant/crm/v1/calendar/events/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.calendar.events.by.id.patch` |
 | crm | GET | `/api/tenant/crm/v1/custom-fields` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.custom.fields.get` |
 | crm | POST | `/api/tenant/crm/v1/custom-fields` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.custom.fields.post` |
 | crm | PATCH | `/api/tenant/crm/v1/custom-fields/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.custom.fields.by.id.patch` |
@@ -404,26 +410,14 @@ Machine-readable source:
 | crm | PATCH | `/api/tenant/crm/v1/pipelines/:id/stages/reorder` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.pipelines.by.id.stages.reorder.patch` |
 | crm | GET | `/api/tenant/crm/v1/pipelines/assignment-options` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.pipelines.assignment.options.get` |
 | crm | GET | `/api/tenant/crm/v1/pipelines/configuration` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.pipelines.configuration.get` |
-| crm | GET | `/api/tenant/crm/v1/reminders` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.reminders.get` |
-| crm | POST | `/api/tenant/crm/v1/reminders` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.reminders.post` |
-| crm | PATCH | `/api/tenant/crm/v1/reminders/:id/cancel` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.reminders.by.id.cancel.patch` |
 | crm | GET | `/api/tenant/crm/v1/settings` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.settings.get` |
 | crm | PUT | `/api/tenant/crm/v1/settings` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.put` |
-| crm | GET | `/api/tenant/crm/v1/settings/custom-fields` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.settings.custom.fields.get` |
-| crm | POST | `/api/tenant/crm/v1/settings/custom-fields` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.custom.fields.post` |
-| crm | PATCH | `/api/tenant/crm/v1/settings/custom-fields/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.custom.fields.by.id.patch` |
-| crm | POST | `/api/tenant/crm/v1/settings/custom-fields/:id/requirements` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.custom.fields.by.id.requirements.post` |
-| crm | GET | `/api/tenant/crm/v1/settings/custom-fields/values` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.settings.custom.fields.values.get` |
-| crm | POST | `/api/tenant/crm/v1/settings/custom-fields/values` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.settings.custom.fields.values.post` |
 | crm | GET | `/api/tenant/crm/v1/static-data` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.static.data.get` |
 | crm | GET | `/api/tenant/crm/v1/tags` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.tags.get` |
 | crm | POST | `/api/tenant/crm/v1/tags` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tags.post` |
 | crm | DELETE | `/api/tenant/crm/v1/tags/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tags.by.id.delete` |
 | crm | GET | `/api/tenant/crm/v1/tags/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.tags.by.id.get` |
 | crm | PATCH | `/api/tenant/crm/v1/tags/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tags.by.id.patch` |
-| crm | GET | `/api/tenant/crm/v1/tasks` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.tasks.get` |
-| crm | POST | `/api/tenant/crm/v1/tasks` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `crm.tasks.post` |
-| crm | PATCH | `/api/tenant/crm/v1/tasks/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.tasks.by.id.patch` |
 | crm | GET | `/api/tenant/crm/v1/widgets` | TENANT_PORTAL | AUTHENTICATED | yes | `crm.dashboard.widgets.list.get` |
 | crm | POST | `/api/tenant/crm/v1/widgets` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.widgets.create.post` |
 | crm | DELETE | `/api/tenant/crm/v1/widgets/:id` | TENANT_PORTAL | WRITE_SENSITIVE | no | `crm.dashboard.widgets.by.id.delete` |
@@ -660,6 +654,7 @@ Machine-readable source:
 | trade | POST | `/api/tenant/trade/v1/webhooks/subscriptions` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.webhooks.subscriptions.post` |
 | trade | GET | `/api/tenant/trade/v1/webhooks/subscriptions/:id` | TENANT_PORTAL | AUTHENTICATED | yes | `trading.webhooks.subscriptions.by-id.get` |
 | trade | PATCH | `/api/tenant/trade/v1/webhooks/subscriptions/:id` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.webhooks.subscriptions.by-id.patch` |
+| trade | POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/reveal-secret` | TENANT_PORTAL | WRITE_SENSITIVE | no | `trading.webhooks.subscriptions.by-id.reveal.secret.post` |
 | trade | POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/revoke-secret` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.webhooks.subscriptions.by-id.revoke.secret.post` |
 | trade | POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/rotate-secret` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.webhooks.subscriptions.by-id.rotate.secret.post` |
 | trade | POST | `/api/tenant/trade/v1/webhooks/subscriptions/:id/test` | TENANT_PORTAL | WRITE_SENSITIVE | yes | `trading.webhooks.subscriptions.by-id.test.post` |

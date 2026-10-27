@@ -1,6 +1,6 @@
 import { isUUIDv7 } from "@/lib/uuid";
 
-export type OpportunityTextSearchField =
+type OpportunityTextSearchField =
   | "opportunity"
   | "customer"
   | "email"
@@ -136,6 +136,17 @@ export function addOpportunityBasicFilter(
       ? basic.filters
       : basic.filters.filter((entry) => entry.field !== next.field);
   return { ...basic, text: "", filters: [...filters, next] };
+}
+
+export function opportunityBasicSearchForCustomerParty(
+  partyId: string,
+): OpportunityBasicSearch {
+  const trimmed = partyId.trim();
+  if (!trimmed) return EMPTY_OPPORTUNITY_BASIC_SEARCH;
+  return addOpportunityBasicFilter(EMPTY_OPPORTUNITY_BASIC_SEARCH, {
+    field: "customer",
+    value: trimmed,
+  });
 }
 
 export function removeOpportunityBasicFilter(

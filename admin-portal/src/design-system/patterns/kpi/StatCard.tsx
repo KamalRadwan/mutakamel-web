@@ -95,7 +95,7 @@ export function StatCard({
       </div>
       <p
         className={cn(
-          "font-bold tabular-nums text-foreground",
+          "font-semibold tabular-nums text-foreground",
           compact ? "mt-1 text-lg sm:text-xl" : "mt-1.5 text-xl",
         )}
       >

@@ -12,14 +12,22 @@ function token(name: string): string {
 }
 
 describe("shell geometry", () => {
-  it("keeps both navigation bars at the requested 35px standard-density height", () => {
-    expect(token("size-topbar")).toBe("calc(2.1875rem * var(--ui-scale))");
-    expect(token("size-actionbar")).toBe("calc(2.1875rem * var(--ui-scale))");
+  it("keeps the topbar at 58px and toolbar at 48px at standard density", () => {
+    expect(token("size-topbar")).toBe("calc(3.625rem * var(--ui-scale))");
+    expect(token("size-toolbar")).toBe("calc(3rem * var(--ui-scale))");
   });
 
-  it("derives the chrome offset from the two bars instead of duplicating a literal", () => {
+  it("includes the scaled 11px outer padding in the actionbar height", () => {
+    expect(token("size-actionbar-inset")).toBe("calc(0.6875rem * var(--ui-scale))");
+    expect(token("size-actionbar")).toBe(
+      "calc(var(--size-toolbar) + var(--size-actionbar-inset))",
+    );
+  });
+
+  it("derives the chrome offset from the fixed strip and both bars", () => {
+    expect(token("size-brand-strip")).toBe("3px");
     expect(token("size-chrome")).toBe(
-      "calc(var(--size-topbar) + var(--size-actionbar))",
+      "calc(var(--size-brand-strip) + var(--size-topbar) + var(--size-actionbar))",
     );
   });
 });

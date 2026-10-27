@@ -7,21 +7,19 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isIdempotentReplay } from "@/lib/api/outcomes";
 import {
-  OPPORTUNITY_STAGES_PATH,
   buildUpdatePipelineRequest,
   moveStageOrder,
-  parseOpportunityStageDefinitionsResponse,
   parsePipelineResponse,
   pipelinePath,
   pipelineResetPath,
   pipelineStagePath,
   pipelineStagesPath,
   pipelineStagesReorderPath,
-  type OpportunityStageDefinition,
   type Pipeline,
   type UpdatePipelineInput,
 } from "../pipeline-contract";
 import type { PipelineWriteResult } from "./usePipelines";
+import { useOpportunityStageCatalogue } from "../../shared/hooks/useOpportunityStageCatalogue";
 
 const READ_CONFIG = { cache: "no-store", maxResponseBytes: 512 * 1024 } as const;
 const WRITE_CONFIG = {
@@ -39,12 +37,11 @@ export function usePipelineDetail(pipelineId: string) {
   const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
-  const [catalogue, setCatalogue] = useState<OpportunityStageDefinition[]>([]);
   // The catalogue is a SECOND source on this screen. Its failure degrades the
   // attach control only; the pipeline itself still renders — states.md's
   // partial-failure rule.
-  const [catalogueError, setCatalogueError] =
-    useState<NormalizedApiError | null>(null);
+  const { items: catalogue, queryError: catalogueError, reload: loadCatalogue } =
+    useOpportunityStageCatalogue(canManage);
   const [pendingStageId, setPendingStageId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -71,32 +68,15 @@ export function usePipelineDetail(pipelineId: string) {
     [pipelineId],
   );
 
-  const loadCatalogue = useCallback(async (signal?: AbortSignal) => {
-    setCatalogueError(null);
-    try {
-      const response = await axiosClient.get<unknown>(OPPORTUNITY_STAGES_PATH, {
-        ...READ_CONFIG,
-        signal,
-      });
-      setCatalogue(parseOpportunityStageDefinitionsResponse(response.data));
-    } catch (error) {
-      if (isAbortError(error)) return;
-      setCatalogue([]);
-      setCatalogueError(normalizeApiError(error));
-    }
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
-      // Independent, not Promise.all: a catalogue failure must not blank the
-      // pipeline, and a pipeline 404 must not hide the catalogue error.
+      // The shared catalogue loads independently so its failure cannot blank the pipeline.
       void load(controller.signal);
-      if (canManage) void loadCatalogue(controller.signal);
     });
     return () => controller.abort();
-  }, [canManage, load, loadCatalogue]);
+  }, [load]);
 
   const save = async (
     input: UpdatePipelineInput,
@@ -252,7 +232,7 @@ export function usePipelineDetail(pipelineId: string) {
     // Only active, not-yet-attached definitions can be attached; the service
     // rejects the rest with PIPELINE_STAGE_ALREADY_ASSIGNED or an inactive
     // stage error.
-    attachableStages: catalogue.filter(
+    attachableStages: (catalogueError ? [] : catalogue).filter(
       (stage) => stage.isActive && !attachedStageIds.has(stage.id),
     ),
     save,

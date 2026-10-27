@@ -1,20 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   SCOPE_UNRESOLVED_ERROR,
   useOrganizationScopeHeaders,
 } from "@/hooks/useOrganizationScope";
 import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
+import { CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES } from "../../shared/crm-capabilities";
+import { readLeadStageCatalogue } from "../../shared/lead-stage-catalogue";
 import {
   parseLeadCapabilitiesResponse,
   parseLeadStagesResponse,
   type LeadCapabilities,
   type LeadStage,
 } from "../lead-list-contract";
+import { useLeadCapabilityRefresh } from "./useLeadCapabilities";
+import { LEADS_PATH } from "../lead-contract";
 
-const LEAD_STAGES_PATH = "/api/tenant/crm/v1/lead-stages";
-const LEAD_CAPABILITIES_PATH = "/api/tenant/crm/v1/leads/capabilities";
+const LEAD_CAPABILITIES_PATH = `${LEADS_PATH}/capabilities`;
 
 interface LeadsDegradation {
   stages: boolean;
@@ -26,6 +30,7 @@ const NO_STAGES: LeadStage[] = [];
 
 interface Loaded {
   branchId: string;
+  scope: ReturnType<typeof useOrganizationScopeHeaders>;
   stages: LeadStage[];
   capabilities: LeadCapabilities | null;
   degraded: LeadsDegradation;
@@ -68,48 +73,44 @@ export function useLeadStagesAndCapabilities(branchId: string | null) {
         return;
       }
       setIsLoading(true);
+      setLoaded((current) => current ? { ...current, capabilities: null } : null);
       const [stagesSettled, capabilitiesSettled] = await Promise.allSettled([
-        axiosClient.get<unknown>(LEAD_STAGES_PATH, {
-          signal,
-          cache: "no-store",
-          maxResponseBytes: 256 * 1024,
-        }),
+        readLeadStageCatalogue(signal),
         // An unresolved scope is a gap on this side: the request is not sent,
         // and the capabilities degrade instead of drawing a Gateway 400.
         scope.ready
           ? axiosClient.get<unknown>(
               `${LEAD_CAPABILITIES_PATH}?${new URLSearchParams({ branchId }).toString()}`,
-              { signal, cache: "no-store", maxResponseBytes: 256 * 1024, headers: scope.headers },
+              { signal, cache: "no-store", maxResponseBytes: CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES, headers: scope.headers },
             )
           : Promise.reject(new Error(SCOPE_UNRESOLVED_ERROR.code)),
       ]);
       if (signal?.aborted || epoch !== epochRef.current) return;
-      const stages = degradable(stagesSettled, parseLeadStagesResponse);
+      const stages = stagesSettled.status === "fulfilled"
+        ? parseLeadStagesResponse(stagesSettled.value)
+        : null;
       const capabilities = degradable(capabilitiesSettled, (payload) =>
         parseLeadCapabilitiesResponse(payload, branchId),
       );
+      const capabilitiesDenied = capabilitiesSettled.status === "rejected"
+        && normalizeApiError(capabilitiesSettled.reason).status === 403;
       setLoaded({
         branchId,
+        scope,
         stages: stages ?? NO_STAGES,
         capabilities,
-        degraded: { stages: stages === null, capabilities: capabilities === null },
+        degraded: { stages: stages === null, capabilities: capabilities === null && !capabilitiesDenied },
       });
       setIsLoading(false);
     },
     [branchId, scope],
   );
 
-  useEffect(() => {
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (!controller.signal.aborted) void reload(controller.signal);
-    });
-    return () => controller.abort();
-  }, [reload]);
+  useLeadCapabilityRefresh(reload);
 
   // Another branch's answer never gates this branch's controls, even for the
   // moment between the switch and the new answer.
-  const current = loaded?.branchId === branchId ? loaded : null;
+  const current = loaded?.branchId === branchId && loaded.scope === scope ? loaded : null;
   return {
     stages: current?.stages ?? NO_STAGES,
     capabilities: current?.capabilities ?? null,

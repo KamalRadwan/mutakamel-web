@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Check, Pencil, Plus, Sparkles, UserRound, X } from "lucide-react";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -21,6 +22,7 @@ import {
   TagChip,
   Textarea,
   cn,
+  useToast,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
@@ -65,21 +67,36 @@ export function LeadIdentityCards({
   customFieldsSlot?: React.ReactNode;
 }) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const toast = useToast();
   const describeError = useCrmErrorText();
   const [isEditingMode, setIsEditingMode] = useState(!viewModeByDefault);
   const edit = useLeadDetailsEdit(lead, canEdit, onSaved, onReconcile, allowedOwnerIds);
   const showEditControls = edit.editable && isEditingMode;
   const choices = useLeadDetailsReferences(lead, showEditControls, allowedOwnerIds);
-  const [localTags, setLocalTags] = useState<CrmTag[] | null>(null);
-  const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
+  const [localTagsByLead, setLocalTagsByLead] = useState<{ leadId: string; tags: CrmTag[] } | null>(null);
+  const tagWritePending = useRef(false);
+  const [tagPickerLeadId, setTagPickerLeadId] = useState<string | null>(null);
+  const isTagPickerOpen = tagPickerLeadId === lead.id;
+  const setIsTagPickerOpen = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      setTagPickerLeadId((prevId) => {
+        const prevOpen = prevId === lead.id;
+        const resolved = typeof next === "function" ? next(prevOpen) : next;
+        return resolved ? lead.id : null;
+      });
+    },
+    [lead.id],
+  );
+  const setLocalTags = useCallback(
+    (next: CrmTag[] | null) => {
+      setLocalTagsByLead(next ? { leadId: lead.id, tags: next } : null);
+    },
+    [lead.id],
+  );
   const [availableTags, setAvailableTags] = useState<CrmTag[]>([]);
 
-  useEffect(() => {
-    setLocalTags(null);
-    setIsTagPickerOpen(false);
-  }, [lead.id]);
-
+  const localTags =
+    localTagsByLead?.leadId === lead.id ? localTagsByLead.tags : null;
   const displayedTags = localTags ?? choices.tags;
 
   const handleOpenTagPicker = useCallback(() => {
@@ -91,51 +108,62 @@ export function LeadIdentityCards({
         .then((res) => {
           setAvailableTags(parseCrmTagCatalogue(res.data));
         })
-        .catch(() => {});
+        .catch(() => toast.error(t.crmTags.loadFailed));
     }
-  }, [edit.editable, availableTags.length]);
+  }, [edit.editable, availableTags.length, setIsTagPickerOpen, t, toast]);
 
   const handleAttachTag = useCallback(
     async (tag: CrmTag) => {
-      if (!edit.editable) return;
-      setLocalTags((prev) => {
-        const base = prev ?? choices.tags;
-        return base.some((item) => item.id === tag.id) ? base : [...base, tag];
-      });
+      if (!edit.editable || tagWritePending.current) return;
+      if (!isUUIDv7(lead.id) || !isUUIDv7(tag.id)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = localTags ?? choices.tags;
+      if (previousTags.some((item) => item.id === tag.id)) return;
+      tagWritePending.current = true;
+      setLocalTags([...previousTags, tag]);
       setIsTagPickerOpen(false);
-      if (isUUIDv7(lead.id) && isUUIDv7(tag.id)) {
-        try {
-          const res = await axiosClient.post<unknown>(
-            `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags`,
-            { tagId: tag.id },
-            { skipAutoIdempotency: true },
-          );
-          if (Array.isArray(res.data)) {
-            setLocalTags(parseCrmTags(res.data));
-          }
-        } catch {
-          // Keep optimistic tag
-        }
+      try {
+        const res = await axiosClient.post<unknown>(
+          `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags`,
+          { tagIds: [tag.id] },
+          { skipAutoIdempotency: true },
+        );
+        if (!Array.isArray(res.data)) throw new Error("INVALID_CRM_TAGS_RESPONSE");
+        setLocalTags(parseCrmTags(res.data));
+      } catch {
+        setLocalTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [edit.editable, choices.tags, lead.id],
+    [edit.editable, localTags, choices.tags, lead.id, setIsTagPickerOpen, setLocalTags, t, toast],
   );
 
   const handleDetachTag = useCallback(
     async (tagId: string) => {
-      if (!edit.editable) return;
-      setLocalTags((prev) => (prev ?? choices.tags).filter((item) => item.id !== tagId));
-      if (isUUIDv7(lead.id) && isUUIDv7(tagId)) {
-        try {
-          await axiosClient.delete(
-            `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags/${encodeURIComponent(tagId)}`,
-          );
-        } catch {
-          // Keep optimistic removal
-        }
+      if (!edit.editable || tagWritePending.current) return;
+      if (!isUUIDv7(lead.id) || !isUUIDv7(tagId)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = localTags ?? choices.tags;
+      tagWritePending.current = true;
+      setLocalTags(previousTags.filter((item) => item.id !== tagId));
+      try {
+        await axiosClient.delete(
+          `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags/${encodeURIComponent(tagId)}`,
+        );
+      } catch {
+        setLocalTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [edit.editable, choices.tags, lead.id],
+    [edit.editable, localTags, choices.tags, lead.id, setLocalTags, t, toast],
   );
 
   const selectedSourceId = (showEditControls ? edit.form?.acquisitionSourceId : undefined) ?? lead.acquisitionSourceId ?? "";
@@ -164,15 +192,17 @@ export function LeadIdentityCards({
           <span className="dossier-icon-pill dossier-ip-violet" aria-hidden="true">
             <Sparkles className="size-3.5" aria-hidden="true" />
           </span>
-          <h2 className="text-xs font-extrabold tracking-wider uppercase">
+          <h2 className="text-xs font-semibold tracking-wider uppercase">
             {t.crmLeadDetail.detailsTitle}
           </h2>
         </div>
         {edit.editable ? (
           showEditControls ? (
             <div className="flex items-center gap-1.5">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 className="dossier-btn-cancel"
                 aria-label={t.common.cancel}
                 title={t.common.cancel}
@@ -184,9 +214,11 @@ export function LeadIdentityCards({
               >
                 <X className="size-3.5" aria-hidden="true" />
                 <span>{t.common.cancel}</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 className="dossier-btn-save"
                 aria-label={t.crmLeadDetail.saveDetails}
                 title={t.crmLeadDetail.saveDetails}
@@ -198,11 +230,13 @@ export function LeadIdentityCards({
               >
                 <Check className="size-3.5" aria-hidden="true" />
                 <span>{t.crmLeadDetail.saveDetails}</span>
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               className="dossier-btn-action dossier-btn-action-violet"
               aria-label={t.crmTags.edit}
               title={t.crmTags.edit}
@@ -210,11 +244,11 @@ export function LeadIdentityCards({
             >
               <Pencil className="size-3" aria-hidden="true" />
               <span>{t.crmTags.edit}</span>
-            </button>
+            </Button>
           )
         ) : (
           <span className="dossier-badge dossier-badge-converted">
-            🔒 {isAr ? "للقراءة فقط" : "Read-Only"}
+            🔒 {t.crmLeads.executive.readOnly}
           </span>
         )}
       </CardHeader>
@@ -276,7 +310,7 @@ export function LeadIdentityCards({
             return (
               <DetailsValue key={field} label={fieldLabel} wide={isWide}>
                 {viewModeByDefault && !showEditControls ? (
-                  <div className="min-h-6 text-xs font-bold text-foreground">
+                  <div className="min-h-6 text-xs font-semibold text-foreground">
                     {fieldValue.trim().length > 0 ? (
                       <span className="whitespace-pre-wrap break-words">{fieldValue}</span>
                     ) : (
@@ -320,28 +354,32 @@ export function LeadIdentityCards({
                               <span className="inline-flex items-center gap-1">
                                 <TagChip label={tag.name} backgroundColor={tag.backgroundColor} textColor={tag.textColor} />
                                 {edit.editable && (
-                                  <button
+                                  <Button
                                     type="button"
+                                    variant="ghost"
+                                    size="xs"
                                     aria-label={`Remove tag ${tag.name}`}
                                     onClick={() => void handleDetachTag(tag.id)}
-                                    className="rounded px-1 text-xs font-extrabold text-muted-foreground hover:text-destructive"
+                                    className="h-auto rounded px-1 py-0 text-xs font-semibold text-muted-foreground hover:text-destructive"
                                   >
                                     ×
-                                  </button>
+                                  </Button>
                                 )}
                               </span>
                             ) : (
                               <span className={toneClass}>
                                 <span>{tag.name}</span>
                                 {edit.editable && (
-                                  <button
+                                  <Button
                                     type="button"
+                                    variant="ghost"
+                                    size="xs"
                                     aria-label={`Remove tag ${tag.name}`}
                                     onClick={() => void handleDetachTag(tag.id)}
-                                    className="ms-1 border-0 bg-transparent p-0 font-extrabold opacity-75 hover:opacity-100"
+                                    className="ms-1 h-auto border-0 bg-transparent p-0 font-semibold opacity-75 hover:opacity-100"
                                   >
                                     ×
-                                  </button>
+                                  </Button>
                                 )}
                               </span>
                             )}
@@ -354,28 +392,32 @@ export function LeadIdentityCards({
                   )}
 
                   {edit.editable && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={handleOpenTagPicker}
                       className="dossier-tag dossier-tag-add"
                     >
                       <Plus className="size-3" aria-hidden="true" />
-                      <span>{isAr ? "ربط وسم" : "Attach Tag"}</span>
-                    </button>
+                      <span>{t.crmLeads.executive.attachTag}</span>
+                    </Button>
                   )}
                 </div>
 
                 {isTagPickerOpen && availableTags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 rounded-lg border border-violet-300/60 bg-violet-500/[0.06] p-2 dark:border-violet-500/30">
+                  <div className="flex flex-wrap gap-1.5 rounded-lg border border-border/60 bg-muted/40 p-2">
                     {availableTags.map((tag) => (
-                      <button
+                      <Button
                         key={tag.id}
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => void handleAttachTag(tag)}
                         className="dossier-tag dossier-tag-indigo"
                       >
                         + {tag.name}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
@@ -390,9 +432,9 @@ export function LeadIdentityCards({
           </div>
         )}
 
-        {showEditControls && edit.form && (!choices.canReadUsers || choices.usersUnavailable) && (
+        {showEditControls && edit.form && choices.usersUnavailable && (
           <p role="status" className="mt-3 text-xs text-muted-foreground">
-            {choices.canReadUsers ? t.crmLeadDetail.usersUnavailable : t.crmLeadDetail.usersPermissionRequired}
+            {t.crmLeadDetail.usersUnavailable}
           </p>
         )}
         {edit.error && (
@@ -419,7 +461,7 @@ function DetailsValue({ label, children, wide }: { label: string; children: Reac
 function DetailsIdentity({ name, image, initialsName = name }: { name: string; image?: string | null; initialsName?: string }) {
   const initials = leadDetailsInitials(initialsName);
   return (
-    <span className="flex min-h-6 min-w-0 items-center gap-1.5 text-xs font-bold text-foreground">
+    <span className="flex min-h-6 min-w-0 items-center gap-1.5 text-xs font-semibold text-foreground">
       <Avatar className="size-6" aria-hidden="true">
         <AvatarImage src={image ?? undefined} alt="" />
         <AvatarFallback>{initials || <UserRound className="size-3.5" aria-hidden="true" />}</AvatarFallback>

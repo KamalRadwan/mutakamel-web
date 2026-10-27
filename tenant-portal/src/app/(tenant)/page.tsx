@@ -50,7 +50,7 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={user ? t.workspaceHome.greeting(`${user.firstName} ${user.lastName}`) : ""}
         description={t.workspaceHome.subtitle}
       />

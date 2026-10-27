@@ -29,6 +29,11 @@ export const PROVISIONING_PERMISSION_REQUIREMENTS = {
     "admin.provisioning.prerequisites.request",
     "admin.provisioning.critical",
   ],
+  closeFailed: [
+    "admin.tenants.reprovision",
+    "admin.tenants.critical",
+    "admin.provisioning.critical",
+  ],
   addApplication: [
     "admin.provisioning.add-application",
     "admin.provisioning.critical",
@@ -51,6 +56,8 @@ export function deriveProvisioningPermissions(
   user: AdminAuthorizationContext | null | undefined,
 ): ProvisioningPermissions {
   return {
+    canResendRelease: adminCanAll(user, PROVISIONING_PERMISSION_REQUIREMENTS.requestPrerequisites),
+    canCloseFailed: adminCanAll(user, PROVISIONING_PERMISSION_REQUIREMENTS.closeFailed),
     canReadOperations: adminCan(user, PROVISIONING_PERMISSION_REQUIREMENTS.read[0]),
     canRetryOrCancel: adminCanAll(
       user,

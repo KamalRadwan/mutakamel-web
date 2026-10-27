@@ -57,50 +57,19 @@ const CORPORATE_ONLY_KEYS = [
   "commercialRegistrationNumber",
 ] as const;
 
-export interface CreateCustomerProfileRequest {
-  branchId: string;
-  profileType: CustomerProfileType;
-  displayName: string;
-  status?: CustomerProfileStatus;
-  acquisitionSourceId?: string;
-  companyName?: string;
-  companyEmail?: string;
-  companyPhone?: string;
-  companyWebsite?: string;
-  taxNumber?: string;
-  commercialRegistrationNumber?: string;
-  description?: string;
-}
-
-export function buildCreateCustomerProfileRequest(
-  form: CustomerProfileForm,
-  branchId: string,
-): CreateCustomerProfileRequest {
-  const request: CreateCustomerProfileRequest = {
-    branchId,
-    profileType: form.profileType,
-    displayName: form.displayName.trim(),
-    status: form.status,
-  };
-  const description = form.description.trim();
-  if (description.length > 0) request.description = description;
-  if (form.acquisitionSourceId.length > 0) {
-    request.acquisitionSourceId = form.acquisitionSourceId;
-  }
-  if (form.profileType === "CORPORATE") {
-    for (const key of CORPORATE_ONLY_KEYS) {
-      const value = form[key].trim();
-      if (value.length > 0) request[key] = value;
-    }
-  }
-  return request;
-}
+type ClearableCompanyField = Exclude<(typeof CORPORATE_ONLY_KEYS)[number], "companyName" | "companyPhone">;
 
 export type UpdateCustomerProfileRequest = Partial<
-  Omit<CreateCustomerProfileRequest, "branchId" | "profileType" | "acquisitionSourceId">
+  Omit<
+    CustomerProfileForm,
+    "profileType" | "acquisitionSourceId" | "companyPhone" | ClearableCompanyField
+  >
+> & Partial<
+  Record<ClearableCompanyField, string | null>
 > & {
   /** `@IsUUID('7')` on `string | null` — an explicit null is how it is cleared. */
   acquisitionSourceId?: string | null;
+  companyPhones?: string[];
 };
 
 /**
@@ -137,8 +106,13 @@ export function buildUpdateCustomerProfileRequest(
     for (const key of CORPORATE_ONLY_KEYS) {
       const next = form[key].trim();
       if (next === baseline[key].trim()) continue;
-      if (key === "companyName" && next.length === 0) continue;
-      request[key] = next;
+      if (key === "companyName") {
+        if (next.length > 0) request.companyName = next;
+      } else if (key === "companyPhone") {
+        request.companyPhones = next.length > 0 ? [next] : [];
+      } else {
+        request[key] = next.length > 0 ? next : null;
+      }
     }
   }
   return request;

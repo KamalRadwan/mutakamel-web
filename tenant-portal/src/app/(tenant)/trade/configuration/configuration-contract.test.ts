@@ -107,6 +107,24 @@ describe("defaultPriceBookPath", () => {
 });
 
 describe("parseDefinitionsResponse", () => {
+  it("preserves replacement eligibility separately from immutable effectiveTo", () => {
+    const version = {
+      id: VERSION_ID, versionNumber: 1, version: 2, scopeTarget: "TENANT",
+      value: true, status: "PUBLISHED", effectiveFrom: "2026-09-01T00:00:00.000Z",
+      effectiveTo: null, supersededAt: "2026-10-18T12:00:00.000Z", contentHash: "a".repeat(64),
+    };
+    const response = {
+      items: [{ id: DEFINITION_ID, key: "trade.test", version: 1, valueSchema: {},
+        allowedScopes: ["TENANT"], mergeStrategy: "OVERRIDE", riskClass: "LOW", versions: [version] }],
+      total: 1, page: 1, limit: 25,
+    };
+    expect(parseDefinitionsResponse(response).items[0].versions[0]).toMatchObject({
+      effectiveTo: null, supersededAt: version.supersededAt,
+    });
+    expect(() => parseDefinitionsResponse({ ...response, items: [{
+      ...response.items[0], versions: [{ ...version, supersededAt: "invalid" }],
+    }] })).toThrow();
+  });
   it("reads the versions the list embeds per definition", () => {
     const page = parseDefinitionsResponse({
       items: [

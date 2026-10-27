@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTenantAuth } from "@/context/AuthContext";
+import { hasPermission } from "@/design-system";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError } from "@/lib/api/errors";
 import {
@@ -32,6 +34,7 @@ export function useDashboardLayout(
   detail: DashboardDetail | null,
   onChanged: () => Promise<void> | void,
 ) {
+  const { user } = useTenantAuth();
   const serverOrder = useMemo(
     () => (detail ? orderedBoxes(detail.placements) : []),
     [detail],
@@ -55,7 +58,8 @@ export function useDashboardLayout(
     };
   }, [isEditing, serverOrder]);
 
-  const canEdit = detail?.accessLevel === "OWNER" || detail?.accessLevel === "EDIT";
+  const hasEditAccess = detail?.accessLevel === "OWNER" || detail?.accessLevel === "EDIT";
+  const canEdit = hasEditAccess && hasPermission(user?.permissions ?? [], "crm.dashboards.update");
   const isDirty = draft.map((box) => box.id).join(",") !== serverOrder.map((box) => box.id).join(",");
 
   function move(id: string, offset: -1 | 1): void {
@@ -135,7 +139,8 @@ export function useDashboardLayout(
 
   return {
     canEdit,
-    isEditing,
+    editPermissionMissing: hasEditAccess && !canEdit,
+    isEditing: isEditing && canEdit,
     setIsEditing: (editing: boolean) => {
       setDraft(serverOrder);
       setIsEditing(editing);

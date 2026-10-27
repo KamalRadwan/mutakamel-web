@@ -115,13 +115,26 @@ export function toBrandingForm(branding: BrandingSettings): BrandingFormValues {
 const HEX_COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 export const BRANDING_FORM_COLOR_ERROR = "BRANDING_FORM_COLOR";
+export const BRANDING_FORM_TEXT_ERROR = "BRANDING_FORM_TEXT";
+
+export function validateBrandingForm(values: BrandingFormValues) {
+  const errors: Partial<Record<keyof BrandingFormValues, string>> = {};
+  for (const field of ["appName", "tabTitle", "fontFamily"] as const) {
+    if (values[field].length > BRANDING_TEXT_MAX_LENGTH) errors[field] = BRANDING_FORM_TEXT_ERROR;
+  }
+  for (const field of ["primaryColor", "secondaryColor"] as const) {
+    const color = values[field].trim();
+    if (color && !HEX_COLOR.test(color)) errors[field] = BRANDING_FORM_COLOR_ERROR;
+  }
+  return errors;
+}
 
 export interface UpdateBrandingRequest {
-  appName?: string;
-  tabTitle?: string;
-  primaryColor?: string;
-  secondaryColor?: string;
-  fontFamily?: string;
+  appName?: string | null;
+  tabTitle?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  fontFamily?: string | null;
 }
 
 /**
@@ -131,23 +144,18 @@ export interface UpdateBrandingRequest {
  * only writes keys the body actually carries, so omitting it preserves whatever
  * is stored. Sending `""` would silently erase a tenant's login page.
  */
-export function buildUpdateBrandingRequest(values: BrandingFormValues): UpdateBrandingRequest {
+export function buildUpdateBrandingRequest(
+  values: BrandingFormValues,
+  current: BrandingSettings,
+): UpdateBrandingRequest {
+  const error = Object.values(validateBrandingForm(values))[0];
+  if (error) throw new Error(error);
   const request: UpdateBrandingRequest = {};
-  const text = (value: string) => value.trim().slice(0, BRANDING_TEXT_MAX_LENGTH);
-  const appName = text(values.appName);
-  const tabTitle = text(values.tabTitle);
-  const fontFamily = text(values.fontFamily);
-  const primaryColor = values.primaryColor.trim();
-  const secondaryColor = values.secondaryColor.trim();
-
-  if (primaryColor && !HEX_COLOR.test(primaryColor)) throw new Error(BRANDING_FORM_COLOR_ERROR);
-  if (secondaryColor && !HEX_COLOR.test(secondaryColor)) throw new Error(BRANDING_FORM_COLOR_ERROR);
-
-  if (appName) request.appName = appName;
-  if (tabTitle) request.tabTitle = tabTitle;
-  if (fontFamily) request.fontFamily = fontFamily;
-  if (primaryColor) request.primaryColor = primaryColor;
-  if (secondaryColor) request.secondaryColor = secondaryColor;
+  for (const field of ["appName", "tabTitle", "fontFamily", "primaryColor", "secondaryColor"] as const) {
+    const value = values[field].trim() || null;
+    // Core preserves omitted keys and persists null as an explicit reset.
+    if (value !== (current[field] || null)) request[field] = value;
+  }
   return request;
 }
 

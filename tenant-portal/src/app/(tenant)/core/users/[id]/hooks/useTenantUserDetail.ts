@@ -30,6 +30,13 @@ export function useTenantUserDetail(id: string) {
   const [actionError, setActionError] = useState<NormalizedApiError | null>(null);
   const [isDeleted, setIsDeleted] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const isSelfTarget = !!user && user.id === actor?.id;
+  const isProtectedTarget = !!user && (user.isTenantOwner || isSelfTarget);
+  const protectedTargetReason = isProtectedTarget
+    ? user?.isTenantOwner
+      ? t.coreIdentity.users.ownerManagementProtected
+      : t.coreIdentity.users.selfManagementProtected
+    : undefined;
 
   useEffect(() => {
     // Deferred past the effect body on purpose: a synchronous setState there
@@ -88,7 +95,7 @@ export function useTenantUserDetail(id: string) {
 
   const saveEdits = useCallback(
     async (patch: UpdateUserInput): Promise<boolean> => {
-      if (!user) return false;
+      if (!user || isProtectedTarget) return false;
       setIsSubmitting(true);
       setActionError(null);
       try {
@@ -102,15 +109,19 @@ export function useTenantUserDetail(id: string) {
         setIsSubmitting(false);
       }
     },
-    [user],
+    [user, isProtectedTarget],
   );
 
   return {
     t,
     lang,
     user,
-    isEditOpen,
+    isEditOpen: isEditOpen && !isProtectedTarget,
+    isProtectedTarget,
+    isSelfTarget,
+    protectedTargetReason,
     openEdit: () => {
+      if (isProtectedTarget) return;
       setActionError(null);
       setIsEditOpen(true);
     },
@@ -129,6 +140,7 @@ export function useTenantUserDetail(id: string) {
     canManageMemberships: permissions.includes("users.user.manage_memberships"),
     canAssignRoles: permissions.includes("users.user.assign_roles"),
     canUpdate: permissions.includes("users.user.update"),
+    canManageModules: (actor?.isTenantOwner === true || permissions.includes("users.user.manage_modules")) && !isSelfTarget,
     isTenantOwnerActor: actor?.isTenantOwner ?? false,
     allowedActions: user
       ? allowedUserActions(user, actor?.id ?? null)

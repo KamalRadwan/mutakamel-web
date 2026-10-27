@@ -45,9 +45,9 @@ export function useTradeDraftReference(
   const [value, setValue] = useState("");
 
   const submit = useCallback(async (): Promise<void> => {
-    if (version === null) return;
+    if (version === null || write.isBlocked) return;
     const trimmed = value.trim();
-    const saved = await write.runWrite({
+    await write.runWrite({
       operation,
       send: (idempotency) =>
         tradePatch(
@@ -58,21 +58,22 @@ export function useTradeDraftReference(
             maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
           },
         ),
+      onSuccess: async () => {
+        setIsOpen(false);
+        await onSaved();
+      },
     });
-    if (saved) {
-      setIsOpen(false);
-      await onSaved();
-    }
   }, [basePath, documentId, version, value, operation, headers, write, onSaved]);
 
   return {
     isOpen,
     open: () => {
+      if (write.isBlocked) return;
       setValue(current ?? "");
       setIsOpen(true);
     },
     close: () => {
-      if (write.isWriting) return;
+      if (write.isBlocked) return;
       setIsOpen(false);
     },
     value,

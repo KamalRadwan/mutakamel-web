@@ -10,6 +10,7 @@ import { TaxFormFields } from "./TaxFormFields";
 interface CreateTaxModalProps {
   isOpen: boolean;
   companies: CompanyOption[];
+  tenantWideAllowed: boolean;
   onClose: () => void;
   onSubmit: (values: TaxFormValues) => Promise<boolean>;
   isSubmitting: boolean;
@@ -19,22 +20,24 @@ interface CreateTaxModalProps {
 export function CreateTaxModal({
   isOpen,
   companies,
+  tenantWideAllowed,
   onClose,
   onSubmit,
   isSubmitting,
   error,
 }: CreateTaxModalProps) {
   const { t } = useI18n();
-  const [values, setValues] = useState<TaxFormValues>(EMPTY_TAX_FORM);
-  const isDirty = JSON.stringify(values) !== JSON.stringify(EMPTY_TAX_FORM);
+  const initial = { ...EMPTY_TAX_FORM, companyId: tenantWideAllowed ? null : companies[0]?.id ?? null };
+  const [values, setValues] = useState<TaxFormValues>(initial);
+  const isDirty = JSON.stringify(values) !== JSON.stringify(initial);
 
   const close = () => {
-    setValues(EMPTY_TAX_FORM);
+    setValues(initial);
     onClose();
   };
 
   const handleSubmit = async () => {
-    if (await onSubmit(values)) setValues(EMPTY_TAX_FORM);
+    if (await onSubmit(values)) setValues(initial);
   };
 
   return (
@@ -62,6 +65,7 @@ export function CreateTaxModal({
         values={values}
         onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
         companies={companies}
+        tenantWideAllowed={tenantWideAllowed}
         isSubmitting={isSubmitting}
         scopeReadOnly={false}
       />

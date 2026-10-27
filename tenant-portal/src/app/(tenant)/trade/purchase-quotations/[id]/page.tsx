@@ -10,6 +10,7 @@ import {
   ErrorState,
   Money,
   NotFoundState,
+  PermissionGate,
   type ColumnDef,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -101,6 +102,10 @@ export default function PurchaseQuotationDetailPage({
         <TradeScopeRequired />
       </TradeGate>
     );
+  }
+
+  if (detail.loadError?.status === 403) {
+    return <PermissionGate require={PURCHASE_QUOTATION_PERMISSIONS.read} denied>{null}</PermissionGate>;
   }
 
   if (detail.isMissing) {

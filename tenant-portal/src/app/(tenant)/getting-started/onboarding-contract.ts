@@ -26,10 +26,9 @@ import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 // `PipelinesController.findAll(actor)` take no list query at all).
 //
 // TRADE ITEMS are deliberately NOT probed. `GET /trade/v1/items` needs a
-// resolved `TradeRequestContext` and `GET /trade/v1/uoms` is BRANCH_REQUIRED at
-// the Gateway, so neither can answer before a branch exists — and a step that
-// reports "unknown" for a reason the user cannot act on is worse than a step
-// that simply names the next action. Recorded as Q112.
+// resolved `TradeRequestContext`. UoM master reads allow tenant-wide access
+// before a branch exists; they do not establish whether any items exist.
+// The item step names the next action rather than guessing its occupancy.
 
 export const ONBOARDING_STEP_IDS = [
   "company",

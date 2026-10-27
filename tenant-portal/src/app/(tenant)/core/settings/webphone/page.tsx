@@ -34,7 +34,7 @@ export default function TenantWebphoneSettingsPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       {/* No filled action: with the scope-level save gone, every submit below
           is `secondary`. See docs/design/patterns.md#pageheader. */}
-      <PageHeader
+      <PageHeader className="sr-only"
         title={copy.title}
         description={copy.subtitle}
         secondaryActions={

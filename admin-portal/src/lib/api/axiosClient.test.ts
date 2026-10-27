@@ -615,6 +615,10 @@ describe("admin cookie refresh retry", () => {
     expect(getAdminAuthHandling(failure)).toBe("permission-denied");
     expect(storage.getItem("admin_session_meta")).not.toBeNull();
     expect(dispatchedEvents("global-toast")).toHaveLength(1);
+    expect(dispatchedEvents("global-toast")[0].detail).toEqual({
+      type: "error",
+      localizationKey: "authorizationDenied",
+    });
     expect(
       dispatchedEvents("admin-auth-lifecycle").map((event) => event.detail),
     ).not.toContain("DEGRADED");

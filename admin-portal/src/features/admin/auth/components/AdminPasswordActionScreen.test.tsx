@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminPasswordActionScreen } from "./AdminPasswordActionScreen";
 
 const auth = vi.hoisted(() => ({
+  login: vi.fn(),
   acceptInvite: vi.fn(),
   resetPassword: vi.fn(),
 }));
 
 const i18n = vi.hoisted(() => ({ lang: "en" as "en" | "ar" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => auth,

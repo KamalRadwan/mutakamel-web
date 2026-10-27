@@ -14,10 +14,8 @@ import {
   MessageSquare,
   RefreshCw,
   Save,
-  Send,
   Settings2,
   ShieldAlert,
-  Smartphone,
   Trash2,
   Wifi,
 } from "lucide-react";
@@ -26,9 +24,6 @@ import {
   Badge,
   Button,
   Checkbox,
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
   Field,
   Input,
   PageHeader,
@@ -38,18 +33,13 @@ import {
   SelectTrigger,
   SelectValue,
   Switch,
-  Textarea,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localeForLanguage } from "@/i18n/locale";
 import {
-  buildDeviceTokenCommand,
   buildPreferenceCommand,
-  isCanonicalUuidV7,
   NOTIFICATION_LIST_LIMITS,
   safeNotificationActionUrl,
-  type DeviceTokenDraft,
-  type DeviceTokenValidationErrors,
   type PreferenceDraft,
   type PreferenceValidationErrors,
 } from "./contracts";
@@ -64,22 +54,9 @@ import { useAdminNotifications } from "./useAdminNotifications";
 const INITIAL_PREFERENCE: PreferenceDraft = {
   notificationType: "",
   inAppEnabled: true,
-  pushEnabled: false,
-  emailEnabled: false,
-  quietHoursText: "{}",
 };
 
-const INITIAL_DEVICE: DeviceTokenDraft = {
-  provider: "web-push",
-  token: "",
-  deviceId: "",
-  platform: "web",
-  enabled: true,
-};
-
-type Confirmation =
-  | { kind: "dismiss"; id: string; compatibility: boolean }
-  | { kind: "revoke"; id: string };
+type Confirmation = { kind: "dismiss"; id: string };
 
 export function AdminNotificationsScreen() {
   const { lang } = useI18n();
@@ -87,10 +64,6 @@ export function AdminNotificationsScreen() {
   const view = useAdminNotifications();
   const [preferenceDraft, setPreferenceDraft] = useState<PreferenceDraft>(INITIAL_PREFERENCE);
   const [preferenceErrors, setPreferenceErrors] = useState<PreferenceValidationErrors>({});
-  const [deviceDraft, setDeviceDraft] = useState<DeviceTokenDraft>(INITIAL_DEVICE);
-  const [deviceErrors, setDeviceErrors] = useState<DeviceTokenValidationErrors>({});
-  const [revokeId, setRevokeId] = useState("");
-  const [revokeIdError, setRevokeIdError] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
   const pending = view.actionStatus.state === "PENDING";
@@ -135,37 +108,11 @@ export function AdminNotificationsScreen() {
     await view.savePreference(built.command);
   };
 
-  const submitDevice = async (event: FormEvent) => {
-    event.preventDefault();
-    const built = buildDeviceTokenCommand(deviceDraft);
-    setDeviceErrors(built.errors);
-    if (!built.command) return;
-    const receipt = await view.registerDevice(built.command);
-    if (receipt) {
-      setDeviceDraft((current) => ({ ...current, token: "" }));
-      setRevokeId(receipt.id);
-    }
-  };
-
-  const requestRevoke = () => {
-    const normalized = revokeId.trim().toLowerCase();
-    const invalid = !isCanonicalUuidV7(normalized);
-    setRevokeIdError(invalid);
-    if (!invalid) setConfirmation({ kind: "revoke", id: normalized });
-  };
-
   const confirmDestructiveAction = () => {
     const current = confirmation;
     setConfirmation(null);
     if (!current) return;
-    if (current.kind === "revoke") {
-      void view.revokeDevice(current.id);
-    } else {
-      void view.performItemAction(
-        current.id,
-        current.compatibility ? "dismiss-post-compatibility" : "dismiss",
-      );
-    }
+    void view.performItemAction(current.id, "dismiss");
   };
 
   return shell(
@@ -211,7 +158,6 @@ export function AdminNotificationsScreen() {
         {view.canManage ? (
           <div className="flex flex-wrap gap-2 rounded-lg border border-primary/25 bg-selected/50 p-2.5">
             <Button disabled={pending || view.unreadCount === 0} type="button" variant="primary" size="sm" onClick={() => void view.performBulkAction("read-all")}><CheckCheck className="size-3.5" aria-hidden="true" />{copy.readAll}</Button>
-            <Button disabled={pending || view.unreadCount === 0} type="button" variant="outline" size="sm" onClick={() => void view.performBulkAction("mark-all-read-compatibility")}>{copy.markAllReadLegacy}</Button>
           </div>
         ) : null}
 
@@ -226,7 +172,7 @@ export function AdminNotificationsScreen() {
                 canManage={view.canManage}
                 pending={pending}
                 onAction={(action) => void view.performItemAction(notification.id, action)}
-                onDismiss={(compatibility) => setConfirmation({ kind: "dismiss", id: notification.id, compatibility })}
+                onDismiss={() => setConfirmation({ kind: "dismiss", id: notification.id })}
               />
             ))}
           </div>
@@ -241,7 +187,6 @@ export function AdminNotificationsScreen() {
         ) : null}
       </section>
 
-      <div className="grid gap-3 xl:grid-cols-2">
         <section className="space-y-3 rounded-lg border border-border bg-card p-3 sm:p-3.5">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Settings2 className="size-4 text-info" aria-hidden="true" />{copy.preferences}</h2>
           {view.preferences.length ? (
@@ -251,9 +196,6 @@ export function AdminNotificationsScreen() {
                   setPreferenceDraft({
                     notificationType: preference.notificationType,
                     inAppEnabled: preference.inAppEnabled,
-                    pushEnabled: preference.pushEnabled,
-                    emailEnabled: preference.emailEnabled,
-                    quietHoursText: JSON.stringify(preference.quietHours, null, 2),
                   });
                   setPreferenceErrors({});
                 }} />
@@ -266,66 +208,11 @@ export function AdminNotificationsScreen() {
               <Field label={copy.notificationType} error={preferenceError(preferenceErrors.notificationType, copy)} id="notification-preference-type" hideLabel required>
                 {(field) => <Input {...field} size="sm" value={preferenceDraft.notificationType} onChange={(event) => setPreferenceDraft((current) => ({ ...current, notificationType: event.target.value }))} maxLength={128} placeholder={`${copy.notificationType} *`} />}
               </Field>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Toggle label={copy.inApp} checked={preferenceDraft.inAppEnabled} onChange={(checked) => setPreferenceDraft((current) => ({ ...current, inAppEnabled: checked }))} />
-                <Toggle label={copy.push} checked={preferenceDraft.pushEnabled} onChange={(checked) => setPreferenceDraft((current) => ({ ...current, pushEnabled: checked }))} />
-                <Toggle label={copy.email} checked={preferenceDraft.emailEnabled} onChange={(checked) => setPreferenceDraft((current) => ({ ...current, emailEnabled: checked }))} />
-              </div>
-              <Field label={copy.quietHours} hint={copy.quietHoursHint} error={quietHoursError(preferenceErrors.quietHours, copy)} id="notification-quiet-hours" hideLabel>
-                {(field) => <Textarea {...field} rows={3} value={preferenceDraft.quietHoursText} onChange={(event) => setPreferenceDraft((current) => ({ ...current, quietHoursText: event.target.value }))} className="resize-y font-mono" placeholder={`${copy.quietHours} (JSON)`} />}
-              </Field>
+              <Toggle label={copy.inApp} checked={preferenceDraft.inAppEnabled} onChange={(checked) => setPreferenceDraft((current) => ({ ...current, inAppEnabled: checked }))} />
               <Button type="submit" variant="primary" size="sm" disabled={pending}>{pending ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Save className="size-3.5" aria-hidden="true" />}{pending ? copy.saving : copy.savePreference}</Button>
             </form>
           ) : null}
         </section>
-
-        <section className="space-y-3 rounded-lg border border-border bg-card p-3 sm:p-3.5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><Smartphone className="size-4 text-info" aria-hidden="true" />{copy.devices}</h2>
-          {view.canManage ? (
-            <form noValidate onSubmit={(event) => void submitDevice(event)} className="grid gap-2.5">
-              <Field label={copy.provider} id="notification-device-provider" hideLabel>
-                {({ id }) => (
-                  <Select value={deviceDraft.provider} onValueChange={(provider) => setDeviceDraft((current) => ({ ...current, provider: provider as DeviceTokenDraft["provider"] }))}>
-                    <SelectTrigger id={id} size="sm"><SelectValue placeholder={copy.provider} /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="web-push">web-push</SelectItem>
-                      <SelectItem value="fcm">fcm</SelectItem>
-                      <SelectItem value="apns">apns</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </Field>
-              <Field label={copy.deviceToken} hint={copy.tokenHint} error={deviceTokenError(deviceErrors.token, copy)} id="notification-device-token" hideLabel required>
-                {(field) => <Textarea {...field} rows={2} value={deviceDraft.token} onChange={(event) => setDeviceDraft((current) => ({ ...current, token: event.target.value }))} maxLength={4096} autoComplete="off" spellCheck={false} className="resize-y font-mono" placeholder={`${copy.deviceToken} *`} />}
-              </Field>
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <Field label={copy.deviceId} error={deviceErrors.deviceId ? copy.validation.deviceIdTooLong : undefined} id="notification-device-id" hideLabel>
-                  {(field) => <Input {...field} size="sm" value={deviceDraft.deviceId} onChange={(event) => setDeviceDraft((current) => ({ ...current, deviceId: event.target.value }))} maxLength={128} placeholder={copy.deviceId} />}
-                </Field>
-                <Field label={copy.platform} error={deviceErrors.platform ? copy.validation.platformTooLong : undefined} id="notification-device-platform" hideLabel>
-                  {(field) => <Input {...field} size="sm" value={deviceDraft.platform} onChange={(event) => setDeviceDraft((current) => ({ ...current, platform: event.target.value }))} maxLength={32} placeholder={copy.platform} />}
-                </Field>
-              </div>
-              <Toggle label={copy.enabled} checked={deviceDraft.enabled} onChange={(enabled) => setDeviceDraft((current) => ({ ...current, enabled }))} />
-              <Button type="submit" variant="primary" size="sm" disabled={pending}>{pending ? <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Send className="size-3.5" aria-hidden="true" />}{pending ? copy.registering : copy.register}</Button>
-            </form>
-          ) : null}
-          {view.deviceReceipt ? (
-            <dl className="grid gap-2 rounded-lg border border-success/30 bg-success-subtle p-2.5 text-xs text-success-subtle-foreground">
-              <Evidence label={copy.receipt} value={view.deviceReceipt.id} mono />
-              <Evidence label={copy.tokenHash} value={view.deviceReceipt.tokenHash} mono />
-            </dl>
-          ) : null}
-          {view.canManage ? (
-            <div className="grid gap-2 border-t border-border pt-3">
-              <Field label={copy.tokenId} error={revokeIdError ? copy.validation.uuid : undefined} id="notification-revoke-id" hideLabel required>
-                {(field) => <Input {...field} size="sm" value={revokeId} onChange={(event) => { setRevokeId(event.target.value); setRevokeIdError(false); }} autoComplete="off" spellCheck={false} className="font-mono" placeholder={`${copy.tokenId} (UUIDv7) *`} />}
-              </Field>
-              <Button type="button" variant="destructive" size="sm" disabled={pending} onClick={requestRevoke}><Trash2 className="size-3.5" aria-hidden="true" />{pending ? copy.revoking : copy.revoke}</Button>
-            </div>
-          ) : null}
-        </section>
-      </div>
 
       <RuntimePanel config={view.config} copy={copy} />
 
@@ -333,8 +220,8 @@ export function AdminNotificationsScreen() {
         isOpen={confirmation !== null}
         onClose={() => setConfirmation(null)}
         onConfirm={confirmDestructiveAction}
-        title={confirmation?.kind === "revoke" ? copy.revokeConfirmTitle : copy.dismissConfirmTitle}
-        description={confirmation?.kind === "revoke" ? copy.revokeConfirmDescription : copy.dismissConfirmDescription}
+        title={copy.dismissConfirmTitle}
+        description={copy.dismissConfirmDescription}
         targetName={confirmation?.id ?? ""}
         actionType="delete"
         requireNameTyping={false}
@@ -352,8 +239,8 @@ function NotificationCard({ notification, copy, lang, canManage, pending, onActi
   lang: "ar" | "en";
   canManage: boolean;
   pending: boolean;
-  onAction: (action: "read" | "acknowledge" | "ack-compatibility") => void;
-  onDismiss: (compatibility: boolean) => void;
+  onAction: (action: "read" | "acknowledge") => void;
+  onDismiss: () => void;
 }) {
   const url = safeNotificationActionUrl(notification.actionUrl);
   return (
@@ -376,16 +263,7 @@ function NotificationCard({ notification, copy, lang, canManage, pending, onActi
         <div className="mt-2.5 flex flex-wrap gap-2 border-t border-border pt-2.5">
           <Button disabled={pending || Boolean(notification.readAt)} type="button" variant="outline" size="sm" onClick={() => onAction("read")}><Check className="size-3.5" aria-hidden="true" />{copy.markRead}</Button>
           <Button disabled={pending || Boolean(notification.acknowledgedAt)} type="button" variant="outline" size="sm" onClick={() => onAction("acknowledge")}><CheckCheck className="size-3.5" aria-hidden="true" />{copy.acknowledge}</Button>
-          <Button disabled={pending} type="button" variant="ghost" size="sm" onClick={() => onDismiss(false)} className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"><Trash2 className="size-3.5" aria-hidden="true" />{copy.dismiss}</Button>
-          <Collapsible className="basis-full sm:basis-auto">
-            <CollapsibleTrigger asChild>
-              <Button type="button" variant="outline" size="sm">{copy.compatibility}<ChevronDown className="size-3.5" aria-hidden="true" /></Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 flex flex-wrap gap-2 rounded-lg border border-warning/30 bg-warning-subtle p-2 motion-reduce:transition-none">
-              <Button disabled={pending || Boolean(notification.acknowledgedAt)} type="button" variant="outline" size="sm" onClick={() => onAction("ack-compatibility")}>{copy.acknowledgeLegacy}</Button>
-              <Button disabled={pending} type="button" variant="ghost" size="sm" onClick={() => onDismiss(true)} className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground">{copy.dismissLegacy}</Button>
-            </CollapsibleContent>
-          </Collapsible>
+          <Button disabled={pending} type="button" variant="ghost" size="sm" onClick={onDismiss} className="text-destructive hover:bg-destructive-subtle hover:text-destructive-subtle-foreground"><Trash2 className="size-3.5" aria-hidden="true" />{copy.dismiss}</Button>
         </div>
       ) : null}
     </article>
@@ -393,15 +271,15 @@ function NotificationCard({ notification, copy, lang, canManage, pending, onActi
 }
 
 function PreferenceRow({ preference, copy, onEdit }: { preference: NotificationPreference; copy: NotificationsCopy; onEdit: () => void }) {
-  return <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-2.5 text-xs"><div><p className="font-mono font-semibold text-foreground">{preference.notificationType}</p><p className="mt-0.5 text-xs text-muted-foreground">{copy.inApp}: {yesNo(preference.inAppEnabled, copy)} · {copy.push}: {yesNo(preference.pushEnabled, copy)} · {copy.email}: {yesNo(preference.emailEnabled, copy)}</p></div><Button type="button" variant="outline" size="sm" onClick={onEdit}>{copy.edit}</Button></div>;
+  return <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-2.5 text-xs"><div><p className="font-mono font-semibold text-foreground">{preference.notificationType}</p><p className="mt-0.5 text-xs text-muted-foreground">{copy.inApp}: {yesNo(preference.inAppEnabled, copy)}</p></div><Button type="button" variant="outline" size="sm" onClick={onEdit}>{copy.edit}</Button></div>;
 }
 
 function RuntimePanel({ config, copy }: { config: ReturnType<typeof useAdminNotifications>["config"]; copy: NotificationsCopy }) {
   if (!config) return null;
   const metrics = [
-    [copy.runtimeEnabled, config.enabled], [copy.inAppEnabled, config.inAppEnabled], [copy.realtimeEnabled, config.realtimeEnabled], [copy.pushEnabled, config.pushEnabled], [copy.emailEnabled, config.emailEnabled],
+    [copy.runtimeEnabled, config.enabled], [copy.inAppEnabled, config.inAppEnabled], [copy.realtimeEnabled, config.realtimeEnabled],
   ] as const;
-  return <section className="space-y-2.5 rounded-lg border border-border bg-card p-3 sm:p-3.5"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><MessageSquare className="size-4 text-info" aria-hidden="true" />{copy.runtime}</h2><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">{metrics.map(([label, value]) => <div key={label} className="rounded-lg border border-border p-2.5"><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={`mt-0.5 text-xs font-semibold ${value ? "text-success" : "text-muted-foreground"}`}>{yesNo(value, copy)}</p></div>)}</div><dl className="grid gap-2 text-xs sm:grid-cols-3"><Evidence label={copy.runtimeProvider} value={config.provider} /><Evidence label={copy.polling} value={`${config.pollIntervalMs} ms`} /><Evidence label={copy.previewLimit} value={String(config.previewLimit)} /></dl>{!config.pushEnabled ? <p className="rounded-md bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">{copy.firebaseUnavailable}</p> : null}</section>;
+  return <section className="space-y-2.5 rounded-lg border border-border bg-card p-3 sm:p-3.5"><h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><MessageSquare className="size-4 text-info" aria-hidden="true" />{copy.runtime}</h2><div className="grid gap-2 sm:grid-cols-3">{metrics.map(([label, value]) => <div key={label} className="rounded-lg border border-border p-2.5"><p className="text-xs font-semibold text-muted-foreground">{label}</p><p className={`mt-0.5 text-xs font-semibold ${value ? "text-success" : "text-muted-foreground"}`}>{yesNo(value, copy)}</p></div>)}</div><dl className="grid gap-2 text-xs sm:grid-cols-2"><Evidence label={copy.polling} value={`${config.pollIntervalMs} ms`} /><Evidence label={copy.previewLimit} value={String(config.previewLimit)} /></dl></section>;
 }
 
 function ActionBanner({ status, copy, updated, onClose, onRetry }: { status: NotificationActionStatus; copy: NotificationsCopy; updated: number | null; onClose: () => void; onRetry: () => void }) {
@@ -416,8 +294,6 @@ function actionTitle(status: NotificationActionStatus, copy: NotificationsCopy):
   if (status.state === "PENDING") return copy.pending;
   if (status.state === "SUCCESS") {
     if (status.messageKey === "preferenceSaved") return copy.preferenceSaved;
-    if (status.messageKey === "deviceRegistered") return copy.deviceRegistered;
-    if (status.messageKey === "deviceRevoked") return copy.deviceRevoked;
     if (status.messageKey === "bulkCompleted") return copy.bulkCompleted;
     return copy.actionSucceeded;
   }
@@ -441,5 +317,3 @@ function formatDate(value: string, lang: "ar" | "en"): string { try { return new
 function yesNo(value: boolean, copy: NotificationsCopy): string { return value ? copy.enabledValue : copy.disabledValue; }
 function errorDetail(error: { errorCode: string; message: string; correlationId?: string } | null, copy: NotificationsCopy): string | undefined { if (!error) return undefined; return [error.message, `${copy.errorCode}: ${error.errorCode}`, error.correlationId ? `${copy.correlation}: ${error.correlationId}` : null].filter(Boolean).join(" · "); }
 function preferenceError(value: PreferenceValidationErrors["notificationType"], copy: NotificationsCopy) { return value === "required" ? copy.validation.required : value === "tooLong" ? copy.validation.typeTooLong : undefined; }
-function quietHoursError(value: PreferenceValidationErrors["quietHours"], copy: NotificationsCopy) { return value === "invalidJson" ? copy.validation.invalidJson : value === "objectRequired" ? copy.validation.objectRequired : undefined; }
-function deviceTokenError(value: DeviceTokenValidationErrors["token"], copy: NotificationsCopy) { return value === "required" ? copy.validation.required : value === "tooLong" ? copy.validation.tokenTooLong : undefined; }

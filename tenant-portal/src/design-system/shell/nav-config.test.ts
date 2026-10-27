@@ -84,6 +84,15 @@ describe("the three app navs", () => {
 
     expect(items?.primaryPage).toBe(true);
   });
+
+  it("links the CRM Reports navigation item to the prebuilt reports route", () => {
+    const reports = NAV_SECTIONS.flatMap((section) => section.items).find(
+      (item) => item.id === "crmDashboardReports",
+    );
+
+    expect(reports?.href).toBe("/crm/dashboards/reports");
+    expect(reports?.labelKey).toBe("presetDashboards");
+  });
 });
 
 // The i18n gate. Every nav surface reads labels as

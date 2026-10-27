@@ -30,6 +30,20 @@ function request(path: string, init: RequestInit = {}) {
 }
 
 describe("development Gateway proxy over a real HTTP connection", () => {
+  it("forwards tenant WebPhone paths and query strings to the Gateway", async () => {
+    let received: { url?: string; host?: string } | undefined;
+    await gateway((req, res) => {
+      received = { url: req.url, host: req.headers.host };
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end('{"enabled":true}');
+    });
+    const path = "/api/tenant/webphone/v1/config?name=a%2Fb";
+    const result = await GET(request(path));
+    expect(result.status).toBe(200);
+    expect(await result.text()).toBe('{"enabled":true}');
+    expect(received).toEqual({ url: path, host: "mersany.mutakamel.ai:5002" });
+  });
+
   it("preserves tenant authority, auth body and each response cookie without trusting forwarded headers", async () => {
     let received: { headers: IncomingMessage['headers']; method?: string; url?: string; body: string } | undefined;
     const cookies = [
@@ -101,6 +115,10 @@ describe("development Gateway proxy over a real HTTP connection", () => {
 
   it.each([
     { mode: "production", path: "/api/tenant/core/v1/branding/public", status: 404 },
+    { mode: "production", path: "/api/tenant/webphone/v1/config", status: 404 },
+    { mode: "development", path: "/api/admin/webphone/v1/config", status: 404 },
+    { mode: "development", path: "/api/tenant/webphone/v2/config", status: 404 },
+    { mode: "development", path: "/api/tenant/webphone-other/v1/config", status: 404 },
     { mode: "development", path: "/api/admin/core/v1/auth/login", status: 404 },
     { mode: "development", path: "/api/tenant/core/v2/auth/login", status: 404 },
     { mode: "development", path: "/api/tenant/core/v1/auth/login", host: "tenant.invalid,attacker.invalid", status: 400 },

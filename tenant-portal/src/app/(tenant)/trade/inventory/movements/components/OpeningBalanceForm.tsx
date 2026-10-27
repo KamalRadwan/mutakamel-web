@@ -12,6 +12,8 @@ import {
   SWATCH_SURFACE_PALETTES,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { SerialKeysField } from "./SerialKeysField";
+import { splitSerialInput } from "../serial-input";
 import { isUuidV7 } from "../../../trade-advanced-validation";
 import type { InventoryNode } from "../../inventory-contract";
 import {
@@ -42,10 +44,7 @@ export function OpeningBalanceForm({
   const set = (patch: Partial<OpeningBalanceFormValues>) =>
     setValues((current) => ({ ...current, ...patch }));
 
-  const serialCount = (values.serialKeys ?? "")
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0).length;
+  const serialCount = splitSerialInput(values.serialKeys ?? "").length;
 
   const isReady =
     isUuidV7(values.nodeId) &&
@@ -116,7 +115,7 @@ export function OpeningBalanceForm({
                     : "border-border bg-card text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <span className="font-mono font-semibold">{node.code}</span>
+                <span dir="ltr" className="font-mono font-semibold">{node.code}</span>
                 <span>({node.name})</span>
               </Button>
             );
@@ -152,7 +151,7 @@ export function OpeningBalanceForm({
             onChange={(event) => set({ uomId: event.target.value })}
           />
         </Field>
-        <Field label={t.tradeInventory.quantity} required hint={t.tradeCommon.decimalHint}>
+        <Field label={t.tradeInventory.quantity} required hint={serialCount > 0 ? t.tradeInventory.serialArrayHint : t.tradeCommon.decimalHint}>
           <Input
             size="sm"
             placeholder="100"
@@ -238,29 +237,14 @@ export function OpeningBalanceForm({
                 onChange={(event) => set({ lotKey: event.target.value })}
               />
             </Field>
+            <SerialKeysField value={values.serialKeys ?? ""} quantity={values.quantity}
+              disabled={disabled || isPending} onChange={(serialKeys) => set({ serialKeys })} />
             <Field
-              label={isAr ? "الأرقام التسلسلية (serialKeys)" : "Serial Keys (serialKeys)"}
-              hint={
-                isAr
-                  ? "افصل بين الأرقام بفاصلة أو مسافة؛ يجب أن يطابق العدد الكمية"
-                  : "Comma/space separated; count must match integer quantity"
-              }
+              label={t.tradeInventory.trackingExpiryDate}
             >
               <Input
                 size="sm"
-                placeholder="SN-1001, SN-1002, SN-1003"
-                value={values.serialKeys ?? ""}
-                disabled={disabled || isPending}
-                onChange={(event) => set({ serialKeys: event.target.value })}
-              />
-            </Field>
-            <Field
-              label={isAr ? "تاريخ انتهاء الصلاحية (expiresAt)" : "Expiration Date (expiresAt)"}
-              hint={isAr ? "للأصناف القابلة للتلف" : "ISO timestamp for perishable lots"}
-            >
-              <Input
-                size="sm"
-                type="datetime-local"
+                type="date"
                 value={values.expiresAt ?? ""}
                 disabled={disabled || isPending}
                 onChange={(event) => set({ expiresAt: event.target.value })}

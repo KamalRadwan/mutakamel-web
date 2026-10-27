@@ -21,7 +21,7 @@ export function ApplicationAccessList({ scope, scopeId }: { scope: "COMPANY" | "
   ];
   return <PermissionGate require={[]} denied={denied}>
     <div className="flex flex-col gap-4">
-      <PageHeader title={copy.title} description={copy.directoryNotice}
+      <PageHeader className="sr-only" title={copy.title} description={copy.directoryNotice}
         secondaryActions={<><Button size="sm" variant="outline" asChild><Link href="/core/application-access">{copy.changeScope}</Link></Button>
           <Button size="sm" variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button></>} />
       <DetailSection title={copy.scope} fields={[{ label: scope === "COMPANY" ? copy.company : copy.branch, value: <IdentifierText>{scopeId}</IdentifierText> }]} />

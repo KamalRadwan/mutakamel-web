@@ -4,6 +4,7 @@
 //   GET  /api/tenant/trade/v1/sales-orders?partyId=…&limit=1
 //   GET  /api/tenant/trade/v1/invoices?partyId=…&limit=1
 
+import { hasPermission } from "@/design-system";
 import type { CrmPath, TradePath } from "@/lib/api/envelope";
 import { isUUIDv7 } from "@/lib/uuid";
 
@@ -23,29 +24,50 @@ export const CUSTOMER_RELATED_PERMISSIONS: Record<CustomerRelatedKind, string> =
   invoices: "trade.invoices.read",
 };
 
-export const CUSTOMER_RELATED_ROUTES: Record<CustomerRelatedKind, string> = {
+export function canReadCustomerRelated(
+  permissions: readonly string[],
+  kind: CustomerRelatedKind,
+): boolean {
+  return hasPermission(
+    permissions,
+    CUSTOMER_RELATED_PERMISSIONS[kind],
+    kind === "opportunities",
+  );
+}
+
+const CUSTOMER_RELATED_ROUTES: Record<CustomerRelatedKind, string> = {
   opportunities: "/crm/opportunities",
   quotations: "/trade/quotations",
   salesOrders: "/trade/sales-orders",
   invoices: "/trade/invoices",
 };
 
+export function buildCustomerRelatedHref(
+  kind: CustomerRelatedKind,
+  partyId: string | null | undefined,
+): string {
+  const base = CUSTOMER_RELATED_ROUTES[kind];
+  const trimmed = partyId?.trim() ?? "";
+  if (!trimmed) return base;
+  return `${base}?partyId=${encodeURIComponent(trimmed)}`;
+}
+
 export const CUSTOMER_OPPORTUNITY_SEARCH_PATH: CrmPath =
   "/api/tenant/crm/v1/opportunities/search";
 
 export function customerOpportunitySearch(
-  customerProfileId: string,
+  partyId: string,
   branchId: string,
 ): Record<string, unknown> {
-  if (!isUUIDv7(customerProfileId) || !isUUIDv7(branchId)) {
-    throw new Error("Invalid customer profile or branch id.");
+  if (!isUUIDv7(partyId) || !isUUIDv7(branchId)) {
+    throw new Error("Invalid customer party or branch id.");
   }
   return {
     branchId,
     filterTree: {
-      field: "customerProfileId",
+      field: "customerPartyId",
       operator: "eq",
-      value: customerProfileId,
+      value: partyId,
     },
     page: 1,
     limit: 1,

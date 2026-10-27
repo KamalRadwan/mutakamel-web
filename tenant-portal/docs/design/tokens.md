@@ -4,12 +4,17 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
+Updated: **2026-10-26** — [CRM Leads v3 Ocean Navy token contract](specs/crm-leads-v3.md).
+
 Source of truth once implemented: `src/app/globals.css`.
 
-> **Superseded on palette and density.** [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) is authoritative for colors, fonts,
-> sizes and per-page UI/UX: every ramp value, the fonts and the whole shell
-> geometry are now the **admin portal's**, and `--ui-scale` ships at **1**, not
-> 0.9. This page keeps the longer reasoning and the exhaustive status mapping.
+> **Authoritative token contract (2026-10-26).** [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) and
+> [specs/crm-leads-v3.md](specs/crm-leads-v3.md) define the shipped ramps,
+> semantic roles, named gradients, shadows, radii and sizes (`--ui-scale: 1`).
+> Spec blues map onto `--color-brand-*` so tenant white-labelling survives, while
+> the Ocean Navy header, brand strip and avatar gradients remain fixed chrome.
+> This page keeps the structural reasoning, the v3 role architecture and the
+> exhaustive status mapping.
 
 ## The four roles
 
@@ -78,6 +83,24 @@ current palette is shaped the way it is:
   `contrast.mjs` stays meaningful instead of failing on nine known-clipped
   values.
 
+### CRM Leads v3 ramps (`accent`, `aqua`, `ember`, `navy`)
+
+Added **2026-10-26** ([specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 2) in
+section 2 (`@theme`) of `src/app/globals.css`, written as sRGB-in-gamut OKLCH
+steps verified by `scripts/design/contrast.mjs`:
+
+| Ramp | Steps | Anchor | Purpose |
+| --- | --- | --- | --- |
+| `--color-accent-50…950` | 11 | `600 = #0284c7` (Tailwind sky) | Fixed sky chrome highlights, company entity badges (`entity-company-*`), and the secondary stop of `bg-gradient-primary`, `bg-gradient-avatar` and `bg-gradient-logo` — replacing purple/violet |
+| `--color-aqua-50…950` | 11 | `600 = #0d9488` (Tailwind teal) | User/owner avatar (`bg-gradient-avatar`) and brand logo (`bg-gradient-logo`) gradient stops |
+| `--color-ember-50…950` | 11 | `500 = #f97316` (Tailwind orange) | "Due today" activity health (`--activity-today`), distinct from amber rating stars |
+| `--color-navy-800/900/950` | 3 | `#132c52` / `#0f2342` / `#091526` | Fixed Ocean Navy global header stops (`bg-gradient-header`); invariant across light, dark and white-label tenants |
+
+Rating stars (`--star-filled`) bind directly to `#f59e0b` in `:root` and
+`#fbbf24` in `.dark` rather than `caution-500` (`#f29a08`) or a separate
+`--color-amber-500` ramp token, because section 5 ("The theme flip") already
+aliases `--color-amber-*` onto `--color-caution-*`.
+
 
 ## Contrast resolution
 
@@ -108,9 +131,16 @@ measurement, and are corrected here rather than quietly left in place. The
 figures below are the ported palette's, recomputed after the port:
 
 - **`--muted-foreground` is not `ink-500`.** Correct as stated: `ink-500`
-  measures **4.12** on white, below the 4.5 bar. (The light value is now a
-  dedicated `oklch(0.518211 0.050915 249.823)` rather than a ramp step; it
-  measures 6.31.)
+  measures **4.12** on white, below the 4.5 bar. As of **2026-10-26**
+  ([specs/crm-leads-v3.md](specs/crm-leads-v3.md)), `--muted-foreground` is
+  `#64748b` in light mode (**4.76:1** on white, **4.56:1** on `--surface-subtle`)
+  and `ink-400` in dark mode (**7.78:1** on `--card`). Where the owner spec
+  paired `#64748b` with a darker `#f1f5f9` pill fill (4.34:1) or `#dc2626` on
+  `#fef2f2` (4.41:1) or white count text on `#d97706` / `#16a34a` / `#ef4444`,
+  the token layer steps one Tailwind shade darker so every shipped pair clears
+  WCAG AA (`#475569` = **6.92:1**, `#b91c1c` = **5.92:1**, and KPI count fills
+  `#b45309` = **5.03:1**, `#15803d` = **5.01:1**, `#dc2626` = **4.83:1**), all
+  verified in `CRM LEADS V3 SEMANTIC ROLES` inside `scripts/design/contrast.mjs`.
 - **Destructive is `negative-700`, not `negative-600`.** The original claim was
   that `negative-600` *fails* contrast. It does not — it measures **5.01** with
   a white label and would be acceptable. `negative-700` (7.02) is kept as a
@@ -169,60 +199,50 @@ Two distinctions inside the status roles decide how the product reads:
   Those dark steps are exactly what made every badge read grey-green instead of
   green.
 
-`PageActionBar` paints `--card` — white in light, `ink-950` in dark — which is
-also the exact background `--sidebar-active`'s two contrast pairs are measured
-against, so the active marker in `NavSheet` is validated on the surface it sits
-on. `--sidebar-foreground` and `--sidebar-active` are the two that family still
-draws; `--sidebar` itself is declared for `admin-portal` parity and consumed by
-nothing, the same standing `--radius-xl` has.
+`PageActionBar` paints `--surface-toolbar` (`#ffffff` in light, `ink-950` in
+dark), matching `--card` so `--sidebar-active`'s two contrast pairs remain
+validated on the surface `NavSheet` sits on.
+
+### CRM Leads v3 semantic role groups and named gradients
+
+Added **2026-10-26** ([specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 2).
+Every role is declared in `:root`, overridden in `.dark`, and bridged in
+`@theme inline` as `--color-<role>`:
+
+| Group | Tokens | White-label behaviour |
+| --- | --- | --- |
+| Neutral surfaces & lines | `--surface-{column,column-header,toolbar,subtle}`, `--line-{column,card,control,divider}`, `--foreground-secondary` | Neutral slate/cool-ink staircase in both themes |
+| Activity health & pills | `--activity-{none,today,future,overdue}` and `--activity-{none,future,today,overdue}-{surface,line,text}` | Fixed semantic status hues (slate, orange, green, red); dark mode uses low-alpha `rgb(... / 0.14–0.15)` tints with bright pastel text |
+| Rating stars | `--star-filled` (`#f59e0b` / `#fbbf24`), `--star-empty` (`#cbd5e1` / `#475569`) | Fixed amber/slate |
+| KPI badges | `--kpi-{total,new,rated,qualified,overdue}-{surface,line,text,count}` | `kpi-new-*` maps to `--color-brand-{50,200,800,600}` (light) / `{950,800,200,600}` (dark); count text is `text-white` in both themes |
+| Entity & count badges | `--entity-{person,company}-{surface,fg}`, `--count-{active,zero,danger}-{surface,fg}`, `--chip-active-{line,fg}` | `entity-person-*`, `count-active-*` and `chip-active-*` map to `--color-brand-*`; `entity-company-*` maps to `--color-accent-*` |
+| Named gradients (`@utility`) | `bg-gradient-header`, `bg-gradient-brand-strip`, `bg-gradient-primary`, `bg-gradient-avatar`, `bg-gradient-logo`, `bg-gradient-canvas`, `bg-gradient-chip-active` | `header`, `brand-strip` and `avatar` stay fixed Ocean Navy / sky-teal chrome; `primary`, `logo` and `chip-active` consume `--color-brand-*` |
 
 ### The nav is the one inverted surface
 
-`GlobalNav` is not on `--card`. It paints `--color-chrome`, `#000068` — the
-brand hue (264.05, against brand-600's 264.376) held at the ramp's darkest
-lightness. It is deliberately **not** a ramp step: the brand ramp desaturates as
-it darkens, from C 0.217 at 600 to 0.098 at 950, and the chrome holds 0.162,
-because a 35px band of brand wants the saturation the ramp gives up. Keeping it
-out of the ramp is what stops it being reached for as "brand-1000" on a surface
-where that curve is the rule.
+`GlobalNav` is a fixed `58px` (`--size-topbar`) Ocean Navy chrome band in **both**
+light and dark modes, crowned by a `3px` `bg-gradient-brand-strip` bar. Its
+primary surface is `bg-gradient-header` (`--color-navy-950` `#091526` →
+`--color-navy-900` `#0f2342` → `--color-navy-800` `#132c52`), while
+`--color-chrome` (`#000068`) remains declared for `brand-ramp.ts` parity and
+`.nav-surface` fallback.
 
-| Token | Value | Against the chrome |
+| Token | Value (light & dark) | Against `navy-800` (lightest header stop) |
 | --- | --- | ---: |
-| `--nav-foreground` | `white` | 17.50 |
-| `--nav-muted-foreground` | `ink-400` | 6.96 |
-| `--nav-active` | `brand-300` | 9.70 |
-| `--nav-ring` | `white` | 17.50 |
-| `--nav-border` | `brand-800` | 1.69 — separation, not legibility |
-| `--nav-accent` (hover) | `brand-900` | 1.36 — the same |
+| `--nav-foreground-strong` | `#f8fafc` | 13.78 |
+| `--nav-foreground` | `#e2e8f0` | 11.39 |
+| `--nav-switcher-fg` on `--nav-switcher-surface` | `#e0f2fe` on `rgb(14 165 233 / 0.16–0.18)` | ≥ 9.23 |
+| `--nav-muted-foreground` | `ink-300` | ≥ 8.80 |
+| `--nav-active` | `#38bdf8` | 6.82 (non-text ≥ 3.0) |
+| `--nav-tab-active-line` / `--nav-chrome-line` | translucent sky / slate hairlines | separation, not legibility |
 
-Every one of those is a claim in `scripts/design/contrast.mjs`, so a step
-changed underneath them fails the gate rather than the eye.
-
-**Three things make this work and would break it if dropped.**
-
-1. **`.nav-surface` re-points the ordinary names.** The class sets
-   `--foreground`, `--muted-foreground`, `--accent`, `--border`, `--ring`,
-   `--background` and `--card` from the `--nav-*` set, on the bar only. A ghost
-   `Button` there asks for `hover:bg-accent` like every other button in the
-   product and gets the on-chrome value; nothing in the bar knows it is
-   inverted, and a control added later inherits that for free. Menus opened from
-   the bar are Radix portals under `<body>`, outside the class, so they keep the
-   light popover surface — the menus are content, the bar is chrome.
-2. **It follows the tenant.** `deriveChrome` rebuilds the chrome at the
-   tenant's hue beside the ramp, fitting chroma into gamut per hue the same way
-   every step does, and `apply-branding.ts` writes `--color-chrome` with the
-   rest. `navTextLight` and `navActiveLight` are contrast pairs in
-   `brand-ramp.ts`, so a tenant colour that made the bar unreadable is refused
-   before it is applied, and `brand-ramp.test.ts` sweeps all 360 hues.
-3. **Dark mode is untouched.** Each `--nav-*` points back at the value the
-   control would have read anyway, so `.nav-surface` is a no-op there. Against
-   an `ink-1000` canvas a saturated navy separates less than the card surface
-   does, and inverting an already-inverted theme inverts nothing.
-
-`--primary` is deliberately not re-pointed: brand-600 measures **2.61:1**
-against the chrome, and the screen's one filled action lives in
-`PageActionBar`, which is still `--card`. A primary button that ever has to sit
-on the bar needs its own on-chrome fill.
+Every text and non-text pair above is guarded in both themes by
+`scripts/design/contrast.mjs`. `.nav-surface` continues to re-point ordinary
+semantic names (`--foreground`, `--muted-foreground`, `--accent`, `--border`,
+`--ring`) on `<header>` while Radix dropdown/popover portals render under
+`<body>` on `--popover`. Active nav pills use `bg-gradient-primary` with
+`text-white` and `shadow-nav-active`; the screen's primary CTA lives below in
+the floating `48px` `PageActionBar` (`bg-surface-toolbar`).
 
 ## Status mapping
 
@@ -322,6 +342,14 @@ The words always travel with the colour — "Overdue", "Due today" — in the
 item's accessible name and in its text, so the hue is reinforcement. A calendar
 chip or a board card takes its tone from this table and **never from its
 type**.
+
+On CRM boards and cards ([specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 1 #9–10),
+`crmActivityState` classifies `nextActivity` against local midnight (`startOfToday`):
+`OVERDUE` (`due < startOfToday`, `--activity-overdue`), `TODAY`
+(`startOfToday <= due <= now`, `--activity-today`), `FUTURE` (`due > now`,
+`--activity-future`), and `NONE` (`--activity-none`), powering both the card's
+`--activity-<state>-{surface,line,text}` pill and the stage column header's
+proportional segmented progress bar.
 
 ### Structured category & entity palettes (`--swatch-*`) vs generic enums
 
@@ -494,6 +522,21 @@ and `--shadow-overlay`, or the `shadow-pop` / `shadow-overlay` utilities
 generate **nothing at all** and every popover silently renders flat. Verify
 this after implementing — it is a known trap that shipped undetected in the
 sibling portal.
+
+CRM Leads v3 ([specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 2) extends the
+bridged elevation, radius and shell-size tokens with:
+
+- **Shadows (`@theme inline`)**: `--shadow-toolbar`, `--shadow-column`,
+  `--shadow-card` (soft `rgb(15 23 42)` drop shadows in `:root`; subtle top
+  inset hairlines in `.dark`) and `--shadow-nav-active` (`0 4px 14px rgb(2 132 199 / 0.42)`
+  in `:root`, `0.36` in `.dark`).
+- **Named radii (`@theme`)**: `--radius-card` (`13px` → `rounded-card`) and
+  `--radius-column` (`16px` → `rounded-column`).
+- **Scaled chrome & toolbar heights (`:root`, multiplied by `var(--ui-scale)`)**:
+  `--size-topbar` (`58px`), `--size-toolbar` (`48px`), and
+  `--size-toolbar-control` (`33px`).
+
+The `--text-tab` type step produces `text-tab`, avoiding a utility collision with `--color-nav`; nav foreground color roles stay separate.
 
 See [geometry.md](geometry.md) for how these are consumed.
 

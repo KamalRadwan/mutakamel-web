@@ -5,6 +5,16 @@ import {
 } from "./permissions";
 
 describe("tenant provisioning permissions", () => {
+  it("requires every critical permission for release recovery and failed closure", () => {
+    const release = ["admin.provisioning.prerequisites.request", "admin.provisioning.critical"];
+    const close = ["admin.tenants.reprovision", "admin.tenants.critical", "admin.provisioning.critical"];
+    for (const [keys, field] of [[release, "canResendRelease"], [close, "canCloseFailed"]] as const) {
+      expect(deriveProvisioningPermissions({ permissions: [...keys], isSuperAdmin: false })[field]).toBe(true);
+      for (const missing of keys) {
+        expect(deriveProvisioningPermissions({ permissions: keys.filter((key) => key !== missing), isSuperAdmin: false })[field]).toBe(false);
+      }
+    }
+  });
   it("uses the exact Gateway/Core ALL requirements for every command", () => {
     expect(PROVISIONING_PERMISSION_REQUIREMENTS.retryOrCancel).toEqual([
       "admin.tenants.read",

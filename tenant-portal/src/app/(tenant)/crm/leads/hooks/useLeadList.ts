@@ -5,11 +5,11 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
-  buildLeadBasicSearchRequest,
   buildLeadsListQuery,
   leadBasicSearchNeedsPost,
   type LeadSearchWindow,
 } from "../lead-basic-search-contract";
+import { buildLeadBoardRequest } from "../lead-board-contract";
 import {
   parseLeadsResponse,
   type LeadItem,
@@ -17,7 +17,6 @@ import {
 } from "../lead-list-contract";
 import {
   DEFAULT_LEAD_SEARCH,
-  buildLeadSearchRequest,
   type LeadSearchState,
 } from "../lead-search-contract";
 
@@ -123,10 +122,12 @@ export function useLeadList({ branchId, actorId, activeView, onLoadStart }: Lead
         sortDir: order.direction === "asc" ? "ASC" : "DESC",
       };
       // Both endpoints answer with the same page envelope, so one parser reads either.
-      if (query.mode === "advanced" || leadBasicSearchNeedsPost(query.basic)) {
-        const body = query.mode === "advanced"
-          ? buildLeadSearchRequest(query, window)
-          : buildLeadBasicSearchRequest(query.basic, window, actorId);
+      if (
+        query.mode === "advanced" ||
+        (query.kpiPreset && query.kpiPreset !== "ALL") ||
+        leadBasicSearchNeedsPost(query.basic)
+      ) {
+        const body = buildLeadBoardRequest(query, window, actorId);
         // A POST that reads: no idempotency key, and safe to replay after a refresh.
         return axiosClient.post<unknown>("/api/tenant/crm/v1/leads/search", body, {
           ...READ_OPTIONS,
@@ -225,7 +226,12 @@ export function useLeadList({ branchId, actorId, activeView, onLoadStart }: Lead
     (next: LeadSearchState) => {
       setSearch(next);
       if (next.mode === "basic") applySearch(next);
-      else if (queryRef.current.search.mode !== "advanced") applySearch(submittedAdvancedRef.current);
+      else if (queryRef.current.search.mode !== "advanced") {
+        applySearch({ ...submittedAdvancedRef.current, kpiPreset: next.kpiPreset });
+      } else if (next.kpiPreset !== queryRef.current.search.kpiPreset) {
+        // A pill acts immediately on the submitted query, leaving draft edits unapplied.
+        applySearch({ ...queryRef.current.search, kpiPreset: next.kpiPreset });
+      }
     },
     [applySearch],
   );

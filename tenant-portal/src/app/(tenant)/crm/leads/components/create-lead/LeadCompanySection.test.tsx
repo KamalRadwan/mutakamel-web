@@ -43,13 +43,16 @@ const companies = [
 function renderSection(overrides: { existingCompanyPartyId?: string } = {}) {
   const onSelectCompany = vi.fn();
   const selectCompany = vi.fn().mockResolvedValue(undefined);
-  render(
+  const searchCompanies = vi.fn();
+  const section = (items: typeof companies) => (
     <I18nProvider>
       <LeadCompanySection
         form={{ ...emptyCreateLeadForm("contact-1"), ...overrides }}
         errors={{}}
         options={{
-          companies,
+          companies: items,
+          selectedCompany: null,
+          searchCompanies,
           contacts: [],
           selectedCompanyId: overrides.existingCompanyPartyId ?? null,
           isLoadingCompanies: false,
@@ -66,9 +69,15 @@ function renderSection(overrides: { existingCompanyPartyId?: string } = {}) {
         onPhoneRemove={vi.fn()}
         onBlur={vi.fn()}
       />
-    </I18nProvider>,
+    </I18nProvider>
   );
-  return { onSelectCompany, selectCompany };
+  const view = render(section(companies));
+  return {
+    onSelectCompany,
+    selectCompany,
+    searchCompanies,
+    receiveCompanies: (items: typeof companies) => view.rerender(section(items)),
+  };
 }
 
 const picker = () => screen.getByRole("button", { name: /Existing company/ });
@@ -78,31 +87,39 @@ describe("the existing-company picker", () => {
   it("searches the directory instead of scrolling it", async () => {
     // A branch's directory runs to hundreds of organizations, which is what a
     // plain Select could not answer.
-    renderSection();
+    const { searchCompanies, receiveCompanies } = renderSection();
     fireEvent.click(picker());
     expect(screen.getByText("Acme Trading")).toBeInTheDocument();
 
     fireEvent.change(search(), { target: { value: "nile" } });
-    await waitFor(() => expect(screen.queryByText("Acme Trading")).toBeNull());
+    await waitFor(() => expect(searchCompanies).toHaveBeenLastCalledWith("nile"));
+    // Results are supplied by the server; the component does not filter them.
+    expect(screen.getByText("Acme Trading")).toBeInTheDocument();
+    receiveCompanies([companies[1]]);
+    expect(screen.queryByText("Acme Trading")).toBeNull();
     expect(screen.getByText("Nile Foods")).toBeInTheDocument();
   });
 
   it("finds a company by the legal name it is filed under", async () => {
     // The name on the tax card is not always the name people say.
-    renderSection();
+    const { searchCompanies, receiveCompanies } = renderSection();
     fireEvent.click(picker());
     fireEvent.change(search(), { target: { value: "import" } });
-    await waitFor(() => expect(screen.queryByText("Delta Logistics")).toBeNull());
+    await waitFor(() => expect(searchCompanies).toHaveBeenLastCalledWith("import"));
+    receiveCompanies([companies[1]]);
+    expect(screen.queryByText("Delta Logistics")).toBeNull();
     expect(screen.getByText("Nile Foods")).toBeInTheDocument();
   });
 
   it("keeps 'create a new company' reachable when nothing matches", async () => {
     // A search that finds nothing is exactly when the new-company route is the
     // answer; making the user clear the box to reach it would be backwards.
-    renderSection();
+    const { searchCompanies, receiveCompanies } = renderSection();
     fireEvent.click(picker());
     fireEvent.change(search(), { target: { value: "no such company" } });
-    await waitFor(() => expect(screen.queryByText("Acme Trading")).toBeNull());
+    await waitFor(() => expect(searchCompanies).toHaveBeenLastCalledWith("no such company"));
+    receiveCompanies([]);
+    expect(screen.queryByText("Acme Trading")).toBeNull();
     expect(screen.getByRole("option", { name: en.crmLeads.newCompany })).toBeInTheDocument();
   });
 

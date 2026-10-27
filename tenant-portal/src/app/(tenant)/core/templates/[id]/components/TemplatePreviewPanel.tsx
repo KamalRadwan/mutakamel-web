@@ -94,7 +94,17 @@ export function TemplatePreviewPanel({
           </Field>
         ) : null}
 
-        {preview.jobStatus ? (
+        {preview.isPollingExhausted ? (
+          <section role="status" className="flex flex-col gap-2 rounded-sm border border-border bg-muted p-3">
+            <p className="text-sm font-medium text-foreground">{copy.pdfMonitoringPaused}</p>
+            <p className="text-xs text-muted-foreground">{copy.pdfMonitoringPausedHint}</p>
+            <div>
+              <Button variant="outline" size="sm" onClick={preview.resumePolling}>
+                {copy.pdfResumeMonitoring}
+              </Button>
+            </div>
+          </section>
+        ) : preview.jobStatus ? (
           <AsyncJobState
             status={preview.jobStatus}
             operation={copy.pdfJobOperation}

@@ -4,6 +4,8 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
+Updated: **2026-10-26** — [CRM Leads v3 policy](specs/crm-leads-v3.md).
+
 **Read this before writing any markup.**
 
 The requirement is that this product must not look generated. That is not a
@@ -13,7 +15,7 @@ are already present in this codebase and measurable. This page is that list.
 ## Why this page exists
 
 The current tenant portal was built screen by screen with no shared system.
-The measured result:
+The historical pre-rebuild measurements (not current gate targets):
 
 | Signal | Count |
 | --- | --- |
@@ -35,22 +37,30 @@ reasonable. That is exactly how the generated look happens.
 ### 1. Oversized corner radius
 
 `rounded-2xl` (16px) and `rounded-3xl` (24px) are the single loudest signal.
-The scale stops at 10px, and the ceiling you may actually write in markup is
-`rounded-lg` (8px) — see [geometry.md](geometry.md#radius--5-steps).
+The generic scale's markup ceiling is `rounded-lg` (8px) — see
+[geometry.md](geometry.md#radius--5-steps). CRM Leads v3 adds the named
+`rounded-card` (13px) and `rounded-column` (16px) tokens for those surfaces.
 
 **Lint: error** on `rounded-xl` and above. That includes the 10px
 `--radius-xl` token: it exists for parity with the admin portal, and no
 component in this portal consumes it.
 
-### 2. Decorative gradients
+### 2. Raw or improvised gradients
 
-Currently 19. Budget: **2** — the brand mark and `Skeleton`'s shimmer.
+Gradients are allowed only through the named utilities in the
+[v3 token contract](specs/crm-leads-v3.md):
+`bg-gradient-header`, `bg-gradient-brand-strip`, `bg-gradient-primary`,
+`bg-gradient-avatar`, `bg-gradient-logo`, `bg-gradient-canvas` and
+`bg-gradient-chip-active`. Use them for the contract's designated surfaces;
+each has a theme-aware token definition.
 
-Specifically banned: gradient buttons, gradient card backgrounds, gradient text
-(`bg-clip-text`), gradient borders, and the two blurred colored orbs behind the
-login form.
+Raw `bg-linear-*`, `bg-radial-*`, `bg-conic-*`, v3 `bg-gradient-to-*` and
+arbitrary gradient images are banned in `src/app/**` and `src/components/**`.
+This includes bare radial/conic forms and template literals. Raw gradient
+definitions belong in the token layer or design-system implementation.
 
-**Census gate.**
+**Lint: error. Census: raw forms only, feature target 0.** Named gradients do
+not spend an occurrence budget.
 
 ### 3. Backdrop blur as decoration
 
@@ -81,18 +91,22 @@ and translated text label — never raw Tailwind palette utilities.
 157 bold-or-heavier sites against 30 normal/medium. A table where every cell is
 600 has no hierarchy at all.
 
-Table body cells are **400**. Weight is remapped at the token level so
-`font-bold` cannot escalate past 600.
+Table body cells remain **400**. The allowed weights are **400, 500, 600, 700
+and 800**: `font-bold` and `font-extrabold` are permitted for the hierarchy
+specified in CRM Leads v3. The old ceiling at 600 is lifted for those weights.
 
-**Lint: error.**
+**Lint: error on `font-black` (900)**, in strings and template literals.
 
 ### 6. Microscopic type
 
-83 arbitrary `text-[10px]`/`text-[11px]` sizes. The floor is 13px, and Arabic
-lifts it to 14px. Density comes from tight spacing and short rows, never from
-shrinking text below legibility.
+Arbitrary `text-[10px]`/`text-[11px]` sizes remain banned. Small type uses only
+the named v3 steps: `text-micro` (10px, count chips only), `text-badge` (11px),
+`text-caption` (12px), `text-label` (12.5px), `text-tab` (13.5px),
+`text-card-title` (14px) and `text-column-title` (14.5px), where the owner spec
+assigns them. Arabic lift and the density multiplier still apply to every step.
 
-**Lint: error on arbitrary `text-[Npx]`.**
+**Lint: error on arbitrary `text-[Npx]`, including fractional pixel values.**
+Named steps pass in both strings and template literals. `text-tab` avoids a utility collision with `--color-nav`.
 
 ### 7. Shadows on cards
 
@@ -194,7 +208,7 @@ Reviewers sometimes justify a violation with "it's a dense admin UI". Density
 is achieved by:
 
 - 44px rows, 32px controls, tight `gap` values
-- A 13px workhorse type size — not 10px
+- A readable workhorse type size, with named small steps only in their specified roles
 - Short labels — not smaller labels
 - Fewer columns — not narrower columns
 
@@ -204,18 +218,19 @@ matching the sibling portal's physical size was judged worth roughly three rows
 of a 1366×768 screen. Shrinking a component to win those rows back for
 everyone is the violation this section exists to refuse.
 
-Density is **never** achieved by shrinking text below the floor, removing focus
-rings, dropping labels to icon-only without tooltips, or cramming actions into
-an unlabeled overflow menu.
+Density is **never** achieved by inventing smaller type outside the named
+steps, removing focus rings, dropping labels to icon-only without tooltips, or
+cramming actions into an unlabeled overflow menu.
 
 ## Before you commit
 
 - [ ] No `rounded-xl`/`2xl`/`3xl`
-- [ ] No gradient outside the 2-item budget
+- [ ] Gradients use only the seven named utilities in their designated roles
 - [ ] No `backdrop-blur` outside the modal scrim
 - [ ] No `shadow-lg`/`xl`/`2xl`
 - [ ] No arbitrary `text-[Npx]`
-- [ ] No `font-bold`/`extrabold`/`black`
+- [ ] No `font-black`; weights 700/800 follow the specified hierarchy
+- [ ] Small type uses named steps only; `text-micro` is limited to count chips
 - [ ] No raw palette utility (`bg-slate-800`) in new code — use tokens
 - [ ] No hand-rolled `<button>`/`<input>`/`<select>`/`<table>`
 - [ ] No physical direction utility

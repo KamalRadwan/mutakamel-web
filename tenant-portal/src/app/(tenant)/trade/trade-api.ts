@@ -102,19 +102,6 @@ export function derivePageInfo(payload: unknown): TradePageInfo | null {
   };
 }
 
-/**
- * Trade failures carry **`code`**, not Core's `errorCode`, and there is no
- * exception filter — error bodies are Nest defaults with the thrown object's
- * keys merged in, so the shape is less regular than Core's. Read the code
- * defensively and fall back to the status.
- */
-export function tradeErrorCode(payload: unknown): string | null {
-  if (!payload || typeof payload !== "object") return null;
-  const record = payload as Record<string, unknown>;
-  const code = record.code ?? (record.error as Record<string, unknown> | undefined)?.code;
-  return typeof code === "string" ? code : null;
-}
-
 // One "PUT" exists: `trading.items.by.id.image.put`, the Item image upload
 // (LLD 02b §5). It is a multipart body, never JSON. Do not add a verb the
 // Gateway contract does not have — that is the same mistake as an invented DTO

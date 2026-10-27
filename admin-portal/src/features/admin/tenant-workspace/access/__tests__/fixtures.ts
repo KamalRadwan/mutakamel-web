@@ -40,6 +40,7 @@ export function userPayload(
     roleAssignments: [
       {
         assignmentId: ASSIGNMENT_ID,
+        source: "BRANCH_ROLE",
         roleId: ROLE_ID,
         roleName: "Finance",
         scope: "BRANCH",

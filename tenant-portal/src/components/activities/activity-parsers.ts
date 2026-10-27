@@ -97,6 +97,11 @@ function parseTarget(value: unknown): ActivityTarget {
 export function parseActivity(value: unknown): Activity {
   const row = record(value);
   if (!row || !Array.isArray(row.targets)) invalid();
+  const reminderOffsetMinutes = row.reminderOffsetMinutes === undefined || row.reminderOffsetMinutes === null
+    ? null : count(row, "reminderOffsetMinutes");
+  if (reminderOffsetMinutes !== null && reminderOffsetMinutes > 2147483647) invalid();
+  const reminderSentAt = optionalTimestamp(row, "reminderSentAt");
+  if (reminderSentAt !== null && reminderOffsetMinutes === null) invalid();
   return {
     id: uuid(row, "id"),
     type: text(row, "type", ENUM_MAX),
@@ -106,6 +111,8 @@ export function parseActivity(value: unknown): Activity {
     priority: text(row, "priority", ENUM_MAX),
     status: text(row, "status", ENUM_MAX),
     dueAt: timestamp(row, "dueAt"),
+    reminderOffsetMinutes,
+    reminderSentAt,
     endsAt: optionalTimestamp(row, "endsAt"),
     location: optionalText(row, "location", ACTIVITY_LOCATION_MAX),
     meetingUrl: optionalText(row, "meetingUrl", ACTIVITY_MEETING_URL_MAX),

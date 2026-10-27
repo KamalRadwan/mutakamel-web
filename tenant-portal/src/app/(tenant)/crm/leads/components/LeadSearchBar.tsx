@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Flame, PhoneCall, SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal } from "lucide-react";
 import { Button, PageActions, iconSize } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { localizedName } from "@/lib/format/localized";
@@ -21,7 +21,7 @@ import {
 } from "../lead-search-contract";
 import { LeadBasicSearch } from "./LeadBasicSearch";
 
-export interface LeadSearchBarProps {
+interface LeadSearchBarProps {
   value: LeadSearchState;
   onChange: (next: LeadSearchState) => void;
   /** Promotes the Advanced draft to the request. Basic applies immediately. */
@@ -30,7 +30,6 @@ export interface LeadSearchBarProps {
   /** Remounts Basic's local, unfinished prompt when the branch changes. */
   resetKey: string;
   disabled?: boolean;
-  matchCount?: number;
 }
 
 /** Basic is the default Odoo-style bar; Advanced renders the visual Filter Tree Builder (Screen 08). */
@@ -41,10 +40,8 @@ export function LeadSearchBar({
   stages,
   resetKey,
   disabled,
-  matchCount,
 }: LeadSearchBarProps) {
-  const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t } = useI18n();
 
   return (
     <>
@@ -60,12 +57,13 @@ export function LeadSearchBar({
         )}
 
         <Button
-          variant={value.mode === "advanced" ? "secondary" : "outline"}
-          size="xs"
+          variant="outline"
+          size="toolbar"
           disabled={disabled}
           aria-pressed={value.mode === "advanced"}
           aria-label={t.crmLeads.searchMode.advanced}
           title={`${t.crmLeads.searchMode.label}: ${t.crmLeads.searchMode.advanced}`}
+          className="h-(--size-toolbar-control) rounded-lg border-line-control px-3 text-label font-semibold aria-pressed:border-ring aria-pressed:bg-selected"
           onClick={() =>
             onChange(
               leadSearchWithMode(value, value.mode === "advanced" ? "basic" : "advanced"),
@@ -78,72 +76,18 @@ export function LeadSearchBar({
       </PageActions>
 
       {value.mode === "advanced" && (
-        <div className="flex flex-col gap-2.5 rounded-xl border-2 border-blue-500/80 bg-white p-3.5 shadow-sm dark:border-blue-500/60 dark:bg-slate-900">
-          {/* Screen 08: Advanced Filter Tree Builder Header & Saved Presets Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5 dark:border-slate-800">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-slate-900 dark:text-slate-100">
-                <SlidersHorizontal className="size-3.5 text-blue-600" aria-hidden="true" />
-                <span>
-                  {isAr
-                    ? "منشئ شجرة الفلاتر المتقدمة (POST /crm/leads/search)"
-                    : "Advanced Filter Tree Builder (POST /crm/leads/search)"}
-                </span>
-              </span>
-              <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                Depth ≤ 5 · 100 Leaves
-              </span>
-
-              <span className="ms-1 text-[11px] font-medium text-slate-400">
-                {isAr ? "قوالب جاهزة:" : "Saved Presets:"}
-              </span>
-              <button
-                type="button"
-                onClick={onSubmit}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50/80 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
-              >
-                <Flame className="size-3 text-amber-500" aria-hidden="true" />
-                <span>{isAr ? "عملاء المؤسسات الساخنون" : "My Hot Corporate Leads"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={onSubmit}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              >
-                <Clock className="size-3 text-rose-500" aria-hidden="true" />
-                <span>{isAr ? "متأخر > 3 أيام" : "Stagnant > 3 Days"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={onSubmit}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-              >
-                <PhoneCall className="size-3 text-rose-500" aria-hidden="true" />
-                <span>{isAr ? "مركز الاتصال غير المتابع" : "Uncontacted Call Center"}</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => onChange(leadSearchCleared(value))}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {isAr ? "إعادة ضبط الكل" : "Reset All"}
-              </button>
-              <button
-                type="button"
-                onClick={onSubmit}
-                className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
-              >
-                <Check className="size-3.5" aria-hidden="true" />
-                <span>
-                  {isAr
-                    ? `تطبيق شجرة الفلاتر (${matchCount ?? 0})`
-                    : `Apply Filter Tree (${matchCount ?? 0} Matches)`}
-                </span>
-              </button>
-            </div>
+        <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-card p-3.5">
+          <div className="flex justify-end gap-1.5">
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => onChange(leadSearchCleared(value))}
+            >
+              {t.crmLeads.basicSearch.clear}
+            </Button>
+            <Button variant="secondary" size="xs" onClick={onSubmit}>
+              {t.crmLeads.advancedSearch.apply}
+            </Button>
           </div>
 
           <LeadAdvancedSearch

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildServerPatch,
+  extensionDraftToDto,
   moveServerId,
   readWebphoneConfig,
   readWebphoneExtension,
+  readWebphoneExtensions,
   readWebphoneIceServer,
   readWebphoneSeats,
   readWebphoneServer,
@@ -78,6 +80,64 @@ const BACKUP_SERVER = {
   enabled: false,
   iceServers: [],
 };
+
+const EXTENSION = {
+  id: "0198c0de-0000-7000-8000-00000000c001",
+  ownerId: "0198c0de-0000-7000-8000-00000000d001",
+  extension: "1001",
+  sipUsername: "user1001",
+  passwordConfigured: true,
+  displayName: null,
+  outboundCallerId: null,
+  enabled: true,
+};
+
+describe("WebPhone extension contract", () => {
+  it("parses and lists API extensions without a transport field", () => {
+    expect(readWebphoneExtension(EXTENSION)).toEqual(EXTENSION);
+    expect(readWebphoneExtensions([EXTENSION])).toEqual([EXTENSION]);
+    expect(readWebphoneExtensions({ items: [EXTENSION] })).toEqual([EXTENSION]);
+  });
+
+  it("still rejects malformed required fields", () => {
+    for (const invalid of [
+      { ...EXTENSION, id: "" },
+      { ...EXTENSION, ownerId: "" },
+      { ...EXTENSION, extension: "" },
+      { ...EXTENSION, sipUsername: "" },
+      { ...EXTENSION, passwordConfigured: "true" },
+      { ...EXTENSION, enabled: "true" },
+    ]) {
+      expect(() => readWebphoneExtensions([invalid])).toThrow(
+        /INVALID_WEBPHONE_EXTENSION_RESPONSE/,
+      );
+    }
+  });
+
+  it("builds a create request using only the extension DTO fields", () => {
+    const dto = extensionDraftToDto({
+      ...EMPTY_EXTENSION_DRAFT,
+      ownerId: ` ${EXTENSION.ownerId} `,
+      extension: " 1001 ",
+      sipUsername: " user1001 ",
+      sipPassword: "s3cret",
+      displayName: " Cairo sales ",
+      outboundCallerId: " +201234567890 ",
+      enabled: true,
+    });
+
+    expect(dto).toEqual({
+      ownerId: EXTENSION.ownerId,
+      extension: "1001",
+      sipUsername: "user1001",
+      sipPassword: "s3cret",
+      displayName: "Cairo sales",
+      outboundCallerId: "+201234567890",
+      enabled: true,
+    });
+    expect(dto).not.toHaveProperty("transport");
+  });
+});
 
 describe("readWebphoneConfig", () => {
   it("reads the one derived flag and ignores the tenant id beside it", () => {
@@ -159,16 +219,8 @@ describe("write-only secrets", () => {
   it("refuses an extension response that carries a SIP password", () => {
     expect(() =>
       readWebphoneExtension({
-        id: "x1",
-        ownerId: "u1",
-        extension: "1001",
-        sipUsername: "user1001",
+        ...EXTENSION,
         sipPassword: "leaked-secret",
-        passwordConfigured: true,
-        displayName: null,
-        outboundCallerId: null,
-        transport: "wss",
-        enabled: true,
       }),
     ).toThrow(/INVALID_WEBPHONE_EXTENSION_RESPONSE/);
   });

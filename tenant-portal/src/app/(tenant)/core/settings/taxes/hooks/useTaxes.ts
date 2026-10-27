@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useToast } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
+import { useCan, useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { formatTemplate } from "@/lib/format/template";
@@ -32,9 +31,9 @@ const ROW_RESPONSE_LIMIT_BYTES = 20_000;
 export function useTaxes() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("taxes.tax.manage") ?? false;
-  const companies = useCompanyOptions();
+  const canManage = useCan("taxes.tax.manage");
+  const { companies, manageableCompanies, tenantWideAllowed, canManageScope, canCreate } =
+    useCompanyOptions("taxes.tax.manage");
 
   const [items, setItems] = useState<Tax[]>([]);
   const [total, setTotal] = useState(0);
@@ -123,7 +122,7 @@ export function useTaxes() {
 
   const create = useCallback(
     async (values: TaxFormValues): Promise<boolean> => {
-      if (!canManage || isSubmitting) return false;
+      if (!canManageScope(values.companyId) || isSubmitting) return false;
       setIsSubmitting(true);
       setFormError(null);
       try {
@@ -144,12 +143,12 @@ export function useTaxes() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, reportWriteError, toast, t, load],
+    [canManageScope, isSubmitting, reportWriteError, toast, t, load],
   );
 
   const update = useCallback(
     async (values: TaxFormValues): Promise<boolean> => {
-      if (!canManage || !editing || isSubmitting) return false;
+      if (!editing || !canManageScope(editing.companyId) || isSubmitting) return false;
       setIsSubmitting(true);
       setFormError(null);
       try {
@@ -176,11 +175,11 @@ export function useTaxes() {
         setIsSubmitting(false);
       }
     },
-    [canManage, editing, isSubmitting, reportWriteError, toast, t, load],
+    [canManageScope, editing, isSubmitting, reportWriteError, toast, t, load],
   );
 
   const deactivate = useCallback(async (): Promise<void> => {
-    if (!canManage || !deactivating || pendingId) return;
+    if (!deactivating || !canManageScope(deactivating.companyId) || pendingId) return;
     setPendingId(deactivating.id);
     try {
       await coreDelete(taxPath(deactivating.id), { maxResponseBytes: 10_000 });
@@ -192,7 +191,7 @@ export function useTaxes() {
       setDeactivating(null);
       await load();
     }
-  }, [canManage, deactivating, pendingId, reportWriteError, toast, t, load]);
+  }, [canManageScope, deactivating, pendingId, reportWriteError, toast, t, load]);
 
   const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
     const field = TAX_SORT_FIELDS.find((allowed) => allowed === next.id);
@@ -207,6 +206,10 @@ export function useTaxes() {
     t,
     lang,
     canManage,
+    canCreate,
+    canManageScope,
+    tenantWideAllowed,
+    manageableCompanies,
     companies,
     items,
     pageInfo: { page, limit: TAX_PAGE_SIZE, total },
@@ -236,6 +239,7 @@ export function useTaxes() {
       setSearch(next);
     },
     openCreate: () => {
+      if (!canCreate) return;
       setFormError(null);
       setCreateOpen(true);
     },
@@ -245,6 +249,7 @@ export function useTaxes() {
       setCreateOpen(false);
     },
     openEdit: (tax: Tax) => {
+      if (!canManageScope(tax.companyId)) return;
       setFormError(null);
       setEditing(tax);
     },
@@ -253,7 +258,7 @@ export function useTaxes() {
       setFormError(null);
       setEditing(null);
     },
-    openDeactivate: (tax: Tax) => setDeactivating(tax),
+    openDeactivate: (tax: Tax) => canManageScope(tax.companyId) && setDeactivating(tax),
     closeDeactivate: () => {
       if (pendingId) return;
       setDeactivating(null);

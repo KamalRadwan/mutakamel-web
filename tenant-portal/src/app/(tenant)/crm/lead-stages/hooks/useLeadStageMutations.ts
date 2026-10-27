@@ -3,7 +3,10 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import {
+  LEAD_STAGES_PATH,
   buildCreateLeadStageRequest,
   buildUpdateLeadStageRequest,
   isProtectedLeadStage,
@@ -13,10 +16,8 @@ import {
   type UpdateLeadStageFormData,
 } from "../lead-stage-contract";
 import {
-  LEAD_STAGES_PATH,
   NON_REPLAYABLE_MUTATION,
   isAmbiguousLeadStageMutation,
-  leadStageErrorMessage,
 } from "./lead-stage-requests";
 import { useLeadStageOrdering } from "./useLeadStageOrdering";
 
@@ -50,6 +51,7 @@ export interface LeadStageCataloguePort {
  */
 export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
   const { t } = useI18n();
+  const errorText = useCrmErrorText();
   const { canManage, setItems, reconcile, notify, onCreated } = catalogue;
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -68,8 +70,8 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     let payload: ReturnType<typeof buildCreateLeadStageRequest>;
     try {
       payload = buildCreateLeadStageRequest(form);
-    } catch (caught) {
-      setCreateError(leadStageErrorMessage(caught, t.crmLeadStages.createInvalid));
+    } catch {
+      setCreateError(t.crmLeadStages.createInvalid);
       return false;
     }
     setIsCreating(true);
@@ -106,12 +108,12 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
         const reloaded = await reconcile();
         onCreated();
         notify(
-          reloaded
+          `${errorText(normalizeApiError(caught))} ${reloaded
             ? t.crmLeadStages.createAmbiguousReloaded
-            : t.crmLeadStages.createAmbiguousStale,
+            : t.crmLeadStages.createAmbiguousStale}`,
         );
       } else {
-        setCreateError(leadStageErrorMessage(caught, t.crmLeadStages.createFailed));
+        setCreateError(errorText(normalizeApiError(caught)) ?? t.crmLeadStages.createFailed);
       }
       return false;
     } finally {
@@ -167,13 +169,13 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     } catch (caught) {
       if (isAmbiguousLeadStageMutation(caught)) {
         notify(
-          (await reconcile())
+          `${errorText(normalizeApiError(caught))} ${(await reconcile())
             ? t.crmLeadStages.editAmbiguousReloaded
-            : t.crmLeadStages.editAmbiguousStale,
+            : t.crmLeadStages.editAmbiguousStale}`,
         );
         return true;
       }
-      setEditError(leadStageErrorMessage(caught, t.crmLeadStages.editFailed));
+      setEditError(errorText(normalizeApiError(caught)) ?? t.crmLeadStages.editFailed);
       return false;
     } finally {
       setIsUpdating(false);
@@ -207,13 +209,13 @@ export function useLeadStageMutations(catalogue: LeadStageCataloguePort) {
     } catch (caught) {
       if (isAmbiguousLeadStageMutation(caught)) {
         notify(
-          (await reconcile())
+          `${errorText(normalizeApiError(caught))} ${(await reconcile())
             ? t.crmLeadStages.deleteAmbiguousReloaded
-            : t.crmLeadStages.deleteAmbiguousStale,
+            : t.crmLeadStages.deleteAmbiguousStale}`,
         );
         return true;
       }
-      setDeleteError(leadStageErrorMessage(caught, t.crmLeadStages.deleteFailed));
+      setDeleteError(errorText(normalizeApiError(caught)) ?? t.crmLeadStages.deleteFailed);
       return false;
     } finally {
       setIsDeleting(false);

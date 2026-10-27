@@ -8,6 +8,7 @@ import {
   DetailSection,
   EmptyState,
   ErrorState,
+  PermissionGate,
   Skeleton,
   Textarea,
 } from "@/design-system";
@@ -29,15 +30,11 @@ export interface RecordNotesSectionProps {
   sourceType: CrmNoteSourceType;
   sourceId: string | null;
   /**
-   * The **source record's** owner, not the note's.
-   *
-   * `NotesAttachmentsService.resolveSourceScope` authorises every note write
-   * against the owner of the lead, profile or opportunity it hangs off — a
-   * note carries `createdByUserId`, which is not what the scope check reads.
+   * Creation uses the source record's owner. Existing note mutations use the
+   * server's per-item flags, so reassignment does not transfer authorship.
    */
   sourceOwnerUserId: string | null;
   createCapability: CrmActionCapability | null;
-  deleteCapability: CrmActionCapability | null;
   /** Suppresses every write affordance — READ_ONLY, DUNNING or BLOCKED. */
   readOnly?: boolean;
 }
@@ -45,20 +42,22 @@ export interface RecordNotesSectionProps {
 /**
  * Notes on one CRM record, embedded on lead, customer and opportunity detail.
  *
- * Update carries no capability of its own: `/leads/capabilities` reports
- * `notes.create` and `notes.delete` and nothing else, while
- * `PATCH /notes/:id` requires `crm.notes.update`. Rather than invent a
- * capability the endpoint does not return, editing is offered on the same
- * boundary as creation — the narrower of the two answers this branch gives —
- * and the backend stays authoritative.
+ * Edit/delete admission comes from each note response, independently of create.
  */
-export function RecordNotesSection({
+export function RecordNotesSection(props: RecordNotesSectionProps) {
+  return (
+    <PermissionGate require="crm.notes.read" scoped>
+      <RecordNotesContent {...props} />
+    </PermissionGate>
+  );
+}
+
+function RecordNotesContent({
   branchId,
   sourceType,
   sourceId,
   sourceOwnerUserId,
   createCapability,
-  deleteCapability,
   readOnly = false,
 }: RecordNotesSectionProps) {
   const { t } = useI18n();
@@ -70,8 +69,6 @@ export function RecordNotesSection({
 
   const canCreate =
     !readOnly && crmCapabilityAllowsOwner(createCapability, sourceOwnerUserId);
-  const canDelete =
-    !readOnly && crmCapabilityAllowsOwner(deleteCapability, sourceOwnerUserId);
   const trimmedDraft = draft.trim();
 
   async function submitDraft() {
@@ -172,8 +169,8 @@ export function RecordNotesSection({
                 <NoteRow
                   key={note.id}
                   note={note}
-                  canEdit={canCreate}
-                  canDelete={canDelete}
+                  canEdit={!readOnly && note.canEdit}
+                  canDelete={!readOnly && note.canDelete}
                   isPending={notes.pendingId === note.id}
                   onSave={(body) => notes.update(note.id, body)}
                   onDelete={() => notes.remove(note.id)}

@@ -165,25 +165,30 @@ describe("tenant destruction reader", () => {
 });
 
 describe("tenant core response readers", () => {
-  it("parses the exact tenant projection and retains only safe storage fields", () => {
-    const parsed = readTenantView(tenantPayload());
+  it.each(["DRAFT", "ACTIVE", "DRAINING", "OFFLINE"] as const)(
+    "parses %s storage placement and retains only safe storage fields",
+    (status) => {
+      const payload = tenantPayload();
+      (payload.storageServer as Record<string, unknown>).status = status;
+      const parsed = readTenantView(payload);
 
-    expect(parsed).toMatchObject({
-      id: TENANT_ID,
-      status: "ACTIVE",
-      storageServerId: STORAGE_ID,
-      storageServer: {
-        id: STORAGE_ID,
-        code: "garage-cairo-1",
-        name: "Garage Cairo",
-        region: "af-cairo-1",
+      expect(parsed).toMatchObject({
+        id: TENANT_ID,
         status: "ACTIVE",
-      },
-    });
-    expect(parsed.storageServer).not.toHaveProperty("bucketName");
-    expect(parsed.storageServer).not.toHaveProperty("endpoint");
-    expect(parsed.storageServer).not.toHaveProperty("accessKeyId");
-  });
+        storageServerId: STORAGE_ID,
+        storageServer: {
+          id: STORAGE_ID,
+          code: "garage-cairo-1",
+          name: "Garage Cairo",
+          region: "af-cairo-1",
+          status,
+        },
+      });
+      expect(parsed.storageServer).not.toHaveProperty("bucketName");
+      expect(parsed.storageServer).not.toHaveProperty("endpoint");
+      expect(parsed.storageServer).not.toHaveProperty("accessKeyId");
+    },
+  );
 
   it.each([
     [

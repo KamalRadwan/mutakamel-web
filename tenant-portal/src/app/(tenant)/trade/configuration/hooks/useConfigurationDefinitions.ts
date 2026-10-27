@@ -41,6 +41,7 @@ import {
 const LIST_RESPONSE_LIMIT_BYTES = 800_000;
 
 export function useConfigurationDefinitions() {
+  const [supersedesVersionId, setSupersedesVersionId] = useState("");
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
@@ -187,7 +188,9 @@ export function useConfigurationDefinitions() {
       setReport(null);
       const outcome = await runWrite(
         async () => {
-          const result = await tradePost(versionActionPath(version.id, action), undefined, {
+          const body = action === "publish" && supersedesVersionId.trim()
+            ? { supersedesVersionId: supersedesVersionId.trim() } : undefined;
+          const result = await tradePost(versionActionPath(version.id, action), body, {
             headers: { ...headers, "if-match": tradeIfMatch(version.version) },
           });
           if (action === "test") setReport(parseTestReport(result.data));
@@ -205,9 +208,10 @@ export function useConfigurationDefinitions() {
         return;
       }
       toast.success(t.trade.savedTitle, replayOrDone(outcome.replayed, action, t));
+      if (action === "publish") setSupersedesVersionId("");
       await load();
     },
-    [canPublish, canManage, isSubmitting, runWrite, headers, describe, toast, t, load],
+    [canPublish, canManage, isSubmitting, supersedesVersionId, runWrite, headers, describe, toast, t, load],
   );
 
   return {
@@ -215,6 +219,8 @@ export function useConfigurationDefinitions() {
     lang,
     canManage,
     canPublish,
+    supersedesVersionId,
+    setSupersedesVersionId,
     items,
     pageInfo: { page, limit: DEFINITION_PAGE_SIZE, total },
     isLoading: isLoading && !hasLoaded,
@@ -227,7 +233,10 @@ export function useConfigurationDefinitions() {
     selectedId,
     report,
     setPage,
-    setSelectedId,
+    setSelectedId: (id: string | null) => {
+      setSupersedesVersionId("");
+      setSelectedId(id);
+    },
     openCreate: () => {
       setFormError(null);
       setCreateOpen(true);

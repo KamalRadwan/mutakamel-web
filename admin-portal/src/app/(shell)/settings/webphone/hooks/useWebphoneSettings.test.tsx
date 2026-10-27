@@ -20,7 +20,7 @@ const { api, authMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@mutakamel/webphone", () => ({ notifyWebphoneChanged: vi.fn() }));
+vi.mock("@mutakamel/webphone-ui", () => ({ notifyWebphoneChanged: vi.fn() }));
 vi.mock("@/lib/api/axiosClient", () => ({
   axiosClient: api,
   unwrapCoreData: (payload: unknown) =>

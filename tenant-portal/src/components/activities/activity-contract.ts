@@ -118,6 +118,8 @@ export interface Activity {
   priority: string;
   status: string;
   dueAt: string;
+  reminderOffsetMinutes: number | null;
+  reminderSentAt: string | null;
   endsAt: string | null;
   location: string | null;
   meetingUrl: string | null;

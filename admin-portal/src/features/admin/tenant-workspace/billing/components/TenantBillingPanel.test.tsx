@@ -269,6 +269,8 @@ function workspaceFixture(
     billingSummaryState: "ready",
     billingSummaryError: null,
     walletPreview: null,
+    walletConfirmation: null,
+    walletRecoveryUnavailable: false,
     selectedPaymentId: null,
     reconciliationCase: null,
     reconciliationState: "idle",
@@ -304,6 +306,47 @@ function activateTab(name: string) {
 }
 
 describe("TenantBillingPanel safety boundaries", () => {
+  it.each([
+    ["en", "Recover original adjustment", "Wallet"],
+    ["ar", "استعادة التعديل الأصلي", "المحفظة"],
+  ] as const)("offers immutable recovery after quote expiry in %s", (lang, action, tab) => {
+    const workspace = workspaceFixture({
+      permissions: permissionFixture({ canPreviewWalletAdjustment: true, canConfirmWalletAdjustment: true }),
+      walletPreview: walletPreviewFixture(),
+      walletConfirmation: { actorId: ACTOR_ID, tenantId: TENANT_ID, quoteId: walletPreviewFixture().quoteId, note: "Original audit note", key: ITEM_ID },
+    });
+    render(<TenantBillingPanel workspace={workspace} lang={lang} />);
+    const recover = screen.getByRole("button", { name: action });
+    expect(recover).toBeEnabled();
+    expect(screen.getByText(/Original audit note/)).toBeInTheDocument();
+    activateTab(tab);
+    expect(screen.queryByRole("button", { name: /Preview adjustment|معاينة التعديل/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Dismiss|إغلاق/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Audit note|ملاحظة التدقيق/)).not.toBeInTheDocument();
+    fireEvent.click(recover);
+    expect(workspace.confirmWalletAdjustment).toHaveBeenCalledWith("");
+  });
+
+  it("preserves recovery evidence without exposing a replay action to a read-only actor", () => {
+    const workspace = workspaceFixture({
+      walletConfirmation: { actorId: ACTOR_ID, tenantId: TENANT_ID, quoteId: walletPreviewFixture().quoteId, note: "Original audit note", key: ITEM_ID },
+    });
+    render(<TenantBillingPanel workspace={workspace} lang="en" />);
+    expect(screen.getByText(/Original audit note/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Recover original adjustment" })).not.toBeInTheDocument();
+  });
+
+  it("blocks fresh adjustments and explains unavailable recovery storage", () => {
+    const workspace = workspaceFixture({
+      permissions: permissionFixture({ canPreviewWalletAdjustment: true, canConfirmWalletAdjustment: true }),
+      walletRecoveryUnavailable: true,
+    });
+    render(<TenantBillingPanel workspace={workspace} lang="en" />);
+    activateTab("Wallet");
+    expect(screen.getByRole("alert")).toHaveTextContent("Wallet recovery storage is unavailable or invalid");
+    expect(screen.queryByRole("button", { name: "Preview adjustment" })).not.toBeInTheDocument();
+  });
+
   it("keeps current subscription rows and focus available during a background refresh", () => {
     const workspace = workspaceFixture();
     const view = render(<TenantBillingPanel workspace={workspace} lang="en" />);

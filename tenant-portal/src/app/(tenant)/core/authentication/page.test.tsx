@@ -47,7 +47,6 @@ const t = {
     confirmEndMessage: "This browser will be signed out immediately. Other sessions remain active.",
     confirmRevokeTitle: "Revoke this sign-in session?",
     confirmRevokeMessage: "That browser or device will lose access immediately.",
-    confirmLoading: "Revoking…",
     clientTypeWeb: "Web",
     clientTypeIos: "iOS",
     clientTypeAndroid: "Android",

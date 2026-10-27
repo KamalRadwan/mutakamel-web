@@ -145,6 +145,26 @@ describe("storage servers API", () => {
     expect(JSON.stringify(rotation)).not.toMatch(/accessKey|secret/i);
   });
 
+  it("reads the current rotation, including an empty result, through the canonical browser route", async () => {
+    getMock.mockResolvedValue(envelope(null));
+    await expect(storageServersApi.currentCredentialRotation(SERVER_ID)).resolves.toBeNull();
+    expect(getMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/storage-servers/${SERVER_ID}/credential-rotations/current`,
+      { signal: undefined },
+    );
+  });
+
+  it("aborts a staged rotation with only its audit reason and caller-owned key", async () => {
+    const rotationId = "019f0000-0000-7000-8000-000000000030";
+    postMock.mockResolvedValue(envelope({ id: rotationId, status: "ABORTED" }));
+    await storageServersApi.abortCredentialRotation(SERVER_ID, rotationId, "Wrong key", COMMAND_ID);
+    expect(postMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/storage-servers/${SERVER_ID}/credential-rotations/${rotationId}/abort`,
+      { reason: "Wrong key" },
+      { headers: { "x-idempotency-key": COMMAND_ID } },
+    );
+  });
+
   it("revokes a credential rotation by id with an idempotency key", async () => {
     const rotationId = "019f0000-0000-7000-8000-000000000030";
     const revoked = { id: rotationId, status: "REVOKED" };

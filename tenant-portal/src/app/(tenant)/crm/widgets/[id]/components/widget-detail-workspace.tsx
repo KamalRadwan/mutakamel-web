@@ -22,11 +22,10 @@ import { wireLabel } from "@/lib/format/wire-label";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { parseWidgetResult, type WidgetResult } from "../../../dashboards/dashboard-run-contract";
-import { WIDGET_PREVIEW_PATH, buildCreateWidgetRequest } from "../../../dashboards/widget-contract";
+import { WIDGET_CATALOG_PATH, WIDGET_PREVIEW_PATH, buildCreateWidgetRequest } from "../../../dashboards/widget-contract";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError } from "@/lib/api/errors";
 import { parseCatalogResponse, type DashboardCatalog } from "../../../dashboards/dashboard-catalog-contract";
-import { DASHBOARDS_CATALOG_PATH } from "../../../dashboards/dashboard-contract";
 import { WidgetFormDrawer } from "../../components/WidgetFormDrawer";
 import { buildWidgetUpdate, widgetSpecLimitations, widgetToForm } from "../../widget-form";
 import { useWidgetDetail } from "../hooks/useWidgetDetail";
@@ -58,7 +57,7 @@ export function WidgetDetailWorkspace({ widgetId }: { widgetId: string }) {
   useEffect(() => {
     let cancelled = false;
     void axiosClient
-      .get<unknown>(DASHBOARDS_CATALOG_PATH, { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 })
+      .get<unknown>(WIDGET_CATALOG_PATH, { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 })
       .then((response) => {
         if (!cancelled) setCatalog(parseCatalogResponse(response.data));
       })

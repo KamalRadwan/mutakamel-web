@@ -115,7 +115,7 @@ export default function TemplateAssignmentsPage() {
   return (
     <PermissionGate require={TEMPLATE_READ_PERMISSION}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.assignmentsTitle}
           description={copy.assignmentsSubtitle}
           primaryAction={

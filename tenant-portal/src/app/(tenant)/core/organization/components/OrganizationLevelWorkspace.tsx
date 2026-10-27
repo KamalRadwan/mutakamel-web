@@ -17,6 +17,7 @@ import {
 import { formatTemplate } from "@/lib/format/template";
 import {
   ORG_NODE_STATUSES,
+  ORG_CURRENCY_CODE_LENGTH,
   type OrgLevel,
   type OrgNodeOf,
   type OrgNodeStatus,
@@ -91,7 +92,7 @@ export function OrganizationLevelWorkspace<L extends OrgLevel>({ level }: { leve
   return (
     <PermissionGate require={config.readPermission}>
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={levelCopy.title}
           description={levelCopy.subtitle}
           primaryAction={canManage ? { label: levelCopy.add, onClick: openCreate } : undefined}
@@ -200,6 +201,8 @@ export function OrganizationLevelWorkspace<L extends OrgLevel>({ level }: { leve
           error={mutationText}
           submitDisabled={
             form.name.trim().length === 0 ||
+            (screen.editing !== null && config.fields.includes("currencyCode") &&
+              form.currencyCode.trim().length !== ORG_CURRENCY_CODE_LENGTH) ||
             (!screen.editing && form.code.trim().length === 0) ||
             (!screen.editing && Boolean(config.parent) && form.parentId.length === 0)
           }

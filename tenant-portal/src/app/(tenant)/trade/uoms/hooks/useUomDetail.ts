@@ -30,9 +30,7 @@ const ROW_RESPONSE_LIMIT_BYTES = 40_000;
 /**
  * `GET /uoms/:id`.
  *
- * Two things the route table does not say. It is Gateway `BRANCH_REQUIRED`
- * like the list, so it needs the company and branch headers even though the
- * controller target is only `OPERATING_CONTEXT`. And a UOM that does not exist
+ * Reads allow an optional operating context. A UOM that does not exist
  * is **422 `TRADE.CATALOG.UOM_INVALID`**, not a 404: `CatalogUomService.get`
  * throws `missingUom()`, which is an `UnprocessableEntityException`. A screen
  * that branches on 404 alone renders a retry button for a record that is gone.
@@ -43,7 +41,7 @@ export function useUomDetail(id: string) {
   const { user } = useTenantAuth();
   const runWrite = useTradeWrite();
   const canManage = canPerformTradeAction(user, TRADE_PERMISSIONS.catalogMasterManage);
-  const { headers, gap } = useTradeScopeRequest("BRANCH");
+  const { headers } = useTradeScopeRequest("OPERATING_CONTEXT");
 
   const [uom, setUom] = useState<Uom | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,7 +62,7 @@ export function useUomDetail(id: string) {
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
-      if (isMalformedId || gap) {
+      if (isMalformedId) {
         setIsLoading(false);
         return;
       }
@@ -88,7 +86,7 @@ export function useUomDetail(id: string) {
         });
     });
     return () => controller.abort();
-  }, [id, headers, gap, isMalformedId, attempt]);
+  }, [id, headers, isMalformedId, attempt]);
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
@@ -245,7 +243,6 @@ export function useUomDetail(id: string) {
     error,
     formError,
     isGone,
-    scopeGap: gap,
     editOpen,
     retireOpen,
     reactivateOpen,

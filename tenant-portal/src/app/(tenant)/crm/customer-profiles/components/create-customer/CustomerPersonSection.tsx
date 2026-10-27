@@ -34,7 +34,7 @@ import {
   type CreateCustomerProfileForm,
 } from "../../customer-profile-create-contract";
 
-export type PersonField = "honorificTitle" | "firstName" | "lastName" | "email";
+type PersonField = "honorificTitle" | "firstName" | "lastName" | "email";
 
 export interface CustomerPersonSectionProps {
   form: CreateCustomerProfileForm;
@@ -90,28 +90,28 @@ export function CustomerPersonSection({
     <section
       id="person"
       data-form-section="person"
-      className="relative overflow-hidden rounded-xl border border-sky-500/20 bg-card shadow-xs transition-colors dark:border-sky-400/20"
+      className="relative overflow-hidden rounded-lg border border-swatch-blue-soft bg-card shadow-xs transition-colors"
     >
       {/* Top 3px Sky-Blue to Emerald accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-sky-500 via-cyan-500 to-emerald-500"
+        className="h-1 w-full bg-swatch-blue"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-sky-500/[0.03] px-4 py-3 dark:bg-sky-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-swatch-blue-soft px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-600 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-swatch-blue-soft bg-swatch-blue-soft text-swatch-blue-deep">
             <UserCheck className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <span dir="ltr" className="rounded bg-swatch-blue-soft px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-swatch-blue-deep">
                 02
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmLeads.create.personalInformationTitle}
               </h3>
@@ -122,28 +122,28 @@ export function CustomerPersonSection({
           </div>
         </div>
 
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-300">
-          <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-swatch-green-soft bg-swatch-green-soft px-2.5 py-0.5 text-2xs font-semibold text-swatch-green-deep">
+          <span className="size-1.5 rounded-full bg-swatch-green" aria-hidden="true" />
           {t.crmLeads.create.types.INDIVIDUAL} · B2C
         </span>
       </div>
 
       {/* Section Body — Contact Card matching LeadContactRow design */}
       <div className="@container p-4">
-        <div className="flex flex-col gap-3.5 rounded-xl border border-sky-500/35 bg-sky-500/[0.02] p-3.5 shadow-2xs transition-all dark:border-sky-400/35 dark:bg-sky-500/[0.05]">
+        <div className="flex flex-col gap-3.5 rounded-lg border border-swatch-blue-soft bg-swatch-blue-soft p-3.5 shadow-2xs transition-all">
           {/* Contact Card Top Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5">
             <div className="flex items-center gap-2">
-              <span className="inline-flex size-6 items-center justify-center rounded-md bg-sky-600 text-xs font-bold text-white">
+              <span className="inline-flex size-6 items-center justify-center rounded-md bg-swatch-blue text-xs font-semibold text-primary-foreground">
                 #1
               </span>
-              <span className="text-xs font-bold text-foreground">
+              <span className="text-xs font-semibold text-foreground">
                 {formatTemplate(t.crmLeads.create.contactHeading, { number: 1 })}
               </span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-swatch-green-soft bg-swatch-green-soft px-2.5 py-1 text-xs font-semibold text-swatch-green-deep">
                 <Star className="size-3 fill-current" aria-hidden="true" />
                 {t.crmLeads.create.primaryContact}
               </span>
@@ -155,7 +155,7 @@ export function CustomerPersonSection({
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12 @min-[52rem]:grid-cols-12">
             {/* Honorific Title (2 cols) */}
             <div className="relative md:col-span-2 @min-[52rem]:col-span-2">
-              <div className="absolute end-0 top-0 z-10">
+              <div className="absolute end-0 top-0">
                 <LeadFieldGuide field="honorificTitle" align="start" />
               </div>
               <Field
@@ -189,12 +189,13 @@ export function CustomerPersonSection({
 
             {/* First Name (5 cols) */}
             <div className="relative md:col-span-5 @min-[52rem]:col-span-5">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+              <div className="absolute end-0 top-0 flex items-center gap-1">
                 <span
+                  dir="ltr"
                   className={cn(
-                    "font-mono text-[10px]",
+                    "font-mono text-2xs tabular-nums",
                     form.firstName.length >= limits.firstName
-                      ? "font-semibold text-amber-600"
+                      ? "font-semibold text-warning"
                       : "text-muted-foreground",
                   )}
                 >
@@ -231,12 +232,13 @@ export function CustomerPersonSection({
 
             {/* Last Name (5 cols) */}
             <div className="relative md:col-span-5 @min-[52rem]:col-span-5">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+              <div className="absolute end-0 top-0 flex items-center gap-1">
                 <span
+                  dir="ltr"
                   className={cn(
-                    "font-mono text-[10px]",
+                    "font-mono text-2xs tabular-nums",
                     form.lastName.length >= limits.lastName
-                      ? "font-semibold text-amber-600"
+                      ? "font-semibold text-warning"
                       : "text-muted-foreground",
                   )}
                 >
@@ -268,8 +270,8 @@ export function CustomerPersonSection({
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12 @min-[52rem]:grid-cols-12">
             {/* Phone / Mobile Numbers (6 cols) */}
             <div className="relative md:col-span-6 @min-[52rem]:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="inline-flex items-center gap-1 rounded bg-swatch-blue-soft px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-swatch-blue-deep">
                   <Phone className="size-2.5" aria-hidden="true" />
                   {form.phones.length}/{CRM_PHONE_LIST_MAX}
                 </span>
@@ -302,7 +304,7 @@ export function CustomerPersonSection({
                         aria-label={t.crmShared.addPhone}
                         data-icon-button
                         onClick={onPhoneAdd}
-                        className="size-7 shrink-0 rounded-full bg-emerald-600 p-0 text-white not-disabled:hover:bg-emerald-700"
+                        className="size-7 shrink-0 rounded-full bg-swatch-green p-0 text-primary-foreground not-disabled:hover:bg-swatch-green/90"
                       >
                         <Plus className="size-3.5" aria-hidden="true" />
                       </Button>
@@ -360,14 +362,14 @@ export function CustomerPersonSection({
 
             {/* Email Address (6 cols) */}
             <div className="relative md:col-span-6 @min-[52rem]:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
                 {isEmailValid && (
-                  <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded bg-swatch-green-soft px-1.5 py-0.5 text-2xs font-semibold text-swatch-green-deep">
                     <CheckCircle2 className="size-2.5" aria-hidden="true" />
                     Valid
                   </span>
                 )}
-                <span className="font-mono text-[10px] text-muted-foreground">
+                <span dir="ltr" className="font-mono text-2xs tabular-nums text-muted-foreground">
                   {form.email.length}/{limits.email}
                 </span>
                 <LeadFieldGuide field="email" />

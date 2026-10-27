@@ -9,6 +9,7 @@
 // `pipelines/pipeline-contract.ts`.
 
 import { isUUIDv7 } from "@/lib/uuid";
+import { parseDefinitionPage, type DefinitionPage } from './definition-pagination';
 import {
   boundedArray,
   finiteNumber,
@@ -20,6 +21,7 @@ import {
 } from "./dashboard-parse";
 
 export const WIDGETS_PATH = "/api/tenant/crm/v1/widgets";
+export const WIDGET_CATALOG_PATH = "/api/tenant/crm/v1/widgets/catalog";
 export const WIDGET_PREVIEW_PATH = "/api/tenant/crm/v1/widgets/preview";
 export const WIDGET_SHARE_TARGETS_PATH =
   "/api/tenant/crm/v1/widgets/share-targets";
@@ -28,7 +30,6 @@ export const WIDGET_SHARE_TARGETS_PATH =
 export const WIDGET_NAME_MAX_LENGTH = 120;
 /** `LIMIT 21` guards on every placement query; more than 20 is a 409. */
 export const DASHBOARD_WIDGET_LIMIT = 20;
-const MAX_WIDGETS_IN_RESPONSE = 500;
 
 /** `CRM_DASHBOARD_VISUALIZATIONS` — dashboard-catalog.ts. */
 const CRM_VISUALIZATIONS = [
@@ -198,9 +199,8 @@ export function buildCloneWidgetRequest(name: string): Record<string, unknown> {
   return trimmed.length > 0 ? { name: requiredName(trimmed) } : {};
 }
 
-export function parseWidgetsResponse(payload: unknown): WidgetDefinition[] {
-  if (!boundedArray(payload, MAX_WIDGETS_IN_RESPONSE)) invalidResponse("widgets");
-  return payload.map(parseWidgetDefinition);
+export function parseWidgetsResponse(payload: unknown): DefinitionPage<WidgetDefinition> {
+  return parseDefinitionPage(payload, parseWidgetDefinition);
 }
 
 export function parseWidgetDetailResponse(payload: unknown): WidgetDetail {

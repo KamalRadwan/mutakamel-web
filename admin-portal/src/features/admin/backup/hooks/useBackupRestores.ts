@@ -45,6 +45,8 @@ export function useBackupRestores() {
   const [restores, setRestores] = useState<RestoreRun[]>([]);
   const [query, setQuery] = useState<RestoreRunListQuery>({});
   const requestedArtifactId = searchParams.get("artifactId") ?? "";
+  const requestedRunId = searchParams.get("runId") ?? "";
+  const requestedTenantId = searchParams.get("tenantId") ?? "";
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [enrichmentWarning, setEnrichmentWarning] =
@@ -75,7 +77,14 @@ export function useBackupRestores() {
     try {
       const [nextRestores, nextArtifacts] = await Promise.all([
         backupApi.listRestores(query),
-        backupApi.listArtifacts(),
+        backupApi.listArtifacts(
+          requestedArtifactId && requestedRunId
+            ? {
+                runId: requestedRunId,
+                ...(requestedTenantId ? { tenantId: requestedTenantId } : {}),
+              }
+            : undefined,
+        ),
       ]);
       if (refreshGeneration !== refreshGenerationRef.current) return;
       setRestores(nextRestores);
@@ -96,7 +105,7 @@ export function useBackupRestores() {
     } else {
       setEnrichmentWarning(enrichment.error);
     }
-  }, [canReadServers, query]);
+  }, [canReadServers, query, requestedArtifactId, requestedRunId, requestedTenantId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

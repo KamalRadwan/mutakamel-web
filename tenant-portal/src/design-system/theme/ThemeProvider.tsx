@@ -17,6 +17,17 @@ function readTheme(): Theme {
   return stored === "dark" || stored === "light" ? stored : "system";
 }
 
+function setTheme(next: Theme): void {
+  // An explicit system choice must survive account preference hydration.
+  safeStorage.setItem(STORAGE_KEY, next);
+  window.dispatchEvent(new Event(LOCAL_CHANGE_EVENT));
+}
+
+export function hydrateAccountTheme(value: string | null): void {
+  if (safeStorage.getItem(STORAGE_KEY) !== null) return;
+  if (value === "system" || value === "light" || value === "dark") setTheme(value);
+}
+
 function prefersDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
@@ -62,15 +73,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
-
-  const setTheme = (next: Theme) => {
-    if (next === "system") {
-      safeStorage.removeItem(STORAGE_KEY);
-    } else {
-      safeStorage.setItem(STORAGE_KEY, next);
-    }
-    window.dispatchEvent(new Event(LOCAL_CHANGE_EVENT));
-  };
 
   return (
     <ThemeContext.Provider value={{ theme, isDark, setTheme }}>

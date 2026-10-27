@@ -19,6 +19,7 @@ const messages: CustomerProfileCreateMessages = {
   email: "Bad email.",
   maxLength: "At most {max} characters.",
   duplicatePhone: "Already listed.",
+  phone: "Invalid phone.",
   url: "Bad URL.",
 };
 
@@ -33,6 +34,12 @@ describe("buildCreateCustomerProfileFullRequest — corporate", () => {
         companyName: "  Acme Trading  ",
         taxNumber: " 123 ",
         companyWebsite: " https://acme.example ",
+        address: {
+          ...emptyCreateCustomerProfileForm("row-1").address,
+          country: "Egypt",
+          city: "Cairo",
+          street1: "10 Nile Street",
+        },
       }),
       BRANCH_ID,
     );
@@ -45,22 +52,17 @@ describe("buildCreateCustomerProfileFullRequest — corporate", () => {
       companyWebsite: "https://acme.example",
     });
     expect(request).not.toHaveProperty("address");
-    // Both legacy aliases collapse onto the modern column and would silently lose.
-    expect(request).not.toHaveProperty("taxCardNumber");
     // The name is CRM's to compose from `companyName`; typing it twice was the
     // whole reason this key left the form.
     expect(request).not.toHaveProperty("displayName");
-    expect(request).not.toHaveProperty("commercialRegisterNumber");
   });
 
-  it("sends companyPhones alone, never beside the singular that would be wiped", () => {
+  it("sends companyPhones as the only company-phone write field", () => {
     const request = buildCreateCustomerProfileFullRequest(
       form({ companyPhones: [" 0100 111 2223 ", "", "0111 222 3334"] }),
       BRANCH_ID,
     );
     expect(request.companyPhones).toEqual(["0100 111 2223", "0111 222 3334"]);
-    // `synchronizePhoneNumbers` replaces the whole PHONE set from the array
-    // afterwards, so a `companyPhone` sent beside it would be soft-deleted.
     expect(request).not.toHaveProperty("companyPhone");
   });
 
@@ -116,6 +118,20 @@ describe("buildCreateCustomerProfileFullRequest — individual", () => {
     });
     expect(request).not.toHaveProperty("email");
     expect(request).not.toHaveProperty("phones");
+  });
+
+  it("omits a populated address from an individual create request", () => {
+    const request = individual({
+      firstName: "Sara",
+      address: {
+        ...emptyCreateCustomerProfileForm("row-1").address,
+        country: "Egypt",
+        city: "Cairo",
+        street1: "10 Nile Street",
+      },
+    });
+    expect(request).not.toHaveProperty("address");
+    expect(request.primaryContact).not.toHaveProperty("address");
   });
 
   it("never sends a company key, each of which is a 422 here", () => {

@@ -29,7 +29,6 @@ describe("Lead board response", () => {
             cardColor: null,
             owner: null,
             nextActivity: null,
-            primaryContactName: null,
             tags: [],
           }],
           total: 51,

@@ -19,8 +19,8 @@ import {
 } from "lucide-react";
 
 /**
- * The permission -> route mapping, as data. Covers all 54 (auth) + (shell)
- * routes — see docs/design-system/shell-and-navigation.md for the table
+ * The permission -> route mapping, as data. Lists top-level shell
+ * destinations — see docs/design-system/shell-and-navigation.md for the table
  * that proves nothing was skipped. useNavTree.ts filters this against the
  * exact same adminCan/adminCanAll/adminCanAny checks useNavbar.ts used,
  * just reshaped from hook-computed booleans into a data structure a
@@ -119,6 +119,14 @@ export const NAV_SECTIONS: NavSection[] = [
         permission: any("admin.database_servers.read", "admin.database_servers.create"),
       },
       {
+        key: "database-migrations",
+        labelKey: { en: "Database Migrations", ar: "ترحيلات قواعد البيانات" },
+        href: "/database-migrations",
+        icon: Database,
+        permission: single("admin.migrations.read"),
+        activePrefixes: ["/database-migrations"],
+      },
+      {
         key: "storage-servers",
         labelKey: { en: "Storage Servers", ar: "خوادم التخزين" },
         href: "/storage-servers",
@@ -200,10 +208,7 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: { en: "Settings", ar: "الإعدادات" },
         href: "/settings",
         icon: Settings,
-        // Matches the pre-migration behavior: no page-level permission
-        // gate on the settings index itself — each settings sub-page
-        // enforces its own via SettingsResourceBoundary.
-        permission: { kind: "public" },
+        permission: single("admin.settings.read"),
         activePrefixes: ["/settings"],
       },
     ],
@@ -221,16 +226,16 @@ export const BACKUP_SUBNAV: { href: string; labelKey: { en: string; ar: string }
 ];
 
 /** Settings SubNav items — see SettingsSidebar.tsx. */
-export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string }; permission?: string }[] = [
-  { href: "/settings/platform", labelKey: { en: "Platform & Branding", ar: "الهوية والهوية البصرية" } },
-  { href: "/settings/auth", labelKey: { en: "Auth & Security", ar: "المصادقة والأمان" } },
-  { href: "/settings/billing", labelKey: { en: "Billing & Gateways", ar: "الفواتير وبوابات الدفع" } },
-  { href: "/settings/notifications", labelKey: { en: "Notifications & Alerts", ar: "الإشعارات والتنبيهات" } },
+export const SETTINGS_SUBNAV: { href: string; labelKey: { en: string; ar: string }; permission: string }[] = [
+  { href: "/settings/platform", labelKey: { en: "Platform & Branding", ar: "الهوية والهوية البصرية" }, permission: "admin.settings.read" },
+  { href: "/settings/auth", labelKey: { en: "Auth & Security", ar: "المصادقة والأمان" }, permission: "admin.settings.read" },
+  { href: "/settings/billing", labelKey: { en: "Billing & Gateways", ar: "الفواتير وبوابات الدفع" }, permission: "admin.settings.read" },
+  { href: "/settings/notifications", labelKey: { en: "Notifications & Alerts", ar: "الإشعارات والتنبيهات" }, permission: "admin.settings.read" },
   // The WebPhone module replaced the `asterisk.*` settings keys and the
   // /settings/asterisk screen that edited them; that route no longer exists.
-  { href: "/settings/webphone", labelKey: { en: "WebPhone", ar: "الهاتف المرئي" } },
-  { href: "/settings/smtp", labelKey: { en: "Email (SMTP)", ar: "البريد الإلكتروني (SMTP)" } },
-  { href: "/settings/fatal-alerts", labelKey: { en: "Fatal Alerts", ar: "التنبيهات الحرجة" } },
-  { href: "/settings/storage", labelKey: { en: "Storage Runtime", ar: "تشغيل التخزين" } },
+  { href: "/settings/webphone", labelKey: { en: "WebPhone", ar: "الهاتف المرئي" }, permission: "admin.settings.read" },
+  { href: "/settings/smtp", labelKey: { en: "Email (SMTP)", ar: "البريد الإلكتروني (SMTP)" }, permission: "admin.settings.read" },
+  { href: "/settings/fatal-alerts", labelKey: { en: "Fatal Alerts", ar: "التنبيهات الحرجة" }, permission: "admin.settings.read" },
+  { href: "/settings/storage", labelKey: { en: "Storage Runtime", ar: "تشغيل التخزين" }, permission: "admin.settings.read" },
   { href: "/settings/worker-events", labelKey: { en: "Worker Messages", ar: "رسائل Worker" }, permission: "admin.provisioning.publisher-keys.read" },
 ];

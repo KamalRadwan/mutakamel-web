@@ -7,7 +7,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet, tradeIfMatch, tradePatch, tradePost } from "../../trade-api";
 import { canPerformTradeAction, TRADE_CONCURRENCY_CODES, TRADE_PERMISSIONS } from "../../trade-scope";
-import { useTradeScopeRequest } from "../../useTradeScope";
+import { useTradeScope, useTradeScopeRequest } from "../../useTradeScope";
 import { useTradeWrite } from "../../useTradeWrite";
 import {
   buildCreateChannelRequest,
@@ -16,11 +16,11 @@ import {
   CHANNEL_CODE_TAKEN_CODE,
   CHANNEL_INVALID_CODE,
   channelPath,
-  parseChannelListResponse,
   parseChannelResponse,
   type Channel,
   type ChannelFormValues,
 } from "../channel-contract";
+import { ChannelPageLimitError, loadChannels } from "../load-channels";
 
 const LIST_RESPONSE_LIMIT_BYTES = 400_000;
 const ROW_RESPONSE_LIMIT_BYTES = 40_000;
@@ -34,9 +34,11 @@ export function useChannels() {
   const { user } = useTenantAuth();
   const runWrite = useTradeWrite();
   const canManage = canPerformTradeAction(user, TRADE_PERMISSIONS.itemsManage);
-  const { headers, gap } = useTradeScopeRequest(READ_TARGET);
+  const { headers, gap } = useTradeScopeRequest(READ_TARGET, { includeChannel: false });
+  const { refreshChannels } = useTradeScope();
 
   const [items, setItems] = useState<Channel[]>([]);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
@@ -55,23 +57,27 @@ export function useChannels() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const result = await tradeGet(CHANNELS_PATH, {
+        const result = await loadChannels({
           signal,
           headers,
           maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
         });
-        // A **bare array**, not `{ items, total, page, limit }`. A generic list
-        // adapter reads `undefined` here.
-        setItems(parseChannelListResponse(result.data));
+        if (signal?.aborted) return;
+        setItems(result.items);
+        setTotal(result.total);
         setHasLoaded(true);
       } catch (error) {
         if (isAbortError(error)) return;
-        setQueryError(normalizeApiError(error));
+        setQueryError(
+          normalizeApiError(
+            error instanceof ChannelPageLimitError ? new Error(t.trade.channelPageLimit) : error,
+          ),
+        );
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [gap, headers],
+    [gap, headers, t.trade.channelPageLimit],
   );
 
   useEffect(() => {
@@ -123,6 +129,7 @@ export function useChannels() {
           describe,
         });
         if (!outcome.ok) return false;
+        refreshChannels();
         setCreateOpen(false);
         toast.success(t.trade.savedTitle, replayMessage(outcome.replayed, t));
         await load();
@@ -134,7 +141,7 @@ export function useChannels() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, runWrite, headers, describe, toast, t, load],
+    [canManage, isSubmitting, runWrite, headers, describe, toast, t, load, refreshChannels],
   );
 
   const update = useCallback(
@@ -160,6 +167,7 @@ export function useChannels() {
           return false;
         }
         setEditing(null);
+        refreshChannels();
         toast.success(t.trade.savedTitle, replayMessage(outcome.replayed, t));
         await load();
         return true;
@@ -182,6 +190,7 @@ export function useChannels() {
       toast,
       t,
       load,
+      refreshChannels,
     ],
   );
 
@@ -191,9 +200,8 @@ export function useChannels() {
     canManage,
     scopeGap: gap,
     items,
-    // `GET /channels` is not paginated at all, so this is the honest total on
-    // one page rather than a fabricated pager over a single fetch.
-    pageInfo: { page: 1, limit: Math.max(items.length, 1), total: items.length },
+    // All server pages are loaded before the screen applies its local filters.
+    pageInfo: { page: 1, limit: Math.max(items.length, 1), total },
     isLoading: isLoading && !hasLoaded,
     isRefreshing: isLoading,
     isSubmitting,

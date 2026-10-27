@@ -2,6 +2,57 @@
 
 Status: **[Verified]**
 
+WebPhone decommission source amendment: **2026-10-18** (PROV-DECOM-001;
+source review only; checks and authenticated runtime pending lead verification).
+`POST /api/admin/core/v1/tenants/:tenantId/provisioning/operations/decommission`
+rejects WebPhone with `400 PROVISIONING_DECOMMISSION_UNSUPPORTED_COMPONENT`
+before installation changes or planning. The workspace command alert shows
+the refusal in Arabic or English. Full WebPhone decommission is deferred.
+
+Recovery source amendment: **2026-10-18** (PROV-RECOVERY-001; source review only;
+typecheck, lint, specs and authenticated runtime pending lead verification).
+
+The prerequisite-evidence response now includes `recovery`: `stuck`, `attempts`,
+`alerted`, `nextRetryAt`, `releaseEvidenceExists`, `canResendRelease` and
+`canCloseFailed`. These are safe state hints; commands revalidate under locks.
+Available updates also include `lastOperationId`. An already planned target
+links to that operation and shows its prerequisite/fence status, retry schedule,
+exhaustion alert and permitted recovery action. The operation and prerequisite
+panels expose the same state. Missing access or a failed read is shown explicitly.
+
+Two POST commands use the canonical browser root
+`/api/admin/core/v1/tenants/:tenantId/provisioning/`:
+
+| Suffix | Required permissions (ALL) |
+| --- | --- |
+| `prerequisite-releases/resend` | `admin.provisioning.prerequisites.request`, `admin.provisioning.critical` |
+| `operations/close-failed` | `admin.tenants.reprovision`, `admin.tenants.critical`, `admin.provisioning.critical` |
+
+Both require a caller-owned UUIDv7 `x-idempotency-key` and exactly
+`{operationId, expectedPlanDigest, reasonCode}`. They answer 202 with
+`{operationId, requestId, action}` (`RESEND_RELEASE` or `CLOSE_FAILED`). The same
+intent reuses its key after an uncertain outcome; a changed intent needs a new
+key. Commands are audited transactionally and appear on the operation timeline.
+
+Re-send requires a terminal operation and retained source evidence. It preserves
+request, plan, pins and evidence identity and waits for Worker release; it never
+opens a fence locally. Close requires `MANUAL_RECOVERY_REQUIRED`, actual Worker
+`RELEASED` evidence and released request/fence state. It records
+`FAILED_OPERATION_CLOSED` as the phase while retaining the original failed status
+and signed projection revision; it acknowledges recovery, without claiming that
+the update succeeded. Re-provision still creates a new generation. Both actions
+use the shared confirmation dialog. English/Arabic guidance covers the new 409s:
+`PROVISIONING_RELEASE_RECOVERY_BLOCKED`, `PROVISIONING_RELEASE_EVIDENCE_REQUIRED`
+and `PROVISIONING_FAILED_OPERATION_CLOSE_BLOCKED`.
+
+Component selection-source amendment: **2026-10-17** (CLXAPP-136). The
+component reader accepts `ADDON` alongside `FOUNDATION`, `ENTITLEMENT` and
+`DEPENDENCY`. The State table displays all four sources in Arabic and English,
+and its source filter includes Add-on. This local filter applies to the loaded
+component page (currently at most 100 rows); it does not fetch additional pages
+or filter seed state. The typed API query also accepts `selectionSource=ADDON`.
+Source reviewed; automated checks and authenticated runtime remain unverified.
+
 Last source verification: **2026-10-11** (one current release per component:
 release-upgrade and prerequisite refusals, update scope, new step codes; a
 retry re-pins a failed plan on superseded releases; Worker heartbeats and
@@ -679,7 +730,7 @@ interface TenantComponentInstallationQueryDto {
   search?: string;
   componentKey?: string;
   state?: TenantComponentInstallationStateEnum;
-  selectionSource?: "FOUNDATION" | "ENTITLEMENT" | "DEPENDENCY";
+  selectionSource?: "FOUNDATION" | "ENTITLEMENT" | "DEPENDENCY" | "ADDON";
   sortBy?: "state" | "createdAt" | "updatedAt";
   sortDir?: "ASC" | "DESC"; // default ASC
 }
@@ -867,6 +918,14 @@ commands chain their seed steps and run each as the kind Core's
 `provisioningSeedStepKind` assigns.
 
 ## Errors and UI behavior
+
+Maintenance-conflict source contract verified **2026-10-18**: prerequisite-bearing
+retries and new prerequisite requests refuse another operation's open fence or
+unreleased prerequisite with `409 PROVISIONING_MAINTENANCE_FENCE_OPEN`.
+`details.blockingOperationId`, `details.prerequisiteStatus` and
+`details.maintenanceFenceStatus` are string arrays. The provisioning alert has
+Arabic/English guidance to inspect the earlier operation and wait for
+Worker-confirmed release before trying again. No fence is automatically released.
 
 | Status | Code | UI behavior |
 |:---:|:---|:---|

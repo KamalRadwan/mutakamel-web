@@ -3,8 +3,7 @@
 import { Star } from "lucide-react";
 import { Button, cn, iconSize } from "@/design-system";
 import { formatTemplate } from "@/lib/format/template";
-
-export const MAX_CRM_RATING = 3;
+import { CRM_RATING_STARS, MAX_CRM_RATING } from "../crm-rating-contract";
 
 export interface CrmRatingLabels {
   group: string;
@@ -22,8 +21,7 @@ export interface CrmRatingProps {
 export function CrmRating({ value, onChange, disabled, labels }: CrmRatingProps) {
   return (
     <div role="group" aria-label={labels.group} className="flex items-center">
-      {Array.from({ length: MAX_CRM_RATING }, (_, index) => {
-        const stars = index + 1;
+      {CRM_RATING_STARS.map((stars) => {
         const isFilled = stars <= value;
         const next = value === stars ? 0 : stars;
 

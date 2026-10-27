@@ -29,6 +29,14 @@ beforeEach(() => {
 });
 
 describe("applyBrandingTokens — tab icon", () => {
+  it.each([null, "not-a-colour", "#16a34a"])("restores system tokens when the new color is %s", (primaryColor) => {
+    document.documentElement.style.setProperty("--color-brand-600", "old tenant color");
+    document.documentElement.style.setProperty("--color-chrome", "old chrome");
+    applyBrandingTokens(branding({ primaryColor }));
+    expect(document.documentElement.style.getPropertyValue("--color-brand-600")).toBe("");
+    expect(document.documentElement.style.getPropertyValue("--color-chrome")).toBe("");
+  });
+
   it("points an existing icon link at the tenant's own icon", () => {
     // What Next's app-dir convention emits for src/app/icon.svg.
     document.head.innerHTML =

@@ -20,7 +20,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+        primary: "bg-gradient-primary text-white not-disabled:hover:brightness-90 not-disabled:hover:shadow-pop",
         secondary: "bg-secondary text-secondary-foreground hover:bg-accent",
         outline: "border border-input bg-card text-foreground hover:bg-accent",
         ghost: "bg-transparent text-foreground hover:bg-accent",
@@ -33,11 +33,17 @@ const buttonVariants = cva(
         md: "",
         lg: "",
         xl: "",
+        toolbar: "h-(--size-toolbar-control) px-3.5 gap-1.5 rounded-lg text-label font-semibold",
       },
     },
     defaultVariants: { variant: "secondary", size: "sm" },
   },
 );
+
+// The shared control scale has 24/28/32/36/40px steps; toolbar owns the 33px token.
+function resolveButtonSize(size: VariantProps<typeof buttonVariants>["size"] = "sm"): string {
+  return size === "toolbar" ? "" : controlSize({ size });
+}
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
@@ -56,7 +62,7 @@ export function buttonVariantClasses(
   variant: NonNullable<VariantProps<typeof buttonVariants>["variant"]>,
   size: NonNullable<VariantProps<typeof buttonVariants>["size"]> = "sm",
 ): string {
-  return cn(buttonVariants({ variant, size }), controlSize({ size }));
+  return cn(buttonVariants({ variant, size }), resolveButtonSize(size));
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -66,7 +72,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         ref={ref}
-        className={cn(buttonVariants({ variant, size }), controlSize({ size }), className)}
+        className={cn(buttonVariants({ variant, size }), resolveButtonSize(size), className)}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
         {...props}

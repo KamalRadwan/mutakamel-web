@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { useI18n } from "@/i18n/I18nContext";
-import { Field, Input, Button } from "@/design-system";
+import { Field, Input, Button, MfaCodeStep } from "@/design-system";
 import {
   ADMIN_PASSWORD_MAX_LENGTH,
   ADMIN_PASSWORD_MIN_LENGTH,
@@ -33,6 +33,10 @@ export function AdminPasswordActionScreen({
     ? t.authActions.acceptInvite
     : t.authActions.resetPassword;
   const common = t.authActions.common;
+
+  if (action.mfa.step) {
+    return <AuthShell><MfaCodeStep flow={action.mfa} onRestart={action.restartMfa} /></AuthShell>;
+  }
 
   if (!action.isTokenReady) {
     return (
@@ -118,7 +122,7 @@ export function AdminPasswordActionScreen({
                 <div key={key} className={`flex items-center gap-1.5 text-xs ${passed ? "text-success" : "text-muted-foreground"}`}>
                   {passed ? <CheckCircle2 className="size-3 text-success" aria-hidden="true" /> : <Circle className="size-3" aria-hidden="true" />}
                   <span>{label}</span>
-                  <span className="ms-auto font-medium text-[11px]">{stateLabel}</span>
+                  <span className="ms-auto font-medium text-xs">{stateLabel}</span>
                 </div>
               );
             })}

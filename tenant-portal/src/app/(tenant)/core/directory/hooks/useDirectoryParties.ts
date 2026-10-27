@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast, useWorkspaceState } from "@/design-system";
+import { useCan, useToast, useWorkspaceState } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { can } from "@/lib/auth/permission-scope";
 import { createParty, deleteParty, fetchParties, updateParty } from "../directory-api";
 import {
   PARTY_MANAGE_PERMISSION,
@@ -40,7 +41,13 @@ export function useDirectoryParties() {
   const { user } = useTenantAuth();
   const permissions = user?.permissions ?? [];
   const canRead = permissions.includes(PARTY_READ_PERMISSION);
-  const canManage = permissions.includes(PARTY_MANAGE_PERMISSION);
+  // The directory's create form creates a shared party without a branch target.
+  const canCreate = useCan(PARTY_MANAGE_PERMISSION, { tenantWide: true });
+  const canManageParty = useCallback(
+    (party: Party) => can(user, PARTY_MANAGE_PERMISSION,
+      party.branchId ? { branchId: party.branchId } : { tenantWide: true }),
+    [user],
+  );
 
   const [items, setItems] = useState<Party[]>([]);
   const [total, setTotal] = useState(0);
@@ -130,7 +137,7 @@ export function useDirectoryParties() {
 
   const create = useCallback(
     async (values: PartyFormValues): Promise<boolean> => {
-      if (!canManage || isSubmitting) return false;
+      if (!canCreate || isSubmitting) return false;
       setIsSubmitting(true);
       setFormError(null);
       try {
@@ -150,11 +157,11 @@ export function useDirectoryParties() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, toast, t, reportFailure],
+    [canCreate, isSubmitting, toast, t, reportFailure],
   );
 
   const remove = useCallback(async (): Promise<void> => {
-    if (!canManage || !deleting || pendingId) return;
+    if (!deleting || !canManageParty(deleting) || pendingId) return;
     setPendingId(deleting.id);
     try {
       await deleteParty(deleting.id);
@@ -166,7 +173,7 @@ export function useDirectoryParties() {
       setPendingId(null);
       setDeleting(null);
     }
-  }, [canManage, deleting, pendingId, toast, t, reportFailure]);
+  }, [canManageParty, deleting, pendingId, toast, t, reportFailure]);
 
   /**
    * The board's grouping axis is `status`, so a card move is a real
@@ -175,7 +182,8 @@ export function useDirectoryParties() {
    */
   const moveStatus = useCallback(
     async (partyId: string, status: PartyStatus): Promise<void> => {
-      if (!canManage) return;
+      const target = items.find((party) => party.id === partyId);
+      if (!target || !canManageParty(target)) return;
       const previous = items;
       setItems((current) =>
         current.map((party) => (party.id === partyId ? { ...party, status } : party)),
@@ -191,7 +199,7 @@ export function useDirectoryParties() {
         setPendingId(null);
       }
     },
-    [canManage, items, toast, t, reportFailure],
+    [canManageParty, items, toast, t, reportFailure],
   );
 
   const pageInfo = useMemo(
@@ -208,7 +216,8 @@ export function useDirectoryParties() {
     t,
     lang,
     canRead,
-    canManage,
+    canCreate,
+    canManageParty,
     workspace,
     items,
     pageInfo,
@@ -228,6 +237,7 @@ export function useDirectoryParties() {
       setFilters(next);
     },
     openCreate: () => {
+      if (!canCreate) return;
       setFormError(null);
       setIsCreateOpen(true);
     },
@@ -236,7 +246,7 @@ export function useDirectoryParties() {
       setFormError(null);
       setIsCreateOpen(false);
     },
-    openDelete: (party: Party) => setDeleting(party),
+    openDelete: (party: Party) => canManageParty(party) && setDeleting(party),
     closeDelete: () => {
       if (pendingId) return;
       setDeleting(null);

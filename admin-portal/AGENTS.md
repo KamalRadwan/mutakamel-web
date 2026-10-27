@@ -92,3 +92,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
   routes. SIP passwords may exist only in active component memory and must
   never be written to browser storage, logs, analytics, or UI fixtures.
 - **File Scope**: Modify files only when the user has authorized changes.
+- **Claude Code MCP servers**: Claude Code sessions (not Codex or Antigravity)
+  have user-scope `playwright` and `chrome-devtools` to look at the running
+  portal on `5001` (screenshot changed screens in RTL/LTR and light/dark;
+  console and network errors), `context7` for current Next.js 16, Tailwind v4
+  and Radix docs, and `eslint` for single-file lint. Look only at an app that
+  is already running; never start one for a screenshot. Runbook:
+  `../../backend/docs/operations/claude-mcp-servers.md`.

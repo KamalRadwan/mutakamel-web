@@ -7,6 +7,7 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { can } from "@/lib/auth/permission-scope";
 import {
   deleteTemplate,
   fetchTemplate,
@@ -49,19 +50,23 @@ export function useTemplateDetail(templateId: string) {
   const { user } = useTenantAuth();
   const permissions = user?.permissions ?? [];
   const copy = t.coreOperations.templates;
+  const [template, setTemplate] = useState<TemplateDetail | null>(null);
+  const target = template?.scope.type === "BRANCH"
+    ? { branchId: template.scope.branchId, companyId: template.scope.companyId }
+    : { companyId: template?.scope.type === "COMPANY" ? template.scope.companyId : null };
+  const permitted = (key: string) => !!template && can(user, key, target);
 
   const grants: TemplateGrants = {
     canRead: permissions.includes(TEMPLATE_READ_PERMISSION),
-    canUpdate: permissions.includes(TEMPLATE_UPDATE_PERMISSION),
-    canPublish: permissions.includes(TEMPLATE_PUBLISH_PERMISSION),
-    canArchive: permissions.includes(TEMPLATE_ARCHIVE_PERMISSION),
-    canRestore: permissions.includes(TEMPLATE_RESTORE_PERMISSION),
-    canPreview: permissions.includes(TEMPLATE_PREVIEW_PERMISSION),
-    canManageAssets: permissions.includes(TEMPLATE_ASSETS_PERMISSION),
-    canManageAssignments: permissions.includes(TEMPLATE_ASSIGNMENTS_PERMISSION),
+    canUpdate: permitted(TEMPLATE_UPDATE_PERMISSION),
+    canPublish: permitted(TEMPLATE_PUBLISH_PERMISSION),
+    canArchive: permitted(TEMPLATE_ARCHIVE_PERMISSION),
+    canRestore: permitted(TEMPLATE_RESTORE_PERMISSION),
+    canPreview: permitted(TEMPLATE_PREVIEW_PERMISSION),
+    canManageAssets: permitted(TEMPLATE_ASSETS_PERMISSION),
+    canManageAssignments: permitted(TEMPLATE_ASSIGNMENTS_PERMISSION),
   };
 
-  const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMissing, setIsMissing] = useState(false);
   const [isEntitlementBlocked, setIsEntitlementBlocked] = useState(false);
@@ -187,6 +192,7 @@ export function useTemplateDetail(templateId: string) {
     pendingAction,
     hasConflict,
     openEdit: () => {
+      if (!grants.canUpdate) return;
       setFormError(null);
       setIsEditOpen(true);
     },

@@ -111,7 +111,7 @@ function SubscriptionFilters({
               {copy.filters}
             </h2>
             {view.activeFilterCount ? (
-              <Badge tone="info" className="text-[11px]">
+              <Badge tone="info" className="text-xs">
                 {formatInteger(view.activeFilterCount, lang)} {copy.activeFilters}
               </Badge>
             ) : null}
@@ -253,7 +253,7 @@ function SubscriptionResults({
         <div className="max-w-52">
           {item.tenant ? (
             <>
-              <Link href={`/tenants/${item.tenant.id}`} className="font-semibold text-action hover:underline">
+              <Link href={`/subscriptions/${item.tenant.id}`} className="font-semibold text-action hover:underline">
                 {item.tenant.companyName}
               </Link>
               <p className="mt-1 text-sm text-muted-foreground">{item.tenant.name}</p>

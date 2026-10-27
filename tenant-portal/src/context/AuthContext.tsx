@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { DegradedBanner } from "@/design-system";
+import { useDictionary } from "@/i18n/useLanguage";
 import {
   adoptTenantCookieSession,
   axiosClient,
@@ -21,6 +23,7 @@ import {
   hasTenantSessionCookieHint,
   readWebAuthSessionResponse,
   startTenantActivityTracking,
+  subscribePermissionDenials,
   synchronizeTenantTabSession,
   TenantApiClientError,
   unwrapCoreData,
@@ -40,6 +43,8 @@ import {
   isMissingCredentialsFailure,
 } from "@/lib/auth/sessionErrors";
 import { startTenantSessionRefreshScheduler } from "@/lib/auth/sessionRefresh";
+import { isPermissionScopes, type PermissionScope } from "@/lib/auth/permission-scope";
+import { readMfaStep, type MfaStep } from "@/lib/auth/mfaApi";
 import {
   isAccessibleBranchCompanies,
   type AccessibleBranchCompany,
@@ -64,10 +69,17 @@ export interface TenantUserProfile {
   status: string;
   accessibleBranches: string[];
   accessibleCompanies: string[];
-  /** Absent only on older Core responses; never inferred from company order. */
-  accessibleBranchCompanies?: AccessibleBranchCompany[];
+  accessibleBranchCompanies: AccessibleBranchCompany[];
   permissions: string[];
+  permissionScopes: Record<string, PermissionScope>;
   teamMemberships: TenantTeamMembership[];
+  accessScope: {
+    mode: "FULL" | "EXPLICIT";
+    branchesTruncated: boolean;
+    companiesTruncated: boolean;
+    teamMembershipsTruncated: boolean;
+    teamMembershipsTotal: number;
+  };
 }
 
 export type TenantAuthState =
@@ -79,11 +91,11 @@ export type TenantAuthState =
   | "DEGRADED"
   | "ENDED";
 
-interface TenantLoginOptions {
+type TenantLoginOptions = {
   email: string;
   password: string;
   rememberMe?: boolean;
-}
+} | { challengeId: string; code: string; rememberMe?: boolean };
 
 interface TenantAuthContextValue {
   user: TenantUserProfile | null;
@@ -109,7 +121,7 @@ interface TenantAuthContextValue {
   realtimeAuthGeneration: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (options: TenantLoginOptions) => Promise<void>;
+  login: (options: TenantLoginOptions) => Promise<MfaStep | void>;
   logout: () => Promise<void>;
   retryBootstrap: () => Promise<void>;
 }
@@ -117,6 +129,14 @@ interface TenantAuthContextValue {
 const TenantAuthContext = createContext<TenantAuthContextValue | undefined>(
   undefined,
 );
+
+const PERMISSION_BOOTSTRAP_DEBOUNCE_MS = 250;
+const STALE_PERMISSION_CODES = new Set([
+  "MISSING_REQUIRED_PERMISSIONS",
+  "TENANT_WIDE_PERMISSION_REQUIRED",
+  "BRANCH_PERMISSION_DENIED",
+  "COMPANY_PERMISSION_DENIED",
+]);
 
 export function TenantAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TenantUserProfile | null>(null);
@@ -232,6 +252,36 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     };
   }, [bootstrap]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = subscribePermissionDenials(({ code, endpoint }) => {
+      // A failed /me must settle through bootstrap's error handling, not
+      // schedule another /me indefinitely.
+      if (
+        !STALE_PERMISSION_CODES.has(code) ||
+        endpoint.split("?")[0].replace(/\/+$/, "") === "/api/tenant/core/v1/auth/me" ||
+        bootstrapAbort.current !== null
+      ) return;
+      const sessionId = getStoredTenantSessionMeta()?.sessionId;
+      if (!sessionId) return;
+      const generation = authOperationGeneration.current;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (
+          generation !== authOperationGeneration.current ||
+          getStoredTenantSessionMeta()?.sessionId !== sessionId
+        ) return;
+        void bootstrap(false);
+      }, PERMISSION_BOOTSTRAP_DEBOUNCE_MS);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [bootstrap, user?.id]);
+
   useEffect(() =>
     subscribeToTenantAuthEvents((event) => {
       if (event.kind === "session-ended") {
@@ -330,11 +380,8 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const login = useCallback(async ({
-    email,
-    password,
-    rememberMe = false,
-  }: TenantLoginOptions) => {
+  const login = useCallback(async (options: TenantLoginOptions) => {
+    const rememberMe = options.rememberMe ?? false;
     const generation = invalidatePendingAuthWork();
     let sessionCommitted = false;
     setRealtimeAuthGeneration(null);
@@ -346,16 +393,22 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
         }
         clearLocalTenantAuthState();
         const loginResponse = await axiosClient.post(
-          "/api/tenant/core/v1/auth/login",
-          { email, password },
+          "challengeId" in options
+            ? "/api/tenant/core/v1/auth/mfa/verify" : "/api/tenant/core/v1/auth/login",
+          "challengeId" in options
+            ? { challengeId: options.challengeId, code: options.code }
+            : { email: options.email, password: options.password },
           {
             headers: { "x-auth-remember": rememberMe ? "1" : "0" },
             skipAuthRefresh: true,
             skipAutoIdempotency: true,
+            nonReplayable: true,
             cache: "no-store",
             signal,
           },
         );
+        const step = "challengeId" in options ? null : readMfaStep(loginResponse.data);
+        if (step) return step;
         const auth = readWebAuthSessionResponse(loginResponse.data);
         if (!auth) {
           const invalidResponse = new Error("INVALID_AUTH_RESPONSE");
@@ -395,6 +448,11 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
 
       if (generation !== authOperationGeneration.current) {
         throw sessionChangedError();
+      }
+      if ("mfaRequired" in profile) {
+        setUser(null);
+        setAuthState("UNAUTHENTICATED");
+        return profile;
       }
       setUser(profile);
       setEndedReason(null);
@@ -509,9 +567,22 @@ export function TenantAuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <TenantAuthContext.Provider value={value}>
+      {user && <AccessScopeNotice scope={user.accessScope} />}
       {children}
     </TenantAuthContext.Provider>
   );
+}
+
+function AccessScopeNotice({ scope }: { scope: TenantUserProfile["accessScope"] }) {
+  const t = useDictionary();
+  const messages = [
+    scope.branchesTruncated && t.authScopeNotice.branches,
+    scope.companiesTruncated && t.authScopeNotice.companies,
+    scope.teamMembershipsTruncated && t.authScopeNotice.teamMemberships,
+  ].filter(Boolean);
+  return messages.length > 0
+    ? <DegradedBanner message={messages.join(" ")} />
+    : null;
 }
 
 export function useTenantAuth(): TenantAuthContextValue {
@@ -538,29 +609,38 @@ function readTenantUserProfile(payload: unknown): TenantUserProfile {
     !stringArray(candidate.accessibleBranches) ||
     !stringArray(candidate.accessibleCompanies) ||
     !stringArray(candidate.permissions) ||
+    !isPermissionScopes(candidate.permissionScopes, candidate.permissions) ||
     !Array.isArray(candidate.teamMemberships) ||
     !candidate.teamMemberships.every(isTenantTeamMembership)
   ) {
     throw new Error("INVALID_AUTH_PROFILE");
   }
   const accessScope = candidate.accessScope;
-  const companiesTruncated =
-    accessScope !== null &&
-    typeof accessScope === "object" &&
-    !Array.isArray(accessScope) &&
-    "companiesTruncated" in accessScope &&
-    accessScope.companiesTruncated === true;
+  if (!isAccessScope(accessScope)) throw new Error("INVALID_AUTH_PROFILE");
   if (
-    "accessibleBranchCompanies" in candidate &&
     !isAccessibleBranchCompanies(
       candidate.accessibleBranchCompanies,
       candidate.accessibleBranches,
-      companiesTruncated ? null : candidate.accessibleCompanies,
+      accessScope.companiesTruncated ? null : candidate.accessibleCompanies,
     )
   ) {
     throw new Error("INVALID_AUTH_PROFILE");
   }
   return candidate as unknown as TenantUserProfile;
+}
+
+function isAccessScope(value: unknown): value is TenantUserProfile["accessScope"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const scope = value as Record<string, unknown>;
+  return (
+    (scope.mode === "FULL" || scope.mode === "EXPLICIT") &&
+    typeof scope.branchesTruncated === "boolean" &&
+    typeof scope.companiesTruncated === "boolean" &&
+    typeof scope.teamMembershipsTruncated === "boolean" &&
+    typeof scope.teamMembershipsTotal === "number" &&
+    Number.isSafeInteger(scope.teamMembershipsTotal) &&
+    scope.teamMembershipsTotal >= 0
+  );
 }
 
 function stringArray(value: unknown): value is string[] {

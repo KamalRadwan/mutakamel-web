@@ -8,15 +8,17 @@ import {
   IdentifierText,
   Input,
   Money,
+  PermissionGate,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   computeTradeEvidence,
   createEmptyEvidenceLineDraft,
-  type ComputedTradeDocumentTotals,
   type TradeEvidenceDialect,
   type TradeEvidenceLineDraft,
 } from "../lib/trade-financial-evidence";
+import { tradeDocumentMessage } from "../trade-document-errors";
 
 export interface TradeFinancialLinesEditorProps {
   dialect: TradeEvidenceDialect;
@@ -29,6 +31,7 @@ export interface TradeFinancialLinesEditorProps {
   onChangeAmountPaid?: (next: string) => void;
   showAmountPaid?: boolean;
   disabled?: boolean;
+  pricing?: { ready: boolean; error: NormalizedApiError | null };
 }
 
 export function TradeFinancialLinesEditor({
@@ -42,11 +45,12 @@ export function TradeFinancialLinesEditor({
   onChangeAmountPaid,
   showAmountPaid = false,
   disabled = false,
+  pricing,
 }: TradeFinancialLinesEditorProps) {
   const { t } = useI18n();
   const td = t.tradeDocuments;
 
-  const computed: ComputedTradeDocumentTotals = React.useMemo(
+  const outcome = React.useMemo(
     () =>
       computeTradeEvidence(lines, {
         dialect,
@@ -56,6 +60,12 @@ export function TradeFinancialLinesEditor({
       }),
     [lines, dialect, currencyCode, roundingTotal, amountPaid],
   );
+  const computed = outcome.ok ? outcome : null;
+  const fieldError = (field: string, lineIndex?: number) => {
+    const issue = outcome.errors.find((error) => error.field === field &&
+      (field === "calculation" || error.lineIndex === lineIndex));
+    return issue ? td.lineEditor[issue.message] : undefined;
+  };
 
   function updateLine(index: number, patch: Partial<TradeEvidenceLineDraft>) {
     onChangeLines(
@@ -80,10 +90,10 @@ export function TradeFinancialLinesEditor({
                   ? td.executive.dialectFinancialBadge
                   : td.executive.dialectOrderBadge}
               </span>
-              <span className="dossier-tag dossier-tag-emerald">
+              {computed && (!pricing || pricing.ready) ? <span className="dossier-tag dossier-tag-emerald">
                 <CheckCircle2 className="me-1 h-3 w-3" aria-hidden />
                 {td.executive.evidenceVerifiedBadge}
-              </span>
+              </span> : null}
             </div>
           </div>
         </div>
@@ -102,9 +112,15 @@ export function TradeFinancialLinesEditor({
         </Button>
       </div>
 
+      {pricing?.error?.status === 403 ? <PermissionGate require="trade.pricing.read" denied>{null}</PermissionGate> : pricing ? <p role="status" className="text-xs text-muted-foreground">
+        {pricing.ready ? td.lineEditor.previewNote : pricing.error
+          ? (tradeDocumentMessage(pricing.error.code, td.errors) ?? td.lineEditor.priceUnavailable)
+          : td.lineEditor.awaitingPrice}
+      </p> : null}
+
       <div className="space-y-3">
         {lines.map((row, idx) => {
-          const calcLine = computed.lines[idx];
+          const calcLine = computed?.lines[idx];
           return (
             <div
               key={row.id}
@@ -173,7 +189,7 @@ export function TradeFinancialLinesEditor({
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                <Field label={td.quantity} required>
+                <Field label={td.quantity} required error={fieldError("quantity", idx)}>
                   <Input
                     size="sm"
                     inputMode="decimal"
@@ -184,18 +200,19 @@ export function TradeFinancialLinesEditor({
                   />
                 </Field>
 
-                <Field label={td.unitPrice} required>
+                <Field label={td.unitPrice} required error={fieldError("unitPrice", idx)}>
                   <Input
                     size="sm"
                     inputMode="decimal"
                     value={row.unitPrice}
+                    readOnly={pricing !== undefined}
                     disabled={disabled}
                     onChange={(e) => updateLine(idx, { unitPrice: e.target.value })}
                     placeholder={td.unitPrice}
                   />
                 </Field>
 
-                <Field label={td.executive.discountAmountLabel}>
+                <Field label={td.executive.discountAmountLabel} error={fieldError("discountAmount", idx)}>
                   <Input
                     size="sm"
                     inputMode="decimal"
@@ -209,7 +226,7 @@ export function TradeFinancialLinesEditor({
                 </Field>
 
                 {dialect === "FINANCIAL" ? (
-                  <Field label={td.executive.chargeAmountLabel}>
+                  <Field label={td.executive.chargeAmountLabel} error={fieldError("chargeAmount", idx)}>
                     <Input
                       size="sm"
                       inputMode="decimal"
@@ -233,7 +250,7 @@ export function TradeFinancialLinesEditor({
                   </Field>
                 )}
 
-                <Field label={td.executive.taxRatePercentLabel}>
+                <Field label={td.executive.taxRatePercentLabel} error={fieldError("taxRatePercent", idx)}>
                   <Input
                     size="sm"
                     inputMode="decimal"
@@ -247,7 +264,7 @@ export function TradeFinancialLinesEditor({
                 </Field>
               </div>
 
-              {calcLine ? (
+              {calcLine && (!pricing || pricing.ready) ? (
                 <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-2.5 text-xs sm:grid-cols-4">
                   <div>
                     <span className="block text-muted-foreground">
@@ -307,7 +324,7 @@ export function TradeFinancialLinesEditor({
       {showAmountPaid || (dialect === "FINANCIAL" && onChangeRoundingTotal) ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {dialect === "FINANCIAL" && onChangeRoundingTotal ? (
-            <Field label={td.executive.computedRounding}>
+            <Field label={td.executive.computedRounding} error={fieldError("roundingTotal")}>
               <Input
                 size="sm"
                 inputMode="decimal"
@@ -319,7 +336,7 @@ export function TradeFinancialLinesEditor({
             </Field>
           ) : null}
           {showAmountPaid && onChangeAmountPaid ? (
-            <Field label={td.executive.amountPaidLabel}>
+            <Field label={td.executive.amountPaidLabel} error={fieldError("amountPaid")}>
               <Input
                 size="sm"
                 inputMode="decimal"
@@ -333,7 +350,8 @@ export function TradeFinancialLinesEditor({
         </div>
       ) : null}
 
-      <div className="trade-totals-ribbon">
+      {fieldError("calculation") ? <p role="alert" className="text-sm text-destructive">{fieldError("calculation")}</p> : null}
+      {computed && (!pricing || pricing.ready) ? <div className="trade-totals-ribbon">
         <div className="trade-totals-cell">
           <span className="block text-xs text-muted-foreground">
             {td.executive.computedSubtotal}
@@ -410,7 +428,7 @@ export function TradeFinancialLinesEditor({
             />
           </div>
         ) : null}
-      </div>
+      </div> : null}
     </div>
   );
 }

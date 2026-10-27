@@ -1,6 +1,67 @@
 import { Dictionary } from "./ar";
 
 export const en: Dictionary = {
+  emailSuppression: {
+    "numberLocale": "en",
+    "title": "Email suppressions",
+    "description": "Look up an address in this scope and lift an incorrect suppression. Lifting allows future delivery attempts; it does not resend messages.",
+    "address": "Email address",
+    "privacy": "The address is used only for this request and is not saved in the browser.",
+    "lookup": "Look up",
+    "working": "Checking…",
+    "suppressed": "This address is suppressed in this scope.",
+    "notSuppressed": "No suppression exists in this scope. Other delivery restrictions may still apply.",
+    "reason": "Reason",
+    "firstOccurred": "First occurrence",
+    "lastOccurred": "Last occurrence",
+    "lift": "Lift suppression",
+    "cancel": "Cancel",
+    "confirmTitle": "Lift this suppression?",
+    "confirmDescription": "Allow future delivery attempts to the address you looked up. Confirm that the bounce or complaint has been resolved. Other scopes are unchanged.",
+    "lifted": "Suppression lifted. Future delivery attempts are allowed in this scope.",
+    "alreadyAbsent": "The suppression was already absent.",
+    "reasons": {
+      "HARD_BOUNCE": "Permanent delivery failure",
+      "COMPLAINT": "Spam complaint"
+    },
+    "errors": {
+      "invalidAddress": "Enter a valid email address (maximum 320 characters).",
+      "forbidden": "You do not have permission to manage suppressions.",
+      "rateLimited": "Too many requests. Wait before trying again.",
+      "failed": "Could not confirm the current state. Try the lookup again, or retry the same lift to resolve its outcome."
+    }
+  },
+  mfa: {
+    title: "Email verification",
+    description: "Require an emailed code after your password when signing in. Changing this setting signs you out on every device.",
+    enabled: "Email verification is on",
+    disabled: "Email verification is off",
+    enable: "Turn on email verification",
+    disable: "Turn off email verification",
+    currentPassword: "Current password",
+    sendCode: "Send confirmation code",
+    cancel: "Cancel",
+    loading: "Checking email verification settings…",
+    reload: "Reload settings",
+    codeTitle: "Check your email",
+    codeHint: "Enter the latest six-digit code from your email. You can paste it. Resending replaces the previous code.",
+    codeLabel: "Email code",
+    verify: "Confirm code",
+    resend: "Resend code",
+    resendWait: "Resend in {seconds} seconds",
+    retryWait: "Try again in {seconds} seconds",
+    restart: "Start again",
+    recovery: "If you lose access to your mailbox, recover it through your mail provider or organization. Password recovery does not turn off email verification.",
+    errors: {
+      invalid: "The code is invalid, expired or already used. Try the latest code or start again.",
+      expired: "This code has expired. Start again to request a new code.",
+      codeFormat: "Enter exactly six digits (0–9).",
+      throttled: "Too many attempts. Wait before trying again.",
+      unavailable: "Email verification is temporarily unavailable. Try again later.",
+      currentPassword: "The current password is incorrect.",
+      ambiguous: "The result could not be confirmed. Do not submit this code again. Start again or sign in to check your account.",
+    },
+  },
   common: {
     appName: "Mutakamel CRM",
     adminTag: "Control Plane",
@@ -34,7 +95,15 @@ export const en: Dictionary = {
     successTitle: "Success",
     errorTitle: "Error",
   },
+  globalToast: {
+    authorizationDenied: {
+      title: "Access Denied",
+      message: "You do not have permission to perform this action.",
+    },
+  },
   login: {
+    loginThrottled: "Too many sign-in attempts. Try again in {minutes} minute(s).",
+    temporarilyUnavailable: "Authentication is temporarily unavailable. Please try again later.",
     title: "Admin Portal Sign-In",
     subtitle:
       "Enter your administrative credentials to access the control plane",
@@ -1526,6 +1595,7 @@ export const en: Dictionary = {
     errorTitle: "Error",
     draftedSuccessDesc: "Application drafted successfully.",
     onboardedSuccessDesc: "Application onboarded successfully.",
+    databasePolicyUpdated: "Database policy updated.",
     registrationOnlyTitle: "Register an Application",
     registrationOnlyDescription:
       "You can perform the authorized registration command without loading the Application Catalogue. This screen sends no list request because this account lacks read permission.",
@@ -1888,6 +1958,12 @@ export const en: Dictionary = {
     superAdminCheckbox: "Grant Super Admin Privileges",
     sendInvite: "Send Invitation Email",
     sendingInvite: "Sending invitation...",
+    resendInvite: "Resend invitation",
+    inviteResentTitle: "Invitation queued",
+    inviteResentDesc: "A new invitation was queued. Previous invitation links are no longer valid.",
+    inviteNotPending: "Only pending administrator invitations can be resent.",
+    inviteResendThrottled: "Wait one minute between administrator invitations.",
+    inviteDeliveryUnavailable: "Invitation delivery could not be queued. Please retry.",
     identityProfile: "Identity Profile",
     firstNameLabel: "First Name",
     lastNameLabel: "Last Name",
@@ -1923,6 +1999,7 @@ export const en: Dictionary = {
     backToUsers: "Back to Staff Directory",
     retryLoad: "Retry",
     loadError: "Failed to load user details.",
+    detailRefreshFailed: "User details could not be refreshed. These are previously loaded values and may be out of date. Retry to load the latest details before making changes.",
     roleChangeWarning:
       "Changing a user's role or Super Admin status will automatically invalidate their active sessions.",
     saveChanges: "Save Changes",
@@ -1945,6 +2022,13 @@ export const en: Dictionary = {
     deleteActionDescription: (name: string) =>
       `Are you sure you want to delete ${name}?`,
     rolesLoadFailed: "Failed to load roles",
+    rolesLoading: "Loading the role catalogue…",
+    rolesEmpty: "No roles are available.",
+    assignableRolesPrerequisite: "Role selection requires the invitation or role-assignment permission together with the critical user-management permission. Assignment also requires another active, manageable user.",
+    assignableRolesForbidden: "You no longer have access to roles for this operation. Ask an administrator to review your permissions, then retry.",
+    assignableRolesEmpty: "No roles fall within your assignment permissions. Ask an administrator with sufficient permissions to complete this operation.",
+    rolesSearchPlaceholder: "Search roles…",
+    rolesNoMatches: "No matching roles.",
     requestChangedTitle: "Request changed",
     requestChangedDesc:
       "Restore the original values before retrying the unresolved invitation.",
@@ -1971,6 +2055,12 @@ export const en: Dictionary = {
     displayNameLabel: "Display Name",
     outboundCallerIdLabel: "Outbound Caller ID",
     serverChainTitle: "SIP Server Order",
+    webphoneServerCatalogue: "SIP Server Catalogue",
+    webphoneReadLoading: "Loading WebPhone data. Editing is unavailable until the required reads succeed.",
+    webphoneLoadFailed: "Could not load the WebPhone identity. Retry before editing phone settings.",
+    webphoneServersLoadFailed: "Could not load the server catalogue. Retry before replacing the server order.",
+    webphoneChainLoadFailed: "Could not load the current server order. Retry before replacing existing assignments.",
+    retryWebphoneReads: "Retry WebPhone reads",
     serverChainHint:
       "The servers this user tries, in order. Leave a timeout or retry count blank to inherit that server's default.",
     serverChainEmpty: "This user has no server in their failover chain yet.",
@@ -2030,6 +2120,7 @@ export const en: Dictionary = {
     unsavedBadge: "UNSAVED",
     superAdminPrivilegesLabel: "Super Admin Privileges",
     superAdminPrivilegesHint: "Bypasses system permissions logic.",
+    protectedSuperAdminReason: "Only a super admin can change this super-admin account or its role, resend its invitation, suspend, activate or delete it.",
     assignedRoleTitle: "Assigned Control Plane Role",
     unsavedRoleBadge: "UNSAVED ROLE",
     applyRoleAssignment: "Apply Role Assignment",
@@ -2046,6 +2137,7 @@ export const en: Dictionary = {
       unexpected: "An unexpected error occurred.",
       missingPermissions: (perms?: string) =>
         `Missing required permissions${perms ? `: (${perms})` : "."}`,
+      adminUserNotActive: "Roles can only be assigned to active admin users.",
       adminUserNotFound:
         "The specified admin user could not be found or has been deleted.",
       adminEmailTaken: "This email address is already registered to another admin.",
@@ -2149,6 +2241,10 @@ export const en: Dictionary = {
       "Read-only; replacement requires admin.roles.update and admin.roles.critical.",
     permissionsEditableHint:
       "Review the selection, then explicitly save the complete permission set.",
+    permissionNotDelegableHint:
+      "You can delegate only permissions granted to your account.",
+    protectedPermissionSetHint:
+      "This role contains permissions outside your delegation limit. A higher-authority administrator must edit its permission set; existing assignments are preserved.",
     searchPermissionsPlaceholder: "Search permissions...",
     selectedSuffix: "selected",
     loadingCatalogue: "Loading the permission catalogue...",
@@ -2466,6 +2562,27 @@ export const en: Dictionary = {
     },
   },
   tenantProvisioning: {
+    resendReleaseButton: "Re-send prerequisite release",
+    closeFailedButton: "Close failed operation",
+    recoveryAcceptedTitle: "Recovery command accepted",
+    releaseResentMessage: "The release request was re-sent. Wait for Worker release evidence before retrying.",
+    failedClosedMessage: "Recovery is closed. The failed outcome remains in history; re-provision creates a new generation.",
+    resendReleaseDescription: "Re-send the release request with its retained evidence. Maintenance stays in place until the Worker confirms release.",
+    closeFailedDescription: "Acknowledge the failed operation after confirmed release. Keep the failed outcome and history; retry creates a new generation.",
+    recoveryGeneration: (generation: number) => `Operation generation ${generation}`,
+    plannedRecoveryReason: "This target is already assigned to an operation. Inspect that operation before applying another update.",
+    blockingOperationLink: "View blocking operation",
+    prerequisiteStateLabel: "Prerequisite",
+    recoveryFenceLabel: "Maintenance fence",
+    noFenceLabel: "None",
+    noPrerequisiteLabel: "No prerequisite request recorded for this operation.",
+    recoveryUnavailableLabel: "Prerequisite recovery evidence is unavailable with the current access or response. Refresh or ask an authorized operator.",
+    recoveryAttemptsLabel: (attempts: number) => `Release recovery attempts: ${attempts}`,
+    recoveryNextRetryLabel: (at: string) => `Next automatic attempt: ${at}`,
+    recoveryAlertLabel: "Automatic release recovery exhausted. Inspect the Worker dead-letter queue, fix the cause, then re-send release.",
+    recoveryWaitingLabel: "Release is pending. Wait for Worker evidence; use Re-send prerequisite release if delivery failed.",
+    recoveryRetryLabel: "Release is confirmed. Re-provision from the operation panel to retry the failed update.",
+    recoveryClosedLabel: "Failed operation recovery closed; the recorded failure and retry history are retained.",
     ariaLabel: "Tenant provisioning management",
     title: "Tenant provisioning",
     livePollingBadge: (interval: string) => `Live · every ${interval}`,
@@ -2480,6 +2597,13 @@ export const en: Dictionary = {
      * local validation code. A code missing here is shown verbatim.
      */
     commandErrors: {
+      PROVISIONING_DECOMMISSION_UNSUPPORTED_COMPONENT:
+        "WebPhone decommission is not supported yet.",
+      PROVISIONING_RELEASE_RECOVERY_BLOCKED: "Wait for the Worker to confirm the operation has stopped, then re-send release. Resync can recover missing stop evidence.",
+      PROVISIONING_RELEASE_EVIDENCE_REQUIRED: "Required release evidence is missing. Inspect the prerequisite and Worker dead-letter queue. Maintenance cannot be bypassed.",
+      PROVISIONING_FAILED_OPERATION_CLOSE_BLOCKED: "Only an unclosed operation requiring manual recovery can be closed after confirmed prerequisite and maintenance release.",
+      PROVISIONING_MAINTENANCE_FENCE_OPEN:
+        "A previous operation still holds maintenance or an unreleased prerequisite. Check that operation and wait for the Worker to confirm release, then try again.",
       TENANT_PROVISIONING_OPERATION_ALREADY_OPEN:
         "An operation is still open. Open Operations and wait for it to finish or complete cancellation before re-provisioning.",
       TENANT_PROVISIONING_OPERATION_SUPERSEDED:
@@ -2592,7 +2716,7 @@ export const en: Dictionary = {
       `Stalled · no Worker heartbeat for ${duration}`,
     stallNoProgressNote: (duration: string, step: string | null) =>
       step
-        ? `${step} has reported neither a transition nor a Worker heartbeat for ${duration}, three heartbeats missed. The Worker may have stopped, lost its record of the step, or let the step's lease run out.`
+        ? `${step} has reported neither a state change nor a Worker heartbeat for ${duration}, three heartbeats missed. The Worker may have stopped, lost its record of the step, or let the step's lease run out.`
         : `No progress has been reported for ${duration}. The Worker may have stopped, or the work is taking longer than expected.`,
     stallDispatchLeaseExpiredNote: (duration: string, step: string | null) =>
       `${step ?? "A step"} was handed to its owning application ${duration} ago and no result has come back. Its 5-minute dispatch lease has expired; the Worker does not send it again but keeps waiting for the result, and fails the step as retryable (WORKER.PROVISIONING.OWNER_RESULT_TIMEOUT) if none arrives within 45 minutes of the dispatch.`,
@@ -2672,6 +2796,14 @@ export const en: Dictionary = {
     installedComponentsTitle: "Installed components",
     componentColumnHeader: "Component",
     sourceColumnHeader: "Source",
+    componentSourceFilterLabel: "Source (loaded components)",
+    allComponentSourcesLabel: "All sources",
+    componentSelectionSources: {
+      FOUNDATION: "Foundation",
+      ENTITLEMENT: "Entitlement",
+      DEPENDENCY: "Dependency",
+      ADDON: "Add-on",
+    },
     stateColumnHeader: "State",
     desiredColumnHeader: "Desired",
     appliedColumnHeader: "Applied",
@@ -2719,6 +2851,16 @@ export const en: Dictionary = {
       "This independently permissioned resource is not represented as empty.",
     resourceUnavailableTitle: "Resource unavailable",
   },
+  storageByteCapacity: {
+    maxLabel: "Byte limit (bytes)",
+    reservedLabel: "Reserved bytes",
+    committedLabel: "Committed bytes",
+    availableLabel: "Available bytes",
+    unlimited: "Unlimited",
+    exhausted: "Byte capacity exhausted",
+    limitHint: "Leave empty for unlimited capacity. Otherwise enter a whole number from 1 to 9223372036854775807 bytes, without separators.",
+    invalidLimit: "Enter a whole number from 1 to 9223372036854775807 bytes, without separators, or leave empty for unlimited capacity.",
+  },
   storageServerDetail: {
     actionCompletedTitle: "Action completed",
     actionFailedTitle: "Action failed",
@@ -2752,6 +2894,8 @@ export const en: Dictionary = {
     credentialsNotConfiguredLabel: "Not configured",
     safeRotationRequiredNote:
       "This server has assigned tenants. Use safe rotation: it keeps the previous key valid through a bounded grace window before revoking it, with no downtime or reactivation.",
+    platformDefaultRotationNote:
+      "Platform-default credentials require safe rotation, even with no assigned tenants. Safe rotation is available while the server is ACTIVE or DRAINING.",
     rotationGeneralNote:
       "Core never returns raw keys to the browser. Rotation replaces them and moves the server to DRAFT until it is activated again.",
     lastRotatedLabel: "Last rotated",
@@ -2823,6 +2967,13 @@ export const en: Dictionary = {
     graceWindowLabel: "Grace window (hours)",
     graceWindowHint: "How long the old key stays valid alongside the new one.",
     currentRotationLabel: "Current rotation",
+    abortRotationButton: "Abort staged rotation",
+    abortRotationTitle: "Abort this staged credential?",
+    abortRotationDescription: "This permanently closes the unactivated rotation. The active credential stays unchanged. Provider credentials are not revoked. A concurrent activation may prevent the abort.",
+    abortRotationReasonLabel: "Audit reason",
+    abortRotationSuccess: "Staged rotation aborted. Rotation, drain and migration can be requested again.",
+    stagedRotationRecoveryNote: "This credential has not activated. If its probe failed, abort this command before starting a corrected rotation or storage maintenance.",
+    rotationServerRecoveryNote: "The current rotation is recovered from Core when this page loads. No credential material is returned.",
     graceExpiresLabel: "Grace expires",
     revokedAtLabel: "Revoked at",
     rotationReceiptKeptNote:

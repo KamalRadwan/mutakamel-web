@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStoredTenantSessionMeta } from "../api/axiosClient";
-import { revokeTenantAuthSession, type TenantAuthSessionSummary } from "./sessionApi";
+import { listTenantAuthSessionPage, listTenantAuthSessions, revokeTenantAuthSession, type TenantAuthSessionSummary } from "./sessionApi";
 
 describe("revokeTenantAuthSession", () => {
   beforeEach(() => {
@@ -13,6 +13,26 @@ describe("revokeTenantAuthSession", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('returns every active device alongside bounded history and reads later pages', async () => {
+    const items = Array.from({ length: 125 }, (_, i) => sessionSummary(`active-${i}`, i === 0));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: {
+      items, endedHistory: { page: 2, pageSize: 50, hasMore: false },
+    } }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const page = await listTenantAuthSessionPage(2);
+    expect(page.items).toHaveLength(125);
+    expect(page.endedHistory).toEqual({ page: 2, pageSize: 50, hasMore: false });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("historyPage=2");
+    expect(await listTenantAuthSessions()).toHaveLength(125);
+  });
+
+  it('rejects malformed ended-history metadata', async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ data: {
+      items: [], endedHistory: { page: 0, pageSize: 50, hasMore: false },
+    } }), { status: 200, headers: { "content-type": "application/json" } })));
+    await expect(listTenantAuthSessionPage()).rejects.toThrow("INVALID_AUTH_SESSION_LIST");
   });
 
   it("publishes the current SID before clearing its local fallback", async () => {

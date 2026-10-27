@@ -1,44 +1,13 @@
 "use client";
 
-import * as React from "react";
 import { FileText, Plus, Trash2 } from "lucide-react";
-import {
-  Button,
-  Field,
-  FormDrawer,
-  IdentifierText,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/design-system";
-import { useI18n } from "@/i18n/I18nContext";
-import { generateUUIDv7, isUUIDv7 } from "@/lib/uuid";
-import { tradeIfMatch, tradePatch, tradePost } from "../../trade-api";
-import {
-  TRADE_ACTION_RESPONSE_BYTES,
-  readTotalsSnapshot,
-  tradeDocumentPath,
-} from "../../documents/trade-document-contract";
-import { useTradeWrite } from "../../documents/hooks/useTradeWrite";
-import { TradeWriteOutcome } from "../../documents/components/TradeBoundaryStates";
+import { Button, Field, FormDrawer, IdentifierText, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/design-system";
+import { TradeWriteFields, TradeWriteOutcome } from "../../documents/components/TradeBoundaryStates";
 import { TradeFinancialLinesEditor } from "../../documents/components/TradeFinancialLinesEditor";
-import {
-  buildZeroFinancialTotals,
-  computeTradeEvidence,
-  createEmptyEvidenceLineDraft,
-  type TradeEvidenceLineDraft,
-} from "../../documents/lib/trade-financial-evidence";
-import {
-  CONTRACTS_PATH,
-  buildContractDraftContent,
-  contractFinancialMode,
-  type ContractClauseInputPayload,
-  type ContractDetail,
-  type ContractFinancialMode,
-} from "../contract-contract";
+import { FINANCIAL_TOTAL_KEYS } from "../../documents/financial-totals";
+import type { ContractDetail } from "../contract-contract";
+import { useContractFormDrawer } from "../hooks/useContractFormDrawer";
+import { tradeDecimalError } from "../../documents/lib/trade-evidence-validation";
 
 export interface ContractFormDrawerProps {
   open: boolean;
@@ -48,342 +17,129 @@ export interface ContractFormDrawerProps {
   onSaved: () => Promise<unknown>;
 }
 
-function createEmptyClause(): ContractClauseInputPayload {
-  return {
-    clientClauseId: generateUUIDv7(),
-    title: "",
-    body: "",
-  };
-}
-
-export function ContractFormDrawer({
-  open,
-  onOpenChange,
-  headers,
-  contract,
-  onSaved,
-}: ContractFormDrawerProps) {
-  const { t } = useI18n();
-  const td = t.tradeDocuments;
-  const write = useTradeWrite();
-  const isEdit = Boolean(contract);
-
-  const initialMode: ContractFinancialMode =
-    contract && contractFinancialMode(contract) === "FINANCIAL"
-      ? "FINANCIAL"
-      : "NON_FINANCIAL";
-
-  const [partyId, setPartyId] = React.useState(contract?.partyId ?? "");
-  const [currencyCode, setCurrencyCode] = React.useState(
-    contract?.currencyCode ?? "SAR",
-  );
-  const [effectiveFrom, setEffectiveFrom] = React.useState(
-    contract?.effectiveFrom ?? "",
-  );
-  const [effectiveTo, setEffectiveTo] = React.useState(
-    contract?.effectiveTo ?? "",
-  );
-  const [reference, setReference] = React.useState(contract?.reference ?? "");
-  const [notes, setNotes] = React.useState(contract?.notes ?? "");
-  const [mode, setMode] = React.useState<ContractFinancialMode>(initialMode);
-  const [clauses, setClauses] = React.useState<ContractClauseInputPayload[]>(
-    () =>
-      contract && contract.clauses.length > 0
-        ? contract.clauses.map((c) => ({
-            clientClauseId: c.id,
-            title: c.title,
-            body: c.body,
-          }))
-        : [createEmptyClause()],
-  );
-  const [lines, setLines] = React.useState<TradeEvidenceLineDraft[]>(() => {
-    if (contract && initialMode === "FINANCIAL") {
-      const snap = readTotalsSnapshot(contract.totalsSnapshot);
-      return [
-        {
-          ...createEmptyEvidenceLineDraft(),
-          unitPrice: snap.subtotal ?? "0",
-          discountAmount: snap.discountTotal ?? "0",
-          chargeAmount: snap.chargeTotal ?? "0",
-          taxRatePercent: "0",
-        },
-      ];
-    }
-    return [createEmptyEvidenceLineDraft()];
-  });
-
-  const computed = React.useMemo(
-    () =>
-      computeTradeEvidence(lines, {
-        dialect: "FINANCIAL",
-        currencyCode,
-      }),
-    [lines, currencyCode],
-  );
-
-  const clausesValid =
-    clauses.length > 0 &&
-    clauses.every((c) => c.title.trim().length > 0 && c.body.trim().length > 0);
-
-  const windowValid =
-    !effectiveFrom || !effectiveTo || effectiveTo >= effectiveFrom;
-
-  const canSubmit =
-    !write.isWriting &&
-    isUUIDv7(partyId.trim()) &&
-    /^[A-Z]{3}$/u.test(currencyCode.trim().toUpperCase()) &&
-    clausesValid &&
-    windowValid;
-
-  function updateClause(
-    index: number,
-    patch: Partial<ContractClauseInputPayload>,
-  ) {
-    setClauses((prev) =>
-      prev.map((row, idx) => (idx === index ? { ...row, ...patch } : row)),
-    );
-  }
-
-  async function handleSubmit() {
-    if (!canSubmit) return;
-    const payload = buildContractDraftContent({
-      partyId,
-      currencyCode,
-      effectiveFrom,
-      effectiveTo,
-      reference,
-      notes,
-      mode,
-      totalsSnapshot:
-        mode === "NON_FINANCIAL"
-          ? buildZeroFinancialTotals()
-          : {
-              subtotal: computed.subtotal,
-              discountTotal: computed.discountTotal,
-              chargeTotal: computed.chargeTotal,
-              taxTotal: computed.taxTotal,
-              roundingTotal: computed.roundingTotal,
-              grandTotal: computed.grandTotal,
-              amountPaid: "0",
-              amountDue: computed.grandTotal,
-            },
-      clauses,
-    });
-
-    const ok = await write.runWrite({
-      operation: isEdit ? td.executive.editContract : td.executive.newContract,
-      send: (idempotency) =>
-        contract
-          ? tradePatch(
-              tradeDocumentPath(CONTRACTS_PATH, contract.id),
-              payload,
-              {
-                headers: {
-                  ...headers,
-                  ...idempotency,
-                  "if-match": tradeIfMatch(contract.version),
-                },
-                maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
-              },
-            )
-          : tradePost(CONTRACTS_PATH, payload, {
-              headers: { ...headers, ...idempotency },
-              maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
-            }),
-    });
-
-    if (ok) {
-      onOpenChange(false);
-      await onSaved();
-    }
-  }
-
+export function ContractFormDrawer(props: ContractFormDrawerProps) {
+  const form = useContractFormDrawer(props);
+  const { t, td, write, isEdit } = form;
   return (
-    <FormDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={
-        isEdit
-          ? td.executive.editContractTitle
-          : td.executive.createContractTitle
-      }
+    <FormDrawer open={props.open} onOpenChange={(next) => { if (!write.isBlocked) props.onOpenChange(next); }}
+      title={isEdit ? td.executive.editContractTitle : td.executive.createContractTitle}
       description={td.executive.contractDrawerDescription}
-      isDirty={partyId !== "" || reference !== ""}
-      isSubmitting={write.isWriting}
-      submitDisabled={!canSubmit}
-      onSubmit={() => void handleSubmit()}
-      labels={{
-        submit: td.executive.saveContractDraft,
-        cancel: t.common.cancel,
-        discardTitle: t.common.discardTitle,
-        discardDescription: t.common.discardDescription,
-        discardConfirm: t.common.discardConfirm,
-        discardCancel: t.common.cancel,
-      }}
-    >
+      isDirty={form.partyId !== "" || form.reference !== ""}
+      isSubmitting={write.isWriting} submitDisabled={!form.canSubmit}
+      onSubmit={() => void form.handleSubmit()}
+      labels={{ submit: td.executive.saveContractDraft, cancel: t.common.cancel,
+        discardTitle: t.common.discardTitle, discardDescription: t.common.discardDescription,
+        discardConfirm: t.common.discardConfirm, discardCancel: t.common.cancel }}>
       <TradeWriteOutcome write={write} />
-
+      <TradeWriteFields write={write}>
       <div className="dossier-card dossier-card-indigo space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label={td.party} required>
-            <Input
-              size="sm"
-              value={partyId}
-              onChange={(e) => setPartyId(e.target.value)}
-              placeholder="UUIDv7"
-            />
+            <Input size="sm" value={form.partyId} readOnly={isEdit}
+              onChange={(e) => form.setPartyId(e.target.value)} placeholder="UUIDv7" />
           </Field>
           <Field label={td.currency} required hint={td.currencyHint}>
-            <Input
-              size="sm"
-              value={currencyCode}
-              onChange={(e) => setCurrencyCode(e.target.value.toUpperCase())}
-              placeholder="SAR"
-            />
+            <Input size="sm" value={form.currencyCode} readOnly={isEdit}
+              onChange={(e) => form.setCurrencyCode(e.target.value.toUpperCase())} placeholder="SAR" />
           </Field>
           <Field label={td.contracts.effectiveFrom}>
-            <Input
-              size="sm"
-              type="date"
-              value={effectiveFrom}
-              onChange={(e) => setEffectiveFrom(e.target.value)}
-              placeholder={td.contracts.effectiveFrom}
-            />
+            <Input size="sm" type="date" value={form.effectiveFrom}
+              onChange={(e) => form.setEffectiveFrom(e.target.value)} placeholder={td.contracts.effectiveFrom} />
           </Field>
           <Field label={td.contracts.effectiveTo}>
-            <Input
-              size="sm"
-              type="date"
-              value={effectiveTo}
-              onChange={(e) => setEffectiveTo(e.target.value)}
-              placeholder={td.contracts.effectiveTo}
-            />
+            <Input size="sm" type="date" value={form.effectiveTo}
+              onChange={(e) => form.setEffectiveTo(e.target.value)} placeholder={td.contracts.effectiveTo} />
           </Field>
           <Field label={td.reference}>
-            <Input
-              size="sm"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              placeholder={td.reference}
-            />
+            <Input size="sm" value={form.reference}
+              onChange={(e) => form.setReference(e.target.value)} placeholder={td.reference} />
           </Field>
           <Field label={td.executive.financialModeLabel}>
-            <Select
-              value={mode}
-              onValueChange={(v) => setMode(v as ContractFinancialMode)}
-            >
-              <SelectTrigger size="sm">
-                <SelectValue />
-              </SelectTrigger>
+            <Select value={form.mode} onValueChange={form.setMode} disabled={write.isBlocked}>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="NON_FINANCIAL">
-                  {td.executive.modeNonFinancial}
-                </SelectItem>
-                <SelectItem value="FINANCIAL">
-                  {td.executive.modeFinancial}
-                </SelectItem>
+                <SelectItem value="NON_FINANCIAL">{td.executive.modeNonFinancial}</SelectItem>
+                <SelectItem value="FINANCIAL">{td.executive.modeFinancial}</SelectItem>
               </SelectContent>
             </Select>
           </Field>
+          {isEdit ? <>
+            <Field label={td.executive.governingLawCountryLabel}>
+              <Input size="sm" value={typeof form.termsSnapshot.governingLawCountry === "string" ? form.termsSnapshot.governingLawCountry : ""}
+                onChange={(e) => form.updateTerm("governingLawCountry", e.target.value)} />
+            </Field>
+            <Field label={td.executive.terminationNoticeDaysLabel}>
+              <Input size="sm" inputMode="numeric"
+                value={typeof form.termsSnapshot.terminationNoticeDays === "number" || typeof form.termsSnapshot.terminationNoticeDays === "string" ? String(form.termsSnapshot.terminationNoticeDays) : ""}
+                onChange={(e) => form.updateTerm("terminationNoticeDays", e.target.value)} />
+            </Field>
+          </> : null}
           <div className="sm:col-span-2">
             <Field label={td.notes}>
-              <Input
-                size="sm"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={td.notes}
-              />
+              <Input size="sm" value={form.notes}
+                onChange={(e) => form.setNotes(e.target.value)} placeholder={td.notes} />
             </Field>
           </div>
         </div>
       </div>
 
-      {mode === "NON_FINANCIAL" ? (
+      {form.mode === "NON_FINANCIAL" ? (
         <div className="dossier-card dossier-card-emerald">
-          <p className="text-xs text-muted-foreground">
-            {td.executive.nonFinancialZeroHint}
-          </p>
+          <p className="text-xs text-muted-foreground">{td.executive.nonFinancialZeroHint}</p>
+        </div>
+      ) : isEdit ? (
+        <div className="dossier-card grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {FINANCIAL_TOTAL_KEYS.map((key) => (
+            <Field key={key} label={td.totals[key]} error={tradeDecimalError(form.editTotals[key]) ? td.lineEditor.decimalInvalid : undefined}>
+              <Input size="sm" inputMode="decimal" value={form.editTotals[key]}
+                readOnly={key === "amountPaid" || key === "amountDue" || key === "grandTotal"}
+                disabled={write.isBlocked} onChange={(e) => form.updateTotal(key, e.target.value)} />
+            </Field>
+          ))}
+          {!form.editTotalsValid ? <p role="alert" className="text-sm text-destructive">{td.lineEditor.calculationInvalid}</p> : null}
         </div>
       ) : (
-        <TradeFinancialLinesEditor
-          dialect="FINANCIAL"
-          currencyCode={currencyCode}
-          lines={lines}
-          onChangeLines={setLines}
-          disabled={write.isWriting}
-        />
+        <TradeFinancialLinesEditor dialect="FINANCIAL" currencyCode={form.currencyCode}
+          lines={form.lines} onChangeLines={form.setLines} disabled={write.isBlocked} />
       )}
 
       <div className="dossier-card dossier-card-violet space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="dossier-icon-pill dossier-ip-violet" aria-hidden>
-              <FileText className="h-4 w-4" />
-            </span>
-            <span className="text-sm font-semibold text-foreground">
-              {td.contracts.clauses}
-            </span>
+            <span className="dossier-icon-pill dossier-ip-violet" aria-hidden><FileText className="h-4 w-4" /></span>
+            <span className="text-sm font-semibold text-foreground">{td.contracts.clauses}</span>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setClauses((prev) => [...prev, createEmptyClause()])}
-          >
-            <Plus className="me-1.5 h-3.5 w-3.5" aria-hidden />
-            {td.executive.addClause}
+          <Button type="button" size="sm" variant="outline" onClick={form.addClause}>
+            <Plus className="me-1.5 h-3.5 w-3.5" aria-hidden />{td.executive.addClause}
           </Button>
         </div>
-
         <div className="space-y-3">
-          {clauses.map((clause, idx) => (
+          {form.clauses.map((clause, index) => (
             <div key={clause.clientClauseId} className="trade-clause-card space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="trade-clause-order-badge">
-                    <IdentifierText>{String(idx + 1)}</IdentifierText>
-                  </span>
+                  <span className="trade-clause-order-badge"><IdentifierText>{String(index + 1)}</IdentifierText></span>
                   <span className="text-xs font-semibold text-foreground">
-                    {td.executive.clauseOrderLabel}{" "}
-                    <IdentifierText>{String(idx + 1)}</IdentifierText>
+                    {td.executive.clauseOrderLabel}{" "}<IdentifierText>{String(index + 1)}</IdentifierText>
                   </span>
                 </div>
-                {clauses.length > 1 ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      setClauses((prev) => prev.filter((_, i) => i !== idx))
-                    }
-                    aria-label={td.executive.removeClause}
-                  >
+                {form.clauses.length > 1 ? (
+                  <Button type="button" size="sm" variant="ghost" onClick={() => form.removeClause(index)} aria-label={td.executive.removeClause}>
                     <Trash2 className="h-4 w-4 text-destructive" aria-hidden />
                   </Button>
                 ) : null}
               </div>
-
               <Field label={td.executive.clauseTitleLabel} required>
-                <Input
-                  size="sm"
-                  value={clause.title}
-                  onChange={(e) => updateClause(idx, { title: e.target.value })}
-                  placeholder={td.executive.clauseTitleLabel}
-                />
+                <Input size="sm" value={clause.title} onChange={(e) => form.updateClause(index, { title: e.target.value })} placeholder={td.executive.clauseTitleLabel} />
               </Field>
-
               <Field label={td.executive.clauseBodyLabel} required>
-                <Input
-                  size="sm"
-                  value={clause.body}
-                  onChange={(e) => updateClause(idx, { body: e.target.value })}
-                  placeholder={td.executive.clauseBodyLabel}
-                />
+                <Input size="sm" value={clause.body} onChange={(e) => form.updateClause(index, { body: e.target.value })} placeholder={td.executive.clauseBodyLabel} />
               </Field>
             </div>
           ))}
         </div>
       </div>
+      </TradeWriteFields>
     </FormDrawer>
   );
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildDeviceTokenCommand,
   buildPreferenceCommand,
   isCanonicalUuidV7,
-  readDeviceTokenReceipt,
+  readPreference,
+  readPreferences,
   readNotificationPage,
   readRuntimeConfig,
   requireNotificationUuid,
@@ -13,20 +13,14 @@ import {
 const ID = "019f0000-0000-7000-8000-000000000001";
 
 describe("admin notification contracts", () => {
-  it("builds the exact full preference snapshot and validates JSON objects", () => {
+  it("builds only the current in-app preference command", () => {
     expect(buildPreferenceCommand({
       notificationType: " tenant.user.invited ",
       inAppEnabled: true,
-      pushEnabled: false,
-      emailEnabled: true,
-      quietHoursText: '{"from":"22:00"}',
     })).toEqual({
       command: {
         notificationType: "tenant.user.invited",
         inAppEnabled: true,
-        pushEnabled: false,
-        emailEnabled: true,
-        quietHours: { from: "22:00" },
       },
       errors: {},
     });
@@ -34,32 +28,29 @@ describe("admin notification contracts", () => {
     expect(buildPreferenceCommand({
       notificationType: "",
       inAppEnabled: true,
-      pushEnabled: true,
-      emailEnabled: true,
-      quietHoursText: "[]",
     })).toEqual({
       command: null,
-      errors: { notificationType: "required", quietHours: "objectRequired" },
+      errors: { notificationType: "required" },
     });
   });
 
-  it("preserves the provider token exactly while trimming bounded metadata", () => {
-    expect(buildDeviceTokenCommand({
-      provider: "web-push",
-      token: "  opaque-provider-token  ",
-      deviceId: " browser-1 ",
-      platform: " web ",
+  it("rejects notification types longer than Core's limit", () => {
+    expect(buildPreferenceCommand({ notificationType: "a".repeat(129), inAppEnabled: false }))
+      .toEqual({ command: null, errors: { notificationType: "tooLong" } });
+  });
+
+  it("reads Core's minimal runtime config without provider or channel configuration", () => {
+    const config = {
       enabled: true,
-    })).toEqual({
-      command: {
-        provider: "web-push",
-        token: "  opaque-provider-token  ",
-        deviceId: "browser-1",
-        platform: "web",
-        enabled: true,
-      },
-      errors: {},
-    });
+      inAppEnabled: true,
+      realtimeEnabled: false,
+      previewLimit: 5,
+      pollIntervalMs: 60_000,
+    };
+    expect(readRuntimeConfig(config)).toEqual(config);
+    expect(() => readRuntimeConfig({ ...config, pollIntervalMs: 4_999 })).toThrow();
+    expect(() => readRuntimeConfig({ ...config, previewLimit: 21 })).toThrow();
+    expect(() => readRuntimeConfig({ ...config, inAppEnabled: "true" })).toThrow();
   });
 
   it("enforces canonical UUIDv7 ids and rejects unsafe destinations", () => {
@@ -83,16 +74,15 @@ describe("admin notification contracts", () => {
     expect(() => readRuntimeConfig({ enabled: true })).toThrow("NOTIFICATION_CONTRACT_INVALID");
   });
 
-  it("accepts empty optional device metadata emitted by the exact DTO", () => {
-    expect(readDeviceTokenReceipt({
-      id: ID,
-      provider: "web-push",
-      tokenHash: "b".repeat(64),
-      deviceId: "",
-      platform: "",
-      enabled: true,
-      lastSeenAt: "2026-08-12T10:00:00.000Z",
-      revokedAt: null,
-    })).toMatchObject({ deviceId: "", platform: "" });
+  it("reads in-app preferences and rejects missing required response fields", () => {
+    const preference = {
+      notificationType: "tenant.user.invited",
+      inAppEnabled: false,
+      updatedAt: "2026-08-12T10:00:00.000Z",
+    };
+    expect(readPreference(preference)).toEqual(preference);
+    expect(readPreferences([preference])).toEqual([preference]);
+    expect(() => readPreference({ ...preference, inAppEnabled: undefined })).toThrow();
+    expect(() => readPreferences([preference, preference])).toThrow();
   });
 });

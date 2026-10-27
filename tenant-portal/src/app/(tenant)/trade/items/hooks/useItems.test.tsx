@@ -63,7 +63,7 @@ beforeEach(() => {
   localStorage.clear();
   auth.mockReturnValue(session());
   get.mockImplementation(async (path: string, options: { headers: Record<string, string> }) => {
-    if (path.endsWith("/channels")) return { data: [] };
+    if (path.includes("/channels?")) return { data: { items: [], total: 0, page: 1, limit: 100 } };
     return page(options.headers["x-mutakamel-company-id"] ? [] : [ITEM]);
   });
   post.mockResolvedValue(page());
@@ -79,7 +79,7 @@ describe("Items operating context", () => {
     if (scope === "master") localStorage.setItem("tenant_trade_company", "__tenant__");
     let created = false;
     get.mockImplementation(async (path: string, options: { headers: Record<string, string> }) => {
-      if (path.endsWith("/channels")) return { data: [] };
+      if (path.includes("/channels?")) return { data: { items: [], total: 0, page: 1, limit: 100 } };
       return page(created && !options.headers["x-mutakamel-company-id"] ? [ITEM] : []);
     });
     post.mockImplementation(async (path: string) => {
@@ -131,7 +131,7 @@ describe("Items operating context", () => {
 
   it.each(["table", "card", "board"])("offers scope recovery and opens New item in the real %s view", async (view) => {
     localStorage.setItem("tenant_view_trade-items", view);
-    get.mockImplementation(async (path: string) => path.endsWith("/channels") ? { data: [] } : page());
+    get.mockImplementation(async (path: string) => path.includes("/channels?") ? { data: { items: [], total: 0, page: 1, limit: 100 } } : page());
     render(<TooltipProvider><TradeScopeProvider><ItemsWorkspace /></TradeScopeProvider></TooltipProvider>);
     await screen.findByText(en.trade.itemScopeEmpty);
     expect(screen.queryByText(en.trade.itemSearchNote)).toBeNull();
@@ -194,7 +194,7 @@ describe("Items operating context", () => {
     };
     const { comboComponents: _combo, optionalProducts: _optional, ...listRow } = detailItem;
     get.mockImplementation(async (path: string) => {
-      if (path.endsWith("/channels")) return { data: [] };
+      if (path.includes("/channels?")) return { data: { items: [], total: 0, page: 1, limit: 100 } };
       if (path === `/api/tenant/trade/v1/items/${ITEM.id}`) return { data: detailItem };
       return page([listRow]);
     });
@@ -239,7 +239,7 @@ describe("Items operating context", () => {
   });
 
   it("describes a genuinely empty master as a new catalog", async () => {
-    get.mockImplementation(async (path: string) => path.endsWith("/channels") ? { data: [] } : page());
+    get.mockImplementation(async (path: string) => path.includes("/channels?") ? { data: { items: [], total: 0, page: 1, limit: 100 } } : page());
     const { result } = mount();
     await waitFor(() => expect(result.current.scope.context.companyId).toBe(COMPANY));
     act(() => result.current.scope.selectCompany(null));
@@ -255,7 +255,7 @@ describe("Items operating context", () => {
   it("does not offer item creation to a reader without master management permission", async () => {
     auth.mockReturnValue({ user: { ...session().user, isTenantOwner: false, permissions: ["trade.items.read"] } });
     localStorage.setItem("tenant_trade_company", "__tenant__");
-    get.mockImplementation(async (path: string) => path.endsWith("/channels") ? { data: [] } : page());
+    get.mockImplementation(async (path: string) => path.includes("/channels?") ? { data: { items: [], total: 0, page: 1, limit: 100 } } : page());
     const { result } = mount();
     await waitFor(() => expect(result.current.items.isRefreshing).toBe(false));
     expect(result.current.items.canManage).toBe(false);
@@ -265,7 +265,7 @@ describe("Items operating context", () => {
   it("does not let a late company request overwrite the master result", async () => {
     let finishCompany: (result: ReturnType<typeof page>) => void = () => {};
     get.mockImplementation((path: string, options: { headers: Record<string, string> }) => {
-      if (path.endsWith("/channels")) return Promise.resolve({ data: [] });
+      if (path.includes("/channels?")) return Promise.resolve({ data: { items: [], total: 0, page: 1, limit: 100 } });
       if (options.headers["x-mutakamel-company-id"]) return new Promise((resolve) => { finishCompany = resolve; });
       return Promise.resolve(page([ITEM]));
     });

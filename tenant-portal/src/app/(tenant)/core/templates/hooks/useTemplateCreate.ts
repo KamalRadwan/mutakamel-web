@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/design-system";
+import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError } from "@/lib/api/errors";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { can } from "@/lib/auth/permission-scope";
 import { createTemplate, fetchCreationScopes, fetchTemplateStarters } from "../templates-api";
 import type { TemplateCreationScope, TemplateStarter } from "../template-discovery-contract";
 import {
   TEMPLATE_CODE_MAX,
+  TEMPLATE_CREATE_PERMISSION,
   TEMPLATE_NAME_MAX,
   type TemplateAdapterKey,
   type TemplateDirection,
@@ -59,6 +62,7 @@ export function useTemplateCreate(isOpen: boolean) {
   const { t } = useI18n();
   const toast = useToast();
   const router = useRouter();
+  const { user } = useTenantAuth();
   const copy = t.coreOperations.templates;
 
   const [values, setValues] = useState<TemplateCreateValues>(EMPTY_TEMPLATE_CREATE);
@@ -87,7 +91,9 @@ export function useTemplateCreate(isOpen: boolean) {
     return () => controller.abort();
   }, [isOpen]);
 
-  const scope = scopes[Number(values.scopeIndex)] ?? null;
+  const permittedScopes = scopes.filter((scope) => can(user, TEMPLATE_CREATE_PERMISSION,
+    { companyId: scope.type === "TENANT" ? null : scope.companyId }));
+  const scope = permittedScopes[Number(values.scopeIndex)] ?? null;
 
   useEffect(() => {
     if (!isOpen || !scope) return;
@@ -181,7 +187,7 @@ export function useTemplateCreate(isOpen: boolean) {
 
   return {
     values,
-    scopes,
+    scopes: permittedScopes,
     scope,
     scopesUnavailable,
     starters,

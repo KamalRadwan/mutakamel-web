@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isIdempotentReplay } from "@/lib/api/outcomes";
+import { canSendOutboundEmail } from "./useOutboundEmails";
 import {
   buildRetryRequest,
   isPendingDelivery,
@@ -23,21 +24,22 @@ const WRITE_CONFIG = {
   nonReplayable: true,
 } as const;
 
-export interface RetryResult {
-  ok: boolean;
-  replayed: boolean;
-  error: NormalizedApiError | null;
-}
+export type RetryResult =
+  | { ok: true; outboundEmailId: string; replayed: boolean; error: null }
+  | { ok: false; replayed: false; error: NormalizedApiError };
 
 /** `GET /outbound-emails/:id` and `POST /outbound-emails/:id/retry`. */
 export function useOutboundEmailDetail(outboundEmailId: string) {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const canSend = user?.permissions.includes("crm.email.send") ?? false;
+  const canSend = canSendOutboundEmail(user?.permissions);
   const [detail, setDetail] = useState<OutboundEmailDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const canRetry = canSend && !isLoading && !isRetrying &&
+    detail?.outboundEmailId === outboundEmailId && detail.status === "FAILED" &&
+    !detail.retriedById && detail.content.state === "AVAILABLE";
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -80,6 +82,18 @@ export function useOutboundEmailDetail(outboundEmailId: string) {
         error: { status: 403, code: "FORBIDDEN" },
       };
     }
+    if (!canRetry) {
+      return {
+        ok: false,
+        replayed: false,
+        error: {
+          status: 409,
+          code: detail?.retriedById
+            ? "CRM.EMAIL.RETRY_ALREADY_CREATED"
+            : "CRM.EMAIL.RETRY_NOT_ALLOWED",
+        },
+      };
+    }
     let body: Record<string, unknown>;
     try {
       body = buildRetryRequest(reason);
@@ -102,10 +116,13 @@ export function useOutboundEmailDetail(outboundEmailId: string) {
       );
       // Parsed to prove the 202 body is the accepted shape before the screen
       // claims anything about it.
-      parseAcceptedResponse(response.data);
-      await load();
+      const accepted = parseAcceptedResponse(response.data);
+      setDetail((current) => current?.outboundEmailId === outboundEmailId
+        ? { ...current, retriedById: accepted.outboundEmailId }
+        : current);
       return {
         ok: true,
+        outboundEmailId: accepted.outboundEmailId,
         replayed: isIdempotentReplay(response.headers),
         error: null,
       };
@@ -125,6 +142,7 @@ export function useOutboundEmailDetail(outboundEmailId: string) {
     queryError,
     notFound: queryError?.status === 404,
     canSend,
+    canRetry,
     // Delivery state is written by the worker pipeline after the fact, so a
     // QUEUED or DISPATCHING row is expected to change without anything the
     // user did. The screen says so and offers a refresh.

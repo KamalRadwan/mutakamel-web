@@ -213,6 +213,32 @@ describe("TradeQuickInspectModal", () => {
 });
 
 describe("TradeFinancialLinesEditor", () => {
+  it("connects inline numeric errors to the unchanged input and hides invalid totals", () => {
+    const lines = [{ ...createEmptyEvidenceLineDraft(), quantity: "-2", taxRatePercent: "15oops" }];
+    render(<TradeFinancialLinesEditor dialect="FINANCIAL" currencyCode="SAR"
+      lines={lines} onChangeLines={vi.fn()} />);
+    const quantity = screen.getByPlaceholderText(en.tradeDocuments.quantity);
+    expect(quantity).toHaveValue("-2");
+    expect(quantity).toHaveAttribute("aria-invalid", "true");
+    expect(quantity).toHaveAccessibleDescription(en.tradeDocuments.lineEditor.decimalInvalid);
+    expect(screen.getByText(en.tradeDocuments.lineEditor.taxRateInvalid)).toBeVisible();
+    expect(screen.queryByText(en.tradeDocuments.executive.computedSubtotal)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.tradeDocuments.executive.evidenceVerifiedBadge)).not.toBeInTheDocument();
+  });
+
+  it("keeps engine prices read-only and hides evidence while pricing is pending", () => {
+    const lines = [{ ...createEmptyEvidenceLineDraft(), unitPrice: "25" }];
+    const { rerender } = render(<TradeFinancialLinesEditor dialect="ORDER" currencyCode="SAR"
+      lines={lines} onChangeLines={vi.fn()} pricing={{ ready: false, error: null }} />);
+    expect(screen.getByPlaceholderText(en.tradeDocuments.unitPrice)).toHaveAttribute("readonly");
+    expect(screen.getByRole("status")).toHaveTextContent(en.tradeDocuments.lineEditor.awaitingPrice);
+    expect(screen.queryByText(en.tradeDocuments.executive.computedSubtotal)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.tradeDocuments.executive.evidenceVerifiedBadge)).not.toBeInTheDocument();
+    rerender(<TradeFinancialLinesEditor dialect="ORDER" currencyCode="SAR"
+      lines={lines} onChangeLines={vi.fn()} pricing={{ ready: true, error: null }} />);
+    expect(screen.getByText(en.tradeDocuments.executive.computedSubtotal)).toBeVisible();
+  });
+
   it("adds lines and computes live financial evidence totals", () => {
     function Harness() {
       const [lines, setLines] = React.useState(() => [

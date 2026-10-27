@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { createElement, type ReactNode } from "react";
+import { createElement, type FormEvent, type ReactNode } from "react";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n/I18nContext";
@@ -95,6 +95,30 @@ describe("useActionTokenPassword accepted invite", () => {
   // workspace holding the cookies and no session metadata: the one tab that
   // cannot refresh itself, because a refresh is coordinated against a session
   // id this tab would not have.
+  it("keeps an enrolled invitation at the code step until verification succeeds", async () => {
+    window.location.hash = `#token=${VALID_TOKEN}`;
+    const step = { mfaRequired: true, challengeId: "a".repeat(43), expiresIn: 600, resendAfterSeconds: 60 };
+    const request = vi.fn(async (url: string) => url.endsWith("/accept-invite")
+      ? jsonResponse({ data: step }) : jsonResponse(webAuthResponse()));
+    vi.stubGlobal("fetch", request);
+    const { result } = renderHook(() => useActionTokenPassword("accept-invite"), { wrapper });
+    await waitFor(() => expect(result.current.state).toBe("ready"));
+    act(() => {
+      result.current.setNewPassword(NEW_PASSWORD);
+      result.current.setConfirmPassword(NEW_PASSWORD);
+    });
+    await act(async () => result.current.submit());
+    expect(result.current.mfa.step).toMatchObject(step);
+    expect(result.current.newPassword).toBe("");
+    expect(replace).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
+    act(() => result.current.mfa.setCode("012345"));
+    await act(async () => result.current.mfa.submit({ preventDefault: vi.fn() } as unknown as FormEvent));
+    expect(replace).toHaveBeenCalledWith("/");
+    expect(window.sessionStorage.getItem("tenant_session_meta")).not.toBeNull();
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it("commits the issued session so the new user can refresh it", async () => {
     window.location.hash = `#token=${VALID_TOKEN}`;
     const requested: string[] = [];
@@ -155,6 +179,52 @@ describe("useActionTokenPassword accepted invite", () => {
 
     expect(replace).toHaveBeenCalledWith("/login");
     expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
+  });
+});
+
+describe.each(["accept-invite", "reset-password"] as const)("%s password feedback", (flow) => {
+  beforeEach(() => resetBrowser());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it.each([
+    [400, undefined, "ready"],
+    [422, "WEAK_PASSWORD", "ready"],
+    [400, "INVALID_ACTION_TOKEN", "rejected"],
+    [503, "GW.RATE.UNAVAILABLE", "ready"],
+  ] as const)("handles HTTP %s / %s without confusing password and token failures", async (status, code, state) => {
+    window.location.hash = `#token=${VALID_TOKEN}`;
+    const request = vi.fn(async () => jsonResponse({
+      errorCode: code,
+      message: "server error",
+      correlationId: "password-action-reference",
+    }, status));
+    vi.stubGlobal("fetch", request);
+    const { result } = renderHook(() => useActionTokenPassword(flow), { wrapper });
+    await waitFor(() => expect(result.current.state).toBe("ready"));
+
+    act(() => {
+      result.current.setNewPassword("Quokka7مرحباTree");
+      result.current.setConfirmPassword("Quokka7مرحباTree");
+    });
+    await act(async () => { await result.current.submit(); });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(result.current.state).toBe(state);
+    expect(result.current.error).toMatchObject({
+      status,
+      correlationId: "password-action-reference",
+      message: status === 422 || (status === 400 && !code)
+        ? result.current.t.coreIdentity.actionToken.passwordPolicy
+        : status === 503
+          ? result.current.t.auth.temporarilyUnavailable
+          : "server error",
+    });
+    expect(result.current.newPassword).toBe("Quokka7مرحباTree");
+    expect(replace).not.toHaveBeenCalled();
   });
 });
 

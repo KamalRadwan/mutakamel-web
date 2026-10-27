@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import {
+  LEAD_STAGES_PATH,
   buildLeadStageReorderRequest,
   canBeDefaultLeadStage,
   parseLeadStageCatalogueResponse,
@@ -11,11 +14,9 @@ import {
   type LeadStageItem,
 } from "../lead-stage-contract";
 import {
-  LEAD_STAGES_PATH,
   LEAD_STAGES_REORDER_PATH,
   NON_REPLAYABLE_MUTATION,
   REPLAYABLE_MUTATION,
-  leadStageErrorMessage,
 } from "./lead-stage-requests";
 import type { LeadStageCataloguePort } from "./useLeadStageMutations";
 
@@ -27,6 +28,7 @@ export function useLeadStageOrdering({
   notify,
 }: Omit<LeadStageCataloguePort, "onCreated">) {
   const { t } = useI18n();
+  const errorText = useCrmErrorText();
   const [isReordering, setIsReordering] = useState(false);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
@@ -75,7 +77,7 @@ export function useLeadStageOrdering({
       // Roll back AND say why: a silent revert leaves the user watching their
       // own change undo itself (docs/design/states.md, state 8).
       setItems(previous);
-      notify(leadStageErrorMessage(caught, t.crmLeadStages.reorderFailed));
+      notify(errorText(normalizeApiError(caught)) ?? t.crmLeadStages.reorderFailed);
       await reconcile();
     } finally {
       setIsReordering(false);
@@ -122,7 +124,7 @@ export function useLeadStageOrdering({
       }
     } catch (caught) {
       await reconcile();
-      notify(leadStageErrorMessage(caught, t.crmLeadStages.defaultFailed));
+      notify(errorText(normalizeApiError(caught)) ?? t.crmLeadStages.defaultFailed);
     } finally {
       setSettingDefaultId(null);
     }

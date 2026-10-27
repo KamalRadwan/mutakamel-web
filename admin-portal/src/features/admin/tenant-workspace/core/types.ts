@@ -83,7 +83,7 @@ export interface TenantStorageServerSummary {
   code: string;
   name: string;
   region: string;
-  status: "DRAFT" | "ACTIVE" | "OFFLINE";
+  status: "DRAFT" | "ACTIVE" | "DRAINING" | "OFFLINE";
 }
 
 export interface TenantView {

@@ -94,7 +94,7 @@ export function formatCurrencyAmount(
   amount: string | null,
   currencyCode: string | null,
 ): string {
-  if (amount === null || !/^-?\d+(?:\.\d{1,2})?$/.test(amount)) return "—";
+  if (amount === null || !/^-?\d+(?:\.\d{1,3})?$/.test(amount)) return "—";
   const negative = amount.startsWith("-");
   const unsigned = negative ? amount.slice(1) : amount;
   const [whole, fraction = ""] = unsigned.split(".");

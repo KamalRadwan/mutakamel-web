@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../trade-api";
 import { TRADE_DOCUMENT_RESPONSE_BYTES, tradeDocumentPath } from "../trade-document-contract";
@@ -34,22 +34,37 @@ export function useTradeDocumentDetail<T>(
   parse: (payload: unknown) => T,
 ): TradeDocumentDetailState<T> {
   const scope = useTradeDocumentScope();
-  const [document, setDocument] = useState<T | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [isMissing, setIsMissing] = useState(false);
-  const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
+  const [result, setResult] = useState<{
+    key: string;
+    document: T | null;
+    isLoading: boolean;
+    isMissing: boolean;
+    error: NormalizedApiError | null;
+  } | null>(null);
+  const activeKey = useRef<string | null>(null);
+  const request = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
 
   const { isResolved, headers } = scope;
+  const requestKey = JSON.stringify([
+    basePath, id, scope.userId, isResolved,
+    Object.entries(headers).sort(([a], [b]) => a.localeCompare(b)),
+  ]);
+  // Hide obsolete details before the new route or scope's effect runs.
+  const current = isResolved && result?.key === requestKey ? result : null;
+  // Revisiting a previous scope must still require a fresh authorized read.
+  if (result && result.key !== requestKey) setResult(null);
 
   const load = useCallback(
-    async (signal?: AbortSignal): Promise<T | null> => {
-      if (!isResolved) {
-        setIsLoading(false);
-        return null;
-      }
-      setIsLoading(true);
-      setLoadError(null);
+    async (): Promise<T | null> => {
+      if (!isResolved || activeKey.current !== requestKey) return null;
+      request.current.controller?.abort();
+      const controller = new AbortController();
+      const { signal } = controller;
+      const generation = request.current.generation + 1;
+      request.current = { generation, controller };
+      const isCurrent = () => !signal.aborted && activeKey.current === requestKey &&
+        request.current.generation === generation;
+      setResult({ key: requestKey, document: null, isLoading: true, isMissing: false, error: null });
       try {
         const result = await tradeGet(tradeDocumentPath(basePath, id), {
           signal,
@@ -57,38 +72,41 @@ export function useTradeDocumentDetail<T>(
           maxResponseBytes: TRADE_DOCUMENT_RESPONSE_BYTES,
         });
         const parsed = parse(result.data);
-        setDocument(parsed);
-        setIsMissing(false);
-        setHasLoaded(true);
+        if (!isCurrent()) return null;
+        setResult({ key: requestKey, document: parsed, isLoading: false, isMissing: false, error: null });
         return parsed;
       } catch (error) {
-        if (isAbortError(error)) return null;
+        if (!isCurrent() || isAbortError(error)) return null;
         const normalized = normalizeApiError(error);
-        if (normalized.status === 404) setIsMissing(true);
-        else setLoadError(normalized);
+        setResult({ key: requestKey, document: null, isLoading: false,
+          isMissing: normalized.status === 404, error: normalized.status === 404 ? null : normalized });
         return null;
-      } finally {
-        if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [basePath, id, isResolved, headers, parse],
+    [basePath, id, isResolved, headers, parse, requestKey],
   );
 
   useEffect(() => {
-    const controller = new AbortController();
+    activeKey.current = requestKey;
+    let disposed = false;
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(controller.signal);
+      if (!disposed) void load();
     });
-    return () => controller.abort();
-  }, [load]);
+    return () => {
+      disposed = true;
+      activeKey.current = null;
+      request.current.controller?.abort();
+      request.current.generation += 1;
+    };
+  }, [load, requestKey]);
 
   return {
     scope,
-    document,
-    isLoading: isLoading && !hasLoaded,
-    isRefreshing: isLoading,
-    isMissing,
-    loadError,
+    document: current?.document ?? null,
+    isLoading: isResolved && (!current || current.isLoading),
+    isRefreshing: isResolved && (!current || current.isLoading),
+    isMissing: current?.isMissing ?? false,
+    loadError: current?.error ?? null,
     reload: () => load(),
   };
 }

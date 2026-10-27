@@ -99,32 +99,33 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("the lead's related records", () => {
-  it("counts each resource against the id that resource is filed under", async () => {
+  it("counts each resource against the party id and links to party-scoped destination pages", async () => {
     renderNav();
 
     await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
-    // Opportunities carry `leadId`. Filtering them by the party would answer a
-    // different question — every opportunity that party has ever had.
     const [searchPath, searchBody] = api.post.mock.calls[0];
     expect(searchPath).toBe("/api/tenant/crm/v1/opportunities/search");
     expect(searchBody).toMatchObject({
       branchId: BRANCH_ID,
-      filterTree: { field: "leadId", operator: "eq", value: LEAD_ID },
+      filterTree: { field: "customerPartyId", operator: "eq", value: PARTY_ID },
       limit: 1,
     });
 
-    // A trade document has never heard of a lead: it is filed against a party.
     const paths = api.get.mock.calls.map((call: unknown[]) => String(call[0]));
     expect(paths).toHaveLength(3);
     for (const path of paths) expect(path).toContain(`partyId=${PARTY_ID}`);
   });
 
-  it("shows each count beside its own link", async () => {
+  it("shows each count beside its own link with ?partyId query", async () => {
     renderNav();
     await waitFor(() => expect(link("opportunities")).toHaveTextContent("2"));
     expect(link("quotations")).toHaveTextContent("3");
     expect(link("salesOrders")).toHaveTextContent("4");
     expect(link("invoices")).toHaveTextContent("5");
+    expect(link("opportunities")).toHaveAttribute("href", `/crm/opportunities?partyId=${PARTY_ID}`);
+    expect(link("quotations")).toHaveAttribute("href", `/trade/quotations?partyId=${PARTY_ID}`);
+    expect(link("salesOrders")).toHaveAttribute("href", `/trade/sales-orders?partyId=${PARTY_ID}`);
+    expect(link("invoices")).toHaveAttribute("href", `/trade/invoices?partyId=${PARTY_ID}`);
     // The number is in the accessible name too — the badge alone is a bare
     // digit with no noun attached to it.
     expect(link("invoices")).toHaveAccessibleName(`${copy.labels.invoices}: 5`);

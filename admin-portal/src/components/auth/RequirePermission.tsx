@@ -7,4 +7,4 @@
 export {
   PermissionGate as RequirePermission,
   useHasPermission,
-} from "@/design-system/patterns/permission-gate/PermissionGate";
+} from "@/design-system";

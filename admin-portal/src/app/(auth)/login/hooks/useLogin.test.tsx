@@ -31,6 +31,29 @@ describe("forgot-password transport policy", () => {
     vi.clearAllMocks();
   });
 
+  it("shows Core's cooldown and blocks a second submit", async () => {
+    loginMock.mockRejectedValueOnce({ response: {
+      status: 429, headers: new Headers({ "Retry-After": "90" }),
+      data: { errorCode: "AUTH_LOGIN_THROTTLED" },
+    } });
+    const { result, unmount } = renderHook(() => useLogin());
+    act(() => { result.current.setEmail("admin@example.com"); result.current.setPassword("password"); });
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(result.current.isCoolingDown).toBe(true);
+    expect(result.current.error).toContain("2");
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(loginMock).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("localizes login 503 failures", async () => {
+    loginMock.mockRejectedValueOnce({ response: { status: 503, data: { message: "raw upstream text" } } });
+    const { result } = renderHook(() => useLogin());
+    act(() => { result.current.setEmail("admin@example.com"); result.current.setPassword("password"); });
+    await act(async () => { await result.current.handleSubmit(); });
+    expect(result.current.error).toBe("Authentication is temporarily unavailable. Please try again later.");
+  });
+
   it("sends the public non-idempotent request without a key or replay", async () => {
     const { result } = renderHook(() => useLogin());
     act(() => result.current.setEmail(" admin+ops@sub.example.com "));

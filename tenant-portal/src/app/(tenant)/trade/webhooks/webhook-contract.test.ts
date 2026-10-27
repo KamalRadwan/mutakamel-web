@@ -99,8 +99,8 @@ describe("Trade webhooks contract", () => {
   });
 
   it("bounds maxAttempts and overlapHours the way the DTOs do", () => {
-    expect(buildRotateSecretRequest("24")).toEqual({ overlapHours: 24 });
-    expect(() => buildRotateSecretRequest("169")).toThrow("WEBHOOK_FORM_OVERLAP");
+    expect(buildRotateSecretRequest("30")).toEqual({ overlapHours: 30 });
+    expect(buildRotateSecretRequest(" 168 ")).toEqual({ overlapHours: 168 });
     expect(() =>
       buildCreateWebhookSubscriptionRequest(
         {
@@ -115,6 +115,13 @@ describe("Trade webhooks contract", () => {
       ),
     ).toThrow("WEBHOOK_FORM_ATTEMPTS");
   });
+
+  it.each(["", " ", "0", "1", "24", "29", "29.9", "30.5", "169", "NaN", "Infinity"])(
+    "rejects rotation overlap outside the retry horizon or integer range: %s",
+    (overlapHours) => {
+      expect(() => buildRotateSecretRequest(overlapHours)).toThrow("WEBHOOK_FORM_OVERLAP");
+    },
+  );
 
   it("requires a code-shaped reason on a retry", () => {
     expect(buildRetryDeliveryRequest("manual_replay")).toEqual({

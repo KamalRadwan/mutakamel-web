@@ -124,12 +124,12 @@ export default function InventoryDecisionPage({
                   {t.tradeInventory.outcome}
                 </span>
                 {decision.outcome === "ALLOW" ? (
-                  <CheckCircle2 className="size-4 text-positive-600" aria-hidden="true" />
+                  <CheckCircle2 className={cn("size-4", SWATCH_SURFACE_PALETTES.green.iconText)} aria-hidden="true" />
                 ) : (
-                  <ShieldAlert className="size-4 text-negative-600" aria-hidden="true" />
+                  <ShieldAlert className={cn("size-4", SWATCH_SURFACE_PALETTES.red.iconText)} aria-hidden="true" />
                 )}
               </div>
-              <span className="font-mono text-lg font-semibold text-foreground">
+              <span dir="ltr" className="font-mono text-lg font-semibold text-foreground">
                 {decision.outcome
                   ? tradeStatusLabel(
                       t.tradeStatus,
@@ -151,7 +151,7 @@ export default function InventoryDecisionPage({
                 <span className="text-xs font-semibold text-foreground">
                   {t.tradeInventory.decisionType}
                 </span>
-                <Gavel className="size-4 text-brand-600" aria-hidden="true" />
+                <Gavel className={cn("size-4", SWATCH_SURFACE_PALETTES.purple.iconText)} aria-hidden="true" />
               </div>
               <span className="text-xs font-semibold text-foreground">
                 {tradeStatusLabel(
@@ -173,7 +173,7 @@ export default function InventoryDecisionPage({
                 <span className="text-xs font-semibold text-foreground">
                   {t.tradeInventory.aggregateType}
                 </span>
-                <Layers className="size-4 text-positive-600" aria-hidden="true" />
+                <Layers className={cn("size-4", SWATCH_SURFACE_PALETTES.teal.iconText)} aria-hidden="true" />
               </div>
               <span className="text-xs font-semibold text-foreground">
                 {tradeStatusLabel(
@@ -195,7 +195,7 @@ export default function InventoryDecisionPage({
                 <span className="text-xs font-semibold text-foreground">
                   {t.tradeInventory.evaluatedAt}
                 </span>
-                <Clock className="size-4 text-caution-600" aria-hidden="true" />
+                <Clock className={cn("size-4", SWATCH_SURFACE_PALETTES.amber.iconText)} aria-hidden="true" />
               </div>
               <span className="text-xs font-semibold text-foreground">
                 {formatDateTime(decision.evaluatedAt, lang)}

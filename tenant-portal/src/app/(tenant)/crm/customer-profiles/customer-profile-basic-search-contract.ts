@@ -4,7 +4,7 @@ import type {
   CrmSearchRequestBody,
 } from "../shared/search/filter-tree";
 
-export type CustomerProfileTextSearchField = "customer" | "email" | "phone";
+type CustomerProfileTextSearchField = "customer" | "email" | "phone";
 export type CustomerProfileSearchFieldId =
   | CustomerProfileTextSearchField
   | "status"

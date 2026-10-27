@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   Archive,
-  ArrowLeftRight,
   Calculator,
   CheckCircle2,
   Clock,
@@ -23,7 +22,6 @@ import {
   Card,
   cn,
   DataTable,
-  DegradedBanner,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -42,10 +40,10 @@ import { formatDateTime } from "@/lib/format/date";
 import { formatTemplate } from "@/lib/format/template";
 import { tradeStatusLabel } from "../../trade-advanced-validation";
 import { InventoryModuleSubnav } from "../components/InventoryModuleSubnav";
+import { InventoryListPagination } from "../components/InventoryListPagination";
 import { INVENTORY_READ_PERMISSION } from "../inventory-contract";
 import {
   CONVERSION_REASON_PRESETS,
-  INVENTORY_LIST_LIMIT,
   UOM_CONVERSION_STATUSES,
   convertQuantityPreview,
   type InventoryUomConversion,
@@ -78,6 +76,8 @@ export default function UomConversionsPage() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     statusFilter,
     isLoading,
     isRefreshing,
@@ -142,7 +142,7 @@ export default function UomConversionsPage() {
           <IdentifierText className="text-xs font-semibold">
             {row.itemCompanyProfileId}
           </IdentifierText>
-          <span className="font-mono text-2xs text-muted-foreground">
+          <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
             {row.fromUomId.slice(0, 8)} → {row.toUomId.slice(0, 8)}
           </span>
         </div>
@@ -155,7 +155,7 @@ export default function UomConversionsPage() {
       // Both halves are `bigint` columns and stay exact strings — a ratio
       // rendered through Number() would round at 2^53.
       cell: (row) => (
-        <span className="inline-flex items-center gap-1 rounded-md border border-info/30 bg-info-subtle/40 px-2 py-0.5 font-mono text-xs font-semibold text-info-subtle-foreground">
+        <span dir="ltr" className="inline-flex items-center gap-1 rounded-md border border-info/30 bg-info-subtle/40 px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-info-subtle-foreground">
           {row.factorNumerator} : {row.factorDenominator}
         </span>
       ),
@@ -273,55 +273,38 @@ export default function UomConversionsPage() {
         className="sr-only"
         title={t.tradeInventory.conversionsTitle}
         description={t.tradeInventory.conversionsSubtitle}
-      />
-
-      {/* Colorful Header Banner */}
-      <Card className="flex flex-wrap items-center justify-between gap-3 border border-border/70 bg-gradient-to-r from-card via-card to-brand/5 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg border border-brand/30 bg-brand-subtle text-brand-subtle-foreground">
-            <ArrowLeftRight className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-foreground">
-                {t.tradeInventory.conversionsTitle}
-              </h1>
-              <Badge tone="brand">
-                {isAr ? "نسب كسرية bigint" : "Exact Rational Factors"}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t.tradeInventory.conversionsSubtitle}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <TenantBranchSelect
-            branchIds={branchIds}
-            branchId={branchId}
-            onChange={selectBranch}
-            disabled={isRefreshing}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void reload()}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={isRefreshing ? "size-4 animate-spin" : "size-4"}
-              aria-hidden="true"
+        primaryAction={
+          canManage
+            ? {
+                label: t.tradeInventory.conversionCreate,
+                icon: <Plus className="size-4" aria-hidden="true" />,
+                onClick: openCreate,
+              }
+            : undefined
+        }
+        secondaryActions={
+          <>
+            <TenantBranchSelect
+              branchIds={branchIds}
+              branchId={branchId}
+              onChange={selectBranch}
+              disabled={isRefreshing}
             />
-            {t.tradeCommon.reload}
-          </Button>
-          {canManage ? (
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="size-4" aria-hidden="true" />
-              {t.tradeInventory.conversionCreate}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void reload()}
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={isRefreshing ? "size-4 animate-spin" : "size-4"}
+                aria-hidden="true"
+              />
+              {t.tradeCommon.reload}
             </Button>
-          ) : null}
-        </div>
-      </Card>
+          </>
+        }
+      />
 
       {isScopeResolved ? (
         <>
@@ -442,13 +425,7 @@ export default function UomConversionsPage() {
             </div>
           </Card>
 
-          {items.length === INVENTORY_LIST_LIMIT ? (
-            <DegradedBanner
-              message={formatTemplate(t.tradeCommon.limitOnlyCapped, {
-                limit: INVENTORY_LIST_LIMIT,
-              })}
-            />
-          ) : null}
+          <InventoryListPagination page={pagination} onPageChange={setPage} isRefreshing={isRefreshing} />
 
           {viewMode === "bento" ? (
             filteredItems.length === 0 && !isLoading ? (
@@ -504,23 +481,24 @@ export default function UomConversionsPage() {
                           )}
                         >
                           <div className="flex items-center gap-1.5 text-xs font-semibold">
-                            <span className="rounded-md bg-card/80 px-2 py-1 font-mono">
+                            <span dir="ltr" className="rounded-md bg-card/80 px-2 py-1 font-mono">
                               1 {row.fromUomId.slice(0, 8)}
                             </span>
                             <span className="text-muted-foreground">=</span>
                             <span
+                              dir="ltr"
                               className={cn(
-                                "rounded-md px-2.5 py-1 font-mono text-sm font-semibold",
+                                "rounded-md px-2.5 py-1 font-mono text-sm font-semibold tabular-nums",
                                 palette.badge,
                               )}
                             >
                               {row.factorNumerator} / {row.factorDenominator}
                             </span>
-                            <span className="rounded-md bg-card/80 px-2 py-1 font-mono">
+                            <span dir="ltr" className="rounded-md bg-card/80 px-2 py-1 font-mono">
                               {row.toUomId.slice(0, 8)}
                             </span>
                           </div>
-                          <span className="font-mono text-2xs text-muted-foreground">
+                          <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
                             v{row.version}
                           </span>
                         </div>
@@ -538,7 +516,7 @@ export default function UomConversionsPage() {
                             <span className="text-2xs text-muted-foreground">
                               {isAr ? "نسخة التزامن" : "If-Match Version"}
                             </span>
-                            <span className="font-mono font-medium text-foreground">
+                            <span dir="ltr" className="font-mono font-medium text-foreground">
                               v{row.version}
                             </span>
                           </div>
@@ -784,7 +762,7 @@ export default function UomConversionsPage() {
                       ? "محاكي تحويل الكميات الدقيق (Exact Rational Simulator)"
                       : "Interactive Exact Rational Quantity Simulator"}
                   </span>
-                  <span className="font-mono text-xs font-semibold text-info-subtle-foreground">
+                  <span dir="ltr" className="font-mono text-xs font-semibold tabular-nums text-info-subtle-foreground">
                     {selectedConversion.factorNumerator} : {selectedConversion.factorDenominator}
                   </span>
                 </div>
@@ -795,12 +773,15 @@ export default function UomConversionsPage() {
                       {isAr ? "كمية وحدة المصدر (From UOM)" : "Input Quantity (From UOM)"}
                     </label>
                     <div className="flex items-center gap-2">
-                      <input
+                      <Input
+                        size="sm"
                         type="text"
                         inputMode="numeric"
+                        dir="ltr"
                         value={simulatorQty}
                         onChange={(e) => setSimulatorQty(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-border bg-card px-3 font-mono text-sm font-semibold text-foreground focus:border-primary focus:outline-none"
+                        placeholder="1"
+                        className="font-mono font-semibold tabular-nums"
                       />
                       <IdentifierText className="shrink-0 rounded-md bg-muted px-2 py-1 text-2xs">
                         {selectedConversion.fromUomId.slice(0, 8)}
@@ -812,7 +793,7 @@ export default function UomConversionsPage() {
                     <label className="text-2xs font-medium text-muted-foreground">
                       {isAr ? "الكمية المحولة (To UOM)" : "Converted Output (To UOM)"}
                     </label>
-                    <div className="flex h-9 items-center justify-between rounded-lg border border-info/40 bg-card px-3 font-mono text-sm font-semibold text-info-subtle-foreground">
+                    <div dir="ltr" className="flex h-8 items-center justify-between rounded-lg border border-info/40 bg-card px-3 font-mono text-sm font-semibold tabular-nums text-info-subtle-foreground">
                       <span>{simulatedOutput ?? "—"}</span>
                       <IdentifierText className="rounded-md bg-muted px-2 py-0.5 text-2xs text-foreground">
                         {selectedConversion.toUomId.slice(0, 8)}
@@ -868,7 +849,7 @@ export default function UomConversionsPage() {
                     <Clock className="size-3" aria-hidden="true" />
                     {isAr ? "رقم المراجعة" : "Revision Number"}
                   </span>
-                  <span className="mt-1 block font-mono text-xs font-semibold text-foreground">
+                  <span dir="ltr" className="mt-1 block font-mono text-xs font-semibold text-foreground">
                     Rev #{selectedConversion.revisionNumber} · v{selectedConversion.version}
                   </span>
                 </div>

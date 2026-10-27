@@ -138,6 +138,10 @@ export interface TenantProvisioningController {
   requestPrerequisites: (
     dto: RequestTenantPrerequisiteDto,
   ) => Promise<TenantPrerequisiteRequest>;
+  recoverPrerequisite: (
+    action: "resend-release" | "close-failed",
+    dto: RequestTenantPrerequisiteDto,
+  ) => ReturnType<typeof tenantProvisioningApi.recoverPrerequisite>;
   addApplication: (
     dto: CreateAddApplicationOperationDto,
   ) => Promise<ManagedProvisioningOperation>;
@@ -503,7 +507,6 @@ export function useTenantProvisioning(
         : false);
     const prerequisitePending = prerequisites.data.some(
       (request) =>
-        request.status !== "FAILED" &&
         (request.status !== "RELEASED" ||
           (request.maintenanceFence !== null &&
             request.maintenanceFence.status !== "RELEASED")),
@@ -733,6 +736,18 @@ export function useTenantProvisioning(
     ],
   );
 
+  const recoverPrerequisite = useCallback(
+    (action: "resend-release" | "close-failed", dto: RequestTenantPrerequisiteDto) =>
+      runCommand(
+        action,
+        action === "resend-release" ? permissions.canResendRelease : permissions.canCloseFailed,
+        { tenantId, dto },
+        (key) => tenantProvisioningApi.recoverPrerequisite(tenantId, action, dto, key),
+        (result) => refreshAfterOperation(result.operationId),
+      ),
+    [permissions.canResendRelease, permissions.canCloseFailed, refreshAfterOperation, runCommand, tenantId],
+  );
+
   const addApplication = useCallback(
     async (dto: CreateAddApplicationOperationDto) => {
       validateAddApplicationInput(dto);
@@ -906,6 +921,7 @@ export function useTenantProvisioning(
     resyncOperation,
     applyUpdates,
     requestPrerequisites,
+    recoverPrerequisite,
     addApplication,
     repair,
     decommission,

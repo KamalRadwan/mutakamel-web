@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readMigrationPermissions } from "../model/migration-permissions";
 import type {
   MigrationRun,
   MigrationTenantResult,
@@ -277,6 +278,7 @@ describe("MigrationRunDetailScreen permission gating", () => {
       canAbort: true,
       canRetryFailed: true,
     };
+    detailMock.control.mockClear();
   });
 
   it("fails closed before rendering the run when read permission is absent", () => {
@@ -314,7 +316,7 @@ describe("MigrationRunDetailScreen permission gating", () => {
       screen.queryByRole("button", { name: /Retry failed tenants/ }),
     ).toBeNull();
     expect(
-      screen.getByText("admin.migrations.manage, admin.migrations.critical"),
+      screen.getByText("admin.migrations.manage"),
     ).toBeInTheDocument();
     // The read surface itself stays available.
     expect(
@@ -322,20 +324,56 @@ describe("MigrationRunDetailScreen permission gating", () => {
     ).toBeInTheDocument();
   });
 
-  it("withholds abort from an operator without the critical permission", () => {
-    detailMock.permissions = {
-      canRead: true,
-      hasExecute: true,
-      hasCritical: false,
-      canExecute: false,
-      canDestroy: false,
-    };
+  it.each([
+    ["Pause", "PAUSE"],
+    ["Resume", "RESUME"],
+    ["Retry failed tenants", "RETRY_FAILED"],
+  ] as const)("dispatches %s for an operator without critical", (label, action) => {
+    detailMock.permissions = readMigrationPermissions({
+      isSuperAdmin: false,
+      permissions: ["admin.migrations.read", "admin.migrations.manage"],
+    });
     render(<MigrationRunDetailScreen runId={RUN_ID} />);
 
-    expect(screen.queryByRole("button", { name: /Abort/ })).toBeNull();
-    expect(
-      screen.getByText("admin.migrations.critical"),
-    ).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: label });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/^Audit reason/), {
+      target: { value: "review rollout" },
+    });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(detailMock.control).toHaveBeenCalledWith(action, "review rollout");
+    expect(screen.queryByText("This surface is read-only for you")).toBeNull();
+  });
+
+  it("lets a manage-only operator abort after the audit reason and typed confirmation", async () => {
+    detailMock.permissions = readMigrationPermissions({
+      isSuperAdmin: false,
+      permissions: ["admin.migrations.read", "admin.migrations.manage"],
+    });
+    render(<MigrationRunDetailScreen runId={RUN_ID} />);
+
+    const abort = screen.getByRole("button", { name: "Abort" });
+    expect(abort).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/^Audit reason/), {
+      target: { value: "stop failing rollout" },
+    });
+    fireEvent.click(abort);
+
+    const dialog = screen.getByRole("alertdialog", { name: "Abort this run" });
+    const confirm = within(dialog).getByRole("button", { name: "Abort" });
+    expect(confirm).toBeDisabled();
+    expect(detailMock.control).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByLabelText("Type the exact name to confirm"), {
+      target: { value: RUN_ID },
+    });
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(detailMock.control).toHaveBeenCalledWith("ABORT", "stop failing rollout");
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
   });
 
   it("offers the full control set once both mutating permissions are held", () => {

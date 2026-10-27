@@ -4,6 +4,9 @@ import { BookOpen, RefreshCw } from "lucide-react";
 import {
   Badge,
   Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   DataTable,
   DegradedBanner,
   FilterBar,
@@ -35,8 +38,23 @@ export default function CrmStaticCataloguePage() {
           <span className="flex size-7 items-center justify-center rounded-sm bg-muted">
             <BookOpen className="size-4 text-muted-foreground" aria-hidden="true" />
           </span>
-          <IdentifierText className="text-xs font-medium text-foreground">{item.key}</IdentifierText>
+          <span className="text-xs font-medium text-foreground">{item.label}</span>
         </div>
+      ),
+    },
+    {
+      id: "technicalDetails",
+      header: t.crmStaticCatalogue.technicalDetails,
+      cell: (item) => (
+        <Collapsible>
+          <CollapsibleTrigger>{t.crmStaticCatalogue.technicalDetails}</CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="flex max-w-xl flex-col gap-1 py-2">
+              <IdentifierText>{item.key}</IdentifierText>
+              {item.technicalValues.map((value, index) => <IdentifierText key={index}>{value}</IdentifierText>)}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       ),
     },
     {
@@ -68,7 +86,7 @@ export default function CrmStaticCataloguePage() {
   return (
     <PermissionGate require="crm.settings.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.crm.staticDataCatalogAndRefere}
           description={t.crmStaticCatalogue.subtitle}
           secondaryActions={

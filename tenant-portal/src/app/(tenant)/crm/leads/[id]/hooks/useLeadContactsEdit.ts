@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
@@ -21,17 +22,22 @@ export function useLeadContactsEdit(
   canEdit: boolean,
 ) {
   const { t } = useI18n();
+  const toast = useToast();
   const [form, setForm] = useState<LeadContactsForm | null>(null);
   const [baseline, setBaseline] = useState<LeadContactsForm | null>(null);
+  const [editLead, setEditLead] = useState(lead);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reconciliation, setReconciliation] = useState({ lead, pending: false });
   const inFlight = useRef(false);
+  if (reconciliation.lead !== lead) setReconciliation({ lead, pending: false });
 
   const clearError = () => { setError(null); setErrors({}); };
   const startEdit = () => {
-    if (!canEdit || inFlight.current || (lead.leadProfileType === "CORPORATE" && lead.contacts.length === 0)) return;
+    if (!canEdit || reconciliation.pending || inFlight.current || (lead.leadProfileType === "CORPORATE" && lead.contacts.length === 0)) return;
     setBaseline(toLeadContactsForm(lead));
+    setEditLead(lead);
     setForm(toLeadContactsForm(lead));
     clearError();
   };
@@ -63,22 +69,26 @@ export function useLeadContactsEdit(
     });
     setErrors(fieldErrors);
     if (Object.keys(fieldErrors).length > 0) return;
-    const body = buildLeadContactsRequest(lead, form, baseline);
+    const body = buildLeadContactsRequest(editLead, form, baseline);
     if (Object.keys(body).length === 0) { cancel(); return; }
     inFlight.current = true;
     setSaving(true);
     setError(null);
     try {
-      const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body, parse: parseLeadDetailResponse });
+      const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body: { ...body, expectedUpdatedAt: editLead.updatedAt }, parse: parseLeadDetailResponse });
       if (outcome.kind === "success") {
         onSaved(outcome.value);
         setForm(null);
         setBaseline(null);
       } else {
         setError(outcome.error);
-        if (outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable") {
+        const conflict = outcome.error.code === "CRM.LEAD.CONCURRENT_UPDATE" || outcome.error.status === 409;
+        // The discarded form and the reload both remove the inline error.
+        if (conflict) toast.warning(t.crmShared.refusals["CRM.LEAD.CONCURRENT_UPDATE"], undefined, 0, { label: t.crmLeadDetail.reloadLead, onClick: onReconcile });
+        if (outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable" || conflict) {
           setForm(null);
           setBaseline(null);
+          setReconciliation((current) => ({ ...current, pending: true }));
           onReconcile();
         }
       }

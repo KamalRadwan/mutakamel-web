@@ -29,6 +29,11 @@ export function setLanguage(lang: Language): void {
   window.dispatchEvent(new Event(LOCAL_CHANGE_EVENT));
 }
 
+export function hydrateAccountLanguage(value: string | null): void {
+  if (safeStorage.getItem(STORAGE_KEY) !== null) return;
+  if (value === "ar" || value === "en") setLanguage(value);
+}
+
 function subscribe(callback: () => void): () => void {
   window.addEventListener("storage", callback);
   window.addEventListener(LOCAL_CHANGE_EVENT, callback);

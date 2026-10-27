@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
+import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
@@ -33,7 +33,8 @@ function isAbortError(error: unknown): boolean {
  * fields is the common case, and a values call that 403s on
  * `crm.custom_fields.read` must not blank a detail screen that loaded fine —
  * so `error` is set only when the **definitions** could not be read, and the
- * caller hides the card whenever there is nothing to show.
+ * caller hides the card whenever there is nothing to show. Editors must also
+ * require `valuesLoaded`: a failed values read is not an empty saved value.
  */
 export function useCrmCustomFieldValues(
   branchId: string | null,
@@ -43,9 +44,14 @@ export function useCrmCustomFieldValues(
   const [entries, setEntries] = useState<CrmCustomFieldEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [valuesError, setValuesError] = useState<NormalizedApiError | null>(null);
+  const [loadedValuesKey, setLoadedValuesKey] = useState<string | null>(null);
+  const valuesKey = JSON.stringify([branchId, ownerType, ownerId]);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      setLoadedValuesKey(null);
+      setValuesError(null);
       if (!isUUIDv7(branchId) || !isUUIDv7(ownerId)) {
         setEntries([]);
         setError(null);
@@ -69,6 +75,7 @@ export function useCrmCustomFieldValues(
             },
           ),
         ]);
+        if (signal?.aborted) return;
         if (
           [definitionsSettled, valuesSettled].some(
             (settled) =>
@@ -85,7 +92,18 @@ export function useCrmCustomFieldValues(
           parseCrmCustomFieldDefinitions(definitionsSettled.value.data),
           ownerType,
         );
-        const values = readValues(valuesSettled, ownerType, ownerId);
+        let values: CrmCustomFieldValue[];
+        try {
+          if (valuesSettled.status === "rejected") throw valuesSettled.reason;
+          values = parseCrmCustomFieldValues(valuesSettled.value.data, {
+            ownerType,
+            ownerId,
+          });
+          setLoadedValuesKey(valuesKey);
+        } catch (caught) {
+          setValuesError(normalizeApiError(caught));
+          values = [];
+        }
         const valueByDefinition = new Map(
           values.map((value) => [value.fieldDefinitionId, value]),
         );
@@ -103,7 +121,7 @@ export function useCrmCustomFieldValues(
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, ownerId, ownerType],
+    [branchId, ownerId, ownerType, valuesKey],
   );
 
   useEffect(() => {
@@ -114,19 +132,12 @@ export function useCrmCustomFieldValues(
     return () => controller.abort();
   }, [load]);
 
-  return { entries, isLoading, error, reload: () => void load() };
-}
-
-/** Values degrade to none: a field with no stored value still renders its label. */
-function readValues(
-  settled: PromiseSettledResult<AxiosResponse<unknown>>,
-  ownerType: CrmCustomFieldValueOwnerType,
-  ownerId: string,
-): CrmCustomFieldValue[] {
-  if (settled.status === "rejected") return [];
-  try {
-    return parseCrmCustomFieldValues(settled.value.data, { ownerType, ownerId });
-  } catch {
-    return [];
-  }
+  return {
+    entries,
+    isLoading,
+    error,
+    valuesError,
+    valuesLoaded: loadedValuesKey === valuesKey,
+    reload: () => void load(),
+  };
 }

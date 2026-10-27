@@ -69,7 +69,7 @@ export function AppShell({ children, initialApp }: AppShellProps) {
 
   return (
     <PageActionSlotsProvider>
-      <div className="relative flex h-dvh flex-col overflow-hidden bg-canvas">
+      <div className="relative flex h-dvh flex-col overflow-hidden bg-gradient-canvas">
         {/* B6 (SKILL-AUDIT.md): the first focusable element in the app.
             Without it a keyboard user tabs the whole nav — the brand, the
             switcher and up to six menus — on every page load before reaching

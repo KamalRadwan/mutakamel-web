@@ -36,7 +36,8 @@ export function DirectoryWorkspace() {
   const directory = useDirectoryParties();
   const {
     t,
-    canManage,
+    canCreate,
+    canManageParty,
     workspace,
     items,
     pageInfo,
@@ -77,7 +78,7 @@ export function DirectoryWorkspace() {
   }));
 
   const renderDeleteAction = (party: Party) =>
-    canManage ? (
+    canManageParty(party) ? (
       <Button
         variant="ghost"
         size="xs"
@@ -104,11 +105,11 @@ export function DirectoryWorkspace() {
   return (
     <PermissionGate require={PARTY_READ_PERMISSION}>
       <div className="flex h-full flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.listTitle}
           description={copy.listSubtitle}
           primaryAction={
-            canManage ? { label: copy.partyCreate, onClick: directory.openCreate } : undefined
+            canCreate ? { label: copy.partyCreate, onClick: directory.openCreate } : undefined
           }
           secondaryActions={
             <Button size="sm" variant="outline" onClick={directory.reload} disabled={isRefreshing}>
@@ -199,7 +200,7 @@ export function DirectoryWorkspace() {
               columnOf={(party) => party.status}
               renderCard={(party) => <PartyCard party={party} />}
               renderActions={renderDeleteAction}
-              canDrag={() => canManage && pendingId === null}
+              canDrag={(party) => canManageParty(party) && pendingId === null}
               onCardMove={(move) =>
                 void directory.moveStatus(move.itemId, move.toColumnId as PartyStatus)
               }

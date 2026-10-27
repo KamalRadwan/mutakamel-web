@@ -92,7 +92,7 @@ export function BackupArtifactsScreen() {
           <div className="flex items-center justify-end gap-1">
             {view.canRestore && artifact.status === BackupArtifactStatus.COMPLETED && (
               <Button type="button" variant="ghost" size="sm" asChild>
-                <Link href={`/backup/restores?artifactId=${encodeURIComponent(artifact.id)}`}>
+                <Link href={`/backup/restores?artifactId=${encodeURIComponent(artifact.id)}&runId=${encodeURIComponent(artifact.runId)}&tenantId=${encodeURIComponent(artifact.tenantId)}`}>
                   <ArchiveRestore className="size-3.5" aria-hidden="true" />
                   {copy.restoreAction}
                 </Link>

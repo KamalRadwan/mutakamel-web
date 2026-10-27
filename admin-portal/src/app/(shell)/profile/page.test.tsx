@@ -7,6 +7,7 @@ import type { NormalizedApiError } from "@/shared/api/normalized-api-error";
 const { hookMock } = vi.hoisted(() => ({ hookMock: vi.fn() }));
 
 vi.mock("./hooks/useMyProfile", () => ({ useMyProfile: hookMock }));
+vi.mock("./components/ProfileMfa", () => ({ ProfileMfa: () => null }));
 
 import MyProfilePage from "./page";
 

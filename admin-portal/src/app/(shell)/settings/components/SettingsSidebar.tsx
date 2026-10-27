@@ -17,7 +17,7 @@ export function SettingsSidebar() {
         {t.settings.pageTitle}
       </h2>
       <SubNav
-        items={SETTINGS_SUBNAV.filter((item) => !item.permission || adminCan(user, item.permission))
+        items={SETTINGS_SUBNAV.filter((item) => adminCan(user, item.permission))
           .map((item) => ({ href: item.href, labelKey: item.labelKey }))}
         ariaLabel={t.settings.pageTitle}
       />

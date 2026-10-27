@@ -57,6 +57,20 @@ const run = {
 };
 
 describe("Dashboard run contract", () => {
+  it("preserves retirement separately from an empty or failed result", () => {
+    const parsed = parseWidgetResult({
+      widgetId: OK_WIDGET,
+      state: "RETIRED",
+      shape: "SCALAR",
+      value: null,
+      series: [],
+      rows: [],
+      meta: { availability: "RETIRED", generatedAt: run.generatedAt, warnings: [] },
+    });
+    expect(parsed.state).toBe("RETIRED");
+    expect(parsed.value).toBeNull();
+    expect(parsed.errorCode).toBeNull();
+  });
   it("keeps a failed widget beside the ones that worked — the dashboard is not all-or-nothing", () => {
     const parsed = parseRunResponse(run);
     expect(Object.keys(parsed.widgets)).toHaveLength(2);

@@ -90,7 +90,7 @@ export function LocationPickerDialog({
           draggable: true,
           icon: leaflet.divIcon({
             className: "",
-            html: '<span style="display:block;width:18px;height:18px;border-radius:9999px;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></span>',
+            html: '<span style="display:block;width:18px;height:18px;border-radius:9999px;background:#2563eb;border:3px solid #fff;outline:1px solid rgba(15,23,42,.35)"></span>',
             iconSize: [18, 18],
             iconAnchor: [9, 9],
           }),

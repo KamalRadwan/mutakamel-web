@@ -27,6 +27,7 @@ const COMPONENTS: Record<string, Bilingual> = {
 };
 
 const STEPS: Record<string, Bilingual> = {
+  FAILED_OPERATION_CLOSED: ["Failed operation recovery closed", "أُغلق استرداد العملية الفاشلة"],
   "database.create": ["Create tenant database", "إنشاء قاعدة بيانات المستأجر"],
   "tenant.activate": ["Activate tenant", "تفعيل المستأجر"],
   "core.owner-invitation": ["Owner invitation email", "رسالة دعوة المالك"],
@@ -64,6 +65,9 @@ const KINDS: Record<string, Bilingual> = {
  * wire value, and a reader should not have to decode SCREAMING_SNAKE_CASE.
  */
 const EVENTS: Record<string, Bilingual> = {
+  PREREQUISITE_RELEASE_RECOVERY_REQUESTED: ["Prerequisite release recovery requested", "طُلب استرداد تحرير المتطلب المسبق"],
+  PREREQUISITE_RELEASE_RECOVERY_EXHAUSTED: ["Prerequisite release recovery exhausted", "استُنفد استرداد تحرير المتطلب المسبق"],
+  FAILED_OPERATION_CLOSED: ["Failed operation recovery closed", "أُغلق استرداد العملية الفاشلة"],
   OPERATION_PLANNED: ["Operation planned", "خُطّطت العملية"],
   STEP_STARTED: ["Step started", "بدأت الخطوة"],
   STEP_SUCCEEDED: ["Step succeeded", "نجحت الخطوة"],

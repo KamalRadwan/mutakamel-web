@@ -9,39 +9,44 @@ import {
   Check,
   ChevronDown,
   Eye,
-  MessageCircle,
   Pencil,
-  Phone,
-  Send,
   Star,
   Trash2,
   X,
 } from "lucide-react";
 import {
+  Button,
   EmptyState,
   ErrorState,
   Pagination,
   Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   cn,
   type PageInfo,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { useTenantAuth } from "@/context/AuthContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { canCreateActivities } from "@/components/activities/activity-presentation";
 import { localizedName, localizedValue } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
-import { countryIsoFromName } from "@/lib/geo/country-data";
+import { CRM_RATING_STARS } from "../../shared/crm-rating-contract";
 import {
   leadActivityState,
   leadCardHeading,
+  leadCountryIso,
   leadOwnerInitials,
   type LeadCardPatch,
 } from "../lead-card-contract";
-import {
-  normalizePhoneDigits,
-  normalizeWhatsAppDigits,
-} from "../lead-phone-links";
+import { LeadPhoneActionsRow } from "./LeadPhoneActionsRow";
 import type { LeadItem, LeadStage } from "../hooks/useLeads";
 
-export interface LeadExecutiveTableViewProps {
+interface LeadExecutiveTableViewProps {
   items: readonly LeadItem[];
   stages: readonly LeadStage[];
   branchId: string | null;
@@ -64,13 +69,6 @@ export interface LeadExecutiveTableViewProps {
   onInlinePhoneSave: (lead: LeadItem, nextPhone: string) => void;
 }
 
-function resolveCountryIso(country: string): string {
-  const trimmed = country.trim();
-  if (!trimmed) return "";
-  if (/^[A-Z]{2}$/i.test(trimmed)) return trimmed.toUpperCase();
-  return countryIsoFromName(trimmed) ?? trimmed.slice(0, 2).toUpperCase();
-}
-
 /**
  * High-Density Spreadsheet Table View matching Screens `06-table-view-inline-edit.png`
  * and `07-table-view-bulk-actions.png` pixel-for-pixel:
@@ -81,7 +79,7 @@ function resolveCountryIso(country: string): string {
  * 5. Country (`EG Egypt`)
  * 6. Stage (Inline Editable custom popover menu `CHANGE STAGE INLINE`)
  * 7. Source (Pill)
- * 8. Salesperson (Inline pill `KR Kamal Radwan`)
+ * 8. Salesperson (Inline pill with initials and name)
  * 9. Rating & Follow-up (`★★★` + Colored Activity Pill)
  * 10. Same-Page Actions (`[👁 Peek]` + `✏️` + `🗑`)
  */
@@ -91,8 +89,8 @@ export function LeadExecutiveTableView({
   branchId,
   selectedIds,
   onSelectionChange,
-  canUpdate,
-  canDelete,
+  canUpdate: capabilityCanUpdate,
+  canDelete: capabilityCanDelete,
   isLoading,
   error,
   onRetry,
@@ -108,7 +106,11 @@ export function LeadExecutiveTableView({
   onInlinePhoneSave,
 }: LeadExecutiveTableViewProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { user } = useTenantAuth();
+  const { canMutate } = useAccessMode();
+  const canUpdate = (lead: LeadItem) => canMutate && capabilityCanUpdate(lead);
+  const canDelete = (lead: LeadItem) => canMutate && capabilityCanDelete(lead);
+  const canOpenActivities = canMutate && canCreateActivities(user);
   const cardDict = t.crmLeads.card;
 
   const [editingPhoneLeadId, setEditingPhoneLeadId] = useState<string | null>(null);
@@ -170,22 +172,23 @@ export function LeadExecutiveTableView({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200/90 bg-white shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-        <table className="w-full border-collapse text-start text-xs">
-          <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 text-[11px] font-bold text-slate-600 backdrop-blur-xs dark:border-slate-800 dark:bg-slate-900/95 dark:text-slate-300">
-            <tr>
-              <th className="w-10 px-3 py-2.5 text-center">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card shadow-2xs">
+        <Table className="w-full border-collapse text-start text-xs">
+          <TableHeader className="sticky top-0 z-(--z-sticky-header) border-b border-border bg-muted/95 text-xs font-semibold text-muted-foreground">
+            <TableRow>
+              <TableHead className="w-10 px-3 py-2.5 text-center">
                 <input
                   type="checkbox"
                   checked={isAllSelected}
                   onChange={toggleSelectAll}
                   aria-label={t.views.selectAll}
-                  className="size-4 rounded-xs border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="size-4 rounded-xs border-border text-primary focus:ring-primary"
                 />
-              </th>
-              <th className="px-3 py-2.5 text-start">
-                <button
+              </TableHead>
+              <TableHead className="px-3 py-2.5 text-start">
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() =>
                     onSortChange?.({
                       id: "displayName",
@@ -193,40 +196,40 @@ export function LeadExecutiveTableView({
                         isSortedByName && sort?.direction === "asc" ? "desc" : "asc",
                     })
                   }
-                  className="inline-flex items-center gap-1 font-bold text-slate-700 hover:text-blue-600 dark:text-slate-200"
+                  className="inline-flex h-auto items-center gap-1 p-0 text-xs font-semibold text-foreground hover:bg-transparent hover:text-primary"
                 >
-                  <span>{isAr ? "العميل / المؤسسة" : "Lead / Organization"}</span>
+                <span>{t.crmLeads.executive.leadOrganization}</span>
                   {isSortedByName && sort?.direction === "desc" ? (
                     <ArrowDown className="size-3" aria-hidden="true" />
                   ) : (
                     <ArrowUp className="size-3" aria-hidden="true" />
                   )}
-                </button>
-              </th>
-              <th className="px-3 py-2.5 text-start">
-                {isAr ? "مسؤول التواصل" : "Primary Contact"}
-              </th>
-              <th className="px-3 py-2.5 text-start">
-                {isAr ? "الهاتف وقنوات التواصل الفوري" : "Phone & Instant Channels"}
-              </th>
-              <th className="px-3 py-2.5 text-start">{isAr ? "الدولة" : "Country"}</th>
-              <th className="px-3 py-2.5 text-start">
-                {isAr ? "المرحلة (تعديل فوري)" : "Stage (Inline Editable)"}
-              </th>
-              <th className="px-3 py-2.5 text-start">{isAr ? "المصدر" : "Source"}</th>
-              <th className="px-3 py-2.5 text-start">
-                {isAr ? "مسؤول المبيعات" : "Salesperson (Inline)"}
-              </th>
-              <th className="px-3 py-2.5 text-start">
-                {isAr ? "التقييم والمتابعة" : "Rating & Follow-up"}
-              </th>
-              <th className="px-3 py-2.5 text-end">
-                {isAr ? "إجراءات بنفس الصفحة" : "Same-Page Actions"}
-              </th>
-            </tr>
-          </thead>
+                </Button>
+              </TableHead>
+              <TableHead className="px-3 py-2.5 text-start">
+                {t.crmLeads.executive.primaryContact}
+              </TableHead>
+              <TableHead className="px-3 py-2.5 text-start">
+                {t.crmLeads.executive.instantChannels}
+              </TableHead>
+              <TableHead className="px-3 py-2.5 text-start">{t.crmLeads.executive.country}</TableHead>
+              <TableHead className="px-3 py-2.5 text-start">
+                {t.crmLeads.executive.inlineStage}
+              </TableHead>
+              <TableHead className="px-3 py-2.5 text-start">{t.crmLeads.executive.source}</TableHead>
+              <TableHead className="px-3 py-2.5 text-start">
+                {t.crmLeads.executive.inlineSalesperson}
+              </TableHead>
+              <TableHead className="px-3 py-2.5 text-start">
+                {t.crmLeads.executive.ratingFollowUp}
+              </TableHead>
+              <TableHead className="px-3 py-2.5 text-end">
+                {t.crmLeads.executive.samePageActions}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
 
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+          <TableBody className="divide-y divide-border/60">
             {items.map((lead) => {
               const isSelected = selectedIds.has(lead.id);
               const { title, contactName } = leadCardHeading(lead);
@@ -236,96 +239,84 @@ export function LeadExecutiveTableView({
               const isQualified = stage?.flag === "QUALIFIED";
               const isDisqualified = stage?.flag === "DISQUALIFIED";
               const sourceLabel = localizedValue(lead.sourceNameAr, lead.sourceNameEn, lang);
-              const countryIso = resolveCountryIso(lead.country);
+              const countryIso = leadCountryIso(lead.country);
               const primaryPhone =
                 (isCompany ? lead.primaryContact?.phones[0] || lead.phone : lead.phone) ||
                 lead.phones[0] ||
                 "";
 
-              const callDigits = primaryPhone ? normalizePhoneDigits(primaryPhone) : "";
-              const waDigits = primaryPhone
-                ? normalizeWhatsAppDigits(primaryPhone, lead.country)
-                : null;
-              const tgDigits = waDigits;
-
               const activityState = leadActivityState(lead.nextActivity);
               const ownerInitials = lead.owner ? leadOwnerInitials(lead.owner) : "";
               const ownerName = lead.owner
                 ? `${lead.owner.firstName} ${lead.owner.lastName}`.trim()
-                : isAr
-                  ? "غير معين"
-                  : "Unassigned";
+                : t.crmLeads.executive.unassigned;
 
-              const isEditingPhone = editingPhoneLeadId === lead.id;
-              const isStagePopoverOpen = openStageMenuLeadId === lead.id;
+              const isEditingPhone = editingPhoneLeadId === lead.id && canUpdate(lead) && !isTerminal;
+              const isStagePopoverOpen = canUpdate(lead) && !isTerminal && openStageMenuLeadId === lead.id;
 
               return (
-                <tr
+                <TableRow
                   key={lead.id}
                   className={cn(
-                    "transition-colors hover:bg-blue-50/30 dark:hover:bg-slate-800/40",
-                    isSelected && "bg-blue-50/60 dark:bg-blue-950/30",
+                    "transition-colors hover:bg-muted/40",
+                    isSelected && "bg-primary/10",
                   )}
                 >
                   {/* 1. Checkbox */}
-                  <td className="px-3 py-2.5 text-center">
+                  <TableCell className="px-3 py-2.5 text-center">
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleRow(lead.id)}
                       aria-label={`Select ${title}`}
-                      className="size-4 rounded-xs border-slate-300 text-blue-600 focus:ring-blue-500"
+                      className="size-4 rounded-xs border-border text-primary focus:ring-primary"
                     />
-                  </td>
+                  </TableCell>
 
                   {/* 2. Lead / Organization + Badge */}
-                  <td className="px-3 py-2.5">
+                  <TableCell className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/crm/leads/${lead.id}`}
-                        className="font-bold text-slate-900 hover:text-blue-600 hover:underline dark:text-slate-100 dark:hover:text-blue-400"
+                        className="font-semibold text-foreground hover:text-primary hover:underline"
                       >
                         {title}
                       </Link>
                       <span
                         className={cn(
-                          "rounded-md border px-1.5 py-0.5 text-[10px] font-bold",
+                          "rounded-md border px-1.5 py-0.5 text-xs font-semibold",
                           isCompany
-                            ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                            : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                            ? "border-border bg-muted text-foreground"
+                            : "border-border/60 bg-muted/60 text-muted-foreground",
                         )}
                       >
                         {isCompany ? cardDict.company : cardDict.individual}
                       </span>
                     </div>
-                  </td>
+                  </TableCell>
 
                   {/* 3. Primary Contact · Role */}
-                  <td className="px-3 py-2.5">
+                  <TableCell className="px-3 py-2.5">
                     <Link
                       href={`/crm/leads/${lead.id}`}
-                      className="inline-flex items-center gap-1 text-slate-700 hover:text-blue-600 dark:text-slate-300"
+                      className="inline-flex items-center gap-1 text-foreground hover:text-primary"
                     >
                       <span className="font-medium">{contactName || title}</span>
-                      <span className="text-slate-400">
+                      <span className="text-muted-foreground">
                         ·{" "}
                         {lead.primaryContact?.jobTitle ||
                           (isCompany
-                            ? isAr
-                              ? "مسؤول التواصل"
-                              : "Primary"
-                            : isAr
-                              ? "عميل مباشر"
-                              : "Direct")}
+                            ? t.crmLeads.executive.primaryContactShort
+                            : t.crmLeads.executive.directProspectShort)}
                       </span>
                     </Link>
-                  </td>
+                  </TableCell>
 
                   {/* 4. Phone & Instant Channels (Inline Editable like Screen 06) */}
-                  <td className="px-3 py-2.5">
+                  <TableCell className="px-3 py-2.5">
                     {isEditingPhone ? (
-                      <div className="inline-flex items-center gap-1 rounded-lg border-2 border-blue-600 bg-blue-50/40 px-2 py-0.5 dark:bg-blue-950/40">
-                        <span className="text-[10px] font-bold text-slate-500">
+                      <div className="inline-flex items-center gap-1 rounded-lg border-2 border-primary bg-primary/10 px-2 py-0.5">
+                        <span className="text-xs font-semibold text-muted-foreground">
                           {countryIso}
                         </span>
                         <input
@@ -337,182 +328,171 @@ export function LeadExecutiveTableView({
                             if (e.key === "Enter") commitPhoneEdit(lead);
                             if (e.key === "Escape") setEditingPhoneLeadId(null);
                           }}
-                          className="w-36 bg-transparent font-mono text-xs font-bold text-slate-900 focus:outline-hidden dark:text-white"
+                          className="w-36 bg-transparent font-mono text-xs font-semibold tabular-nums text-foreground focus:outline-hidden"
                           autoFocus
                         />
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => commitPhoneEdit(lead)}
                           aria-label="Save phone"
-                          className="flex size-5 items-center justify-center rounded-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                          className="flex size-5 items-center justify-center rounded-xs bg-success-subtle p-0 text-success-subtle-foreground hover:bg-success-subtle/80"
                         >
                           <Check className="size-3" aria-hidden="true" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() => setEditingPhoneLeadId(null)}
                           aria-label="Cancel phone edit"
-                          className="flex size-5 items-center justify-center rounded-xs bg-slate-200 text-slate-700 hover:bg-slate-300"
+                          className="flex size-5 items-center justify-center rounded-xs bg-muted p-0 text-foreground hover:bg-muted/80"
                         >
                           <X className="size-3" aria-hidden="true" />
-                        </button>
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => canUpdate(lead) && startPhoneEdit(lead, primaryPhone)}
-                          className="font-mono text-xs font-bold text-slate-800 hover:text-blue-600 dark:text-slate-100"
-                          dir="ltr"
-                        >
-                          {primaryPhone || (isAr ? "+ إضافة هاتف" : "+ Add phone")}
-                        </button>
+                        {canUpdate(lead) && !isTerminal ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => startPhoneEdit(lead, primaryPhone)}
+                            className="h-auto p-0 font-mono text-xs font-semibold tabular-nums text-foreground hover:bg-transparent hover:text-primary"
+                            dir="ltr"
+                          >
+                              {primaryPhone || t.crmLeads.executive.addPhone}
+                          </Button>
+                        ) : (
+                          <span className="font-mono text-xs font-semibold tabular-nums text-foreground" dir="ltr">
+                            {primaryPhone || "—"}
+                          </span>
+                        )}
 
-                        <div className="flex items-center gap-1">
-                          {callDigits && (
-                            <a
-                              href={`tel:${callDigits}`}
-                              aria-label={`Call ${primaryPhone}`}
-                              className="flex size-6 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                            >
-                              <Phone className="size-3" aria-hidden="true" />
-                            </a>
-                          )}
-                          {waDigits && (
-                            <a
-                              href={`https://wa.me/${waDigits}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Message ${primaryPhone} on WhatsApp`}
-                              className="flex size-6 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                            >
-                              <MessageCircle className="size-3" aria-hidden="true" />
-                            </a>
-                          )}
-                          {tgDigits && (
-                            <a
-                              href={`https://t.me/+${tgDigits}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Message ${primaryPhone} on Telegram`}
-                              className="flex size-6 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300"
-                            >
-                              <Send className="size-3" aria-hidden="true" />
-                            </a>
-                          )}
-                        </div>
+                        <LeadPhoneActionsRow phone={primaryPhone} country={lead.country} actionsOnly />
                       </div>
                     )}
-                  </td>
+                  </TableCell>
 
                   {/* 5. Country */}
-                  <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300">
-                    {countryIso && <span className="font-bold text-slate-400">{countryIso} </span>}
+                  <TableCell className="px-3 py-2.5 text-foreground">
+                    {countryIso && <span className="font-semibold text-muted-foreground">{countryIso} </span>}
                     <span>{lead.country || "—"}</span>
-                  </td>
+                  </TableCell>
 
                   {/* 6. Stage (Inline Editable Custom Popover matching Screen 06) */}
-                  <td className="relative px-3 py-2.5">
-                    <button
+                  <TableCell className="relative px-3 py-2.5">
+                    {!canMutate ? <span>{stage ? localizedName(stage, lang) : "—"}</span> : (
+                    <Button
                       type="button"
-                      disabled={!canUpdate(lead) || isTerminal}
-                      onClick={() =>
-                        setOpenStageMenuLeadId(isStagePopoverOpen ? null : lead.id)
-                      }
+                      variant="ghost"
+                      aria-disabled={!canUpdate(lead) || isTerminal}
+                      aria-label={!canUpdate(lead) || isTerminal
+                        ? `${stage ? localizedName(stage, lang) : t.crmLeads.executive.changeStageInline}. ${t.crmLeadDetail.stageMoveUnavailable}`
+                        : undefined}
+                      onClick={() => {
+                        if (canUpdate(lead) && !isTerminal) {
+                          setOpenStageMenuLeadId(isStagePopoverOpen ? null : lead.id);
+                        }
+                      }}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition-all",
-                        isStagePopoverOpen && "ring-2 ring-blue-600",
+                        "inline-flex h-auto items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-all aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+                        isStagePopoverOpen && "ring-2 ring-primary",
                         isQualified || isTerminal
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                          ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
                           : isDisqualified
-                            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
+                            ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
                             : stage?.flag === "NEW"
-                              ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                              : "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "border-border bg-muted text-foreground",
                       )}
                     >
                       <span>{stage ? localizedName(stage, lang) : "—"}</span>
                       {!isTerminal && <ChevronDown className="size-3" aria-hidden="true" />}
-                    </button>
+                    </Button>
+                    )}
 
                     {isStagePopoverOpen && (
-                      <div className="absolute start-3 top-10 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                        <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {isAr ? "تغيير المرحلة فورياً" : "CHANGE STAGE INLINE"}
+                      <div className="absolute start-3 top-10 z-(--z-popover) w-44 rounded-lg border border-border bg-popover p-1.5 shadow-xl">
+                        <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                              {t.crmLeads.executive.changeStageInline}
                         </div>
                         {nonTerminalStages.map((st) => {
                           const active = st.id === lead.stageId;
                           return (
-                            <button
+                            <Button
                               key={st.id}
                               type="button"
+                              variant="ghost"
                               onClick={() => {
                                 setOpenStageMenuLeadId(null);
                                 if (!active) onMoveStage(lead, st.id);
                               }}
                               className={cn(
-                                "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-start text-xs font-semibold transition-colors",
+                                "flex h-auto w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-start text-xs font-semibold transition-colors",
                                 active
-                                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                                  ? "bg-primary/10 text-primary"
                                   : st.flag === "QUALIFIED"
-                                    ? "text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400"
+                                    ? "text-success hover:bg-success-subtle"
                                     : st.flag === "DISQUALIFIED"
-                                      ? "text-red-600 hover:bg-red-50 dark:text-red-400"
-                                      : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
+                                      ? "text-destructive hover:bg-destructive-subtle"
+                                      : "text-foreground hover:bg-muted",
                               )}
                             >
                               <span>{localizedName(st, lang)}</span>
-                              {active && <Check className="size-3.5 text-blue-600" aria-hidden="true" />}
+                              {active && <Check className="size-3.5 text-primary" aria-hidden="true" />}
                               {!active && st.flag === "QUALIFIED" && (
-                                <Star className="size-3 fill-emerald-600 text-emerald-600" aria-hidden="true" />
+                                <Star className="size-3 fill-success text-success" aria-hidden="true" />
                               )}
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>
                     )}
-                  </td>
+                  </TableCell>
 
                   {/* 7. Source */}
-                  <td className="px-3 py-2.5">
+                  <TableCell className="px-3 py-2.5">
                     {sourceLabel ? (
-                      <span className="inline-flex rounded-md border border-slate-200 bg-slate-100/80 px-2 py-0.5 text-[11px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <span className="inline-flex rounded-md border border-border bg-muted/80 px-2 py-0.5 text-xs font-medium text-foreground">
                         {sourceLabel}
                       </span>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-muted-foreground">—</span>
                     )}
-                  </td>
+                  </TableCell>
 
                   {/* 8. Salesperson (Inline Pill) */}
-                  <td className="px-3 py-2.5">
-                    <button
+                  <TableCell className="px-3 py-2.5">
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => onOpenQuickModal(lead)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-1.5 py-0.5 hover:border-blue-200 hover:bg-blue-50/50 dark:hover:border-slate-700"
+                      className="inline-flex h-auto items-center gap-1.5 rounded-lg border border-transparent px-1.5 py-0.5 hover:border-border hover:bg-muted/50"
                     >
                       {ownerInitials && (
-                        <span className="flex size-5 items-center justify-center rounded-md bg-blue-50 text-[10px] font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                        <span className="flex size-5 items-center justify-center rounded-md bg-muted text-xs font-semibold text-foreground">
                           {ownerInitials}
                         </span>
                       )}
-                      <span className="font-medium text-slate-700 dark:text-slate-200">
+                      <span className="font-medium text-foreground">
                         {ownerName}
                       </span>
-                    </button>
-                  </td>
+                    </Button>
+                  </TableCell>
 
                   {/* 9. Rating & Follow-up */}
-                  <td className="px-3 py-2.5">
+                  <TableCell className="px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-0.5">
-                        {[1, 2, 3].map((st) => {
+                        {CRM_RATING_STARS.map((st) => {
                           const filled = st <= lead.rating;
+                          if (!canMutate) return <Star key={st} className={cn("size-3.5", filled ? "fill-warning text-warning" : "text-muted-foreground/40")} aria-hidden="true" />;
                           return (
-                            <button
+                            <Button
                               key={st}
                               type="button"
-                              disabled={!canUpdate(lead)}
+                              variant="ghost"
+                              disabled={!canUpdate(lead) || isTerminal}
                               onClick={() =>
                                 onCardChange(
                                   lead.id,
@@ -520,84 +500,93 @@ export function LeadExecutiveTableView({
                                   lead,
                                 )
                               }
-                              aria-label={`Rate ${st} of 3`}
-                              className="p-0.5 disabled:cursor-default"
+                              aria-label={formatTemplate(t.crmLeads.ratingStarLabel, { rating: st, name: lead.leadName })}
+                              className="h-auto p-0.5 hover:bg-transparent disabled:cursor-default"
                             >
                               <Star
                                 className={cn(
                                   "size-3.5",
                                   filled
-                                    ? "fill-amber-400 text-amber-500"
-                                    : "text-slate-300 dark:text-slate-600",
+                                    ? "fill-warning text-warning"
+                                    : "text-muted-foreground/40",
                                 )}
                               />
-                            </button>
+                            </Button>
                           );
                         })}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => onOpenActivities(lead)}
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
-                          activityState === "OVERDUE"
-                            ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
-                            : activityState === "TODAY"
-                              ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
-                              : activityState === "FUTURE"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"
-                                : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400",
-                        )}
-                      >
-                        <Activity className="size-3 shrink-0" aria-hidden="true" />
-                        <span>{cardDict.activityStates[activityState]}</span>
-                      </button>
+                      {canOpenActivities && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => onOpenActivities(lead)}
+                          className={cn(
+                            "inline-flex h-auto items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold",
+                            activityState === "OVERDUE"
+                              ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+                              : activityState === "TODAY"
+                                ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+                                : activityState === "FUTURE"
+                                  ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+                                  : "border-border bg-muted text-muted-foreground",
+                          )}
+                        >
+                          <Activity className="size-3 shrink-0" aria-hidden="true" />
+                          <span>{cardDict.activityStates[activityState]}</span>
+                        </Button>
+                      )}
                     </div>
-                  </td>
+                  </TableCell>
 
                   {/* 10. Same-Page Actions (`[👁 Peek]` + `✏️` + `🗑`) */}
-                  <td className="px-3 py-2.5 text-end">
+                  <TableCell className="px-3 py-2.5 text-end">
                     <div className="inline-flex items-center justify-end gap-1.5">
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="xs"
                         onClick={() => onOpenQuickModal(lead)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 shadow-2xs transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold"
                       >
                         <Eye className="size-3.5" aria-hidden="true" />
-                        <span>{isAr ? "معاينة" : "Peek"}</span>
-                      </button>
+                            <span>{t.crmLeads.executive.peek}</span>
+                      </Button>
 
-                      {canUpdate(lead) && (
-                        <button
+                      {canUpdate(lead) && !isTerminal && (
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="xs"
                           onClick={() => startPhoneEdit(lead, primaryPhone)}
-                          title={isAr ? "تعديل الهاتف بالصف" : "Edit cell inline"}
-                          aria-label={isAr ? "تعديل الهاتف بالصف" : "Edit cell inline"}
-                          className="flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                              title={t.crmLeads.executive.editCell}
+                              aria-label={t.crmLeads.executive.editCell}
+                          className="flex size-7 items-center justify-center rounded-lg p-0"
                         >
                           <Pencil className="size-3.5" aria-hidden="true" />
-                        </button>
+                        </Button>
                       )}
 
                       {canDelete(lead) && (
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="xs"
                           onClick={() => onDeleteLead(lead)}
                           title={t.common.delete}
                           aria-label={t.common.delete}
-                          className="flex size-7 items-center justify-center rounded-lg border border-red-200 bg-red-50/70 text-red-600 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-400"
+                          className="flex size-7 items-center justify-center rounded-lg border-destructive/30 bg-destructive-subtle p-0 text-destructive hover:bg-destructive-subtle/80"
                         >
                           <Trash2 className="size-3.5" aria-hidden="true" />
-                        </button>
+                        </Button>
                       )}
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {page && onPageChange && (

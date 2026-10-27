@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "./AuthContext";
@@ -25,7 +25,7 @@ class MemoryStorage implements Storage {
 function AuthActionsProbe() {
   const { authState, user, acceptInvite, resetPassword, logoutAll } = useAuth();
   const [error, setError] = useState("none");
-  const run = (action: () => Promise<void>) => {
+  const run = (action: () => Promise<unknown>) => {
     setError("none");
     void action().catch((caught: unknown) => {
       setError(caught instanceof Error ? caught.message : "unknown");
@@ -70,6 +70,38 @@ describe("AuthProvider admin password and all-session actions", () => {
     cleanup();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it.each(["login", "accept-invite"])("requires MFA after %s before hydrating or navigating", async (route) => {
+    const step = { mfaRequired: true, challengeId: "a".repeat(43), expiresIn: 600, resendAfterSeconds: 60 };
+    let verified = false;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === `/api/admin/core/v1/auth/${route}`) return jsonResponse({ data: step });
+      if (url === "/api/admin/core/v1/auth/mfa/verify") { verified = true; return jsonResponse(webAuthResponse()); }
+      if (url === "/api/admin/core/v1/auth/me") return verified ? jsonResponse(adminMePayload()) : endedSessionResponse();
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await waitFor(() => expect(result.current.authState).toBe("ENDED"));
+    const beforeChallenge = fetchMock.mock.calls.length;
+    await act(async () => {
+      const challenge = route === "login"
+        ? await result.current.login({ email: "admin@example.test", password: "password" })
+        : await result.current.acceptInvite({ token: "abcdefghijklmnop", newPassword: "StrongPassword1!" });
+      expect(challenge).toEqual(step);
+    });
+    expect(result.current.authState).toBe("UNAUTHENTICATED");
+    expect(result.current.user).toBeNull();
+    expect(fetchMock.mock.calls.length).toBe(beforeChallenge + 1);
+    expect(push).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("admin_session_meta")).toBeNull();
+    await act(async () => { await result.current.login({ challengeId: step.challengeId, code: "012345" }); });
+    expect(result.current.authState).toBe("AUTHENTICATED");
+    expect(push).toHaveBeenCalledWith("/dashboard");
+    const [, init] = findRequest(fetchMock, "/api/admin/core/v1/auth/mfa/verify");
+    expect(JSON.parse(init?.body as string)).toEqual({ challengeId: step.challengeId, code: "012345" });
+    expect(new Headers(init?.headers).has("x-idempotency-key")).toBe(false);
   });
 
   it("accepts an invite with the exact non-replayable DTO and establishes the cookie session", async () => {

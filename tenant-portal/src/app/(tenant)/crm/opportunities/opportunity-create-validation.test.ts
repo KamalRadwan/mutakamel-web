@@ -21,6 +21,7 @@ const messages: OpportunityCreateMessages = {
   email: "Bad email.",
   maxLength: "At most {max} characters.",
   duplicatePhone: "Already listed.",
+  phone: "Invalid phone.",
   url: "Bad URL.",
   amountInvalid: "Bad amount.",
   outOfRange: "Out of range.",
@@ -79,6 +80,12 @@ describe("validateCreateOpportunity", () => {
     expect(
       validateCreateOpportunity(form({ currencyCode: "AAA" }), messages).currencyCode,
     ).toBeUndefined();
+  });
+
+  it("reports currency precision errors on the amount field", () => {
+    expect(validateCreateOpportunity(form({ amount: "1.234", currencyCode: "KWD" }), messages).amount).toBeUndefined();
+    expect(validateCreateOpportunity(form({ amount: "1.234", currencyCode: "EGP" }), messages).amount).toBe("Bad amount.");
+    expect(validateCreateOpportunity(form({ amount: "1.230", currencyCode: "EGP" }), messages).amount).toBeUndefined();
   });
 
   it("holds a required custom field open until it has a value", () => {

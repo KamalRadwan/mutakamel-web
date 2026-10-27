@@ -2501,15 +2501,20 @@ projection and has no list filter, so the four presets cannot all become one
 server query today. The count on a pill can therefore exceed what the filtered
 page shows.
 
-**Interim, 2026-10-16:** the client-side filtering is gone. New and Qualified
-now set the Basic search's server `stageFlag` filter. Rated 3 stars and Overdue
-activity are figures only, with no toggle, so no control narrows just the loaded
-rows.
+**Decided — D-026; implementation planned (FE-LEADS-017), source reviewed
+2026-10-17.** Every KPI pill must filter on the server before pagination, for
+both list/search and board. The earlier 2026-10-16 interim claim that local
+filtering was removed does not match the current source: `page.tsx` still runs
+`filterByKpiPreset` over loaded rows for New, Rated 3 stars, Overdue and
+Qualified; `LeadKpiStrip` exposes all four as toggles. `LeadSearchDto` still has
+no overdue-activity predicate. Q140 remains open for implementation, with no
+product decision outstanding.
 
-**Settle with:** an `activityBucket` (or `hasOverdueActivity`) filter on
-`POST /leads/search` and `/leads/board`. A Basic `rating` field would also be
-needed. After that, the two figure-only presets can become server-side toggles
-too. See [the KPI route](../api/crm-leads.md#post-leadskpis--the-kpi-strip-2026-10-14).
+**Settle with:** implement server predicates for all four presets, including
+the Core activity projection's overdue bucket, and send the same filters to
+list/search and board before count/pagination. Do not invent a DTO key before
+the backend contract exists. See
+[the KPI route](../api/crm-leads.md#post-leadskpis--the-kpi-strip-2026-10-14).
 
 **Related, Q133:** the inline primary-phone editors now send the lead's whole
 list with only the first number replaced (`lead-phone-patch.ts`), so a lead's

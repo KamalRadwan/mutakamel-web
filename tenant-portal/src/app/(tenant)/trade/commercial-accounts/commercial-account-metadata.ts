@@ -57,47 +57,6 @@ export const ISO_CURRENCY_PRESETS = [
   { code: "GBP", labelEn: "GBP — British Pound", labelAr: "جنيه إسترليني (GBP)" },
 ] as const;
 
-export const BLOCK_REASON_PRESETS = [
-  {
-    code: "OVERDUE_INVOICES_90D",
-    labelEn: "Overdue Invoices > 90 Days",
-    labelAr: "فواتير متأخرة لأكثر من 90 يوماً",
-  },
-  {
-    code: "CREDIT_RISK_REVIEW",
-    labelEn: "Credit Committee Risk Review",
-    labelAr: "مراجعة مخاطر لجنة الائتمان",
-  },
-  {
-    code: "LEGAL_COLLECTION_DISPUTE",
-    labelEn: "Legal / Collection Dispute",
-    labelAr: "نزاع قانوني أو تحصيل",
-  },
-  {
-    code: "KYC_COMPLIANCE_EXPIRED",
-    labelEn: "KYC / Commercial License Expired",
-    labelAr: "انتهاء صلاحية السجل أو مستندات الامتثال",
-  },
-] as const;
-
-export const UNBLOCK_REASON_PRESETS = [
-  {
-    code: "SETTLEMENT_CLEARED_FINANCE",
-    labelEn: "Overdue Balance Settled & Cleared",
-    labelAr: "سداد وتسوية المديونية المالية",
-  },
-  {
-    code: "BANK_GUARANTEE_RECEIVED",
-    labelEn: "Approved Bank Guarantee Received",
-    labelAr: "استلام خطاب ضمان بنكي معتمد",
-  },
-  {
-    code: "EXECUTIVE_CREDIT_APPROVAL",
-    labelEn: "Executive / CFO Credit Exception",
-    labelAr: "اعتماد استثنائي من الإدارة المالية",
-  },
-] as const;
-
 export const ACCOUNT_UI_COPY = {
   en: {
     creditControlsTitle: "Credit Limit & Settlement Currency",

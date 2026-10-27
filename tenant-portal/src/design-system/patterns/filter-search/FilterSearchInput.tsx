@@ -56,32 +56,41 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
         <div
           ref={rootRef}
           className={cn(
-            "flex h-7 w-[444px] min-w-64 max-w-full items-center gap-0.5 rounded-md border border-input bg-card ps-1.5 text-foreground",
+            "flex h-(--size-toolbar-control) w-[460px] max-w-[460px] min-w-64 flex-1 items-center gap-2 rounded-lg border border-line-control bg-surface-subtle ps-2.5 pe-1.5 text-foreground",
             "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
             props.disabled && "opacity-50",
           )}
         >
-          <Search className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           {props.tokens.length > 0 && (
-            <div ref={tokensRef} className="flex max-w-3/5 shrink items-center gap-0.5 overflow-x-auto">
+            <div ref={tokensRef} className="flex max-w-3/5 shrink items-center gap-1 overflow-x-auto">
               {props.tokens.map((token) => (
-                <span key={token.id} className="inline-flex shrink-0 items-center overflow-hidden rounded-xs bg-secondary text-xs">
-                  {token.kind === "filter" && <span className="flex size-5 items-center justify-center bg-primary text-primary-foreground">
-                    <Filter className="size-3" aria-hidden="true" />
-                  </span>}
-                  <span className={cn(
-                    "px-0.5 font-medium",
-                    token.kind === "field" && "inline-flex self-stretch items-center bg-primary text-primary-foreground",
-                  )}>{token.label}</span>
-                  {token.value && <span className="max-w-32 truncate border-s border-border px-0.5" title={token.value}>{token.value}</span>}
+                <span
+                  key={token.id}
+                  className="inline-flex h-[21px] shrink-0 items-center gap-1 rounded-[5px] border border-chip-active-line bg-gradient-chip-active px-[7px] text-badge font-semibold text-chip-active-fg"
+                >
+                  {token.kind === "filter" && <Filter className="size-3 shrink-0" aria-hidden="true" />}
+                  <span>{token.label}</span>
+                  {token.value && (
+                    <span
+                      className="max-w-32 truncate border-s border-chip-active-line ps-1 font-medium"
+                      title={token.value}
+                    >
+                      {token.value}
+                    </span>
+                  )}
                   <Button
                     data-filter-remove=""
-                    variant="ghost" size="sm" className={cn("size-5 shrink-0 rounded-none p-0", hitTarget)}
+                    variant="ghost"
+                    size="sm"
+                    className={cn("size-4 shrink-0 rounded-xs p-0 text-chip-active-fg", hitTarget)}
                     disabled={props.disabled}
                     aria-label={props.removeLabel([token.label, token.value].filter(Boolean).join(": "))}
                     onClick={() => removeToken(token.id)}
                     onKeyDown={(event) => onTokenKeyDown(event, token.id)}
-                  ><X className="size-3" aria-hidden="true" /></Button>
+                  >
+                    <X className="size-3" aria-hidden="true" />
+                  </Button>
                 </span>
               ))}
             </div>
@@ -99,15 +108,15 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
             aria-activedescendant={open && activeIndex >= 0 ? optionId(activeIndex) : undefined}
             aria-label={props.label} placeholder={props.placeholder}
             value={props.query} disabled={props.disabled} autoComplete="off" maxLength={200}
-            className="h-6 min-w-16 flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+            className="h-full min-w-16 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
             onChange={onQueryChange}
             onFocus={onFocus} onKeyDown={onKeyDown}
           />
-          <Button variant="ghost" size="sm" className="h-full w-7 shrink-0 rounded-none border-s border-border p-0"
+          <Button variant="ghost" size="sm" className="size-6 shrink-0 rounded-sm p-0 text-muted-foreground hover:text-foreground"
             disabled={props.disabled} aria-label={props.toggleLabel} aria-expanded={open}
             aria-controls={open ? listId : undefined} aria-haspopup="listbox"
             onMouseDown={preventFocus} onClick={toggleSuggestions}>
-            <ChevronDown className="size-3" aria-hidden="true" />
+            <ChevronDown className="size-3.5" aria-hidden="true" />
           </Button>
         </div>
       </PopoverAnchor>

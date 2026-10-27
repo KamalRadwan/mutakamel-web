@@ -110,7 +110,7 @@ export function SearchWorkspace({ initialTerm }: { initialTerm: string }) {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={copy.title}
         description={copy.description}
         secondaryActions={

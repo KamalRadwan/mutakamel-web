@@ -110,6 +110,21 @@ const BACKUP_SERVER = {
   enabled: false,
 };
 
+const EXTENSION = {
+  id: "0198c0de-0000-7000-8000-00000000c001",
+  tenantId: CONFIG.tenantId,
+  ownerType: "TENANT_USER",
+  ownerId: "0198c0de-0000-7000-8000-00000000d001",
+  extension: "1001",
+  sipUsername: "user1001",
+  passwordConfigured: true,
+  displayName: null,
+  outboundCallerId: null,
+  enabled: true,
+  createdAt: "2026-10-17T12:00:00.000Z",
+  updatedAt: "2026-10-17T12:00:00.000Z",
+};
+
 function moduleError(status: number, code: string) {
   return {
     response: { status, data: { code, message: `refused: ${code}` } },
@@ -129,13 +144,16 @@ function resolveReads(
     overAllowance: boolean;
   },
   servers: unknown[] = [],
+  extensions: unknown[] = [],
 ) {
   api.get.mockImplementation((url: string) => {
     if (url.endsWith("/config")) return Promise.resolve({ data: { data: CONFIG } });
     if (url.endsWith("/servers")) {
       return Promise.resolve({ data: { data: servers } });
     }
-    if (url.endsWith("/extensions")) return Promise.resolve({ data: { data: [] } });
+    if (url.endsWith("/extensions")) {
+      return Promise.resolve({ data: { data: extensions } });
+    }
     if (url.endsWith("/seats")) return Promise.resolve({ data: { data: seats } });
     throw new Error(`unexpected request: ${url}`);
   });
@@ -467,6 +485,69 @@ describe("Tenant WebPhone settings — the scope has no stored settings", () => 
     for (const [url] of api.patch.mock.calls) {
       expect(url).not.toMatch(/\/config$/);
     }
+  });
+});
+
+describe("Tenant WebPhone settings — extensions", () => {
+  it("lists an API extension without transport and keeps its actions available", async () => {
+    resolveReads(SEATS, [PRIMARY_SERVER], [EXTENSION]);
+    api.patch.mockResolvedValue({ data: { data: EXTENSION } });
+    render(<TenantWebphoneSettingsPage />);
+
+    const row = await screen.findByRole("article", { name: "Extension 1001" });
+    expect(within(row).getByText("user1001")).toBeInTheDocument();
+    expect(within(row).queryByText("Transport")).not.toBeInTheDocument();
+    expect(
+      within(row).getByRole("button", { name: "Delete extension: 1001" }),
+    ).toBeEnabled();
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Disable extension: 1001" }),
+    );
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
+    expect(api.patch.mock.calls[0][0]).toBe(
+      `/api/tenant/webphone/v1/extensions/${EXTENSION.id}`,
+    );
+    expect(api.patch.mock.calls[0][1]).toEqual({ enabled: false });
+  });
+
+  it("creates an extension without offering or sending transport", async () => {
+    resolveReads(SEATS, [PRIMARY_SERVER]);
+    api.post.mockResolvedValue({ data: { data: EXTENSION } });
+    render(<TenantWebphoneSettingsPage />);
+
+    const form = await screen.findByRole("form", { name: "Add extension" });
+    const submit = within(form).getByRole("button", { name: "Add extension" });
+    await waitFor(() => expect(submit).toBeEnabled());
+    expect(within(form).queryByLabelText("Transport")).not.toBeInTheDocument();
+    fireEvent.change(within(form).getByLabelText("Owner user ID"), {
+      target: { value: EXTENSION.ownerId },
+    });
+    fireEvent.change(within(form).getByLabelText("Extension"), {
+      target: { value: "1001" },
+    });
+    fireEvent.change(within(form).getByLabelText("SIP username"), {
+      target: { value: "user1001" },
+    });
+    fireEvent.change(within(form).getByLabelText("SIP password (write-only)"), {
+      target: { value: "s3cret" },
+    });
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    const [url, body, config] = api.post.mock.calls[0];
+    expect(url).toBe("/api/tenant/webphone/v1/extensions");
+    expect(body).toEqual({
+      ownerId: EXTENSION.ownerId,
+      extension: "1001",
+      sipUsername: "user1001",
+      sipPassword: "s3cret",
+      enabled: false,
+    });
+    expect(body).not.toHaveProperty("transport");
+    expect(config.headers["x-idempotency-key"]).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
   });
 });
 

@@ -5,7 +5,6 @@ import {
 } from "./customer-profile-contract";
 import {
   buildAddCustomerContactRequest,
-  buildCreateCustomerProfileRequest,
   buildUpdateCustomerProfileRequest,
   toCustomerProfileForm,
   type CustomerProfileForm,
@@ -94,42 +93,6 @@ const form: CustomerProfileForm = {
 };
 
 describe("customer profile write payloads", () => {
-  it("builds the create body with the corporate block", () => {
-    expect(buildCreateCustomerProfileRequest(form, BRANCH)).toEqual({
-      branchId: BRANCH,
-      profileType: "CORPORATE",
-      displayName: "Acme Retail",
-      status: "PROSPECT",
-      description: "Key account",
-      acquisitionSourceId: SOURCE,
-      companyName: "Acme Retail LLC",
-      companyEmail: "info@acme.test",
-      companyPhone: "+201001112223",
-      companyWebsite: "https://acme.test",
-      taxNumber: "TAX-12345",
-      commercialRegistrationNumber: "CR-67890",
-    });
-  });
-
-  it("omits every corporate key on an individual profile", () => {
-    // `assertCorporateOnlyFields` rejects all of them there.
-    const payload = buildCreateCustomerProfileRequest(
-      { ...form, profileType: "INDIVIDUAL" },
-      BRANCH,
-    );
-    expect(payload).not.toHaveProperty("companyName");
-    expect(payload).not.toHaveProperty("taxNumber");
-    expect(payload).not.toHaveProperty("commercialRegistrationNumber");
-  });
-
-  it("sends the canonical alias only, never both", () => {
-    const payload = buildCreateCustomerProfileRequest(form, BRANCH);
-    // The service resolves `taxNumber ?? taxCardNumber`, so the legacy alias
-    // adds nothing and would be a second key for the same value.
-    expect(payload).not.toHaveProperty("taxCardNumber");
-    expect(payload).not.toHaveProperty("commercialRegisterNumber");
-  });
-
   it("patches only the changed keys and never the profile type", () => {
     const baseline = { ...form };
     expect(buildUpdateCustomerProfileRequest(baseline, baseline)).toEqual({});
@@ -139,7 +102,7 @@ describe("customer profile write payloads", () => {
     );
     expect(changed).toEqual({
       status: "ACTIVE_CUSTOMER",
-      companyPhone: "+201009998887",
+      companyPhones: ["+201009998887"],
     });
     expect(changed).not.toHaveProperty("profileType");
   });
@@ -158,9 +121,40 @@ describe("customer profile write payloads", () => {
     ).toEqual({});
   });
 
+  it.each([
+    "companyEmail",
+    "companyWebsite",
+    "taxNumber",
+    "commercialRegistrationNumber",
+  ] as const)("clears %s with null and leaves unchanged empty fields omitted", (key) => {
+    expect(buildUpdateCustomerProfileRequest({ ...form, [key]: "  " }, form))
+      .toEqual({ [key]: null });
+    const emptyBaseline = { ...form, [key]: "" };
+    expect(buildUpdateCustomerProfileRequest(emptyBaseline, emptyBaseline)).toEqual({});
+    expect(buildUpdateCustomerProfileRequest({ ...form, [key]: "  replacement  " }, form))
+      .toEqual({ [key]: "replacement" });
+    expect(buildUpdateCustomerProfileRequest(
+      { ...form, profileType: "INDIVIDUAL", [key]: "" },
+      { ...form, profileType: "INDIVIDUAL" },
+    )).toEqual({});
+  });
+
   it("round-trips the detail record through the form", () => {
     const parsed = parseCustomerProfileDetailResponse(profile);
     expect(toCustomerProfileForm(parsed)).toEqual(form);
+  });
+
+  it("writes the company phone as an array and clears it with an empty array", () => {
+    expect(buildUpdateCustomerProfileRequest({ ...form, companyPhone: "  " }, form))
+      .toEqual({ companyPhones: [] });
+    expect(buildUpdateCustomerProfileRequest({ ...form, companyPhone: "  +201009998887  " }, form))
+      .toEqual({ companyPhones: ["+201009998887"] });
+    const emptyBaseline = { ...form, companyPhone: "" };
+    expect(buildUpdateCustomerProfileRequest(emptyBaseline, emptyBaseline)).toEqual({});
+    expect(buildUpdateCustomerProfileRequest(
+      { ...form, profileType: "INDIVIDUAL", companyPhone: "" },
+      { ...form, profileType: "INDIVIDUAL" },
+    )).toEqual({});
   });
 
   it("sends a contact phone as `phones`, the only key the DTO has", () => {

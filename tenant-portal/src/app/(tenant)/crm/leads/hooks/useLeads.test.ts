@@ -85,7 +85,6 @@ describe("Leads API contracts", () => {
           cardColor: null,
           owner: null,
           nextActivity: null,
-          primaryContactName: "",
           tags: [],
         },
       ],
@@ -97,6 +96,21 @@ describe("Leads API contracts", () => {
       hasPrev: false,
     });
     expect(parseLeadResponse(lead, lead.branchId).id).toBe(lead.id);
+  });
+
+  it("omits unsupported contact counts from the list model", () => {
+    expect(parseLeadResponse(lead, lead.branchId)).not.toHaveProperty("contactsCount");
+    expect(parseLeadResponse({ ...lead, contactsCount: 3 }, lead.branchId)).not.toHaveProperty("contactsCount");
+  });
+
+  it("uses only the lead contact when an organization contact name disagrees", () => {
+    const parsed = parseLeadResponse({
+      ...lead, primaryContactName: "Another company's contact",
+    }, lead.branchId);
+    expect(parsed.primaryContact?.displayName).toBe("Dina Ali");
+    expect(parsed).not.toHaveProperty("primaryContactName");
+    expect(parseLeadResponse({ ...lead, primaryContact: null }, lead.branchId).primaryContact)
+      .toBeNull();
   });
 
   it("reads the board-card fields, and defaults the ones a row omits", () => {

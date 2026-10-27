@@ -35,6 +35,8 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
   const {
     lang,
     dashboard,
+    canEdit,
+    canShare,
     run,
     shares,
     shareTargets,
@@ -53,8 +55,6 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
     removeShare,
     reload,
   } = useDashboardDetail(dashboardId);
-
-  const canEdit = dashboard?.accessLevel === "OWNER" || dashboard?.accessLevel === "EDIT";
 
   return (
     <div className="flex flex-col gap-4">
@@ -118,6 +118,7 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
       ) : dashboard ? (
         <>
           {actionError ? <DegradedBanner message={actionError} /> : null}
+          {!canEdit ? <p className="text-sm text-muted-foreground">{t.tradeAnalytics.editPermissionRequired}</p> : null}
           {/* PARTIAL is a first-class outcome, not a failure: some tiles came
               back and some did not. */}
           {run?.status === "PARTIAL" ? (
@@ -193,11 +194,13 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
             title={t.tradeAnalytics.shares}
             description={t.tradeAnalytics.sharesDescription}
           >
-            {sharesUnavailable ? (
+            {!canShare ? (
+              <p className="text-sm text-muted-foreground">{t.tradeAnalytics.sharePermissionRequired}</p>
+            ) : sharesUnavailable ? (
               <DegradedBanner message={t.tradeAnalytics.sharesUnavailable} />
             ) : null}
 
-            {canEdit && shareTargets.length > 0 ? (
+            {canShare && shareTargets.length > 0 ? (
               <div className="mb-3 flex items-end gap-3">
                 <Field label={t.tradeAnalytics.subjectId} hint={t.tradeAnalytics.subjectIdHint}>
                   <Select
@@ -255,14 +258,15 @@ export function DashboardWorkspace({ dashboardId }: { dashboardId: string }) {
                     <Badge tone="brand">
                       {tradeStatusLabel(t.tradeStatus, share.accessLevel, t.common.unknownCode)}
                     </Badge>
-                    <Button
+                    {canShare ? <Button
                       variant="ghost"
                       size="sm"
+                      aria-label={t.tradeAnalytics.removeShare}
                       disabled={pending !== null}
                       onClick={() => void removeShare(share.id)}
                     >
                       <Trash2 className="size-4" aria-hidden="true" />
-                    </Button>
+                    </Button> : null}
                   </li>
                 ))}
               </ul>

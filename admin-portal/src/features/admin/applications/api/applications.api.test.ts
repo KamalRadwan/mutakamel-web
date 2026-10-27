@@ -173,6 +173,19 @@ describe("Application technical provisioning API", () => {
     );
   });
 
+  it("forwards catalogue-list cancellation while preserving rows and pagination", async () => {
+    const controller = new AbortController();
+    const data = [{ key: "crm" }];
+    const meta = { page: 2, limit: 20, total: 21, totalPages: 2, hasNext: false, hasPrev: true };
+    getMock.mockResolvedValue({ data: { data, meta } });
+
+    await expect(applicationsApi.list({ page: 2 }, controller.signal)).resolves.toEqual({ data, meta });
+    expect(getMock).toHaveBeenCalledWith(
+      "/api/admin/core/v1/applications?page=2",
+      { signal: controller.signal },
+    );
+  });
+
   it.each([true, false, undefined])("preserves additive pending-draft evidence %s on current reads", async hasPendingDraft => {
     const data = { key: "crm", publicationStatus: "PUBLISHED", catalogueRevision: "99", publicationRevision: "2", ...(hasPendingDraft === undefined ? {} : { hasPendingDraft }) };
     getMock.mockResolvedValueOnce(envelope(data)).mockResolvedValueOnce(envelope([data]));

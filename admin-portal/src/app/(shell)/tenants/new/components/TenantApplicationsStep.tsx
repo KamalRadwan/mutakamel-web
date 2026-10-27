@@ -210,7 +210,7 @@ export function TenantApplicationsStep({
                       }`}
                     >
                       <span className="truncate">{candidate.name}</span>
-                      <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                      <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                         {candidate.key}
                       </span>
                     </label>
@@ -367,7 +367,7 @@ export function TenantApplicationsStep({
           ) : null}
           {previewState === "ready" && preview ? (
             <div className="space-y-2.5">
-              <dl className="grid grid-cols-3 gap-1.5 text-2xs">
+              <dl className="grid grid-cols-3 gap-1.5 text-xs">
                 <div className="rounded-md bg-muted p-2">
                   <dt className="text-muted-foreground">{copy.selectedApplicationsLabel}</dt>
                   <dd className="mt-0.5 font-mono font-semibold">{preview.selectedApplicationKeys.join(", ")}</dd>
@@ -385,12 +385,12 @@ export function TenantApplicationsStep({
                 {preview.components.map((component) => (
                   <div
                     key={component.componentId}
-                    className="rounded-md border border-border px-2 py-1.5 text-2xs leading-4"
+                    className="rounded-md border border-border px-2 py-1.5 text-xs leading-4"
                   >
                     <div className="flex items-center justify-between gap-1.5">
                       <p className="truncate font-mono font-semibold text-foreground">{component.componentKey}</p>
                       <span
-                        className={`shrink-0 rounded-sm px-1 py-0.5 text-2xs font-semibold ${component.selectionSource === "FOUNDATION" ? "bg-info-subtle text-info-subtle-foreground" : "bg-muted text-muted-foreground"}`}
+                        className={`shrink-0 rounded-sm px-1 py-0.5 text-xs font-semibold ${component.selectionSource === "FOUNDATION" ? "bg-info-subtle text-info-subtle-foreground" : "bg-muted text-muted-foreground"}`}
                         title={component.selectionSource}
                       >
                         {component.selectionSource.charAt(0)}

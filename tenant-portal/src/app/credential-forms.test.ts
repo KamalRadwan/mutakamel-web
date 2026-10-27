@@ -58,6 +58,7 @@ describe("credential forms never submit as GET", () => {
   // giving its form a method.
   it("finds exactly the screens we know handle a password", () => {
     expect(credentialFiles).toEqual([
+      "(tenant)/core/profile/components/ProfileMfa.tsx",
       "(tenant)/core/settings/email/components/EmailProviderFields.tsx",
       "login/page.tsx",
       "tenant/components/ActionTokenScreen.tsx",

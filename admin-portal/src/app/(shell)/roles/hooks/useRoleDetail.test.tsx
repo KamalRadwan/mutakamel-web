@@ -29,6 +29,8 @@ vi.mock("@/i18n/I18nContext", () => ({
         updateFailedTitle: "Update failed",
         permissionsSavedTitle: "Permissions updated",
         permissionsSavedDesc: "The server-confirmed permission set is now displayed.",
+        permissionNotDelegableHint: "You can delegate only permissions granted to your account.",
+        protectedPermissionSetHint: "A higher-authority administrator must edit this permission set.",
       },
     },
   }),
@@ -164,7 +166,9 @@ describe("useRoleDetail", () => {
   );
 
   it("submits the complete permission set only with the critical pair", async () => {
-    authMock.user.permissions = ["admin.roles.update", "admin.roles.critical"];
+    authMock.user.permissions = [
+      "admin.roles.update", "admin.roles.critical", "admin.billing.read", "admin.billing.update",
+    ];
     vi.mocked(rolesApi.permissions).mockResolvedValue(
       result([
         permission,
@@ -194,7 +198,9 @@ describe("useRoleDetail", () => {
   // write answers with the whole role. Whichever one is saved must leave the
   // other operator's unsaved work — and its dirty flag — exactly where it was.
   describe("independent editors", () => {
-    const bothPermissions = ["admin.roles.update", "admin.roles.critical"];
+    const bothPermissions = [
+      "admin.roles.update", "admin.roles.critical", "admin.billing.read", "admin.billing.update",
+    ];
     const twoPermissionCatalogue = [
       permission,
       { ...permission, id: SECOND_PERMISSION_ID, key: "admin.billing.update" },
@@ -276,6 +282,98 @@ describe("useRoleDetail", () => {
 
       expect(hook.current.name).toBe("Renamed elsewhere");
       expect(hook.current.metadataDirty).toBe(false);
+    });
+  });
+
+  describe("delegation ceiling", () => {
+    const unownedId = "019f0000-0000-7000-8000-000000000014";
+    const catalogue = [
+      permission,
+      { ...permission, id: SECOND_PERMISSION_ID, key: "admin.billing.update" },
+      { ...permission, id: unownedId, key: "admin.billing.delete" },
+    ];
+    const grants = [
+      "admin.roles.update", "admin.roles.critical", "admin.billing.read", "admin.billing.update",
+    ];
+
+    beforeEach(() => {
+      authMock.user.permissions = [...grants];
+      vi.mocked(rolesApi.permissions).mockResolvedValue(result(catalogue));
+    });
+
+    it("blocks unowned and unknown permissions individually and through group actions", async () => {
+      const { result: hook } = renderHook(() => useRoleDetail(ROLE_ID));
+      await waitFor(() => expect(hook.current.canReplacePermissions).toBe(true));
+
+      act(() => {
+        hook.current.togglePermission(unownedId);
+        hook.current.togglePermission("unknown-id");
+      });
+      expect(hook.current.assignedPermissions).toEqual(new Set([PERMISSION_ID]));
+      act(() => hook.current.toggleGroup("Billing", true));
+      expect(hook.current.assignedPermissions).toEqual(new Set([PERMISSION_ID, SECOND_PERMISSION_ID]));
+      vi.mocked(rolesApi.replacePermissions).mockResolvedValue(
+        result({ ...role, permissionIds: [PERMISSION_ID, SECOND_PERMISSION_ID] }),
+      );
+      await act(async () => hook.current.savePermissions());
+      expect(rolesApi.replacePermissions).toHaveBeenCalledWith(
+        ROLE_ID, { permissionIds: [PERMISSION_ID, SECOND_PERMISSION_ID] }, expect.any(String),
+      );
+      expect(hook.current.permissionsDirty).toBe(false);
+      act(() => hook.current.toggleGroup("Billing", false));
+      expect(hook.current.assignedPermissions.size).toBe(0);
+    });
+
+    it.each([unownedId, "unresolved-assignment-id"])(
+      "preserves protected assignment %s and blocks the entire replacement while metadata remains editable",
+      async (protectedId) => {
+        vi.mocked(rolesApi.get).mockResolvedValue(result({ ...role, permissionIds: [PERMISSION_ID, protectedId] }));
+        const { result: hook } = renderHook(() => useRoleDetail(ROLE_ID));
+        await waitFor(() => expect(hook.current.permissionsDelegationBlocked).toBe(true));
+
+        expect(hook.current.canReplacePermissions).toBe(false);
+        expect(hook.current.canUpdateMetadata).toBe(true);
+        act(() => {
+          hook.current.togglePermission(protectedId);
+          hook.current.togglePermission(SECOND_PERMISSION_ID);
+          hook.current.toggleGroup("Billing", false);
+        });
+        expect(hook.current.assignedPermissions).toEqual(new Set([PERMISSION_ID, protectedId]));
+        await act(async () => hook.current.savePermissions());
+        expect(rolesApi.replacePermissions).not.toHaveBeenCalled();
+        expect(hook.current.permissionsError?.message).toContain("higher-authority");
+      },
+    );
+
+    it("rechecks current grants before saving a previously selected permission", async () => {
+      const { result: hook, rerender } = renderHook(() => useRoleDetail(ROLE_ID));
+      await waitFor(() => expect(hook.current.canReplacePermissions).toBe(true));
+      act(() => hook.current.togglePermission(SECOND_PERMISSION_ID));
+      authMock.user = { isSuperAdmin: false, permissions: grants.filter((key) => key !== "admin.billing.update") };
+      rerender();
+      await act(async () => hook.current.savePermissions());
+      expect(rolesApi.replacePermissions).not.toHaveBeenCalled();
+      expect(hook.current.permissionsError?.message).toContain("only permissions granted");
+      expect(hook.current.assignedPermissions).toEqual(new Set([PERMISSION_ID, SECOND_PERMISSION_ID]));
+    });
+
+    it("restricts group actions to the visible delegable subset", async () => {
+      const { result: hook } = renderHook(() => useRoleDetail(ROLE_ID));
+      await waitFor(() => expect(hook.current.canReplacePermissions).toBe(true));
+      act(() => hook.current.setSearch("admin.billing.update"));
+      act(() => hook.current.toggleGroup("Billing", false));
+      expect(hook.current.assignedPermissions).toEqual(new Set([PERMISSION_ID]));
+      act(() => hook.current.toggleGroup("Billing", true));
+      expect(hook.current.assignedPermissions).toEqual(new Set([PERMISSION_ID, SECOND_PERMISSION_ID]));
+    });
+
+    it("allows a super administrator to delegate without explicit permission keys", async () => {
+      authMock.user = { isSuperAdmin: true, permissions: [] };
+      const { result: hook } = renderHook(() => useRoleDetail(ROLE_ID));
+      await waitFor(() => expect(hook.current.canReplacePermissions).toBe(true));
+      act(() => hook.current.toggleGroup("Billing", true));
+      expect(hook.current.assignedPermissions).toEqual(new Set([PERMISSION_ID, SECOND_PERMISSION_ID, unownedId]));
+      expect(hook.current.permissionsDelegationBlocked).toBe(false);
     });
   });
 

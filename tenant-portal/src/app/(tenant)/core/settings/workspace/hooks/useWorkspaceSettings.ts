@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useToast } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
+import { useCan, useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { coreGet, corePut } from "../../../core-api";
@@ -33,8 +32,7 @@ export type WorkspaceFieldName = "defaultLanguage" | "defaultCurrencyCode" | "ti
 export function useWorkspaceSettings() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("workspace.manage") ?? false;
+  const canManage = useCan("workspace.manage", { tenantWide: true });
 
   const [settings, setSettings] = useState<WorkspaceSettings | null>(null);
   const [draft, setDraft] = useState<WorkspaceSettingsDraft | null>(null);

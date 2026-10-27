@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import type { NormalizedApiError } from "@/lib/api/errors";
 import {
   useCrmCreateForm,
   type CrmFormErrors,
@@ -66,6 +67,8 @@ interface CreateLeadFormState {
   /** Reveals every error. Called from submit so a never-blurred field still speaks. */
   revealAll: () => void;
   reset: () => void;
+  reportServerError: (error: NormalizedApiError) => void;
+  clearServerErrors: () => void;
 }
 
 /**
@@ -116,6 +119,36 @@ export function useCreateLeadForm(
   );
   const { form, errors, allErrors, isDirty, setForm, setField, touch, revealAll, reset } =
     useCrmCreateForm({ createInitial, validate, fingerprint });
+  const [serverErrors, setServerErrors] = useState<{
+    form: CreateLeadForm;
+    errors: CrmFormErrors;
+  } | null>(null);
+  // Errors belong to the submitted snapshot; edits, resets and row removal
+  // must never attach a previous response to a different contact or phone.
+  const visibleServerErrors = serverErrors?.form === form ? serverErrors.errors : {};
+  const reportServerError = (error: NormalizedApiError) => {
+    const mapped: CrmFormErrors = {};
+    for (const [wirePath, messages] of Object.entries(error.fieldErrors ?? {})) {
+      if (!messages.length) continue;
+      let path = wirePath.replace(/\[(\d+)\]/gu, ".$1");
+      if (path === "primaryMobile") path = "phones.0";
+      if (path === "companyPhone") path = "companyPhones.0";
+      if (path === "phones" || path === "companyPhones") path += ".0";
+      // The request builder drops blank phone rows before sending arrays.
+      const phone = /^(phones|companyPhones)\.(\d+)$/u.exec(path);
+      const contactPhone = /^contacts\.(\d+)\.phones\.(\d+)$/u.exec(path);
+      const list = phone ? form[phone[1] as "phones" | "companyPhones"]
+        : contactPhone ? form.contacts[Number(contactPhone[1])]?.phones : undefined;
+      if (list) {
+        const wireIndex = Number(phone ? phone[2] : contactPhone![2]);
+        const formIndex = list.map((value, index) => ({ value, index }))
+          .filter(({ value }) => value.trim().length > 0)[wireIndex]?.index;
+        if (formIndex !== undefined) path = path.replace(/\.\d+$/u, `.${formIndex}`);
+      }
+      mapped[path] = messages.join(" ");
+    }
+    setServerErrors({ form, errors: mapped });
+  };
 
   const patchContact = useCallback(
     (index: number, update: (contact: LeadContactForm) => LeadContactForm) => {
@@ -282,7 +315,7 @@ export function useCreateLeadForm(
 
   return {
     form,
-    errors,
+    errors: { ...errors, ...visibleServerErrors },
     allErrors,
     isDirty,
     setField,
@@ -303,5 +336,7 @@ export function useCreateLeadForm(
     touch,
     revealAll,
     reset,
+    reportServerError,
+    clearServerErrors: () => setServerErrors(null),
   } satisfies CreateLeadFormState;
 }

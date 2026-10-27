@@ -150,6 +150,23 @@ describe("normalizeFilterValue", () => {
 });
 
 describe("FilterBar", () => {
+  it("hides search while keeping status filters and reset available", () => {
+    const { props } = renderBar({
+      hideSearch: true,
+      filters: [filters[0]],
+      values: { status: { kind: "select", value: "OPEN" } },
+    });
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByText("Status: Open")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Status: Open" }));
+    expect(props.onChange).toHaveBeenCalledWith({ status: undefined });
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(props.onReset).toHaveBeenCalledOnce();
+    openFilters();
+    expect(screen.getByLabelText("Status")).toBeInTheDocument();
+    expect(props.onSearchChange).not.toHaveBeenCalled();
+  });
+
   it("renders a control for every filter kind", () => {
     renderBar();
     openFilters();
@@ -226,5 +243,46 @@ describe("FilterBar", () => {
     vi.advanceTimersByTime(300);
     expect(onSearchChange).toHaveBeenCalledWith("acme");
     vi.useRealTimers();
+  });
+
+  it("renders the toolbar search box with a non-overlapping flex magnifier", () => {
+    renderBar();
+    const input = screen.getByPlaceholderText("Search");
+    const box = input.parentElement;
+    expect(box).not.toBeNull();
+    expect(box).toHaveClass(
+      "flex",
+      "h-(--size-toolbar-control)",
+      "max-w-[460px]",
+      "flex-1",
+      "bg-surface-subtle",
+      "border",
+      "border-line-control",
+      "rounded-lg",
+      "px-2.5",
+      "gap-2",
+    );
+    const icon = box?.querySelector("svg");
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveClass("shrink-0");
+    expect(icon).not.toHaveClass("absolute");
+  });
+
+  it("styles active filter chips with the active chip tokens and keeps remove accessible", () => {
+    renderBar({ values: { status: { kind: "select", value: "OPEN" } } });
+    const chip = screen.getByText("Status: Open").parentElement;
+    expect(chip).not.toBeNull();
+    expect(chip).toHaveClass(
+      "h-[21px]",
+      "px-[7px]",
+      "rounded-[5px]",
+      "bg-gradient-chip-active",
+      "border",
+      "border-chip-active-line",
+      "text-chip-active-fg",
+      "text-badge",
+      "font-semibold",
+    );
+    expect(screen.getByRole("button", { name: "Remove Status: Open" })).toBeInTheDocument();
   });
 });

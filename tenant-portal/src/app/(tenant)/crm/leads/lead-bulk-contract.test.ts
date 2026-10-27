@@ -24,12 +24,11 @@ describe("lead bulk contract", () => {
     expect(bulkLeadFields(patch)).toEqual({ rating: 3, cardColor: null });
   });
 
-  it("parses KPI figures and refuses a malformed count", () => {
+  it("parses headline KPI figures without a stage breakdown and refuses a malformed count", () => {
     const body = {
       totalLeads: 3, newStageLeads: 1, newTodayLeads: 1, hotLeads: 2, overdueActivityLeads: 0, qualifiedLeads: 1,
-      byStage: [{ stageId: STAGE, total: 3, hot: 2, overdue: 0 }],
     };
-    expect(parseLeadKpisResponse(body).byStage).toEqual([{ stageId: STAGE, total: 3, hot: 2, overdue: 0 }]);
+    expect(parseLeadKpisResponse(body)).toEqual(body);
     expect(() => parseLeadKpisResponse({ ...body, hotLeads: -1 })).toThrow();
   });
 

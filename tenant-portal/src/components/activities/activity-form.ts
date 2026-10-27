@@ -33,6 +33,8 @@ export interface ActivityFormValues {
   direction: string;
   startDate: string;
   startTime: string;
+  /** Blank disables the reminder; otherwise minutes before the start/due time. */
+  reminderOffsetMinutes: string;
   /** Both "" = no end. */
   endDate: string;
   endTime: string;
@@ -136,6 +138,7 @@ export function createActivityForm(options: {
     status: "PLANNED",
     priority: "NORMAL",
     direction: "",
+    reminderOffsetMinutes: "",
     ...withInstant("start", start),
     ...defaultEnd(type, start),
     location: "",
@@ -161,6 +164,7 @@ export function activityToForm(activity: Activity): ActivityFormValues {
     status: "PLANNED",
     priority: activity.priority,
     direction: activity.direction ?? "",
+    reminderOffsetMinutes: activity.reminderOffsetMinutes === null ? "" : String(activity.reminderOffsetMinutes),
     ...withInstant("start", new Date(activity.dueAt)),
     ...(end ? withInstant("end", end) : { endDate: "", endTime: "" }),
     location: activity.location ?? "",
@@ -279,7 +283,7 @@ export function activityFormDurationMinutes(values: ActivityFormValues): number 
 export function isActivityFieldModified(
   values: ActivityFormValues,
   seed: ActivityFormValues | undefined,
-  field: "type" | "subject" | "start" | "end" | "assigneeUserId" | "priority" | "direction" | "location" | "meetingUrl" | "description",
+  field: "type" | "subject" | "start" | "end" | "assigneeUserId" | "priority" | "direction" | "location" | "meetingUrl" | "description" | "reminderOffsetMinutes",
 ): boolean {
   if (!seed) return false;
   if (field === "start") {
@@ -300,6 +304,7 @@ export function countModifiedActivityFields(
     "type",
     "subject",
     "start",
+    "reminderOffsetMinutes",
     "end",
     "assigneeUserId",
     "priority",

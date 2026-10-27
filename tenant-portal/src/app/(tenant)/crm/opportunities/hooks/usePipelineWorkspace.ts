@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAccessMode } from "@/hooks/useAccessMode";
 import { useTenantAuth } from "@/context/AuthContext";
 import {
   SCOPE_UNRESOLVED_ERROR,
@@ -9,6 +10,7 @@ import {
 } from "@/hooks/useOrganizationScope";
 import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
 import { useI18n } from "@/i18n/I18nContext";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import {
   TenantApiClientError,
   axiosClient,
@@ -20,6 +22,7 @@ import {
   appendOpportunityBasicQuery,
   DEFAULT_OPPORTUNITY_BASIC_SEARCH,
   EMPTY_OPPORTUNITY_BASIC_SEARCH,
+  opportunityBasicSearchForCustomerParty,
   type OpportunityBasicSearch,
 } from "../opportunity-basic-search-contract";
 import {
@@ -157,7 +160,7 @@ function money(value: unknown, contract: string): string | null {
   if (value === null || value === undefined) return null;
   if (
     typeof value !== "string" ||
-    !/^-?\d{1,16}(?:\.\d{1,2})?$/.test(value)
+    !/^-?\d{1,17}(?:\.\d{1,3})?$/.test(value)
   ) {
     throw new Error(`Invalid ${contract} response.`);
   }
@@ -167,7 +170,7 @@ function money(value: unknown, contract: string): string | null {
 function aggregateMoney(value: unknown, contract: string): string {
   if (
     typeof value !== "string" ||
-    !/^-?\d{1,32}(?:\.\d{1,2})?$/.test(value)
+    !/^-?\d{1,32}(?:\.\d{1,3})?$/.test(value)
   ) {
     throw new Error(`Invalid ${contract} response.`);
   }
@@ -251,7 +254,7 @@ function parseOpportunity(
   const stageFlag =
     item.stageFlag === null || item.stageFlag === undefined
       ? stage.flag
-      : enumValue(item.stageFlag, STAGE_FLAGS, "opportunity board");
+      : STAGE_FLAGS.includes(item.stageFlag as StageFlag) ? (item.stageFlag as StageFlag) : stage.flag;
   const importance = requiredInteger(
     item,
     "importance",
@@ -534,6 +537,42 @@ export async function reconcileOpportunityBoardAfterConfirmedCardPatch(
   await reloadBoard(selectedPipelineId);
 }
 
+/** Gateway crm.assignable.owners.get; CRM applies the update owner scope. */
+export async function readAssignableOpportunityOwners(
+  branchId: string,
+  signal: AbortSignal,
+  headers: Record<string, string>,
+): Promise<{ id: string; firstName: string; lastName: string }[]> {
+  const owners: { id: string; firstName: string; lastName: string }[] = [];
+  let cursor: string | null = null;
+  for (;;) {
+    const query = new URLSearchParams({ branchId, resource: "opportunities", action: "update", limit: "100" });
+    if (cursor) query.set("cursor", cursor);
+    const response = await axiosClient.get<unknown>(`/api/tenant/crm/v1/assignable-owners?${query}`, {
+      signal, headers, cache: "no-store", maxResponseBytes: 512 * 1024,
+    });
+    if (signal.aborted) throw new DOMException("Request aborted", "AbortError");
+    const page = record(response.data);
+    if (!page || !Array.isArray(page.items) || (page.nextCursor !== null && !isUUIDv7(page.nextCursor))) {
+      throw new Error("Invalid assignable owners response.");
+    }
+    let previousId = cursor;
+    for (const raw of page.items) {
+      const owner = record(raw);
+      if (!owner || !isUUIDv7(owner.id) || typeof owner.displayName !== "string" ||
+        (owner.avatarUrl !== null && typeof owner.avatarUrl !== "string") ||
+        (previousId !== null && owner.id <= previousId)) {
+        throw new Error("Invalid assignable owner.");
+      }
+      previousId = owner.id;
+      owners.push({ id: owner.id, firstName: owner.displayName, lastName: "" });
+    }
+    if (page.nextCursor === null) return owners;
+    if (!page.items.length || page.nextCursor !== previousId) throw new Error("Invalid assignable owners cursor.");
+    cursor = page.nextCursor as string;
+  }
+}
+
 export function buildStageMoveRequest(
   stageId: string,
   targetFlag: StageFlag,
@@ -548,10 +587,6 @@ export function buildStageMoveRequest(
         : { reason }
       : {}),
   };
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -596,19 +631,42 @@ async function opportunityReachedStage(
   }
 }
 
+type StageMoveOpportunity = Pick<
+  OpportunityCardRecord,
+  "id" | "title" | "stageId" | "ownerUserId"
+>;
+
+interface ListTerminalMoveContext {
+  opportunity: StageMoveOpportunity;
+  reload: () => Promise<void>;
+}
+
 // Owns branch/pipeline selection and the board (the purpose-built
 // GET /pipelines/:id/board projection) — see
 // docs/design/views.md#opportunities-pipeline. Card and table views fetch
 // from their own purpose-built/generic endpoints in sibling hooks
 // (useOpportunityCards, useOpportunitiesList) but read branchId/pipelineId
 // from here, so the pipeline selector stays a single shared control.
-export function usePipelineWorkspace(boardEnabled = true) {
+export function usePipelineWorkspace(boardEnabled = true, summariesEnabled = false) {
   const { lang, t } = useI18n();
+  const describeError = useCrmErrorText();
+  const errorMessage = useCallback(
+    (caught: unknown, fallback: string): string =>
+      caught instanceof TenantApiClientError
+        ? describeError(normalizeApiError(caught)) ?? fallback
+        : fallback,
+    [describeError],
+  );
   const { user } = useTenantAuth();
+  const { canMutate } = useAccessMode();
   const actorUserId = user?.id;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const initialPartyId =
+    searchParams?.get("partyId")?.trim() ||
+    searchParams?.get("search")?.trim() ||
+    "";
   const [pipelines, setPipelines] = useState<OpportunityPipeline[]>([]);
   const [capabilities, setCapabilities] =
     useState<OpportunityCapabilities | null>(null);
@@ -619,10 +677,13 @@ export function usePipelineWorkspace(boardEnabled = true) {
     },
   );
   const [board, setBoard] = useState<OpportunityBoard | null>(null);
+  const [boardResponseKey, setBoardResponseKey] = useState<string | null>(null);
   const [basicSearch, setBasicSearch] = useState<OpportunityBasicSearch>(() =>
-    isUUIDv7(actorUserId)
-      ? DEFAULT_OPPORTUNITY_BASIC_SEARCH
-      : EMPTY_OPPORTUNITY_BASIC_SEARCH,
+    initialPartyId
+      ? opportunityBasicSearchForCustomerParty(initialPartyId)
+      : isUUIDv7(actorUserId)
+        ? DEFAULT_OPPORTUNITY_BASIC_SEARCH
+        : EMPTY_OPPORTUNITY_BASIC_SEARCH,
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -644,8 +705,18 @@ export function usePipelineWorkspace(boardEnabled = true) {
     cardId: string;
     destStageId: string;
     targetFlag: StageFlag;
-    opportunity: OpportunityCardRecord | null;
+    opportunity: StageMoveOpportunity | null;
+    listMove?: ListTerminalMoveContext;
   } | null>(null);
+
+  const [reopenMove, setReopenMove] = useState<{
+    cardId: string;
+    destStageId: string;
+    targetFlag: StageFlag;
+    opportunity: StageMoveOpportunity;
+    listMove?: ListTerminalMoveContext;
+  } | null>(null);
+  const capabilitiesRequestEpoch = useRef(0);
 
   const { branchIds, branchId, selectBranch } =
     useTenantBranchSelection(user);
@@ -660,6 +731,44 @@ export function usePipelineWorkspace(boardEnabled = true) {
     "BRANCH_REQUIRED",
     branchId,
   );
+
+  const refreshCapabilities = useCallback(async () => {
+    const epoch = ++capabilitiesRequestEpoch.current;
+    setCapabilities(null);
+    if (!branchId || !capabilityScope.ready) return;
+    try {
+      const response = await axiosClient.get<unknown>(
+        `/api/tenant/crm/v1/opportunities/capabilities?branchId=${encodeURIComponent(branchId)}`,
+        { headers: capabilityScope.headers, cache: "no-store", maxResponseBytes: 128 * 1024 },
+      );
+      const next = parseOpportunityCapabilitiesResponse(response.data, branchId);
+      if (epoch !== capabilitiesRequestEpoch.current) return;
+      setCapabilities(next);
+      setCapabilitiesUnavailable(false);
+    } catch {
+      if (epoch === capabilitiesRequestEpoch.current) setCapabilitiesUnavailable(true);
+    }
+  }, [branchId, capabilityScope]);
+
+  useEffect(() => {
+    const onFocus = () => { void refreshCapabilities(); };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      capabilitiesRequestEpoch.current += 1;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refreshCapabilities]);
+
+  // The funnel describes all stages under the current basic filters, regardless
+  // of the selected stage or list page. Board summaries count beyond lane pages.
+  const boardQuery = useMemo(() => {
+    const query = new URLSearchParams({ branchId: branchId ?? "", limitPerStage: "50" });
+    appendOpportunityBasicQuery(query, basicSearch, actorUserId, {
+      includePipeline: false,
+      includeStage: false,
+    });
+    return query.toString();
+  }, [actorUserId, basicSearch, branchId]);
 
   const setSelectedPipelineId = useCallback(
     (nextPipelineId: string | null) => {
@@ -689,6 +798,8 @@ export function usePipelineWorkspace(boardEnabled = true) {
         return;
       }
       boardRequestEpochRef.current += 1;
+      const capabilityEpoch = ++capabilitiesRequestEpoch.current;
+      setCapabilities(null);
       setIsLoading(true);
       setError(null);
       setLoadError(null);
@@ -721,6 +832,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
         ]);
 
         if (
+          signal?.aborted ||
           [pipelinesSettled, capabilitiesSettled].some(
             (settled) =>
               settled.status === "rejected" && isAbortError(settled.reason),
@@ -732,16 +844,16 @@ export function usePipelineWorkspace(boardEnabled = true) {
         const nextCapabilities = degradableSource(capabilitiesSettled, (payload) =>
           parseOpportunityCapabilitiesResponse(payload, branchId),
         );
-        setCapabilities(nextCapabilities);
-        setCapabilitiesUnavailable(nextCapabilities === null);
+        if (capabilityEpoch === capabilitiesRequestEpoch.current) {
+          setCapabilities(nextCapabilities);
+          setCapabilitiesUnavailable(nextCapabilities === null);
+        }
 
         if (pipelinesSettled.status === "rejected") throw pipelinesSettled.reason;
         const available = parsePipelinesResponse(pipelinesSettled.value.data);
         setHasLoadedPipelines(true);
         if (available.length === 0) {
-          // A tenant nobody has configured a pipeline for is not a failure.
-          // It is an empty workspace, and a red banner over it tells the
-          // reader something broke when nothing did.
+          // An empty accessible set does not prove the tenant has no pipelines.
           setPipelines([]);
           setSelectedPipelineIdState(null);
           setBoard(null);
@@ -761,12 +873,13 @@ export function usePipelineWorkspace(boardEnabled = true) {
         setSelectedPipelineIdState(null);
         setBoard(null);
         setHasLoadedPipelines(false);
+        if (normalizeApiError(caught).status === 403) void refreshCapabilities();
         setLoadError(normalizeApiError(caught));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [branchId, capabilityScope],
+    [branchId, capabilityScope, refreshCapabilities],
   );
 
   const fetchBoardData = useCallback(
@@ -779,13 +892,8 @@ export function usePipelineWorkspace(boardEnabled = true) {
       setLoadError(null);
       setBoard(null);
       try {
-        const query = new URLSearchParams({ branchId, limitPerStage: "50" });
-        appendOpportunityBasicQuery(query, basicSearch, actorUserId, {
-          includePipeline: false,
-          includeStage: false,
-        });
         const response = await axiosClient.get<unknown>(
-          `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/board?${query.toString()}`,
+          `/api/tenant/crm/v1/pipelines/${encodeURIComponent(pipelineId)}/board?${boardQuery}`,
           {
             signal,
             cache: "no-store",
@@ -801,8 +909,9 @@ export function usePipelineWorkspace(boardEnabled = true) {
         ) {
           throw new Error("Invalid opportunity board response.");
         }
-        if (requestEpoch !== boardRequestEpochRef.current) return false;
+        if (signal?.aborted || requestEpoch !== boardRequestEpochRef.current) return false;
         setBoard(nextBoard);
+        setBoardResponseKey(`${pipelineId}?${boardQuery}`);
         return true;
       } catch (caught) {
         if (
@@ -811,6 +920,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
         ) {
           return false;
         }
+        if (normalizeApiError(caught).status === 403) void refreshCapabilities();
         setLoadError(normalizeApiError(caught));
         return false;
       } finally {
@@ -822,7 +932,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
         }
       }
     },
-    [actorUserId, basicSearch, branchId],
+    [boardQuery, branchId, refreshCapabilities],
   );
 
   const loadMoreStage = useCallback(
@@ -900,15 +1010,16 @@ export function usePipelineWorkspace(boardEnabled = true) {
           };
         });
       } catch (caught) {
+        if (normalizeApiError(caught).status === 403) void refreshCapabilities();
         setError(
-          errorMessage(caught, "Unable to load more opportunities."),
+          errorMessage(caught, t.crmOpportunities.stageLoadFailed),
         );
       } finally {
         loadMoreInFlightRef.current = false;
         setLoadingStageId(null);
       }
     },
-    [actorUserId, basicSearch, board, branchId, loadingStageId, selectedPipelineId],
+    [actorUserId, basicSearch, board, branchId, loadingStageId, selectedPipelineId, refreshCapabilities, errorMessage, t.crmOpportunities.stageLoadFailed],
   );
 
   useEffect(() => {
@@ -920,7 +1031,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
   }, [fetchPipelines]);
 
   useEffect(() => {
-    if (!boardEnabled || !hasLoadedPipelines || !selectedPipelineId) return;
+    if (!(boardEnabled || summariesEnabled) || !hasLoadedPipelines || !selectedPipelineId) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) {
@@ -928,24 +1039,24 @@ export function usePipelineWorkspace(boardEnabled = true) {
       }
     });
     return () => controller.abort();
-  }, [boardEnabled, fetchBoardData, hasLoadedPipelines, pipelinesRevision, selectedPipelineId]);
+  }, [boardEnabled, summariesEnabled, fetchBoardData, hasLoadedPipelines, pipelinesRevision, selectedPipelineId]);
 
   const canUpdateOpportunity = useCallback(
-    (opportunity: OpportunityCardRecord) =>
-      opportunityCapabilityAllowsOwner(
+    (opportunity: Pick<OpportunityCardRecord, "ownerUserId">) =>
+      canMutate && opportunityCapabilityAllowsOwner(
         capabilities?.update ?? null,
         opportunity.ownerUserId,
       ),
-    [capabilities?.update],
+    [canMutate, capabilities?.update],
   );
 
   const canDeleteOpportunity = useCallback(
     (opportunity: OpportunityCardRecord) =>
-      opportunityCapabilityAllowsOwner(
+      canMutate && opportunityCapabilityAllowsOwner(
         capabilities?.delete ?? null,
         opportunity.ownerUserId,
       ),
-    [capabilities?.delete],
+    [canMutate, capabilities?.delete],
   );
 
   const performMove = useCallback(
@@ -954,12 +1065,16 @@ export function usePipelineWorkspace(boardEnabled = true) {
       destStageId: string,
       targetFlag: StageFlag,
       terminalReason?: string,
+      listMove?: ListTerminalMoveContext,
     ): Promise<boolean> => {
-      const opportunity = board?.stages
-        .flatMap(({ items }) => items)
-        .find(({ id }) => id === cardId);
+      const opportunity =
+        listMove?.opportunity ??
+        board?.stages
+          .flatMap(({ items }) => items)
+          .find(({ id }) => id === cardId);
       if (
         !selectedPipelineId ||
+        !pipelines.find(({ id }) => id === selectedPipelineId)?.stages.some(({ id }) => id === destStageId) ||
         !opportunity ||
         !canUpdateOpportunity(opportunity) ||
         mutationInFlightRef.current ||
@@ -970,6 +1085,14 @@ export function usePipelineWorkspace(boardEnabled = true) {
       mutationInFlightRef.current = true;
       setIsMutating(true);
       setError(null);
+      const refresh = async (): Promise<boolean> => {
+        if (listMove) {
+          await listMove.reload();
+          if (summariesEnabled) await fetchBoardData(selectedPipelineId);
+          return true;
+        }
+        return fetchBoardData(selectedPipelineId);
+      };
       try {
         await axiosClient.post(
           `/api/tenant/crm/v1/opportunities/${encodeURIComponent(cardId)}/stage`,
@@ -981,22 +1104,26 @@ export function usePipelineWorkspace(boardEnabled = true) {
             maxResponseBytes: 512 * 1024,
           },
         );
-        return await fetchBoardData(selectedPipelineId);
+        return await refresh();
       } catch (caught) {
+        if (normalizeApiError(caught).status === 403) void refreshCapabilities();
         const message = errorMessage(
           caught,
-          "Unable to move the opportunity.",
+          t.crmOpportunities.moveFailed,
         );
         if (isAmbiguousMutationError(caught)) {
           const committed = await opportunityReachedStage(cardId, destStageId);
-          await fetchBoardData(selectedPipelineId);
+          await refresh();
           if (committed === true) return true;
           if (committed === null) {
+            setReopenMove(null);
             setTerminalMove((current) =>
               current?.cardId === cardId ? null : current,
             );
             setError(
-              "The stage-change result is uncertain. The board was refreshed; review the opportunity before trying again.",
+              listMove
+                ? t.crmOpportunities.stageMoveUncertain
+                : t.crmOpportunities.boardStageMoveUncertain,
             );
             return false;
           }
@@ -1008,7 +1135,55 @@ export function usePipelineWorkspace(boardEnabled = true) {
         setIsMutating(false);
       }
     },
-    [board, canUpdateOpportunity, fetchBoardData, selectedPipelineId],
+    [
+      board,
+      canUpdateOpportunity,
+      fetchBoardData,
+      refreshCapabilities,
+      selectedPipelineId,
+      pipelines,
+      summariesEnabled,
+      errorMessage,
+      t.crmOpportunities.moveFailed,
+      t.crmOpportunities.boardStageMoveUncertain,
+      t.crmOpportunities.stageMoveUncertain,
+    ],
+  );
+
+  const requestListStageMove = useCallback(
+    (
+      opportunity: StageMoveOpportunity,
+      destStageId: string,
+      reload: () => Promise<void>,
+    ) => {
+      const stage = pipelines
+        .find(({ id }) => id === selectedPipelineId)
+        ?.stages.find(({ id }) => id === destStageId);
+      if (
+        !stage ||
+        opportunity.stageId === destStageId ||
+        !canUpdateOpportunity(opportunity) ||
+        mutationInFlightRef.current ||
+        loadMoreInFlightRef.current
+      ) {
+        return;
+      }
+      setError(null);
+      if (stage.flag !== "WON" && stage.flag !== "LOST") {
+        const source = pipelines.find(({ id }) => id === selectedPipelineId)?.stages.find(({ id }) => id === opportunity.stageId);
+        if (source?.flag !== "WON" && source?.flag !== "LOST") return;
+        setReopenMove({ cardId: opportunity.id, destStageId, targetFlag: stage.flag, opportunity, listMove: { opportunity, reload } });
+        return;
+      }
+      setTerminalMove({
+        cardId: opportunity.id,
+        destStageId,
+        targetFlag: stage.flag,
+        opportunity,
+        listMove: { opportunity, reload },
+      });
+    },
+    [canUpdateOpportunity, pipelines, selectedPipelineId],
   );
 
   const moveCard = useCallback(
@@ -1030,7 +1205,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
         ({ stage }) => stage.id === sourceStageId,
       );
       const opportunity = sourceLane?.items.find(({ id }) => id === cardId);
-      if (!opportunity || !canUpdateOpportunity(opportunity)) return;
+      if (!opportunity || sourceStageId === destStageId || !canUpdateOpportunity(opportunity)) return;
       const targetFlag = destLane.stage.flag;
       if (targetFlag === "WON" || targetFlag === "LOST") {
         setError(null);
@@ -1042,10 +1217,25 @@ export function usePipelineWorkspace(boardEnabled = true) {
         });
         return;
       }
+      if (sourceLane?.stage.flag === "WON" || sourceLane?.stage.flag === "LOST") {
+        setError(null);
+        setReopenMove({ cardId, destStageId, targetFlag, opportunity });
+        return;
+      }
       void performMove(cardId, destStageId, targetFlag);
     },
     [board, canUpdateOpportunity, performMove],
   );
+
+  const confirmReopenMove = useCallback(async () => {
+    if (!reopenMove) return false;
+    const moved = await performMove(reopenMove.cardId, reopenMove.destStageId, reopenMove.targetFlag, undefined, reopenMove.listMove);
+    if (moved) setReopenMove(null);
+    return moved;
+  }, [performMove, reopenMove]);
+  const cancelReopenMove = useCallback(() => {
+    if (!isMutating) setReopenMove(null);
+  }, [isMutating]);
 
   const confirmTerminalMove = useCallback(
     async (reason: string): Promise<boolean> => {
@@ -1055,6 +1245,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
         terminalMove.destStageId,
         terminalMove.targetFlag,
         reason,
+        terminalMove.listMove,
       );
       if (moved) setTerminalMove(null);
       return moved;
@@ -1078,10 +1269,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
         .find(({ id }) => id === cardId);
       if (
         !opportunity ||
-        !opportunityCapabilityAllowsOwner(
-          capabilities?.update ?? null,
-          opportunity.ownerUserId,
-        )
+        !canUpdateOpportunity(opportunity)
       ) {
         return false;
       }
@@ -1151,6 +1339,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
             },
           );
         } catch (caught) {
+          if (normalizeApiError(caught).status === 403) void refreshCapabilities();
           applyCardFields({
             ...(patch.importance !== undefined ? { importance: previous.importance } : {}),
             ...(patch.cardColor !== undefined ? { cardColor: previous.cardColor } : {}),
@@ -1203,11 +1392,13 @@ export function usePipelineWorkspace(boardEnabled = true) {
     [
       board,
       boardEnabled,
-      capabilities?.update,
+      canUpdateOpportunity,
       fetchBoardData,
+      refreshCapabilities,
       selectedPipelineId,
       t.crmOpportunities.cardUpdateAmbiguous,
       t.crmOpportunities.cardUpdateFailed,
+      errorMessage,
     ],
   );
 
@@ -1222,11 +1413,20 @@ export function usePipelineWorkspace(boardEnabled = true) {
 
   return {
     actorUserId,
+    initialPartyId,
     lang,
     t,
     board,
+    funnelLanes: !isLoading && !loadError &&
+      boardResponseKey === `${selectedPipelineId}?${boardQuery}`
+      ? board?.stages
+      : undefined,
     pipelines,
-    capabilities,
+    capabilities: canMutate ? capabilities : null,
+    refreshCapabilities,
+    reopenMove,
+    confirmReopenMove,
+    cancelReopenMove,
     branchIds,
     branchId,
     selectBranch: (nextBranchId: string) => {
@@ -1237,6 +1437,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
       setSelectedPipelineId(null);
       setBoard(null);
       setTerminalMove(null);
+      setReopenMove(null);
       setError(null);
       setLoadError(null);
       setCapabilitiesUnavailable(false);
@@ -1250,7 +1451,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
     error,
     loadError,
     capabilitiesUnavailable,
-    // The tenant has been asked, and the answer was "none configured".
+    // The server returned no accessible pipelines.
     hasNoPipelines: hasLoadedPipelines && !isLoading && pipelines.length === 0,
     needsBranchSelection: branchId === null,
     fetchPipelines,
@@ -1260,6 +1461,7 @@ export function usePipelineWorkspace(boardEnabled = true) {
     canUpdateOpportunity,
     canDeleteOpportunity,
     moveCard,
+    requestListStageMove,
     terminalMove,
     confirmTerminalMove,
     cancelTerminalMove,

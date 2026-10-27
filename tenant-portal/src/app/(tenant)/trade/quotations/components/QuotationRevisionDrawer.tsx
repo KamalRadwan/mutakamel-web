@@ -3,6 +3,7 @@
 import { Field, FormDrawer, Input } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TradeLineEditor } from "../../documents/components/TradeLineEditor";
+import { TradeWriteFields, TradeWriteOutcome } from "../../documents/components/TradeBoundaryStates";
 import type { QuotationRevisionState } from "../hooks/useQuotationRevision";
 
 export interface QuotationRevisionDrawerProps {
@@ -13,12 +14,8 @@ export interface QuotationRevisionDrawerProps {
 /**
  * A new revision — the only way a quotation's lines change.
  *
- * `CreateQuotationRevisionDto` carries `validUntil`, the line set, and an
- * optional `terms` that defaults to `{}`. `terms` is **omitted** here rather
- * than composed: there is no published schema for a document terms snapshot
- * (Q32), and the server's own default is the only honest value. The cost of
- * that is recorded as Q80 — a revision with empty terms can never be converted
- * to a sales order, because the conversion check requires non-empty terms.
+ * Terms are authored explicitly. Blank durations use the displayed defaults;
+ * valid zero durations remain zero in the revision request.
  */
 export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisionDrawerProps) {
   const { t } = useI18n();
@@ -43,6 +40,8 @@ export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisi
         discardCancel: t.common.cancel,
       }}
     >
+      <TradeWriteOutcome write={state.write} />
+      <TradeWriteFields write={state.write}>
       <div className="dossier-card dossier-card-indigo space-y-3">
         <Field label={td.validUntil} required>
           <Input
@@ -76,7 +75,11 @@ export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisi
               placeholder="EXW"
             />
           </Field>
-          <Field label={td.executive.deliveryDaysLabel}>
+          <Field
+            label={td.executive.deliveryDaysLabel}
+            error={state.deliveryDaysError}
+            hint={td.executive.revisionDeliveryDaysHint}
+          >
             <Input
               size="sm"
               inputMode="numeric"
@@ -85,7 +88,11 @@ export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisi
               placeholder="14"
             />
           </Field>
-          <Field label={td.executive.warrantyMonthsLabel}>
+          <Field
+            label={td.executive.warrantyMonthsLabel}
+            error={state.warrantyMonthsError}
+            hint={td.executive.revisionWarrantyMonthsHint}
+          >
             <Input
               size="sm"
               inputMode="numeric"
@@ -100,8 +107,9 @@ export function QuotationRevisionDrawer({ state, currencyCode }: QuotationRevisi
       <TradeLineEditor
         state={state.lineDraft}
         currencyCode={currencyCode}
-        disabled={state.write.isWriting}
+        disabled={state.write.isBlocked}
       />
+      </TradeWriteFields>
     </FormDrawer>
   );
 }

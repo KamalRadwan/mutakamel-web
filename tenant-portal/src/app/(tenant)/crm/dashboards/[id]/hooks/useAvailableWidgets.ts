@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { definitionListPath, mergeDefinitionItems } from '../../definition-pagination';
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { WIDGETS_PATH, parseWidgetsResponse, type WidgetDefinition } from "../../widget-contract";
@@ -17,16 +18,19 @@ const READ_CONFIG = { cache: "no-store", maxResponseBytes: 2 * 1024 * 1024 } as 
  */
 export function useAvailableWidgets(enabled: boolean) {
   const [widgets, setWidgets] = useState<WidgetDefinition[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<NormalizedApiError | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (cursor?: string): Promise<void> => {
     if (!enabled) return;
-    setIsLoading(true);
     setError(null);
+    setIsLoading(true);
     try {
-      const response = await axiosClient.get<unknown>(WIDGETS_PATH, READ_CONFIG);
-      setWidgets(parseWidgetsResponse(response.data));
+      const response = await axiosClient.get<unknown>(definitionListPath(WIDGETS_PATH, cursor), READ_CONFIG);
+      const page = parseWidgetsResponse(response.data);
+      setWidgets((current) => cursor ? mergeDefinitionItems(current, page.items) : page.items);
+      setNextCursor(page.nextCursor);
     } catch (caught) {
       setError(normalizeApiError(caught));
     } finally {
@@ -47,5 +51,9 @@ export function useAvailableWidgets(enabled: boolean) {
     };
   }, [load]);
 
-  return { widgets, isLoading, error, reload: load };
+  return {
+    widgets, error, reload: () => load(), isLoading,
+    hasMore: nextCursor !== null,
+    loadMore: () => nextCursor && !isLoading ? load(nextCursor) : Promise.resolve(),
+  };
 }

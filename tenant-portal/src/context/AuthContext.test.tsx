@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useEffect, useState } from "react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { createElement, useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   publishTenantAuthEvent,
@@ -10,7 +10,9 @@ import {
 import { TenantAuthGuard } from "@/components/auth/TenantAuthGuard";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { ar } from "@/i18n/dictionaries/ar";
+import { en } from "@/i18n/dictionaries/en";
 import { useOrganizationScopeHeaders } from "@/hooks/useOrganizationScope";
+import { axiosClient } from "@/lib/api/axiosClient";
 import { TenantAuthProvider, useTenantAuth } from "./AuthContext";
 
 const replace = vi.fn();
@@ -41,26 +43,30 @@ function LoginProbe() {
     <div>
       <span>{authState}:{user?.email ?? "none"}</span>
       <span>error:{error}</span>
-      <button
-        type="button"
-        onClick={() => {
-          setError("none");
-          void login({
-            email: "tenant@example.test",
-            password: "correct horse battery staple",
-            rememberMe: true,
-          }).catch((loginError: unknown) => {
-            setError(
-              loginError instanceof Error ? loginError.message : "unknown",
-            );
-          });
-        }}
-      >
-        login
-      </button>
-      <button type="button" onClick={() => void retryBootstrap()}>
-        retry
-      </button>
+      {createElement(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setError("none");
+            void login({
+              email: "tenant@example.test",
+              password: "correct horse battery staple",
+              rememberMe: true,
+            }).catch((loginError: unknown) => {
+              setError(
+                loginError instanceof Error ? loginError.message : "unknown",
+              );
+            });
+          },
+        },
+        "login",
+      )}
+      {createElement(
+        "button",
+        { type: "button", onClick: () => void retryBootstrap() },
+        "retry",
+      )}
     </div>
   );
 }
@@ -83,6 +89,11 @@ function LogoutProbe() {
 function OrganizationScopeProbe() {
   const headers = useOrganizationScopeHeaders("BRANCH_REQUIRED", SCOPE_BRANCH);
   return <output data-testid="organization-scope">{JSON.stringify(headers)}</output>;
+}
+
+function PermissionProbe() {
+  const { user } = useTenantAuth();
+  return <span>{user?.permissions.includes("roles.role.create") && "permission-control"}</span>;
 }
 
 describe("TenantAuthProvider committed login bootstrap", () => {
@@ -116,8 +127,151 @@ describe("TenantAuthProvider committed login bootstrap", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it("keeps the challenge signed out until a leading-zero code establishes a session", async () => {
+    const step = { mfaRequired: true, challengeId: "a".repeat(43), expiresIn: 600, resendAfterSeconds: 60 };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === "/api/tenant/core/v1/auth/login") return jsonResponse({ data: step });
+      if (url === "/api/tenant/core/v1/auth/mfa/verify") return jsonResponse(webAuthResponse());
+      if (url === "/api/tenant/core/v1/auth/me") return jsonResponse(profileResponse());
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useTenantAuth(), { wrapper: TenantAuthProvider });
+    await waitFor(() => expect(result.current.authState).toBe("UNAUTHENTICATED"));
+    await act(async () => {
+      expect(await result.current.login({ email: "tenant@example.test", password: "password" })).toEqual(step);
+    });
+    expect(result.current.user).toBeNull();
+    expect(result.current.authState).toBe("UNAUTHENTICATED");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("tenant_session_meta")).toBeNull();
+    await act(async () => { await result.current.login({ challengeId: step.challengeId, code: "012345" }); });
+    expect(result.current.authState).toBe("AUTHENTICATED");
+    expect(push).toHaveBeenCalledWith("/");
+    const verify = fetchMock.mock.calls.find(([url]) => url.endsWith("/mfa/verify"));
+    const init = (verify as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(init.body as string)).toEqual({ challengeId: step.challengeId, code: "012345" });
+    expect(new Headers(init.headers).has("x-idempotency-key")).toBe(false);
+  });
+
+  it.each([
+    "MISSING_REQUIRED_PERMISSIONS",
+    "TENANT_WIDE_PERMISSION_REQUIRED",
+    "BRANCH_PERMISSION_DENIED",
+    "COMPANY_PERMISSION_DENIED",
+  ])("coalesces %s denials and removes a revoked control without realtime", async (code) => {
+    vi.useFakeTimers();
+    seedSessionState("session-a");
+    let meRequests = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url !== "/api/tenant/core/v1/auth/me") return jsonResponse({ code }, 403);
+      meRequests += 1;
+      return jsonResponse(profileResponse({
+        isTenantOwner: false,
+        permissions: meRequests === 1 ? ["roles.role.create"] : [],
+        permissionScopes: meRequests === 1
+          ? { "roles.role.create": { tenantWide: true, companyIds: [], branchIds: [] } }
+          : {},
+      }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TenantAuthProvider><PermissionProbe /></TenantAuthProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText("permission-control")).toBeTruthy();
+
+    await act(async () => {
+      for (let index = 0; index < 3; index += 1) {
+        await expect(axiosClient.post("/api/tenant/core/v1/roles", {}))
+          .rejects.toMatchObject({ response: { status: 403 } });
+      }
+      await vi.advanceTimersByTimeAsync(249);
+    });
+    expect(meRequests).toBe(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(meRequests).toBe(2);
+    expect(screen.queryByText("permission-control")).toBeNull();
+    // Only the three deliberate writes were sent; no denied action is replayed.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("coalesces denials while the permission refresh is in flight", async () => {
+    vi.useFakeTimers();
+    seedSessionState("session-a");
+    let meRequests = 0;
+    let resolveProfile!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      if (url !== "/api/tenant/core/v1/auth/me") {
+        return Promise.resolve(jsonResponse({ code: "MISSING_REQUIRED_PERMISSIONS" }, 403));
+      }
+      meRequests += 1;
+      return meRequests === 1 ? Promise.resolve(jsonResponse(profileResponse()))
+        : new Promise<Response>((resolve) => { resolveProfile = resolve; });
+    }));
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => {
+      await expect(axiosClient.post("/api/tenant/core/v1/roles", {})).rejects.toMatchObject({ response: { status: 403 } });
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(meRequests).toBe(2);
+    await act(async () => {
+      await expect(axiosClient.post("/api/tenant/core/v1/roles", {})).rejects.toMatchObject({ response: { status: 403 } });
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(meRequests).toBe(2);
+    await act(async () => {
+      resolveProfile(jsonResponse(profileResponse({ firstName: "Updated" })));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("AUTHENTICATED:tenant@example.test")).toBeTruthy();
+  });
+
+  it.each(["unmount", "session-ended"])("cancels a queued permission refresh on %s", async (ending) => {
+    vi.useFakeTimers();
+    seedSessionState("session-a");
+    const fetchMock = vi.fn(async (url: string) => url === "/api/tenant/core/v1/auth/me"
+      ? jsonResponse(profileResponse())
+      : jsonResponse({ code: "MISSING_REQUIRED_PERMISSIONS" }, 403));
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => {
+      await expect(axiosClient.post("/api/tenant/core/v1/roles", {})).rejects.toMatchObject({ response: { status: 403 } });
+      if (ending === "unmount") view.unmount();
+      else publishTenantAuthLifecycle("ENDED");
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores unrelated denials and does not loop when the profile refresh is denied", async () => {
+    vi.useFakeTimers();
+    seedSessionState("session-a");
+    let meRequests = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url !== "/api/tenant/core/v1/auth/me") return jsonResponse({ code: "ROLE_PERMISSION_GRANT_DENIED" }, 403);
+      meRequests += 1;
+      return meRequests === 1 ? jsonResponse(profileResponse())
+        : jsonResponse({ code: "MISSING_REQUIRED_PERMISSIONS" }, 403);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => {
+      await expect(axiosClient.post("/api/tenant/core/v1/roles", {})).rejects.toMatchObject({ response: { status: 403 } });
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(meRequests).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "retry" }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(meRequests).toBe(2);
+    expect(screen.getByText("DEGRADED:tenant@example.test")).toBeTruthy();
   });
 
   it.each([false, true])(
@@ -297,7 +451,7 @@ describe("TenantAuthProvider committed login bootstrap", () => {
           { branchId: SCOPE_BRANCH, companyId: selectedCompany },
           { branchId: otherBranch, companyId: OTHER_SCOPE_COMPANY },
         ],
-        accessScope: { branchesTruncated: false, companiesTruncated: true },
+        accessScope: { mode: "FULL", branchesTruncated: false, companiesTruncated: true, teamMembershipsTruncated: false, teamMembershipsTotal: 0 },
       }))));
 
       render(
@@ -316,7 +470,62 @@ describe("TenantAuthProvider committed login bootstrap", () => {
     },
   );
 
+  it.each(["ar", "en"] as const)("shows every partial-list warning in %s and clears it after refresh", async (lang) => {
+    seedSessionState("session-a");
+    window.localStorage.setItem("tenant_lang", lang);
+    const accessScope = { mode: "FULL", branchesTruncated: false, companiesTruncated: false, teamMembershipsTruncated: false, teamMembershipsTotal: 501 };
+    const fetchMock = vi.fn(async () => jsonResponse(profileResponse({ accessScope })));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+    await screen.findByText("AUTHENTICATED:tenant@example.test");
+    expect(screen.queryByRole("status")).toBeNull();
+    const labels = { ar, en }[lang].authScopeNotice;
+    for (const [flag, message] of [
+      ["branchesTruncated", labels.branches],
+      ["companiesTruncated", labels.companies],
+      ["teamMembershipsTruncated", labels.teamMemberships],
+    ] as const) {
+      fetchMock.mockImplementation(async () => jsonResponse(profileResponse({ accessScope: { ...accessScope, [flag]: true } })));
+      fireEvent.click(screen.getByRole("button", { name: "retry" }));
+      await waitFor(() => expect(screen.getByRole("status").textContent).toBe(message));
+    }
+    fetchMock.mockImplementation(async () => jsonResponse(profileResponse({ accessScope: {
+      ...accessScope, branchesTruncated: true, companiesTruncated: true, teamMembershipsTruncated: true,
+    } })));
+    fireEvent.click(screen.getByRole("button", { name: "retry" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe(Object.values(labels).join(" ")));
+    fetchMock.mockImplementation(async () => jsonResponse(profileResponse({ accessScope })));
+    fireEvent.click(screen.getByRole("button", { name: "retry" }));
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
   it.each([
+    undefined, null, {},
+    { mode: "FULL", branchesTruncated: "false", companiesTruncated: false, teamMembershipsTruncated: false, teamMembershipsTotal: 0 },
+    { mode: "FULL", branchesTruncated: false, companiesTruncated: false, teamMembershipsTruncated: undefined, teamMembershipsTotal: 0 },
+  ])("rejects a missing or malformed truncation projection: %j", async (accessScope) => {
+    seedSessionState("session-a");
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(profileResponse({ accessScope }))));
+    render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+    await screen.findByText("UNAUTHENTICATED:none");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it.each([undefined, null, [], { "roles.role.create": { tenantWide: true, companyIds: [], branchIds: [] } }]
+    .map((permissionScopes) => ({ permissionScopes })))(
+    "rejects a missing, malformed or mismatched permission projection: %j",
+    async ({ permissionScopes }) => {
+      seedSessionState("session-a");
+      const fetchMock = vi.fn(async () => jsonResponse(profileResponse({ permissionScopes })));
+      vi.stubGlobal("fetch", fetchMock);
+      render(<TenantAuthProvider><LoginProbe /></TenantAuthProvider>);
+      await waitFor(() => expect(screen.getByText("UNAUTHENTICATED:none")).toBeTruthy());
+      expect(fetchMock).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([
+    { name: "absent map", mapping: undefined },
     { name: "null map", mapping: null },
     { name: "object instead of array", mapping: { branchId: SCOPE_BRANCH, companyId: SCOPE_COMPANY } },
     { name: "null entry", mapping: [null] },
@@ -987,7 +1196,10 @@ function profileResponse(overrides: Record<string, unknown> = {}): Record<string
       status: "ACTIVE",
       accessibleBranches: [],
       accessibleCompanies: ["company-a"],
+      accessibleBranchCompanies: [],
+      accessScope: { mode: "FULL", branchesTruncated: false, companiesTruncated: false, teamMembershipsTruncated: false, teamMembershipsTotal: 0 },
       permissions: [],
+      permissionScopes: {},
       teamMemberships: [],
       ...overrides,
     },

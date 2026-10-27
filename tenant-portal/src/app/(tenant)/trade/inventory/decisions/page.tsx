@@ -20,7 +20,6 @@ import {
   Card,
   cn,
   DataTable,
-  DegradedBanner,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -39,9 +38,9 @@ import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { tradeStatusLabel } from "../../trade-advanced-validation";
 import { InventoryModuleSubnav } from "../components/InventoryModuleSubnav";
+import { InventoryListPagination } from "../components/InventoryListPagination";
 import { INVENTORY_READ_PERMISSION } from "../inventory-contract";
 import {
-  INVENTORY_LIST_LIMIT,
   INVENTORY_POLICY_KINDS,
   type InventoryDecision,
 } from "../inventory-governance-contract";
@@ -72,6 +71,8 @@ export default function InventoryDecisionsPage() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     policyKind,
     aggregateIdFilter,
     isLoading,
@@ -251,49 +252,29 @@ export default function InventoryDecisionsPage() {
         className="sr-only"
         title={t.tradeInventory.decisionsTitle}
         description={t.tradeInventory.decisionsSubtitle}
-      />
-
-      {/* Colorful Header Banner */}
-      <Card className="flex flex-wrap items-center justify-between gap-3 border border-border/70 bg-gradient-to-r from-card via-card to-negative/5 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg border border-negative/30 bg-negative-subtle text-negative-subtle-foreground">
-            <Gavel className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-foreground">
-                {t.tradeInventory.decisionsTitle}
-              </h1>
-              <Badge tone="brand">
-                {isAr ? "تدقيق جنائي 360°" : "Forensic Policy Studio Projection"}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t.tradeInventory.decisionsSubtitle}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <TenantBranchSelect
-            branchIds={branchIds}
-            branchId={branchId}
-            onChange={selectBranch}
-            disabled={isRefreshing}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void reload()}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={isRefreshing ? "size-4 animate-spin" : "size-4"}
-              aria-hidden="true"
+        secondaryActions={
+          <>
+            <TenantBranchSelect
+              branchIds={branchIds}
+              branchId={branchId}
+              onChange={selectBranch}
+              disabled={isRefreshing}
             />
-            {t.tradeCommon.reload}
-          </Button>
-        </div>
-      </Card>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void reload()}
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={isRefreshing ? "size-4 animate-spin" : "size-4"}
+                aria-hidden="true"
+              />
+              {t.tradeCommon.reload}
+            </Button>
+          </>
+        }
+      />
 
       {isScopeResolved ? (
         <>
@@ -415,13 +396,7 @@ export default function InventoryDecisionsPage() {
             </div>
           </Card>
 
-          {items.length === INVENTORY_LIST_LIMIT ? (
-            <DegradedBanner
-              message={formatTemplate(t.tradeCommon.limitOnlyCapped, {
-                limit: INVENTORY_LIST_LIMIT,
-              })}
-            />
-          ) : null}
+          <InventoryListPagination page={pagination} onPageChange={setPage} isRefreshing={isRefreshing} />
 
           {viewMode === "bento" ? (
             filteredItems.length === 0 && !isLoading ? (

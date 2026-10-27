@@ -19,7 +19,7 @@ export function DefinitionAdoptionWorkspace() {
   const change = useCommercialChange(null, discovery.reload, !discovery.denied && !discovery.state?.error && !discovery.busy, discovery.revision);
   const state = change.state, intent = state?.intent, operation = state?.operation;
   return <div className="flex min-w-0 flex-col gap-4">
-    <PageHeader title={copy.title} description={copy.description} secondaryActions={<>
+    <PageHeader className="sr-only" title={copy.title} description={copy.description} secondaryActions={<>
       <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreApplicationAccess}>{t.applicationAccess.title}</Link></Button>
       <Button size="sm" variant="outline" disabled={change.busy || discovery.busy} onClick={() => void change.recheck()}>{copy.recheck}</Button>
     </>} />

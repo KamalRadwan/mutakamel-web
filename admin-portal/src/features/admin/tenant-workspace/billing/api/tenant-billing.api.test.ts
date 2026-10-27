@@ -19,7 +19,6 @@ vi.mock("../model/readers", () => ({
     reader: (value: unknown) => unknown,
   ) => ({ items: payload.data.map(reader), meta: payload.meta }),
   readSubscriptionView: (value: unknown) => value,
-  readSubscriptionItems: (value: unknown) => value,
   readCancellationResult: (value: unknown) => value,
   readWallet: (value: unknown) => value,
   readWalletInputCurrencies: (value: unknown) => value,
@@ -66,9 +65,7 @@ describe("tenant billing API contract", () => {
 
   it("uses canonical subscription reads and the reviewed initial seed command", async () => {
     const detail = commercialFixture();
-    const items = { subscriptionId: detail.subscription.id, subscriptionRevision: detail.subscriptionRevision,
-      baseItems: detail.baseItems, addonSelections: detail.addonSelections };
-    getMock.mockResolvedValueOnce(addonEnvelope(detail)).mockResolvedValueOnce(addonEnvelope(items));
+    getMock.mockResolvedValueOnce(addonEnvelope(detail));
     await tenantBillingApi.getSubscription(commercialIds.tenant);
     const quote = initialQuoteFixture(), dto = buildInitialSeedRequest(quote, initialRequestFixture());
     postMock.mockResolvedValueOnce(initialResponse(initialReceiptFixture()));
@@ -76,14 +73,12 @@ describe("tenant billing API contract", () => {
 
     expect(getMock).toHaveBeenNthCalledWith(1,
       `/api/admin/core/v1/tenants/${commercialIds.tenant}/subscription`, { cache: "no-store", signal: undefined });
-    expect(getMock).toHaveBeenNthCalledWith(2,
-      `/api/admin/core/v1/tenants/${commercialIds.tenant}/subscription/items`, { cache: "no-store", signal: undefined });
-    expect(getMock).toHaveBeenCalledTimes(2);
+    expect(getMock).toHaveBeenCalledTimes(1);
     expect(postMock).toHaveBeenCalledWith(`/api/admin/core/v1/tenants/${initialId(2)}/subscription`,
       dto, { headers: { "x-idempotency-key": key }, replayAfterRefresh: true, cache: "no-store" });
   });
 
-  it("reconciles a non-empty tenant ledger through the exact wallet-id route", async () => {
+  it("reads a non-empty ledger once through the tenant-scoped route", async () => {
     const walletId = "019f0000-0000-7000-8000-000000000009";
     const row = { id: key, walletId };
     const meta = {
@@ -94,19 +89,18 @@ describe("tenant billing API contract", () => {
       hasNext: false,
       hasPrev: false,
     };
-    getMock
-      .mockResolvedValueOnce(envelope([row], meta))
-      .mockResolvedValueOnce(envelope([row], meta));
+    getMock.mockResolvedValueOnce(envelope([row], meta));
 
     await expect(tenantBillingApi.getLedger(tenantId)).resolves.toEqual({
       items: [row],
       meta,
     });
     expect(getMock).toHaveBeenNthCalledWith(
-      2,
-      `/api/admin/core/v1/wallets/${walletId}/ledger?page=1&limit=20`,
+      1,
+      `/api/admin/core/v1/tenants/${tenantId}/wallet/ledger?page=1&limit=20`,
       undefined,
     );
+    expect(getMock).toHaveBeenCalledTimes(1);
   });
 
   it("uses preview/apply and the non-nested canonical cancellation route", async () => {

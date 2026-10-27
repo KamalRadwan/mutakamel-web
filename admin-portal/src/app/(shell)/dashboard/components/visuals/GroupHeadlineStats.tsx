@@ -31,7 +31,7 @@ export function GroupHeadlineStats({
     >
       {cards.map((card) => (
         <div key={card.key} className="min-w-36">
-          <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
+          <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground rtl:normal-case rtl:tracking-normal">
             {resolveMetricLabel(card, lang, t)}
           </dt>
           <dd

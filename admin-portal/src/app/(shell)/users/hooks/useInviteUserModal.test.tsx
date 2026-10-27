@@ -18,11 +18,18 @@ const api = vi.hoisted(() => ({
 }));
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+const auth = vi.hoisted(() => ({ user: { id: "admin", isSuperAdmin: true, permissions: [] as string[] } }));
 
-vi.mock("../api/adminUsersApi", () => api);
+vi.mock("../api/adminUsersApi", () => ({
+  ...api,
+  listAssignableRoles: (purpose: string, params: unknown) => {
+    expect(purpose).toBe("invite");
+    return api.listRoles(params);
+  },
+}));
 vi.mock("@/components/ui/ToastContext", () => ({ useToast: () => toast }));
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ user: { id: "admin", isSuperAdmin: true } }),
+  useAuth: () => auth,
 }));
 vi.mock("@/i18n/I18nContext", async () => {
   const { en } = await import("@/i18n/dictionaries/en");
@@ -91,14 +98,49 @@ describe("useInviteUserModal ambiguous invitation", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    auth.user = { id: "admin", isSuperAdmin: true, permissions: [] };
     api.listRoles.mockResolvedValue({
       data: [{ id: ROLE_ID, name: "Support" }],
+      meta: { page: 1, limit: 100, total: 1, totalPages: 1, hasNext: false, hasPrev: false },
     });
     api.listAdminUsers.mockResolvedValue({ data: [activeLookalike()] });
   });
 
   const render = () =>
     renderHook(() => useInviteUserModal({ onClose, onSuccess }));
+
+  it("invites with invitation grants and no role-read grant", async () => {
+    auth.user = { id: "admin", isSuperAdmin: false, permissions: ["admin.users.invite", "admin.users.critical"] };
+    api.inviteAdminUser.mockResolvedValue(activeLookalike());
+    const { result } = render();
+    await waitFor(() => expect(result.current.rolesStatus).toBe("success"));
+    await fillAndSubmit(result);
+    expect(api.inviteAdminUser).toHaveBeenCalledWith(expect.objectContaining({ roleId: ROLE_ID, isSuperAdmin: false }), expect.any(String));
+    expect(onSuccess).toHaveBeenCalledOnce();
+  });
+
+  it.each([["admin.users.invite"], ["admin.users.critical"], ["admin.roles.read"]])("blocks invitation without the full permission pair %j", async (...permissions) => {
+    auth.user = { id: "admin", isSuperAdmin: false, permissions };
+    const { result } = render();
+    expect(result.current.rolesStatus).toBe("unavailable");
+    await fillAndSubmit(result);
+    expect(api.listRoles).not.toHaveBeenCalled();
+    expect(api.inviteAdminUser).not.toHaveBeenCalled();
+  });
+
+  it("invites with a role beyond the first catalogue page", async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({ id: `role-${index}`, name: `Role ${index}` }));
+    api.listRoles.mockImplementation(async ({ page }: { page: number }) => ({
+      data: page === 1 ? firstPage : [{ id: ROLE_ID, name: "Support" }],
+      meta: { page, limit: 100, total: 101, totalPages: 2, hasNext: page === 1, hasPrev: page > 1 },
+    }));
+    api.inviteAdminUser.mockResolvedValue(activeLookalike());
+    const { result: hook } = render();
+    await waitFor(() => expect(hook.current.rolesStatus).toBe("success"));
+    expect(hook.current.roles).toHaveLength(101);
+    await fillAndSubmit(hook);
+    expect(api.inviteAdminUser).toHaveBeenCalledWith(expect.objectContaining({ roleId: ROLE_ID }), expect.any(String));
+  });
 
   // A directory row that matches every submitted field proves an account like
   // this exists — never that this command created it. The account below was

@@ -2,22 +2,19 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useI18n } from "@/i18n/I18nContext";
 import { COMPANY_SCOPE_HEADER } from "@/lib/api/organization-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { safeStorage } from "@/lib/safeStorage";
 import { isUUIDv7 } from "@/lib/uuid";
-import { tradeGet } from "./trade-api";
+import { ChannelPageLimitError, loadChannels } from "./channels/load-channels";
 import {
   resolveTradeScope,
   type TradeOperatingContext,
   type TradeScopeGap,
   type TradeScopeTarget,
 } from "./trade-scope";
-import {
-  CHANNELS_PATH,
-  parseChannelListResponse,
-  type Channel,
-} from "./channels/channel-contract";
+import type { Channel } from "./channels/channel-contract";
 
 // The Trade operating context, mounted once for the whole route group.
 //
@@ -47,6 +44,7 @@ export interface TradeScopeValue {
   isLoadingChannels: boolean;
   /** `GET /channels` failed — a 403 here is an ordinary answer, not a bug. */
   channelsError: NormalizedApiError | null;
+  refreshChannels: () => void;
   selectCompany: (companyId: string | null) => void;
   selectBranch: (branchId: string | null) => void;
   selectChannel: (channelId: string | null) => void;
@@ -65,6 +63,7 @@ function storedId(key: string, allowed: readonly string[]): string | null {
 
 export function TradeScopeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useTenantAuth();
+  const { t } = useI18n();
 
   const companyIds = useMemo(
     () => [...new Set((user?.accessibleCompanies ?? []).filter(isUUIDv7))],
@@ -81,6 +80,8 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
   const [channels, setChannels] = useState<Channel[]>([]);
   const [isLoadingChannels, setIsLoadingChannels] = useState(false);
   const [channelsError, setChannelsError] = useState<NormalizedApiError | null>(null);
+  const [channelsRevision, setChannelsRevision] = useState(0);
+  const refreshChannels = useCallback(() => setChannelsRevision((revision) => revision + 1), []);
 
   // Restored once the session is known, not on mount: `accessibleCompanies` is
   // empty during BOOTSTRAPPING and a stored id would be discarded as invalid.
@@ -140,25 +141,35 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
       // Deliberately company-only: sending the selected channel back on the
       // request that lists channels would let one inactive channel 422 the very
       // call that offers a different one.
-      void tradeGet(CHANNELS_PATH, {
+      void loadChannels({
         signal: controller.signal,
         headers: { [COMPANY_SCOPE_HEADER]: companyId },
         maxResponseBytes: CHANNELS_RESPONSE_LIMIT_BYTES,
       })
         .then((result) => {
-          if (!controller.signal.aborted) setChannels(parseChannelListResponse(result.data));
+          if (controller.signal.aborted) return;
+          const active = result.items.filter((channel) => channel.status === "ACTIVE");
+          const saved = safeStorage.getItem(CHANNEL_KEY);
+          if (saved && !active.some((channel) => channel.id === saved)) {
+            safeStorage.removeItem(CHANNEL_KEY);
+          }
+          setChannels(active);
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
           setChannels([]);
-          setChannelsError(normalizeApiError(error));
+          setChannelsError(
+            normalizeApiError(
+              error instanceof ChannelPageLimitError ? new Error(t.trade.channelPageLimit) : error,
+            ),
+          );
         })
         .finally(() => {
           if (!controller.signal.aborted) setIsLoadingChannels(false);
         });
     });
     return () => controller.abort();
-  }, [companyId]);
+  }, [companyId, channelsRevision, t.trade.channelPageLimit]);
 
   // A channel belongs to exactly one company, so a company change invalidates
   // it, and a stored id is only restored once it is known to still exist.
@@ -179,7 +190,7 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
   }, [channels]);
 
   const selectCompany = useCallback((next: string | null) => {
-    if (next !== null && !isUUIDv7(next)) return;
+    if (next !== null && (!isUUIDv7(next) || !companyIds.includes(next))) return;
     // An explicit tenant choice must survive the single-company default on reload.
     safeStorage.setItem(COMPANY_KEY, next ?? ITEM_MASTER_SCOPE);
     setCompanyId(next);
@@ -188,7 +199,7 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
     setChannels([]);
     safeStorage.removeItem(BRANCH_KEY);
     safeStorage.removeItem(CHANNEL_KEY);
-  }, []);
+  }, [companyIds]);
 
   const selectBranch = useCallback((next: string | null) => {
     if (next === null) {
@@ -196,10 +207,10 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
       setBranchId(null);
       return;
     }
-    if (!isUUIDv7(next)) return;
+    if (!companyId || !isUUIDv7(next) || !branchIds.includes(next)) return;
     safeStorage.setItem(BRANCH_KEY, next);
     setBranchId(next);
-  }, []);
+  }, [companyId, branchIds]);
 
   const selectChannel = useCallback((next: string | null) => {
     if (next === null) {
@@ -207,10 +218,10 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
       setChannelId(null);
       return;
     }
-    if (!isUUIDv7(next)) return;
+    if (!isUUIDv7(next) || !channels.some((channel) => channel.id === next)) return;
     safeStorage.setItem(CHANNEL_KEY, next);
     setChannelId(next);
-  }, []);
+  }, [channels]);
 
   const context = useMemo<TradeOperatingContext>(
     () => ({ companyId, branchId, channelId }),
@@ -225,6 +236,7 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
       channels,
       isLoadingChannels,
       channelsError,
+      refreshChannels,
       selectCompany,
       selectBranch,
       selectChannel,
@@ -244,6 +256,7 @@ export function TradeScopeProvider({ children }: { children: React.ReactNode }) 
       channels,
       isLoadingChannels,
       channelsError,
+      refreshChannels,
       selectCompany,
       selectBranch,
       selectChannel,
@@ -269,9 +282,12 @@ export interface TradeScopeRequest {
  *
  * `headersFor` builds a fresh object every call, which is correct for a render
  * but poison in an effect dependency array — every screen would refetch on
- * every render. This memoizes on the three ids, which are the only inputs.
+ * every render. This memoizes the context, target and channel-header option.
  */
-export function useTradeScopeRequest(target: TradeScopeTarget): TradeScopeRequest {
+export function useTradeScopeRequest(
+  target: TradeScopeTarget,
+  { includeChannel = true }: { includeChannel?: boolean } = {},
+): TradeScopeRequest {
   const { context, companyIds, branchIds } = useTradeScope();
   return useMemo(() => {
     const effectiveContext: TradeOperatingContext =
@@ -284,9 +300,14 @@ export function useTradeScopeRequest(target: TradeScopeTarget): TradeScopeReques
             channelId: context.channelId,
           }
         : context;
-    const resolution = resolveTradeScope(target, effectiveContext);
+    // Administration addresses the channel in the URL, independently of the
+    // operating channel's activation or branch mappings.
+    const resolution = resolveTradeScope(
+      target,
+      includeChannel ? effectiveContext : { ...effectiveContext, channelId: null },
+    );
     return resolution.ok
       ? { headers: resolution.headers, gap: null }
       : { headers: {}, gap: resolution.gap };
-  }, [target, context, companyIds, branchIds]);
+  }, [target, context, companyIds, branchIds, includeChannel]);
 }

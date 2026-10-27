@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import type { CustomerProfileDetail } from "../../customer-profile-contract";
 import { CustomerCompanyCard } from "./CustomerCompanyCard";
 
@@ -10,7 +11,16 @@ vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
 }));
 
-afterEach(cleanup);
+vi.mock("@/lib/api/idempotent-write", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/api/idempotent-write")>(),
+  createWriteAttempt: vi.fn(() => ({})),
+  runIdempotentWrite: vi.fn(),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const mockProfile: CustomerProfileDetail = {
   id: "0192f3a0-0000-7000-8000-000000000001",
@@ -73,5 +83,32 @@ describe("CustomerCompanyCard", () => {
     const editBtn = screen.getByTitle(en.crmLeadDetail.editCompany);
     fireEvent.click(editBtn);
     expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves company edits without sending its existing Party address", async () => {
+    const updated = { ...mockProfile, companyName: "Updated company" };
+    vi.mocked(runIdempotentWrite).mockResolvedValue({
+      kind: "success", value: updated, replayed: false,
+    });
+    const onSaved = vi.fn();
+    render(
+      <CustomerCompanyCard profile={mockProfile} readOnly={false} onSaved={onSaved} />,
+    );
+    fireEvent.click(screen.getByTitle(en.crmLeadDetail.editCompany));
+
+    const address = screen.getByRole("textbox", { name: en.crmLeads.create.sections.address });
+    expect(address).toHaveAttribute("readonly");
+    expect(address).toHaveValue("Riyadh · Saudi Arabia");
+    expect(screen.getByText(en.crmCustomerProfileActions.addressReadOnly)).toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue("Al-Amal Healthcare Co."), {
+      target: { value: "Updated company" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeadDetail.saveCompany }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(updated));
+    expect(runIdempotentWrite).toHaveBeenCalledTimes(1);
+    const request = vi.mocked(runIdempotentWrite).mock.calls[0][0];
+    expect(request).toMatchObject({ method: "patch", body: { companyName: "Updated company" } });
+    expect(request.body).not.toHaveProperty("address");
   });
 });

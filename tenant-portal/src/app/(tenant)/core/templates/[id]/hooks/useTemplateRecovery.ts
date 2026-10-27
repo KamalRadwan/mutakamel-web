@@ -12,7 +12,8 @@ import {
   SNAPSHOT_STALE_CODE,
   type TemplateRecoverySnapshot,
 } from "../../template-lifecycle-contract";
-import type { TemplateDetail } from "../../templates-contract";
+import type { TemplateCursorPage, TemplateDetail } from "../../templates-contract";
+import { isExpiredCursor, useTemplateCursor } from "../../hooks/useTemplateCursor";
 
 /**
  * Draft recovery snapshots.
@@ -31,8 +32,13 @@ export function useTemplateRecovery(
   const { t } = useI18n();
   const toast = useToast();
   const copy = t.coreOperations.templates;
+  const pagination = useTemplateCursor();
+  const { cursor, restart } = pagination;
 
-  const [snapshots, setSnapshots] = useState<TemplateRecoverySnapshot[]>([]);
+  const [history, setHistory] = useState<{
+    templateId: string | null;
+    page: TemplateCursorPage<TemplateRecoverySnapshot> | null;
+  }>({ templateId: template?.id ?? null, page: null });
   const [isLoading, setIsLoading] = useState(true);
   // A screen that may not restore never asks, so it is never "loading" either.
   const [error, setError] = useState<NormalizedApiError | null>(null);
@@ -44,6 +50,16 @@ export function useTemplateRecovery(
 
   const templateId = template?.id ?? null;
 
+  if (history.templateId !== templateId) {
+    restart(false);
+    setHistory({ templateId, page: null });
+    setIsLoading(true);
+    setError(null);
+    setRestoring(null);
+    setAcknowledgedDiscard(false);
+    setFormError(null);
+  }
+
   useEffect(() => {
     if (!templateId || !canRestore) return;
     const controller = new AbortController();
@@ -53,18 +69,31 @@ export function useTemplateRecovery(
         setIsLoading(true);
         setError(null);
         try {
-          const page = await fetchRecoverySnapshots(templateId, { signal: controller.signal });
-          setSnapshots(page.items);
+          const page = await fetchRecoverySnapshots(templateId, { cursor, signal: controller.signal });
+          if (!controller.signal.aborted) setHistory((current) => ({ ...current, page }));
         } catch (caught) {
-          if (caught instanceof DOMException && caught.name === "AbortError") return;
-          setError(normalizeApiError(caught));
+          if (controller.signal.aborted) return;
+          const normalized = normalizeApiError(caught);
+          if (cursor && isExpiredCursor(normalized)) restart(true);
+          else setError(normalized);
         } finally {
           if (!controller.signal.aborted) setIsLoading(false);
         }
       })();
     });
     return () => controller.abort();
-  }, [templateId, canRestore, reloadToken]);
+  }, [templateId, canRestore, cursor, restart, reloadToken]);
+
+  const changeSnapshotPage = (direction: "previous" | "next") => {
+    if (!canRestore || isLoading || isSubmitting) return;
+    const nextCursor = history.page?.hasNextPage ? history.page.nextCursor : null;
+    if (direction === "next" ? !nextCursor : !pagination.canGoBack) return;
+    if (direction === "next") pagination.advance(nextCursor);
+    else pagination.goBack();
+    setHistory({ ...history, page: null });
+    setIsLoading(true);
+    setError(null);
+  };
 
   const restore = useCallback(
     async (reason: string): Promise<void> => {
@@ -108,7 +137,12 @@ export function useTemplateRecovery(
   );
 
   return {
-    snapshots,
+    snapshots: history.page?.items ?? [],
+    hasPreviousSnapshotPage: pagination.canGoBack,
+    hasNextSnapshotPage: Boolean(history.page?.hasNextPage && history.page.nextCursor),
+    snapshotCursorWasReset: pagination.wasReset,
+    previousSnapshotPage: () => changeSnapshotPage("previous"),
+    nextSnapshotPage: () => changeSnapshotPage("next"),
     isLoading: isLoading && canRestore && template !== null,
     error,
     restoring,

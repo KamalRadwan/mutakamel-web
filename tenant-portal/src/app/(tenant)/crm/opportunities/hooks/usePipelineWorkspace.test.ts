@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatCurrencyAmount, formatOpportunityAmountSummary } from "./pipeline-types";
 import {
   buildStageMoveRequest,
+  readAssignableOpportunityOwners,
   opportunityCapabilityAllowsOwner,
   parseOpportunityBoardResponse,
   parseOpportunityCapabilitiesResponse,
@@ -131,6 +133,36 @@ describe("Pipeline API contracts", () => {
       formatOpportunityAmountSummary({ USD: "12.50", EGP: "18014398509481982.50" }),
     ).toBe("EGP 18,014,398,509,481,982.50 · USD 12.50");
   });
+
+  it.each(["1.234", "1.230", "99999999999999999.999"])(
+    "preserves three-decimal card and aggregate amount %s on board and stage reads",
+    (amount) => {
+      const lane = {
+        stage: pipeline.stages[0],
+        items: [{ ...opportunity, amount, currencyCode: "KWD" }],
+        summary: { totalCount: 1, amountsByCurrency: [{ currencyCode: "KWD", amount }] },
+        activitySummary: { totalCount: 1, noOpenCount: 0, overdueCount: 0, todayCount: 1, futureCount: 0 },
+        pageInfo: { limit: 50, hasMore: false, nextCursor: null },
+      };
+      const board = parseOpportunityBoardResponse({ pipeline, stages: [lane] });
+      const stage = parsePipelinesResponse([pipeline])[0].stages[0];
+      const page = parseOpportunityStagePageResponse({ ...lane, stageId }, stage);
+      for (const parsed of [board.stages[0], page]) {
+        expect(parsed.items[0].amount).toBe(amount);
+        expect(parsed.summary.amountsByCurrency).toEqual({ KWD: amount });
+      }
+      expect(formatCurrencyAmount(amount, "KWD")).toBe(
+        amount === "99999999999999999.999" ? "KWD 99,999,999,999,999,999.999" : `KWD ${amount}`,
+      );
+      expect(formatOpportunityAmountSummary({ KWD: amount })).toBe(formatCurrencyAmount(amount, "KWD"));
+      expect(() => parseOpportunityBoardResponse({ pipeline, stages: [{
+        ...lane, items: [{ ...opportunity, amount: "1.2345" }],
+      }] })).toThrow("Invalid opportunity board response.");
+      expect(() => parseOpportunityBoardResponse({ pipeline, stages: [{
+        ...lane, summary: { totalCount: 1, amountsByCurrency: [{ currencyCode: "KWD", amount: "1.2345" }] },
+      }] })).toThrow("Invalid opportunity board response.");
+    },
+  );
 
   it("uses the branch owner boundary for update affordances", () => {
     const capabilities = parseOpportunityCapabilitiesResponse(
@@ -307,5 +339,35 @@ describe("Pipeline API contracts", () => {
 
     expect(reloadBoard).toHaveBeenCalledTimes(1);
     expect(reloadBoard).toHaveBeenCalledWith(pipelineId);
+  });
+});
+
+describe("CRM assignable opportunity owners", () => {
+  afterEach(() => vi.restoreAllMocks());
+  const ownerId = "01900100-0000-7000-8000-000000000113";
+  const nextId = "01900100-0000-7000-8000-000000000114";
+  const response = (data: unknown): AxiosResponse<unknown> => ({ data, status: 200, statusText: "OK", headers: new Headers() });
+
+  it("follows the cursor and keeps resource, action and branch scope", async () => {
+    const get = vi.spyOn(axiosClient, "get")
+      .mockResolvedValueOnce(response({ items: [{ id: ownerId, displayName: "Sara Sales", avatarUrl: null }], nextCursor: ownerId }))
+      .mockResolvedValueOnce(response({ items: [{ id: nextId, displayName: "Mona", avatarUrl: null }], nextCursor: null }));
+    const headers = { "x-branch-id": "branch" };
+    const owners = await readAssignableOpportunityOwners("branch", new AbortController().signal, headers);
+    expect(owners.map(({ firstName }) => firstName)).toEqual(["Sara Sales", "Mona"]);
+    expect(get).toHaveBeenCalledTimes(2);
+    for (const [path, config] of get.mock.calls) {
+      const query = new URL(path, "https://tenant.example").searchParams;
+      expect(query.get("resource")).toBe("opportunities");
+      expect(query.get("action")).toBe("update");
+      expect(query.get("branchId")).toBe("branch");
+      expect(config?.headers).toEqual(headers);
+    }
+    expect(String(get.mock.calls[1][0])).toContain(`cursor=${ownerId}`);
+  });
+
+  it("rejects a repeated owner instead of looping over an invalid cursor", async () => {
+    vi.spyOn(axiosClient, "get").mockResolvedValue(response({ items: [{ id: ownerId, displayName: "Sara", avatarUrl: null }], nextCursor: ownerId }));
+    await expect(readAssignableOpportunityOwners("branch", new AbortController().signal, {})).rejects.toThrow("Invalid assignable owner");
   });
 });

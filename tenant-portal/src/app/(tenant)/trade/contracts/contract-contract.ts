@@ -1,4 +1,5 @@
 import { isUUIDv7 } from "@/lib/uuid";
+import { parseFinancialTotals, type FinancialTotals } from "../documents/financial-totals";
 import {
   TRADE_V1,
   isBoundedString,
@@ -40,6 +41,8 @@ interface ContractClause {
 
 export interface ContractDetail extends Contract {
   clauses: ContractClause[];
+  totalsSnapshot: FinancialTotals;
+  financialTerms: ContractDraftContentRequest["financialTerms"];
 }
 
 /**
@@ -67,7 +70,19 @@ export function parseContractDetail(payload: unknown): ContractDetail {
   const contract = parseContract(payload);
   const row = record(payload);
   if (!row || !Array.isArray(row.clauses)) tradeInvalidResponse();
-  return { ...contract, clauses: row.clauses.map(parseClause) };
+  const financial = record(contract.termsSnapshot.financial);
+  const sourceEvidence = record(financial?.sourceEvidence);
+  if (!financial || !sourceEvidence ||
+      (financial.mode !== "FINANCIAL" && financial.mode !== "NON_FINANCIAL")) {
+    tradeInvalidResponse();
+  }
+  const totalsSnapshot = parseFinancialTotals(row.totalsSnapshot);
+  return {
+    ...contract,
+    totalsSnapshot,
+    financialTerms: { mode: financial.mode, sourceEvidence, totalsSnapshot },
+    clauses: row.clauses.map(parseClause),
+  };
 }
 
 function parseClause(payload: unknown): ContractClause {
@@ -115,18 +130,23 @@ export interface ContractDraftContentRequest {
   financialTerms: {
     mode: ContractFinancialMode;
     sourceEvidence: Record<string, unknown>;
-    totalsSnapshot: {
-      subtotal: string;
-      discountTotal: string;
-      chargeTotal: string;
-      taxTotal: string;
-      roundingTotal: string;
-      grandTotal: string;
-      amountPaid: string;
-      amountDue: string;
-    };
+    totalsSnapshot: FinancialTotals;
   };
   clauses: ContractClauseInputPayload[];
+}
+
+export type ContractDraftUpdateRequest = Omit<ContractDraftContentRequest, "partyId" | "currencyCode">;
+
+export function buildContractDraftUpdate(input: ContractDraftUpdateRequest): ContractDraftUpdateRequest {
+  return {
+    effectiveFrom: input.effectiveFrom,
+    effectiveTo: input.effectiveTo,
+    reference: input.reference,
+    notes: input.notes,
+    termsSnapshot: input.termsSnapshot,
+    financialTerms: input.financialTerms,
+    clauses: input.clauses,
+  };
 }
 
 export function buildContractDraftContent(input: {

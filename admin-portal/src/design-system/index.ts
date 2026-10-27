@@ -70,3 +70,4 @@ export * from "./shell/Topbar";
 export * from "./shell/MobileNav";
 export * from "./shell/SubNav";
 export * from "./shell/CommandPalette";
+export * from "./patterns/mfa/MfaCodeStep";

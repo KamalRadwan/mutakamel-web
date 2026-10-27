@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useToast } from "@/design-system";
+import { useCan, useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -60,7 +60,7 @@ export function useTemplateAssignments() {
   const { user } = useTenantAuth();
   const permissions = user?.permissions ?? [];
   const canRead = permissions.includes(TEMPLATE_READ_PERMISSION);
-  const canManage = permissions.includes(TEMPLATE_ASSIGNMENTS_PERMISSION);
+  const canManage = useCan(TEMPLATE_ASSIGNMENTS_PERMISSION, { tenantWide: true });
   const copy = t.coreOperations.templates;
 
   const cursor = useTemplateCursor();

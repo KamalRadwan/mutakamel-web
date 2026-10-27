@@ -20,10 +20,12 @@ import {
 } from "@/design-system";
 import { useStorageServers } from "../hooks/useStorageServers";
 import type { StorageServerView } from "../types";
+import { formatStorageBytes } from "../lib/storage-byte-capacity";
 
 export function StorageServersScreen() {
   const { lang, t } = useI18n();
   const copy = t.storageServersList;
+  const byteCopy = t.storageByteCapacity;
   const view = useStorageServers();
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const activeOnPage = view.servers.filter((server) => server.status === "ACTIVE").length;
@@ -93,6 +95,18 @@ export function StorageServersScreen() {
       headerEn: "Tenants",
       headerAr: "المستأجرون",
       cell: (server) => <span className="font-semibold tabular-nums"><bdi>{formatStorageNumber(server.assignedTenants, lang)}</bdi> / <bdi>{server.maxTenants === null ? "∞" : formatStorageNumber(server.maxTenants, lang)}</bdi></span>,
+    },
+    {
+      key: "bytes",
+      headerEn: "Byte capacity",
+      headerAr: "السعة بالبايت",
+      cell: (server) => (
+        <div className="space-y-1 text-xs">
+          <p>{byteCopy.availableLabel}: <bdi className="tabular-nums">{server.availableBytes === null ? byteCopy.unlimited : formatStorageBytes(server.availableBytes, lang)}</bdi></p>
+          <p className="text-muted-foreground">{byteCopy.maxLabel}: <bdi className="tabular-nums">{server.maxBytes === null ? byteCopy.unlimited : formatStorageBytes(server.maxBytes, lang)}</bdi></p>
+          {server.availableBytes === "0" && <Badge tone="danger">{byteCopy.exhausted}</Badge>}
+        </div>
+      ),
     },
     {
       key: "evidence",

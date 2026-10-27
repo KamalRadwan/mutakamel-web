@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { generateUUIDv7 } from "@/lib/uuid";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError } from "@/lib/api/errors";
 import { isTradeReplay, tradeGet, tradeIfMatch, tradePost } from "../../../trade-api";
 import { parseTradeArray } from "../../../trade-advanced-validation";
@@ -35,12 +36,16 @@ import {
   buildReversalRequest,
   deliveryActionPath,
   parseMovementId,
+  parseMovementLines,
+  parseMovementStatus,
+  parseReservation,
   receiptActionPath,
   reservationReleasePath,
   type MovementFormValues,
   type MovementKind,
   type OpeningBalanceFormValues,
   type ReservationFormValues,
+  type ReversalLineValues,
   type SessionMovementEntry,
 } from "../movements-contract";
 
@@ -68,15 +73,24 @@ export function useInventoryMovements() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("BRANCH", branchId);
-  const companyScope = useTradeScope("COMPANY", branchId);
 
   const [created, setCreated] = useState<CreatedIds>({});
   const [sessionLedger, setSessionLedger] = useState<SessionMovementEntry[]>([]);
-  const [knownNodes, setKnownNodes] = useState<InventoryNode[]>([]);
+  const [nodesResult, setNodesResult] = useState<{
+    request: object;
+    nodes: InventoryNode[];
+    error: string | null;
+  } | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const unresolved = useRef<{
+    fingerprint: string;
+    body: unknown;
+    headers: Record<string, string>;
+  } | null>(null);
 
   const can = useCallback(
     (permission: string) =>
@@ -85,23 +99,41 @@ export function useInventoryMovements() {
   );
 
   const canReadNodes = can(INVENTORY_READ_PERMISSION);
+  const nodesRequest = useMemo(
+    () => ({ headers: scope.headers, isResolved: scope.isResolved, branchId, canReadNodes, t }),
+    [scope.headers, scope.isResolved, branchId, canReadNodes, t],
+  );
+  // Hide the previous request's result during render, before the next effect runs.
+  const currentNodesResult = nodesResult?.request === nodesRequest ? nodesResult : null;
+  const knownNodes = currentNodesResult?.nodes ?? [];
+  const nodesError = currentNodesResult?.error ?? null;
 
   useEffect(() => {
-    if (!companyScope.isResolved || !canReadNodes) return;
+    if (!nodesRequest.isResolved || !nodesRequest.canReadNodes) return;
     const controller = new AbortController();
     void tradeGet(INVENTORY_NODES_PATH, {
       signal: controller.signal,
-      headers: companyScope.headers,
+      headers: nodesRequest.headers,
       maxResponseBytes: MOVEMENT_RESPONSE_LIMIT_BYTES,
     })
       .then((res) => {
-        setKnownNodes(parseTradeArray(res.data, parseInventoryNode, invalidResponse));
+        if (controller.signal.aborted) return;
+        setNodesResult({
+          request: nodesRequest,
+          nodes: parseTradeArray(res.data, parseInventoryNode, invalidResponse),
+          error: null,
+        });
       })
-      .catch(() => {
-        // Optional node picker enhancement; ignore errors silently.
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setNodesResult({
+          request: nodesRequest,
+          nodes: [],
+          error: inventoryMessage(normalizeApiError(error), nodesRequest.t) ?? inventoryFormMessage(error, nodesRequest.t),
+        });
       });
     return () => controller.abort();
-  }, [companyScope.isResolved, companyScope.headers, canReadNodes]);
+  }, [nodesRequest]);
 
   const run = useCallback(
     async (
@@ -109,12 +141,14 @@ export function useInventoryMovements() {
       call: () => Promise<{ headers: Headers; data: unknown }>,
       onSuccess?: (data: unknown) => void,
     ): Promise<boolean> => {
-      if (pending) return false;
+      if (inFlight.current) return false;
+      inFlight.current = true;
       setPending(operation);
       setFormError(null);
       try {
         const response = await call();
         onSuccess?.(response.data);
+        unresolved.current = null;
         toast.success(
           t.tradeCommon.savedTitle,
           isTradeReplay(response.headers)
@@ -123,16 +157,27 @@ export function useInventoryMovements() {
         );
         return true;
       } catch (error) {
+        if (error instanceof Error && error.message === "INVENTORY_UNRESOLVED_WRITE") {
+          setFormError(t.tradeInventory.unresolvedWrite);
+          return false;
+        }
         const normalized = normalizeApiError(error);
+        // A client rejection resolves the write, including an unchanged retry.
+        // Keep its identity only while transport/server failures or invalid
+        // success payloads leave the outcome unknown.
+        if (normalized.status >= 400 && normalized.status < 500) {
+          unresolved.current = null;
+        }
         if (normalized.status === 403) return false;
         if (toast.outcomeFromApi(normalized)) return false;
         setFormError(inventoryMessage(normalized, t) ?? inventoryFormMessage(error, t));
         return false;
       } finally {
+        inFlight.current = false;
         setPending(null);
       }
     },
-    [pending, toast, t],
+    [toast, t],
   );
 
   const appendLedger = useCallback((entry: SessionMovementEntry) => {
@@ -156,14 +201,29 @@ export function useInventoryMovements() {
     [],
   );
 
-  const post = (path: string, body: unknown, ifMatch?: number) =>
-    tradePost(path as Parameters<typeof tradePost>[0], body, {
+  const post = (path: string, body: unknown, ifMatch?: number) => {
+    // Business keys are generated by builders; compare the remaining payload
+    // so an unchanged retry can reuse the original body and HTTP identity.
+    const fingerprint = JSON.stringify([path, scope.headers, ifMatch, body], (key, value: unknown) =>
+      key === "operationKey" || key === "intentKey" ? undefined : value,
+    );
+    if (unresolved.current && unresolved.current.fingerprint !== fingerprint) {
+      throw new Error("INVENTORY_UNRESOLVED_WRITE");
+    }
+    unresolved.current ??= {
+      fingerprint,
+      body,
       headers: {
         ...scope.headers,
         ...(ifMatch === undefined ? {} : { "If-Match": tradeIfMatch(ifMatch) }),
+        "x-idempotency-key": generateUUIDv7(),
       },
+    };
+    return tradePost(path as Parameters<typeof tradePost>[0], unresolved.current.body, {
+      headers: unresolved.current.headers,
       maxResponseBytes: MOVEMENT_RESPONSE_LIMIT_BYTES,
     });
+  };
 
   return {
     t,
@@ -176,7 +236,7 @@ export function useInventoryMovements() {
     sessionLedger,
     knownNodes,
     pending,
-    formError,
+    formError: formError ?? nodesError,
     clearError: () => setFormError(null),
     canOpeningBalance: can(INVENTORY_OPENING_BALANCE_PERMISSION),
     canReserve: can(INVENTORY_RESERVE_PERMISSION),
@@ -212,26 +272,39 @@ export function useInventoryMovements() {
         "reservation",
         () => post(INVENTORY_RESERVATIONS_PATH, buildReservationRequest(values)),
         (data) => {
-          const id = parseMovementId(data);
+          const reservation = parseReservation(data);
+          const { id, version, status } = reservation;
           setCreated((current) => ({ ...current, reservation: id }));
           appendLedger({
             id,
             kind: "reservation",
             nodeId: values.nodeId.trim(),
             summary: `Doc ${values.sourceDocumentId.trim().slice(0, 8)} · Qty ${values.quantity.trim()}`,
-            version: extractVersion(data, 1),
-            status: "ACTIVE",
+            version,
+            status,
+            reservation,
             recordedAt: new Date().toISOString(),
           });
         },
       ),
 
-    releaseReservation: (id: string, version: number, quantity: string, reasonCode: string) =>
+    releaseReservation: (id: string, version: number, quantity: string, reasonCode: string, serialKeys = "") =>
       run(
         "release",
-        () => post(reservationReleasePath(id), buildReleaseRequest(quantity, reasonCode), version),
+        () => post(reservationReleasePath(id), buildReleaseRequest(quantity, reasonCode, serialKeys), version),
         (data) => {
-          updateLedgerStatus(id.trim(), "RELEASED", extractVersion(data, version + 1));
+          const reservation = parseReservation(data, id.trim());
+          const previous = sessionLedger.find((entry) => entry.id === reservation.id);
+          appendLedger({
+            id: reservation.id,
+            kind: "reservation",
+            nodeId: reservation.fulfillmentNodeId,
+            summary: previous?.summary ?? t.tradeInventory.reservationTab,
+            version: reservation.version,
+            status: reservation.status,
+            reservation,
+            recordedAt: previous?.recordedAt ?? new Date().toISOString(),
+          });
         },
       ),
 
@@ -241,10 +314,12 @@ export function useInventoryMovements() {
         () => post(INVENTORY_RECEIPTS_PATH, buildReceiptRequest(values)),
         (data) => {
           const id = parseMovementId(data);
+          const lines = parseMovementLines(data);
           setCreated((current) => ({ ...current, receipt: id }));
           appendLedger({
             id,
             kind: "receipt",
+            lines,
             nodeId: values.nodeId.trim(),
             summary: `PO ${values.sourceDocumentId.trim().slice(0, 8)} · ${values.lines.length} line(s)`,
             version: extractVersion(data, 1),
@@ -263,17 +338,17 @@ export function useInventoryMovements() {
         },
       ),
 
-    reverseReceipt: (id: string, version: number, reasonCode: string, effectiveAt: string) =>
+    reverseReceipt: (id: string, version: number, reasonCode: string, effectiveAt: string, lines: ReversalLineValues[] = []) =>
       run(
         "receiptReverse",
         () =>
           post(
             receiptActionPath(id, "reverse"),
-            buildReversalRequest(reasonCode, effectiveAt),
+            buildReversalRequest(reasonCode, effectiveAt, lines),
             version,
           ),
         (data) => {
-          updateLedgerStatus(id.trim(), "REVERSED", extractVersion(data, version + 1));
+          updateLedgerStatus(id.trim(), parseMovementStatus(data), extractVersion(data, version + 1));
         },
       ),
 
@@ -283,10 +358,12 @@ export function useInventoryMovements() {
         () => post(INVENTORY_DELIVERIES_PATH, buildDeliveryRequest(values)),
         (data) => {
           const id = parseMovementId(data);
+          const lines = parseMovementLines(data);
           setCreated((current) => ({ ...current, delivery: id }));
           appendLedger({
             id,
             kind: "delivery",
+            lines,
             nodeId: values.nodeId.trim(),
             summary: `SO ${values.sourceDocumentId.trim().slice(0, 8)} · ${values.lines.length} line(s)`,
             version: extractVersion(data, 1),
@@ -305,17 +382,17 @@ export function useInventoryMovements() {
         },
       ),
 
-    reverseDelivery: (id: string, version: number, reasonCode: string, effectiveAt: string) =>
+    reverseDelivery: (id: string, version: number, reasonCode: string, effectiveAt: string, lines: ReversalLineValues[] = []) =>
       run(
         "deliveryReverse",
         () =>
           post(
             deliveryActionPath(id, "reverse"),
-            buildReversalRequest(reasonCode, effectiveAt),
+            buildReversalRequest(reasonCode, effectiveAt, lines),
             version,
           ),
         (data) => {
-          updateLedgerStatus(id.trim(), "REVERSED", extractVersion(data, version + 1));
+          updateLedgerStatus(id.trim(), parseMovementStatus(data), extractVersion(data, version + 1));
         },
       ),
   };

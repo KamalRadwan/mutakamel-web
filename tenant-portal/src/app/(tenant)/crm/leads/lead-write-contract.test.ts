@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CARD_COLORS } from "@/design-system";
 import {
   buildLeadCompanyFieldRequest,
   buildLeadCompanyPhonesRequest,
@@ -120,9 +121,8 @@ describe("lead company phones payload", () => {
 });
 
 describe("lead update contract - verified CRM contract", () => {
-  it("defines the exact eleven supported card colors", async () => {
-    const { LEAD_CARD_COLORS } = await import("./lead-write-contract");
-    expect(LEAD_CARD_COLORS).toEqual([
+  it("defines the exact eleven supported card colors", () => {
+    expect(CARD_COLORS).toEqual([
       "RED",
       "ORANGE",
       "AMBER",

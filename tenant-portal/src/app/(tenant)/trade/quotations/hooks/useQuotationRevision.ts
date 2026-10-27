@@ -25,10 +25,22 @@ export interface QuotationRevisionState {
   setDeliveryDays: (value: string) => void;
   warrantyMonths: string;
   setWarrantyMonths: (value: string) => void;
+  deliveryDaysError?: string;
+  warrantyMonthsError?: string;
   lineDraft: TradeLineDraftState;
   write: TradeWriteState;
   canSubmit: boolean;
   submit: () => Promise<void>;
+}
+
+// Terms are an object in CreateQuotationRevisionDto; bound integer conversion
+// to JavaScript's exact range rather than silently rounding legal terms.
+function parseTermInteger(input: string, blankDefault: number): number | null {
+  const value = input.trim();
+  if (value === "") return blankDefault;
+  if (!/^[0-9]+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
 export function useQuotationRevision(
@@ -44,6 +56,9 @@ export function useQuotationRevision(
   const [incotermCode, setIncotermCode] = useState("EXW");
   const [deliveryDays, setDeliveryDays] = useState("14");
   const [warrantyMonths, setWarrantyMonths] = useState("12");
+  const parsedDeliveryDays = parseTermInteger(deliveryDays, 14);
+  const parsedWarrantyMonths = parseTermInteger(warrantyMonths, 12);
+  const termsReady = parsedDeliveryDays !== null && parsedWarrantyMonths !== null;
 
   const lineDraft = useTradeLineDraft(
     headers,
@@ -58,8 +73,8 @@ export function useQuotationRevision(
     lineDraft.lines.every((line) => line.itemId !== "" && line.uomId !== "");
 
   const submit = useCallback(async (): Promise<void> => {
-    if (!quotation || !linesReady || validUntil === "") return;
-    const created = await write.runWrite({
+    if (!quotation || !linesReady || validUntil === "" || write.isBlocked || !termsReady) return;
+    await write.runWrite({
       operation: t.tradeDocuments.quotations.newRevision,
       send: (idempotency) =>
         tradePost(
@@ -75,8 +90,8 @@ export function useQuotationRevision(
             terms: {
               paymentTermCode: paymentTermCode.trim() || "NET_30",
               incotermCode: incotermCode.trim() || "EXW",
-              deliveryDays: Number.parseInt(deliveryDays || "14", 10) || 14,
-              warrantyMonths: Number.parseInt(warrantyMonths || "12", 10) || 12,
+              deliveryDays: parsedDeliveryDays,
+              warrantyMonths: parsedWarrantyMonths,
             },
           },
           {
@@ -84,19 +99,20 @@ export function useQuotationRevision(
             maxResponseBytes: TRADE_ACTION_RESPONSE_BYTES,
           },
         ),
+      onSuccess: async () => {
+        setIsOpen(false);
+        await onCreated();
+      },
     });
-    if (created) {
-      setIsOpen(false);
-      await onCreated();
-    }
   }, [
     quotation,
     linesReady,
     validUntil,
     paymentTermCode,
     incotermCode,
-    deliveryDays,
-    warrantyMonths,
+    parsedDeliveryDays,
+    parsedWarrantyMonths,
+    termsReady,
     write,
     t,
     lineDraft.lines,
@@ -106,9 +122,9 @@ export function useQuotationRevision(
 
   return {
     isOpen,
-    open: () => setIsOpen(true),
+    open: () => { if (!write.isBlocked) setIsOpen(true); },
     close: () => {
-      if (write.isWriting) return;
+      if (write.isBlocked) return;
       setIsOpen(false);
     },
     validUntil,
@@ -121,9 +137,11 @@ export function useQuotationRevision(
     setDeliveryDays,
     warrantyMonths,
     setWarrantyMonths,
+    deliveryDaysError: parsedDeliveryDays === null ? t.tradeDocuments.executive.revisionTermIntegerInvalid : undefined,
+    warrantyMonthsError: parsedWarrantyMonths === null ? t.tradeDocuments.executive.revisionTermIntegerInvalid : undefined,
     lineDraft,
     write,
-    canSubmit: linesReady && validUntil !== "" && !write.isWriting,
+    canSubmit: linesReady && validUntil !== "" && !write.isBlocked && termsReady,
     submit,
   };
 }

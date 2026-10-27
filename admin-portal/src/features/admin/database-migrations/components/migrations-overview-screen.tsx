@@ -3,6 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AlertOctagon, PlayCircle, ServerCog } from "lucide-react";
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHeader as DsTableHeader,
+  TableRow,
+} from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { useMigrationsOverview } from "../hooks/use-migrations-overview";
 import { isProjectionDegraded } from "../model/migration-errors";
@@ -33,7 +47,6 @@ import {
   RunStatusChip,
   SchemaStateChip,
   TableHeader,
-  migrationInputClass,
   migrationLabelClass,
   schemaStateLabel,
   type MigrationsCopy,
@@ -75,14 +88,16 @@ export function MigrationsOverviewScreen() {
               pending={overview.isRefreshing}
             />
             {overview.permissions.canExecute ? (
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={openFleetStart}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-card px-2.5 text-xs font-semibold text-primary"
               >
                 <PlayCircle className="size-3.5" aria-hidden="true" />
                 {copy.startRun}
-              </button>
+              </Button>
             ) : null}
           </div>
         }
@@ -251,7 +266,7 @@ function AlarmBanner({
   return (
     <section
       role="alert"
-      className="rounded-lg border border-destructive/40 bg-destructive-subtle p-3 sm:p-3.5 text-destructive-subtle-foreground shadow-sm"
+      className="rounded-lg border border-destructive/40 bg-destructive-subtle p-3 sm:p-3.5 text-destructive-subtle-foreground"
     >
       <div className="flex items-start gap-2.5">
         <AlertOctagon className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
@@ -348,7 +363,7 @@ function FleetCard({
   ];
 
   return (
-    <article className="rounded-lg border border-border bg-card p-4 shadow-sm">
+    <article className="rounded-lg border border-border bg-card p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <ServerCog className="size-5 text-primary" aria-hidden="true" />
@@ -368,13 +383,13 @@ function FleetCard({
 
       <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-xl border border-border p-2">
-          <dt className="text-2xs font-semibold uppercase text-muted-foreground">
+          <dt className="text-xs font-semibold uppercase text-muted-foreground">
             {copy.tenantsTotal}
           </dt>
           <dd className="font-mono text-lg font-semibold">{health.total}</dd>
         </div>
         <div className="rounded-xl border border-border p-2">
-          <dt className="text-2xs font-semibold uppercase text-muted-foreground">
+          <dt className="text-xs font-semibold uppercase text-muted-foreground">
             {copy.behind}
           </dt>
           <dd className="font-mono text-lg font-semibold">{health.behind}</dd>
@@ -386,7 +401,7 @@ function FleetCard({
               key={counter.state}
               className="rounded-xl border border-border p-2"
             >
-              <dt className="text-2xs font-semibold uppercase text-muted-foreground">
+              <dt className="text-xs font-semibold uppercase text-muted-foreground">
                 {schemaStateLabel(counter.state, copy)}{" "}
                 <code dir="ltr" className="font-mono normal-case">
                   {counter.state}
@@ -412,7 +427,7 @@ function FleetCard({
       ) : null}
 
       <section className="mt-3">
-        <h4 className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {copy.distribution}
         </h4>
         {health.fragmented ? (
@@ -420,30 +435,30 @@ function FleetCard({
             <strong>{copy.fragmentedTitle}.</strong> {copy.fragmentedBody}
           </p>
         ) : null}
-        <table className="mt-2 w-full text-xs">
-          <caption className="sr-only">{copy.distribution}</caption>
-          <thead className="text-2xs font-semibold uppercase text-muted-foreground">
-            <tr>
+        <Table className="mt-2 w-full text-xs">
+          <TableCaption className="sr-only">{copy.distribution}</TableCaption>
+          <DsTableHeader className="text-xs font-semibold uppercase text-muted-foreground">
+            <TableRow>
               <TableHeader>{copy.schemaVersion}</TableHeader>
               <TableHeader align="end">{copy.tenantCount}</TableHeader>
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </DsTableHeader>
+          <TableBody>
             {entry.versionDistribution.map((slice) => (
-              <tr
+              <TableRow
                 key={slice.schemaVersion}
                 className="border-t border-border"
               >
-                <td dir="ltr" className="px-4 py-2 text-start font-mono">
+                <TableCell dir="ltr" className="px-4 py-2 text-start font-mono">
                   {slice.schemaVersion}
-                </td>
-                <td className="px-4 py-2 text-end font-mono font-semibold">
+                </TableCell>
+                <TableCell className="px-4 py-2 text-end font-mono font-semibold">
                   {slice.tenantCount}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </section>
     </article>
   );
@@ -459,40 +474,50 @@ function FilterBar({
   return (
     <section className="rounded-lg border border-border bg-card p-3 sm:p-3.5">
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="block">
+        <div className="block">
           <span className={migrationLabelClass}>{copy.filterApplication}</span>
-          <select
-            value={overview.applicationKey}
-            onChange={(event) => overview.setApplicationKey(event.target.value)}
-            className={migrationInputClass}
+          <Select
+            value={overview.applicationKey || "__all__"}
+            onValueChange={(value) =>
+              overview.setApplicationKey(value === "__all__" ? "" : value)
+            }
           >
-            <option value="">{copy.allApplications}</option>
-            {MIGRATION_APPLICATION_KEYS.map((key) => (
-              <option key={key} value={key}>
-                {key}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
+            <SelectTrigger size="sm" aria-label={copy.filterApplication}>
+              <SelectValue placeholder={copy.allApplications} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{copy.allApplications}</SelectItem>
+              {MIGRATION_APPLICATION_KEYS.map((key) => (
+                <SelectItem key={key} value={key}>
+                  {key}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="block">
           <span className={migrationLabelClass}>{copy.filterState}</span>
-          <select
-            value={overview.schemaState}
-            onChange={(event) =>
+          <Select
+            value={overview.schemaState || "__all__"}
+            onValueChange={(value) =>
               overview.setSchemaState(
-                event.target.value as TenantSchemaVersionState | "",
+                value === "__all__" ? "" : (value as TenantSchemaVersionState),
               )
             }
-            className={migrationInputClass}
           >
-            <option value="">{copy.allStates}</option>
-            {TENANT_SCHEMA_VERSION_STATES.map((state) => (
-              <option key={state} value={state}>
-                {`${schemaStateLabel(state, copy)} · ${state}`}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger size="sm" aria-label={copy.filterState}>
+              <SelectValue placeholder={copy.allStates} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{copy.allStates}</SelectItem>
+              {TENANT_SCHEMA_VERSION_STATES.map((state) => (
+                <SelectItem key={state} value={state}>
+                  {`${schemaStateLabel(state, copy)} · ${state}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </section>
   );
@@ -514,7 +539,7 @@ function TenantTable({
   pager: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-border bg-card">
       <header className="px-4 py-3">
         <h2 className="font-semibold">{copy.tenantsTitle}</h2>
         <p className="mt-1 text-xs text-muted-foreground">{copy.tenantsHelp}</p>
@@ -526,39 +551,39 @@ function TenantTable({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
-              <caption className="sr-only">{copy.tenantsTitle}</caption>
-              <thead className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
-                <tr>
+            <Table className="w-full min-w-[900px] text-sm">
+              <TableCaption className="sr-only">{copy.tenantsTitle}</TableCaption>
+              <DsTableHeader className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
+                <TableRow>
                   <TableHeader>{copy.tenant}</TableHeader>
                   <TableHeader>{copy.application}</TableHeader>
                   <TableHeader>{copy.state}</TableHeader>
                   <TableHeader>{copy.version}</TableHeader>
                   <TableHeader>{copy.observedAt}</TableHeader>
                   <TableHeader align="end">{copy.migrateTenant}</TableHeader>
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </DsTableHeader>
+              <TableBody>
                 {tenants.map((tenant) => (
-                  <tr
+                  <TableRow
                     key={`${tenant.tenantId}:${tenant.applicationKey}`}
                     className="border-t border-border align-top"
                   >
-                    <td className="px-3 py-2 text-start">
+                    <TableCell className="px-3 py-2 text-start">
                       <p className="font-semibold text-xs">
                         {tenant.tenantName ?? tenant.tenantId}
                       </p>
                       <code
                         dir="ltr"
-                        className="mt-0.5 block font-mono text-[11px] text-muted-foreground"
+                        className="mt-0.5 block font-mono text-xs text-muted-foreground"
                       >
                         {tenant.tenantId}
                       </code>
-                    </td>
-                    <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
+                    </TableCell>
+                    <TableCell dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
                       {tenant.applicationKey}
-                    </td>
-                    <td className="px-3 py-2 text-start">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-start">
                       <SchemaStateChip state={tenant.state} copy={copy} />
                       {tenant.driftDetail ? (
                         <p className="mt-1.5 max-w-sm text-xs leading-5 text-destructive">
@@ -568,31 +593,33 @@ function TenantTable({
                           </span>
                         </p>
                       ) : null}
-                    </td>
-                    <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
+                    </TableCell>
+                    <TableCell dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
                       {tenant.schemaVersion || copy.none}
-                    </td>
-                    <td className="px-3 py-2 text-start text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-start text-xs text-muted-foreground">
                       {formatMigrationDate(tenant.observedAt, lang)}
-                    </td>
-                    <td className="px-3 py-2 text-end">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-end">
                       {canExecute ? (
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => onMigrateTenant(tenant.tenantId)}
                           className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 px-2.5 text-xs font-semibold text-primary"
                         >
                           <PlayCircle className="size-3.5" aria-hidden="true" />
                           {copy.migrateTenant}
-                        </button>
+                        </Button>
                       ) : (
                         <span className="text-muted-foreground">{copy.none}</span>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
           {pager}
         </>
@@ -611,7 +638,7 @@ function RunTable({
   lang: "ar" | "en";
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-border bg-card">
       <header className="px-4 py-3">
         <h2 className="font-semibold">{copy.runsTitle}</h2>
         <p className="mt-1 text-xs text-muted-foreground">{copy.runsHelp}</p>
@@ -622,10 +649,10 @@ function RunTable({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm">
-            <caption className="sr-only">{copy.runsTitle}</caption>
-            <thead className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
-              <tr>
+          <Table className="w-full min-w-[1000px] text-sm">
+            <TableCaption className="sr-only">{copy.runsTitle}</TableCaption>
+            <DsTableHeader className="bg-muted text-xs font-semibold uppercase text-muted-foreground">
+              <TableRow>
                 <TableHeader>{copy.run}</TableHeader>
                 <TableHeader>{copy.application}</TableHeader>
                 <TableHeader>{copy.mode}</TableHeader>
@@ -633,15 +660,15 @@ function RunTable({
                 <TableHeader>{copy.progress}</TableHeader>
                 <TableHeader>{copy.startedAt}</TableHeader>
                 <TableHeader align="end">{copy.open}</TableHeader>
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </DsTableHeader>
+            <TableBody>
               {runs.map((run) => (
-                <tr
+                <TableRow
                   key={run.id}
                   className="border-t border-border align-top"
                 >
-                  <td className="px-3 py-2 text-start">
+                  <TableCell className="px-3 py-2 text-start">
                     <code dir="ltr" className="font-mono text-xs font-semibold">
                       {run.id}
                     </code>
@@ -650,37 +677,37 @@ function RunTable({
                         ? copy.scopeTenantCount(run.tenantScope.length)
                         : copy.scopeFleet}
                     </p>
-                  </td>
-                  <td dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
+                  </TableCell>
+                  <TableCell dir="ltr" className="px-3 py-2 text-start font-mono text-xs">
                     {run.applicationKey}
                     <span className="mt-0.5 block text-muted-foreground">
                       {run.targetVersion}
                     </span>
-                  </td>
-                  <td className="px-3 py-2 text-start">
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-start">
                     <RunModeChip dryRun={run.progress.dryRun} copy={copy} />
-                  </td>
-                  <td className="px-3 py-2 text-start">
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-start">
                     <RunStatusChip status={run.status} copy={copy} />
-                  </td>
-                  <td className="px-3 py-2 text-start">
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-start">
                     <RunProgressBar run={run} copy={copy} />
-                  </td>
-                  <td className="px-3 py-2 text-start text-xs text-muted-foreground">
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-start text-xs text-muted-foreground">
                     {formatMigrationDate(run.startedAt, lang)}
-                  </td>
-                  <td className="px-3 py-2 text-end">
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-end">
                     <Link
                       href={`/database-migrations/runs/${run.id}`}
                       className="inline-flex h-8 items-center rounded-md border border-primary/40 px-2.5 text-xs font-semibold text-primary"
                     >
                       {copy.open}
                     </Link>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </section>

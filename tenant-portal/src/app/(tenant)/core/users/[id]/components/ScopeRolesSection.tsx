@@ -72,7 +72,7 @@ export function ScopeRolesSection({
       </div>
       <p className="text-2xs text-muted-foreground">{copy.grants.scopeRolesDescription}</p>
 
-      <DataTable
+      {isTenantOwnerActor ? <DataTable
         columns={columns}
         rows={panel.scopeRoles}
         isLoading={panel.isScopeLoading}
@@ -80,7 +80,9 @@ export function ScopeRolesSection({
         onRetry={panel.reload}
         rowKey={(row) => row.id}
         labels={listTableLabels(t, copy.grants.scopeLoadFailed, copy.grants.scopeEmpty)}
-      />
+      /> : (
+        <p className="text-2xs text-muted-foreground">{copy.grants.ownerOnlyExplanation}</p>
+      )}
 
       {isTenantOwnerActor && panel.draft === null ? (
         <div>
@@ -103,10 +105,6 @@ export function ScopeRolesSection({
           isSubmitting={panel.isSubmitting}
         />
       ) : null}
-
-      {isTenantOwnerActor ? null : (
-        <p className="text-2xs text-muted-foreground">{copy.grants.ownerOnlyExplanation}</p>
-      )}
 
       <AtomicReplacementConfirm
         open={panel.isReviewing}

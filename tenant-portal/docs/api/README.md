@@ -30,6 +30,21 @@ The current source-derived inventory is in
 [../generated/tenant-api-routes.md](../generated/tenant-api-routes.md);
 machine-readable in the sibling `.json`. Regenerate with `pnpm docs:routes`.
 
+## Request language
+
+Source-verified **2026-10-17** (CXPORTAL-SHELL-115).
+
+The shared client sends `Accept-Language` from the current portal selection
+(`tenant_lang`: `ar` or `en`, default `ar`) on API requests and direct auth
+refresh calls. Changing the selection updates subsequent requests without a
+reload, independently of the browser locale. An explicit caller header is
+preserved, including case-insensitive header names.
+
+The backend retains its language precedence: a language already resolved for
+the request, then a supported user preference, then `Accept-Language`, then
+the backend default. Catalogue-backed server errors retain their returned
+message; the portal header supplies the language when no user preference exists.
+
 ## Route classes
 
 Every Gateway route declares one. It determines transport policy.
@@ -345,6 +360,12 @@ They are all semantically documented. The 26 are these, and they have not moved:
 | `crm/activities/activities.controller.ts` | 11 — activities, tasks, calendar events, reminders | **none since 2026-09-24** — `/crm/tasks`, `/crm/calendar` and `/crm/reminders` were removed and `/crm/activities` now reads [Core's activity hub](core-directory.md#activities--12-routes) |
 | `crm/notes-attachments/notes-attachments.controller.ts` | 9 — notes, attachments, upload, download | The notes and attachments panels on every CRM detail screen |
 | `crm/outbound-emails/outbound-emails.controller.ts` | 6 — options, preview, create, list, detail, retry | `/crm/outbound-emails` |
+
+Outbound-email action visibility reviewed **2026-10-17**: Compose and Retry
+use the shared scoped `crm.email.send` check, accepting `.own`, `.team`, or
+`.all` grants. Without a send grant both actions are hidden; Retry also requires
+a `FAILED` email. Page admission still requires scoped `crm.activities.read`.
+These checks are advisory; the backend enforces the record's send scope.
 
 **This paragraph used to say these families had "no portal screen", and that is
 the part that was wrong.** It was true on 2026-08-28 and stopped being true when

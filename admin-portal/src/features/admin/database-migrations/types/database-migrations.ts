@@ -224,13 +224,11 @@ export interface MigrationPermissions {
   /** `admin.migrations.critical`. */
   hasCritical: boolean;
   /**
-   * Start, pause, resume, retry. The Gateway route contract requires
-   * ALL(`admin.migrations.manage`, `admin.migrations.critical`) on every
-   * mutating migration route today, so a manage-only operator is shown a
-   * read-only surface rather than a control certain to return `403`.
+   * Start, pause, resume, abort and retry-failed require
+   * `admin.migrations.manage` alone in both Gateway and Worker.
    */
   canExecute: boolean;
-  /** Abort and fleet-wide apply — `execute` **and** `critical`. */
+  /** Blocks, downgrade and FORCE windows — `execute` **and** `critical`. */
   canDestroy: boolean;
 }
 

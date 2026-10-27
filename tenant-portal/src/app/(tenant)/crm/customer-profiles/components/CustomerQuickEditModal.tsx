@@ -1,7 +1,7 @@
-/* eslint-disable no-restricted-syntax */
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Ban,
@@ -16,29 +16,43 @@ import {
   DOSSIER_HEADER_CARD_COLORS,
   DOSSIER_KPI_PILL_CLASSES,
   DOSSIER_TAG_TONE_CLASSES,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
   type CardColor,
+  Field,
+  Input,
   cn,
   dossierAvatarClass,
   dossierStageCellClass,
   dossierStatusBadgeClass,
+  useToast,
 } from "@/design-system";
 import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
-import { EntityHistoryCard } from "@/components/audit/EntityHistoryCard";
+import { RecordHistoryTab } from "@/components/audit/RecordHistoryTab";
+import { useAuditAccess } from "@/components/audit/hooks/useAuditAccess";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
+import { useAccessMode } from "@/hooks/useAccessMode";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { readCoreData } from "@/lib/api/envelope";
+import { normalizeApiError } from "@/lib/api/errors";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { findHonorific, getHonorificOptions } from "@/lib/catalogues/contact-titles";
 import { localizedValue } from "@/lib/format/localized";
+import { formatTemplate } from "@/lib/format/template";
 import { splitPhoneNumber } from "@/lib/geo/country-data";
-import { generateUUIDv7, isUUIDv7 } from "@/lib/uuid";
+import { isUUIDv7 } from "@/lib/uuid";
 import { CrmJobTitleField } from "../../shared/components/CrmJobTitleField";
 import { CrmPhoneNumberInput } from "../../shared/components/CrmPhoneNumberInput";
+import { CrmScopeGate } from "../../shared/components/CrmScopeGate";
 import { RecordAttachmentsSection } from "../../shared/components/RecordAttachmentsSection";
 import { RecordNotesSection } from "../../shared/components/RecordNotesSection";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import { useCrmCustomFieldValues } from "../../shared/hooks/useCrmCustomFieldValues";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import { useCrmRecordCapabilities } from "../../shared/hooks/useCrmRecordCapabilities";
 import {
   CRM_TAGS_PATH,
@@ -52,20 +66,24 @@ import {
   parseLeadDetailsUser,
   type LeadDetailsUser,
 } from "../../leads/[id]/lead-details-edit-contract";
-import { leadActivityState } from "../../leads/lead-card-contract";
+import { crmActivityState } from "../../shared/crm-activity-tone";
 import {
   normalizePhoneDigits,
   normalizeWhatsAppDigits,
 } from "../../leads/lead-phone-links";
-import { CUSTOMER_RELATED_ROUTES } from "../[id]/customer-profile-related-contract";
+import {
+  CUSTOMER_RELATED_KINDS,
+  buildCustomerRelatedHref,
+} from "../[id]/customer-profile-related-contract";
 import { useCustomerProfileRelatedCounts } from "../[id]/hooks/useCustomerProfileRelatedCounts";
 import type { CustomerProfileCardPatch } from "../customer-profile-card-contract";
+import type { CustomerCardUpdateResult } from "../hooks/useUpdateCustomerProfileCard";
+import type { StatusUpdateResult } from "../hooks/useUpdateCustomerProfileStatus";
 import {
   BLACKLISTED_STATUS,
   CUSTOMER_STATUSES,
   parseAddContactResponse,
   parseCustomerProfileDetailResponse,
-  type CustomerProfileContact,
   type CustomerProfileDetail,
 } from "../customer-profile-contract";
 import {
@@ -88,8 +106,8 @@ export interface CustomerQuickEditModalProps {
   onCardChange: (
     item: CustomerProfileItem,
     patch: CustomerProfileCardPatch,
-  ) => void;
-  onMoveStatus: (item: CustomerProfileItem, status: CustomerProfileStatus) => void;
+  ) => Promise<CustomerCardUpdateResult>;
+  onMoveStatus: (item: CustomerProfileItem, status: CustomerProfileStatus) => Promise<StatusUpdateResult | null>;
   onDelete?: (item: CustomerProfileItem) => void;
   onSaved?: () => void;
 }
@@ -112,78 +130,6 @@ function getInitials(name: string): string {
   if (parts.length === 0) return "CP";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
-
-function synthesizeCustomerDetail(item: CustomerProfileItem): CustomerProfileDetail {
-  const isCorporate = item.profileType === "CORPORATE";
-  const initialPhones =
-    item.phones && item.phones.length > 0
-      ? [...item.phones]
-      : item.phone
-        ? [item.phone]
-        : [];
-
-  const synthesizedContacts: CustomerProfileContact[] =
-    isCorporate && item.primaryContact
-      ? [
-          {
-            partyId: item.primaryContact.partyId,
-            relationshipId: null,
-            displayName: item.primaryContact.displayName,
-            firstName: item.primaryContact.displayName.split(" ")[0] ?? null,
-            lastName:
-              item.primaryContact.displayName.split(" ").slice(1).join(" ") ||
-              null,
-            honorificTitle: null,
-            jobTitle: item.primaryContact.jobTitle || null,
-            isPrimary: true,
-            email: item.primaryContact.email || null,
-            phones:
-              item.primaryContact.phones.length > 0
-                ? [...item.primaryContact.phones]
-                : item.phone
-                  ? [item.phone]
-                  : [],
-          },
-        ]
-      : [];
-
-  return {
-    id: item.id,
-    branchId: item.branchId,
-    partyId: item.partyId,
-    profileType: item.profileType,
-    status: item.status,
-    displayName: item.displayName,
-    companyName: isCorporate ? item.companyName || item.displayName : null,
-    companyEmail: isCorporate ? item.email || null : null,
-    companyPhone: isCorporate ? initialPhones[0] ?? null : null,
-    companyWebsite: item.companyWebsite ?? null,
-    email: item.email || null,
-    primaryMobile: isCorporate ? null : initialPhones[0] ?? null,
-    phones: initialPhones,
-    address:
-      item.country || item.city
-        ? {
-            country: item.country || null,
-            city: item.city ?? null,
-            area: null,
-            street: null,
-          }
-        : null,
-    contacts: synthesizedContacts,
-    taxNumber: null,
-    commercialRegistrationNumber: null,
-    legalName: null,
-    description: null,
-    ownerUserId: item.ownerUserId,
-    sourceLeadId: null,
-    acquisitionSourceId: null,
-    acquisitionSourceNameAr: item.acquisitionSourceNameAr ?? null,
-    acquisitionSourceNameEn: item.acquisitionSourceNameEn ?? null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
 }
 
 function formatPhoneDisplay(rawPhone: string): string {
@@ -287,24 +233,38 @@ export function CustomerQuickEditModal({
   onSaved,
 }: CustomerQuickEditModalProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const canReadHistory = useAuditAccess();
+  const { canMutate } = useAccessMode();
+  const toast = useToast();
+  const errorText = useCrmErrorText();
+  const itemId = item?.id ?? null;
+  const currentItem = useRef(item);
+  useEffect(() => {
+    currentItem.current = item;
+  }, [item]);
+  const headerWritePending = useRef(false);
   const router = useRouter();
   const { user: actor } = useTenantAuth();
   const statusLabels: Record<string, string | undefined> = t.statusValues;
   const { items: sources } = useCrmAcquisitionSources();
 
   const canReadUsers = actor?.permissions.includes("users.user.read") ?? false;
+  const canReadTags =
+    actor?.isTenantOwner === true ||
+    (actor?.permissions.includes("crm.tags.read") ?? false);
 
-  // Synchronously synthesize detail from `item` so frame 1 and unit tests have zero flicker,
-  // then hydrate full `GET /api/tenant/crm/v1/customer-profiles/:id` when `item.id` is a valid UUIDv7.
-  const [detail, setDetail] = useState<CustomerProfileDetail | null>(() =>
-    item ? synthesizeCustomerDetail(item) : null,
-  );
+  const [detail, setDetail] = useState<CustomerProfileDetail | null>(null);
+  const [detailLoad, setDetailLoad] = useState<{
+    itemId: string;
+    status: "ready" | "error" | "forbidden";
+  } | null>(null);
+  const [detailReload, setDetailReload] = useState(0);
   const [localRating, setLocalRating] = useState<number>(item?.rating ?? 0);
   const [localCardColor, setLocalCardColor] = useState<CardColor | null>(
     item?.cardColor ?? null,
   );
   const [localTags, setLocalTags] = useState<CrmTag[]>(item?.tags ?? []);
+  const tagWritePending = useRef(false);
 
   // Section-level edit mode flags (View Mode by default)
   const [isEditingIdentity, setIsEditingIdentity] = useState(false);
@@ -341,16 +301,6 @@ export function CustomerQuickEditModal({
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [personalEmailDraft, setPersonalEmailDraft] = useState("");
 
-  // Structured Address draft state
-  const [countryDraft, setCountryDraft] = useState("");
-  const [cityDraft, setCityDraft] = useState("");
-  const [areaDraft, setAreaDraft] = useState("");
-  const [postalCodeDraft, setPostalCodeDraft] = useState("");
-  const [streetDraft, setStreetDraft] = useState("");
-  const [buildingNoDraft, setBuildingNoDraft] = useState("");
-  const [floorDraft, setFloorDraft] = useState("");
-  const [landmarkDraft, setLandmarkDraft] = useState("");
-
   // Card 2 draft state (Account Details, Ownership & Custom Fields)
   const [ownerUserIdDraft, setOwnerUserIdDraft] = useState("");
   const [sourceIdDraft, setSourceIdDraft] = useState("");
@@ -359,11 +309,14 @@ export function CustomerQuickEditModal({
     Record<string, unknown>
   >({});
 
-  const effectiveBranchId = detail?.branchId || item?.branchId || null;
+  // Tie readiness to this row so switching customers cannot reuse the previous detail.
+  const fallbackDetail =
+    detailLoad?.itemId === itemId && detailLoad?.status === "ready" ? detail : null;
+  const effectiveBranchId = fallbackDetail?.branchId || item?.branchId || null;
   const attached = useCrmRecordCapabilities(effectiveBranchId);
   const relatedCounts = useCustomerProfileRelatedCounts(
     item?.id ?? null,
-    detail?.partyId ?? item?.partyId ?? null,
+    fallbackDetail?.partyId ?? item?.partyId ?? null,
     effectiveBranchId,
   );
   const customFieldValues = useCrmCustomFieldValues(
@@ -374,23 +327,23 @@ export function CustomerQuickEditModal({
   const customFieldEntries = customFieldValues.entries;
   const reloadCustomFieldValues = customFieldValues.reload;
 
-  // Sync synthesized state when `item` prop changes
+  // Only a validated detail response may unlock edits.
   useEffect(() => {
+    const item = currentItem.current;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
-      if (!item) {
-        setDetail(null);
-        return;
-      }
-      const seeded = synthesizeCustomerDetail(item);
-      setDetail(seeded);
+      setDetail(null);
+      setDetailLoad(null);
+      if (!item) return;
+      if (!isUUIDv7(item.id)) setDetailLoad({ itemId: item.id, status: "error" });
       setLocalRating(item.rating);
       setLocalCardColor(item.cardColor);
       setLocalTags(item.tags ?? []);
       setIsEditingIdentity(false);
       setIsEditingQualification(false);
       setEditingContactDraft(null);
+      setIsTagPickerOpen(false);
       setSectionError(null);
     });
 
@@ -404,10 +357,16 @@ export function CustomerQuickEditModal({
       .then((res) => {
         if (controller.signal.aborted) return;
         const parsed = parseCustomerProfileDetailResponse(res.data);
+        if (parsed.id !== item.id) {
+          throw new Error("Unexpected customer profile response.");
+        }
         setDetail(parsed);
+        setDetailLoad({ itemId: item.id, status: "ready" });
       })
-      .catch(() => {
-        // Keep synthesized detail when offline or mocked
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        const forbidden = normalizeApiError(error).status === 403;
+        setDetailLoad({ itemId: item.id, status: forbidden ? "forbidden" : "error" });
       });
 
     void axiosClient
@@ -424,12 +383,7 @@ export function CustomerQuickEditModal({
       .catch(() => {});
 
     return () => controller.abort();
-  }, [item]);
-
-  const fallbackDetail = useMemo(
-    () => (item ? detail ?? synthesizeCustomerDetail(item) : null),
-    [item, detail],
-  );
+  }, [itemId, detailReload]);
 
   const ownerUserIdForLookup = fallbackDetail?.ownerUserId ?? null;
   useEffect(() => {
@@ -478,8 +432,8 @@ export function CustomerQuickEditModal({
     return () => controller.abort();
   }, [allowedOwnerIds, canReadUsers, effectiveBranchId, isEditingQualification]);
 
-  const editable = item ? canUpdate(item) : false;
-  const deletable = item ? canDelete(item) : false;
+  const editable = item && fallbackDetail ? canUpdate(item) : false;
+  const deletable = item && fallbackDetail ? canDelete(item) : false;
 
   const currentIndex = item
     ? allItems.findIndex((entry) => entry.id === item.id)
@@ -528,16 +482,8 @@ export function CustomerQuickEditModal({
     setDisplayNameDraft(fallbackDetail.displayName || "");
     setPersonalEmailDraft(fallbackDetail.email ?? "");
 
-    setCountryDraft(fallbackDetail.address?.country ?? item?.country ?? "");
-    setCityDraft(fallbackDetail.address?.city ?? item?.city ?? "");
-    setAreaDraft(fallbackDetail.address?.area ?? "");
-    setPostalCodeDraft("");
-    setStreetDraft(fallbackDetail.address?.street ?? "");
-    setBuildingNoDraft("");
-    setFloorDraft("");
-    setLandmarkDraft("");
     setIsEditingIdentity(true);
-  }, [fallbackDetail, editable, item]);
+  }, [fallbackDetail, editable]);
 
   // Populate Card 2 drafts when entering Account Details Edit Mode
   const startQualificationEdit = useCallback(() => {
@@ -557,11 +503,7 @@ export function CustomerQuickEditModal({
   // Helper to execute PATCH on `/api/tenant/crm/v1/customer-profiles/:id`
   const patchCustomerProfile = useCallback(
     async (body: Record<string, unknown>): Promise<boolean> => {
-      if (!item) return false;
-      if (!isUUIDv7(item.id)) {
-        onSaved?.();
-        return true;
-      }
+      if (!item || !fallbackDetail || !editable || !isUUIDv7(item.id)) return false;
       const outcome = await runIdempotentWrite({
         attempt: createWriteAttempt(),
         method: "patch",
@@ -576,11 +518,11 @@ export function CustomerQuickEditModal({
         return true;
       }
       setSectionError(
-        outcome.error.message ?? t.crmCustomerProfiles.cardUpdateFailed,
+        errorText({ ...outcome.error, message: undefined }) ?? t.crmCustomerProfiles.cardUpdateFailed,
       );
       return false;
     },
-    [item, onSaved, t.crmCustomerProfiles.cardUpdateFailed],
+    [item, fallbackDetail, editable, onSaved, errorText, t.crmCustomerProfiles.cardUpdateFailed],
   );
 
   // Save Card 1 (Corporate Company Details OR Individual Personal Info)
@@ -591,20 +533,10 @@ export function CustomerQuickEditModal({
     const cleanedPhones = phonesDraft.map((p) => p.trim()).filter(Boolean);
     const body: Record<string, unknown> = {};
 
-    const hasAddressInput = Boolean(
-      countryDraft.trim() ||
-        cityDraft.trim() ||
-        areaDraft.trim() ||
-        streetDraft.trim() ||
-        buildingNoDraft.trim() ||
-        postalCodeDraft.trim() ||
-        landmarkDraft.trim(),
-    );
-
     if (isCorp) {
       if (!companyNameDraft.trim()) {
         setSectionError(
-          isAr ? "اسم الشركة مطلوب" : "Company Name is required.",
+          t.crmCustomerProfiles.ui.quickEdit.company_name_is_required,
         );
         return false;
       }
@@ -625,9 +557,7 @@ export function CustomerQuickEditModal({
         [firstNameDraft.trim(), lastNameDraft.trim()].filter(Boolean).join(" ");
       if (!nextDisplay) {
         setSectionError(
-          isAr
-            ? "اسم العميل مطلوب"
-            : "First Name / Display Name is required.",
+          t.crmCustomerProfiles.ui.quickEdit.first_name_display_name_is_required,
         );
         return false;
       }
@@ -643,19 +573,6 @@ export function CustomerQuickEditModal({
           ? { email: personalEmailDraft.trim() }
           : {}),
         phones: cleanedPhones,
-      };
-    }
-
-    if (hasAddressInput) {
-      body.address = {
-        country: countryDraft.trim() || undefined,
-        city: cityDraft.trim() || undefined,
-        state: areaDraft.trim() || undefined,
-        postalCode: postalCodeDraft.trim() || undefined,
-        street1: streetDraft.trim() || undefined,
-        buildingNo: buildingNoDraft.trim() || undefined,
-        floor: floorDraft.trim() || undefined,
-        landmark: landmarkDraft.trim() || undefined,
       };
     }
 
@@ -689,14 +606,6 @@ export function CustomerQuickEditModal({
           phones: cleanedPhones,
           companyPhone: isCorp ? cleanedPhones[0] ?? null : prev.companyPhone,
           primaryMobile: isCorp ? prev.primaryMobile : cleanedPhones[0] ?? null,
-          address: hasAddressInput
-            ? {
-                country: countryDraft.trim() || null,
-                city: cityDraft.trim() || null,
-                area: areaDraft.trim() || null,
-                street: streetDraft.trim() || null,
-              }
-            : prev.address,
         };
       });
       setIsEditingIdentity(false);
@@ -709,15 +618,7 @@ export function CustomerQuickEditModal({
     fallbackDetail,
     editable,
     phonesDraft,
-    countryDraft,
-    cityDraft,
-    areaDraft,
-    streetDraft,
-    buildingNoDraft,
-    postalCodeDraft,
-    landmarkDraft,
     companyNameDraft,
-    isAr,
     taxNumberDraft,
     crNumberDraft,
     companyEmailDraft,
@@ -727,8 +628,9 @@ export function CustomerQuickEditModal({
     lastNameDraft,
     honorificDraft,
     personalEmailDraft,
-    floorDraft,
     patchCustomerProfile,
+    t.crmCustomerProfiles.ui.quickEdit.company_name_is_required,
+    t.crmCustomerProfiles.ui.quickEdit.first_name_display_name_is_required,
   ]);
 
   // Save Card 2 (Account Details, Ownership & Custom Fields)
@@ -798,9 +700,7 @@ export function CustomerQuickEditModal({
       .join(" ");
     if (!fullDisplayName) {
       setSectionError(
-        isAr
-          ? "الاسم الأول لجهة الاتصال مطلوب"
-          : "Contact first name is required.",
+        t.crmCustomerProfiles.ui.quickEdit.contact_first_name_is_required,
       );
       return false;
     }
@@ -810,46 +710,6 @@ export function CustomerQuickEditModal({
       .filter(Boolean);
     const currentContacts = fallbackDetail.contacts;
     const isAdding = editingContactDraft.partyId === null;
-    const nextPartyId = editingContactDraft.partyId ?? generateUUIDv7();
-
-    const updatedContactList: CustomerProfileContact[] = isAdding
-      ? [
-          ...currentContacts.map((c) =>
-            editingContactDraft.isPrimary ? { ...c, isPrimary: false } : c,
-          ),
-          {
-            partyId: nextPartyId,
-            relationshipId: null,
-            displayName: fullDisplayName,
-            firstName: trimmedFirst || null,
-            lastName: trimmedLast || null,
-            honorificTitle: editingContactDraft.honorificTitle.trim() || null,
-            jobTitle: editingContactDraft.jobTitle.trim() || null,
-            email: editingContactDraft.email.trim() || null,
-            phones: cleanedPhones,
-            isPrimary:
-              editingContactDraft.isPrimary || currentContacts.length === 0,
-          },
-        ]
-      : currentContacts.map((c) => {
-          if (c.partyId === editingContactDraft.partyId) {
-            return {
-              ...c,
-              displayName: fullDisplayName,
-              firstName: trimmedFirst || null,
-              lastName: trimmedLast || null,
-              honorificTitle: editingContactDraft.honorificTitle.trim() || null,
-              jobTitle: editingContactDraft.jobTitle.trim() || null,
-              email: editingContactDraft.email.trim() || null,
-              phones: cleanedPhones,
-              isPrimary: editingContactDraft.isPrimary,
-            };
-          }
-          return editingContactDraft.isPrimary
-            ? { ...c, isPrimary: false }
-            : c;
-        });
-
     setIsSavingSection(true);
     try {
       if (isAdding && isUUIDv7(item.id)) {
@@ -876,32 +736,30 @@ export function CustomerQuickEditModal({
         });
         if (outcome.kind !== "success") {
           setSectionError(
-            outcome.error.message ?? t.crmCustomerProfiles.cardUpdateFailed,
+            errorText({ ...outcome.error, message: undefined }) ?? t.crmCustomerProfiles.cardUpdateFailed,
           );
           return false;
         }
         onSaved?.();
       } else {
-        const contactsPayload = updatedContactList.map((c) => ({
-          ...(currentContacts.some((orig) => orig.partyId === c.partyId)
-            ? { contactPartyId: c.partyId }
-            : {}),
-          fullName: c.displayName,
-          firstName: c.firstName ?? c.displayName,
-          lastName: c.lastName ?? undefined,
-          honorificTitle: c.honorificTitle,
-          jobTitle: c.jobTitle,
-          email: c.email,
-          phones: c.phones,
-          isPrimary: c.isPrimary,
+        const contactsPayload = currentContacts.map((contact) => ({
+          contactPartyId: contact.partyId,
+          fullName: contact.displayName,
+          jobTitle:
+            contact.partyId === editingContactDraft.partyId
+              ? editingContactDraft.jobTitle.trim() || null
+              : contact.jobTitle,
+          isPrimary: editingContactDraft.isPrimary
+            ? contact.partyId === editingContactDraft.partyId
+            : contact.partyId === editingContactDraft.partyId
+              ? false
+              : contact.isPrimary,
         }));
         const ok = await patchCustomerProfile({ contacts: contactsPayload });
         if (!ok) return false;
       }
 
-      setDetail((prev) =>
-        prev ? { ...prev, contacts: updatedContactList } : prev,
-      );
+      if (isAdding) setDetailReload((value) => value + 1);
       setEditingContactDraft(null);
       return true;
     } finally {
@@ -912,8 +770,9 @@ export function CustomerQuickEditModal({
     fallbackDetail,
     editingContactDraft,
     editable,
-    isAr,
+    errorText,
     t.crmCustomerProfiles.cardUpdateFailed,
+    t.crmCustomerProfiles.ui.quickEdit.contact_first_name_is_required,
     onSaved,
     patchCustomerProfile,
   ]);
@@ -926,7 +785,7 @@ export function CustomerQuickEditModal({
         ...c,
         isPrimary: c.partyId === targetPartyId,
       }));
-      const ok = await patchCustomerProfile({
+      await patchCustomerProfile({
         contacts: updated.map((c) => ({
           contactPartyId: c.partyId,
           fullName: c.displayName,
@@ -938,39 +797,54 @@ export function CustomerQuickEditModal({
           isPrimary: c.isPrimary,
         })),
       });
-      if (ok) {
-        setDetail((prev) => (prev ? { ...prev, contacts: updated } : prev));
-      }
     },
     [item, fallbackDetail, editable, patchCustomerProfile],
   );
 
   // Interactive 3-Star Rating toggle in Header
   const handleToggleRating = useCallback(
-    (starValue: number) => {
-      if (!item || !editable) return;
+    async (starValue: number) => {
+      if (!item || !editable || headerWritePending.current) return;
+      headerWritePending.current = true;
+      setSectionError(null);
       const nextRating = localRating === starValue ? 0 : starValue;
       setLocalRating(nextRating);
-      onCardChange(item, { rating: nextRating });
+      try {
+        const result = await onCardChange(item, { rating: nextRating });
+        if (currentItem.current?.id !== item.id) return;
+        setLocalRating(result.ok ? result.patch.rating ?? nextRating : localRating);
+        if (!result.ok && result.error) setSectionError(errorText({ ...result.error, message: undefined }));
+      } finally {
+        headerWritePending.current = false;
+      }
     },
-    [item, editable, localRating, onCardChange],
+    [item, editable, localRating, onCardChange, errorText],
   );
 
   // Interactive Board Card Color Picker in Header ("No color" first + 5 colors)
   const handleSelectCardColor = useCallback(
-    (color: CardColor | null) => {
-      if (!item || !editable) return;
+    async (color: CardColor | null) => {
+      if (!item || !editable || headerWritePending.current) return;
+      headerWritePending.current = true;
+      setSectionError(null);
       const nextColor =
         color === null ? null : localCardColor === color ? null : color;
       setLocalCardColor(nextColor);
-      onCardChange(item, { cardColor: nextColor });
+      try {
+        const result = await onCardChange(item, { cardColor: nextColor });
+        if (currentItem.current?.id !== item.id) return;
+        setLocalCardColor(result.ok ? result.patch.cardColor ?? null : localCardColor);
+        if (!result.ok && result.error) setSectionError(errorText({ ...result.error, message: undefined }));
+      } finally {
+        headerWritePending.current = false;
+      }
     },
-    [item, editable, localCardColor, onCardChange],
+    [item, editable, localCardColor, onCardChange, errorText],
   );
 
   // Attach / Detach Tag handlers
   const handleOpenTagPicker = useCallback(() => {
-    if (!editable) return;
+    if (!editable || !canReadTags) return;
     setIsTagPickerOpen((prev) => !prev);
     if (availableTags.length === 0) {
       void axiosClient
@@ -981,57 +855,72 @@ export function CustomerQuickEditModal({
         .then((res) => {
           setAvailableTags(parseCrmTagCatalogue(res.data));
         })
-        .catch(() => {});
+        .catch(() => {
+          setIsTagPickerOpen(false);
+          toast.error(t.crmTags.loadFailed);
+        });
     }
-  }, [editable, availableTags.length]);
+  }, [editable, canReadTags, availableTags.length, t.crmTags.loadFailed, toast]);
 
   const handleAttachTag = useCallback(
     async (tag: CrmTag) => {
-      if (!item || !editable) return;
-      setLocalTags((prev) =>
-        prev.some((existing) => existing.id === tag.id) ? prev : [...prev, tag],
-      );
+      if (!item || !editable || tagWritePending.current) return;
+      if (!isUUIDv7(item.id) || !isUUIDv7(tag.id)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = localTags;
+      if (previousTags.some((existing) => existing.id === tag.id)) return;
+      tagWritePending.current = true;
+      setLocalTags([...previousTags, tag]);
       setIsTagPickerOpen(false);
-      if (isUUIDv7(item.id) && isUUIDv7(tag.id)) {
-        try {
-          const res = await axiosClient.post<unknown>(
-            `${customerProfilePath(item.id)}/tags`,
-            { tagId: tag.id },
-            { skipAutoIdempotency: true },
-          );
-          if (Array.isArray(res.data)) {
-            setLocalTags(parseCrmTags(res.data));
-          }
-          onSaved?.();
-        } catch {
-          // Keep optimistic tag in UI if offline/mocked
-        }
+      try {
+        const res = await axiosClient.post<unknown>(
+          `${customerProfilePath(item.id)}/tags`,
+          { tagIds: [tag.id] },
+          { skipAutoIdempotency: true },
+        );
+        if (!Array.isArray(res.data)) throw new Error("INVALID_CRM_TAGS_RESPONSE");
+        setLocalTags(parseCrmTags(res.data));
+        onSaved?.();
+      } catch {
+        setLocalTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [item, editable, onSaved],
+    [item, editable, localTags, onSaved, t, toast],
   );
 
   const handleDetachTag = useCallback(
     async (tagId: string) => {
-      if (!item || !editable) return;
-      setLocalTags((prev) => prev.filter((existing) => existing.id !== tagId));
-      if (isUUIDv7(item.id) && isUUIDv7(tagId)) {
-        try {
-          await axiosClient.delete(
-            `${customerProfilePath(item.id)}/tags/${encodeURIComponent(tagId)}`,
-          );
-          onSaved?.();
-        } catch {
-          // Keep optimistic removal
-        }
+      if (!item || !editable || tagWritePending.current) return;
+      if (!isUUIDv7(item.id) || !isUUIDv7(tagId)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = localTags;
+      tagWritePending.current = true;
+      setLocalTags(previousTags.filter((existing) => existing.id !== tagId));
+      try {
+        await axiosClient.delete(
+          `${customerProfilePath(item.id)}/tags/${encodeURIComponent(tagId)}`,
+        );
+        onSaved?.();
+      } catch {
+        setLocalTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [item, editable, onSaved],
+    [item, editable, localTags, onSaved, t, toast],
   );
 
   // Save & Close [Ctrl+S] handler
   const handleSaveAndClose = useCallback(async () => {
-    if (!item) return;
+    if (!item || !fallbackDetail || !editable || isSavingSection) return;
     if (isEditingIdentity) {
       const ok = await saveIdentitySection();
       if (!ok) return;
@@ -1047,6 +936,9 @@ export function CustomerQuickEditModal({
     onClose();
   }, [
     item,
+    fallbackDetail,
+    editable,
+    isSavingSection,
     isEditingIdentity,
     isEditingQualification,
     editingContactDraft,
@@ -1060,7 +952,8 @@ export function CustomerQuickEditModal({
     if (!item) return;
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        onClose();
+        // The loading/error dialog handles its own Escape key.
+        if (fallbackDetail) onClose();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -1086,9 +979,53 @@ export function CustomerQuickEditModal({
     onClose,
     onSelectCustomer,
     handleSaveAndClose,
+    fallbackDetail,
   ]);
 
-  if (!item || !fallbackDetail) return null;
+  if (!item) return null;
+  if (!fallbackDetail) {
+    const loadStatus = detailLoad?.itemId === itemId ? detailLoad?.status : null;
+    const loadFailed = loadStatus === "error" || loadStatus === "forbidden";
+    return (
+      <Dialog
+        open
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogTitle>{item.displayName}</DialogTitle>
+          <DialogDescription
+            role={loadFailed ? "alert" : "status"}
+            aria-busy={!loadFailed}
+          >
+            {loadStatus === "forbidden"
+              ? t.crmShared.scopeDeniedDescription
+              : loadFailed
+                ? t.crmCustomerProfiles.loadFailed
+                : t.crmCustomerProfiles.loading}
+          </DialogDescription>
+          {loadStatus === "forbidden" && <CrmScopeGate />}
+          <div className="flex gap-2">
+            {loadFailed && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDetailLoad(null);
+                  setDetailReload((value) => value + 1);
+                }}
+              >
+                {t.common.retry}
+              </Button>
+            )}
+            <Button variant="outline" onClick={onClose}>
+              {t.common.close}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const isCorporate = fallbackDetail.profileType === "CORPORATE";
   const currentStatus = fallbackDetail.status;
@@ -1116,7 +1053,7 @@ export function CustomerQuickEditModal({
     (item.owner
       ? `${item.owner.firstName} ${item.owner.lastName}`.trim()
       : "") ||
-    (isAr ? "غير معين" : "Unassigned");
+    (t.crmCustomerProfiles.ui.quickEdit.unassigned);
 
   const locationDisplay = [
     fallbackDetail.address?.city ?? item.city,
@@ -1125,14 +1062,14 @@ export function CustomerQuickEditModal({
     .filter(Boolean)
     .join(", ");
 
-  const activityState = leadActivityState(item.nextActivity);
+  const activityState = crmActivityState(item.nextActivity);
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={`Quick Edit ${fallbackDetail.displayName}`}
-      className="dossier-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5"
+      className="dossier-backdrop fixed inset-0 z-(--z-overlay) flex items-center justify-center p-3 sm:p-5"
       onClick={onClose}
     >
       <div
@@ -1161,12 +1098,8 @@ export function CustomerQuickEditModal({
                   )}
                 >
                   {isCorporate
-                    ? isAr
-                      ? "🏢 عميل شركات (CORPORATE)"
-                      : "🏢 Corporate Customer"
-                    : isAr
-                      ? "👤 عميل فردي (INDIVIDUAL)"
-                      : "👤 Individual Customer"}
+                    ? t.crmCustomerProfiles.ui.quickEdit.corporate_customer
+                    : t.crmCustomerProfiles.ui.quickEdit.individual_customer}
                 </span>
 
                 {/* Customer Status Badge */}
@@ -1190,12 +1123,12 @@ export function CustomerQuickEditModal({
                 <div
                   className="dossier-stars"
                   role="group"
-                  aria-label={isAr ? "تقييم العميل" : "Customer rating"}
+                  aria-label={t.crmCustomerProfiles.ui.quickEdit.customer_rating}
                 >
                   {[1, 2, 3].map((starNum) => {
                     const active = starNum <= localRating;
                     return (
-                      <button
+                      <Button
                         key={starNum}
                         type="button"
                         disabled={!editable}
@@ -1209,7 +1142,7 @@ export function CustomerQuickEditModal({
                         )}
                       >
                         ★
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -1218,23 +1151,25 @@ export function CustomerQuickEditModal({
                 <div
                   className="dossier-color-dots"
                   role="group"
-                  aria-label={isAr ? "لون البطاقة" : "Card color"}
+                  aria-label={t.crmCustomerProfiles.ui.quickEdit.card_color}
                 >
                   {DOSSIER_HEADER_CARD_COLORS.map((opt) => {
                     const isNone = opt.color === null;
                     const isActive = localCardColor === opt.color;
                     return (
-                      <button
+                      <Button
                         key={opt.color ?? "NONE"}
                         type="button"
                         disabled={!editable}
                         onClick={() => handleSelectCardColor(opt.color)}
                         title={
-                          isAr
-                            ? opt.labelAr
-                            : isNone
-                              ? "No color"
-                              : opt.labelEn
+                          isNone
+                            ? t.crmCustomerProfiles.ui.quickEdit.no_color
+                            : localizedValue(
+                                opt.labelAr,
+                                opt.labelEn,
+                                lang,
+                              )
                         }
                         aria-label={`Card color ${opt.labelEn}`}
                         aria-pressed={isActive}
@@ -1271,7 +1206,7 @@ export function CustomerQuickEditModal({
                   🕒 Created:{" "}
                   <b>
                     {new Date(fallbackDetail.createdAt).toLocaleDateString(
-                      isAr ? "ar-EG" : "en-US",
+                      lang,
                       { month: "short", day: "numeric", year: "numeric" },
                     )}
                   </b>
@@ -1282,48 +1217,29 @@ export function CustomerQuickEditModal({
 
           {/* Right Header KPI Counter Pills & Actions */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                router.push(CUSTOMER_RELATED_ROUTES.opportunities);
-              }}
-              className={DOSSIER_KPI_PILL_CLASSES.opportunities}
-            >
-              🚀 Opportunities <b>{relatedCounts.counts.opportunities ?? 0}</b>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                router.push(CUSTOMER_RELATED_ROUTES.quotations);
-              }}
-              className={DOSSIER_KPI_PILL_CLASSES.quotations}
-            >
-              📄 Quotations <b>{relatedCounts.counts.quotations ?? 0}</b>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                router.push(CUSTOMER_RELATED_ROUTES.salesOrders);
-              }}
-              className={DOSSIER_KPI_PILL_CLASSES.salesOrders}
-            >
-              📦 Orders <b>{relatedCounts.counts.salesOrders ?? 0}</b>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                router.push(CUSTOMER_RELATED_ROUTES.invoices);
-              }}
-              className={DOSSIER_KPI_PILL_CLASSES.invoices}
-            >
-              🧾 Invoices <b>{relatedCounts.counts.invoices ?? 0}</b>
-            </button>
+            {CUSTOMER_RELATED_KINDS.filter(
+              (kind) => relatedCounts.permitted[kind],
+            ).map((kind) => (
+              <Link
+                key={kind}
+                href={buildCustomerRelatedHref(kind, fallbackDetail.partyId)}
+                onClick={() => onClose()}
+                className={DOSSIER_KPI_PILL_CLASSES[kind]}
+              >
+                {t.crmLeadDetail.related.labels[kind]}{" "}
+                <b>
+                  {relatedCounts.counts[kind] === null
+                    ? relatedCounts.isLoading
+                      ? "\u2026"
+                      : "\u2014"
+                    : new Intl.NumberFormat(
+                        lang,
+                      ).format(relatedCounts.counts[kind])}
+                </b>
+              </Link>
+            ))}
 
-            <button
+            <Button
               type="button"
               onClick={() => {
                 onClose();
@@ -1334,17 +1250,17 @@ export function CustomerQuickEditModal({
               className="dossier-btn dossier-btn-outline"
             >
               <ExternalLink className="size-3.5" aria-hidden="true" />
-              <span>{isAr ? "فتح الصفحة الكاملة" : "Open Full Page"}</span>
-            </button>
+              <span>{t.crmCustomerProfiles.ui.quickEdit.open_full_page}</span>
+            </Button>
 
-            <button
+            <Button
               type="button"
               onClick={onClose}
               aria-label="Close modal"
               className="dossier-close"
             >
               <X className="size-4" aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1369,16 +1285,26 @@ export function CustomerQuickEditModal({
                       : "NEW";
 
               return (
-                <button
+                <Button
                   key={status}
                   type="button"
                   disabled={!editable || isCurrent}
-                  onClick={() => {
-                    onMoveStatus(item, status);
-                    if (status !== BLACKLISTED_STATUS) {
+                  onClick={async () => {
+                    if (headerWritePending.current) return;
+                    headerWritePending.current = true;
+                    setSectionError(null);
+                    try {
+                      const result = await onMoveStatus(item, status);
+                      if (currentItem.current?.id !== item.id || !result) return;
+                      if (!result.ok) {
+                        setSectionError(errorText({ ...result.error, message: undefined }));
+                        return;
+                      }
                       setDetail((prev) =>
                         prev ? { ...prev, status } : prev,
                       );
+                    } finally {
+                      headerWritePending.current = false;
                     }
                   }}
                   className={dossierStageCellClass({
@@ -1392,10 +1318,10 @@ export function CustomerQuickEditModal({
                   )}
                   <span className="truncate">
                     {isCurrent
-                      ? `● ${statusName} (${isAr ? "الحالية" : "Current"})`
+                      ? `● ${statusName} (${t.crmCustomerProfiles.ui.quickEdit.current})`
                       : statusName}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -1403,12 +1329,10 @@ export function CustomerQuickEditModal({
 
         {/* ================= 3. BLACKLISTED WARNING BANNER ================= */}
         {isBlacklisted && (
-          <div className="mx-5 mt-3 flex items-center gap-2 rounded-xl border border-red-500/35 bg-red-500/10 px-3.5 py-2 text-xs font-bold text-red-700 dark:text-red-300">
+          <div className="mx-5 mt-3 flex items-center gap-2 rounded-lg border border-destructive/35 bg-destructive/10 px-3.5 py-2 text-xs font-semibold text-destructive">
             <Ban className="size-4 shrink-0" />
             <span>
-              {isAr
-                ? "هذا العميل مدرج في القائمة السوداء — لا يمكن فتح فرص بيعية جديدة عليه."
-                : "This customer is blacklisted — creating new sales opportunities on this account is blocked."}
+              {t.crmCustomerProfiles.ui.quickEdit.blacklisted_warning}
             </span>
           </div>
         )}
@@ -1417,7 +1341,7 @@ export function CustomerQuickEditModal({
         {sectionError && (
           <div
             role="alert"
-            className="mx-5 mt-3 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300"
+            className="mx-5 mt-3 rounded-lg border border-destructive bg-destructive-subtle px-3.5 py-2 text-xs font-semibold text-destructive-subtle-foreground"
           >
             {sectionError}
           </div>
@@ -1441,17 +1365,13 @@ export function CustomerQuickEditModal({
                     <span className="dossier-card-icon">🏢</span>
                     <span>
                       {isEditingIdentity
-                        ? isAr
-                          ? "تعديل بيانات الشركة وأرقام الهواتف"
-                          : "Editing Company Details & Phones"
-                        : isAr
-                          ? "بيانات الشركة"
-                          : "Company Details"}
+                        ? t.crmCustomerProfiles.ui.quickEdit.editing_company_details_phones
+                        : t.crmCustomerProfiles.ui.quickEdit.company_details}
                     </span>
                   </div>
                   {isEditingIdentity ? (
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
                         disabled={isSavingSection}
                         onClick={() => {
@@ -1460,27 +1380,27 @@ export function CustomerQuickEditModal({
                         }}
                         className="dossier-edit-btn dossier-cancel-btn"
                       >
-                        ✕ {isAr ? "إلغاء" : "Cancel"}
-                      </button>
-                      <button
+                        ✕ {t.crmCustomerProfiles.ui.quickEdit.cancel}
+                      </Button>
+                      <Button
                         type="button"
                         disabled={isSavingSection}
                         onClick={() => void saveIdentitySection()}
                         className="dossier-edit-btn dossier-save-btn"
                       >
-                        ✓ {isAr ? "حفظ الشركة" : "Save Company"}
-                      </button>
+                        ✓ {t.crmCustomerProfiles.ui.quickEdit.save_company}
+                      </Button>
                     </div>
                   ) : (
                     editable && (
-                      <button
+                      <Button
                         type="button"
                         onClick={startIdentityEdit}
                         className="dossier-edit-btn"
                       >
                         ✏️{" "}
-                        {isAr ? "تعديل بيانات الشركة" : "Edit Company Details"}
-                      </button>
+                        {t.crmCustomerProfiles.ui.quickEdit.edit_company_details}
+                      </Button>
                     )
                   )}
                 </div>
@@ -1495,16 +1415,14 @@ export function CustomerQuickEditModal({
                             📞 Company Phone Numbers (companyPhones — View Mode)
                           </span>
                           {editable && (
-                            <button
+                            <Button
                               type="button"
                               onClick={startIdentityEdit}
                               className="dossier-edit-btn"
                             >
                               ✏️{" "}
-                              {isAr
-                                ? "تعديل الأرقام (كود + رقم)"
-                                : "Edit Phones (Code + Number)"}
-                            </button>
+                              {t.crmCustomerProfiles.ui.quickEdit.edit_phones_code_number}
+                            </Button>
                           )}
                         </div>
                         {fallbackDetail.phones.length > 0 ? (
@@ -1536,10 +1454,8 @@ export function CustomerQuickEditModal({
                             </div>
                           ))
                         ) : (
-                          <div className="text-xs text-slate-500">
-                            {isAr
-                              ? "لا توجد أرقام مسجلة"
-                              : "No company phone numbers recorded"}
+                          <div className="text-xs text-muted-foreground">
+                            {t.crmCustomerProfiles.ui.quickEdit.no_company_phone_numbers_recorded}
                           </div>
                         )}
                       </div>
@@ -1648,7 +1564,7 @@ export function CustomerQuickEditModal({
                             Number (CrmPhoneNumberInput)
                           </span>
                           {phonesDraft.length < 10 && (
-                            <button
+                            <Button
                               type="button"
                               onClick={() =>
                                 setPhonesDraft((prev) => [...prev, ""])
@@ -1657,9 +1573,9 @@ export function CustomerQuickEditModal({
                             >
                               <Plus className="size-3.5" aria-hidden="true" />
                               <span>
-                                {isAr ? "إضافة رقم" : "Add Phone"}
+                                {t.crmCustomerProfiles.ui.quickEdit.add_phone}
                               </span>
-                            </button>
+                            </Button>
                           )}
                         </div>
                         {phonesDraft.map((ph, idx) => (
@@ -1686,7 +1602,7 @@ export function CustomerQuickEditModal({
                             >
                               {idx === 0 ? "Primary" : `#${idx + 1}`}
                             </span>
-                            <button
+                            <Button
                               type="button"
                               aria-label={`Remove phone ${idx + 1}`}
                               onClick={() =>
@@ -1702,7 +1618,7 @@ export function CustomerQuickEditModal({
                                 className="size-3.5"
                                 aria-hidden="true"
                               />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                         <div className="dossier-phone-hint">
@@ -1789,120 +1705,19 @@ export function CustomerQuickEditModal({
                         </div>
                       </div>
 
-                      {/* Structured Address Inputs */}
-                      <div className="dossier-grid-4">
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-country"
-                          >
-                            Country
-                          </label>
-                          <input
-                            id="addr-country"
-                            className="dossier-input"
-                            value={countryDraft}
-                            onChange={(e) => setCountryDraft(e.target.value)}
+                      <div className="dossier-field-box dossier-span-all">
+                        <Field
+                          label={t.crmLeads.create.sections.address}
+                          hint={t.crmCustomerProfileActions.addressReadOnly}
+                          readOnly
+                          showLabel
+                        >
+                          <Input
+                            size="sm"
+                            value={formatFullAddress(fallbackDetail.address)}
+                            readOnly
                           />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-city"
-                          >
-                            City
-                          </label>
-                          <input
-                            id="addr-city"
-                            className="dossier-input"
-                            value={cityDraft}
-                            onChange={(e) => setCityDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-area"
-                          >
-                            Area / District
-                          </label>
-                          <input
-                            id="addr-area"
-                            className="dossier-input"
-                            value={areaDraft}
-                            onChange={(e) => setAreaDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-postal"
-                          >
-                            Postal Code
-                          </label>
-                          <input
-                            id="addr-postal"
-                            className="dossier-input mono"
-                            value={postalCodeDraft}
-                            onChange={(e) => setPostalCodeDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-street"
-                          >
-                            Street
-                          </label>
-                          <input
-                            id="addr-street"
-                            className="dossier-input"
-                            value={streetDraft}
-                            onChange={(e) => setStreetDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-bldg"
-                          >
-                            Building No.
-                          </label>
-                          <input
-                            id="addr-bldg"
-                            className="dossier-input"
-                            value={buildingNoDraft}
-                            onChange={(e) => setBuildingNoDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-floor"
-                          >
-                            Floor / Apt
-                          </label>
-                          <input
-                            id="addr-floor"
-                            className="dossier-input"
-                            value={floorDraft}
-                            onChange={(e) => setFloorDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="addr-landmark"
-                          >
-                            Landmark
-                          </label>
-                          <input
-                            id="addr-landmark"
-                            className="dossier-input"
-                            value={landmarkDraft}
-                            onChange={(e) => setLandmarkDraft(e.target.value)}
-                          />
-                        </div>
+                        </Field>
                       </div>
                     </>
                   )}
@@ -1922,17 +1737,13 @@ export function CustomerQuickEditModal({
                     <span className="dossier-card-icon">👤</span>
                     <span>
                       {isEditingIdentity
-                        ? isAr
-                          ? "تعديل البيانات الشخصية وأرقام الموبايل"
-                          : "Editing Personal & Contact Information"
-                        : isAr
-                          ? "البيانات الشخصية وبيانات التواصل"
-                          : "Personal & Contact Information"}
+                        ? t.crmCustomerProfiles.ui.quickEdit.editing_personal_contact_information
+                        : t.crmCustomerProfiles.ui.quickEdit.personal_contact_information}
                     </span>
                   </div>
                   {isEditingIdentity ? (
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
                         disabled={isSavingSection}
                         onClick={() => {
@@ -1941,28 +1752,28 @@ export function CustomerQuickEditModal({
                         }}
                         className="dossier-edit-btn dossier-cancel-btn"
                       >
-                        ✕ {isAr ? "إلغاء" : "Cancel"}
-                      </button>
-                      <button
+                        ✕ {t.crmCustomerProfiles.ui.quickEdit.cancel}
+                      </Button>
+                      <Button
                         type="button"
                         disabled={isSavingSection}
                         onClick={() => void saveIdentitySection()}
                         className="dossier-edit-btn dossier-save-btn"
                       >
                         ✓{" "}
-                        {isAr ? "حفظ البيانات الشخصية" : "Save Personal Info"}
-                      </button>
+                        {t.crmCustomerProfiles.ui.quickEdit.save_personal_info}
+                      </Button>
                     </div>
                   ) : (
                     editable && (
-                      <button
+                      <Button
                         type="button"
                         onClick={startIdentityEdit}
                         className="dossier-edit-btn"
                       >
                         ✏️{" "}
-                        {isAr ? "تعديل البيانات الشخصية" : "Edit Personal Info"}
-                      </button>
+                        {t.crmCustomerProfiles.ui.quickEdit.edit_personal_info}
+                      </Button>
                     )
                   )}
                 </div>
@@ -1977,16 +1788,14 @@ export function CustomerQuickEditModal({
                             📱 Personal Mobile Numbers (phones[] — View Mode)
                           </span>
                           {editable && (
-                            <button
+                            <Button
                               type="button"
                               onClick={startIdentityEdit}
                               className="dossier-edit-btn"
                             >
                               ✏️{" "}
-                              {isAr
-                                ? "تعديل الأرقام (كود + رقم)"
-                                : "Edit Phones (Code + Number)"}
-                            </button>
+                              {t.crmCustomerProfiles.ui.quickEdit.edit_phones_code_number}
+                            </Button>
                           )}
                         </div>
                         {fallbackDetail.phones.length > 0 ? (
@@ -2018,10 +1827,8 @@ export function CustomerQuickEditModal({
                             </div>
                           ))
                         ) : (
-                          <div className="text-xs text-slate-500">
-                            {isAr
-                              ? "لا توجد أرقام موبايل مسجلة"
-                              : "No mobile numbers recorded"}
+                          <div className="text-xs text-muted-foreground">
+                            {t.crmCustomerProfiles.ui.quickEdit.no_mobile_numbers_recorded}
                           </div>
                         )}
                       </div>
@@ -2126,7 +1933,7 @@ export function CustomerQuickEditModal({
                             onChange={(e) => setHonorificDraft(e.target.value)}
                           >
                             <option value="">
-                              {isAr ? "بدون لقب" : "None"}
+                              {t.crmCustomerProfiles.ui.quickEdit.none}
                             </option>
                             {getHonorificOptions(lang).map((opt) => (
                               <option key={opt.key} value={opt.label}>
@@ -2194,7 +2001,7 @@ export function CustomerQuickEditModal({
                             National Number (CrmPhoneNumberInput)
                           </span>
                           {phonesDraft.length < 10 && (
-                            <button
+                            <Button
                               type="button"
                               onClick={() =>
                                 setPhonesDraft((prev) => [...prev, ""])
@@ -2203,9 +2010,9 @@ export function CustomerQuickEditModal({
                             >
                               <Plus className="size-3.5" aria-hidden="true" />
                               <span>
-                                {isAr ? "إضافة موبايل" : "Add Mobile"}
+                                {t.crmCustomerProfiles.ui.quickEdit.add_mobile}
                               </span>
-                            </button>
+                            </Button>
                           )}
                         </div>
                         {phonesDraft.map((ph, idx) => (
@@ -2232,7 +2039,7 @@ export function CustomerQuickEditModal({
                             >
                               {idx === 0 ? "Primary Mobile" : "Secondary"}
                             </span>
-                            <button
+                            <Button
                               type="button"
                               aria-label={`Remove mobile ${idx + 1}`}
                               onClick={() =>
@@ -2248,7 +2055,7 @@ export function CustomerQuickEditModal({
                                 className="size-3.5"
                                 aria-hidden="true"
                               />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                         <div className="dossier-phone-hint">
@@ -2274,89 +2081,19 @@ export function CustomerQuickEditModal({
                             }
                           />
                         </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="ind-country"
+                        <div className="dossier-field-box dossier-span-all">
+                          <Field
+                            label={t.crmLeads.create.sections.address}
+                            hint={t.crmCustomerProfileActions.addressReadOnly}
+                            readOnly
+                            showLabel
                           >
-                            Country
-                          </label>
-                          <input
-                            id="ind-country"
-                            className="dossier-input"
-                            value={countryDraft}
-                            onChange={(e) => setCountryDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="ind-city"
-                          >
-                            City
-                          </label>
-                          <input
-                            id="ind-city"
-                            className="dossier-input"
-                            value={cityDraft}
-                            onChange={(e) => setCityDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="ind-area"
-                          >
-                            Area
-                          </label>
-                          <input
-                            id="ind-area"
-                            className="dossier-input"
-                            value={areaDraft}
-                            onChange={(e) => setAreaDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="ind-street"
-                          >
-                            Street
-                          </label>
-                          <input
-                            id="ind-street"
-                            className="dossier-input"
-                            value={streetDraft}
-                            onChange={(e) => setStreetDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="ind-bldg"
-                          >
-                            Building / Floor
-                          </label>
-                          <input
-                            id="ind-bldg"
-                            className="dossier-input"
-                            value={buildingNoDraft}
-                            onChange={(e) => setBuildingNoDraft(e.target.value)}
-                          />
-                        </div>
-                        <div className="dossier-field-box">
-                          <label
-                            className="dossier-field-label"
-                            htmlFor="ind-landmark"
-                          >
-                            Landmark
-                          </label>
-                          <input
-                            id="ind-landmark"
-                            className="dossier-input"
-                            value={landmarkDraft}
-                            onChange={(e) => setLandmarkDraft(e.target.value)}
-                          />
+                            <Input
+                              size="sm"
+                              value={formatFullAddress(fallbackDetail.address)}
+                              readOnly
+                            />
+                          </Field>
                         </div>
                       </div>
                     </>
@@ -2378,17 +2115,13 @@ export function CustomerQuickEditModal({
                   <span className="dossier-card-icon">🎯</span>
                   <span>
                     {isEditingQualification
-                      ? isAr
-                        ? "تعديل بيانات الحساب والمسؤول والحقول المخصصة"
-                        : "Editing Account Details, Ownership & Custom Fields"
-                      : isAr
-                        ? "بيانات الحساب والمسؤول والحقول المخصصة"
-                        : "Account Details, Ownership & Custom Fields"}
+                      ? t.crmCustomerProfiles.ui.quickEdit.editing_account_details_ownership_custom_fields
+                      : t.crmCustomerProfiles.ui.quickEdit.account_details_ownership_custom_fields}
                   </span>
                 </div>
                 {isEditingQualification ? (
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       type="button"
                       disabled={isSavingSection}
                       onClick={() => {
@@ -2397,26 +2130,26 @@ export function CustomerQuickEditModal({
                       }}
                       className="dossier-edit-btn dossier-cancel-btn"
                     >
-                      ✕ {isAr ? "إلغاء" : "Cancel"}
-                    </button>
-                    <button
+                      ✕ {t.crmCustomerProfiles.ui.quickEdit.cancel}
+                    </Button>
+                    <Button
                       type="button"
                       disabled={isSavingSection}
                       onClick={() => void saveQualificationSection()}
                       className="dossier-edit-btn dossier-save-btn"
                     >
-                      ✓ {isAr ? "حفظ التفاصيل" : "Save Details"}
-                    </button>
+                      ✓ {t.crmCustomerProfiles.ui.quickEdit.save_details}
+                    </Button>
                   </div>
                 ) : (
                   editable && (
-                    <button
+                    <Button
                       type="button"
                       onClick={startQualificationEdit}
                       className="dossier-edit-btn"
                     >
-                      ✏️ {isAr ? "تعديل التفاصيل" : "Edit Details"}
-                    </button>
+                      ✏️ {t.crmCustomerProfiles.ui.quickEdit.edit_details}
+                    </Button>
                   )
                 )}
               </div>
@@ -2446,7 +2179,7 @@ export function CustomerQuickEditModal({
                         <div className="dossier-field-val">
                           {new Date(
                             fallbackDetail.updatedAt,
-                          ).toLocaleDateString(isAr ? "ar-EG" : "en-US", {
+                          ).toLocaleDateString(lang, {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
@@ -2460,7 +2193,7 @@ export function CustomerQuickEditModal({
                         <div className="dossier-field-box dossier-span-all">
                           <div className="dossier-field-label">Source Lead</div>
                           <div className="dossier-field-val">
-                            <button
+                            <Button
                               type="button"
                               onClick={() => {
                                 onClose();
@@ -2468,10 +2201,10 @@ export function CustomerQuickEditModal({
                                   `/crm/leads/${encodeURIComponent(fallbackDetail.sourceLeadId!)}`,
                                 );
                               }}
-                              className="text-blue-600 underline hover:text-blue-700 dark:text-blue-400"
+                              className="text-primary underline hover:text-primary/80"
                             >
-                              🔗 {isAr ? "عرض العميل المحتمل الأصلي ↗" : "View Source Lead ↗"}
-                            </button>
+                              🔗 {t.crmCustomerProfiles.ui.quickEdit.view_source_lead}
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -2511,41 +2244,44 @@ export function CustomerQuickEditModal({
                               >
                                 🏷️ {tag.name}
                                 {editable && (
-                                  <button
+                                  <Button
                                     type="button"
                                     aria-label={`Remove tag ${tag.name}`}
                                     onClick={() =>
                                       void handleDetachTag(tag.id)
                                     }
-                                    className="ms-1 border-0 bg-transparent p-0 font-extrabold opacity-75 hover:opacity-100"
+                                    className="ms-1 border-0 bg-transparent p-0 font-semibold opacity-75 hover:opacity-100"
                                   >
                                     ×
-                                  </button>
+                                  </Button>
                                 )}
                               </span>
                             );
                           })}
-                          {editable && (
-                            <button
+                          {editable && canReadTags && (
+                            <Button
                               type="button"
                               onClick={handleOpenTagPicker}
                               className="dossier-tag dossier-tag-add"
                             >
-                              + {isAr ? "ربط وسم" : "Attach Tag"}
-                            </button>
+                              + {t.crmCustomerProfiles.ui.quickEdit.attach_tag}
+                            </Button>
                           )}
                         </div>
-                        {isTagPickerOpen && availableTags.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-violet-200 bg-violet-50/50 p-2 dark:border-violet-800 dark:bg-violet-950/40">
+                        {editable &&
+                          canReadTags &&
+                          isTagPickerOpen &&
+                          availableTags.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-primary/30 bg-primary/5 p-2">
                             {availableTags.map((tag) => (
-                              <button
+                              <Button
                                 key={tag.id}
                                 type="button"
                                 onClick={() => void handleAttachTag(tag)}
                                 className="dossier-tag dossier-tag-indigo"
                               >
                                 + {tag.name}
-                              </button>
+                              </Button>
                             ))}
                           </div>
                         )}
@@ -2590,7 +2326,7 @@ export function CustomerQuickEditModal({
                         onChange={(e) => setSourceIdDraft(e.target.value)}
                       >
                         <option value="">
-                          {isAr ? "بدون مصدر" : "No Source"}
+                          {t.crmCustomerProfiles.ui.quickEdit.no_source}
                         </option>
                         {sources.map((src) => (
                           <option key={src.id} value={src.id}>
@@ -2691,37 +2427,39 @@ export function CustomerQuickEditModal({
                     <span>
                       {editingContactDraft
                         ? editingContactDraft.partyId
-                          ? isAr
-                            ? "تعديل جهة الاتصال"
-                            : `Editing Contact Person (${editingContactDraft.firstName})`
-                          : isAr
-                            ? "إضافة جهة اتصال"
-                            : "Adding Contact Person"
-                        : `${isAr ? "جهات الاتصال" : "Contact Persons"} (${fallbackDetail.contacts.length})`}
+                          ? formatTemplate(
+                              t.crmCustomerProfiles.ui.quickEdit.editing_contact_person,
+                              {
+                                editingContactDraft_firstName:
+                                  editingContactDraft.firstName,
+                              },
+                            )
+                          : t.crmCustomerProfiles.ui.quickEdit.adding_contact_person
+                        : `${t.crmCustomerProfiles.ui.quickEdit.contact_persons} (${fallbackDetail.contacts.length})`}
                     </span>
                   </div>
                   {editingContactDraft ? (
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
                         disabled={isSavingSection}
                         onClick={() => setEditingContactDraft(null)}
                         className="dossier-edit-btn dossier-cancel-btn"
                       >
-                        ✕ {isAr ? "إلغاء" : "Cancel"}
-                      </button>
-                      <button
+                        ✕ {t.crmCustomerProfiles.ui.quickEdit.cancel}
+                      </Button>
+                      <Button
                         type="button"
                         disabled={isSavingSection}
                         onClick={() => void saveContactPerson()}
                         className="dossier-edit-btn dossier-save-btn"
                       >
-                        ✓ {isAr ? "حفظ جهة الاتصال" : "Save Contact"}
-                      </button>
+                        ✓ {t.crmCustomerProfiles.ui.quickEdit.save_contact}
+                      </Button>
                     </div>
                   ) : (
                     editable && (
-                      <button
+                      <Button
                         type="button"
                         onClick={() =>
                           setEditingContactDraft({
@@ -2737,8 +2475,8 @@ export function CustomerQuickEditModal({
                         }
                         className="dossier-edit-btn"
                       >
-                        + {isAr ? "إضافة جهة اتصال" : "Add Contact Person"}
-                      </button>
+                        + {t.crmCustomerProfiles.ui.quickEdit.add_contact_person}
+                      </Button>
                     )
                   )}
                 </div>
@@ -2746,6 +2484,11 @@ export function CustomerQuickEditModal({
                 <div className="dossier-card-body">
                   {editingContactDraft && (
                     <div className="dossier-phone-box-edit">
+                      {editingContactDraft.partyId !== null && (
+                        <p className="text-sm text-muted-foreground">
+                          {t.crmCustomerProfiles.existingContactReadOnly}
+                        </p>
+                      )}
                       <div className="dossier-grid-3">
                         <div className="dossier-field-box">
                           <label
@@ -2756,6 +2499,7 @@ export function CustomerQuickEditModal({
                           </label>
                           <select
                             id="ct-honorific"
+                            disabled={editingContactDraft.partyId !== null || isSavingSection}
                             className="dossier-select"
                             value={
                               findHonorific(
@@ -2775,7 +2519,7 @@ export function CustomerQuickEditModal({
                             }
                           >
                             <option value="">
-                              {isAr ? "بدون لقب" : "None"}
+                              {t.crmCustomerProfiles.ui.quickEdit.none}
                             </option>
                             {getHonorificOptions(lang).map((opt) => (
                               <option key={opt.key} value={opt.label}>
@@ -2804,6 +2548,7 @@ export function CustomerQuickEditModal({
                           </label>
                           <input
                             id="ct-first-name"
+                            disabled={editingContactDraft.partyId !== null || isSavingSection}
                             className="dossier-input"
                             value={editingContactDraft.firstName}
                             onChange={(e) =>
@@ -2824,6 +2569,7 @@ export function CustomerQuickEditModal({
                           </label>
                           <input
                             id="ct-last-name"
+                            disabled={editingContactDraft.partyId !== null || isSavingSection}
                             className="dossier-input"
                             value={editingContactDraft.lastName}
                             onChange={(e) =>
@@ -2860,6 +2606,7 @@ export function CustomerQuickEditModal({
                           </label>
                           <input
                             id="ct-email"
+                            disabled={editingContactDraft.partyId !== null || isSavingSection}
                             className="dossier-input"
                             value={editingContactDraft.email}
                             onChange={(e) =>
@@ -2877,7 +2624,7 @@ export function CustomerQuickEditModal({
                         <span className="dossier-phone-box-label">
                           📱 Contact Mobile Numbers (Split Code + Number)
                         </span>
-                        <button
+                        <Button
                           type="button"
                           onClick={() =>
                             setEditingContactDraft((prev) =>
@@ -2886,16 +2633,18 @@ export function CustomerQuickEditModal({
                                 : prev,
                             )
                           }
+                          disabled={editingContactDraft.partyId !== null || isSavingSection}
                           className="dossier-add-phone-btn"
                         >
                           + Add Number
-                        </button>
+                        </Button>
                       </div>
 
                       {editingContactDraft.phones.map((ph, idx) => (
                         <div key={idx} className="dossier-phone-split-row">
                           <CrmPhoneNumberInput
                             value={ph}
+                            disabled={editingContactDraft.partyId !== null || isSavingSection}
                             maxLength={32}
                             label={`Contact Mobile ${idx + 1}`}
                             placeholder="1229988776"
@@ -2913,9 +2662,10 @@ export function CustomerQuickEditModal({
                             }
                             onBlur={() => {}}
                           />
-                          <button
+                          <Button
                             type="button"
                             aria-label={`Remove contact phone ${idx + 1}`}
+                            disabled={editingContactDraft.partyId !== null || isSavingSection}
                             onClick={() =>
                               setEditingContactDraft((prev) =>
                                 prev
@@ -2937,7 +2687,7 @@ export function CustomerQuickEditModal({
                               className="size-3.5"
                               aria-hidden="true"
                             />
-                          </button>
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -2991,7 +2741,7 @@ export function CustomerQuickEditModal({
                             {editable && (
                               <div className="flex items-center gap-1.5">
                                 {!ct.isPrimary && (
-                                  <button
+                                  <Button
                                     type="button"
                                     onClick={() =>
                                       void handleSetPrimaryContact(ct.partyId)
@@ -2999,9 +2749,9 @@ export function CustomerQuickEditModal({
                                     className="dossier-edit-btn"
                                   >
                                     ★ Set Primary
-                                  </button>
+                                  </Button>
                                 )}
-                                <button
+                                <Button
                                   type="button"
                                   onClick={() =>
                                     setEditingContactDraft({
@@ -3030,7 +2780,7 @@ export function CustomerQuickEditModal({
                                   className="dossier-edit-btn"
                                 >
                                   ✏️ Edit
-                                </button>
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -3055,10 +2805,8 @@ export function CustomerQuickEditModal({
                         </div>
                       ))
                   ) : (
-                    <div className="rounded-lg border border-dashed border-cyan-300 p-3 text-center text-xs text-slate-500 dark:border-cyan-800">
-                      {isAr
-                        ? "لا توجد جهات اتصال مسجلة لهذه الشركة"
-                        : "No contact persons recorded for this company"}
+                    <div className="rounded-lg border border-dashed border-primary/30 p-3 text-center text-xs text-muted-foreground">
+                      {t.crmCustomerProfiles.ui.quickEdit.no_contact_persons_recorded_for_this_company}
                     </div>
                   )}
                 </div>
@@ -3075,7 +2823,7 @@ export function CustomerQuickEditModal({
             >
               <div className="dossier-card-head">
                 <div className="dossier-tabs" role="tablist">
-                  <button
+                  <Button
                     type="button"
                     role="tab"
                     aria-selected={activeDossierTab === "activities"}
@@ -3085,10 +2833,10 @@ export function CustomerQuickEditModal({
                       activeDossierTab === "activities" && "active",
                     )}
                   >
-                    📅 {isAr ? "الأنشطة" : "Activities"} (
+                    📅 {t.crmCustomerProfiles.ui.quickEdit.activities} (
                     {item.nextActivity ? 1 : 0})
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     role="tab"
                     aria-selected={activeDossierTab === "notes"}
@@ -3098,9 +2846,9 @@ export function CustomerQuickEditModal({
                       activeDossierTab === "notes" && "active",
                     )}
                   >
-                    📝 {isAr ? "الملاحظات" : "Notes"}
-                  </button>
-                  <button
+                    📝 {t.crmCustomerProfiles.ui.quickEdit.notes}
+                  </Button>
+                  {canReadHistory && <Button
                     type="button"
                     role="tab"
                     aria-selected={activeDossierTab === "history"}
@@ -3110,9 +2858,9 @@ export function CustomerQuickEditModal({
                       activeDossierTab === "history" && "active",
                     )}
                   >
-                    🕒 {isAr ? "سجل التدقيق" : "Audit Log"}
-                  </button>
-                  <button
+                    {t.audit.historyTitle}
+                  </Button>}
+                  <Button
                     type="button"
                     role="tab"
                     aria-selected={activeDossierTab === "files"}
@@ -3122,18 +2870,18 @@ export function CustomerQuickEditModal({
                       activeDossierTab === "files" && "active",
                     )}
                   >
-                    📎 {isAr ? "الملفات" : "Files"}
-                  </button>
+                    📎 {t.crmCustomerProfiles.ui.quickEdit.files}
+                  </Button>
                 </div>
 
                 {activeDossierTab === "activities" && onOpenActivities && (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => onOpenActivities(item)}
                     className="dossier-edit-btn"
                   >
-                    + {isAr ? "حجز نشاط" : "Book Activity"}
-                  </button>
+                    + {t.crmCustomerProfiles.ui.quickEdit.book_activity}
+                  </Button>
                 )}
               </div>
 
@@ -3145,15 +2893,13 @@ export function CustomerQuickEditModal({
                         <div className="flex items-center justify-between gap-2">
                           <span className="dossier-activity-title">
                             📞{" "}
-                            {isAr
-                              ? "نشاط متابعة قادم"
-                              : "Next Scheduled Follow-Up"}
+                            {t.crmCustomerProfiles.ui.quickEdit.next_scheduled_follow_up}
                           </span>
                           <span
                             className={cn(
                               "dossier-badge",
                               activityState === "OVERDUE"
-                                ? "border-red-300 bg-red-100 text-red-700"
+                                ? "border-destructive bg-destructive-subtle text-destructive-subtle-foreground"
                                 : "dossier-badge-stage",
                             )}
                           >
@@ -3163,7 +2909,7 @@ export function CustomerQuickEditModal({
                             •{" "}
                             {new Date(
                               item.nextActivity.activityAt,
-                            ).toLocaleDateString(isAr ? "ar-EG" : "en-US", {
+                            ).toLocaleDateString(lang, {
                               month: "short",
                               day: "numeric",
                             })}
@@ -3175,16 +2921,12 @@ export function CustomerQuickEditModal({
                         </div>
                       </div>
                     ) : (
-                      <div className="rounded-xl border border-dashed border-amber-300 p-4 text-center dark:border-amber-800">
-                        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                          {isAr
-                            ? "لا توجد أنشطة مجدولة حالياً"
-                            : "No scheduled activities"}
+                      <div className="rounded-lg border border-dashed border-warning p-4 text-center">
+                        <p className="text-xs font-semibold text-foreground">
+                          {t.crmCustomerProfiles.ui.quickEdit.no_scheduled_activities}
                         </p>
-                        <p className="mt-1 text-[11px] text-slate-500">
-                          {isAr
-                            ? "اضغط على (+ حجز نشاط) لجدولة مكالمة أو اجتماع"
-                            : "Click (+ Book Activity) to schedule a call, meeting, or follow-up."}
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t.crmCustomerProfiles.ui.quickEdit.book_activity_hint}
                         </p>
                       </div>
                     )}
@@ -3210,13 +2952,12 @@ export function CustomerQuickEditModal({
                     sourceId={fallbackDetail.id}
                     sourceOwnerUserId={fallbackDetail.ownerUserId}
                     createCapability={attached.capabilities.notesCreate}
-                    deleteCapability={attached.capabilities.notesDelete}
-                    readOnly={!editable}
+                    readOnly={!canMutate || fallbackDetail.status === "BLACKLISTED"}
                   />
                 )}
 
                 {activeDossierTab === "history" && (
-                  <EntityHistoryCard
+                  <RecordHistoryTab
                     density="compact"
                     entityType="CustomerProfile"
                     entityId={fallbackDetail.id}
@@ -3248,33 +2989,33 @@ export function CustomerQuickEditModal({
 
         {/* ================= 5. BOTTOM MODAL FOOTER ================= */}
         <div className="dossier-footer">
-          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
             <span>
               Navigate Customers (
               {currentIndex >= 0 ? currentIndex + 1 : 1} of{" "}
               {Math.max(allItems.length, 1)}):
             </span>
-            <button
+            <Button
               type="button"
               disabled={!prevCustomer || !onSelectCustomer}
               onClick={() => prevCustomer && onSelectCustomer?.(prevCustomer)}
               className="dossier-btn dossier-btn-outline disabled:opacity-40"
             >
               ← Prev Customer [J]
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               disabled={!nextCustomer || !onSelectCustomer}
               onClick={() => nextCustomer && onSelectCustomer?.(nextCustomer)}
               className="dossier-btn dossier-btn-outline disabled:opacity-40"
             >
               Next Customer [K] →
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             {deletable && onDelete && (
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   onClose();
@@ -3282,24 +3023,24 @@ export function CustomerQuickEditModal({
                 }}
                 className="dossier-btn dossier-btn-danger"
               >
-                🗑️ {isAr ? "حذف العميل" : "Delete Customer"}
-              </button>
+                🗑️ {t.crmCustomerProfiles.ui.quickEdit.delete_customer}
+              </Button>
             )}
-            <button
+            <Button
               type="button"
               onClick={onClose}
               className="dossier-btn dossier-btn-outline"
             >
-              {isAr ? "إغلاق [Esc]" : "Close [Esc]"}
-            </button>
-            <button
+              {t.crmCustomerProfiles.ui.quickEdit.close_esc}
+            </Button>
+            <Button
               type="button"
-              disabled={isSavingSection}
+              disabled={!editable || isSavingSection}
               onClick={() => void handleSaveAndClose()}
               className="dossier-btn dossier-btn-primary"
             >
-              ✓ {isAr ? "حفظ وإغلاق [Ctrl+S]" : "Save & Close [Ctrl+S]"}
-            </button>
+              ✓ {t.crmCustomerProfiles.ui.quickEdit.save_close_ctrl_s}
+            </Button>
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ export function SubscriptionOffersWorkspace() {
   const copy = t.subscriptionOffers;
   return <OwnerGate denied={denied}>
     <div className="flex flex-col gap-4">
-      <PageHeader title={copy.title} description={copy.description} secondaryActions={<>
+      <PageHeader className="sr-only" title={copy.title} description={copy.description} secondaryActions={<>
         <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscriptionChange}>{t.commercialPurchase.title}</Link></Button>
         <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscription}>{copy.back}</Link></Button>
         <Button size="sm" variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button>

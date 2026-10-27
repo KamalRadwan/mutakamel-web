@@ -1,12 +1,19 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import type { CustomerProfileDetail } from "../../customer-profile-contract";
 import { useCustomerProfileDetail } from "../hooks/useCustomerProfileDetail";
 import { CustomerProfileDetailWorkspace } from "./customer-profile-detail-workspace";
 
+const feedback = vi.hoisted(() => ({ error: vi.fn() }));
+vi.mock("@/lib/api/idempotent-write", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/api/idempotent-write")>(),
+  createWriteAttempt: vi.fn(() => ({ idempotencyKey: "test-attempt" })),
+  runIdempotentWrite: vi.fn(),
+}));
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ t: en, lang: "en", dir: "ltr" }),
 }));
@@ -14,14 +21,13 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/hooks/useAccessMode", () => ({
   useAccessMode: () => ({ canMutate: true }),
 }));
-vi.mock("../../../shared/hooks/useCrmErrorText", () => ({
-  useCrmErrorText: () => () => null,
-}));
 vi.mock("../hooks/useCustomerProfileDetail", () => ({
   useCustomerProfileDetail: vi.fn(),
 }));
 vi.mock("../../hooks/useCustomerProfilesCapabilities", () => ({
-  useCustomerProfilesCapabilities: () => ({ capabilities: {} }),
+  useCustomerProfilesCapabilities: () => ({
+    capabilities: { update: { scope: "all", ownerUserIds: null } },
+  }),
 }));
 vi.mock("../../../shared/hooks/useCrmRecordCapabilities", () => ({
   useCrmRecordCapabilities: () => ({ capabilities: {} }),
@@ -46,15 +52,15 @@ vi.mock("@/design-system", async () => {
   );
   const cnMod = await import("@/design-system/lib/cn");
   const cardColorMod = await import("@/design-system/views/card-color");
+  const errorFormatting = await import("@/design-system/feedback/format-api-error");
+  const buttonMod = await import("@/design-system/primitives/Button");
   return {
     ...tokens,
     ...cnMod,
     ...cardColorMod,
-    Button: ({ children, ...props }: { children: React.ReactNode }) => (
-      <div role="button" tabIndex={0} {...props}>
-        {children}
-      </div>
-    ),
+    ...errorFormatting,
+    ...buttonMod,
+    useToast: () => feedback,
     ConfirmActionModal: () => null,
     DegradedBanner: () => null,
     DetailHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
@@ -83,9 +89,10 @@ vi.mock("../../../shared/components/RecordNotesSection", () => ({
 vi.mock("@/components/activities/RecordActivitiesPanel", () => ({
   RecordActivitiesPanel: () => <section aria-label="Inline activities" />,
 }));
-vi.mock("@/components/audit/EntityHistoryCard", () => ({
-  EntityHistoryCard: () => <section aria-label="Inline audit history" />,
+vi.mock("@/components/audit/RecordHistoryTab", () => ({
+  RecordHistoryTab: () => <section aria-label="Inline audit history" />,
 }));
+vi.mock("@/components/audit/hooks/useAuditAccess", () => ({ useAuditAccess: () => true }));
 vi.mock("./CustomerProfileRelatedNav", () => ({
   CustomerProfileRelatedNav: () => <nav data-testid="related-nav" />,
 }));
@@ -146,9 +153,45 @@ const mockProfile: CustomerProfileDetail = {
   updatedAt: "2026-09-10T12:00:00Z",
 };
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("CustomerProfileDetailWorkspace", () => {
+  it.each(["rating", "colour"])("shows translated feedback after a forbidden %s save", async (field) => {
+    const setProfile = vi.fn();
+    const setCard = vi.fn();
+    const reload = vi.fn();
+    vi.mocked(useCustomerProfileDetail).mockReturnValue({
+      profile: mockProfile,
+      card: { rating: 2, cardColor: "TEAL" },
+      isLoading: false,
+      isNotFound: false,
+      isForbidden: false,
+      error: null,
+      reload,
+      setProfile,
+      setCard,
+    });
+    vi.mocked(runIdempotentWrite).mockResolvedValue({
+      kind: "failed",
+      error: { status: 403, message: "Internal permission detail" },
+    });
+    render(<CustomerProfileDetailWorkspace profileId={mockProfile.id} />);
+    const group = screen.getByRole("group", {
+      name: field === "rating" ? en.crmLeads.card.rating : en.crmLeads.card.cardColor,
+    });
+    fireEvent.click(group.querySelectorAll("button")[0]);
+
+    await waitFor(() => expect(feedback.error).toHaveBeenCalledWith(en.crmShared.errorForbidden));
+    expect(runIdempotentWrite).toHaveBeenCalledTimes(1);
+    expect(setProfile).not.toHaveBeenCalled();
+    expect(setCard).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+    expect(group.querySelectorAll("button")[0]).not.toBeDisabled();
+  });
+
   it("renders Dossier 360 hero, related nav, status pipeline, cards, and inline 4-tab workspace", () => {
     vi.mocked(useCustomerProfileDetail).mockReturnValue({
       profile: mockProfile,
@@ -179,7 +222,7 @@ describe("CustomerProfileDetailWorkspace", () => {
       name: en.crmLeads.card.cardColor,
     });
     const colorButtons = colorGroup.querySelectorAll("button");
-    expect(colorButtons).toHaveLength(12);
+    expect(colorButtons).toHaveLength(6);
     expect(colorButtons[0]).toHaveAttribute(
       "aria-label",
       en.crmLeads.card.colorNone,

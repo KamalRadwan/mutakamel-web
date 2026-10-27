@@ -5,6 +5,7 @@ import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import {
   CRM_CUSTOM_FIELDS_PATH,
   normalizeCrmCustomFieldKey,
@@ -13,13 +14,10 @@ import {
   type CreateCustomFieldInput,
   type CustomFieldItem,
 } from "../custom-field-contract";
+import { useCustomFieldEdit } from "./useCustomFieldEdit";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function isAmbiguousMutationError(error: unknown): boolean {
@@ -39,6 +37,7 @@ async function readDefinitions(signal?: AbortSignal): Promise<CustomFieldItem[]>
 
 export function useCrmCustomFields() {
   const { t } = useI18n();
+  const crmErrorText = useCrmErrorText();
   const { user } = useTenantAuth();
   const canManage = user?.permissions.includes("crm.custom_fields.manage") ?? false;
   const [definitions, setDefinitions] = useState<CustomFieldItem[]>([]);
@@ -56,14 +55,21 @@ export function useCrmCustomFields() {
     setError(null);
     try {
       setDefinitions(await readDefinitions(signal));
+      return true;
     } catch (caught) {
       if (isAbortError(caught)) return;
       setDefinitions([]);
-      setError(normalizeApiError(caught));
+      const { status, code } = normalizeApiError(caught);
+      setError({ status, code });
+      return false;
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
   }, []);
+
+  const editor = useCustomFieldEdit(canManage, (updated) => {
+    setDefinitions((current) => current.map((field) => field.id === updated.id ? updated : field));
+  }, async () => (await load()) === true);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,7 +92,7 @@ export function useCrmCustomFields() {
   const handleCreate = useCallback(
     async (input: CreateCustomFieldInput): Promise<boolean> => {
       if (!canManage) {
-        setCreateError("You do not have permission to manage custom fields.");
+        setCreateError(t.crmCustomFields.editForbidden);
         return false;
       }
       setIsCreating(true);
@@ -134,16 +140,15 @@ export function useCrmCustomFields() {
               : t.crmCustomFields.ambiguousCreateStale,
           );
         } else {
-          setCreateError(
-            errorMessage(caught, t.crmCustomFields.createFailed),
-          );
+          const { status, code } = normalizeApiError(caught);
+          setCreateError(crmErrorText({ status, code }) ?? t.crmCustomFields.createFailed);
         }
         return false;
       } finally {
         setIsCreating(false);
       }
     },
-    [canManage, t],
+    [canManage, crmErrorText, t],
   );
 
   const openCreate = () => {
@@ -159,6 +164,7 @@ export function useCrmCustomFields() {
 
   return {
     t,
+    editor,
     items,
     searchQuery,
     setSearchQuery,

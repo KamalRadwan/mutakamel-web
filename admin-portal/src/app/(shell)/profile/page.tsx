@@ -15,6 +15,7 @@ import { Button, Card, RadioGroup, RadioGroupItem } from "@/design-system";
 import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { useMyProfile } from "./hooks/useMyProfile";
+import { ProfileMfa } from "./components/ProfileMfa";
 
 export default function MyProfilePage() {
   const {
@@ -119,6 +120,7 @@ export default function MyProfilePage() {
         </div>
       ) : null}
 
+      <ProfileMfa />
       <Card className="space-y-3 p-3 sm:p-3.5">
         <fieldset className="space-y-2">
           <legend className="flex items-center gap-1.5 text-xs font-semibold text-foreground">

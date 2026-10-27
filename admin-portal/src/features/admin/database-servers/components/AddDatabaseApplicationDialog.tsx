@@ -95,7 +95,8 @@ export function AddDatabaseApplicationDialog({
 
   useEffect(() => {
     if (!isOpen) return;
-    ++dialogGeneration.current;
+    const generationRef = dialogGeneration;
+    ++generationRef.current;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -105,7 +106,7 @@ export function AddDatabaseApplicationDialog({
     });
     return () => {
       cancelled = true;
-      ++dialogGeneration.current;
+      ++generationRef.current;
     };
   }, [isOpen]);
 
@@ -233,13 +234,13 @@ export function AddDatabaseApplicationDialog({
               {selected && (
                 <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-muted p-2 text-xs">
                   <div>
-                    <span className="block text-[11px] font-medium uppercase text-muted-foreground">
+                    <span className="block text-xs font-medium uppercase text-muted-foreground">
                       {copy.catalogueRevision}
                     </span>
                     <code>{selected.catalogueRevision}</code>
                   </div>
                   <div>
-                    <span className="block text-[11px] font-medium uppercase text-muted-foreground">
+                    <span className="block text-xs font-medium uppercase text-muted-foreground">
                       {copy.policyRevision}
                     </span>
                     <code>{selected.databasePolicy.policyRevision}</code>

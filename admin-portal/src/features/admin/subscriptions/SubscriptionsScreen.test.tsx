@@ -111,7 +111,7 @@ describe("SubscriptionsScreen", () => {
     render(<SubscriptionsScreen />);
 
     const tenantLink = screen.getByRole("link", { name: "Acme LLC" });
-    expect(tenantLink.getAttribute("href")).toBe(`/tenants/${TENANT_ID}`);
+    expect(tenantLink.getAttribute("href")).toBe(`/subscriptions/${TENANT_ID}`);
     expect(screen.getByText("crm")).toBeTruthy();
     expect(screen.queryByText("Professional")).toBeNull();
     fireEvent.click(

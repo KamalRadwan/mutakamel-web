@@ -1,49 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Plus, Search, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Search, SlidersHorizontal } from "lucide-react";
 import {
+  Badge,
   Button,
   Card,
   CardContent,
-  CardFooter,
   CardHeader,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  DatePicker,
-  Input,
-  MultiSelect,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   cn,
   iconSize,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
-import { fromIsoDate, toIsoDate } from "../iso-date";
-import {
-  crmGroupsWithCondition,
-  crmGroupsWithConditionAdded,
-  crmGroupsWithConditionRemoved,
-  crmGroupsWithConnector,
-  crmGroupsWithGroupAdded,
-  crmGroupsWithGroupRemoved,
-  crmOperatorTakesManyValues,
-  crmOperatorTakesNoValue,
-  crmOperatorTakesTwoValues,
-  crmOperatorsForField,
-  type CrmFilterOperator,
-  type CrmSearchCondition,
-  type CrmSearchConnector,
-  type CrmSearchFieldDef,
-  type CrmSearchGroup,
-} from "../search/filter-tree";
-
-const UNSELECTED_FIELD_VALUE = "__crm_unselected_field__";
+import { useCrmAdvancedSearch } from "../hooks/useCrmAdvancedSearch";
+import type { CrmSearchFieldDef, CrmSearchGroup } from "../search/filter-tree";
+import { CrmSearchGroupRow } from "./CrmSearchGroupRow";
 
 /** One option of a catalogue-backed field, already localized by the caller. */
 export interface CrmSearchCatalogueOption {
@@ -65,17 +42,6 @@ export interface CrmAdvancedSearchCardProps<Id extends string> {
   enumLabel: (field: Id, wireValue: string) => string;
   /** The options of a `catalogue` field, or an empty list while it is degraded. */
   catalogueOptions: (field: Id) => readonly CrmSearchCatalogueOption[];
-  /** Omit both to start directly with the condition rows. */
-  text?: string;
-  onTextChange?: (next: string) => void;
-  /**
-   * What the free-text box actually matches on THIS screen, when it is not
-   * what the shared copy says. Free text is a per-repository `searchableFields`
-   * list, not one rule: leads and customers match the party's name, phone and
-   * email; opportunities match the title alone. A card that told every screen
-   * the same story would be lying to two of them.
-   */
-  textHint?: string;
   groups: readonly CrmSearchGroup<Id>[];
   onGroupsChange: (next: readonly CrmSearchGroup<Id>[]) => void;
   /** Runs the query. Nothing else in this card touches the network. */
@@ -88,34 +54,36 @@ export interface CrmAdvancedSearchCardProps<Id extends string> {
 }
 
 /**
- * The advanced-search card: optional free text, OR-separated groups of AND-ed
- * conditions, and one button that runs them.
+ * The advanced-search card: OR-separated rows of AND-ed conditions, and one
+ * button that runs them.
  *
- * Four decisions are load-bearing:
+ * Five decisions are load-bearing:
  *
- *  1. **Nothing runs until Search is pressed.** A filter tree is built one
+ *  1. **Nothing runs until Apply is pressed.** A filter tree is built one
  *     control at a time and every intermediate state is a different question;
  *     a debounce would fire a request for each of them, and the half-built
  *     ones are usually the expensive ones. The basic bar keeps its debounce
  *     because a single text box has no half-built state worth skipping.
- *  2. **Every row after the first names AND or OR.** Choosing OR splits a
- *     visible section at that row; choosing AND merges it back. The section
- *     boundary maps exactly onto `{op:"OR",children:[{op:"AND",…},…]}` while
- *     keeping precedence visible to the user.
+ *  2. **One row is one OR group.** Its conditions sit side by side joined by
+ *     a fixed AND; every row after the first opens with OR, and switching that
+ *     to AND merges the row into the one above. A row maps exactly onto one
+ *     `{op:"AND",…}` child of `{op:"OR",children:[…]}`, so precedence is the
+ *     layout itself.
  *  3. **A field may be repeated.** `POST /search` has a node per leaf, not a
  *     query-string slot per key, so `stageFlag = NEW OR stageFlag = CONTACTED`
  *     is expressible and the picker withholds nothing.
- *  4. **Searching collapses the card.** The answer is the table below it, and
+ *  4. **Applying collapses the card.** The answer is the table below it, and
  *     a builder that stays open pushes the first row off the screen.
+ *  5. **Every action lives in the header.** A footer costs a full line under a
+ *     builder that is usually two rows tall; the header line is already there.
+ *
+ * State, edits and focus handling live in `useCrmAdvancedSearch`.
  */
 export function CrmAdvancedSearchCard<Id extends string>({
   fields,
   fieldLabels,
   enumLabel,
   catalogueOptions,
-  text,
-  onTextChange,
-  textHint,
   groups,
   onGroupsChange,
   onSubmit,
@@ -124,582 +92,161 @@ export function CrmAdvancedSearchCard<Id extends string>({
   requireFieldSelection = false,
 }: CrmAdvancedSearchCardProps<Id>) {
   const { t } = useI18n();
-  // Open on arrival: the card exists to be filled in. It closes itself on
-  // Search (decision 4) and the trigger reopens it to adjust the question.
-  const [isOpen, setIsOpen] = useState(true);
-
   const copy = t.crmAdvancedSearch;
-  const hasTextSearch = text !== undefined && onTextChange !== undefined;
-  // Never empty: every caller passes its whole whitelist, and a module with no
-  // filterable field would not mount this card at all.
-  const first = fields[0]!;
-
-  function resolve(id: Id): CrmSearchFieldDef<Id> {
-    const definition = fields.find((candidate) => candidate.id === id);
-    // Only reachable through a cast — the picker offers ids from this list.
-    if (!definition) throw new Error(`Unknown search field: ${id}`);
-    return definition;
-  }
-
-  // What the header says while the card is shut, so a collapsed filter is
-  // never a silent one. Counts only conditions a user actually filled in,
-  // because the blank ones are dropped before the request is built.
-  const filledCount = groups.reduce(
-    (total, group) =>
-      total +
-      group.conditions.filter(
-        (condition) =>
-          condition.fieldSelected !== false &&
-          (crmOperatorTakesNoValue(condition.operator) || condition.value.trim().length > 0),
-      ).length,
-    0,
-  );
-
-  function submit() {
-    onSubmit();
-    setIsOpen(false);
-  }
+  const {
+    isOpen,
+    setIsOpen,
+    toggleRef,
+    rowsRef,
+    resolve,
+    filledCount,
+    submit,
+    addGroup,
+    changeConnector,
+    patchCondition,
+    addCondition,
+    removeCondition,
+    removeGroup,
+  } = useCrmAdvancedSearch({
+    fields,
+    groups,
+    onGroupsChange,
+    onSubmit,
+    disabled,
+    requireFieldSelection,
+  });
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="border-border">
-        {/* The header's rule separates it from the body; with the body shut
-            there is nothing to separate it from. */}
-        <CardHeader
-          className={cn(
-            "flex flex-row items-center justify-between gap-2 py-3",
-            !isOpen && "border-b-0",
-          )}
-        >
-          <CollapsibleTrigger disabled={disabled} className="text-sm text-foreground">
-            <ChevronDown
-              className={cn(
-                iconSize({ size: "md" }),
-                "text-muted-foreground transition-transform duration-150",
-                !isOpen && "-rotate-90 rtl:rotate-90",
-              )}
-              aria-hidden="true"
-            />
-            {copy.title}
-          </CollapsibleTrigger>
-
-          {!isOpen && (
-            <span className="text-2xs text-muted-foreground">
-              {filledCount > 0
-                ? formatTemplate(copy.summary, { count: filledCount })
-                : copy.summaryEmpty}
-            </span>
-          )}
-        </CardHeader>
-
-        <CollapsibleContent>
-          {/* A real form, so Enter in any text box runs the query the same way
-              the button does — a filter builder that ignores Enter feels
-              broken long before a user finds the button. */}
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!disabled) submit();
-            }}
+    // A real form around the whole card, header included, so Enter in any box
+    // and the header's Apply button run the same submit.
+    <form onSubmit={submit}>
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Card className="border-border">
+          {/* The header's rule separates it from the body; with the body shut
+              there is nothing to separate it from. */}
+          <CardHeader
+            className={cn(
+              "flex flex-row flex-wrap items-center gap-2 py-2 sm:py-2",
+              !isOpen && "border-b-0",
+            )}
           >
-            <CardContent className="flex flex-col gap-3 pt-0">
-              {hasTextSearch && (
-                <div className="flex flex-col gap-1">
-                  <Input
+            <div className="flex min-w-0 items-center gap-2">
+              <SlidersHorizontal
+                className={cn(iconSize({ size: "md" }), "shrink-0 text-muted-foreground")}
+                aria-hidden="true"
+              />
+              <span className="text-sm font-medium text-foreground">{copy.title}</span>
+              {/* Always mounted, so a screen reader hears the count change. */}
+              <span role="status" aria-live="polite" className="contents">
+                {filledCount > 0 ? (
+                  <Badge className="normal-case tracking-normal">
+                    {formatTemplate(copy.conditionCount, { count: filledCount })}
+                  </Badge>
+                ) : (
+                  // Visible only when shut; while open it still tells a screen
+                  // reader that clearing the last condition left none.
+                  <span className={cn("text-2xs text-muted-foreground", isOpen && "sr-only")}>
+                    {copy.summaryEmpty}
+                  </span>
+                )}
+              </span>
+            </div>
+
+            <div className="ms-auto flex flex-wrap items-center gap-2">
+              {isOpen && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
                     size="sm"
-                    value={text}
                     disabled={disabled}
-                    maxLength={200}
-                    placeholder={copy.textPlaceholder}
-                    aria-label={copy.textLabel}
-                    onChange={(event) => onTextChange(event.target.value)}
-                  />
-                  <p className="text-2xs text-muted-foreground">{textHint ?? copy.textHint}</p>
-                </div>
+                    aria-label={copy.addGroupLabel}
+                    onClick={addGroup}
+                  >
+                    <Plus className={iconSize({ size: "md" })} aria-hidden="true" />
+                    {copy.addGroup}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onReset}>
+                    {copy.reset}
+                  </Button>
+                  {/* Outline, not filled: the screen's one filled action is
+                      the PageHeader's create button (design law 4). */}
+                  <Button type="submit" variant="outline" size="sm" disabled={disabled}>
+                    <Search className={iconSize({ size: "md" })} aria-hidden="true" />
+                    {copy.submit}
+                  </Button>
+                </>
               )}
 
-              {groups.map((group, groupIndex) => (
-                // Keyed by POSITION. Every row is fully controlled by props, so
-                // an index that shifts after a removal still renders the right
-                // condition — and a stable key is what keeps a Radix trigger
-                // from being destroyed in the same commit that closes its menu,
-                // which drops focus to the body.
-                <div key={groupIndex} className="flex flex-col gap-2">
-                  <div
-                    role="group"
-                    aria-label={formatTemplate(copy.groupLabel, { number: groupIndex + 1 })}
-                    className="flex flex-col gap-2 rounded-sm border border-border bg-card p-3"
-                  >
-                    {group.conditions.map((condition, conditionIndex) => (
-                      <div key={conditionIndex} className="flex flex-wrap items-center gap-2">
-                        <ConditionRow
-                          condition={condition}
-                          definition={
-                            condition.fieldSelected === false
-                              ? undefined
-                              : resolve(condition.field)
-                          }
-                          connector={
-                            groupIndex === 0 && conditionIndex === 0
-                              ? undefined
-                              : conditionIndex === 0
-                                ? "OR"
-                                : "AND"
-                          }
-                          fields={fields}
-                          fieldLabels={fieldLabels}
-                          enumLabel={enumLabel}
-                          catalogueOptions={catalogueOptions}
-                          disabled={disabled}
-                          onConnectorChange={(next) =>
-                            onGroupsChange(
-                              crmGroupsWithConnector(
-                                groups,
-                                groupIndex,
-                                conditionIndex,
-                                next,
-                              ),
-                            )
-                          }
-                          onPatch={(patch) =>
-                            onGroupsChange(
-                              crmGroupsWithCondition(
-                                groups,
-                                groupIndex,
-                                conditionIndex,
-                                patch,
-                                resolve,
-                              ),
-                            )
-                          }
-                        />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <CollapsibleTrigger asChild>
+                    {/* Named by the title, not "Collapse…/Expand…": aria-expanded
+                        already states which, and both would read as a
+                        contradiction. Never disabled — it only shows or hides,
+                        and Apply moves focus here even while the caller loads. */}
+                    <Button
+                      ref={toggleRef}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={copy.title}
+                      aria-describedby={undefined}
+                      className="size-(--size-control-sm) p-0"
+                    >
+                      <ChevronDown
+                        className={cn(
+                          iconSize({ size: "md" }),
+                          "text-muted-foreground transition-transform duration-150",
+                          isOpen && "rotate-180",
+                        )}
+                        aria-hidden="true"
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{isOpen ? copy.collapse : copy.expand}</TooltipContent>
+              </Tooltip>
+            </div>
+          </CardHeader>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={disabled}
-                          aria-label={formatTemplate(copy.removeCondition, {
-                            field:
-                              condition.fieldSelected === false
-                                ? copy.field
-                                : fieldLabels[condition.field],
-                          })}
-                          onClick={() =>
-                            onGroupsChange(
-                              crmGroupsWithConditionRemoved(
-                                groups,
-                                groupIndex,
-                                conditionIndex,
-                                first,
-                                !requireFieldSelection,
-                              ),
-                            )
-                          }
-                          className="size-6 shrink-0 rounded-full p-0"
-                        >
-                          <Trash2 className="size-3.5 text-destructive" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    ))}
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={disabled}
-                        onClick={() =>
-                          onGroupsChange(
-                            crmGroupsWithConditionAdded(
-                              groups,
-                              groupIndex,
-                              first,
-                              !requireFieldSelection,
-                            ),
-                          )
-                        }
-                      >
-                        <Plus className={iconSize({ size: "md" })} aria-hidden="true" />
-                        {copy.addCondition}
-                      </Button>
-
-                      {groups.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={disabled}
-                          onClick={() =>
-                            onGroupsChange(
-                              crmGroupsWithGroupRemoved(
-                                groups,
-                                groupIndex,
-                                first,
-                                !requireFieldSelection,
-                              ),
-                            )
-                          }
-                        >
-                          {formatTemplate(copy.removeGroup, { number: groupIndex + 1 })}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={disabled}
-                  onClick={() =>
-                    onGroupsChange(
-                      crmGroupsWithGroupAdded(groups, first, !requireFieldSelection),
-                    )
-                  }
-                >
-                  <Plus className={iconSize({ size: "md" })} aria-hidden="true" />
-                  {copy.addGroup}
-                </Button>
+          <CollapsibleContent>
+            {/* The rail: one start-side rule down every row, each row ticking
+                into it, so the rows read as branches of one question. */}
+            <CardContent className="py-1.5 sm:py-1.5">
+              <div
+                ref={rowsRef}
+                className="divide-y divide-border border-s border-border ps-2"
+              >
+                {groups.map((group, groupIndex) => (
+                  <CrmSearchGroupRow
+                    // Keyed by POSITION, for the focus reason the row explains.
+                    key={groupIndex}
+                    group={group}
+                    groupIndex={groupIndex}
+                    fields={fields}
+                    fieldLabels={fieldLabels}
+                    enumLabel={enumLabel}
+                    catalogueOptions={catalogueOptions}
+                    resolve={resolve}
+                    removable={groups.length > 1}
+                    disabled={disabled}
+                    onConnectorChange={(next) => changeConnector(groupIndex, next)}
+                    onPatch={(conditionIndex, patch) =>
+                      patchCondition(groupIndex, conditionIndex, patch)
+                    }
+                    onConditionAdded={() => addCondition(groupIndex)}
+                    onConditionRemoved={(conditionIndex) =>
+                      removeCondition(groupIndex, conditionIndex)
+                    }
+                    onRemoved={() => removeGroup(groupIndex)}
+                  />
+                ))}
               </div>
             </CardContent>
-
-            <CardFooter className="flex flex-wrap items-center justify-end gap-2 pt-0">
-              <Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onReset}>
-                {copy.reset}
-              </Button>
-              <Button type="submit" size="sm" disabled={disabled}>
-                <Search className={iconSize({ size: "md" })} aria-hidden="true" />
-                {copy.submit}
-              </Button>
-            </CardFooter>
-          </form>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+    </form>
   );
-}
-
-interface ConditionRowProps<Id extends string> {
-  condition: CrmSearchCondition<Id>;
-  definition?: CrmSearchFieldDef<Id>;
-  connector?: CrmSearchConnector;
-  fields: readonly CrmSearchFieldDef<Id>[];
-  fieldLabels: Record<Id, string>;
-  enumLabel: (field: Id, wireValue: string) => string;
-  catalogueOptions: (field: Id) => readonly CrmSearchCatalogueOption[];
-  disabled?: boolean;
-  onConnectorChange: (connector: CrmSearchConnector) => void;
-  onPatch: (patch: Partial<CrmSearchCondition<Id>>) => void;
-}
-
-/**
- * Field, operator, value — where both the operator LIST and the value CONTROL
- * follow the field's kind.
- *
- * The operator list is the whole point of deriving it: `ilike` on a date and
- * `between` on an enum are both `400 INVALID_OPERATOR_VALUE`, which arrives at
- * the screen as a failed load rather than as an unavailable option.
- */
-function ConditionRow<Id extends string>({
-  condition,
-  definition,
-  connector,
-  fields,
-  fieldLabels,
-  enumLabel,
-  catalogueOptions,
-  disabled,
-  onConnectorChange,
-  onPatch,
-}: ConditionRowProps<Id>) {
-  const { t, lang } = useI18n();
-  const copy = t.crmAdvancedSearch;
-  const operators = definition ? crmOperatorsForField(definition) : [];
-  const operatorLabels: Record<CrmFilterOperator, string> = copy.operators;
-  const effectiveOperator =
-    definition && operators.includes(condition.operator)
-      ? condition.operator
-      : operators[0];
-
-  return (
-    <>
-      {connector ? (
-        <Select
-          value={connector}
-          disabled={disabled}
-          onValueChange={(next) => onConnectorChange(next as CrmSearchConnector)}
-        >
-          <SelectTrigger size="sm" className="w-24" aria-label={copy.connector}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="AND">{copy.and}</SelectItem>
-            <SelectItem value="OR">{copy.or}</SelectItem>
-          </SelectContent>
-        </Select>
-      ) : (
-        <span className="w-24 shrink-0 text-center text-2xs uppercase text-muted-foreground">
-          {copy.where}
-        </span>
-      )}
-
-      <Select
-        value={condition.fieldSelected === false ? UNSELECTED_FIELD_VALUE : condition.field}
-        disabled={disabled}
-        onValueChange={(next) => {
-          if (next !== UNSELECTED_FIELD_VALUE) {
-            onPatch({ field: next as Id, fieldSelected: true });
-          }
-        }}
-      >
-        <SelectTrigger size="sm" className="w-52" aria-label={copy.field}>
-          <SelectValue placeholder={copy.selectField} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={UNSELECTED_FIELD_VALUE} disabled>
-            {copy.selectField}
-          </SelectItem>
-          {/* Every field, every time: repeating one is legal on this wire. */}
-          {fields.map((candidate) => (
-            <SelectItem key={candidate.id} value={candidate.id}>
-              {fieldLabels[candidate.id]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {definition && effectiveOperator && (
-        <>
-          {operators.length > 1 && (
-            <Select
-              value={effectiveOperator}
-              disabled={disabled}
-              onValueChange={(next) => onPatch({ operator: next as CrmFilterOperator })}
-            >
-              <SelectTrigger size="sm" className="w-44" aria-label={copy.operator}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {operators.map((operator) => (
-                  <SelectItem key={operator} value={operator}>
-                    {operatorLabels[operator]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <ValueControl
-            condition={{ ...condition, operator: effectiveOperator }}
-            definition={definition}
-            label={`${copy.value}: ${fieldLabels[definition.id]}`}
-            enumLabel={enumLabel}
-            catalogueOptions={catalogueOptions}
-            disabled={disabled}
-            language={lang}
-            onPatch={onPatch}
-          />
-        </>
-      )}
-    </>
-  );
-}
-
-interface ValueControlProps<Id extends string> {
-  condition: CrmSearchCondition<Id>;
-  definition: CrmSearchFieldDef<Id>;
-  label: string;
-  enumLabel: (field: Id, wireValue: string) => string;
-  catalogueOptions: (field: Id) => readonly CrmSearchCatalogueOption[];
-  disabled?: boolean;
-  language: ReturnType<typeof useI18n>["lang"];
-  onPatch: (patch: Partial<CrmSearchCondition<Id>>) => void;
-}
-
-/** The value half of a row: nothing, one control, a list, or a pair. */
-function ValueControl<Id extends string>({
-  condition,
-  definition,
-  label,
-  enumLabel,
-  catalogueOptions,
-  disabled,
-  language,
-  onPatch,
-}: ValueControlProps<Id>) {
-  const { t } = useI18n();
-  const copy = t.crmAdvancedSearch;
-
-  // `isNull`/`isNotNull` carry NO value key at all; the compiler drops it and
-  // the row must not offer a box that would silently be ignored.
-  if (crmOperatorTakesNoValue(condition.operator)) {
-    return <span className="text-2xs text-muted-foreground">{copy.noValueNeeded}</span>;
-  }
-
-  if (crmOperatorTakesManyValues(condition.operator)) {
-    const options = catalogueOptions(definition.id);
-    const selectable =
-      definition.kind === "enum"
-        ? (definition.values ?? []).map((wireValue) => ({
-            value: wireValue,
-            label: enumLabel(definition.id, wireValue),
-          }))
-        : options.map((option) => ({ value: option.id, label: option.label }));
-
-    // Scalar lists without a catalogue are typed as comma-separated values.
-    // The compiler converts number parts while preserving text, dates and ids.
-    if (definition.kind !== "enum" && definition.kind !== "catalogue") {
-      return (
-        <Input
-          size="sm"
-          className={cn("w-60", definition.kind === "uuid" && "font-mono")}
-          dir={definition.kind === "uuid" || definition.kind === "date" ? "ltr" : undefined}
-          inputMode={definition.kind === "number" ? "decimal" : undefined}
-          value={condition.value}
-          disabled={disabled}
-          placeholder={copy.listPlaceholder}
-          aria-label={label}
-          onChange={(event) => onPatch({ value: event.target.value })}
-        />
-      );
-    }
-
-    return (
-      <MultiSelect
-        className="w-60"
-        values={splitList(condition.value)}
-        options={selectable}
-        disabled={disabled || selectable.length === 0}
-        placeholder={
-          selectable.length > 0 ? copy.selectValue : copy.catalogueUnavailable
-        }
-        emptyLabel={copy.catalogueUnavailable}
-        moreLabel={copy.multiMore}
-        removeLabel={copy.multiRemove}
-        overflowLabel={copy.multiOverflow}
-        clearAllLabel={copy.multiClearAll}
-        onValuesChange={(next) => onPatch({ value: next.join(",") })}
-      />
-    );
-  }
-
-  const isRange = crmOperatorTakesTwoValues(condition.operator);
-
-  if (definition.kind === "date") {
-    return (
-      <>
-        <DatePicker
-          className="w-44"
-          value={fromIsoDate(condition.value)}
-          language={language}
-          disabled={disabled}
-          placeholder={isRange ? copy.valueFrom : copy.datePlaceholder}
-          clearLabel={copy.clearDate}
-          onValueChange={(next) => onPatch({ value: toIsoDate(next) })}
-        />
-        {isRange && (
-          <DatePicker
-            className="w-44"
-            value={fromIsoDate(condition.valueTo)}
-            language={language}
-            disabled={disabled}
-            placeholder={copy.valueTo}
-            clearLabel={copy.clearDate}
-            onValueChange={(next) => onPatch({ valueTo: toIsoDate(next) })}
-          />
-        )}
-      </>
-    );
-  }
-
-  if (definition.kind === "number") {
-    return (
-      <>
-        <Input
-          size="sm"
-          className="w-28 tabular-nums"
-          dir="ltr"
-          inputMode="decimal"
-          value={condition.value}
-          disabled={disabled}
-          placeholder={isRange ? copy.valueFrom : copy.numberPlaceholder}
-          aria-label={label}
-          onChange={(event) => onPatch({ value: event.target.value })}
-        />
-        {isRange && (
-          <Input
-            size="sm"
-            className="w-28 tabular-nums"
-            dir="ltr"
-            inputMode="decimal"
-            value={condition.valueTo}
-            disabled={disabled}
-            placeholder={copy.valueTo}
-            aria-label={`${label} — ${copy.valueTo}`}
-            onChange={(event) => onPatch({ valueTo: event.target.value })}
-          />
-        )}
-      </>
-    );
-  }
-
-  if (definition.kind === "enum" || definition.kind === "catalogue") {
-    const options =
-      definition.kind === "enum"
-        ? (definition.values ?? []).map((wireValue) => ({
-            id: wireValue,
-            label: enumLabel(definition.id, wireValue),
-          }))
-        : catalogueOptions(definition.id);
-    const hasOptions = options.length > 0;
-
-    return (
-      <Select
-        value={condition.value}
-        disabled={disabled || !hasOptions}
-        onValueChange={(next) => onPatch({ value: next })}
-      >
-        <SelectTrigger size="sm" className="w-60" aria-label={label}>
-          <SelectValue
-            placeholder={hasOptions ? copy.selectValue : copy.catalogueUnavailable}
-          />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.id} value={option.id}>
-              {("content" in option && option.content) || option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-
-  // `uuid` and `text` alike: a single box. A uuid is typed left-to-right in
-  // both languages, which `dir="ltr"` is what states.
-  return (
-    <Input
-      size="sm"
-      className={cn("w-60", definition.kind === "uuid" && "font-mono")}
-      dir={definition.kind === "uuid" ? "ltr" : undefined}
-      value={condition.value}
-      disabled={disabled}
-      maxLength={definition.maxLength}
-      placeholder={definition.kind === "uuid" ? copy.uuidPlaceholder : copy.textValuePlaceholder}
-      aria-label={label}
-      onChange={(event) => onPatch({ value: event.target.value })}
-    />
-  );
-}
-
-/** The comma-joined list a multi-value row stores, back as its parts. */
-function splitList(value: string): string[] {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
 }

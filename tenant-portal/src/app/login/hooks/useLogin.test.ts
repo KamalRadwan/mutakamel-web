@@ -27,8 +27,11 @@ vi.mock("@/design-system", () => ({
 
 vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({
+    lang: "en",
     t: {
       auth: {
+        loginThrottled: "Try again in {minutes} minutes.",
+        temporarilyUnavailable: "Temporarily unavailable.",
         signInSuccess: "Signed in",
         signInSuccessMessage: "ok",
         signInFailed: "Sign-in failed",
@@ -118,7 +121,7 @@ describe("classifyLoginFailure", () => {
     [{ status: 503, code: "TENANT_INACTIVE" }, "tenantInactive"],
     [{ status: 429, code: "GW.RATE.LIMIT_EXCEEDED" }, "rateLimited"],
     [{ status: 0 }, "offline"],
-    [{ status: 503, code: "GW.RATE.UNAVAILABLE" }, "unknown"],
+    [{ status: 503, code: "GW.RATE.UNAVAILABLE" }, "temporarilyUnavailable"],
     [{ status: 500 }, "unknown"],
   ])("maps %o to its own screen state", (error, expected) => {
     expect(classifyLoginFailure(error)).toBe(expected);
@@ -130,5 +133,29 @@ describe("classifyLoginFailure", () => {
 
   it("puts the rate limit ahead of the status, so a 429 is never read as offline", () => {
     expect(classifyLoginFailure({ status: 429 })).toBe("rateLimited");
+  });
+});
+
+describe("public authentication feedback", () => {
+  it("blocks a second submit during Core's cooldown", async () => {
+    loginMock.mockRejectedValueOnce(new TenantApiClientError("throttled", {
+      status: 429, statusText: "", headers: new Headers({ "Retry-After": "90" }),
+      data: { errorCode: "AUTH_LOGIN_THROTTLED" },
+    }));
+    const { result, unmount } = renderHook(() => useLogin());
+    await act(async () => { await result.current.handleSubmit(submitEvent()); });
+    expect(result.current.isCoolingDown).toBe(true);
+    expect(result.current.throttleMessage).toBe("Try again in 2 minutes.");
+    await act(async () => { await result.current.handleSubmit(submitEvent()); });
+    expect(loginMock).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+  it("localizes forgot-password service unavailability", async () => {
+    postMock.mockRejectedValueOnce(new TenantApiClientError("raw upstream text", {
+      status: 503, statusText: "", headers: new Headers(), data: {},
+    }));
+    const { result } = renderHook(() => useLogin());
+    await act(async () => { await result.current.handleForgotPassword(submitEvent()); });
+    expect(toastMock.error).toHaveBeenCalledWith("Request failed", "Temporarily unavailable.");
   });
 });

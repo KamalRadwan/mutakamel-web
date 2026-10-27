@@ -97,12 +97,14 @@ function isAbortError(error: unknown): boolean {
 
 export function useCustomerProfileBoard({
   enabled,
+  totalsEnabled = false,
   branchId,
   search,
   sort,
   revision,
 }: {
   enabled: boolean;
+  totalsEnabled?: boolean;
   branchId: string | null;
   search: CustomerProfileSearchState;
   sort: { id: "displayName" | "createdAt"; direction: "asc" | "desc" };
@@ -117,6 +119,16 @@ export function useCustomerProfileBoard({
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [loadMoreError, setLoadMoreError] =
     useState<NormalizedApiError | null>(null);
+  const requestKey = JSON.stringify([
+    branchId,
+    search,
+    sort,
+    revision,
+    user?.id,
+    enabled,
+    totalsEnabled,
+  ]);
+  const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
   const requestEpochRef = useRef(0);
   const loadMoreRef = useRef<Set<string>>(new Set());
 
@@ -178,7 +190,7 @@ export function useCustomerProfileBoard({
       const epoch = requestEpochRef.current + 1;
       requestEpochRef.current = epoch;
       if (
-        !enabled ||
+        (!enabled && !totalsEnabled) ||
         !branchId ||
         (search.mode === "basic" &&
           search.basic.myCustomers &&
@@ -194,6 +206,53 @@ export function useCustomerProfileBoard({
       setError(null);
       setLoadMoreError(null);
       try {
+        if (!enabled) {
+          // CustomerProfileBoardSearchDto fixes board pages at 50
+          // (crm-app/src/crm/customer-profiles/dto/customer-profile-search.dto.ts).
+          // Search totals use the same branch, owner and filter scope.
+          const body = requestBody(1);
+          const entries = await Promise.all(
+            CUSTOMER_PROFILE_BOARD_STATUSES.map(async (status) => {
+              const statusFilter = {
+                field: "status",
+                operator: "eq" as const,
+                value: status,
+              };
+              const response = await axiosClient.post<unknown>(
+                "/api/tenant/crm/v1/customer-profiles/search",
+                {
+                  ...body,
+                  limit: 1,
+                  filterTree: body.filterTree
+                    ? { op: "AND", children: [body.filterTree, statusFilter] }
+                    : statusFilter,
+                },
+                {
+                  signal,
+                  cache: "no-store",
+                  maxResponseBytes: 1024 * 1024,
+                  skipAutoIdempotency: true,
+                  replayAfterRefresh: true,
+                },
+              );
+              const page = parseCustomerProfilesPageResponse(
+                response.data,
+                branchId,
+              );
+              const lane: CustomerProfileBoardLane = {
+                items: [],
+                total: page.total,
+                page: 1,
+                hasMore: false,
+              };
+              return [status, lane] as const;
+            }),
+          );
+          if (signal?.aborted || epoch !== requestEpochRef.current) return false;
+          setLanes(Object.fromEntries(entries));
+          setLoadedRequestKey(requestKey);
+          return true;
+        }
         const response = await axiosClient.post<unknown>(
           "/api/tenant/crm/v1/customer-profiles/board",
           requestBody(1),
@@ -207,6 +266,7 @@ export function useCustomerProfileBoard({
         );
         if (signal?.aborted || epoch !== requestEpochRef.current) return false;
         setLanes(parseCustomerProfileBoardResponse(response.data, branchId));
+        setLoadedRequestKey(requestKey);
         return true;
       } catch (caught) {
         if (isAbortError(caught) || epoch !== requestEpochRef.current) return false;
@@ -219,7 +279,7 @@ export function useCustomerProfileBoard({
         }
       }
     },
-    [branchId, enabled, requestBody, search, user?.id],
+    [branchId, enabled, requestBody, requestKey, search, totalsEnabled, user?.id],
   );
 
   useEffect(() => {
@@ -297,12 +357,13 @@ export function useCustomerProfileBoard({
   const totals = useMemo(
     () =>
       new Map(
-        CUSTOMER_PROFILE_BOARD_STATUSES.map((status) => [
-          status,
-          lanes[status]?.total ?? 0,
-        ]),
+        CUSTOMER_PROFILE_BOARD_STATUSES.flatMap((status) =>
+          loadedRequestKey === requestKey && !isLoading && lanes[status]
+            ? [[status, lanes[status].total] as const]
+            : [],
+        ),
       ),
-    [lanes],
+    [isLoading, lanes, loadedRequestKey, requestKey],
   );
 
   const applyCardFields = useCallback(

@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@mutakamel/identifiers": "workspace:*",
-    "@mutakamel/webphone": "workspace:*",
+    "@mutakamel/webphone-ui": "workspace:*",
     "@noble/hashes": "2.4.0",
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-avatar": "^1.2.6",

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 
-export type LeadFieldGuideTone =
+type LeadFieldGuideTone =
   | "indigo"
   | "emerald"
   | "violet"
@@ -13,7 +13,7 @@ export type LeadFieldGuideTone =
   | "teal"
   | "rose";
 
-export interface LeadFieldGuideEntry {
+interface LeadFieldGuideEntry {
   title: string;
   dtoKey: string;
   description: string;
@@ -22,7 +22,7 @@ export interface LeadFieldGuideEntry {
   tone?: LeadFieldGuideTone;
 }
 
-export type LeadFieldGuideKey =
+type LeadFieldGuideKey =
   | "branchId"
   | "ownerUserId"
   | "companyId"
@@ -58,7 +58,6 @@ export type LeadFieldGuideKey =
   | "street2"
   | "buildingNo"
   | "floor"
-  | "apartment"
   | "landmark"
   | "postalCode"
   | "interestSummary"
@@ -377,15 +376,6 @@ const GUIDE_EN: Record<LeadFieldGuideKey, LeadFieldGuideEntry> = {
       "Floor level within the building.",
     rule: "Optional · Max 40 characters.",
     example: "Floor 14",
-    tone: "amber",
-  },
-  apartment: {
-    title: "Suite / Office / Apartment",
-    dtoKey: "address.apartment (Max 40 chars)",
-    description:
-      "Office suite, unit, or apartment number.",
-    rule: "Optional · Max 40 characters.",
-    example: "Suite 1402",
     tone: "amber",
   },
   landmark: {
@@ -746,14 +736,6 @@ const GUIDE_AR: Record<LeadFieldGuideKey, LeadFieldGuideEntry> = {
     example: "الطابق 14",
     tone: "amber",
   },
-  apartment: {
-    title: "المكتب / الوحدة / الشقة",
-    dtoKey: "address.apartment (حتى 40 حرفاً)",
-    description: "رقم المكتب أو الجناح أو الوحدة الفرعية.",
-    rule: "اختياري · حتى 40 حرفاً.",
-    example: "مكتب 1402",
-    tone: "amber",
-  },
   landmark: {
     title: "معلم قريب مميز",
     dtoKey: "address.landmark (حتى 160 حرفاً)",
@@ -805,19 +787,19 @@ const GUIDE_AR: Record<LeadFieldGuideKey, LeadFieldGuideEntry> = {
 
 const TONE_BADGE_STYLES: Record<LeadFieldGuideTone, string> = {
   indigo:
-    "border-indigo-500/35 bg-indigo-500/12 text-indigo-600 hover:bg-indigo-600 hover:text-white dark:border-indigo-400/40 dark:bg-indigo-500/20 dark:text-indigo-300 dark:hover:bg-indigo-500 dark:hover:text-white",
+    "border-border/60 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground",
   emerald:
-    "border-emerald-500/35 bg-emerald-500/12 text-emerald-600 hover:bg-emerald-600 hover:text-white dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-300 dark:hover:bg-emerald-500 dark:hover:text-white",
+    "border-border/60 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground",
   violet:
-    "border-violet-500/35 bg-violet-500/12 text-violet-600 hover:bg-violet-600 hover:text-white dark:border-violet-400/40 dark:bg-violet-500/20 dark:text-violet-300 dark:hover:bg-violet-500 dark:hover:text-white",
-  sky: "border-sky-500/35 bg-sky-500/12 text-sky-600 hover:bg-sky-600 hover:text-white dark:border-sky-400/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500 dark:hover:text-white",
+    "border-border/60 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground",
+  sky: "border-border/60 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground",
   amber:
-    "border-amber-500/35 bg-amber-500/12 text-amber-600 hover:bg-amber-600 hover:text-white dark:border-amber-400/40 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500 dark:hover:text-white",
-  teal: "border-teal-500/35 bg-teal-500/12 text-teal-600 hover:bg-teal-600 hover:text-white dark:border-teal-400/40 dark:bg-teal-500/20 dark:text-teal-300 dark:hover:bg-teal-500 dark:hover:text-white",
-  rose: "border-rose-500/35 bg-rose-500/12 text-rose-600 hover:bg-rose-600 hover:text-white dark:border-rose-400/40 dark:bg-rose-500/20 dark:text-rose-300 dark:hover:bg-rose-500 dark:hover:text-white",
+    "border-border/60 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground",
+  teal: "border-border/60 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground",
+  rose: "border-border/60 bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground",
 };
 
-export interface LeadFieldGuideProps {
+interface LeadFieldGuideProps {
   field: LeadFieldGuideKey;
   customEntry?: Partial<LeadFieldGuideEntry>;
   align?: "start" | "end";
@@ -825,7 +807,7 @@ export interface LeadFieldGuideProps {
 }
 
 /**
- * Interactive `!` badge that displays a rich glassmorphic field guide card on
+ * Interactive `!` badge that displays a rich field guide card on
  * hover or focus, detailing the field's purpose, DTO contract key, validation
  * rules, and example value without polluting static DOM queries when closed.
  */
@@ -838,7 +820,7 @@ export function LeadFieldGuide({
   const { lang } = useI18n();
   const [open, setOpen] = useState(false);
 
-  const dictionary = lang === "ar" ? GUIDE_AR : GUIDE_EN;
+  const dictionary = { ar: GUIDE_AR, en: GUIDE_EN }[lang];
   const base = dictionary[field];
   const entry: LeadFieldGuideEntry = {
     ...base,
@@ -859,7 +841,7 @@ export function LeadFieldGuide({
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         className={cn(
-          "inline-flex size-4 cursor-help select-none items-center justify-center rounded-full border text-[10px] font-extrabold leading-none shadow-2xs transition-all duration-150",
+          "inline-flex size-4 cursor-help select-none items-center justify-center rounded-full border text-xs font-semibold leading-none shadow-2xs transition-all duration-150",
           TONE_BADGE_STYLES[tone],
         )}
       >
@@ -870,29 +852,29 @@ export function LeadFieldGuide({
         <div
           role="tooltip"
           className={cn(
-            "pointer-events-none absolute bottom-[calc(100%+8px)] z-50 w-72 rounded-xl border border-slate-700/90 bg-slate-900/95 p-3 text-start text-xs text-slate-100 shadow-2xl backdrop-blur-md",
+            "pointer-events-none absolute bottom-[calc(100%+8px)] z-(--z-dropdown) w-72 rounded-lg border border-border bg-popover p-3 text-start text-xs text-popover-foreground shadow-lg",
             align === "end" ? "end-0" : "start-0",
           )}
         >
           <div className="mb-1.5 flex items-start justify-between gap-2">
-            <span className="font-bold text-white">{entry.title}</span>
+            <span className="font-semibold text-popover-foreground">{entry.title}</span>
             <span
               dir="ltr"
-              className="shrink-0 rounded border border-indigo-400/30 bg-indigo-500/20 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-indigo-200"
+              className="shrink-0 rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground"
             >
               {entry.dtoKey}
             </span>
           </div>
-          <p className="leading-relaxed text-slate-300">{entry.description}</p>
+          <p className="leading-relaxed text-muted-foreground">{entry.description}</p>
           {entry.rule && (
-            <div className="mt-2 border-t border-slate-700/80 pt-1.5 text-[11px] font-medium text-emerald-300">
+            <div className="mt-2 border-t border-border/60 pt-1.5 text-xs font-medium text-success-subtle-foreground">
               {entry.rule}
             </div>
           )}
           {entry.example && (
-            <div className="mt-1 text-[11px] text-sky-300">
-              <span className="font-semibold text-slate-400">
-                {lang === "ar" ? "مثال: " : "Example: "}
+            <div className="mt-1 text-xs text-foreground">
+              <span className="font-semibold text-muted-foreground">
+                {{ ar: "مثال: ", en: "Example: " }[lang]}
               </span>
               <span dir="auto">{entry.example}</span>
             </div>

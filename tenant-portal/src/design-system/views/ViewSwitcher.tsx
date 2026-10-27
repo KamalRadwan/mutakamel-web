@@ -26,10 +26,9 @@ export interface ViewSwitcherProps<V extends WorkspaceView> {
 }
 
 // A segmented radiogroup, not three independent buttons — Radix RadioGroup
-// gives roving tabindex and arrow-key navigation for free, and the active
-// option is bg-secondary, never a colored fill (that was the hue-coded
-// switcher this replaces — three hues for one control; see D10 in
-// docs/build/DEFECTS.md).
+// gives roving tabindex and arrow-key navigation for free, and every view
+// shares one active treatment (bg-gradient-primary) rather than per-view
+// rainbow hues (see D10 in docs/build/DEFECTS.md and specs/crm-leads-v3.md §3B).
 export function ViewSwitcher<V extends WorkspaceView>({ value, onChange, available, labels }: ViewSwitcherProps<V>) {
   return (
     <RadioGroupPrimitive.Root
@@ -40,10 +39,11 @@ export function ViewSwitcher<V extends WorkspaceView>({ value, onChange, availab
         const view = available.find((candidate) => candidate === next);
         if (view) onChange(view);
       }}
-      className="inline-flex items-center gap-0.5 rounded-sm border border-border bg-card p-0.5"
+      className="inline-flex h-(--size-toolbar-control) items-center gap-0.5 rounded-lg border border-line-control bg-surface-subtle p-0.5"
     >
       {available.map((view) => {
         const Icon: LucideIcon = VIEW_ICONS[view];
+        const isActive = view === value;
         return (
           <Tooltip key={view}>
             <TooltipTrigger asChild>
@@ -51,9 +51,10 @@ export function ViewSwitcher<V extends WorkspaceView>({ value, onChange, availab
                 value={view}
                 aria-label={labels[view]}
                 className={cn(
-                  "flex size-7 items-center justify-center rounded-xs text-muted-foreground",
-                  "data-[state=checked]:bg-secondary data-[state=checked]:text-secondary-foreground",
-                  "hover:text-foreground",
+                  "flex h-full w-7 cursor-pointer items-center justify-center rounded-md transition-colors",
+                  isActive
+                    ? "bg-gradient-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                   focusRing,
                 )}
               >

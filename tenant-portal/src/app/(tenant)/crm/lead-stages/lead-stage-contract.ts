@@ -1,5 +1,7 @@
 import { isUUIDv7 } from "@/lib/uuid";
 
+export const LEAD_STAGES_PATH = "/api/tenant/crm/v1/lead-stages";
+
 const LEAD_STAGE_FLAGS = [
   "NEW",
   "CONTACTED",
@@ -11,7 +13,7 @@ const LEAD_STAGE_FLAGS = [
   "ON_HOLD",
 ] as const;
 
-export const PROTECTED_LEAD_STAGE_FLAGS = [
+const PROTECTED_LEAD_STAGE_FLAGS = [
   "NEW",
   "DISQUALIFIED",
   "CONVERTED",
@@ -300,14 +302,6 @@ export function buildLeadStageReorderRequest(
     throw new Error("Invalid lead stage order.");
   }
   return { orderedIds: [...orderedIds] };
-}
-
-/** The stage the entry-stage rule pins to rank 1, when the catalogue has one. */
-export function entryLeadStageId(
-  stages: readonly LeadStageItem[],
-): string | null {
-  const entryStages = stages.filter(({ flag }) => flag === "NEW");
-  return entryStages.length === 1 ? entryStages[0]!.id : null;
 }
 
 /** IDs whose rank is fixed by the server-owned lifecycle order. */

@@ -19,7 +19,7 @@ export function ApplicationAccessDetail({ request }: { request: ApplicationAcces
     <div className="flex flex-col gap-4">
     <PermissionGate require={[]} denied={denied}>
       <div className="flex flex-col gap-4">
-        <PageHeader title={copy.title} description={copy.description}
+        <PageHeader className="sr-only" title={copy.title} description={copy.description}
           secondaryActions={<>
             {configurationHref && <Button size="sm" variant="outline" asChild><Link href={configurationHref}>{copy.configuration}</Link></Button>}
             <Button size="sm" variant="outline" onClick={reload} disabled={loading}>{t.coreBilling.reload}</Button>

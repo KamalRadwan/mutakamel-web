@@ -34,21 +34,17 @@ export function NotificationDropdown() {
           variant="ghost"
           size="sm"
           dir={view.dir}
-          className="relative size-7 p-0 text-slate-300 hover:bg-white/10 hover:text-white"
+          className="relative size-9 shrink-0 rounded-full border border-nav-chrome-line bg-white/5 p-0 text-nav-foreground hover:bg-white/10 hover:text-nav-foreground-strong"
           aria-label={view.unreadCount > 0
             ? `${view.copy.title}: ${new Intl.NumberFormat(view.locale).format(view.unreadCount)} ${view.copy.newNotifications}`
             : view.copy.title}
         >
-          <Bell className="size-3.5" aria-hidden="true" />
+          <Bell className="size-4 shrink-0" aria-hidden="true" />
           {view.unreadCount > 0 ? (
             <span
               aria-hidden="true"
-              className="absolute end-0 top-0 inline-flex min-h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground ring-2 ring-[#0f172a]"
-            >
-              {view.unreadCount > 99
-                ? `${new Intl.NumberFormat(view.locale).format(99)}+`
-                : new Intl.NumberFormat(view.locale).format(view.unreadCount)}
-            </span>
+              className="absolute end-1.5 top-1.5 size-2 rounded-full bg-activity-overdue ring-2 ring-navy-900"
+            />
           ) : null}
         </Button>
       </PopoverTrigger>

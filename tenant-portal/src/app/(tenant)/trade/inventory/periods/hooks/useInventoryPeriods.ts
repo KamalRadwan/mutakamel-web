@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isTradeReplay, tradeGet, tradeIfMatch, tradePost } from "../../../trade-api";
-import { parseTradeArray } from "../../../trade-advanced-validation";
+import { parseTradeOffsetPage } from "../../../trade-advanced-validation";
+import { useInventoryPagination } from "../../hooks/useInventoryPagination";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import {
   INVENTORY_GOVERNANCE_PERMISSION,
@@ -32,16 +33,11 @@ const PERIOD_RESPONSE_LIMIT_BYTES = 20_000;
 
 type PendingAction = { id: string; action: "close" | "reopen" } | null;
 
-/**
- * Periods are COMPANY-scoped and limit-only: the response is a bare array with
- * no `total`, so the screen shows what came back and says the list is capped
- * rather than rendering a pager it cannot honour.
- */
 export function useInventoryPeriods() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [items, setItems] = useState<InventoryPeriod[]>([]);
@@ -55,6 +51,9 @@ export function useInventoryPeriods() {
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [transition, setTransition] = useState<PendingAction>(null);
+  const { page, pagination, setPage, setTotal } = useInventoryPagination(
+    JSON.stringify([scope.headers, statusFilter, effectiveAtFilter]),
+  );
 
   const canRead = hasTradePermission(
     scope.permissions,
@@ -76,21 +75,24 @@ export function useInventoryPeriods() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const response = await tradeGet(periodsListPath(statusFilter, effectiveAtFilter), {
+        const response = await tradeGet(periodsListPath(statusFilter, effectiveAtFilter, page), {
           signal,
           headers: scope.headers,
           maxResponseBytes: PERIODS_RESPONSE_LIMIT_BYTES,
         });
-        setItems(parseTradeArray(response.data, parseInventoryPeriod, invalidResponse));
+        if (signal?.aborted) return;
+        const result = parseTradeOffsetPage(response.data, parseInventoryPeriod, invalidResponse);
+        setItems(result.items);
+        setTotal(result.total);
         setHasLoaded(true);
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [scope.isResolved, scope.headers, statusFilter, effectiveAtFilter],
+    [scope.isResolved, scope.headers, statusFilter, effectiveAtFilter, page, setTotal],
   );
 
   useEffect(() => {
@@ -174,6 +176,8 @@ export function useInventoryPeriods() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     statusFilter,
     effectiveAtFilter,
     isLoading: isLoading && !hasLoaded,

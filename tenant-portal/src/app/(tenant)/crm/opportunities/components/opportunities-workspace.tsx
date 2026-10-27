@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import {
+  ConfirmActionModal,
   DegradedBanner,
   EmptyState,
   ErrorState,
@@ -20,15 +21,18 @@ import {
   type SortState,
 } from "@/design-system";
 import { ActivitiesWorkspaceLink } from "@/components/activities/ActivitiesWorkspaceLink";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { useTenantAuth } from "@/context/AuthContext";
+import { canCreateActivities } from "@/components/activities/activity-presentation";
 import { ActivityModal } from "@/components/activities/ActivityModal";
 import type { ActivityTargetSelection } from "@/components/activities/activity-contract";
 import { TenantBranchSelect } from "@/components/tenant/TenantBranchSelect";
 import { useI18n } from "@/i18n/I18nContext";
-import { axiosClient } from "@/lib/api/axiosClient";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
-import { localizedName, localizedValue } from "@/lib/format/localized";
+import { localizedName } from "@/lib/format/localized";
 import { useCrmCreateCustomFields } from "../../shared/hooks/useCrmCreateCustomFields";
 import { useCrmFieldMessages } from "../../shared/hooks/useCrmFieldMessages";
+import { CrmScopeGate } from "../../shared/components/CrmScopeGate";
 import { CreateOpportunityModal } from "./CreateOpportunityModal";
 import {
   DeleteOpportunityDialog,
@@ -70,6 +74,9 @@ import {
 
 export function OpportunitiesWorkspace() {
   const { t, lang } = useI18n();
+  const { canMutate } = useAccessMode();
+  const { user } = useTenantAuth();
+  const canOpenActivities = canMutate && canCreateActivities(user);
   const [selectedForDelete, setSelectedForDelete] =
     useState<OpportunityDeleteItem | null>(null);
   const {
@@ -97,7 +104,12 @@ export function OpportunitiesWorkspace() {
   const {
     actorUserId,
     board,
+    funnelLanes,
     capabilities,
+    refreshCapabilities,
+    reopenMove,
+    confirmReopenMove,
+    cancelReopenMove,
     pipelines,
     branchIds,
     branchId,
@@ -117,19 +129,30 @@ export function OpportunitiesWorkspace() {
     canUpdateOpportunity,
     canDeleteOpportunity,
     moveCard,
+    requestListStageMove,
     terminalMove,
     confirmTerminalMove,
     cancelTerminalMove,
     updateCard,
     loadMoreStage,
-  } = usePipelineWorkspace(view === "board");
+    initialPartyId,
+  } = usePipelineWorkspace(view === "board", view !== "board");
 
   const list = useOpportunitiesList(
     view === "table" || view === "card" ? branchId : null,
     selectedPipelineId,
     null,
     actorUserId,
+    initialPartyId,
   );
+
+  const listErrorStatus = list.error?.status;
+  useEffect(() => {
+    if (listErrorStatus !== 403) return;
+    let active = true;
+    queueMicrotask(() => { if (active) void refreshCapabilities(); });
+    return () => { active = false; };
+  }, [listErrorStatus, refreshCapabilities]);
 
   const activeBasicSearch =
     list.search.mode === "basic"
@@ -166,6 +189,23 @@ export function OpportunitiesWorkspace() {
   ]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [stageMoveError, setStageMoveError] = useState<string | null>(null);
+  const [bulkTerminalMove, setBulkTerminalMove] = useState<{
+    ids: readonly string[];
+    stageId: string;
+    flag: "WON" | "LOST";
+  } | null>(null);
+  const [bulkReopenMove, setBulkReopenMove] = useState<{ ids: readonly string[]; stageId: string } | null>(null);
+  const [isBulkMoving, setIsBulkMoving] = useState(false);
+  const stageMoveInFlight = useRef(false);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<readonly string[] | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const bulkDeleteInFlight = useRef(false);
+  const [bulkDeleteSummary, setBulkDeleteSummary] = useState<{
+    deleted: number;
+    failed: number;
+    skipped: number;
+  } | null>(null);
   const [quickEditItem, setQuickEditItem] =
     useState<OpportunityQuickEditItem | null>(null);
 
@@ -196,6 +236,9 @@ export function OpportunitiesWorkspace() {
 
   function selectPipeline(nextPipelineId: string) {
     setSelectedPipelineId(nextPipelineId);
+    setBulkReopenMove(null);
+    setBulkTerminalMove(null);
+    cancelReopenMove();
     setSelectedIds(new Set());
     if (list.search.mode !== "basic") return;
     const validStageIds = new Set(
@@ -219,6 +262,8 @@ export function OpportunitiesWorkspace() {
 
   function selectBranch(nextBranchId: string) {
     selectPipelineBranch(nextBranchId);
+    setBulkReopenMove(null);
+    setBulkTerminalMove(null);
     setSelectedIds(new Set());
     if (list.search.mode !== "basic") return;
     const basic: OpportunityBasicSearch = {
@@ -258,7 +303,7 @@ export function OpportunitiesWorkspace() {
   const createMessages = useMemo(
     () => ({
       ...fieldMessages,
-      amountInvalid: t.crmOpportunityDetail.create.amountInvalid,
+      amountInvalid: t.crmShared.refusals.CRM_AMOUNT_SCALE_INVALID,
       outOfRange: t.crmOpportunityDetail.create.outOfRange,
       currencyLength: t.crmOpportunityDetail.create.currencyLength,
     }),
@@ -281,49 +326,59 @@ export function OpportunitiesWorkspace() {
 
   const canUpdateRow = useCallback(
     (item: { ownerUserId?: string | null }) =>
-      opportunityCapabilityAllowsOwner(
+      canMutate && opportunityCapabilityAllowsOwner(
         capabilities?.update ?? null,
         item.ownerUserId,
       ),
-    [capabilities?.update],
+    [canMutate, capabilities?.update],
   );
 
   const canDeleteRow = useCallback(
     (item: { ownerUserId?: string | null }) =>
-      opportunityCapabilityAllowsOwner(
+      canMutate && opportunityCapabilityAllowsOwner(
         capabilities?.delete ?? null,
         item.ownerUserId,
       ),
-    [capabilities?.delete],
+    [canMutate, capabilities?.delete],
   );
 
   async function handleDelete() {
-    if (!selectedForDelete) return;
+    if (!canMutate || !selectedForDelete) return;
+    const candidate = [...list.items, ...(board?.stages.flatMap(({ items }) => items) ?? [])].find(({ id }) => id === selectedForDelete.id);
+    if (!candidate || !canDeleteRow(candidate)) return;
     if (await deleteOpportunity(selectedForDelete.id)) {
       setSelectedForDelete(null);
       void list.reload();
       void fetchPipelines();
+    } else {
+      void refreshCapabilities();
     }
   }
 
   const handleStageMoveItem = useCallback(
     async (
-      item: { id: string; stageId: string; title: string },
+      item: {
+        id: string;
+        stageId: string;
+        title: string;
+        ownerUserId?: string | null;
+      },
       targetStageId: string,
     ) => {
-      if (item.stageId === targetStageId) return;
+      if (item.stageId === targetStageId || !canUpdateRow(item)) return;
+      setStageMoveError(null);
       const targetStage = selectedPipeline?.stages.find(
         (s) => s.id === targetStageId,
       );
       if (!targetStage) return;
 
-      // For board view or terminal moves, delegate to moveCard when item is on board
-      if (
-        view === "board" ||
-        targetStage.flag === "WON" ||
-        targetStage.flag === "LOST"
-      ) {
+      if (view === "board") {
         moveCard(item.id, item.stageId, targetStageId);
+        return;
+      }
+      const sourceStage = selectedPipeline?.stages.find(({ id }) => id === item.stageId);
+      if (targetStage.flag === "WON" || targetStage.flag === "LOST" || sourceStage?.flag === "WON" || sourceStage?.flag === "LOST") {
+        requestListStageMove(item, targetStageId, list.reload);
         return;
       }
 
@@ -341,12 +396,32 @@ export function OpportunitiesWorkspace() {
       ) {
         void list.reload();
         void fetchPipelines();
+      } else {
+        if (outcome.error.status === 403) void refreshCapabilities();
+        setStageMoveError(
+          outcome.kind === "ambiguous"
+            ? t.crmOpportunities.stageMoveUncertain
+            : t.crmOpportunities.moveFailed,
+        );
+        if (outcome.kind === "ambiguous") void list.reload();
       }
     },
-    [fetchPipelines, list, moveCard, selectedPipeline?.stages, view],
+    [
+      fetchPipelines,
+      refreshCapabilities,
+      canUpdateRow,
+      list,
+      moveCard,
+      requestListStageMove,
+      selectedPipeline?.stages,
+      view,
+      t.crmOpportunities.moveFailed,
+      t.crmOpportunities.stageMoveUncertain,
+    ],
   );
 
   async function handleBulkMoveStage(targetStageId: string) {
+    if (stageMoveInFlight.current || bulkTerminalMove || bulkReopenMove) return;
     const targetStage = selectedPipeline?.stages.find(
       (s) => s.id === targetStageId,
     );
@@ -354,19 +429,72 @@ export function OpportunitiesWorkspace() {
     const rows = list.items.filter(
       (i) => selectedIds.has(i.id) && canUpdateRow(i) && i.stageId !== targetStageId,
     );
-    for (const row of rows) {
-      const attempt = createWriteAttempt();
-      await runIdempotentWrite({
-        attempt,
-        method: "post",
-        path: `${opportunityPath(row.id)}/stage`,
-        body: buildStageMoveRequest(targetStageId, targetStage.flag),
-        parse: (payload) => payload,
-      }).catch(() => undefined);
+    if (rows.length === 0) return;
+    setStageMoveError(null);
+    if (targetStage.flag === "WON" || targetStage.flag === "LOST") {
+      setBulkTerminalMove({
+        ids: rows.map(({ id }) => id),
+        stageId: targetStageId,
+        flag: targetStage.flag,
+      });
+      return;
     }
-    setSelectedIds(new Set());
-    await list.reload();
-    void fetchPipelines();
+    if (rows.some((row) => selectedPipeline?.stages.some((stage) => stage.id === row.stageId && (stage.flag === "WON" || stage.flag === "LOST")))) {
+      setBulkReopenMove({ ids: rows.map(({ id }) => id), stageId: targetStageId });
+      return;
+    }
+    await performBulkMove(rows.map(({ id }) => id), targetStageId);
+  }
+
+  async function performBulkMove(
+    ids: readonly string[],
+    targetStageId: string,
+    reason?: string,
+  ): Promise<boolean> {
+    if (stageMoveInFlight.current) return false;
+    const targetStage = selectedPipeline?.stages.find(({ id }) => id === targetStageId);
+    if (!targetStage) return false;
+    stageMoveInFlight.current = true;
+    setIsBulkMoving(true);
+    const movedIds = new Set<string>();
+    let failed = 0;
+    let uncertain = false;
+    try {
+      for (const id of ids) {
+        const row = list.items.find((item) => item.id === id);
+        if (!row || !canUpdateRow(row)) continue;
+        const outcome = await runIdempotentWrite({
+          attempt: createWriteAttempt(),
+          method: "post",
+          path: `${opportunityPath(id)}/stage`,
+          body: buildStageMoveRequest(targetStageId, targetStage.flag, reason),
+          parse: (payload) => payload,
+        });
+        if (outcome.kind === "success" || outcome.kind === "applied_unreadable") {
+          movedIds.add(id);
+        } else {
+          if (outcome.error.status === 403) void refreshCapabilities();
+          failed += 1;
+          uncertain ||= outcome.kind === "ambiguous";
+        }
+      }
+      setSelectedIds((current) => new Set([...current].filter((id) => !movedIds.has(id))));
+      setStageMoveError(
+        failed > 0
+          ? uncertain
+            ? t.crmOpportunities.stageMoveUncertain
+            : t.crmOpportunities.moveFailed
+          : null,
+      );
+      setBulkTerminalMove(null);
+      setBulkReopenMove(null);
+      await list.reload();
+      void fetchPipelines();
+      return failed === 0;
+    } finally {
+      stageMoveInFlight.current = false;
+      setIsBulkMoving(false);
+    }
   }
 
   async function handleBulkSetImportance(importance: number) {
@@ -381,17 +509,52 @@ export function OpportunitiesWorkspace() {
     void fetchPipelines();
   }
 
-  async function handleBulkDelete() {
-    const rows = list.items.filter(
-      (i) => selectedIds.has(i.id) && canDeleteRow(i),
-    );
-    for (const row of rows) {
-      await deleteOpportunity(row.id);
-    }
-    setSelectedIds(new Set());
-    await list.reload();
-    void fetchPipelines();
+  const deletableRows = list.items.filter(
+    (item) => selectedIds.has(item.id) && canDeleteRow(item),
+  );
+
+  function requestBulkDelete() {
+    if (bulkDeleteInFlight.current || deletableRows.length === 0) return;
+    clearError();
+    setBulkDeleteSummary(null);
+    setBulkDeleteIds(deletableRows.map(({ id }) => id));
   }
+
+  async function handleBulkDelete() {
+    if (!bulkDeleteIds || bulkDeleteInFlight.current) return;
+    bulkDeleteInFlight.current = true;
+    setIsBulkDeleting(true);
+    const deletedIds = new Set<string>();
+    let failed = 0;
+    // Recheck scope at confirmation; never expand the confirmed selection.
+    const rows = list.items.filter(
+      (item) => bulkDeleteIds.includes(item.id) && canDeleteRow(item),
+    );
+    const skipped = selectedIds.size - rows.length;
+    try {
+      for (const row of rows) {
+        if (await deleteOpportunity(row.id)) deletedIds.add(row.id);
+        else {
+          failed += 1;
+          void refreshCapabilities();
+        }
+      }
+      setSelectedIds((current) => new Set(
+        [...current].filter((id) => !deletedIds.has(id)),
+      ));
+      setBulkDeleteSummary({ deleted: deletedIds.size, failed, skipped });
+      setBulkDeleteIds(null);
+      clearError();
+      await list.reload();
+      void fetchPipelines();
+    } finally {
+      bulkDeleteInFlight.current = false;
+      setIsBulkDeleting(false);
+    }
+  }
+
+  const scopeDenied = loadError?.status === 403 ||
+    (view !== "board" && list.error?.status === 403);
 
   function resolvePipelineEmptyState() {
     if (needsBranchSelection) {
@@ -399,6 +562,18 @@ export function OpportunitiesWorkspace() {
         <EmptyState
           className="h-full"
           title={t.crmOpportunities.selectBranchFirst}
+        />
+      );
+    }
+    if (scopeDenied) {
+      return <CrmScopeGate className="h-full" />;
+    }
+    if (loadError) {
+      return (
+        <ErrorState
+          title={t.crmOpportunities.loadFailed}
+          onRetry={() => void fetchPipelines()}
+          retryLabel={t.common.retry}
         />
       );
     }
@@ -419,6 +594,7 @@ export function OpportunitiesWorkspace() {
   const [activityOpportunity, setActivityOpportunity] =
     useState<ActivityTargetSelection | null>(null);
   function openActivities(item: { id: string; title: string }) {
+    if (!canOpenActivities) return;
     setActivityOpportunity({
       app: "CRM",
       type: "OPPORTUNITY",
@@ -446,7 +622,7 @@ export function OpportunitiesWorkspace() {
         className="sr-only"
         title={t.crmOpportunities.heading}
         primaryAction={
-          capabilities?.create
+          canMutate && capabilities?.create
             ? {
                 label: t.crmOpportunityDetail.createAction,
                 icon: <Plus className="size-4" aria-hidden="true" />,
@@ -494,7 +670,7 @@ export function OpportunitiesWorkspace() {
         onChange={list.changeSearch}
         onSubmit={list.submitSearch}
         pipelines={pipelines}
-        resetKey={`${branchId ?? "no-branch"}:${selectedPipelineId ?? "no-pipeline"}`}
+        resetKey={`${branchId ?? "no-branch"}:${selectedPipelineId ?? "no-pipeline"}:${initialPartyId || "no-party"}`}
         advancedEnabled={view === "table"}
         disabled={!branchId}
       />
@@ -513,28 +689,38 @@ export function OpportunitiesWorkspace() {
         <ActivitiesWorkspaceLink type="OPPORTUNITY" />
       </PageActions>
 
-      {capabilitiesUnavailable && (
+      {capabilitiesUnavailable && !scopeDenied && (
         <DegradedBanner message={t.crmOpportunities.capabilitiesUnavailable} />
+      )}
+
+      {bulkDeleteSummary && (
+        <div role={bulkDeleteSummary.failed > 0 ? "alert" : "status"}>
+          {t.crmOpportunities.bulkDeleteSummary(
+            bulkDeleteSummary.deleted,
+            bulkDeleteSummary.failed,
+            bulkDeleteSummary.skipped,
+          )}
+        </div>
       )}
 
       {error && (
         <div
           role="alert"
-          className="rounded-sm border border-negative-200 bg-negative-100 p-2.5 text-xs text-negative-800 dark:border-negative-800 dark:bg-negative-950 dark:text-negative-300"
+          className="rounded-sm border border-destructive bg-destructive-subtle p-2.5 text-xs text-destructive-subtle-foreground"
         >
           {error}
         </div>
       )}
 
+      {stageMoveError && <div role="alert">{stageMoveError}</div>}
+
       {/* Full-Width Executive Stage Funnel Bar for Card & Table Views */}
-      {view !== "board" &&
+      {view !== "board" && !scopeDenied &&
         !(view === "table" && list.search.mode === "advanced") &&
         (selectedPipeline?.stages.length ?? 0) > 0 && (
           <OpportunityStageFunnelBar
             stages={selectedPipeline?.stages ?? []}
-            items={list.items}
-            boardLanes={board?.stages}
-            totalCount={list.pageInfo.total}
+            boardLanes={funnelLanes}
             selectedStageId={stageId ?? undefined}
             onSelectStage={selectStage}
             disabled={!branchId}
@@ -551,16 +737,10 @@ export function OpportunitiesWorkspace() {
                 {Array.from({ length: 4 }).map((_, idx) => (
                   <Skeleton
                     key={`board-col-skel-${idx}`}
-                    className="h-full w-80 shrink-0 rounded-xl"
+                    className="h-full w-80 shrink-0 rounded-lg"
                   />
                 ))}
               </div>
-            ) : loadError ? (
-              <ErrorState
-                title={t.crmOpportunities.loadFailed}
-                onRetry={() => void fetchPipelines()}
-                retryLabel={t.common.retry}
-              />
             ) : (
               <OpportunityExecutiveBoardView
                 pipeline={selectedPipeline}
@@ -569,7 +749,8 @@ export function OpportunitiesWorkspace() {
                 isLoading={isLoading}
                 isMutating={isMutating}
                 loadingStageId={loadingStageId}
-                canCreate={Boolean(capabilities?.create)}
+                canCreate={canMutate && Boolean(capabilities?.create)}
+                createCapability={capabilities?.create ?? null}
                 canUpdate={canUpdateOpportunity}
                 canDelete={canDeleteOpportunity}
                 onOpen={(item) => openOpportunity(item.id)}
@@ -597,6 +778,7 @@ export function OpportunitiesWorkspace() {
                 }}
                 onLoadMoreStage={(colId) => void loadMoreStage(colId)}
                 onRefreshBoard={() => void fetchPipelines()}
+                onForbidden={refreshCapabilities}
               />
             )}
           </>
@@ -625,8 +807,6 @@ export function OpportunitiesWorkspace() {
                 documentCountsByParty={documentCounts.countsByParty}
                 documentCountVisibility={documentCounts.visible}
                 onOpenOpportunity={(item) => openOpportunity(item.id)}
-                onOpenQuickModal={(item) => setQuickEditItem(item)}
-                onOpenActivities={(item) => openActivities(item)}
                 onDeleteOpportunity={(item) => {
                   clearError();
                   setSelectedForDelete({ id: item.id, title: item.title });
@@ -686,28 +866,19 @@ export function OpportunitiesWorkspace() {
       </div>
 
       {/* Floating Dark Bulk Actions Command Bar */}
-      {view !== "board" && (
+      {canMutate && view !== "board" && (
         <OpportunityBulkActionsBar
           selectedIds={selectedIds}
           stages={selectedPipeline?.stages ?? []}
           canUpdateAny={list.items.some(
             (i) => selectedIds.has(i.id) && canUpdateRow(i),
           )}
-          canDeleteAny={list.items.some(
-            (i) => selectedIds.has(i.id) && canDeleteRow(i),
-          )}
+          deletableCount={deletableRows.length}
+          isBulkDeleting={isBulkDeleting || isBulkMoving}
           onBulkMoveStage={handleBulkMoveStage}
           onBulkSetImportance={handleBulkSetImportance}
-          onBulkDelete={handleBulkDelete}
+          onBulkDelete={requestBulkDelete}
           onClearSelection={() => setSelectedIds(new Set())}
-          onOpenFirstSelectedModal={() => {
-            const first = list.items.find((i) => selectedIds.has(i.id));
-            if (first) setQuickEditItem(first);
-          }}
-          onOpenFirstSelectedActivities={() => {
-            const first = list.items.find((i) => selectedIds.has(i.id));
-            if (first) openActivities(first);
-          }}
         />
       )}
 
@@ -724,11 +895,12 @@ export function OpportunitiesWorkspace() {
         onSelectOpportunity={(next) => setQuickEditItem(next)}
         onOpenActivities={(item) => openActivities(item)}
         onCardChange={(opportunityId, patch, item) => {
-          void updateCard(opportunityId, patch, item).then((updated) => {
+          return updateCard(opportunityId, patch, item).then((updated) => {
             if (updated) {
               void list.reload();
               void fetchPipelines();
             }
+            return updated;
           });
         }}
         onMoveStage={(item, targetStageId) =>
@@ -738,10 +910,47 @@ export function OpportunitiesWorkspace() {
           clearError();
           setSelectedForDelete({ id: item.id, title: item.title });
         }}
+        onForbidden={refreshCapabilities}
         onSaved={() => {
           void list.reload();
           void fetchPipelines();
         }}
+      />
+
+      <ConfirmActionModal
+        open={canMutate && (reopenMove !== null || bulkReopenMove !== null)}
+        onOpenChange={(open) => {
+          if (!open && !isMutating && !stageMoveInFlight.current) {
+            cancelReopenMove();
+            setBulkReopenMove(null);
+          }
+        }}
+        title={t.crmOpportunities.reopenTitle}
+        description={t.crmOpportunities.reopenMessage}
+        confirmLabel={t.crmOpportunities.reopenConfirm}
+        cancelLabel={t.common.cancel}
+        loading={isMutating || isBulkMoving}
+        onConfirm={() => {
+          if (bulkReopenMove) void performBulkMove(bulkReopenMove.ids, bulkReopenMove.stageId);
+          else void confirmReopenMove();
+        }}
+      />
+
+      <TerminalMoveDialog
+        key={bulkTerminalMove ? `bulk:${bulkTerminalMove.stageId}` : "bulk-closed"}
+        isOpen={canMutate && bulkTerminalMove !== null}
+        onClose={() => {
+          if (!stageMoveInFlight.current) setBulkTerminalMove(null);
+        }}
+        opportunity={bulkTerminalMove ? {
+          title: t.crmOpportunities.bulkMoveSelection(bulkTerminalMove.ids.length),
+        } : null}
+        targetFlag={bulkTerminalMove?.flag ?? "WON"}
+        onConfirm={(reason) => bulkTerminalMove
+          ? performBulkMove(bulkTerminalMove.ids, bulkTerminalMove.stageId, reason)
+          : Promise.resolve(false)}
+        isSubmitting={isBulkMoving}
+        error={null}
       />
 
       <TerminalMoveDialog
@@ -750,7 +959,7 @@ export function OpportunitiesWorkspace() {
             ? `${terminalMove.cardId}:${terminalMove.destStageId}`
             : "closed"
         }
-        isOpen={terminalMove !== null}
+        isOpen={canMutate && terminalMove !== null}
         onClose={cancelTerminalMove}
         opportunity={terminalMove?.opportunity ?? null}
         targetFlag={terminalMove?.targetFlag ?? "WON"}
@@ -759,15 +968,30 @@ export function OpportunitiesWorkspace() {
         error={terminalMove ? error : null}
       />
 
-      <CreateOpportunityModal
+      {canMutate && capabilities?.create && <CreateOpportunityModal
         create={create}
+        createCapability={capabilities?.create ?? null}
+        updateCapability={capabilities?.update ?? null}
         pipelines={pipelines}
         branchId={branchId}
         customFields={customFields}
+      />}
+
+      <ConfirmActionModal
+        open={canMutate && bulkDeleteIds !== null}
+        onOpenChange={(open) => {
+          if (!open && !bulkDeleteInFlight.current) setBulkDeleteIds(null);
+        }}
+        title={t.crmOpportunities.bulkDeleteTitle}
+        description={t.crmOpportunities.bulkDeleteMessage(bulkDeleteIds?.length ?? 0)}
+        confirmLabel={isBulkDeleting ? t.crmOpportunities.deleting : t.common.delete}
+        cancelLabel={t.common.cancel}
+        onConfirm={() => void handleBulkDelete()}
+        loading={isBulkDeleting}
       />
 
       <DeleteOpportunityDialog
-        item={selectedForDelete}
+        item={canMutate ? selectedForDelete : null}
         onClose={() => setSelectedForDelete(null)}
         onConfirm={() => void handleDelete()}
         isDeleting={isDeleting}
@@ -779,7 +1003,7 @@ export function OpportunitiesWorkspace() {
         branchId={branchId}
         request={
           activityOpportunity
-            ? { kind: "create", target: activityOpportunity, agenda: true }
+            && canOpenActivities ? { kind: "create", target: activityOpportunity, agenda: true }
             : null
         }
         onClose={() => setActivityOpportunity(null)}

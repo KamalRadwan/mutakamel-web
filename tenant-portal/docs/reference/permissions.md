@@ -5,6 +5,11 @@ Status: **verified**
 Last source verification: **2026-08-31** (Trade section; CRM 2026-08-27, Core
 2026-08-28, Core activities 2026-09-24)
 
+Trade unused-key disposition and Control Tower field permission re-verified:
+**2026-10-17** (CLXAPP-134).
+
+CRM settings permission alias re-verified: **2026-10-18** (DOCS-FE-002).
+
 Source: `../backend/mutakamel-apps/crm-app/node_modules/@mutakamel/crm-app-common/dist/constants/permissions.d.ts`
 (package `0.0.1`), plus `@RequirePermissions` decorators on the owning
 controllers. Trade comes from
@@ -30,12 +35,17 @@ crm.widgets.read               crm.widgets.create             crm.widgets.update
 crm.widgets.delete             crm.widgets.share
 ```
 
-**Existing in the catalogue is not the same as guarding a route.**
-`crm.settings.update` is declared here but does **not** guard
-`PUT /api/tenant/crm/v1/settings` — that route requires `crm.settings.manage`.
-A user holding only `crm.settings.update` cannot save settings. Always read the
-controller's `@RequirePermissions` rather than assuming the `.update` variant
-guards the write; `pnpm docs:audit-api` checks this mechanically.
+**CRM settings has an explicit alias exception to exact matching.**
+`PUT /api/tenant/crm/v1/settings` declares `crm.settings.manage`, but
+`scopedPermissionVariants` in CRM's `crm-scoped-permissions.ts` treats
+`crm.settings.manage` and `crm.settings.update` as mutual aliases.
+`PermissionsGuard` uses `hasPermissionVariant`, so either key satisfies that
+permission requirement; a user holding only `crm.settings.update` can save
+settings, subject to the route's other authorization checks. The portal's
+`useCrmSettings` likewise accepts either key. Read both the controller's
+`@RequirePermissions` and the guard's matching rules when checking access;
+the declared key alone does not describe alias matching. Update this paragraph
+when CRM-PERM-002 removes the alias.
 
 ### Scoped permissions — base plus scope
 
@@ -277,12 +287,21 @@ trade.automation.manage          trade.sales_orders.amend
 trade.purchasing.override
 ```
 
-Four of the nine are not entirely inert: `pricing.view_cost`,
-`inventory.view_cost`, `policy.view_sensitive_facts` and
-`control_tower.view_sensitive` appear as **`fieldPermissions`** on dashboard
-metrics in `trade-app/src/modules/dashboards/dashboard-catalog.ts`, so they
-redact fields rather than admit routes. The other five guard nothing anywhere.
-MASTER-PLAN 10.2 says "eight"; the route-decorator count is nine.
+Route-decorator counts do not describe field authorization.
+`trade.pricing.view_cost` protects implemented pricing cost/margin data.
+`trade.control_tower.view_sensitive` protects resolved exception
+`resolutionEvidence` on Control Tower list/detail in the current exact
+scope; resolve acknowledgements omit evidence, including replays.
+
+The following six keys have no current operation and are scheduled for
+catalogue/seed removal in **PLATFORM-SCHEMA-002**: `trade.credit.override`,
+`trade.pricing.override`, `trade.purchasing.override`,
+`trade.sales_orders.amend`, `trade.inventory.view_cost`, and
+`trade.policy.view_sensitive_facts`. Do not build gates from them. Existing
+credit evaluation uses `trade.credit.view`; document edits use the owning
+document create/update permission; decision reads use `trade.policy.read`.
+`trade.automation.manage` remains a reserved Future designer key with no
+current generic automation action; its catalogue is unchanged in this run.
 
 ## The Trade authorization model
 

@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight, CheckSquare, Eye, Square } from "lucide-react";
 import { Button, IdentifierText, Money } from "@/design-system";

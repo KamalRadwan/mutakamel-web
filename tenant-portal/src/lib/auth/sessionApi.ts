@@ -27,9 +27,18 @@ export interface TenantAuthSessionSummary {
   current: boolean;
 }
 
+export interface TenantAuthSessionPage {
+  items: TenantAuthSessionSummary[];
+  endedHistory: { page: number; pageSize: number; hasMore: boolean };
+}
+
 export async function listTenantAuthSessions(): Promise<TenantAuthSessionSummary[]> {
+  return (await listTenantAuthSessionPage()).items;
+}
+
+export async function listTenantAuthSessionPage(historyPage = 1): Promise<TenantAuthSessionPage> {
   const response = await axiosClient.get(
-    "/api/tenant/core/v1/auth/sessions",
+    `/api/tenant/core/v1/auth/sessions?historyPage=${encodeURIComponent(historyPage)}`,
     { cache: "no-store" },
   );
   const payload = unwrapCoreData<unknown>(response.data);
@@ -38,7 +47,19 @@ export async function listTenantAuthSessions(): Promise<TenantAuthSessionSummary
   }
   const items = (payload as { items?: unknown }).items;
   if (!Array.isArray(items)) throw new Error("INVALID_AUTH_SESSION_LIST");
-  return items.map(readSession);
+  const history = (payload as { endedHistory?: unknown }).endedHistory;
+  if (!history || typeof history !== "object" || Array.isArray(history)) {
+    throw new Error("INVALID_AUTH_SESSION_LIST");
+  }
+  const pagination = history as Record<string, unknown>;
+  if (!positiveInteger(pagination.page) || pagination.pageSize !== 50 ||
+      typeof pagination.hasMore !== "boolean") {
+    throw new Error("INVALID_AUTH_SESSION_LIST");
+  }
+  return {
+    items: items.map(readSession),
+    endedHistory: { page: pagination.page, pageSize: 50, hasMore: pagination.hasMore },
+  };
 }
 
 export async function revokeTenantAuthSession(

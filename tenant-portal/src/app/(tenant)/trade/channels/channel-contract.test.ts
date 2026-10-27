@@ -62,15 +62,23 @@ describe("buildUpdateChannelRequest", () => {
 });
 
 describe("parseChannelListResponse", () => {
-  it("reads a bare array — this route is not paginated at all", () => {
-    expect(parseChannelListResponse([row])).toHaveLength(1);
+  it("reads a paginated envelope and preserves the server total", () => {
+    expect(parseChannelListResponse({ items: [row], total: 201, page: 2, limit: 100 }))
+      .toMatchObject({ items: [row], total: 201, page: 2, limit: 100 });
   });
 
-  it("refuses the paged shape, which this route never sends", () => {
-    expect(() => parseChannelListResponse({ items: [row], total: 1, page: 1, limit: 25 })).toThrow(
+  it("refuses the retired bare array shape", () => {
+    expect(() => parseChannelListResponse([row])).toThrow(
       /Invalid Trade channels/u,
     );
   });
+
+  it.each([{ total: -1 }, { page: 0 }, { limit: 101 }, { total: "1" }])(
+    "rejects malformed pagination %j", (fields) => {
+      expect(() => parseChannelListResponse({ items: [row], total: 1, page: 1, limit: 25, ...fields }))
+        .toThrow(/Invalid Trade channels/u);
+    },
+  );
 });
 
 describe("parseChannelDetailResponse", () => {

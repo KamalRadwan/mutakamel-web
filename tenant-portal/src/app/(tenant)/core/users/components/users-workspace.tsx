@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
+import { useTenantAuth } from "@/context/AuthContext";
 import {
   Button,
   Card,
@@ -50,6 +51,9 @@ export function UsersWorkspace() {
   const screen = useTenantUsers();
   const { t } = screen;
   const copy = t.coreIdentity;
+  const { user: actor } = useTenantAuth();
+  const canReadPlacement = ["org.company.read", "org.branch.read", "org.department.read"]
+    .every((permission) => actor?.permissions.includes(permission));
   const describeError = useCoreErrorText();
   const mutationText = describeError(screen.mutationError);
 
@@ -67,12 +71,12 @@ export function UsersWorkspace() {
   return (
     <PermissionGate require="users.user.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={copy.users.title}
           description={copy.users.subtitle}
           primaryAction={
             screen.canInvite
-              ? { label: copy.users.invite, onClick: screen.openInvite }
+              ? { label: copy.users.invite, onClick: screen.openInvite, disabled: !canReadPlacement }
               : undefined
           }
           secondaryActions={
@@ -87,6 +91,12 @@ export function UsersWorkspace() {
         />
 
         <SubNav items={CORE_IDENTITY_NAV_ITEMS} />
+
+        {screen.canInvite && !canReadPlacement ? (
+          <p role="status" className="text-xs text-muted-foreground">
+            {copy.users.invitePlacementReadRequired}
+          </p>
+        ) : null}
 
         {screen.isSeatLimitReached ? (
           // 403 USER_LIMIT_REACHED is an outcome with a next step, not a
@@ -179,15 +189,14 @@ export function UsersWorkspace() {
           }}
         />
 
-        <UserFormDrawer
-          key={screen.isInviteOpen ? "invite-open" : "invite-closed"}
+        {screen.isInviteOpen && canReadPlacement ? <UserFormDrawer
           mode="invite"
           isOpen={screen.isInviteOpen}
           onClose={screen.closeInvite}
           onSubmit={(values) => screen.handleInvite(toInviteInput(values))}
           isSubmitting={screen.isSubmitting}
           error={screen.isInviteOpen ? mutationText : undefined}
-        />
+        /> : null}
 
         <ConfirmActionModal
           open={screen.pendingAction !== null}

@@ -6,7 +6,7 @@ import {
   type CrmCardMenuLabels,
 } from "../../../shared/components/CrmCardMenu";
 
-export type CustomerProfileCardMenuLabels = CrmCardMenuLabels;
+type CustomerProfileCardMenuLabels = CrmCardMenuLabels;
 
 export interface CustomerProfileCardMenuProps {
   cardColor: CardColor | null;

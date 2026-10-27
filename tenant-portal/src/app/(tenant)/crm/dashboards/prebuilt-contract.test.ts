@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   PREBUILT_REPORTS,
-  isPrebuiltReportKey,
   parsePrebuiltReport,
   prebuiltReportQuery,
 } from "./prebuilt-contract";
@@ -36,7 +35,7 @@ const envelope = {
     },
     activeDeals: 12,
     newLeads: 30,
-    overdueWork: 4,
+    overdueWork: { state: "RETIRED" },
     winLossSummary: [{ status: "WON", currencyCode: "EGP", count: 3, value: 5000 }],
     topReps: [],
     staleDeals: [
@@ -64,8 +63,6 @@ describe("Prebuilt CRM reports", () => {
       "/api/tenant/crm/v1/dashboards/data-quality",
       "/api/tenant/crm/v1/dashboards/action-center",
     ]);
-    expect(isPrebuiltReportKey("overview")).toBe(true);
-    expect(isPrebuiltReportKey("kpis")).toBe(false);
   });
 
   it("sends only branchId — DashboardQueryDto has no datePreset and no compare", () => {
@@ -103,15 +100,35 @@ describe("Prebuilt CRM reports", () => {
     expect(parsed.widgets.staleDeals).toEqual({ kind: "UNAVAILABLE" });
   });
 
-  it("names repWorkload's count `opentasks` — PostgreSQL folds the unquoted alias", () => {
-    const activities = PREBUILT_REPORTS.find(
-      (report) => report.key === "activities-productivity",
-    );
-    const workload = activities?.widgets.find((widget) => widget.key === "repWorkload");
-    expect(workload?.columns).toEqual(["ownerUserId", "opentasks"]);
+  it("preserves retired sections and rejects old data as unavailable", () => {
+    for (const report of PREBUILT_REPORTS) {
+      for (const spec of report.widgets.filter((widget) => widget.kind === "RETIRED")) {
+        const retired = parsePrebuiltReport({ ...envelope, widgets: { [spec.key]: { state: "RETIRED" } } }, [spec]);
+        expect(retired.widgets[spec.key]).toEqual({ kind: "RETIRED" });
+        const old = parsePrebuiltReport({ ...envelope, widgets: { [spec.key]: [] } }, [spec]);
+        expect(old.widgets[spec.key]).toEqual({ kind: "UNAVAILABLE" });
+      }
+    }
   });
 
   it("rejects a Core envelope", () => {
     expect(() => parsePrebuiltReport({ success: true, data: envelope }, overview!.widgets)).toThrow();
+  });
+
+  it("accepts only a count for duplicate signals and discards phone-bearing rows", () => {
+    const quality = PREBUILT_REPORTS.find((report) => report.key === "data-quality")!;
+    const parsed = parsePrebuiltReport(
+      { ...envelope, widgets: { duplicateSignals: 2 } },
+      quality.widgets,
+    );
+    expect(parsed.widgets.duplicateSignals).toEqual({ kind: "COUNT", value: 2 });
+
+    const phone = "+201000000000";
+    const rejected = parsePrebuiltReport(
+      { ...envelope, widgets: { duplicateSignals: [{ mobile: phone, parties: 2 }] } },
+      quality.widgets,
+    );
+    expect(rejected.widgets.duplicateSignals).toEqual({ kind: "UNAVAILABLE" });
+    expect(JSON.stringify(rejected)).not.toContain(phone);
   });
 });

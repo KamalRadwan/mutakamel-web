@@ -1,20 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { definitionListPath, mergeDefinitionItems } from '../../dashboards/definition-pagination';
 import { useTenantAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/design-system";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isIdempotentReplay } from "@/lib/api/outcomes";
 import {
-  DASHBOARDS_CATALOG_PATH,
-} from "../../dashboards/dashboard-contract";
-import {
   parseCatalogResponse,
   type DashboardCatalog,
 } from "../../dashboards/dashboard-catalog-contract";
 import {
   WIDGETS_PATH,
+  WIDGET_CATALOG_PATH,
   WIDGET_PREVIEW_PATH,
   buildCloneWidgetRequest,
   buildCreateWidgetRequest,
@@ -61,22 +60,25 @@ export function useWidgets() {
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [preview, setPreview] = useState<WidgetResult | null>(null);
   const [previewError, setPreviewError] = useState<NormalizedApiError | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
-  const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
+  const load = useCallback(async (signal?: AbortSignal, cursor?: string): Promise<void> => {
     setIsLoading(true);
     setQueryError(null);
     const [list, catalogue] = await Promise.allSettled([
-      axiosClient.get<unknown>(WIDGETS_PATH, { ...READ_CONFIG, signal }),
-      axiosClient.get<unknown>(DASHBOARDS_CATALOG_PATH, { ...READ_CONFIG, signal }),
+      axiosClient.get<unknown>(definitionListPath(WIDGETS_PATH, cursor), { ...READ_CONFIG, signal }),
+      axiosClient.get<unknown>(WIDGET_CATALOG_PATH, { ...READ_CONFIG, signal }),
     ]);
     if (signal?.aborted) return;
 
     if (list.status === "fulfilled") {
       try {
-        setItems(parseWidgetsResponse(list.value.data));
+        const page = parseWidgetsResponse(list.value.data);
+        setItems((current) => cursor ? mergeDefinitionItems(current, page.items) : page.items);
+        setNextCursor(page.nextCursor);
         setHasLoaded(true);
       } catch (error) {
         setQueryError(normalizeApiError(error));
@@ -210,6 +212,8 @@ export function useWidgets() {
     catalogFailed,
     hasLoaded,
     isLoading,
+    hasMore: nextCursor !== null,
+    loadMore: () => nextCursor && !isLoading ? load(undefined, nextCursor) : Promise.resolve(),
     isSubmitting,
     pendingId,
     queryError,

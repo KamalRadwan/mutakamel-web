@@ -7,6 +7,7 @@ import {
   Button,
   Field,
   Input,
+  Switch,
   cn,
   focusRing,
 } from "@/design-system";
@@ -248,19 +249,13 @@ export function SwitchField({
         ) : null}
         {status}
       </span>
-      <input
+      <Switch
         id={id}
-        type="checkbox"
-        role="switch"
         checked={checked}
         disabled={disabled}
         aria-describedby={help ? helpId : undefined}
-        onChange={(event) => onChange(event.target.checked)}
-        className={cn(
-          "mt-0.5 size-4 shrink-0 accent-primary",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          focusRing,
-        )}
+        onCheckedChange={onChange}
+        className="mt-0.5 shrink-0"
       />
     </div>
   );
@@ -329,7 +324,7 @@ export function SectionCard({
   return (
     <section
       aria-label={title}
-      className="grid gap-3 rounded-lg border border-border bg-card p-3 sm:p-3.5 shadow-2xs"
+      className="grid gap-3 rounded-lg border border-border bg-card p-3 sm:p-3.5"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-0.5">

@@ -1,19 +1,13 @@
 import type {
   AdminNotification,
   AdminNotificationPage,
-  DeviceTokenProvider,
-  DeviceTokenReceipt,
   NotificationPreference,
   NotificationPreferenceCommand,
   NotificationRuntimeConfig,
-  RegisterDeviceTokenCommand,
 } from "./types";
 
 export const NOTIFICATION_LIST_LIMITS = [10, 20, 50] as const;
 const NOTIFICATION_TYPE_MAX_LENGTH = 128;
-const DEVICE_TOKEN_MAX_LENGTH = 4096;
-const DEVICE_ID_MAX_LENGTH = 128;
-const DEVICE_PLATFORM_MAX_LENGTH = 32;
 
 const UUID_V7 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -28,28 +22,10 @@ export class NotificationContractError extends Error {
 export interface PreferenceDraft {
   notificationType: string;
   inAppEnabled: boolean;
-  pushEnabled: boolean;
-  emailEnabled: boolean;
-  quietHoursText: string;
 }
 
 export interface PreferenceValidationErrors {
   notificationType?: "required" | "tooLong";
-  quietHours?: "invalidJson" | "objectRequired";
-}
-
-export interface DeviceTokenDraft {
-  provider: DeviceTokenProvider;
-  token: string;
-  deviceId: string;
-  platform: string;
-  enabled: boolean;
-}
-
-export interface DeviceTokenValidationErrors {
-  token?: "required" | "tooLong";
-  deviceId?: "tooLong";
-  platform?: "tooLong";
 }
 
 export function isCanonicalUuidV7(value: string): boolean {
@@ -76,30 +52,12 @@ export function readUpdatedCount(value: unknown): number {
 
 export function readRuntimeConfig(value: unknown): NotificationRuntimeConfig {
   const source = object(value);
-  const firebase = object(source.firebase);
-  const provider = string(source.provider, 16);
-  if (provider !== "none" && provider !== "firebase") fail();
   return {
     enabled: boolean(source.enabled),
     inAppEnabled: boolean(source.inAppEnabled),
     realtimeEnabled: boolean(source.realtimeEnabled),
-    pushEnabled: boolean(source.pushEnabled),
-    emailEnabled: boolean(source.emailEnabled),
-    provider,
     previewLimit: boundedInteger(source.previewLimit, 1, 20),
     pollIntervalMs: boundedInteger(source.pollIntervalMs, 5_000, 3_600_000),
-    firebase: {
-      apiKey: string(firebase.apiKey, 4_096, true),
-      appId: string(firebase.appId, 4_096, true),
-      authDomain: string(firebase.authDomain, 4_096, true),
-      projectId: string(firebase.projectId, 4_096, true),
-      messagingSenderId: string(firebase.messagingSenderId, 4_096, true),
-      storageBucket: string(firebase.storageBucket, 4_096, true),
-      measurementId: string(firebase.measurementId, 4_096, true),
-      webPushVapidPublicKey: string(firebase.webPushVapidPublicKey, 4_096, true),
-      messagingServiceWorkerPath: string(firebase.messagingServiceWorkerPath, 1_024),
-      messagingServiceWorkerScope: string(firebase.messagingServiceWorkerScope, 1_024),
-    },
   };
 }
 
@@ -116,26 +74,7 @@ export function readPreference(value: unknown): NotificationPreference {
   return {
     notificationType: string(source.notificationType, 128),
     inAppEnabled: boolean(source.inAppEnabled),
-    pushEnabled: boolean(source.pushEnabled),
-    emailEnabled: boolean(source.emailEnabled),
-    quietHours: plainObject(source.quietHours),
     updatedAt: isoDate(source.updatedAt),
-  };
-}
-
-export function readDeviceTokenReceipt(value: unknown): DeviceTokenReceipt {
-  const source = object(value);
-  const tokenHash = string(source.tokenHash, 128);
-  if (!/^[0-9a-f]{64}$/.test(tokenHash)) fail();
-  return {
-    id: uuid(source.id),
-    provider: string(source.provider, 16),
-    tokenHash,
-    deviceId: nullableString(source.deviceId, 128),
-    platform: nullableString(source.platform, 32),
-    enabled: boolean(source.enabled),
-    lastSeenAt: isoDate(source.lastSeenAt),
-    revokedAt: nullableIsoDate(source.revokedAt),
   };
 }
 
@@ -150,49 +89,11 @@ export function buildPreferenceCommand(draft: PreferenceDraft): {
     errors.notificationType = "tooLong";
   }
 
-  let quietHours: Record<string, unknown> = {};
-  try {
-    const parsed: unknown = draft.quietHoursText.trim()
-      ? JSON.parse(draft.quietHoursText)
-      : {};
-    if (!isPlainObject(parsed)) errors.quietHours = "objectRequired";
-    else quietHours = parsed;
-  } catch {
-    errors.quietHours = "invalidJson";
-  }
-
   if (Object.keys(errors).length) return { command: null, errors };
   return {
     command: {
       notificationType,
       inAppEnabled: draft.inAppEnabled,
-      pushEnabled: draft.pushEnabled,
-      emailEnabled: draft.emailEnabled,
-      quietHours,
-    },
-    errors,
-  };
-}
-
-export function buildDeviceTokenCommand(draft: DeviceTokenDraft): {
-  command: RegisterDeviceTokenCommand | null;
-  errors: DeviceTokenValidationErrors;
-} {
-  const errors: DeviceTokenValidationErrors = {};
-  if (!draft.token.length) errors.token = "required";
-  else if (draft.token.length > DEVICE_TOKEN_MAX_LENGTH) errors.token = "tooLong";
-  const deviceId = draft.deviceId.trim();
-  const platform = draft.platform.trim();
-  if (deviceId.length > DEVICE_ID_MAX_LENGTH) errors.deviceId = "tooLong";
-  if (platform.length > DEVICE_PLATFORM_MAX_LENGTH) errors.platform = "tooLong";
-  if (Object.keys(errors).length) return { command: null, errors };
-  return {
-    command: {
-      provider: draft.provider,
-      token: draft.token,
-      ...(deviceId ? { deviceId } : {}),
-      ...(platform ? { platform } : {}),
-      enabled: draft.enabled,
     },
     errors,
   };

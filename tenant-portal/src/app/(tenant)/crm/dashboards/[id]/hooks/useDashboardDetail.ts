@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
@@ -53,9 +53,20 @@ export function useDashboardDetail(dashboardId: string) {
   const [detailError, setDetailError] = useState<NormalizedApiError | null>(null);
   const [runError, setRunError] = useState<NormalizedApiError | null>(null);
   const [selection, setSelection] = useState<DashboardFilterSelection>(EMPTY_SELECTION);
+  const definitionRequest = useRef<AbortController | null>(null);
+  const runRequest = useRef<AbortController | null>(null);
+  const runEpoch = useRef(0);
 
   const load = useCallback(
-    async (filters: DashboardFilterSelection, signal?: AbortSignal): Promise<void> => {
+    async (filters: DashboardFilterSelection): Promise<void> => {
+      definitionRequest.current?.abort();
+      runRequest.current?.abort();
+      const controller = new AbortController();
+      const executionController = new AbortController();
+      definitionRequest.current = controller;
+      runRequest.current = executionController;
+      const epoch = ++runEpoch.current;
+      const signal = controller.signal;
       setIsLoading(true);
       setIsRunning(true);
       setDetailError(null);
@@ -67,7 +78,7 @@ export function useDashboardDetail(dashboardId: string) {
         axiosClient.get<unknown>(dashboardPath(dashboardId), { ...READ_CONFIG, signal }),
         axiosClient.post<unknown>(dashboardRunPath(dashboardId), buildRunRequest(filters), {
           ...READ_CONFIG,
-          signal,
+          signal: executionController.signal,
           // `POST /:id/run` is READ_HEAVY, not WRITE_SENSITIVE, so the Gateway
           // reserves no idempotency key for it and re-running is free.
           skipAutoIdempotency: true,
@@ -85,6 +96,8 @@ export function useDashboardDetail(dashboardId: string) {
         setDetailError(normalizeApiError(definition.reason));
       }
 
+      setIsLoading(false);
+      if (epoch !== runEpoch.current || executionController.signal.aborted) return;
       if (execution.status === "fulfilled") {
         try {
           setRun(parseRunResponse(execution.value.data));
@@ -94,7 +107,6 @@ export function useDashboardDetail(dashboardId: string) {
       } else {
         setRunError(normalizeApiError(execution.reason));
       }
-      setIsLoading(false);
       setIsRunning(false);
     },
     [dashboardId],
@@ -103,28 +115,45 @@ export function useDashboardDetail(dashboardId: string) {
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void load(EMPTY_SELECTION, controller.signal);
+      if (!controller.signal.aborted) {
+        setDetail(null);
+        setRun(null);
+        setSelection(EMPTY_SELECTION);
+        void load(EMPTY_SELECTION);
+      }
     });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      definitionRequest.current?.abort();
+      runRequest.current?.abort();
+      ++runEpoch.current;
+    };
   }, [load]);
 
   /** Re-executes without refetching the definition — the filter-change path. */
   const rerun = useCallback(
     async (filters: DashboardFilterSelection): Promise<void> => {
+      runRequest.current?.abort();
+      const controller = new AbortController();
+      runRequest.current = controller;
+      const epoch = ++runEpoch.current;
       setSelection(filters);
+      setRun(null);
       setIsRunning(true);
       setRunError(null);
       try {
         const response = await axiosClient.post<unknown>(
           dashboardRunPath(dashboardId),
           buildRunRequest(filters),
-          { ...READ_CONFIG, skipAutoIdempotency: true },
+          { ...READ_CONFIG, signal: controller.signal, skipAutoIdempotency: true },
         );
+        if (epoch !== runEpoch.current || controller.signal.aborted) return;
         setRun(parseRunResponse(response.data));
       } catch (error) {
+        if (epoch !== runEpoch.current || controller.signal.aborted) return;
         setRunError(normalizeApiError(error));
       } finally {
-        setIsRunning(false);
+        if (epoch === runEpoch.current && !controller.signal.aborted) setIsRunning(false);
       }
     },
     [dashboardId],

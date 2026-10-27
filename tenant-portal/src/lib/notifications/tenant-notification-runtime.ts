@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { customTenantFetch, unwrapCoreData } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
 
 const MAX_CACHED_NOTIFICATIONS = 500;
 const MAX_NOTIFICATION_IDENTITIES = 1_000;
-const MAX_RESYNC_PAGES = 10;
 const PAGE_SIZE = 50;
+const MAX_RESYNC_PAGES = MAX_CACHED_NOTIFICATIONS / PAGE_SIZE;
 const MAX_RESYNC_RETRIES = 3;
 const MAX_NOTIFICATION_RESPONSE_BYTES = 1_048_576;
 
@@ -71,6 +72,7 @@ export interface TenantNotificationSnapshot {
   readonly unreadCount: number;
   readonly lastRealtimeCursor: string | null;
   readonly revision: number;
+  readonly loadState: "idle" | "loading" | "ready" | "error" | "forbidden";
 }
 
 export interface RealtimeNotificationCreated {
@@ -131,11 +133,13 @@ const EMPTY_SNAPSHOT: TenantNotificationSnapshot = Object.freeze({
   unreadCount: 0,
   lastRealtimeCursor: null,
   revision: 0,
+  loadState: "idle",
 });
 
 export class TenantNotificationRuntimeStore {
   private snapshot: TenantNotificationSnapshot = EMPTY_SNAPSHOT;
   private readonly listeners = new Set<Listener>();
+  private readonly queryListeners = new Set<() => Promise<void>>();
   private readonly deliveryEvents = new Map<string, string>();
   private readonly notificationFingerprints = new Map<
     string,
@@ -150,6 +154,7 @@ export class TenantNotificationRuntimeStore {
       readonly version: number;
       readonly stateFingerprint: string;
       readonly eventFingerprint?: string;
+      readonly state?: RealtimeNotificationUpdated["state"];
     }
   >();
   private unreadState: {
@@ -164,11 +169,49 @@ export class TenantNotificationRuntimeStore {
 
   readonly getSnapshot = (): TenantNotificationSnapshot => this.snapshot;
 
+  readonly subscribeInvalidation = (listener: () => Promise<void>): (() => void) => {
+    this.queryListeners.add(listener);
+    return () => { this.queryListeners.delete(listener); };
+  };
+
+  readonly invalidateQueries = async (): Promise<void> => {
+    await Promise.allSettled([...this.queryListeners].map((listener) => listener()));
+  };
+
+  setLoadState(
+    generation: string,
+    loadState: TenantNotificationSnapshot["loadState"],
+  ): void {
+    if (this.snapshot.generation !== generation || this.snapshot.loadState === loadState) return;
+    // Loading feedback must not invalidate the data revision used by resync.
+    this.snapshot = Object.freeze({ ...this.snapshot, loadState });
+    for (const listener of [...this.listeners]) listener();
+  }
+
   readonly getUnreadOrderingRevision = (): number | null =>
     this.unreadState?.revision ?? null;
 
-  readonly getRecipientStateVersion = (notificationId: string): number | null =>
-    this.recipientStateVersions.get(notificationId)?.version ?? null;
+  readonly getRecipientStateMutation = (
+    item: TenantNotification,
+  ): ResyncOverlayMutation | null => {
+    const remembered = this.recipientStateVersions.get(item.id);
+    if (!remembered?.state || remembered.version <= item.recipientStateVersion) {
+      return null;
+    }
+    if (remembered.state.dismissedAt !== null) {
+      return { kind: "DELETE", recipientStateVersion: remembered.version };
+    }
+    return {
+      kind: "UPSERT",
+      item: {
+        ...item,
+        readAt: remembered.state.readAt,
+        acknowledgedAt: remembered.state.acknowledgedAt,
+        recipientStateVersion: remembered.version,
+      },
+      requiresRestPresence: false,
+    };
+  };
 
   bindGeneration(generation: string | null): void {
     if (this.snapshot.generation === generation) return;
@@ -181,6 +224,7 @@ export class TenantNotificationRuntimeStore {
       items: Object.freeze([]),
       unreadCount: 0,
       lastRealtimeCursor: null,
+      loadState: "idle",
     });
   }
 
@@ -194,6 +238,7 @@ export class TenantNotificationRuntimeStore {
       items: Object.freeze([]),
       unreadCount: 0,
       lastRealtimeCursor: null,
+      loadState: "idle",
     });
   }
 
@@ -301,13 +346,17 @@ export class TenantNotificationRuntimeStore {
       (item) => item.id === payload.notificationId,
     );
     if (index < 0) {
-      if (!rememberedState) return "missing";
+      if (!rememberedState) {
+        void this.invalidateQueries();
+        return "missing";
+      }
       if (payload.recipientStateVersion < rememberedState.version) return "stale";
       if (payload.recipientStateVersion === rememberedState.version) {
         return rememberedState.eventFingerprint === eventFingerprint
           ? "duplicate"
           : "conflict";
       }
+      void this.invalidateQueries();
       return payload.recipientStateVersion > rememberedState.version + 1
         ? "gap"
         : "missing";
@@ -327,12 +376,16 @@ export class TenantNotificationRuntimeStore {
           ? "duplicate"
           : "conflict";
       }
-      if (payload.recipientStateVersion !== prior.version + 1) return "gap";
+      if (payload.recipientStateVersion !== prior.version + 1) {
+        void this.invalidateQueries();
+        return "gap";
+      }
     }
     rememberBounded(this.recipientStateVersions, payload.notificationId, {
         version: payload.recipientStateVersion,
         stateFingerprint,
         eventFingerprint,
+        state: payload.state,
       });
     if (payload.change === "DISMISSED") {
       this.commit({
@@ -473,8 +526,9 @@ export class TenantNotificationRuntimeStore {
   }
 
   private commit(
-    next: Omit<TenantNotificationSnapshot, "revision"> & {
+    next: Omit<TenantNotificationSnapshot, "revision" | "loadState"> & {
       readonly revision?: number;
+      readonly loadState?: TenantNotificationSnapshot["loadState"];
     },
   ): void {
     this.snapshot = Object.freeze({
@@ -483,8 +537,10 @@ export class TenantNotificationRuntimeStore {
       unreadCount: next.unreadCount,
       lastRealtimeCursor: next.lastRealtimeCursor,
       revision: this.snapshot.revision + 1,
+      loadState: next.loadState ?? this.snapshot.loadState,
     });
     for (const listener of [...this.listeners]) listener();
+    void this.invalidateQueries();
   }
 }
 
@@ -614,6 +670,43 @@ function rememberBounded<K, V>(map: Map<K, V>, key: K, value: V): void {
 
 export const tenantNotificationRuntime = new TenantNotificationRuntimeStore();
 
+const refreshes = new WeakMap<TenantNotificationRuntimeStore, {
+  generation: string;
+  promise: Promise<boolean>;
+}>();
+
+/** Shared by cold loads, foreground recovery and bell retries. */
+export function refreshTenantNotifications(
+  generation: string,
+  lastRealtimeCursor: string | null,
+  store = tenantNotificationRuntime,
+  afterCurrent = false,
+): Promise<boolean> {
+  if (store.getSnapshot().generation !== generation) return Promise.resolve(false);
+  const current = refreshes.get(store);
+  if (current?.generation === generation) {
+    if (!afterCurrent) return current.promise;
+    // A mutation must reconcile after any load that started before its write.
+    return current.promise.catch(() => false).then(() =>
+      refreshTenantNotifications(generation, store.getSnapshot().lastRealtimeCursor, store),
+    );
+  }
+  store.setLoadState(generation, "loading");
+  const promise: Promise<boolean> = resyncTenantNotifications(generation, lastRealtimeCursor, store)
+    .then((applied) => {
+      store.setLoadState(generation, applied ? "ready" : "error");
+      return applied;
+    }, (error: unknown) => {
+      store.setLoadState(generation, normalizeApiError(error).status === 403 ? "forbidden" : "error");
+      throw error;
+    })
+    .finally(() => {
+      if (refreshes.get(store)?.promise === promise) refreshes.delete(store);
+    });
+  refreshes.set(store, { generation, promise });
+  return promise;
+}
+
 export async function resyncTenantNotifications(
   generation: string,
   lastRealtimeCursor: string | null,
@@ -634,7 +727,6 @@ export async function resyncTenantNotifications(
     let unreadCount: number | null = null;
     let unreadRevision: number | null = null;
     let unreadChangedAt: string | null = null;
-    let concurrentChange = false;
 
     for (let pageNumber = 0; pageNumber < MAX_RESYNC_PAGES; pageNumber += 1) {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
@@ -647,6 +739,7 @@ export async function resyncTenantNotifications(
           maxResponseBytes: MAX_NOTIFICATION_RESPONSE_BYTES,
         },
       );
+      if (store.getSnapshot().generation !== generation) return false;
       const page = notificationListSchema.parse(
         unwrapCoreData<unknown>(response.data),
       );
@@ -658,7 +751,10 @@ export async function resyncTenantNotifications(
         page.unreadRevision !== unreadRevision ||
         page.unreadChangedAt !== unreadChangedAt
       ) {
-        throw new Error("Notification unread authority changed during resync.");
+        if (page.unreadRevision === unreadRevision) {
+          throw new Error("Notification unread authority changed during resync.");
+        }
+        break;
       }
       for (const item of page.items) {
         if (ids.has(item.id)) {
@@ -667,10 +763,11 @@ export async function resyncTenantNotifications(
         ids.add(item.id);
         items.push(Object.freeze(item));
       }
-      if (!page.hasNext) {
-        const merged = applyResyncOverlay(items, overlay);
+      // The shell owns a recent window, not the historical inbox. Core can
+      // retain unread rows indefinitely (core-app notifications.service.ts).
+      if (!page.hasNext || pageNumber === MAX_RESYNC_PAGES - 1) {
+        const merged = applyResyncOverlay(items, overlay, page.hasNext);
         if (!merged.complete) {
-          concurrentChange = true;
           break;
         }
         const mergedUnreadCount =
@@ -694,32 +791,27 @@ export async function resyncTenantNotifications(
         ) {
           return true;
         }
-        rememberConcurrentChanges(
-          startSnapshot,
-          store.getSnapshot(),
-          startUnreadRevision,
-          store.getUnreadOrderingRevision(),
-          (notificationId) =>
-            store.getRecipientStateVersion(notificationId),
-          overlay,
-          (value, revision, isAuthoritative) => {
-            if (isAuthoritative) {
-              overlayUnreadCount = value;
-              overlayUnreadRevision = revision ?? undefined;
-            }
-          },
-          (value) => {
-            overlayRealtimeCursor = value;
-          },
-        );
-        concurrentChange = true;
         break;
       }
       cursor = page.nextCursor;
     }
-    if (!concurrentChange) {
-      throw new Error("Notification resync exceeded the bounded page limit.");
-    }
+    rememberConcurrentChanges(
+      startSnapshot,
+      store.getSnapshot(),
+      startUnreadRevision,
+      store.getUnreadOrderingRevision(),
+      (item) => store.getRecipientStateMutation(item),
+      overlay,
+      (value, revision, isAuthoritative) => {
+        if (isAuthoritative) {
+          overlayUnreadCount = value;
+          overlayUnreadRevision = revision ?? undefined;
+        }
+      },
+      (value) => {
+        overlayRealtimeCursor = value;
+      },
+    );
   }
   return false;
 }
@@ -729,7 +821,7 @@ function rememberConcurrentChanges(
   after: TenantNotificationSnapshot,
   beforeUnreadRevision: number | null,
   afterUnreadRevision: number | null,
-  recipientStateVersion: (notificationId: string) => number | null,
+  recipientStateMutation: (item: TenantNotification) => ResyncOverlayMutation | null,
   overlay: Map<string, ResyncOverlayMutation>,
   rememberUnreadCount: (
     value: number,
@@ -751,16 +843,12 @@ function rememberConcurrentChanges(
       });
     }
   }
-  for (const id of beforeItems.keys()) {
+  for (const [id, item] of beforeItems) {
     if (!afterItems.has(id)) {
-      const version = recipientStateVersion(id);
-      if (version === null) {
-        throw new Error("Notification dismissal lost its state version.");
-      }
-      rememberOverlayMutation(overlay, {
-        kind: "DELETE",
-        recipientStateVersion: version,
-      }, id);
+      // A creation can evict a row, including one read during this request.
+      // Retain its actual versioned mutation rather than inventing a dismissal.
+      const mutation = recipientStateMutation(item);
+      if (mutation) rememberOverlayMutation(overlay, mutation, id);
     }
   }
   rememberUnreadCount(
@@ -776,6 +864,7 @@ function rememberConcurrentChanges(
 function applyResyncOverlay(
   restItems: readonly TenantNotification[],
   overlay: ReadonlyMap<string, ResyncOverlayMutation>,
+  hasOlderHistory: boolean,
 ): { readonly complete: boolean; readonly items: TenantNotification[] } {
   const merged = new Map(restItems.map((item) => [item.id, item]));
   const promoted: TenantNotification[] = [];
@@ -793,6 +882,9 @@ function applyResyncOverlay(
       continue;
     }
     const item = mutation.item;
+    // An absent row may lie beyond the REST window. Do not require a history
+    // crawl or promote that row ahead of Core's recipient/cursor ordering.
+    if (!restItem && hasOlderHistory) continue;
     if (!restItem && mutation.requiresRestPresence) {
       return { complete: false, items: [] };
     }
@@ -808,8 +900,8 @@ function applyResyncOverlay(
         continue;
       }
     }
-    merged.delete(id);
-    promoted.push(item);
+    if (restItem) merged.set(id, item);
+    else promoted.push(item);
   }
   return {
     complete: true,
@@ -867,10 +959,25 @@ export async function markTenantNotificationRead(
     `/api/tenant/core/v1/notifications/${encodeURIComponent(notificationId)}/read`,
     { method: "POST" },
   );
+  await tenantNotificationRuntime.invalidateQueries();
 }
 
 export async function markAllTenantNotificationsRead(): Promise<void> {
   await customTenantFetch("/api/tenant/core/v1/notifications/read-all", {
     method: "POST",
   });
+  await tenantNotificationRuntime.invalidateQueries();
+}
+
+export async function revalidateTenantNotifications(): Promise<void> {
+  const snapshot = tenantNotificationRuntime.getSnapshot();
+  const queries = tenantNotificationRuntime.invalidateQueries();
+  if (snapshot.generation !== null) {
+    // Start after any pre-command refresh, without delaying the screen's own
+    // recipient-scoped REST lookup or relying on realtime delivery.
+    void refreshTenantNotifications(
+      snapshot.generation, snapshot.lastRealtimeCursor, tenantNotificationRuntime, true,
+    ).catch(() => { /* The shell exposes retryable refresh failures. */ });
+  }
+  await queries;
 }

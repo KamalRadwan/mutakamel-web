@@ -5,7 +5,7 @@ import { Button, ErrorState, ThemeProvider } from "@/design-system";
 import { I18nProvider, useI18n } from "@/i18n/I18nContext";
 import { useDirection, useLanguage } from "@/i18n/useLanguage";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
-import { plexArabic, plexLatin, plexMono } from "./fonts";
+import { uiArabic, uiLatin, uiMono } from "./fonts";
 import "./globals.css";
 
 // global-error REPLACES the root layout when it renders, so nothing that
@@ -55,10 +55,10 @@ export default function GlobalError({
   const dir = useDirection();
 
   return (
-    <html lang={lang} dir={dir} className="h-full" suppressHydrationWarning>
+    <html lang={lang} dir={dir} className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable} h-full`} suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${plexLatin.variable} ${plexArabic.variable} ${plexMono.variable} h-full antialiased`}
+        className="h-full antialiased"
       >
         <ThemeProvider>
           <I18nProvider>

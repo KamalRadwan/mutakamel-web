@@ -696,6 +696,7 @@ export default function TradeCommercialAccountsPage() {
                               {visualTerms.allowedCurrencies.map((curr) => (
                                 <span
                                   key={curr}
+                                  dir="ltr"
                                   className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold"
                                 >
                                   {curr}

@@ -1,5 +1,6 @@
 import { ToastProvider } from "@/design-system";
 import { TenantAuthProvider } from "@/context/AuthContext";
+import { TenantPreferenceHydration } from "@/context/TenantPreferenceHydration";
 import { TenantRealtimeProvider } from "@/context/TenantRealtimeProvider";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { TenantAuthGuard } from "./TenantAuthGuard";
@@ -11,6 +12,7 @@ export function TenantPortalRuntime({ children }: { children: React.ReactNode })
       <I18nProvider>
         <ToastProvider>
           <TenantAuthProvider>
+            <TenantPreferenceHydration />
             <TenantRealtimeProvider>
               <TenantAuthGuard>{children}</TenantAuthGuard>
             </TenantRealtimeProvider>

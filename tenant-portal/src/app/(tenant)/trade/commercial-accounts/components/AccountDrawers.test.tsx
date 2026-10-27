@@ -45,6 +45,13 @@ vi.mock("../hooks/useCommercialAccountLookups", () => ({
   }),
 }));
 
+vi.mock("../hooks/useAccountPriceBooks", () => ({
+  useAccountPriceBooks: (role: string) => ({
+    books: [{ id: "book", code: role === "SUPPLIER" ? "PURCHASE-BOOK" : "SALES-BOOK", currencyCode: "EGP" }],
+    unavailable: false,
+  }),
+}));
+
 const { AccountInspectModal, CreateAccountDrawer, EditAccountDrawer } = await import(
   "./AccountDrawers"
 );
@@ -72,6 +79,19 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("AccountDrawers UI component suite", () => {
+  it("updates role-filtered suggestions without replacing the entered assignment", () => {
+    render(
+      <CreateAccountDrawer isOpen isSubmitting={false} error={null} onClose={vi.fn()} onSubmit={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "SALES-BOOK (EGP)" }));
+    const input = screen.getByPlaceholderText(en.trade.accountPriceBook);
+    expect(input).toHaveValue("book");
+    fireEvent.click(screen.getAllByRole("button", { name: new RegExp(en.trade.accountRole_SUPPLIER, "i") })[0]);
+    expect(screen.queryByRole("button", { name: "SALES-BOOK (EGP)" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "PURCHASE-BOOK (EGP)" })).toBeInTheDocument();
+    expect(input).toHaveValue("book");
+  });
+
   it("locks creditLimit automatically when SUPPLIER role is selected in CreateAccountDrawer", () => {
     render(
       <CreateAccountDrawer

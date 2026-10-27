@@ -4,39 +4,48 @@ vi.mock("@/lib/api/axiosClient", () => ({ axiosClient: mocks }));
 import { tenantBillingApi } from "./tenant-billing.api";
 import { commercialFixture, commercialIds } from "../model/subscription-commercial-fixtures";
 import { addonEnvelope } from "../../../applications/lib/addon-test-fixtures";
-function responses() {
-  const detail = commercialFixture();
-  const items = { subscriptionId: detail.subscription.id, subscriptionRevision: detail.subscriptionRevision, baseItems: detail.baseItems, addonSelections: detail.addonSelections };
-  return { detail, items };
-}
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => vi.resetAllMocks());
 describe("Negotiated Admin subscription transport", () => {
-  it("reads and reconciles both V2 resources", async () => {
-    const { detail, items } = responses();
-    mocks.get.mockResolvedValueOnce(addonEnvelope(detail)).mockResolvedValueOnce(addonEnvelope(items));
-    const result = await tenantBillingApi.getSubscription(commercialIds.tenant);
+  it("reads the complete authoritative subscription once", async () => {
+    const detail = commercialFixture();
+    const signal = new AbortController().signal;
+    mocks.get.mockResolvedValueOnce(addonEnvelope(detail));
+    const result = await tenantBillingApi.getSubscription(commercialIds.tenant, signal);
     expect(result.commercial?.addonSelections).toHaveLength(1);
-    expect(mocks.get).toHaveBeenCalledWith(`/api/admin/core/v1/tenants/${commercialIds.tenant}/subscription/items`,
-      { cache: "no-store", signal: undefined });
+    expect(result.commercial).toEqual(detail);
+    expect(mocks.get).toHaveBeenCalledWith(`/api/admin/core/v1/tenants/${commercialIds.tenant}/subscription`,
+      { cache: "no-store", signal });
+    expect(mocks.get).toHaveBeenCalledTimes(1);
   });
-  it("does not reconcile independently read different revisions", async () => {
-    const { detail, items } = responses(); items.subscriptionRevision = "9";
-    mocks.get.mockResolvedValueOnce(addonEnvelope(detail)).mockResolvedValueOnce(addonEnvelope(items));
-    await expect(tenantBillingApi.getSubscription(commercialIds.tenant)).rejects.toMatchObject({ errorCode: "COMMERCIAL_RESPONSE_UNAVAILABLE" });
+  it("accepts a subscription commit between independent loads", async () => {
+    const detail = commercialFixture();
+    const committed = commercialFixture();
+    committed.subscriptionRevision = (BigInt(detail.subscriptionRevision) + BigInt(1)).toString();
+    committed.addonSelections = [];
+    committed.totals.addonRecurringUsd = "0.0000";
+    committed.totals.combinedRecurringUsd = committed.totals.baseRecurringUsd;
+    committed.subscription.totalPrice = committed.totals.combinedRecurringUsd;
+    mocks.get.mockResolvedValueOnce(addonEnvelope(detail)).mockResolvedValueOnce(addonEnvelope(committed));
+    await expect(tenantBillingApi.getSubscription(commercialIds.tenant)).resolves.toMatchObject({ commercial: detail });
+    expect(mocks.get).toHaveBeenCalledTimes(1);
+    await expect(tenantBillingApi.getSubscription(commercialIds.tenant)).resolves.toMatchObject({ commercial: committed });
     expect(mocks.get).toHaveBeenCalledTimes(2);
   });
-  it.each(["FOREIGN_OWNER", "UNKNOWN_SCHEMA", "LEGACY_FIELD"])("does not fall back after %s", async kind => {
-    const { detail, items } = responses(); const response = addonEnvelope(detail);
+  it.each(["FOREIGN_OWNER", "INVALID_ID", "UNKNOWN_SCHEMA", "LEGACY_FIELD", "INVALID_PARENT", "INVALID_TOTAL"])("rejects %s within the authoritative response", async kind => {
+    const detail = commercialFixture(); const response = addonEnvelope(detail);
     if (kind === "FOREIGN_OWNER") detail.subscription.tenantId = commercialIds.app;
+    if (kind === "INVALID_ID") detail.subscription.id = "invalid";
     if (kind === "UNKNOWN_SCHEMA") Object.assign(detail, { unknown: true });
     if (kind === "LEGACY_FIELD") Object.assign(detail, { contractVersion: 2 });
-    mocks.get.mockResolvedValueOnce(response).mockResolvedValueOnce(addonEnvelope(items));
+    if (kind === "INVALID_PARENT") detail.addonSelections[0].parentItemId = commercialIds.app;
+    if (kind === "INVALID_TOTAL") detail.totals.combinedRecurringUsd = "999.0000";
+    mocks.get.mockResolvedValueOnce(response);
     await expect(tenantBillingApi.getSubscription(commercialIds.tenant)).rejects.toMatchObject({ errorCode: "COMMERCIAL_RESPONSE_UNAVAILABLE" });
-    expect(mocks.get).toHaveBeenCalledTimes(2);
+    expect(mocks.get).toHaveBeenCalledTimes(1);
   });
   it.each([403, 406, 503])("does not fall back after HTTP%s", async httpStatus => {
     mocks.get.mockRejectedValue({ isNormalized: true, httpStatus, errorCode: "COMMERCIAL_CONTRACT_UNSUPPORTED", message: "Unavailable" });
     await expect(tenantBillingApi.getSubscription(commercialIds.tenant)).rejects.toMatchObject({ httpStatus });
-    expect(mocks.get).toHaveBeenCalledTimes(2);
+    expect(mocks.get).toHaveBeenCalledTimes(1);
   });
 });

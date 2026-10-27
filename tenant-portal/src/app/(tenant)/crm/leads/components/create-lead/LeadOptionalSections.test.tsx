@@ -26,6 +26,19 @@ function createForm() {
 }
 
 describe("the optional lead sections", () => {
+  it("offers Street 2 without a separate apartment input", () => {
+    const form = createForm();
+    form.address.street2 = "Suite 8";
+    render(
+      <I18nProvider>
+        <LeadAddressSection address={form.address} errors={{}} {...handlers} />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByDisplayValue("Suite 8")).toBeVisible();
+    expect(screen.queryByPlaceholderText(en.crmLeads.create.apartment)).not.toBeInTheDocument();
+  });
+
   it("keeps Address and Qualification collapsed when the modal first opens", () => {
     const form = createForm();
     render(

@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { auditNotificationText } from "@/lib/audit/notification-text";
 import type { NormalizedApiError } from "@/lib/api/errors";
 import { wireLabel } from "@/lib/format/wire-label";
 import { KNOWN_NOTIFICATION_PRIORITY, type InboxNotification } from "../notification-contract";
@@ -85,7 +86,7 @@ export function NotificationList({
                   href={`/core/notifications/${item.id}`}
                   className="text-sm font-medium text-foreground hover:underline"
                 >
-                  {item.title}
+                  {auditNotificationText(item, t.audit.recordMessages).title}
                 </Link>
                 {item.readAt === null ? (
                   <Badge tone="brand">{t.coreNotifications.unread}</Badge>
@@ -95,7 +96,7 @@ export function NotificationList({
                 ) : null}
                 <PriorityBadge priority={item.priority} />
               </div>
-              <p className="line-clamp-2 text-xs text-muted-foreground">{item.body}</p>
+              <p className="line-clamp-2 text-xs text-muted-foreground">{auditNotificationText(item, t.audit.recordMessages).body}</p>
               <p className="text-2xs text-muted-foreground">
                 <DateTime value={item.createdAt} precision="datetime" language={lang} />
               </p>

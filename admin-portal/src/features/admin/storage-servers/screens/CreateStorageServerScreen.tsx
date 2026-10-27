@@ -41,6 +41,7 @@ export function CreateStorageServerScreen() {
     setForm,
     maxTenants,
     setMaxTenants,
+    byteLimit,
     isSubmitting,
     formError,
     handleSubmit,
@@ -171,6 +172,11 @@ export function CreateStorageServerScreen() {
                     <Input {...fp} size="sm" dir="ltr" type="number" min={1} max={1_000_000} value={maxTenants} onChange={(e) => setMaxTenants(e.target.value)} placeholder={c.fields.maxTenants} />
                   )}
                 </DsField>
+                <DsField label={byteLimit.copy.maxLabel} hint={byteLimit.copy.limitHint} error={byteLimit.error}>
+                  {(fp) => (
+                    <Input {...fp} size="sm" dir="ltr" type="text" inputMode="numeric" value={byteLimit.value} onChange={(e) => byteLimit.setValue(e.target.value)} onBlur={() => byteLimit.validate()} />
+                  )}
+                </DsField>
               </CardContent>
             </Card>
 
@@ -227,11 +233,11 @@ export function CreateStorageServerScreen() {
             </CardHeader>
             <CardContent className="p-0 space-y-2 text-xs">
               <div className="space-y-0.5 rounded-md border border-border bg-muted p-2.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{c.previewCard.targetEndpoint}</span>
+                <span className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">{c.previewCard.targetEndpoint}</span>
                 <span dir="ltr" className="block break-all font-mono text-xs font-semibold text-info-subtle-foreground">{form.endpoint.trim() || "https://..."}</span>
               </div>
               <div className="space-y-0.5 rounded-md border border-border bg-muted p-2.5">
-                <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">
+                <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">
                   <Database className="size-3" aria-hidden="true" />
                   {c.previewCard.bucketTarget}
                 </span>
@@ -240,7 +246,7 @@ export function CreateStorageServerScreen() {
                 </span>
               </div>
               <div className="space-y-0.5 rounded-md border border-border bg-muted p-2.5">
-                <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">
+                <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground rtl:normal-case rtl:tracking-normal">
                   <Users className="size-3" aria-hidden="true" />
                   {c.previewCard.tenantCap}
                 </span>

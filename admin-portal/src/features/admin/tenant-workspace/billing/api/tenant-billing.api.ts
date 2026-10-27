@@ -1,6 +1,6 @@
 import { axiosClient } from "@/lib/api/axiosClient";
 import { contractFailure, readCommercialResponse } from "@/shared/api/commercial-contract";
-import { adaptSubscriptionCommercial, readSubscriptionCommercial, readSubscriptionItems } from "../model/subscription-commercial";
+import { adaptSubscriptionCommercial, readSubscriptionCommercial } from "../model/subscription-commercial";
 import {
   readBillingSummary,
   readCancellationResult,
@@ -18,8 +18,6 @@ import type {
   OfflinePaymentDto,
   PaymentReconciliationAction,
   PreviewWalletAdjustmentDto,
-  PageView,
-  WalletLedgerView,
 } from "../types";
 
 const BASE = "/api/admin/core/v1";
@@ -39,20 +37,11 @@ function pageQuery(page: number, limit: number): string {
 export const tenantBillingApi = {
   getSubscription: async (tenantId: string, signal?: AbortSignal) => {
     const config = { cache: "no-store" as const, signal };
-    const [detailResponse, itemsResponse] = await Promise.all([
-      axiosClient.get<unknown>(tenantPath(tenantId, "/subscription"), config),
-      axiosClient.get<unknown>(tenantPath(tenantId, "/subscription/items"), config),
-    ]);
+    const detailResponse = await axiosClient.get<unknown>(tenantPath(tenantId, "/subscription"), config);
     const detail = readCommercialResponse(detailResponse, value => {
       const next = readSubscriptionCommercial(value);
       if (next.subscription.tenantId !== tenantId) contractFailure();
       return next;
-    }, false, 4 * 1024 * 1024 + 256);
-    readCommercialResponse(itemsResponse, value => {
-      const items = readSubscriptionItems(value);
-      if (items.subscriptionId !== detail.subscription.id || items.subscriptionRevision !== detail.subscriptionRevision
-        || JSON.stringify(items.baseItems) !== JSON.stringify(detail.baseItems) || JSON.stringify(items.addonSelections) !== JSON.stringify(detail.addonSelections)) contractFailure();
-      return items;
     }, false, 4 * 1024 * 1024 + 256);
     return adaptSubscriptionCommercial(detail);
   },
@@ -98,15 +87,7 @@ export const tenantBillingApi = {
     if (tenantLedger.items.some((item) => item.walletId !== walletId)) {
       throw new Error("INVALID_TENANT_WALLET_LEDGER_RESPONSE");
     }
-    const exactResponse = await axiosClient.get<unknown>(
-      `${BASE}/wallets/${encodeURIComponent(walletId)}/ledger${pageQuery(page, limit)}`,
-      signal ? { signal } : undefined,
-    );
-    const exactLedger = readCorePage(exactResponse.data, (value) =>
-      readWalletLedger(value, { walletId }),
-    );
-    assertSameLedgerPage(tenantLedger, exactLedger);
-    return exactLedger;
+    return tenantLedger;
   },
 
   previewWalletAdjustment: async (
@@ -239,16 +220,3 @@ export const tenantBillingApi = {
     return readCoreData(response.data, readReconciliation);
   },
 };
-
-function assertSameLedgerPage(
-  tenantLedger: PageView<WalletLedgerView>,
-  exactLedger: PageView<WalletLedgerView>,
-) {
-  if (
-    JSON.stringify(tenantLedger.meta) !== JSON.stringify(exactLedger.meta) ||
-    tenantLedger.items.map((item) => item.id).join("|") !==
-      exactLedger.items.map((item) => item.id).join("|")
-  ) {
-    throw new Error("WALLET_LEDGER_PROJECTION_DRIFT");
-  }
-}

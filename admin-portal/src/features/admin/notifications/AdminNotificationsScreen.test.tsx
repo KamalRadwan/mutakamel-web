@@ -32,9 +32,6 @@ const { viewMock } = vi.hoisted(() => ({
     performItemAction: vi.fn(),
     performBulkAction: vi.fn(),
     savePreference: vi.fn(),
-    registerDevice: vi.fn(),
-    revokeDevice: vi.fn(),
-    deviceReceipt: null,
   },
 }));
 
@@ -65,7 +62,6 @@ vi.mock("./useAdminNotifications", () => ({
 import { AdminNotificationsScreen } from "./AdminNotificationsScreen";
 
 const ID = "019f0000-0000-7000-8000-000000000001";
-const DEVICE_ID = "019f0000-0000-7000-8000-000000000003";
 
 describe("AdminNotificationsScreen", () => {
   beforeEach(() => {
@@ -90,37 +86,27 @@ describe("AdminNotificationsScreen", () => {
       error: null,
     };
     viewMock.lastUpdatedCount = null;
-    viewMock.deviceReceipt = null;
     viewMock.performBulkAction.mockResolvedValue(1);
     viewMock.performItemAction.mockResolvedValue(undefined);
     viewMock.savePreference.mockResolvedValue(preferenceFixture());
-    viewMock.registerDevice.mockResolvedValue(deviceReceiptFixture());
-    viewMock.revokeDevice.mockResolvedValue(undefined);
   });
 
-  it("makes canonical and compatibility notification actions reachable", () => {
+  it("exposes one control per supported notification action", () => {
     render(<AdminNotificationsScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Read all (canonical)" }));
-    fireEvent.click(screen.getByRole("button", {
-      name: "Mark all read (compatibility alias)",
-    }));
     fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
     fireEvent.click(screen.getByRole("button", { name: "Acknowledge" }));
-    fireEvent.click(screen.getByRole("button", { name: "Compatibility aliases" }));
-    fireEvent.click(screen.getByRole("button", { name: "Acknowledge via /ack alias" }));
 
     expect(viewMock.performBulkAction).toHaveBeenNthCalledWith(1, "read-all");
-    expect(viewMock.performBulkAction).toHaveBeenNthCalledWith(
-      2,
-      "mark-all-read-compatibility",
-    );
+    expect(viewMock.performBulkAction).toHaveBeenCalledTimes(1);
     expect(viewMock.performItemAction).toHaveBeenCalledWith(ID, "read");
     expect(viewMock.performItemAction).toHaveBeenCalledWith(ID, "acknowledge");
-    expect(viewMock.performItemAction).toHaveBeenCalledWith(ID, "ack-compatibility");
+    expect(viewMock.performItemAction).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("button", { name: /alias|compatibility/i })).not.toBeInTheDocument();
   });
 
-  it("confirmation-gates both recipient-dismiss routes", () => {
+  it("confirmation-gates recipient dismissal", () => {
     render(<AdminNotificationsScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
@@ -128,63 +114,47 @@ describe("AdminNotificationsScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
     expect(viewMock.performItemAction).toHaveBeenCalledWith(ID, "dismiss");
 
-    fireEvent.click(screen.getByRole("button", { name: "Compatibility aliases" }));
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss via POST alias" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
-    expect(viewMock.performItemAction).toHaveBeenCalledWith(
-      ID,
-      "dismiss-post-compatibility",
-    );
+    expect(viewMock.performItemAction).toHaveBeenCalledTimes(1);
   });
 
-  it("validates and sends exact preference and device-token DTOs", async () => {
+  it("saves only an in-app preference and omits retired controls", async () => {
     render(<AdminNotificationsScreen />);
 
     fireEvent.change(screen.getByLabelText("Notification type"), {
       target: { value: " tenant.billing.overdue " },
     });
-    fireEvent.change(screen.getByLabelText("Quiet-hours JSON object"), {
-      target: { value: '{"from":"22:00"}' },
-    });
+    fireEvent.click(screen.getByRole("switch", { name: "In-app" }));
     fireEvent.click(screen.getByRole("button", { name: "Save preference" }));
     await waitFor(() => expect(viewMock.savePreference).toHaveBeenCalledWith({
       notificationType: "tenant.billing.overdue",
-      inAppEnabled: true,
-      pushEnabled: false,
-      emailEnabled: false,
-      quietHours: { from: "22:00" },
+      inAppEnabled: false,
     }));
 
-    fireEvent.change(screen.getByLabelText("Provider token"), {
-      target: { value: "opaque-token" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Register or refresh token" }));
-    await waitFor(() => expect(viewMock.registerDevice).toHaveBeenCalledWith({
-      provider: "web-push",
-      token: "opaque-token",
-      platform: "web",
-      enabled: true,
-    }));
-    await waitFor(() => expect(screen.getByLabelText("Provider token")).toHaveValue(""));
+    expect(screen.queryByLabelText("Quiet-hours JSON object")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Push" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Email" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Push device token")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Provider token")).not.toBeInTheDocument();
+    expect(screen.getByText("30000 ms")).toBeInTheDocument();
   });
 
-  it("rejects a stale device id locally and confirmation-gates a valid revoke", () => {
+  it("loads an existing in-app preference into the editor", async () => {
+    viewMock.preferences = [{ ...preferenceFixture(), inAppEnabled: false }];
     render(<AdminNotificationsScreen />);
 
-    fireEvent.change(screen.getByLabelText("Device token UUIDv7"), {
-      target: { value: "00000000-0000-4000-8000-000000000000" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Revoke device token" }));
-    expect(screen.getByText("Enter a canonical UUIDv7.")).toBeInTheDocument();
-    expect(viewMock.revokeDevice).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("Notification type")).toHaveValue("tenant.user.invited");
+    expect(screen.getByRole("switch", { name: "In-app" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Save preference" }));
+    await waitFor(() => expect(viewMock.savePreference).toHaveBeenCalledWith({
+      notificationType: "tenant.user.invited", inAppEnabled: false,
+    }));
+  });
 
-    fireEvent.change(screen.getByLabelText("Device token UUIDv7"), {
-      target: { value: DEVICE_ID },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Revoke device token" }));
-    expect(viewMock.revokeDevice).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
-    expect(viewMock.revokeDevice).toHaveBeenCalledWith(DEVICE_ID);
+  it("hides preference writes for read-only operators", () => {
+    viewMock.canManage = false;
+    render(<AdminNotificationsScreen />);
+    expect(screen.queryByRole("button", { name: "Save preference" })).not.toBeInTheDocument();
   });
 });
 
@@ -218,23 +188,8 @@ function runtimeFixture() {
     enabled: true,
     inAppEnabled: true,
     realtimeEnabled: false,
-    pushEnabled: false,
-    emailEnabled: true,
-    provider: "none",
     previewLimit: 10,
     pollIntervalMs: 30_000,
-    firebase: {
-      apiKey: "",
-      appId: "",
-      authDomain: "",
-      projectId: "",
-      messagingSenderId: "",
-      storageBucket: "",
-      measurementId: "",
-      webPushVapidPublicKey: "",
-      messagingServiceWorkerPath: "/firebase-messaging-sw.js",
-      messagingServiceWorkerScope: "/",
-    },
   };
 }
 
@@ -242,22 +197,6 @@ function preferenceFixture() {
   return {
     notificationType: "tenant.user.invited",
     inAppEnabled: true,
-    pushEnabled: false,
-    emailEnabled: true,
-    quietHours: {},
     updatedAt: "2026-08-12T10:00:00.000Z",
-  };
-}
-
-function deviceReceiptFixture() {
-  return {
-    id: DEVICE_ID,
-    provider: "web-push",
-    tokenHash: "d".repeat(64),
-    deviceId: null,
-    platform: "web",
-    enabled: true,
-    lastSeenAt: "2026-08-12T10:00:00.000Z",
-    revokedAt: null,
   };
 }

@@ -217,7 +217,7 @@ export interface CrmSearchGroup<Id extends string> {
 const LIST_SEPARATOR = ",";
 
 /** A selected field with an empty value. */
-export function crmBlankCondition<Id extends string>(
+function crmBlankCondition<Id extends string>(
   definition: CrmSearchFieldDef<Id>,
 ): CrmSearchCondition<Id> {
   const [operator] = crmOperatorsForField(definition);

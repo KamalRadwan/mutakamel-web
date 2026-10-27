@@ -54,6 +54,7 @@ export interface PurchaseQuotation extends TradeFinalizedDocument {
 export interface PurchaseQuotationLine {
   id: string;
   clientLineId: string;
+  itemId: string;
   uomId: string;
   quantity: string;
   unitPrice: string;
@@ -79,6 +80,10 @@ export interface CreatePurchaseQuotationRequest {
   notes?: string;
   lines: Array<{ clientLineId: string; itemId: string; uomId: string; quantity: string }>;
 }
+
+export type UpdatePurchaseQuotationRequest = Omit<CreatePurchaseQuotationRequest, "lines"> & {
+  lines?: CreatePurchaseQuotationRequest["lines"];
+};
 
 export function supplierAccountsPath(): TradePath {
   const query = new URLSearchParams({
@@ -130,6 +135,7 @@ function parseLine(payload: unknown): PurchaseQuotationLine {
     !line ||
     !isUUIDv7(line.id) ||
     !isUUIDv7(line.clientLineId) ||
+    !isUUIDv7(line.itemId) ||
     !isUUIDv7(line.uomId) ||
     !isTradeDecimal(line.quantity) ||
     !isTradeDecimal(line.unitPrice) ||
@@ -140,6 +146,7 @@ function parseLine(payload: unknown): PurchaseQuotationLine {
   return {
     id: line.id,
     clientLineId: line.clientLineId,
+    itemId: line.itemId,
     uomId: line.uomId,
     quantity: line.quantity,
     unitPrice: line.unitPrice,
@@ -182,6 +189,28 @@ export function buildCreatePurchaseQuotation(input: {
   const notes = input.notes.trim();
   if (notes) request.notes = notes.slice(0, TRADE_NOTES_MAX_LENGTH);
   return request;
+}
+
+export function buildUpdatePurchaseQuotation(
+  input: Parameters<typeof buildCreatePurchaseQuotation>[0],
+  existing: PurchaseQuotationDetail,
+): UpdatePurchaseQuotationRequest {
+  const { lines, ...header } = buildCreatePurchaseQuotation(input);
+  // The service deletes and recreates every row when lines are supplied.
+  // Supplier/currency changes require that replacement to refresh pricing.
+  const linesUnchanged =
+    lines.length === existing.lines.length &&
+    lines.every((line, index) => {
+      const original = existing.lines[index];
+      return original !== undefined &&
+        line.clientLineId === original.clientLineId &&
+        line.itemId === original.itemId &&
+        line.uomId === original.uomId &&
+        line.quantity === original.quantity;
+    });
+  const pricingUnchanged = header.supplierPartyId === existing.partyId &&
+    header.currencyCode === existing.currencyCode;
+  return linesUnchanged && pricingUnchanged ? header : { ...header, lines };
 }
 
 export function isPurchaseQuotationDraft(quotation: PurchaseQuotation): boolean {

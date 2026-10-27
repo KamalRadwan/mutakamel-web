@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { TENANT_REALTIME_SHELL_EVENTS } from "@/context/TenantRealtimeProvider";
+import {
+  TENANT_REALTIME_SHELL_EVENTS,
+  getTenantRealtimeConnectionSnapshot,
+  getServerRealtimeConnectionSnapshot,
+  subscribeTenantRealtimeConnection,
+} from "@/context/TenantRealtimeProvider";
 
-export type ConnectivityStatus = "online" | "offline" | "draining" | "stopped";
+export type ConnectivityStatus = "online" | "offline" | "draining" | "retrying" | "stopped";
 
 export interface ConnectivityState {
   status: ConnectivityStatus;
@@ -20,12 +25,14 @@ export interface ConnectivityState {
 }
 
 interface RealtimeState {
+  generation: string | null;
   draining: boolean;
   stopped: boolean;
   stopReason: string | null;
 }
 
 const INITIAL_REALTIME: RealtimeState = {
+  generation: null,
   draining: false,
   stopped: false,
   stopReason: null,
@@ -49,22 +56,12 @@ const isOnline = () => navigator.onLine;
 const isOnlineOnServer = () => true;
 
 /**
- * The listener the realtime layer has been dispatching to since it was built.
+ * Coordinator state survives a late banner mount. Application events add the
+ * server's drain signal and clear obsolete feedback after session readiness.
  *
- * `TenantRealtimeProvider` fires `server-draining`, `permanent-stop`,
- * `resync-required`, `session-ready` and three notification events on `window`
- * — and **nothing anywhere subscribes to the connection ones**. A tenant whose
- * realtime server drains, or whose connection is permanently stopped, sees a
- * portal that looks fine and silently stops updating.
- *
- * `session-ready` is subscribed to as well, though it is not one of the three
- * named in MASTER-PLAN 1.28: it is the only event that says the connection came
- * back, so without it `draining` would be a one-way door and the banner would
- * never clear.
- *
- * **`stopped` is terminal.** The realtime client has given up; coming back
- * online does not restart it. Saying "online" again would be a lie about
- * whether live updates are flowing.
+ * A network recovery cannot clear a stop. A new auth generation or validated
+ * session-ready event can; coordinator snapshots also expose handshake stops
+ * that never reach the application event stream.
  *
  * `resync-required` is deliberately **not** here. It carried a `resyncCount`
  * that nothing ever read, and it counted every scope — so a screen following
@@ -79,18 +76,29 @@ export function useConnectivity(): ConnectivityState {
   // and the effect version has to write state synchronously on mount to catch
   // a page that loaded offline, which cascades a render.
   const online = useSyncExternalStore(subscribeToNetwork, isOnline, isOnlineOnServer);
+  const connection = useSyncExternalStore(
+    subscribeTenantRealtimeConnection,
+    getTenantRealtimeConnectionSnapshot,
+    getServerRealtimeConnectionSnapshot,
+  );
   const [realtime, setRealtime] = useState<RealtimeState>(INITIAL_REALTIME);
 
   useEffect(() => {
-    const onDraining = () => setRealtime((current) => ({ ...current, draining: true }));
-    const onSessionReady = () => setRealtime((current) => ({ ...current, draining: false }));
+    const currentGeneration = () => getTenantRealtimeConnectionSnapshot()?.generation ?? null;
+    const onDraining = () => setRealtime({
+      ...INITIAL_REALTIME, generation: currentGeneration(), draining: true,
+    });
+    const onSessionReady = () => setRealtime({
+      ...INITIAL_REALTIME, generation: currentGeneration(),
+    });
     const onPermanentStop = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      setRealtime((current) => ({
-        ...current,
+      setRealtime({
+        ...INITIAL_REALTIME,
+        generation: currentGeneration(),
         stopped: true,
         stopReason: typeof detail === "string" ? detail : null,
-      }));
+      });
     };
     window.addEventListener(TENANT_REALTIME_SHELL_EVENTS.serverDraining, onDraining);
     window.addEventListener(TENANT_REALTIME_SHELL_EVENTS.sessionReady, onSessionReady);
@@ -106,13 +114,30 @@ export function useConnectivity(): ConnectivityState {
   // Precedence, and it is the whole reason this is derived rather than stored:
   // `stopped` outranks everything, so coming back online cannot silently claim
   // that live updates resumed when the client has given up.
-  const status: ConnectivityStatus = realtime.stopped
+  const application = realtime.generation === (connection?.generation ?? null)
+    ? realtime : INITIAL_REALTIME;
+  const blocked = connection?.phase === "blocked";
+  const retrying = connection?.phase === "waiting_to_reconnect" ||
+    connection?.phase === "connecting" || connection?.phase === "obtaining_credential";
+  const status: ConnectivityStatus = blocked || application.stopped
     ? "stopped"
     : !online
       ? "offline"
-      : realtime.draining
+      : application.draining
         ? "draining"
-        : "online";
+        : retrying ? "retrying" : "online";
 
-  return { status, stopReason: realtime.stopReason };
+  const stopReason = blocked ? readBlockedReason(connection.blockedReason) : application.stopReason;
+  return { status, stopReason };
+}
+
+function readBlockedReason(reason: string | null): string | null {
+  switch (reason) {
+    case "credential_refresh_failed": return "refresh_failed";
+    case "server_access_revoked": return "access_revoked";
+    case "server_connection_replaced": return "connection_replaced";
+    case "server_tenant_unavailable": return "tenant_unavailable";
+    case "invalid_server_event": return "invalid_server_event";
+    default: return null;
+  }
 }

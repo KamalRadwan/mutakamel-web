@@ -1,13 +1,12 @@
 "use client";
 
-import * as React from "react";
 import { Download, Kanban, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { Button, IdentifierText } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 
 export type TradeExecutiveViewMode = "board" | "cards" | "table";
 
-export type TradeKpiTone =
+type TradeKpiTone =
   | "blue"
   | "amber"
   | "emerald"

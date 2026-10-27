@@ -44,6 +44,7 @@ describe("Tenant Portal server route boundary", () => {
     "/core/billing/invoices/0199f2b0-1111-4222-8333-444455556666",
     "/core/subscription",
     "/crm",
+    "/crm/dashboard",
     "/crm/leads",
     "/crm/customer-profiles/customer-id",
     "/crm/opportunities",
@@ -98,7 +99,7 @@ describe("Tenant Portal server route boundary", () => {
     ["/core/templates/an-id/versions", "core"],
     ["/core/directory/an-id/addresses", "core"],
     ["/core/activities/an-id", "core"],
-    ["/crm/dashboard", "crm"],
+    ["/crm/dashboard/extra", "crm"],
     ["/crm/customer-profiles/customer-id/history", "crm"],
     // One detail segment per list, never two.
     ["/trade/inventory/nodes/an-id/branches", "trade"],

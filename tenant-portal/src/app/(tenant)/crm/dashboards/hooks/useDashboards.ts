@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { definitionListPath, mergeDefinitionItems } from '../definition-pagination';
 import { useTenantAuth } from "@/context/AuthContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
@@ -65,24 +66,27 @@ export function useDashboards() {
   const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
+  const load = useCallback(async (signal?: AbortSignal, cursor?: string): Promise<void> => {
     setIsLoading(true);
     setQueryError(null);
     // allSettled, not all: the catalogue only feeds the template picker, and
     // losing the whole screen because it failed is states.md's exact
     // partial-failure mistake.
     const [list, catalogue] = await Promise.allSettled([
-      axiosClient.get<unknown>(DASHBOARDS_PATH, { ...READ_CONFIG, signal }),
+      axiosClient.get<unknown>(definitionListPath(DASHBOARDS_PATH, cursor), { ...READ_CONFIG, signal }),
       axiosClient.get<unknown>(DASHBOARDS_CATALOG_PATH, { ...READ_CONFIG, signal }),
     ]);
     if (signal?.aborted) return;
 
     if (list.status === "fulfilled") {
       try {
-        setItems(parseDashboardsResponse(list.value.data));
+        const page = parseDashboardsResponse(list.value.data);
+        setItems((current) => cursor ? mergeDefinitionItems(current, page.items) : page.items);
+        setNextCursor(page.nextCursor);
         setHasLoaded(true);
       } catch (error) {
         setQueryError(normalizeApiError(error));
@@ -155,33 +159,6 @@ export function useDashboards() {
   };
 
   /**
-   * `POST /from-template/:key` creates a **new** instance every time.
-   * `PUT` on the same path is the idempotent "ensure mine exists" variant; the
-   * screen offers the POST because a user picking a template from a list is
-   * asking for a new dashboard, not for one they may already own.
-   */
-  const createFromTemplate = async (
-    templateKey: DashboardTemplateKey,
-    name: string,
-  ): Promise<DashboardWriteResult> => {
-    if (!canCreate) return forbidden();
-    setIsSubmitting(true);
-    try {
-      return await write(() =>
-        axiosClient.post<unknown>(
-          dashboardFromTemplatePath(templateKey),
-          buildNamedRequest(name),
-          WRITE_CONFIG,
-        ),
-      );
-    } catch (error) {
-      return localFailure(error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  /**
    * `PUT /from-template/:key` — get-or-create.
    *
    * The POST on the same path creates a **new** instance every time;
@@ -209,11 +186,7 @@ export function useDashboards() {
   };
 
   /**
-   * `GET /dashboards/default` — **a GET that writes.**
-   *
-   * With no default and no `CRM_DEFAULT` instance it provisions one and emits
-   * a `DASHBOARD_CREATED` audit event, so it is never called on mount; it is
-   * bound to an explicit action.
+   * `GET /dashboards/default` reads the existing default; setup is an explicit PUT.
    */
   const openDefault = async (): Promise<DashboardWriteResult> => {
     setIsSubmitting(true);
@@ -295,6 +268,8 @@ export function useDashboards() {
     catalogFailed,
     hasLoaded,
     isLoading,
+    hasMore: nextCursor !== null,
+    loadMore: () => nextCursor && !isLoading ? load(undefined, nextCursor) : Promise.resolve(),
     isSubmitting,
     pendingId,
     queryError,
@@ -303,7 +278,6 @@ export function useDashboards() {
     searchQuery,
     setSearchQuery,
     create,
-    createFromTemplate,
     ensureTemplate,
     openDefault,
     duplicate,

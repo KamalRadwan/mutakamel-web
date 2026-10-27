@@ -1,16 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { axiosClient, type AxiosResponse } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
-import { parseLeadStageCatalogueResponse } from "../../../lead-stages/lead-stage-contract";
 import type { LeadStageItem } from "../../../lead-stages/lead-stage-contract";
-import { leadPath, parseLeadDetailResponse, type LeadDetail } from "../../lead-contract";
-import { parseLeadDetailCard, type LeadDetailCard } from "../lead-detail-card-contract";
-
-const DETAIL_RESPONSE_LIMIT_BYTES = 512 * 1024;
-const STAGES_RESPONSE_LIMIT_BYTES = 256 * 1024;
+import { readLeadStageCatalogue } from "../../../shared/lead-stage-catalogue";
+import type { LeadDetail } from "../../lead-contract";
+import { fetchLeadDetail } from "../../lead-requests";
+import type { LeadDetailCard } from "../lead-detail-card-contract";
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
@@ -52,16 +49,8 @@ export function useLeadDetail(leadId: string) {
       setError(null);
       try {
         const [leadSettled, stagesSettled] = await Promise.allSettled([
-          axiosClient.get<unknown>(leadPath(leadId), {
-            signal,
-            cache: "no-store",
-            maxResponseBytes: DETAIL_RESPONSE_LIMIT_BYTES,
-          }),
-          axiosClient.get<unknown>("/api/tenant/crm/v1/lead-stages", {
-            signal,
-            cache: "no-store",
-            maxResponseBytes: STAGES_RESPONSE_LIMIT_BYTES,
-          }),
+          fetchLeadDetail(leadId, signal),
+          readLeadStageCatalogue(signal),
         ]);
         if (
           [leadSettled, stagesSettled].some(
@@ -73,9 +62,9 @@ export function useLeadDetail(leadId: string) {
         }
         if (leadSettled.status === "rejected") throw leadSettled.reason;
 
-        const nextStages = readStages(stagesSettled);
-        setLead(parseLeadDetailResponse(leadSettled.value.data));
-        setCard(readCard(leadSettled.value.data));
+        const nextStages = stagesSettled.status === "fulfilled" ? stagesSettled.value : null;
+        setLead(leadSettled.value.lead);
+        setCard(leadSettled.value.card);
         setStages(nextStages ?? []);
         setStagesDegraded(nextStages === null);
       } catch (caught) {
@@ -120,25 +109,4 @@ export function useLeadDetail(leadId: string) {
     setLead,
     setCard,
   };
-}
-
-// The card fields are decoration beside a lead that parsed: a value of the
-// wrong shape hides the rating and colour controls rather than the record.
-function readCard(payload: unknown): LeadDetailCard | null {
-  try {
-    return parseLeadDetailCard(payload);
-  } catch {
-    return null;
-  }
-}
-
-function readStages(
-  settled: PromiseSettledResult<AxiosResponse<unknown>>,
-): LeadStageItem[] | null {
-  if (settled.status === "rejected") return null;
-  try {
-    return parseLeadStageCatalogueResponse(settled.value.data);
-  } catch {
-    return null;
-  }
 }

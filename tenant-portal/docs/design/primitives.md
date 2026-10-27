@@ -42,7 +42,7 @@ pnpm add @radix-ui/react-alert-dialog @radix-ui/react-avatar \
 | `RadioGroup` | `@radix-ui/react-radio-group` | |
 | `Switch` | `@radix-ui/react-switch` | Thumb travel mirrors under RTL |
 | `Card` | plain | `CardHeader`/`Title`/`Description`/`Content`/`Footer`. **No shadow** |
-| `Badge` | plain CVA | `tone`: `brand`/`positive`/`caution`/`negative`/`neutral` |
+| `Badge` | plain CVA | `tone`: `brand`/`positive`/`caution`/`negative`/`neutral`; `size`: `default`/`sm` |
 | `Separator` | `@radix-ui/react-separator` | |
 | `Skeleton` | plain | The one permitted shimmer |
 | `IdentifierText` | plain `<bdi>` | **The only way to render a machine identifier.** `dir="ltr"` + `wrap-anywhere`. See [typography.md](typography.md#identifiers-wrap-never-overflow) |
@@ -53,22 +53,24 @@ pnpm add @radix-ui/react-alert-dialog @radix-ui/react-avatar \
 | `DropdownMenu` | `@radix-ui/react-dropdown-menu` | Compute physical `side` from `dir` |
 | `Popover` | `@radix-ui/react-popover` | Same |
 | `Tooltip` | `@radix-ui/react-tooltip` | `TooltipProvider` wraps the tree once |
-| `Avatar` | `@radix-ui/react-avatar` | Initials fallback |
+| `Avatar` | `@radix-ui/react-avatar` | Initials fallback; `tone`: `default`/`user` |
 | `ScrollArea` | `@radix-ui/react-scroll-area` | Board columns, long menus |
 | `Table` | plain | Semantic wrappers. Feature code uses `DataTable` instead |
 
 ## Button
 
+Updated **2026-10-26** ([crm-leads-v3.md](specs/crm-leads-v3.md)).
+
 ```ts
 variant: "primary" | "secondary" | "outline" | "ghost" | "destructive" | "link"
-size:    "xs" | "sm" | "md" | "lg" | "xl"        // default md (36px)
+size:    "xs" | "sm" | "md" | "lg" | "xl" | "toolbar" // default sm (28px); toolbar is 33px (--size-toolbar-control)
 loading?: boolean
 asChild?: boolean
 ```
 
 | Variant | Light | Dark |
 | --- | --- | --- |
-| `primary` | `bg-brand-600` + white label | `bg-brand-400` + `ink-950` label |
+| `primary` | `bg-gradient-primary` + `text-white`, hover `brightness-90` + `shadow-pop` | same tokens (`--gradient-primary` + `text-white`) |
 | `secondary` | `bg-secondary` + `text-secondary-foreground` | same tokens |
 | `outline` | `border-border`, transparent, `hover:bg-accent` | same |
 | `ghost` | transparent, `hover:bg-accent` | same |
@@ -100,6 +102,9 @@ Rules:
   `.Cancel` — so `asChild` is not needed there.
 - Icon-only buttons take `size="icon"` semantics via `aria-label` **and** a
   `Tooltip`. Never an icon-only button with no accessible name.
+- `size="toolbar"` maps to `h-(--size-toolbar-control)` (33px), `px-3.5`,
+  `gap-1.5`, `rounded-lg` (8px), `text-label`, and `font-bold` for action-bar
+  controls whose height falls outside the 24/28/32/36/40px `controlSize` scale.
 
 ## Field
 
@@ -244,16 +249,30 @@ saying where it *is* editable.
 
 ## Badge
 
+Updated **2026-10-26** ([crm-leads-v3.md](specs/crm-leads-v3.md)).
+
 ```ts
 tone: "brand" | "positive" | "caution" | "negative" | "neutral"
+size?: "default" | "sm" // default "default"
 ```
 
-Five tones — the four roles plus neutral. **There is no `info` tone and no
-blue.** If you reach for one, the thing you are labelling is a category, not a
-state, and it takes `neutral`.
+Five tones — the four outcome roles plus neutral (`*-subtle` semantic pairs).
+**There is no `info` tone and no purple or indigo tone.** If you reach for one,
+the thing you are labelling is a category, not a state, and it takes `neutral`.
 
-Tinted background + matching foreground + 1px border. `text-xs`, weight 500,
-`rounded-sm`.
+- `size="default"` (default): `rounded-sm px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide` (`rtl:normal-case rtl:tracking-normal`), preserving every existing caller.
+- `size="sm"`: `h-6` (24px), `rounded-md` (6px), `px-2`, `text-badge` (11px), `font-semibold`, never uppercase.
+
+## Avatar
+
+Updated **2026-10-26** ([crm-leads-v3.md](specs/crm-leads-v3.md)).
+
+```ts
+tone?: "default" | "user" // default "default"
+```
+
+- `tone="default"` (default): neutral `bg-secondary text-secondary-foreground font-medium` initials fallback with no outer ring.
+- `tone="user"`: renders the initials fallback with `bg-gradient-avatar text-white font-bold` (cyan-to-teal chrome gradient, never purple) and adds `ring-[1.5px] ring-card` on `Avatar` (`white` in light mode, `--card` in dark mode) so user avatars separate cleanly from nav chrome, toolbar chips, and board cards.
 
 ## Dialog / AlertDialog / Sheet
 
@@ -351,7 +370,6 @@ with the rest of Phase 1's primitives.
 | **`FileUpload`** | plain `<label>` + `<input type=file>` | See below |
 | **`ImageUploadTile`** | `Button` + `<input type=file>` | See below |
 | **`CommandPalette`** | `cmdk` + `Dialog` | See below |
-| **`RichTextEditor`** | `contenteditable` | See below |
 
 ### DateRangePicker presets
 
@@ -512,23 +530,6 @@ Styling takes no stylesheet: six of `cmdk`'s seven parts take a `className`, and
 the group heading — which does not — is reached by a Tailwind arbitrary variant
 on the group's own class list. See
 [DECISIONS D15](../build/DECISIONS.md#d15--third-party-components-take-no-stylesheet--assumed).
-
-### RichTextEditor
-
-For `loginHtml` and email templates. `contenteditable` plus
-`document.execCommand`: formally deprecated, universally implemented, and
-without a replacement — the alternative is a 200KB editor framework for two
-fields.
-
-**Everything that leaves it is sanitized** by `sanitizeRichText`, an allowlist,
-on every change and on every paste. `loginHtml` renders on the **login page**,
-before a session exists, so the output is treated as hostile by construction.
-The allowlist drops every attribute except a safe `href`, drops `<script>` and
-`<style>` contents entirely, refuses `javascript:` and `data:` hrefs while
-keeping the words, and unwraps the `<div>`/`<font>` soup `execCommand` emits.
-
-This is defence in depth, not the boundary: the backend sanitizes what it
-stores, and the renderer still treats stored HTML as untrusted.
 
 ## Icons
 

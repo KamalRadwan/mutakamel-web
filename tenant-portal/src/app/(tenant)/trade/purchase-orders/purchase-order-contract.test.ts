@@ -53,6 +53,18 @@ const raw = {
 };
 
 const everything = () => true;
+
+describe("purchase-order delivery evidence", () => {
+  it("parses nullable evidence and rejects malformed delivery stages", () => {
+    expect(parsePurchaseOrderDetail({ ...raw, delivery: null }).delivery).toBeNull();
+    const delivery = { status: "EMAIL_REQUESTED", attemptCount: 2,
+      lastErrorCode: "TRADE.PURCHASE_ORDER.DELIVERY_EMAIL_FAILED", nextAttemptAt: null };
+    expect(parsePurchaseOrderDetail({ ...raw, delivery }).delivery).toMatchObject({
+      status: delivery.status, attemptCount: delivery.attemptCount, lastErrorCode: delivery.lastErrorCode,
+    });
+    expect(() => parsePurchaseOrderDetail({ ...raw, delivery: { ...delivery, status: "SENT" } })).toThrow();
+  });
+});
 const order = (over: Partial<PurchaseOrder> = {}): PurchaseOrder => ({
   ...parsePurchaseOrder(raw),
   ...over,
@@ -80,12 +92,14 @@ describe("the purchase-order approval ladder", () => {
     expect(purchaseOrderLadder(pending, CHECKER, everything).reject).toBe(true);
   });
 
-  it("allows confirm on APPROVED and on NOT_REQUIRED, and on nothing else", () => {
-    expect(purchaseOrderLadder(order({ approvalStatus: "APPROVED" }), MAKER, everything).confirm).toBe(
+  it("requires current server approval evidence as well as an eligible status", () => {
+    expect(purchaseOrderLadder(order({ approvalStatus: "APPROVED", approvalReady: true }), MAKER, everything).confirm).toBe(
       true,
     );
-    expect(purchaseOrderLadder(order(), MAKER, everything).confirm).toBe(true);
-    expect(purchaseOrderLadder(order({ approvalStatus: "PENDING" }), MAKER, everything).confirm).toBe(
+    expect(purchaseOrderLadder(order({ approvalReady: true }), MAKER, everything).confirm).toBe(true);
+    expect(purchaseOrderLadder(order(), MAKER, everything).confirm).toBe(false);
+    expect(purchaseOrderLadder(order({ approvalStatus: "APPROVED" }), MAKER, everything).confirm).toBe(false);
+    expect(purchaseOrderLadder(order({ approvalStatus: "PENDING", approvalReady: true }), MAKER, everything).confirm).toBe(
       false,
     );
     // A REJECTED order cannot be confirmed and cannot be re-submitted; the only
@@ -98,7 +112,7 @@ describe("the purchase-order approval ladder", () => {
   });
 
   it("stops offering anything but nothing once cancelled", () => {
-    const cancelled = order({ lifecycleStatus: "CANCELLED" });
+    const cancelled = order({ lifecycleStatus: "CANCELLED", approvalReady: true });
     expect(purchaseOrderLadder(cancelled, MAKER, everything).cancel).toBe(false);
     expect(purchaseOrderLadder(cancelled, MAKER, everything).confirm).toBe(false);
   });
@@ -106,6 +120,7 @@ describe("the purchase-order approval ladder", () => {
   it("hides an action the actor has no grant for", () => {
     const noGrants = () => false;
     expect(purchaseOrderLadder(order(), MAKER, noGrants).submit).toBe(false);
+    expect(purchaseOrderLadder(order({ approvalReady: true }), MAKER, noGrants).confirm).toBe(false);
   });
 
   it("requires a reason on reject as well as cancel", () => {
@@ -116,6 +131,12 @@ describe("the purchase-order approval ladder", () => {
 });
 
 describe("parsePurchaseOrder", () => {
+  it("fails closed when approval readiness is absent and rejects malformed readiness", () => {
+    expect(parsePurchaseOrder(raw).approvalReady).toBe(false);
+    expect(parsePurchaseOrder({ ...raw, approvalReady: true }).approvalReady).toBe(true);
+    expect(() => parsePurchaseOrder({ ...raw, approvalReady: "true" })).toThrow();
+  });
+
   it("carries the dispatch axis the contract page omits", () => {
     expect(parsePurchaseOrder(raw).dispatchStatus).toBe("NOT_REQUESTED");
   });

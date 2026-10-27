@@ -8,6 +8,11 @@ import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { useLeadCompanyEdit } from "./useLeadCompanyEdit";
 import { useLeadCompanyModal } from "./useLeadCompanyModal";
 
+const { warning } = vi.hoisted(() => ({ warning: vi.fn() }));
+vi.mock("@/design-system", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/design-system")>()),
+  useToast: () => ({ warning }),
+}));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
 vi.mock("@/lib/api/idempotent-write", () => ({
   runIdempotentWrite: vi.fn(),
@@ -16,6 +21,7 @@ vi.mock("@/lib/api/idempotent-write", () => ({
 
 const lead = {
   id: "01900100-0000-7000-8000-000000000001", leadProfileType: "CORPORATE",
+  updatedAt: "2026-10-26T10:00:00.123Z",
   companyName: "Acme", companyEmail: null, companyWebsite: null,
   taxNumber: null, commercialRegistrationNumber: null, phones: [],
   address: { addressType: "LEGAL", country: "Egypt", city: null },
@@ -35,6 +41,38 @@ function setup() {
 beforeEach(() => vi.clearAllMocks());
 
 describe("useLeadCompanyModal", () => {
+  it.each([{ status: 409, code: "CRM.LEAD.CONCURRENT_UPDATE" }, { status: 409 }, { status: 422, code: "CRM.LEAD.CONCURRENT_UPDATE" }])("cannot unlock a stale conflict by reopening before the refreshed lead arrives: %j", async (conflict) => {
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "failed", error: conflict });
+    const { result, rerender, onReconcile, onSaved } = setup();
+    act(() => result.current.modal.open());
+    act(() => result.current.modal.setField("companyName", "Draft"));
+    await act(() => result.current.modal.save());
+    expect(onReconcile).toHaveBeenCalledOnce();
+    expect(result.current.edit.error).toEqual(conflict);
+    expect(warning).toHaveBeenCalledExactlyOnceWith(en.crmShared.refusals["CRM.LEAD.CONCURRENT_UPDATE"], undefined, 0, { label: en.crmLeadDetail.reloadLead, onClick: onReconcile });
+    expect(warning.mock.invocationCallOrder[0]).toBeLessThan(onReconcile.mock.invocationCallOrder[0]);
+    expect(result.current.edit.reconciliationRequired).toBe(true);
+    act(() => result.current.modal.close());
+    act(() => result.current.modal.open());
+    act(() => result.current.modal.setField("companyName", "Premature retry"));
+    await act(() => result.current.modal.save());
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
+    const refreshed = { ...lead, companyName: "Server company", updatedAt: "2026-10-26T10:01:00.123Z" };
+    rerender({ currentLead: refreshed });
+    await act(() => result.current.modal.save());
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
+    act(() => result.current.modal.close());
+    act(() => result.current.modal.open());
+    expect(result.current.modal.form?.companyName).toBe("Server company");
+    expect(result.current.modal.isDirty).toBe(false);
+    act(() => result.current.modal.setField("companyName", "Reapplied"));
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: { ...refreshed, companyName: "Reapplied" }, replayed: false });
+    await act(() => result.current.modal.save());
+    expect(runIdempotentWrite).toHaveBeenLastCalledWith(expect.objectContaining({ body: { companyName: "Reapplied", expectedUpdatedAt: refreshed.updatedAt } }));
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(result.current.modal.form).toBeNull();
+  });
+
   it.each(["ambiguous", "applied_unreadable"] as const)("blocks retries after %s and reopens from refreshed data", async (kind) => {
     const { result, rerender, onReconcile, onSaved } = setup();
     vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind, error: { status: 0 } });
@@ -69,8 +107,8 @@ describe("useLeadCompanyModal", () => {
     vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: lead, replayed: false });
     act(() => result.current.modal.open());
     act(() => result.current.modal.setField("companyName", "Updated name"));
-    rerender({ currentLead: { ...lead, taxNumber: "Changed elsewhere" } });
+    rerender({ currentLead: { ...lead, updatedAt: "2026-10-26T10:01:00.123Z", taxNumber: "Changed elsewhere" } });
     await act(async () => result.current.modal.save());
-    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { companyName: "Updated name" } }));
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { companyName: "Updated name", expectedUpdatedAt: lead.updatedAt } }));
   });
 });

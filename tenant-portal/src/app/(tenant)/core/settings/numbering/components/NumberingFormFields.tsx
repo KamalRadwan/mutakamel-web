@@ -22,6 +22,7 @@ interface NumberingFormFieldsProps {
   values: NumberingFormValues;
   onChange: (patch: Partial<NumberingFormValues>) => void;
   companies: CompanyOption[];
+  tenantWideAllowed: boolean;
   isSubmitting: boolean;
   /** `UpdateNumberingSequenceDto` carries neither `code` nor `companyId`. */
   scopeReadOnly: boolean;
@@ -33,6 +34,7 @@ export function NumberingFormFields({
   values,
   onChange,
   companies,
+  tenantWideAllowed,
   isSubmitting,
   scopeReadOnly,
   counterLabel,
@@ -60,9 +62,11 @@ export function NumberingFormFields({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={TENANT_WIDE_COMPANY}>
-              {t.coreSettings.numberingTenantWide}
-            </SelectItem>
+            {tenantWideAllowed ? (
+              <SelectItem value={TENANT_WIDE_COMPANY}>
+                {t.coreSettings.numberingTenantWide}
+              </SelectItem>
+            ) : null}
             {companies.map((company) => (
               <SelectItem key={company.id} value={company.id}>
                 {`${company.code} — ${company.name}`}

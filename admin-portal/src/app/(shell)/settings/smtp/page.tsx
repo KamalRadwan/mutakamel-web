@@ -26,6 +26,7 @@ import { en } from "@/i18n/dictionaries/en";
 import { ar } from "@/i18n/dictionaries/ar";
 import { SettingsResourceBoundary } from "../components/SettingsResourceBoundary";
 import { useSmtpSettings } from "./hooks/useSmtpSettings";
+import { EmailSuppressionSection } from "./components/EmailSuppressionSection";
 import {
   SMTP_ALLOWED_PORTS,
   type SmtpFormState,
@@ -144,6 +145,8 @@ export default function SmtpSettingsPage() {
           </>
         ) : null}
       </SettingsResourceBoundary>
+
+      <EmailSuppressionSection />
 
       <section className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border p-3 sm:p-3.5">

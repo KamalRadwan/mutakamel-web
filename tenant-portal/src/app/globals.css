@@ -7,6 +7,14 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ---------- 1. Font variables, bridged from src/app/fonts.ts ----------
    NOT `@theme inline`. Under Tailwind v4, `inline` means "substitute this
    value into utilities and do not emit the custom property" — so
@@ -14,14 +22,15 @@
    resolved to nothing, and the app rendered in the browser's system stack.
 
    Latin first, Arabic second: the browser resolves font-family per character,
-   so Latin/digit runs render in Plex Sans and Arabic runs in Plex Sans Arabic
-   on the same line with no :lang() switching needed. Ported from the admin
-   portal so both portals draw the same superfamily. */
+   so Latin/digit runs render in Plus Jakarta Sans and Arabic runs in Cairo on
+   the same line with no :lang() switching needed. `font-arabic` exposes Cairo
+   explicitly where Arabic headlines opt into optical weight balancing. */
 
 @theme {
-  --font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
+  --font-sans: var(--font-ui-latin), var(--font-ui-arabic), ui-sans-serif,
     system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-arabic: var(--font-ui-arabic), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-ui-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ---------- 2. Ramps, type scale, radius, weight remap, easing ----------
@@ -136,6 +145,55 @@
   --color-ink-950:       oklch(0.176 0.019 244);
   --color-ink-1000:      oklch(0.132 0.017 245);
 
+  /* ACCENT — Tailwind sky family fitted inside sRGB gamut (600 = #0284c7).
+     Powers fixed Ocean Navy chrome highlights, company entity badges and
+     primary/avatar/logo gradient stops without purple. */
+  --color-accent-50:     oklch(0.977 0.0115 236.62);
+  --color-accent-100:    oklch(0.951 0.025 236.82);
+  --color-accent-200:    oklch(0.901 0.056 230.9);
+  --color-accent-300:    oklch(0.828 0.105 230.32);
+  --color-accent-400:    oklch(0.746 0.142 232.66);
+  --color-accent-500:    oklch(0.685 0.148 237.32);
+  --color-accent-600:    oklch(0.587618 0.138871 241.964);      /* #0284c7 */
+  --color-accent-700:    oklch(0.5 0.118 242.75);
+  --color-accent-800:    oklch(0.443 0.098 240.79);
+  --color-accent-900:    oklch(0.391 0.08 240.88);
+  --color-accent-950:    oklch(0.293 0.058 243.16);
+
+  /* AQUA — Tailwind teal family fitted inside sRGB gamut (600 = #0d9488).
+     Powers user/owner avatar and brand-mark gradient stops. */
+  --color-aqua-50:       oklch(0.984 0.014 180.72);
+  --color-aqua-100:      oklch(0.953 0.048 180.8);
+  --color-aqua-200:      oklch(0.91 0.088 180.43);
+  --color-aqua-300:      oklch(0.855 0.126 181.07);
+  --color-aqua-400:      oklch(0.777 0.134 181.91);
+  --color-aqua-500:      oklch(0.704 0.123 182.5);
+  --color-aqua-600:      oklch(0.600205 0.103871 184.706);      /* #0d9488 */
+  --color-aqua-700:      oklch(0.511 0.086 186.39);
+  --color-aqua-800:      oklch(0.437 0.07 188.22);
+  --color-aqua-900:      oklch(0.386 0.056 188.42);
+  --color-aqua-950:      oklch(0.277 0.044 192.52);
+
+  /* EMBER — Tailwind orange family fitted inside sRGB gamut (500 = #f97316).
+     Carries "due today" activity status distinctly from amber rating stars. */
+  --color-ember-50:      oklch(0.98 0.014 73.68);
+  --color-ember-100:     oklch(0.954 0.036 75.16);
+  --color-ember-200:     oklch(0.901 0.074 70.7);
+  --color-ember-300:     oklch(0.837 0.116 66.29);
+  --color-ember-400:     oklch(0.75 0.168 55.93);
+  --color-ember-500:     oklch(0.704871 0.186722 47.604);       /* #f97316 */
+  --color-ember-600:     oklch(0.646 0.194 41.12);
+  --color-ember-700:     oklch(0.553 0.172 38.4);
+  --color-ember-800:     oklch(0.47 0.14 37.3);
+  --color-ember-900:     oklch(0.408 0.11 38.17);
+  --color-ember-950:     oklch(0.266 0.07 36.26);
+
+  /* NAVY — fixed Ocean Navy global header stops (800 = #132c52, 900 = #0f2342,
+     950 = #091526). Fixed chrome, not overwritten by tenant white-labelling. */
+  --color-navy-800:      oklch(0.295828 0.075909 258.62);       /* #132c52 */
+  --color-navy-900:      oklch(0.258227 0.064048 258.91);       /* #0f2342 */
+  --color-navy-950:      oklch(0.194715 0.038695 257.16);       /* #091526 */
+
   /* Two steps the ink ramp cannot express, carried over verbatim from admin:
      the selected-row tint, and the control boundary — darker than ink-200 so
      an input outline clears 3:1 against the card it sits on. */
@@ -202,70 +260,114 @@
   --color-channel-whatsapp: #25d366;
   --color-channel-telegram: #26a5e4;
 
-  /* Type scale — 7 steps, 13px floor, 14px base. Ported from admin; the two
-     steps that moved are text-2xs (12->13px, admin uses it as a compatibility
-     alias for text-xs) and text-2xl (24->25px). Arabic lift applied below. */
-  --text-2xs: 0.71875rem;             /* 11.5px — compact badges, counters, helper pills */
-  --text-2xs--line-height: 1rem;      /* 16px */
+  /* Named CRM Leads v3 steps (docs/design/specs/crm-leads-v3.md Part 2) plus
+     the base 7-step scale. Arabic lift is applied below in html[lang="ar"]. */
+  --text-micro: 0.625rem;               /* 10px — inner count chips & avatar initials only */
+  --text-micro--line-height: 0.875rem;  /* 14px */
+  --text-micro--letter-spacing: 0em;
+
+  --text-badge: 0.6875rem;              /* 11px — KPI badges, activity & source pills, filter chips */
+  --text-badge--line-height: 1rem;      /* 16px */
+  --text-badge--letter-spacing: 0em;
+
+  --text-caption: 0.75rem;              /* 12px — contact subtitle, compact helper lines */
+  --text-caption--line-height: 1.125rem;/* 18px */
+  --text-caption--letter-spacing: 0em;
+
+  --text-label: 0.78125rem;             /* 12.5px — toolbar CTA & compact control labels */
+  --text-label--line-height: 1.125rem;  /* 18px */
+  --text-label--letter-spacing: 0em;
+
+  --text-tab: 0.84375rem;               /* 13.5px — global nav tabs & collapsed rail titles */
+  --text-tab--line-height: 1.25rem;     /* 20px */
+  --text-tab--letter-spacing: -0.002em;
+
+  --text-card-title: 0.875rem;          /* 14px — Kanban & grid card lead/entity title */
+  --text-card-title--line-height: 1.25rem; /* 20px */
+  --text-card-title--letter-spacing: -0.003em;
+
+  --text-column-title: 0.90625rem;      /* 14.5px — Kanban stage column header title */
+  --text-column-title--line-height: 1.3125rem; /* 21px */
+  --text-column-title--letter-spacing: -0.005em;
+
+  --text-2xs: 0.71875rem;               /* 11.5px — compact badges, counters, helper pills */
+  --text-2xs--line-height: 1rem;        /* 16px */
   --text-2xs--letter-spacing: 0em;
 
-  --text-xs: 0.78125rem;              /* 12.5px — the workhorse: table cells, badges, meta */
-  --text-xs--line-height: 1.125rem;   /* 18px */
+  --text-xs: 0.78125rem;                /* 12.5px — the workhorse: table cells, badges, meta */
+  --text-xs--line-height: 1.125rem;     /* 18px */
   --text-xs--letter-spacing: 0em;
 
-  --text-sm: 0.875rem;                /* 14px — base: body, inputs, buttons, labels, nav */
-  --text-sm--line-height: 1.25rem;    /* 20px */
+  --text-sm: 0.875rem;                  /* 14px — base: body, inputs, buttons, labels, nav */
+  --text-sm--line-height: 1.25rem;      /* 20px */
   --text-sm--letter-spacing: -0.003em;
 
-  --text-base: 0.9375rem;             /* 15px — prose, dialog descriptions */
-  --text-base--line-height: 1.5rem;   /* 24px */
+  --text-base: 0.9375rem;               /* 15px — prose, dialog descriptions */
+  --text-base--line-height: 1.5rem;     /* 24px */
   --text-base--letter-spacing: -0.006em;
 
-  --text-lg: 1.0625rem;               /* 17px — card titles, h2/h3 */
-  --text-lg--line-height: 1.5rem;     /* 24px */
+  --text-lg: 1.0625rem;                 /* 17px — card titles, h2/h3 */
+  --text-lg--line-height: 1.5rem;       /* 24px */
   --text-lg--letter-spacing: -0.01em;
 
-  --text-xl: 1.25rem;                 /* 20px — page title */
-  --text-xl--line-height: 1.75rem;    /* 28px */
+  --text-xl: 1.25rem;                   /* 20px — page title */
+  --text-xl--line-height: 1.75rem;      /* 28px */
   --text-xl--letter-spacing: -0.014em;
 
-  --text-2xl: 1.5625rem;              /* 25px — KPI numerals, ceiling */
-  --text-2xl--line-height: 2rem;      /* 32px */
+  --text-2xl: 1.5625rem;                /* 25px — KPI numerals, ceiling */
+  --text-2xl--line-height: 2rem;        /* 32px */
   --text-2xl--letter-spacing: -0.018em;
 
-  /* Weight ceiling — only 400/500/600 are downloaded (src/app/fonts.ts).
-     Remapping bold/extrabold/black to 600 de-escalates every existing
-     font-bold call site with zero .tsx edits. */
-  --font-weight-bold: 600;
-  --font-weight-extrabold: 600;
-  --font-weight-black: 600;
+  /* Weight ceiling — 400/500/600/700/800 are downloaded (src/app/fonts.ts).
+     900 stays forbidden and remaps to 800 so no stray heavy utility triggers
+     synthetic bolding. */
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  --font-weight-black: 800;
 
-  /* Radius — admin's 5 steps. xs is 3px (was 2px) and xl is a real 10px step
-     for dialogs and drawers rather than a squash down to lg. The transitional
-     rounded-2xl/3xl squash is gone with admin's: the census baseline records
-     zero call sites for either, so nothing changes shape. */
-  --radius-xs: 0.1875rem;  /* 3px — checkbox */
-  --radius-sm: 0.25rem;    /* 4px — chips, inline code */
-  --radius-md: 0.375rem;   /* 6px — default: buttons, inputs, badges, tabs */
-  --radius-lg: 0.5rem;     /* 8px — cards, table shell, popovers */
-  --radius-xl: 0.625rem;   /* 10px — dialogs, drawers */
+  /* Radius — 5 generic steps plus the named card (13px) and column (16px)
+     surfaces from CRM Leads v3. */
+  --radius-xs: 0.1875rem;    /* 3px — checkbox */
+  --radius-sm: 0.25rem;      /* 4px — chips, inline code */
+  --radius-md: 0.375rem;     /* 6px — default: buttons, inputs, badges, tabs */
+  --radius-lg: 0.5rem;       /* 8px — table shell, popovers, toolbar controls */
+  --radius-xl: 0.625rem;     /* 10px — dialogs, drawers */
+  --radius-card: 0.8125rem;  /* 13px — Kanban & entity cards */
+  --radius-column: 1rem;     /* 16px — Kanban stage columns & collapsed rails */
 
   /* Motion — docs/design/motion.md#standard-easing. One curve for
      everything: fast start, soft landing. */
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Arabic gets +1px on the three smallest steps, line-heights raised in
-   lockstep — Plex Arabic needs the extra room for dots and diacritics where
-   Plex Latin does not. text-2xs is Latin-only by convention (no uppercase in
-   Arabic) so it is deliberately not lifted. Identical to admin's block. */
+/* Arabic gets +1px on the small and mid steps, line-heights raised in lockstep
+   and tracking zeroed so Cairo's dots and joined forms never clip or split.
+   text-2xs is Latin-only by convention (no uppercase in Arabic) so it is
+   deliberately not lifted. */
 html[lang="ar"] {
-  --text-xs: 0.875rem;                /* 14px */
-  --text-xs--line-height: 1.25rem;    /* 20px */
-  --text-sm: 0.9375rem;               /* 15px */
-  --text-sm--line-height: 1.375rem;   /* 22px */
-  --text-base: 1rem;                  /* 16px */
-  --text-base--line-height: 1.625rem; /* 26px */
+  --text-micro: 0.6875rem;              /* 11px */
+  --text-micro--line-height: 0.9375rem; /* 15px */
+  --text-badge: 0.75rem;                /* 12px */
+  --text-badge--line-height: 1.0625rem; /* 17px */
+  --text-caption: 0.8125rem;            /* 13px */
+  --text-caption--line-height: 1.25rem; /* 20px */
+  --text-label: 0.84375rem;             /* 13.5px */
+  --text-label--line-height: 1.25rem;   /* 20px */
+  --text-tab: 0.90625rem;               /* 14.5px */
+  --text-tab--line-height: 1.375rem;    /* 22px */
+  --text-tab--letter-spacing: 0em;
+  --text-card-title: 0.9375rem;         /* 15px */
+  --text-card-title--line-height: 1.375rem; /* 22px */
+  --text-card-title--letter-spacing: 0em;
+  --text-column-title: 0.96875rem;      /* 15.5px */
+  --text-column-title--line-height: 1.4375rem; /* 23px */
+  --text-column-title--letter-spacing: 0em;
+  --text-xs: 0.875rem;                  /* 14px */
+  --text-xs--line-height: 1.25rem;      /* 20px */
+  --text-sm: 0.9375rem;                 /* 15px */
+  --text-sm--line-height: 1.375rem;     /* 22px */
+  --text-base: 1rem;                    /* 16px */
+  --text-base--line-height: 1.625rem;   /* 26px */
 }
 
 /* ---------- 3. Semantic tokens, control sizes, elevation ----------
@@ -277,13 +379,24 @@ html[lang="ar"] {
 
 :root {
   --background: var(--color-ink-50);
-  --foreground: oklch(0.256528 0.058664 258.037);
+  --foreground: #0f172a;
+  --foreground-secondary: #334155;
   --canvas: var(--color-ink-50);
 
   --card: white;
   --card-foreground: var(--foreground);
   --popover: white;
   --popover-foreground: var(--foreground);
+
+  --surface-column: #f6f8fc;
+  --surface-column-header: #ffffff;
+  --surface-toolbar: #ffffff;
+  --surface-subtle: #f8fafc;
+
+  --line-column: #dce3ef;
+  --line-card: #e2e8f0;
+  --line-control: #cbd5e1;
+  --line-divider: #e8eef6;
 
   --primary: var(--color-brand-600);
   --primary-foreground: white;
@@ -292,7 +405,7 @@ html[lang="ar"] {
   --secondary-foreground: var(--foreground);
 
   --muted: var(--color-ink-100);
-  --muted-foreground: oklch(0.518211 0.050915 249.823);
+  --muted-foreground: #64748b;
 
   --accent: var(--color-ink-100);
   --accent-foreground: var(--foreground);
@@ -375,12 +488,87 @@ html[lang="ar"] {
      as CLAIMS there; the summary is white 17.5:1, ink-400 ~7:1, brand-300
      9.7:1. `.nav-surface` below is what hands these to the controls. */
   --nav: var(--color-chrome);
-  --nav-foreground: white;
+  --nav-foreground: #e2e8f0;
+  --nav-foreground-strong: #f8fafc;
   --nav-muted-foreground: var(--color-ink-300);
   --nav-accent: var(--color-brand-900);
   --nav-border: var(--color-brand-800);
   --nav-active: #38bdf8;
   --nav-ring: white;
+  --nav-switcher-surface: rgb(14 165 233 / 0.16);
+  --nav-switcher-line: rgb(56 189 248 / 0.35);
+  --nav-switcher-fg: #e0f2fe;
+  --nav-tab-active-line: rgb(125 211 252 / 0.45);
+  --nav-chrome-line: rgb(148 163 184 / 0.2);
+
+  /* CRM Leads v3 semantic roles — activity health, pills, stars, KPI badges,
+     entity badges, count pills, active filter chips and named gradients.
+     Spec blues map onto --color-brand-* so tenant white-labelling recolours
+     them automatically; fixed Ocean Navy chrome stays invariant. */
+  --activity-none: #cbd5e1;
+  --activity-today: var(--color-ember-500);
+  --activity-future: #16a34a;
+  --activity-overdue: #ef4444;
+
+  --activity-none-surface: #f1f5f9;
+  --activity-none-line: #cbd5e1;
+  --activity-none-text: #475569;
+  --activity-future-surface: #f0fdf4;
+  --activity-future-line: #86efac;
+  --activity-future-text: #15803d;
+  --activity-today-surface: #fff7ed;
+  --activity-today-line: #fdba74;
+  --activity-today-text: #c2410c;
+  --activity-overdue-surface: #fef2f2;
+  --activity-overdue-line: #fca5a5;
+  --activity-overdue-text: #b91c1c;
+
+  --star-filled: #f59e0b;
+  --star-empty: #cbd5e1;
+
+  --kpi-total-surface: #f1f5f9;
+  --kpi-total-line: #cbd5e1;
+  --kpi-total-text: #1e293b;
+  --kpi-total-count: #334155;
+  --kpi-new-surface: var(--color-brand-50);
+  --kpi-new-line: var(--color-brand-200);
+  --kpi-new-text: var(--color-brand-800);
+  --kpi-new-count: var(--color-brand-600);
+  --kpi-rated-surface: #fffbeb;
+  --kpi-rated-line: #fde68a;
+  --kpi-rated-text: #92400e;
+  --kpi-rated-count: #b45309;
+  --kpi-qualified-surface: #ecfdf5;
+  --kpi-qualified-line: #a7f3d0;
+  --kpi-qualified-text: #065f46;
+  --kpi-qualified-count: #15803d;
+  --kpi-overdue-surface: #fef2f2;
+  --kpi-overdue-line: #fecaca;
+  --kpi-overdue-text: #991b1b;
+  --kpi-overdue-count: #dc2626;
+
+  --entity-person-surface: var(--color-brand-50);
+  --entity-person-fg: var(--color-brand-600);
+  --entity-company-surface: var(--color-accent-50);
+  --entity-company-fg: var(--color-accent-600);
+
+  --count-active-surface: var(--color-brand-50);
+  --count-active-fg: var(--color-brand-700);
+  --count-zero-surface: #f1f5f9;
+  --count-zero-fg: #475569;
+  --count-danger-surface: #fef2f2;
+  --count-danger-fg: #b91c1c;
+
+  --chip-active-line: var(--color-brand-300);
+  --chip-active-fg: var(--color-brand-700);
+
+  --gradient-header: linear-gradient(90deg, var(--color-navy-950) 0%, var(--color-navy-900) 52%, var(--color-navy-800) 100%);
+  --gradient-brand-strip: linear-gradient(90deg, #2563eb 0%, #0ea5e9 35%, #10b981 70%, #f59e0b 100%);
+  --gradient-primary: linear-gradient(135deg, var(--color-brand-600) 0%, var(--color-accent-700) 100%);
+  --gradient-avatar: linear-gradient(135deg, var(--color-accent-700) 0%, var(--color-aqua-700) 100%);
+  --gradient-logo: linear-gradient(135deg, var(--color-brand-600) 0%, var(--color-accent-700) 55%, var(--color-aqua-700) 100%);
+  --gradient-canvas: linear-gradient(180deg, #edf2f8, #e4ebf5);
+  --gradient-chip-active: linear-gradient(135deg, var(--color-brand-50), var(--color-brand-100));
 
   /* Chart roles are semantic first. Qualitative slots are reserved for
      unrelated categories and are always paired with labels or patterns.
@@ -491,24 +679,28 @@ html[lang="ar"] {
      portal's shell is two stacked horizontal bars rather than a sidebar beside
      a topbar — see docs/design/shell.md.
 
-     Both bars are the same height on purpose: they read as one 70px chrome
-     block split by a rule, not as a header with a subordinate strip. 35px
-     clears the bars' 28px controls with a 3.5px optical margin while returning
-     vertical workspace to the dense CRM views.
+     The global Ocean Navy topbar is 58px (--size-topbar), below a fixed 3px
+     brand accent strip (--size-brand-strip). The page action bar is 59px
+     (--size-actionbar): an 11px top inset plus the 48px floating toolbar
+     (--size-toolbar), with 33px controls (--size-toolbar-control).
 
      --size-brand is the inline-start zone of the global nav, sized so the
      tenant's own logo has room next to the app name at a legible size. It is
      10px wider than the 240px sidebar it replaces, which is the one dimension
      the old shell and this one share a lineage on. */
   --size-row: calc(2.75rem * var(--ui-scale));      /* 44px */
-  --size-topbar: calc(2.1875rem * var(--ui-scale)); /* 35px — global nav */
-  --size-actionbar: calc(2.1875rem * var(--ui-scale)); /* 35px — page action bar */
+  --size-topbar: calc(3.625rem * var(--ui-scale));  /* 58px — global Ocean Navy nav */
+  --size-brand-strip: 3px;                       /* fixed brand accent strip */
+  --size-actionbar-inset: calc(0.6875rem * var(--ui-scale)); /* 11px — toolbar top inset */
+  --size-actionbar: calc(var(--size-toolbar) + var(--size-actionbar-inset)); /* 59px — toolbar + top inset */
+  --size-toolbar: calc(3rem * var(--ui-scale));     /* 48px — floating CRM toolbar */
+  --size-toolbar-control: calc(2.0625rem * var(--ui-scale)); /* 33px — CRM toolbar controls */
   --size-brand: calc(15.625rem * var(--ui-scale));  /* 250px */
-  /* Both bars together — what anything positioned against the chrome from
+  /* The strip and both bars — what anything positioned against the chrome from
      OUTSIDE the shell's flex column has to clear. Derived, never a second
-     literal, so the two bars stay the only place a chrome height is
+     literal, so the strip and bars stay the only place a chrome height is
      written down. */
-  --size-chrome: calc(var(--size-topbar) + var(--size-actionbar)); /* 70px */
+  --size-chrome: calc(var(--size-brand-strip) + var(--size-topbar) + var(--size-actionbar)); /* 120px at standard density */
 
   /* A collapsed board column: wide enough for the expand control and the stage
      name turned on its side, narrow enough that four collapsed stages cost
@@ -536,13 +728,14 @@ html[lang="ar"] {
   --z-dropdown: 110;
   --z-toast: 1000;
 
-  /* Elevation — shadow means "floating above the document", nothing else:
-     cards use border + background step, never a shadow. `pop` is the
-     small-surface elevation (popover, tooltip, dropdown, select, switch thumb,
-     toast); `overlay` is the large-surface one (dialog, sheet, alert-dialog).
-     Admin's values. */
+  /* Elevation — pop/overlay cover floating portals; toolbar/column/card/nav-active
+     supply the CRM Leads v3 layered surface hierarchy. */
   --elevation-pop: 0 4px 6px -1px rgb(15 23 32 / 0.08), 0 2px 4px -2px rgb(15 23 32 / 0.06);
   --elevation-overlay: 0 20px 25px -5px rgb(15 23 32 / 0.12), 0 8px 10px -6px rgb(15 23 32 / 0.08);
+  --elevation-toolbar: 0 4px 16px -3px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.03);
+  --elevation-column: 0 4px 16px -4px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.03);
+  --elevation-card: 0 4px 14px -3px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.04);
+  --elevation-nav-active: 0 4px 14px rgb(2 132 199 / 0.42);
 }
 
 /* Real pointer targets for dense controls. `ds-hit-area` increases the control
@@ -618,12 +811,23 @@ html[lang="ar"] {
 .dark {
   --background: var(--color-ink-1000);
   --foreground: var(--color-ink-100);
+  --foreground-secondary: #cbd5e1;
   --canvas: var(--color-ink-1000);
 
   --card: var(--color-ink-950);
   --card-foreground: var(--color-ink-100);
   --popover: var(--color-ink-900);
   --popover-foreground: var(--color-ink-100);
+
+  --surface-column: #070f1a;
+  --surface-column-header: var(--color-ink-950);
+  --surface-toolbar: var(--color-ink-950);
+  --surface-subtle: #111c2b;
+
+  --line-column: #1e2d42;
+  --line-card: #243449;
+  --line-control: #62758f;
+  --line-divider: #1b293b;
 
   /* Bright brand text and fills share one role in the component API. The
      darker brand-500 step was AA as a fill with white, but only 3.66:1 when
@@ -692,18 +896,87 @@ html[lang="ar"] {
   --sidebar-border: var(--color-ink-800);
   --sidebar-ring: var(--color-brand-400);
 
-  /* Dark mode keeps the bar exactly as it was, so `.nav-surface` resolves to a
-     no-op here: every name points back at the value the control would have read
-     anyway. The chrome navy is a LIGHT-mode decision — against an ink-1000
-     canvas a saturated dark blue separates less than the card surface does, and
-     inverting an already-inverted theme inverts nothing. */
+  /* Dark mode keeps the Ocean Navy header invariant (`bg-gradient-header`
+     across navy-950 -> navy-900 -> navy-800), so `.nav-surface` keeps light
+     on-chrome foregrounds and translucent sky switcher accents in both themes. */
   --nav: var(--color-chrome);
-  --nav-foreground: white;
+  --nav-foreground: #e2e8f0;
+  --nav-foreground-strong: #f8fafc;
   --nav-muted-foreground: var(--color-ink-300);
   --nav-accent: var(--color-brand-900);
   --nav-border: var(--color-brand-800);
   --nav-active: #38bdf8;
   --nav-ring: var(--ring);
+  --nav-switcher-surface: rgb(14 165 233 / 0.18);
+  --nav-switcher-line: rgb(56 189 248 / 0.38);
+  --nav-switcher-fg: #e0f2fe;
+  --nav-tab-active-line: rgb(125 211 252 / 0.48);
+  --nav-chrome-line: rgb(148 163 184 / 0.22);
+
+  --activity-none: #64748b;
+  --activity-today: #fb923c;
+  --activity-future: #22c55e;
+  --activity-overdue: #f87171;
+
+  --activity-none-surface: rgb(148 163 184 / 0.14);
+  --activity-none-line: rgb(148 163 184 / 0.32);
+  --activity-none-text: #cbd5e1;
+  --activity-future-surface: rgb(34 197 94 / 0.14);
+  --activity-future-line: rgb(74 222 128 / 0.35);
+  --activity-future-text: #86efac;
+  --activity-today-surface: rgb(249 115 22 / 0.15);
+  --activity-today-line: rgb(251 146 60 / 0.38);
+  --activity-today-text: #fdba74;
+  --activity-overdue-surface: rgb(239 68 68 / 0.15);
+  --activity-overdue-line: rgb(248 113 113 / 0.38);
+  --activity-overdue-text: #fca5a5;
+
+  --star-filled: #fbbf24;
+  --star-empty: #475569;
+
+  --kpi-total-surface: rgb(148 163 184 / 0.14);
+  --kpi-total-line: rgb(148 163 184 / 0.32);
+  --kpi-total-text: #e2e8f0;
+  --kpi-total-count: #334155;
+  --kpi-new-surface: var(--color-brand-950);
+  --kpi-new-line: var(--color-brand-800);
+  --kpi-new-text: var(--color-brand-200);
+  --kpi-new-count: var(--color-brand-600);
+  --kpi-rated-surface: rgb(245 158 11 / 0.15);
+  --kpi-rated-line: rgb(251 191 36 / 0.35);
+  --kpi-rated-text: #fde68a;
+  --kpi-rated-count: #b45309;
+  --kpi-qualified-surface: rgb(16 185 129 / 0.15);
+  --kpi-qualified-line: rgb(52 211 153 / 0.35);
+  --kpi-qualified-text: #a7f3d0;
+  --kpi-qualified-count: #15803d;
+  --kpi-overdue-surface: rgb(239 68 68 / 0.15);
+  --kpi-overdue-line: rgb(248 113 113 / 0.38);
+  --kpi-overdue-text: #fecaca;
+  --kpi-overdue-count: #dc2626;
+
+  --entity-person-surface: var(--color-brand-950);
+  --entity-person-fg: var(--color-brand-300);
+  --entity-company-surface: var(--color-accent-950);
+  --entity-company-fg: var(--color-accent-300);
+
+  --count-active-surface: var(--color-brand-950);
+  --count-active-fg: var(--color-brand-200);
+  --count-zero-surface: rgb(148 163 184 / 0.14);
+  --count-zero-fg: #cbd5e1;
+  --count-danger-surface: rgb(239 68 68 / 0.15);
+  --count-danger-fg: #fca5a5;
+
+  --chip-active-line: var(--color-brand-700);
+  --chip-active-fg: var(--color-brand-200);
+
+  --gradient-header: linear-gradient(90deg, var(--color-navy-950) 0%, var(--color-navy-900) 52%, var(--color-navy-800) 100%);
+  --gradient-brand-strip: linear-gradient(90deg, #2563eb 0%, #0ea5e9 35%, #10b981 70%, #f59e0b 100%);
+  --gradient-primary: linear-gradient(135deg, var(--color-brand-600) 0%, var(--color-accent-700) 100%);
+  --gradient-avatar: linear-gradient(135deg, var(--color-accent-700) 0%, var(--color-aqua-700) 100%);
+  --gradient-logo: linear-gradient(135deg, var(--color-brand-600) 0%, var(--color-accent-700) 55%, var(--color-aqua-700) 100%);
+  --gradient-canvas: linear-gradient(180deg, #040911, #060d17);
+  --gradient-chip-active: linear-gradient(135deg, var(--color-brand-950), var(--color-brand-900));
 
   --chart-action: var(--color-brand-400);
   --chart-success: var(--color-positive-400);
@@ -765,9 +1038,14 @@ html[lang="ar"] {
   --swatch-slate-deep:  #cbd5e1;
 
   /* A drop shadow against an already-dark canvas reads as mud — substitute a
-     top inset hairline instead. */
+     top inset hairline on document surfaces, keeping the sky glow on the
+     active Ocean Navy tab. */
   --elevation-pop: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
   --elevation-overlay: inset 0 1px 0 0 rgb(255 255 255 / 0.08);
+  --elevation-toolbar: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+  --elevation-column: inset 0 1px 0 0 rgb(255 255 255 / 0.04);
+  --elevation-card: inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+  --elevation-nav-active: 0 4px 14px rgb(2 132 199 / 0.36);
 }
 
 /* ---------- 4. Bridge semantics into Tailwind utilities ----------
@@ -778,11 +1056,20 @@ html[lang="ar"] {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
   --color-canvas: var(--canvas);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-surface-column: var(--surface-column);
+  --color-surface-column-header: var(--surface-column-header);
+  --color-surface-toolbar: var(--surface-toolbar);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-line-column: var(--line-column);
+  --color-line-card: var(--line-card);
+  --color-line-control: var(--line-control);
+  --color-line-divider: var(--line-divider);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -846,13 +1133,71 @@ html[lang="ar"] {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Only the two the nav names directly: `bg-nav` on the bar itself, and
-     `bg-nav-active` for the 2px marker under an open section. Everything else
-     on the bar goes through `.nav-surface`, which re-points the ordinary
-     semantic names — a control there asks for `text-muted-foreground` like any
-     other control in the product and gets the on-chrome value. */
   --color-nav: var(--nav);
   --color-nav-active: var(--nav-active);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-nav-foreground-strong: var(--nav-foreground-strong);
+  --color-nav-switcher-surface: var(--nav-switcher-surface);
+  --color-nav-switcher-line: var(--nav-switcher-line);
+  --color-nav-switcher-fg: var(--nav-switcher-fg);
+  --color-nav-tab-active-line: var(--nav-tab-active-line);
+  --color-nav-chrome-line: var(--nav-chrome-line);
+
+  --color-activity-none: var(--activity-none);
+  --color-activity-today: var(--activity-today);
+  --color-activity-future: var(--activity-future);
+  --color-activity-overdue: var(--activity-overdue);
+  --color-activity-none-surface: var(--activity-none-surface);
+  --color-activity-none-line: var(--activity-none-line);
+  --color-activity-none-text: var(--activity-none-text);
+  --color-activity-future-surface: var(--activity-future-surface);
+  --color-activity-future-line: var(--activity-future-line);
+  --color-activity-future-text: var(--activity-future-text);
+  --color-activity-today-surface: var(--activity-today-surface);
+  --color-activity-today-line: var(--activity-today-line);
+  --color-activity-today-text: var(--activity-today-text);
+  --color-activity-overdue-surface: var(--activity-overdue-surface);
+  --color-activity-overdue-line: var(--activity-overdue-line);
+  --color-activity-overdue-text: var(--activity-overdue-text);
+
+  --color-star-filled: var(--star-filled);
+  --color-star-empty: var(--star-empty);
+
+  --color-kpi-total-surface: var(--kpi-total-surface);
+  --color-kpi-total-line: var(--kpi-total-line);
+  --color-kpi-total-text: var(--kpi-total-text);
+  --color-kpi-total-count: var(--kpi-total-count);
+  --color-kpi-new-surface: var(--kpi-new-surface);
+  --color-kpi-new-line: var(--kpi-new-line);
+  --color-kpi-new-text: var(--kpi-new-text);
+  --color-kpi-new-count: var(--kpi-new-count);
+  --color-kpi-rated-surface: var(--kpi-rated-surface);
+  --color-kpi-rated-line: var(--kpi-rated-line);
+  --color-kpi-rated-text: var(--kpi-rated-text);
+  --color-kpi-rated-count: var(--kpi-rated-count);
+  --color-kpi-qualified-surface: var(--kpi-qualified-surface);
+  --color-kpi-qualified-line: var(--kpi-qualified-line);
+  --color-kpi-qualified-text: var(--kpi-qualified-text);
+  --color-kpi-qualified-count: var(--kpi-qualified-count);
+  --color-kpi-overdue-surface: var(--kpi-overdue-surface);
+  --color-kpi-overdue-line: var(--kpi-overdue-line);
+  --color-kpi-overdue-text: var(--kpi-overdue-text);
+  --color-kpi-overdue-count: var(--kpi-overdue-count);
+
+  --color-entity-person-surface: var(--entity-person-surface);
+  --color-entity-person-fg: var(--entity-person-fg);
+  --color-entity-company-surface: var(--entity-company-surface);
+  --color-entity-company-fg: var(--entity-company-fg);
+
+  --color-count-active-surface: var(--count-active-surface);
+  --color-count-active-fg: var(--count-active-fg);
+  --color-count-zero-surface: var(--count-zero-surface);
+  --color-count-zero-fg: var(--count-zero-fg);
+  --color-count-danger-surface: var(--count-danger-surface);
+  --color-count-danger-fg: var(--count-danger-fg);
+
+  --color-chip-active-line: var(--chip-active-line);
+  --color-chip-active-fg: var(--chip-active-fg);
 
   /* Card swatches. `inline` matters here for the usual reason — a plain
      @theme would resolve these once at :root and .dark's override would never
@@ -897,6 +1242,40 @@ html[lang="ar"] {
      renders flat with no error. */
   --shadow-pop: var(--elevation-pop);
   --shadow-overlay: var(--elevation-overlay);
+  --shadow-toolbar: var(--elevation-toolbar);
+  --shadow-column: var(--elevation-column);
+  --shadow-card: var(--elevation-card);
+  --shadow-nav-active: var(--elevation-nav-active);
+}
+
+/* Named gradient utilities (docs/design/specs/crm-leads-v3.md Part 2).
+   Each reads its theme-aware custom property from :root / .dark. */
+@utility bg-gradient-header {
+  background-image: var(--gradient-header);
+}
+
+@utility bg-gradient-brand-strip {
+  background-image: var(--gradient-brand-strip);
+}
+
+@utility bg-gradient-primary {
+  background-image: var(--gradient-primary);
+}
+
+@utility bg-gradient-avatar {
+  background-image: var(--gradient-avatar);
+}
+
+@utility bg-gradient-logo {
+  background-image: var(--gradient-logo);
+}
+
+@utility bg-gradient-canvas {
+  background-image: var(--gradient-canvas);
+}
+
+@utility bg-gradient-chip-active {
+  background-image: var(--gradient-chip-active);
 }
 
 /* ---------- 5. The theme flip ----------
@@ -1023,19 +1402,17 @@ body {
   color: var(--foreground);
   /* Reference the next/font variables directly rather than --font-sans.
      Tailwind v4 only emits a theme variable that some generated utility
-     actually uses, so --font-sans was tree-shaken away and this line
-     resolved to nothing — the app rendered in the system stack while the
-     webfont downloaded on every page load and drew no glyph. The @theme
-     block above still defines font-sans/font-mono so the utilities exist;
-     this line is what puts the face on the page.
+     actually uses, so --font-sans could be tree-shaken away if unreferenced
+     by a utility class. The @theme block above still defines
+     font-sans/font-arabic/font-mono so those utilities exist; this line puts
+     Plus Jakarta Sans (Latin) + Cairo (Arabic) directly on the page.
 
-     Latin first, Arabic second — same order as the @theme block and as
-     admin's: the browser resolves font-family per character, so a Latin
-     enum inside an Arabic sentence stays in Plex Sans while the sentence
-     around it renders in Plex Sans Arabic. */
-  font-family: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
+     Latin first, Arabic second: the browser resolves font-family per
+     character, so a Latin enum inside an Arabic sentence stays in Plus Jakarta
+     Sans while the sentence around it renders in Cairo. */
+  font-family: var(--font-ui-latin), var(--font-ui-arabic), ui-sans-serif,
     system-ui, sans-serif;
-  /* Only 400/500/600 are downloaded — this stops the browser synthesising a
+  /* 400/500/600/700/800 are downloaded — this stops the browser synthesising a
      fake bold for anything heavier that slips through the weight remap
      above. */
   font-synthesis-weight: none;
@@ -1140,17 +1517,30 @@ body {
 
   .dark {
     --background: var(--color-ink-50);
-    --foreground: var(--color-ink-900);
+    --foreground: #0f172a;
+    --foreground-secondary: #334155;
     --canvas: white;
     --card: white;
-    --card-foreground: var(--color-ink-900);
+    --card-foreground: #0f172a;
     --popover: white;
-    --popover-foreground: var(--color-ink-900);
-    --muted-foreground: var(--color-ink-600);
+    --popover-foreground: #0f172a;
+    --surface-column: #f6f8fc;
+    --surface-column-header: #ffffff;
+    --surface-toolbar: #ffffff;
+    --surface-subtle: #f8fafc;
+    --line-column: #dce3ef;
+    --line-card: #e2e8f0;
+    --line-control: #cbd5e1;
+    --line-divider: #e8eef6;
+    --muted-foreground: #64748b;
     --border: var(--color-ink-200);
     --row-zebra: var(--color-ink-25);
     --elevation-pop: none;
     --elevation-overlay: none;
+    --elevation-toolbar: none;
+    --elevation-column: none;
+    --elevation-card: none;
+    --elevation-nav-active: none;
   }
 
   /* A document is read as one continuous thing on paper; the shell's scroll
@@ -1748,7 +2138,7 @@ body {
 }
 
 .dossier-phone-num {
-  font-family: var(--font-plex-mono), monospace;
+  font-family: var(--font-ui-mono), monospace;
   font-size: 12.5px;
   font-weight: 800;
   color: #0f172a;
@@ -1760,7 +2150,7 @@ body {
 
 .dossier-tag-primary,
 .dossier-phone-tag {
-  font-family: var(--font-plex-latin), var(--font-plex-arabic), sans-serif;
+  font-family: var(--font-ui-latin), var(--font-ui-arabic), sans-serif;
   font-size: 10px;
   font-weight: 700;
   padding: 1.5px 6px;
@@ -1772,7 +2162,7 @@ body {
 
 .dossier-tag-secondary,
 .dossier-phone-tag.secondary {
-  font-family: var(--font-plex-latin), var(--font-plex-arabic), sans-serif;
+  font-family: var(--font-ui-latin), var(--font-ui-arabic), sans-serif;
   font-size: 10px;
   font-weight: 700;
   padding: 1.5px 6px;
@@ -1927,7 +2317,7 @@ body {
 
 .dossier-field-val.mono,
 .dossier-input.mono {
-  font-family: var(--font-plex-mono), monospace;
+  font-family: var(--font-ui-mono), monospace;
 }
 
 .dossier-inp,
@@ -2158,7 +2548,7 @@ body {
   border-radius: 4px;
   padding: 0 5px;
   font-size: 10px;
-  font-family: var(--font-plex-mono), monospace;
+  font-family: var(--font-ui-mono), monospace;
   color: #475569;
 }
 

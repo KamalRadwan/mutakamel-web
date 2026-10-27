@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useTenantAuth } from "@/context/AuthContext";
-import { useRealtimeResync } from "@/design-system";
+import { useCan, useRealtimeResync } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
@@ -77,23 +76,23 @@ function buildCreateBody(level: OrgLevel, values: OrgNodeFormValues): Record<str
   return stripUndefined(body);
 }
 
-/** `code` is create-only; every update DTO accepts `status` and none accepts a code. */
+/** Update DTOs clear text with `""` and the team lead with `null`; omission preserves values. */
 function buildUpdateBody(level: OrgLevel, values: OrgNodeFormValues): Record<string, unknown> {
   const config = ORG_LEVEL_CONFIG[level];
   const body: Record<string, unknown> = {
     name: values.name.trim(),
     status: values.status,
   };
-  if (config.fields.includes("legalName")) body.legalName = optionalText(values.legalName);
-  if (config.fields.includes("taxNumber")) body.taxNumber = optionalText(values.taxNumber);
+  if (config.fields.includes("legalName")) body.legalName = values.legalName.trim();
+  if (config.fields.includes("taxNumber")) body.taxNumber = values.taxNumber.trim();
   if (config.fields.includes("currencyCode")) {
-    body.currencyCode = optionalText(values.currencyCode.toUpperCase());
+    body.currencyCode = values.currencyCode.trim().toUpperCase();
   }
-  if (config.fields.includes("address")) body.address = optionalText(values.address);
-  if (config.fields.includes("phone")) body.phone = optionalText(values.phone);
+  if (config.fields.includes("address")) body.address = values.address.trim();
+  if (config.fields.includes("phone")) body.phone = values.phone.trim();
   if (config.fields.includes("isHeadquarters")) body.isHeadquarters = values.isHeadquarters;
-  if (config.fields.includes("leadUserId")) body.leadUserId = optionalText(values.leadUserId);
-  return stripUndefined(body);
+  if (config.fields.includes("leadUserId")) body.leadUserId = optionalText(values.leadUserId) ?? null;
+  return body;
 }
 
 function stripUndefined(body: Record<string, unknown>): Record<string, unknown> {
@@ -102,9 +101,8 @@ function stripUndefined(body: Record<string, unknown>): Record<string, unknown> 
 
 export function useOrganizationLevel<L extends OrgLevel>(level: L) {
   const { t, lang } = useI18n();
-  const { user } = useTenantAuth();
   const config = ORG_LEVEL_CONFIG[level];
-  const canManage = user?.permissions.includes(config.managePermission) ?? false;
+  const canManage = useCan(config.managePermission, { tenantWide: level === "companies" });
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -180,6 +178,7 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
 
   const runWrite = useCallback(
     async (work: () => Promise<void>): Promise<boolean> => {
+      if (!canManage) return false;
       setIsSubmitting(true);
       setMutationError(null);
       try {
@@ -193,7 +192,7 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
         setIsSubmitting(false);
       }
     },
-    [reload],
+    [canManage, reload],
   );
 
   const handleCreate = useCallback(
@@ -219,7 +218,7 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
 
   const handleDelete = useCallback(async () => {
     const target = pendingDelete;
-    if (!target) return;
+    if (!target || !canManage) return;
     setIsSubmitting(true);
     setMutationError(null);
     try {
@@ -239,7 +238,7 @@ export function useOrganizationLevel<L extends OrgLevel>(level: L) {
     } finally {
       setIsSubmitting(false);
     }
-  }, [level, pendingDelete, reload]);
+  }, [canManage, level, pendingDelete, reload]);
 
   const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
     const field = ORG_NODE_SORT_FIELDS.find((allowed) => allowed === next.id);

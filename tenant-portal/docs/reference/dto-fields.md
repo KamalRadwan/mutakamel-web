@@ -6,9 +6,9 @@
 
 Status: **verified** (parsed from controller DTO source)
 
-Last source verification: **2026-10-14**
+Last source verification: **2026-10-17**
 
-Classes: **47** · Fields: **318**
+Classes: **46** · Fields: **322**
 
 ## How to read this
 
@@ -135,6 +135,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `primaryPhone` | string | no | non-empty, max 32 |
 | `email` | email | no | max 180 |
 | `companyName` | string | no | non-empty, max 180 |
+| `legalName` | string | no | max 180 |
 | `companyPhones` | array | no | max 10 items, each item max 32 |
 | `companyEmail` | email | no | max 180 |
 | `companyWebsite` | string | no | max 255 |
@@ -171,9 +172,9 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | `stageId` | UUIDv7 | **yes** | — |
 | `title` | string | **yes** | non-empty, max 180 |
 | `importance` | integer | no | >= 0, <= 3 |
-| `amount` | number | no | >= 0 |
+| `amount` | number | no | >= 0, <= 9999999999999.999 |
 | `description` | string | no | max 2000 |
-| `currencyCode` | string | no | length 3–3, transformed |
+| `currencyCode` | string | no | length 3–3 |
 | `ownerUserId` | UUIDv7 | no | — |
 | `expectedCloseDate` | ISO date string | no | — |
 | `probabilityPercent` | integer | no | >= 0, <= 100 |
@@ -184,8 +185,10 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/leads/dto/lead.dto.ts`
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
 | `profileType` | enum CrmProfileTypeEnum | **yes** | — |
+| `customFields` | object | no | — |
 | `displayName` | string | no | non-empty, max 180 |
 | `companyName` | string | no | non-empty, max 180 |
+| `legalName` | string | no | max 180 |
 | `primaryContact` | LeadConversionContactPersonDto | no | nested, of `LeadConversionContactPersonDto` |
 | `createOpportunity` | boolean | no | transformed |
 | `keepLead` | boolean | no | transformed |
@@ -246,6 +249,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles/dto/custome
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
+| `legalName` | string | no | max 180 |
 | `displayName` | string | no | non-empty, max 180 |
 | `status` | enum CustomerStatusEnum | no | — |
 | `rating` | integer | no | >= CRM_LEAD_RATING_MIN, <= CRM_LEAD_RATING_MAX |
@@ -260,7 +264,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/customer-profiles/dto/custome
 | `companyPhone` | string | no | non-empty, max 32 |
 | `companyPhones` | array | no | max 10 items, each item max 32 |
 | `companyEmail` | email | no | max 180 |
-| `companyWebsite` | string | no | max 180 |
+| `companyWebsite` | string \| null | no | max 180 |
 | `description` | string | no | max 2000 |
 | `primaryContact` | CustomerProfileContactPersonDto | no | nested, of `CustomerProfileContactPersonDto` |
 | `contacts` | array | no | max 20 items, nested, of `CustomerProfileContactPersonDto` |
@@ -282,7 +286,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities/dto/opportunity
 | `stageId` | UUIDv7 | **yes** | — |
 | `title` | string | **yes** | non-empty, max 180 |
 | `importance` | integer | no | >= 0, <= 3 |
-| `amount` | number | no | >= 0 |
+| `amount` | number | no | >= 0, <= 9999999999999.999 |
 | `description` | string | no | max 2000 |
 | `currencyCode` | string | no | length 3–3, transformed |
 | `ownerUserId` | UUIDv7 | no | — |
@@ -297,7 +301,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/opportunities/dto/opportunity
 | `title` | string | no | non-empty, max 180 |
 | `importance` | integer | no | >= 0, <= 3 |
 | `cardColor` | enum CrmLeadCardColorEnum | no | — |
-| `amount` | number | no | >= 0 |
+| `amount` | number | no | >= 0, <= 9999999999999.999 |
 | `description` | string | no | max 2000 |
 | `currencyCode` | string | no | length 3–3, transformed |
 | `ownerUserId` | UUIDv7 | no | — |
@@ -523,6 +527,14 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/custom-fields/dto/custom-fiel
 
 Source: `../backend/mutakamel-apps/crm-app/src/crm/settings/dto/update-crm-settings.dto.ts`
 
+### `IceServerSettingsDto`
+
+| Field | Type | Required | Constraints |
+| --- | --- | --- | --- |
+| `urls` | array | **yes** | min 1 items, max 8 items, each item max 512 |
+| `username` | string | no | max 128 |
+| `credential` | string | no | max 256 |
+
 ### `AsteriskIntegrationSettingsDto`
 
 | Field | Type | Required | Constraints |
@@ -541,18 +553,17 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/settings/dto/update-crm-setti
 | `traceSip` | boolean | no | transformed |
 | `allowInvalidTlsCertificate` | boolean | no | transformed |
 | `stunServers` | array | no | max 16 items, each item max 512 |
-| `turnServers` | array | no | max 16 items |
-| `iceServers` | array | no | max 16 items |
-| `extra` | object | no | — |
+| `turnServers` | array | no | max 16 items, nested, of `IceServerSettingsDto` |
+| `iceServers` | array | no | max 16 items, nested, of `IceServerSettingsDto` |
 
 ### `UpdateCrmSettingsDto`
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
 | `requireQualifiedStageForConversion` | boolean | no | transformed |
-| `defaultLeadStageId` | UUIDv7 | no | — |
 | `asteriskIntegration` | AsteriskIntegrationSettingsDto | no | nested, of `AsteriskIntegrationSettingsDto` |
 | `outboundEmailContentRetentionDays` | integer | no | >= 30, <= 2555 |
+| `expectedOutboundEmailRetentionPolicyRevision` | integer | no | >= 1 |
 
 ## Shared list queries
 
@@ -578,7 +589,7 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/common/dto/crm-list-query.dto
 
 | Field | Type | Required | Constraints |
 | --- | --- | --- | --- |
-| `searchField` | one of a fixed set | no | — |
+| `searchField` | one of a fixed set | no | <= 10000 |
 | `acquisitionSourceId` | UUIDv7 | no | — |
 | `leadProfileType` | enum CrmProfileTypeEnum | no | — |
 | `status` | enum LeadStatusEnum | no | — |
@@ -609,15 +620,3 @@ Source: `../backend/mutakamel-apps/crm-app/src/crm/common/dto/crm-list-query.dto
 | `sourceType` | `LEAD` \| `CUSTOMER_PROFILE` \| `PARTY` \| `OPPORTUNITY` | no | — |
 | `sourceId` | UUIDv7 | no | — |
 | `ownerUserId` | UUIDv7 | no | — |
-
-### `TasksQueryDto` — extends `BranchListQueryDto`
-
-| Field | Type | Required | Constraints |
-| --- | --- | --- | --- |
-| `status` | enum CrmTaskStatusEnum | no | — |
-
-### `RemindersQueryDto` — extends `BranchListQueryDto`
-
-| Field | Type | Required | Constraints |
-| --- | --- | --- | --- |
-| `status` | enum CrmReminderStatusEnum | no | — |

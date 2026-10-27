@@ -42,9 +42,8 @@ export interface PageActionBarProps {
  * for why that is a portal and not shell state.
  *
  * The bar renders on every route, including one that registers nothing. A bar
- * that disappeared on some screens would move the whole page up 35px on those
- * routes, and every navigation between the two kinds would shift the content
- * under the pointer.
+ * that disappeared on some screens would shift the page vertically on those
+ * routes, moving content under the pointer on navigation.
  */
 export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
   const { t } = useI18n();
@@ -85,68 +84,70 @@ export function PageActionBar({ sections, appLabelKey }: PageActionBarProps) {
     : null;
 
   return (
-    <div
-      className={cn(
-        "flex h-(--size-actionbar) shrink-0 items-center gap-3 border-b border-border",
-        // A screen's controls are fixed-width (a 240px search box, a segmented
-        // switcher) and the bar cannot wrap them onto a second line without
-        // becoming two bars. Below `sm` they scroll inside it instead — the
-        // shell root is `overflow-hidden`, so without this they would be
-        // silently clipped, and the view switcher is the one that would go.
-        "overflow-x-auto bg-card px-3 print:hidden",
-      )}
-    >
-      {location.isPrimaryPage && (
-        <div ref={setPrimary} className="flex items-center gap-2 empty:hidden" />
-      )}
-      {/* Not a <nav>: a second landmark announced as navigation would just add
-          noise to the one above it. The SECTION stays plain text because a
-          section has no index route to link to; the ITEM is a link, because it
-          always has one — and on a detail route that link is the way back to
-          the list the record came from, which is the trip a user makes far more
-          often than any other from here. */}
-      {!location.isPrimaryPage && (
-        <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-          <span className="truncate">{sectionLabel}</span>
-          {itemLabel && (
-            <>
-              <ChevronRight
-                className={cn(iconSize({ size: "xs" }), mirrorInRtl)}
-                aria-hidden="true"
-              />
-              {location.itemHref ? (
-                <Link
-                  href={location.itemHref}
-                  className={cn(
-                    "truncate rounded-xs text-sm font-medium text-foreground hover:underline",
-                    focusRing,
-                  )}
-                >
-                  {itemLabel}
-                </Link>
-              ) : (
-                <span className="truncate text-sm font-medium text-foreground">{itemLabel}</span>
-              )}
-            </>
-          )}
-        </p>
-      )}
-      {/* The middle. Links to OTHER records live here rather than in the
-          trailing cluster: they leave this screen, and the controls beside the
-          view switcher act on it. `mx-auto` centres the group in whatever room
-          the location text and the trailing cluster leave, and `min-w-0` lets
-          it shrink and scroll with the bar rather than pushing either aside. */}
-      <div ref={setRelated} className="mx-auto flex min-w-0 items-center gap-2 empty:hidden" />
-      {/* min-w-0 so a long search box shrinks instead of pushing the view
-          switcher off the inline end. `ms-auto` still holds when the middle is
-          empty, which is every list screen. */}
-      <div className="ms-auto flex min-w-0 items-center gap-2">
-        <div ref={setActions} className="flex items-center gap-2" />
-        {!location.isPrimaryPage && (
-          <div ref={setPrimary} className="flex items-center gap-2 empty:hidden" />
+    <div className="shrink-0 px-5 pt-(--size-actionbar-inset) print:hidden">
+      <div
+        className={cn(
+          "flex h-(--size-toolbar) items-center gap-2.5 rounded-xl border border-line-column bg-surface-toolbar px-3.5 shadow-toolbar",
+          // A screen's controls are fixed-width (a 240px search box, a segmented
+          // switcher) and the bar cannot wrap them onto a second line without
+          // becoming two bars. Below `sm` they scroll inside it instead — the
+          // shell root is `overflow-hidden`, so without this they would be
+          // silently clipped, and the view switcher is the one that would go.
+          "overflow-x-auto",
         )}
-        <div ref={setSearch} className="flex min-w-0 items-center gap-2" />
-        <div ref={setView} className="flex items-center gap-2" />
+      >
+        {location.isPrimaryPage && (
+          <div ref={setPrimary} className="flex shrink-0 items-center gap-2 empty:hidden" />
+        )}
+        {/* Not a <nav>: a second landmark announced as navigation would just add
+            noise to the one above it. The SECTION stays plain text because a
+            section has no index route to link to; the ITEM is a link, because it
+            always has one — and on a detail route that link is the way back to
+            the list the record came from, which is the trip a user makes far more
+            often than any other from here. */}
+        {!location.isPrimaryPage && (
+          <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="truncate">{sectionLabel}</span>
+            {itemLabel && (
+              <>
+                <ChevronRight
+                  className={cn(iconSize({ size: "xs" }), mirrorInRtl)}
+                  aria-hidden="true"
+                />
+                {location.itemHref ? (
+                  <Link
+                    href={location.itemHref}
+                    className={cn(
+                      "truncate rounded-xs text-sm font-medium text-foreground hover:underline",
+                      focusRing,
+                    )}
+                  >
+                    {itemLabel}
+                  </Link>
+                ) : (
+                  <span className="truncate text-sm font-medium text-foreground">{itemLabel}</span>
+                )}
+              </>
+            )}
+          </p>
+        )}
+        {/* The middle. Links to OTHER records live here rather than in the
+            trailing cluster: they leave this screen, and the controls beside the
+            view switcher act on it. `mx-auto` centres the group in whatever room
+            the location text and the trailing cluster leave, and `min-w-0` lets
+            it shrink and scroll with the bar rather than pushing either aside. */}
+        <div ref={setRelated} className="mx-auto flex min-w-0 items-center gap-2 empty:hidden" />
+        {/* min-w-0 so a long search box shrinks instead of pushing the view
+            switcher off the inline end. `ms-auto` still holds when the middle is
+            empty, which is every list screen. */}
+        <div className="ms-auto flex min-w-0 items-center gap-2.5">
+          <div ref={setActions} className="flex shrink-0 items-center gap-1.5 empty:hidden" />
+          {!location.isPrimaryPage && (
+            <div ref={setPrimary} className="flex shrink-0 items-center gap-2 empty:hidden" />
+          )}
+          <div ref={setSearch} className="flex min-w-0 items-center gap-2 empty:hidden" />
+          <div ref={setView} className="flex shrink-0 items-center gap-2 empty:hidden" />
+        </div>
       </div>
     </div>
   );

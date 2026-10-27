@@ -112,7 +112,8 @@ export function ApplicationDatabaseBindDialog({
 
   useEffect(() => {
     if (!isOpen) return;
-    ++dialogGeneration.current;
+    const generationRef = dialogGeneration;
+    ++generationRef.current;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -133,7 +134,7 @@ export function ApplicationDatabaseBindDialog({
     });
     return () => {
       cancelled = true;
-      ++dialogGeneration.current;
+      ++generationRef.current;
       loadAbort.current?.abort();
     };
   }, [applicationKey, isOpen, load]);

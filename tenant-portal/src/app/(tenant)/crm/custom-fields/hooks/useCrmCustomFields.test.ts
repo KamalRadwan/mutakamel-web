@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CRM_CUSTOM_FIELD_OWNER_TYPES,
-  CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES,
+  CRM_CUSTOM_FIELD_TYPES,
   CRM_CUSTOM_FIELDS_PATH,
   normalizeCrmCustomFieldKey,
   parseCrmCustomField,
@@ -33,13 +33,15 @@ describe("CRM custom-fields contract", () => {
       "CUSTOMER_PROFILE",
       "OPPORTUNITY",
     ]);
-    expect(CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES).toEqual([
+    expect(CRM_CUSTOM_FIELD_TYPES).toEqual([
       "TEXT",
       "TEXTAREA",
       "NUMBER",
       "DATE",
       "DATETIME",
       "BOOLEAN",
+      "SELECT",
+      "MULTI_SELECT",
       "URL",
       "EMAIL",
       "PHONE",

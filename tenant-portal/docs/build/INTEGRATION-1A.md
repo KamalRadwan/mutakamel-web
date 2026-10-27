@@ -48,20 +48,23 @@ What each line brings in, so a name collision is visible before the merge:
 | `not-found-state/NotFoundState` | `NotFoundState`, `NotFoundStateProps` |
 | `reason-dialog/ReasonDialog` | `ReasonDialog`, `ReasonDialogProps`, `ReasonDialogLabels` |
 
-### Three things that are NOT barrel exports
+### Two things that are NOT barrel exports
 
 | Thing | Import path | Why |
 | --- | --- | --- |
 | `AccessMode`, `ACCESS_MODES`, `isAccessMode`, `accessModeCapabilities`, `AccessModeCapabilities` | `@/lib/access-mode` | `ReadOnlyGate` (design-system) and `useAccessMode` (hooks) both need it, and `design-system → hooks` is a forbidden direction — [file-architecture.md](../architecture/file-architecture.md#dependency-direction). `lib` is the shared spine both may import, exactly as `NormalizedApiError` already works. |
 | `useAccessMode`, `AccessModeState` | `@/hooks/useAccessMode` | A hook, not a design-system piece |
-| `useUnsavedChangesGuard`, `UnsavedChangesGuard` | `@/hooks/useUnsavedChangesGuard` | Same |
+
+Verified **2026-10-18**: the unused page navigation guard and its tests were
+removed (FE-CORE-PERM-DEAD-001). No production screen consumed it; drawer-close
+protection remains in `FormDrawer`.
 
 ### `knip` will be red until this merge lands
 
 Nothing imports the nine new pattern files yet, because the only legal import
 path for feature code is the barrel. `pnpm knip` therefore reports them — and
-both new hooks, and `src/lib/access-mode.ts` — as unused files. Adding the
-lines above clears the pattern files; the two hooks and `src/lib/access-mode.ts`
+the access-mode hook, and `src/lib/access-mode.ts` — as unused files. Adding the
+lines above clears the pattern files; that hook and `src/lib/access-mode.ts`
 clear when the first screen consumes them (phase 4).
 
 `typecheck`, `lint`, `test` and `design:rtl` are already green on all of it.

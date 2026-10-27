@@ -57,6 +57,20 @@ function tradeSharedMessage(
   t: Dictionary,
 ): string | undefined {
   const code = error.code;
+  switch (code) {
+    case "TRADE.AUTH.CONTEXT_REQUIRED": return t.trade.errorRequestContextRequired;
+    case "TRADE.AUTH.TARGET_INVALID": return t.tradeCommon.errorTargetDenied;
+    case "TRADE.CONTEXT.EXECUTION_TARGET_INVALID": return t.trade.errorChannelMismatch;
+    case "TRADE.CONTEXT.COMPANY_REQUIRED": return t.trade.errorMissingCompany;
+    case "TRADE.CATALOG.CHANNEL_NOT_FOUND":
+    case "TRADE.CATALOG.CHANNEL_BRANCH_NOT_FOUND":
+    case "TRADE.CATALOG.CHANNEL_BRANCH_ALREADY_EXISTS": return t.trade.channelInvalid;
+    case "TRADE.CATALOG.COMPANY_PROFILE_NOT_FOUND": return t.trade.companyProfileInvalid;
+    case "TRADE.CATALOG.BRANCH_PROFILE_NOT_FOUND": return t.trade.branchMismatch;
+    case "TRADE.CATALOG.CHANNEL_LISTING_NOT_FOUND": return t.trade.listingInvalid;
+    case "TRADE.CATALOG.ITEM_IDENTITY_CONFLICT":
+    case "TRADE.CATALOG.ITEM_REFERENCE_INVALID": return t.trade.itemIdentityInvalid;
+  }
   if (isTradeEntitlementRefusal(code)) {
     if (code === TRADE_ENTITLEMENT_CODES.moduleDisabled) return t.trade.entitlement_moduleDisabled;
     if (code === TRADE_ENTITLEMENT_CODES.featureRequired) return t.trade.entitlement_featureRequired;
@@ -74,10 +88,7 @@ function tradeSharedMessage(
   if (code === TRADE_CONTEXT_CODES.executionTargetMismatch) return t.trade.errorChannelMismatch;
   if (code === TRADE_CONCURRENCY_CODES.ifMatchRequired) return t.trade.errorIfMatchRequired;
   if (code === TRADE_CONCURRENCY_CODES.staleVersion) return t.trade.errorStaleVersion;
-  // `TRADE.IDEMPOTENCY.KEY_REQUIRED` is 400 at the controller and 422 inside
-  // the domain service — the same code at two statuses, so this branches on
-  // neither and says the one true thing about both.
-  if (code === "TRADE.IDEMPOTENCY.KEY_REQUIRED") return t.trade.errorIdempotencyKey;
+  if (code === "TRADE.IDEMPOTENCY.KEY_REQUIRED" || code === "TRADE.IDEMPOTENCY.KEY_MISSING") return t.trade.errorIdempotencyKey;
   if (code === "TRADE.IDEMPOTENCY.MISMATCH") return t.trade.errorIdempotencyMismatch;
   if (code === "TRADE.IDEMPOTENCY.IN_FLIGHT") return t.trade.errorIdempotencyInFlight;
   if (code === "TRADE.VALIDATION_FAILED") return t.trade.errorValidationFailed;

@@ -4,7 +4,6 @@ import {
   buildLeadStageReorderRequest,
   buildUpdateLeadStageRequest,
   canBeDefaultLeadStage,
-  entryLeadStageId,
   isProtectedLeadStage,
   parseLeadStageCatalogueResponse,
   parseLeadStageResponse,
@@ -309,12 +308,6 @@ describe("Lead-stage reorder contract", () => {
     expect(() => buildLeadStageReorderRequest([], [])).toThrow(
       "Invalid lead stage order.",
     );
-  });
-
-  it("names the pinned entry stage only when the catalogue holds exactly one", () => {
-    expect(entryLeadStageId(catalogue)).toBe(entry.id);
-    expect(entryLeadStageId([stage as LeadStageItem, qualified])).toBeNull();
-    expect(entryLeadStageId([entry, { ...qualified, flag: "NEW" }])).toBeNull();
   });
 
   it("pins all three server-owned lifecycle stages", () => {

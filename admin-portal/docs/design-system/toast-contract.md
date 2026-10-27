@@ -2,7 +2,7 @@
 
 Status: **[Verified current API; approved feedback hierarchy added]**
 
-Last source verification: **2026-08-29**
+Last source verification: **2026-10-18** (global authorization and application feedback localization)
 
 Owner: **Admin Portal**
 
@@ -70,12 +70,16 @@ role, and operational recovery rules live in
   (Phase 9–13) must not import `useToast` — that pairing is a review smell,
   not currently machine-enforced.
 
-## Known gap carried over unchanged
+## Localization
 
-`dispatchForbiddenToast()`'s title/message (`"Access Denied"` / `"You do
-not have permission to perform this action."`) are hard-coded English, not
-localized through `useI18n()`. This is pre-existing behavior, not
-introduced by the design-system migration and remains a target gap.
+`dispatchForbiddenToast()` emits `{ type: "error", localizationKey:
+"authorizationDenied" }`. `ToastProvider` resolves the title and message from
+`t.globalToast` using the active `I18nProvider` dictionary when the event arrives,
+including after a language switch. Transport events carry no English copy.
+
+`useApplications` uses `t.applications.errorTitle` for load and database-policy
+errors, and `successTitle` plus `databasePolicyUpdated` for successful policy
+updates. Normalized server error messages remain intact.
 
 Toast titles, messages, action names, dismiss controls, and screen-reader
 announcements must be localized. Toasts use one appropriately prioritized live

@@ -22,13 +22,16 @@ and
 
 ## Button
 
-Current `variant`: `primary` uses the transitional emerald brand fill. The
-approved target maps it to cobalt `action` with a white label after `action`
-and `success` are separated.
+Updated **2026-10-26** (Ocean Navy v3; source review only). `primary` uses
+`bg-gradient-primary text-white`: the admin `action`-to-`accent` gradient.
+Enabled hover uses `brightness-90` and the `shadow-pop` token; keyboard focus
+and reduced-motion behavior are preserved.
 
 Variants are `primary`, `secondary` (default), `outline`, `ghost`,
 `destructive`, and `link`. `size`:
-`xs`/`sm`/`md`/`lg`/`xl`. `loading` renders a spinning `Loader2` before the
+`xs`/`sm`/`md`/`lg`/`xl` plus `toolbar` (33px via
+`--size-toolbar-control`, `rounded-lg`, `text-label`, `font-semibold`).
+Existing sizes and the default remain unchanged. `loading` renders a spinning `Loader2` before the
 label with `aria-busy`. `asChild` (Radix `Slot`) lets a `Button`-styled
 element render as something else — e.g. a `next/link` `<Link>` — without an
 extra wrapper DOM node.
@@ -57,9 +60,25 @@ each field.
 
 ## Badge
 
-Current `tone` values are `brand`, `danger`, `warn`, and `neutral`. The target
-renames healthy `brand` usage to `success` and adds an `action`/`info` treatment
-that may not be used as a success state.
+Updated **2026-10-26** (Ocean Navy v3; source review only). Admin keeps all
+six tones: `success`, `info`, `brand`, `danger`, `warn`, and `neutral`.
+`brand` remains a green success alias; `info` uses the separate information
+role. The default size retains its padding, uppercase Latin text and RTL
+casing/tracking resets. `size="sm"` adds a 24px pill with `rounded-md`, `px-2`
+and `text-badge`, without uppercase or wide tracking.
+
+## Avatar
+
+Updated **2026-10-26** (Ocean Navy v3; source review only). `Avatar` and
+`AvatarFallback` accept `tone="default" | "user"`. The default retains the
+existing neutral fallback. `tone="user"` on the root passes through context
+to its fallback: `bg-gradient-avatar`, white semibold initials, and a 1.5px
+`ring-card` outline. The fallback can override the inherited tone; a standalone
+user fallback gets an inset card ring. Images, refs and class overrides remain
+supported. Colors and gradients resolve through theme tokens in both themes.
+
+Regression tests for these three primitives and the custom `cn` token merge
+registrations were added but not executed under the task resource restriction.
 
 ## Dialog / AlertDialog / Sheet
 

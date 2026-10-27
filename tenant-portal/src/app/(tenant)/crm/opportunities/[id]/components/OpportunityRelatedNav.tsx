@@ -17,18 +17,13 @@ import {
   OPPORTUNITY_DOCUMENT_COUNT_KINDS,
   type OpportunityDocumentCountKind,
 } from "../../opportunity-document-counts-contract";
+import { buildPartyDocumentHref } from "../../../shared/party-document-counts-contract";
 import { useOpportunityDocumentCounts } from "../../hooks/useOpportunityDocumentCounts";
 
 const DOCUMENT_ICONS: Record<OpportunityDocumentCountKind, typeof FileText> = {
   quotations: FileText,
   salesOrders: HandCoins,
   invoices: Receipt,
-};
-
-const DOCUMENT_ROUTES: Record<OpportunityDocumentCountKind, string> = {
-  quotations: "/trade/quotations",
-  salesOrders: "/trade/sales-orders",
-  invoices: "/trade/invoices",
 };
 
 export function OpportunityRelatedNav({ item }: { item: OpportunityDetail }) {
@@ -92,7 +87,7 @@ export function OpportunityRelatedNav({ item }: { item: OpportunityDetail }) {
         return (
           <Link
             key={kind}
-            href={DOCUMENT_ROUTES[kind]}
+            href={buildPartyDocumentHref(kind, item.customerPartyId)}
             className={cn(buttonVariantClasses("ghost", "sm"), "gap-1.5")}
             aria-label={
               count === null

@@ -414,15 +414,6 @@ export default function TradeUomsPage() {
           </div>
         ) : null}
 
-        {uoms.scopeGap ? (
-          // Not an error: `GET /uoms` is Gateway BRANCH_REQUIRED, so the list
-          // cannot legally be asked for until both are chosen.
-          <EmptyState
-            icon={Filter}
-            title={t.trade.scopeRequiredTitle}
-            description={t.trade.uomScopeRequiredDescription}
-          />
-        ) : (
           <>
             {/* 1. 4-Card KPI Summary Strip */}
             <StatGrid>
@@ -564,7 +555,13 @@ export default function TradeUomsPage() {
                   </Button>
                 </div>
 
-                {uoms.operatingItems.length === 0 && !uoms.isOperatingLoading ? (
+                {uoms.operatingScopeGap ? (
+                  <EmptyState
+                    icon={Filter}
+                    title={t.trade.scopeRequiredTitle}
+                    description={t.trade.uomOperatingScopeRequiredDescription}
+                  />
+                ) : uoms.operatingItems.length === 0 && !uoms.isOperatingLoading ? (
                   <EmptyState
                     icon={Ruler}
                     title={t.trade.uomEmpty}
@@ -965,7 +962,6 @@ export default function TradeUomsPage() {
               </>
             )}
           </>
-        )}
 
         <CreateUomDrawer
           key={uoms.createOpen ? `create-open-${uoms.createInitialMode}` : "create-closed"}

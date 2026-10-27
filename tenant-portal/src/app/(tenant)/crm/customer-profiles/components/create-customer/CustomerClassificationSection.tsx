@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Building2, Compass, Search, Tag, User } from "lucide-react";
 import {
+  Button,
   DegradedBanner,
   Field,
   Input,
@@ -35,10 +36,10 @@ import {
 const NO_SOURCE_VALUE = "__none__";
 
 const STATUS_DOT_BY_VALUE: Record<CustomerProfileCreateStatus, string> = {
-  PROSPECT: "bg-indigo-500 ring-indigo-500/25",
-  ACTIVE_CUSTOMER: "bg-emerald-500 ring-emerald-500/25",
-  INACTIVE: "bg-amber-500 ring-amber-500/25",
-  BLACKLISTED: "bg-rose-500 ring-rose-500/25",
+  PROSPECT: "bg-swatch-indigo",
+  ACTIVE_CUSTOMER: "bg-swatch-green",
+  INACTIVE: "bg-swatch-amber",
+  BLACKLISTED: "bg-swatch-red",
 };
 
 export interface CustomerClassificationSectionProps {
@@ -102,7 +103,7 @@ export function CustomerClassificationSection({
 
   const showCompanyPicker = companyIds.length > 1;
   const showBranchPicker = branchIds.length > 1;
-  const tagIds = form.tagIds ?? [];
+  const tagIds = useMemo(() => form.tagIds ?? [], [form.tagIds]);
   const atTagLimit = tagIds.length >= CUSTOMER_PROFILE_CREATE_LIMITS.tags;
 
   const filteredSources = useMemo(() => {
@@ -140,28 +141,28 @@ export function CustomerClassificationSection({
     <section
       id="classification"
       data-form-section="classification"
-      className="relative overflow-hidden rounded-xl border border-indigo-500/20 bg-card shadow-xs transition-colors dark:border-indigo-400/20"
+      className="relative overflow-hidden rounded-lg border border-swatch-indigo-soft bg-card shadow-xs transition-colors"
     >
       {/* Top 3px colorful accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-indigo-600 via-violet-500 to-sky-500"
+        className="h-1 w-full bg-swatch-indigo"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-indigo-500/[0.03] px-4 py-3 dark:bg-indigo-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-swatch-indigo-soft px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-indigo-500/25 bg-indigo-500/10 text-indigo-600 dark:border-indigo-400/30 dark:bg-indigo-500/20 dark:text-indigo-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-swatch-indigo-soft bg-swatch-indigo-soft text-swatch-indigo-deep">
             <Compass className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+              <span dir="ltr" className="rounded bg-swatch-indigo-soft px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-swatch-indigo-deep">
                 01
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmCustomerProfiles.create.sections.classification}
               </h3>
@@ -179,36 +180,40 @@ export function CustomerClassificationSection({
             aria-label={t.crmCustomerProfiles.type}
             className="inline-flex items-center rounded-lg border border-border bg-muted/60 p-0.5"
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               disabled={disabled}
               onClick={() => onProfileTypeChange("INDIVIDUAL")}
               aria-pressed={form.profileType === "INDIVIDUAL"}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
+                "h-auto inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
                 form.profileType === "INDIVIDUAL"
-                  ? "bg-emerald-600 text-white shadow-2xs"
+                  ? "bg-swatch-green text-primary-foreground shadow-2xs"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               <User className="size-3.5" aria-hidden="true" />
               {t.crmCustomerProfiles.profileTypes.INDIVIDUAL}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               disabled={disabled}
               onClick={() => onProfileTypeChange("CORPORATE")}
               aria-pressed={form.profileType === "CORPORATE"}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
+                "h-auto inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all",
                 form.profileType === "CORPORATE"
-                  ? "bg-violet-600 text-white shadow-2xs"
+                  ? "bg-swatch-purple text-primary-foreground shadow-2xs"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Building2 className="size-3.5" aria-hidden="true" />
               {t.crmCustomerProfiles.profileTypes.CORPORATE}
-            </button>
+            </Button>
           </div>
           <LeadFieldGuide field="leadProfileType" />
         </div>
@@ -221,7 +226,7 @@ export function CustomerClassificationSection({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {showCompanyPicker && (
               <div className="relative">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <div className="absolute end-0 top-0 flex items-center gap-1.5">
                   <LeadFieldGuide field="companyId" />
                 </div>
                 <Field
@@ -251,7 +256,7 @@ export function CustomerClassificationSection({
 
             {showBranchPicker && (
               <div className="relative">
-                <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+                <div className="absolute end-0 top-0 flex items-center gap-1.5">
                   <LeadFieldGuide field="branchId" />
                 </div>
                 <Field
@@ -286,8 +291,8 @@ export function CustomerClassificationSection({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
           {/* Customer Status */}
           <div className={cn("relative", showTags ? "md:col-span-4" : "md:col-span-6")}>
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-              <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+            <div className="absolute end-0 top-0 flex items-center gap-1.5">
+              <span className="rounded bg-swatch-indigo-soft px-1.5 py-0.5 text-2xs font-semibold text-swatch-indigo-deep">
                 Pipeline
               </span>
               <LeadFieldGuide field="stageId" />
@@ -311,13 +316,13 @@ export function CustomerClassificationSection({
                   {CUSTOMER_PROFILE_STATUSES.map((status) => {
                     const dotClass =
                       STATUS_DOT_BY_VALUE[status] ??
-                      "bg-indigo-500 ring-indigo-500/25";
+                      "bg-swatch-indigo";
                     return (
                       <SelectItem key={status} value={status}>
                         <span className="inline-flex items-center gap-2">
                           <span
                             aria-hidden="true"
-                            className={cn("size-2 shrink-0 rounded-full ring-2", dotClass)}
+                            className={cn("size-2 shrink-0 rounded-full", dotClass)}
                           />
                           <span>
                             {t.statusValues[`CustomerStatus.${status}`] ?? status}
@@ -333,7 +338,7 @@ export function CustomerClassificationSection({
 
           {/* Acquisition Source */}
           <div className={cn("relative", showTags ? "md:col-span-4" : "md:col-span-6")}>
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+            <div className="absolute end-0 top-0 flex items-center gap-1.5">
               <LeadFieldGuide field="acquisitionSourceId" />
             </div>
             <Field
@@ -397,8 +402,8 @@ export function CustomerClassificationSection({
           {/* Classification Tags (MultiSelect with Search & Inline Create) */}
           {showTags && (
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded bg-violet-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-600 dark:bg-violet-500/20 dark:text-violet-300">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span dir="ltr" className="inline-flex items-center gap-1 rounded bg-swatch-purple-soft px-1.5 py-0.5 font-mono text-2xs font-semibold tabular-nums text-swatch-purple-deep">
                   <Tag className="size-2.5" aria-hidden="true" />
                   {tagIds.length}/{CUSTOMER_PROFILE_CREATE_LIMITS.tags}
                 </span>

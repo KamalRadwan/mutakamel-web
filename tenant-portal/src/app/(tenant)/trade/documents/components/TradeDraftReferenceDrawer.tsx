@@ -4,6 +4,7 @@ import { Field, FormDrawer, Input } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { TRADE_DRAFT_REFERENCE_MAX_LENGTH } from "../trade-document-contract";
 import type { TradeDraftReferenceState } from "../hooks/useTradeDraftReference";
+import { TradeWriteFields, TradeWriteOutcome } from "./TradeBoundaryStates";
 
 export interface TradeDraftReferenceDrawerProps {
   state: TradeDraftReferenceState;
@@ -27,7 +28,7 @@ export function TradeDraftReferenceDrawer({
       description={description}
       isDirty={state.isDirty}
       isSubmitting={state.write.isWriting}
-      submitDisabled={!state.isDirty}
+      submitDisabled={state.write.isBlocked || !state.isDirty}
       onSubmit={() => void state.submit()}
       labels={{
         submit: t.common.save,
@@ -38,6 +39,8 @@ export function TradeDraftReferenceDrawer({
         discardCancel: t.common.cancel,
       }}
     >
+      <TradeWriteOutcome write={state.write} />
+      <TradeWriteFields write={state.write}>
       <Field label={t.tradeDocuments.draftReference} hint={t.tradeDocuments.draftReferenceHint}>
         <Input size="sm" placeholder={t.tradeDocuments.draftReference}
           value={state.value}
@@ -45,6 +48,7 @@ export function TradeDraftReferenceDrawer({
           onChange={(event) => state.setValue(event.target.value)}
         />
       </Field>
+      </TradeWriteFields>
     </FormDrawer>
   );
 }

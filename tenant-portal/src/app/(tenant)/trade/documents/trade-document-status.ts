@@ -37,6 +37,7 @@ export type TradeStatusKind =
   | "TradeFulfillmentStatus"
   | "TradeBillingStatus"
   | "TradePurchaseOrderStatus"
+  | "TradePurchaseDispatchStatus"
   | "TradeApprovalStatus"
   | "TradePurchaseQuotationStatus"
   | "TradeInvoiceStatus"
@@ -103,6 +104,14 @@ const STATUS_ROLES: Record<TradeStatusKind, Record<string, TradeStatusRole | nul
     CONFIRMED: "positive",
     CANCELLED: "negative",
     CLOSED: null,
+  },
+  // PurchasingService and PurchaseDeliveryService: provider acceptance is SENT,
+  // not proof that a supplier has received or read the message.
+  TradePurchaseDispatchStatus: {
+    NOT_REQUESTED: null,
+    REQUESTED: "pending",
+    SENT: null,
+    FAILED: "negative",
   },
   // The order row only ever holds the first four. WITHDRAWN and EXPIRED live on
   // the approval instance and step rows, where the check constraint pins all

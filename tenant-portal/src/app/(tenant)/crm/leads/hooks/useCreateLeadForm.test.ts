@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from "@testing-library/react";
+import { createElement } from "react";
+import { act, render, renderHook, screen } from "@testing-library/react";
+import { Field, Input } from "@/design-system";
+import { TenantApiClientError } from "@/lib/api/axiosClient";
+import { normalizeApiError } from "@/lib/api/errors";
 import { describe, expect, it } from "vitest";
 import { useCreateLeadForm } from "./useCreateLeadForm";
 import type { LeadCreateMessages } from "../lead-create-validation";
@@ -10,6 +14,7 @@ const messages: LeadCreateMessages = {
   email: "Bad email.",
   maxLength: "At most {max} characters.",
   duplicatePhone: "Already listed.",
+  phone: "Invalid phone.",
   url: "Bad URL.",
   contactRequired: "Add a contact.",
   tagsLimit: "At most {max} tags.",
@@ -23,6 +28,48 @@ const TAG_A = "01900100-0000-7000-8000-0000000000c3";
 function setup(requiredCustomFieldKeys: string[] = []) {
   return renderHook(() => useCreateLeadForm(messages, requiredCustomFieldKeys));
 }
+
+describe("server create field errors", () => {
+  it("renders a normalized 400 below its field and clears it after an edit", () => {
+    const { result } = setup();
+    act(() => result.current.setField("email", "valid@example.com"));
+    const error = new TenantApiClientError("Validation failed", {
+      status: 400, statusText: "Bad Request", headers: new Headers(),
+      data: { details: { email: ["Choose another email."] } },
+    });
+    act(() => result.current.reportServerError(normalizeApiError(error)));
+    // eslint-disable-next-line react/no-children-prop
+    const field = render(createElement(Field, {
+      label: "Email", error: result.current.errors.email,
+      children: createElement(Input, { defaultValue: result.current.form.email }),
+    }));
+    const input = screen.getByLabelText("Email");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(input.getAttribute("aria-describedby") ?? "")?.textContent)
+      .toBe("Choose another email.");
+    act(() => result.current.setField("email", "corrected@example.com"));
+    expect(result.current.errors.email).toBeUndefined();
+    field.unmount();
+  });
+
+  it("maps nested paths and compacted phone indexes to displayed rows", () => {
+    const { result } = setup();
+    act(() => {
+      result.current.addPhone("phones");
+      result.current.setPhone("phones", 1, "+201001112223");
+    });
+    act(() => result.current.reportServerError({ status: 400, fieldErrors: {
+      "phones.0": ["Invalid phone"], "contacts[0].email": ["Invalid email"],
+      "address.city": ["Invalid city"], "customFields.budget": ["Invalid budget"],
+    } }));
+    expect(result.current.errors).toMatchObject({
+      "phones.1": "Invalid phone", "contacts.0.email": "Invalid email",
+      "address.city": "Invalid city", "customFields.budget": "Invalid budget",
+    });
+    act(() => result.current.reset());
+    expect(result.current.errors).toEqual({});
+  });
+});
 
 describe("switching profile type", () => {
   it("clears every field the server would then reject", () => {

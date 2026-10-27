@@ -1,5 +1,30 @@
 # Trade — Foundation
 
+Channel pagination source verification: **2026-10-26**. `GET /channels` now
+accepts `page` (default 1) and `limit` (default 25, maximum 100), and returns
+`{ items, total, page, limit }`. The screen and scope selector collect every
+page before using the rows, preserving filters, counts and saved selections,
+up to 20 pages of 100 rows. Exceeding this limit fails with a translated
+incomplete-list error instead of offering partial results.
+Channel administration (list, create, detail, update and branch mapping) omits
+the operating channel header, retaining the route's company/branch headers.
+This allows reactivation and first branch mappings even when the selected
+channel is inactive or unmapped. Successful channel create/update refreshes
+the operating-context choices; only ACTIVE channels are offered, and a channel
+that becomes inactive is cleared from both the selection and saved storage.
+Configuration version histories retain their complete response arrays; the
+backend reads them in deterministic batches of 100 inside one read snapshot.
+
+Configuration successor publication verified **2026-10-18**: the existing
+`POST /api/tenant/trade/v1/configuration/versions/:id/publish` accepts optional
+`supersedesVersionId` (UUIDv7). The publisher can enter the displayed predecessor
+ID in the versions panel. The server verifies exact definition and scope,
+passing test evidence, maker/checker and If-Match, and atomically ends predecessor
+eligibility at the successor's effectiveFrom. Leaving the field empty preserves
+ordinary publication. Scheduled replacement keeps the predecessor eligible until
+that instant; historical documents retain their original pins. Requires the
+coordinated Trade schema-release-002 before deployment.
+
 Status: **verified**
 
 Last source verification: **2026-10-17** ([Item image](#item-image--3-routes) routes and the `image` summary on Item reads; 2026-10-13: UOM source evidence removed from `CreateUomDto`, `UpdateUomDto` and both UOM read projections)
@@ -229,22 +254,21 @@ then strips and re-sets the two headers from the validated values. The other
 197 routes declare no mode, so their headers pass through untouched and
 `TradeScopeGuard` is the only validator.
 
-Of the 34, **four** are on this page — the whole `/uoms` family — and they
-contradict each other:
+The `/uoms` family supports tenant-wide master reads before a company or branch
+exists (source rechecked **2026-10-17**, CLXAPP-127):
 
 | Route | Gateway mode | Meaning |
 | --- | --- | --- |
-| `GET /api/tenant/trade/v1/uoms` | `BRANCH_REQUIRED` | company **and** branch must both be sent |
-| `GET /api/tenant/trade/v1/uoms/:id` | `BRANCH_REQUIRED` | same |
+| `GET /api/tenant/trade/v1/uoms` | `OPTIONAL_COMPANY_BRANCH` | no scope headers required; a selected company/branch is optional |
+| `GET /api/tenant/trade/v1/uoms/:id` | `OPTIONAL_COMPANY_BRANCH` | same |
 | `POST /api/tenant/trade/v1/uoms` | `NONE` | **neither may be sent** — a company header is a 400 |
 | `PATCH /api/tenant/trade/v1/uoms/:id` | `NONE` | same |
 
-**Read and write on the same resource have opposite header policies.** The
-UOM editor must drop the operating-context headers on submit and re-add them
-to refresh the list. This is consistent with the controller targets
-(`OPERATING_CONTEXT` for reads, `TENANT` for writes) but it is enforced twice,
-by two different components, with two different error shapes. Nothing else on
-this page declares a Gateway mode.
+The UOM editor drops operating-context headers on submit and uses the optional
+selection when refreshing the master list. This matches the controller targets
+(`OPERATING_CONTEXT` for reads, `TENANT` for writes). The separate `/catalog/uoms`
+operating projection still needs a company; its selector prompt does not block
+the master directory or detail page.
 
 Those four are the only Gateway-scoped routes on this page. The other 30 are
 28 `BRANCH_REQUIRED` on
@@ -394,11 +418,8 @@ this page takes `page` (≥ 1, default 1) and `limit` (1–100), and **nothing
 else** — there is no `sortBy`, no `sortDir`, no `search` except where noted.
 Ordering is fixed per endpoint and is not client-controllable.
 
-Two exceptions on this page:
+Exception on this page:
 
-- **`GET /channels` is not paginated and does not return `items`.** It returns
-  a **bare array** of channel rows for the company, ordered `createdAt DESC`
-  (`CatalogService.listChannels`). `data` is the array itself.
 - **`GET /commercial-accounts/lookups`** takes `search` and `limit` (1–100,
   default 50) and no `page`.
 
@@ -625,8 +646,8 @@ confirmation.
 
 | Method | Canonical path | Permission | Scope target | Body / query |
 | --- | --- | --- | --- | --- |
-| GET | `/api/tenant/trade/v1/uoms` | `trade.items.read` | `OPERATING_CONTEXT` | `UomListQueryDto` — **Gateway `BRANCH_REQUIRED`** |
-| GET | `/api/tenant/trade/v1/uoms/:id` | `trade.items.read` | `OPERATING_CONTEXT` | — **Gateway `BRANCH_REQUIRED`** |
+| GET | `/api/tenant/trade/v1/uoms` | `trade.items.read` | `OPERATING_CONTEXT` | `UomListQueryDto` — **Gateway `OPTIONAL_COMPANY_BRANCH`** |
+| GET | `/api/tenant/trade/v1/uoms/:id` | `trade.items.read` | `OPERATING_CONTEXT` | — **Gateway `OPTIONAL_COMPANY_BRANCH`** |
 | POST | `/api/tenant/trade/v1/uoms` | `trade.catalog_master.manage` | `TENANT` | `CreateUomDto` — **Gateway `NONE`: send no scope headers** |
 | PATCH | `/api/tenant/trade/v1/uoms/:id` | `trade.catalog_master.manage` | `TENANT` | `UpdateUomDto` · `If-Match` — **Gateway `NONE`** |
 
@@ -688,7 +709,7 @@ guard's 400 — `requireCompany()` in the read projection throws
 
 | Method | Canonical path | Permission | Scope target | Body |
 | --- | --- | --- | --- | --- |
-| GET | `/api/tenant/trade/v1/channels` | `trade.items.read` | `COMPANY` | — **bare array** |
+| GET | `/api/tenant/trade/v1/channels` | `trade.items.read` | `COMPANY` | `ChannelListQueryDto`: `page`, `limit` (max 100); `{ items, total, page, limit }`, ordered `createdAt DESC, id DESC` |
 | POST | `/api/tenant/trade/v1/channels` | `trade.items.manage` | `COMPANY` | `CreateChannelDto` |
 | GET | `/api/tenant/trade/v1/channels/:id` | `trade.items.read` | `COMPANY` | — |
 | PATCH | `/api/tenant/trade/v1/channels/:id` | `trade.items.manage` | `COMPANY` | `UpdateChannelDto` · `If-Match` |
@@ -718,6 +739,14 @@ sites in `catalog.service.ts`. Three distinct failures, one code.
 ---
 
 ## Commercial accounts — 10 routes
+
+Assignment compatibility rechecked **2026-10-17** (CXTRADE-OPS-117): the account
+form suggests up to four active books from the first role-filtered page of 25
+in the selected Company (`PURCHASE` for suppliers, `SALES` for customers).
+Suggestions use the existing `trade.pricing.read` permission and pricing
+entitlement. If unavailable, the form explains that typed IDs remain usable;
+the backend validates compatibility when saving. Changing role never silently
+replaces the entered assignment.
 
 Feature gate: `@RequireAnyTradeFeature(trade.sales, trade.purchasing)` — the
 tenant needs **either**.
@@ -778,6 +807,7 @@ contract.
 | `TRADE.ACCOUNT.ALREADY_EXISTS` | 409 | one account per party per role |
 | `TRADE.ACCOUNT.PARTY_ROLE_INVALID` | 422 | the party does not hold that commercial role |
 | `TRADE.ACCOUNT.TERM_INVALID` | 422 | `paymentTermsId` unusable |
+| `TRADE.ACCOUNT.PRICE_BOOK_INCOMPATIBLE` | 422 | Assigned book must have purpose PURCHASE for SUPPLIER or SALES for CUSTOMER; create and update validate before saving |
 | `TRADE.ACCOUNT.CREDIT_LIMIT_INVALID` | 422 | limit without a currency, or vice versa |
 | `TRADE.ACCOUNT.BRANCH_RULE_ALREADY_EXISTS` | 409 | `POST` where a rule exists |
 | `TRADE.ACCOUNT.BRANCH_RULE_NOT_FOUND` | 404 | |
@@ -900,8 +930,8 @@ field errors at once.
    formatting, and never `Number()` it.
 2. **`Idempotency-Replayed` is present on first execution too**, with the
    value `"false"`. Test for `=== 'true'`.
-3. **Read and write on `/uoms` require opposite headers.** Reads need company
-   **and** branch; writes must send neither.
+3. **UoM master reads allow tenant-wide access.** Reads accept optional company
+   and branch headers; writes must send neither.
 4. **A tenant-scoped role does not satisfy a branch-scoped route.** The
    permission guard matches `scope_target` exactly. Only the tenant owner
    bypasses.
@@ -911,8 +941,9 @@ field errors at once.
    Omitted optionals with defaults are written as defaults, silently clearing
    `capabilitySet`, `restrictions`, `saleConstraints` and resetting
    `publicationStatus` to `"DRAFT"`.
-7. **`GET /channels` returns a bare array.** `data` is not `{ items }`.
-   A generic list adapter will read `undefined`.
+7. **`GET /channels` returns a paginated envelope.** Both portal callers load
+   every page up to a hard cap of 20; exceeding it fails explicitly so partial
+   filters and operating-context choices are never offered as complete.
 8. **List responses have no `totalPages`, `hasNext` or `hasPrev`**, and no
    `meta` object — `items`, `total`, `page`, `limit`, flat inside `data`.
 9. **There are no capabilities endpoints.** Action gating has to fall back to

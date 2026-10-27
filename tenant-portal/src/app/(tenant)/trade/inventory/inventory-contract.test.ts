@@ -75,26 +75,25 @@ describe("Trade inventory contract", () => {
     expect(() => inventoryDecisionPath("nope")).toThrow("Invalid Trade inventory response.");
   });
 
-  it("sends limit but never page on a limit-only list", () => {
-    // Sending `page` to a limit-only route is a 400 under forbidNonWhitelisted.
+  it("sends page and bounded limit on governance lists", () => {
     expect(periodsListPath("OPEN")).toBe(
-      "/api/tenant/trade/v1/inventory/periods?limit=50&status=OPEN",
+      "/api/tenant/trade/v1/inventory/periods?page=1&limit=50&status=OPEN",
     );
     expect(periodsListPath("OPEN", "2026-08-15")).toBe(
-      "/api/tenant/trade/v1/inventory/periods?limit=50&status=OPEN&effectiveAt=2026-08-15T00%3A00%3A00.000Z",
+      "/api/tenant/trade/v1/inventory/periods?page=1&limit=50&status=OPEN&effectiveAt=2026-08-15T00%3A00%3A00.000Z",
     );
-    expect(periodsListPath()).not.toContain("page=");
+    expect(periodsListPath(undefined, undefined, 2)).toContain("page=2&limit=50");
     expect(serialsListPath("ON_HAND", "SN-1")).toBe(
-      "/api/tenant/trade/v1/inventory/serials?limit=50&state=ON_HAND&serialKey=SN-1",
+      "/api/tenant/trade/v1/inventory/serials?page=1&limit=50&state=ON_HAND&serialKey=SN-1",
     );
-    expect(serialsListPath("ON_HAND", "SN-1", { itemId })).toBe(
-      `/api/tenant/trade/v1/inventory/serials?limit=50&state=ON_HAND&serialKey=SN-1&itemId=${itemId}`,
+    expect(serialsListPath("ON_HAND", "SN-1", { itemId }, 2)).toBe(
+      `/api/tenant/trade/v1/inventory/serials?page=2&limit=50&state=ON_HAND&serialKey=SN-1&itemId=${itemId}`,
     );
-    expect(uomConversionsListPath("PUBLISHED", { itemCompanyProfileId: profileId })).toBe(
-      `/api/tenant/trade/v1/inventory/uom-conversions?limit=50&status=PUBLISHED&itemCompanyProfileId=${profileId}`,
+    expect(uomConversionsListPath("PUBLISHED", { itemCompanyProfileId: profileId }, 2)).toBe(
+      `/api/tenant/trade/v1/inventory/uom-conversions?page=2&limit=50&status=PUBLISHED&itemCompanyProfileId=${profileId}`,
     );
-    expect(inventoryDecisionsListPath("INVENTORY_RESERVATION", nodeId)).toBe(
-      `/api/tenant/trade/v1/inventory/decisions?limit=50&policyKind=INVENTORY_RESERVATION&aggregateId=${nodeId}`,
+    expect(inventoryDecisionsListPath("INVENTORY_RESERVATION", nodeId, 2)).toBe(
+      `/api/tenant/trade/v1/inventory/decisions?page=2&limit=50&policyKind=INVENTORY_RESERVATION&aggregateId=${nodeId}`,
     );
   });
 
@@ -251,11 +250,11 @@ describe("Trade inventory contract", () => {
         effectiveFrom: "2026-08-31T00:00:00.000Z",
       }).factorNumerator,
     ).toBe("12");
-    expect(suggestIntegerFraction("1.5")).toEqual({ numerator: "3", denominator: "2" });
-    expect(suggestIntegerFraction("0.125")).toEqual({ numerator: "1", denominator: "8" });
-    expect(suggestIntegerFraction("2.4")).toEqual({ numerator: "12", denominator: "5" });
-    expect(suggestIntegerFraction("24")).toBeNull();
-    expect(suggestIntegerFraction("0")).toBeNull();
+    expect(suggestIntegerFraction("1.5", "1")).toEqual({ numerator: "3", denominator: "2" });
+    expect(suggestIntegerFraction("0.125", "1")).toEqual({ numerator: "1", denominator: "8" });
+    expect(suggestIntegerFraction("2.4", "1")).toEqual({ numerator: "12", denominator: "5" });
+    expect(suggestIntegerFraction("24", "1")).toBeNull();
+    expect(suggestIntegerFraction("0", "1")).toBeNull();
     expect(convertQuantityPreview(10, "12", "1")).toBe("120.0000");
     expect(convertQuantityPreview(3, "3", "2")).toBe("4.5000");
     expect(convertQuantityPreview(10, "12", "0")).toBe("0.0000");
@@ -280,6 +279,38 @@ describe("Trade inventory contract", () => {
         effectiveFrom: "2026-08-31T00:00:00.000Z",
       }),
     ).toThrow("INVENTORY_FORM_UOM");
+  });
+
+  it.each([
+    ["1", "2.5", "2", "5"],
+    ["2", "2.5", "4", "5"],
+    ["1.5", "2", "3", "4"],
+    ["1.5", "2.5", "3", "5"],
+    [" 01.500 ", " 02.00 ", "3", "4"],
+    ["2.50", "2.500", "1", "1"],
+    ["9007199254740993.0", "2", "9007199254740993", "2"],
+    ["0.000000000000000001", "0.000000000000000003", "1", "3"],
+  ])("preserves the complete ratio %s / %s as %s / %s", (num, den, numerator, denominator) => {
+    expect(suggestIntegerFraction(num, den)).toEqual({ numerator, denominator });
+    const request = buildCreateUomConversionRequest({
+      itemCompanyProfileId: profileId,
+      fromUomId: uomId,
+      toUomId: otherUomId,
+      factorNumerator: numerator,
+      factorDenominator: denominator,
+      effectiveFrom: "2026-08-31T00:00:00.000Z",
+    });
+    expect(request).toMatchObject({ factorNumerator: numerator, factorDenominator: denominator });
+  });
+
+  it.each([
+    ["", "2.5"], ["1.5", ""], ["0", "2.5"], ["1.5", "0"],
+    ["0.0", "2"], ["1.5", "0.00"], ["-1.5", "2"], ["1.5", "-2"],
+    ["1e2", "2.5"], ["1.5", "NaN"], ["1.5", "Infinity"],
+    ["1.", "2"], ["1.5", "2/3"],
+    ["1000000000000000000.0", "1"], ["1", "0.0000000000000000001"],
+  ])("does not suggest an invalid or unrepresentable ratio %s / %s", (num, den) => {
+    expect(suggestIntegerFraction(num, den)).toBeNull();
   });
 
   it("keeps bigint conversion factors as strings", () => {
@@ -368,21 +399,21 @@ describe("Trade inventory contract", () => {
       nodeId,
       itemId,
       uomId,
-      quantity: "2",
+      quantity: "1",
       itemProfileVersion: "1",
       businessEffectiveAt: "2026-08-31T00:00:00.000Z",
       lotKey: "LOT-2026-01",
-      serialKeys: "SN-01, SN-02",
-      expiresAt: "2027-01-01T00:00:00.000Z",
+      serialKeys: "SN-01",
+      expiresAt: "2027-01-01",
     });
     // operationKey is the movement's business identity, separate from the
     // x-idempotency-key header the transport attaches.
     expect(request.operationKey).toMatch(/^[0-9a-f-]{36}$/u);
-    expect(request.quantity).toBe("2");
+    expect(request.quantity).toBe("1");
     expect(request.tracking).toEqual({
       lotKey: "LOT-2026-01",
-      serialKeys: ["SN-01", "SN-02"],
-      expiresAt: "2027-01-01T00:00:00.000Z",
+      serialKeys: ["SN-01"],
+      expiryDate: "2027-01-01",
     });
     expect(() =>
       buildOpeningBalanceRequest({
@@ -430,9 +461,9 @@ describe("Trade inventory contract", () => {
           sourceLineId: uomId,
           sourceLineVersion: "1",
           uomId,
-          quantity: "2",
+          quantity: "1",
           lotKey: "LOT-R1",
-          serialKeys: "SN-R1, SN-R2",
+          serialKeys: "SN-R1",
         },
       ],
     });
@@ -441,7 +472,7 @@ describe("Trade inventory contract", () => {
       purchaseOrderLineId: uomId,
       tracking: {
         lotKey: "LOT-R1",
-        serialKeys: ["SN-R1", "SN-R2"],
+        serialKeys: ["SN-R1"],
       },
     });
 
@@ -503,7 +534,7 @@ describe("Trade inventory contract", () => {
       inventoryMessage(
         {
           status: 409,
-          code: "TRADE.INVENTORY.PERIOD_CLOSED",
+          code: "TRADE.INVENTORY.PERIOD_CONFLICT",
           message: "Closed",
         },
         en,

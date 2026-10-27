@@ -19,6 +19,9 @@ import {
 import { formatDateTime } from "@/lib/format/date";
 import { useCoreErrorText } from "../hooks/useCoreErrorText";
 import { useTenantProfilePreferences } from "./hooks/useTenantProfilePreferences";
+import { ProfileSecurity } from "./components/ProfileSecurity";
+import { ProfileAvatar } from "./components/ProfileAvatar";
+import { ProfileMfa } from "./components/ProfileMfa";
 
 export default function TenantProfilePage() {
   const screen = useTenantProfilePreferences();
@@ -29,7 +32,7 @@ export default function TenantProfilePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader
+      <PageHeader className="sr-only"
         title={copy.title}
         description={copy.subtitle}
         secondaryActions={
@@ -44,6 +47,10 @@ export default function TenantProfilePage() {
       />
 
       <SubNav items={CORE_IDENTITY_NAV_ITEMS} />
+
+      <ProfileAvatar />
+      <ProfileSecurity />
+      <ProfileMfa />
 
       {writeText ? (
         <p

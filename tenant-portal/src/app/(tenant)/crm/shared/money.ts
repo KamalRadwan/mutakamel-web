@@ -1,46 +1,31 @@
-// The one place a money amount crosses from a decimal string into the JSON
-// number the CRM write DTOs demand — defect D3.
-//
-// Every money column in CRM is `numeric(18, 2)` and is exact. Every money DTO
-// field is `@IsNumber({ maxDecimalPlaces: 2 })`, so JSON must carry a
-// **number**: there is no string form the backend accepts, and the conversion
-// cannot be avoided on the way out. What CAN be avoided is doing it silently
-// outside the range where it is lossless.
-//
-// The previous guard allowed 15 integer digits "because the integer part stays
-// below 2^53". That reasoning is wrong: the integer part is not what has to
-// survive, the value WITH its cents does.
-//
-//   Number("999999999999999.99")   -> 1000000000000000     (a whole unit gained)
-//   Number("99999999999999.99")    -> 99999999999999.98    (a cent lost)
-//
-// Two conditions make the conversion exact, and the tighter one binds:
-//
-//   a) adjacent doubles must be closer together than one cent, so two amounts
-//      one cent apart cannot collapse onto the same double. The gap is 2^-7
-//      below 2^46 = 70_368_744_177_664 and 2^-6 above it, so the value must
-//      stay under 2^46;
-//   b) the amount in minor units must itself be a safe integer (< 2^53).
-//
-// (a) is the stricter of the two, and 13 integer digits — 9_999_999_999_999.99,
-// about 1e13 — sits comfortably inside it while staying a rule a person can
-// check by counting. That is 4 orders of magnitude below what numeric(18, 2)
-// stores, so an amount this rejects is one the wire could not have carried
-// faithfully anyway.
-//
-// Nothing converts a money value on the way IN. Amounts arrive as decimal
-// strings and render through `Money`; only this direction exists.
+// CRM opportunity amounts are numeric(20,3), but writes require JSON numbers.
+// Keep reads as strings; only convert writes after checking currency scale and
+// the exact decimal JSON will emit. Three-decimal values near the existing
+// 13-integer-digit ceiling can lose a minor unit, so the round-trip check binds.
 
-/** The widest integer part whose cents survive the trip through a double. */
+/** Existing client ceiling; each value must also pass the round-trip check. */
 export const MONEY_MAX_INTEGER_DIGITS = 13;
 
-/** `9_999_999_999_999.99` — the largest amount `toMoneyWireNumber` accepts. */
+/** The two-decimal ceiling; three-decimal values need their own exact check. */
 export const MONEY_MAX_AMOUNT = "9999999999999.99";
 
-const MONEY_SHAPE = new RegExp(`^\\d{1,${MONEY_MAX_INTEGER_DIGITS}}(\\.\\d{1,2})?$`);
+const MONEY_SHAPE = new RegExp(`^\\d{1,${MONEY_MAX_INTEGER_DIGITS}}(\\.\\d{1,3})?$`);
+
+// Mirrors crm-app/src/crm/opportunities/opportunities.service.ts (CRM-OPP-018).
+const CURRENCY_MINOR_UNITS = new Map<string, number>([
+  ["KWD", 3], ["BHD", 3], ["OMR", 3], ["JOD", 3], ["TND", 3], ["LYD", 3], ["IQD", 3],
+  ["JPY", 0], ["KRW", 0], ["VND", 0], ["CLP", 0], ["ISK", 0],
+]);
 
 /** Thrown, never rendered: the screens validate first and map their own words. */
 export const MONEY_OUT_OF_RANGE = "CRM_AMOUNT_OUT_OF_SAFE_RANGE";
+export const MONEY_SCALE_INVALID = "CRM_AMOUNT_SCALE_INVALID";
+
+function hasCurrencyScale(value: string, currencyCode: string): boolean {
+  const scale = CURRENCY_MINOR_UNITS.get(currencyCode.trim().toUpperCase()) ?? 2;
+  const fraction = value.split(".")[1]?.replace(/0+$/, "") ?? "";
+  return fraction.length <= scale;
+}
 
 /**
  * The decimal the wire will actually carry, with no trailing zeros.
@@ -53,18 +38,18 @@ export const MONEY_OUT_OF_RANGE = "CRM_AMOUNT_OUT_OF_SAFE_RANGE";
 function canonicalDecimal(value: string): string {
   const [whole, fraction = ""] = value.split(".");
   const digits = whole.replace(/^0+(?=\d)/, "");
-  const cents = fraction.replace(/0+$/, "");
-  return cents.length > 0 ? `${digits}.${cents}` : digits;
+  const decimals = fraction.replace(/0+$/, "");
+  return decimals.length > 0 ? `${digits}.${decimals}` : digits;
 }
 
 /**
- * Whether a typed amount is a 2-decimal value this client can send without
- * losing a cent. An empty box is valid — it means "no amount".
+ * Whether an amount fits its currency and survives JSON without rounding.
+ * An empty box is valid — it means "no amount".
  */
-export function isExactMoneyDecimal(value: string): boolean {
+export function isExactMoneyDecimal(value: string, currencyCode = ""): boolean {
   const trimmed = value.trim();
   if (trimmed.length === 0) return true;
-  if (!MONEY_SHAPE.test(trimmed)) return false;
+  if (!MONEY_SHAPE.test(trimmed) || !hasCurrencyScale(trimmed, currencyCode)) return false;
   return String(Number(trimmed)) === canonicalDecimal(trimmed);
 }
 
@@ -75,9 +60,12 @@ export function isExactMoneyDecimal(value: string): boolean {
  * a refusal the user has to see, never a value silently written to a column
  * that would have stored it correctly.
  */
-export function toMoneyWireNumber(value: string): number | undefined {
+export function toMoneyWireNumber(value: string, currencyCode = ""): number | undefined {
   const trimmed = value.trim();
   if (trimmed.length === 0) return undefined;
-  if (!isExactMoneyDecimal(trimmed)) throw new Error(MONEY_OUT_OF_RANGE);
+  if (!MONEY_SHAPE.test(trimmed) || String(Number(trimmed)) !== canonicalDecimal(trimmed)) {
+    throw new Error(MONEY_OUT_OF_RANGE);
+  }
+  if (!hasCurrencyScale(trimmed, currencyCode)) throw new Error(MONEY_SCALE_INVALID);
   return Number(trimmed);
 }

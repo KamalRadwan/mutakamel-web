@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../../../trade-api";
 import { hasTradePermission, useTradeScope } from "../../../../trade-advanced-scope";
@@ -19,7 +19,7 @@ const DECISION_RESPONSE_LIMIT_BYTES = 60_000;
 export function useInventoryDecision(id: string) {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const { branchId } = useTenantBranchSelection(user);
+  const { branchId } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [decision, setDecision] = useState<InventoryDecision | null>(null);

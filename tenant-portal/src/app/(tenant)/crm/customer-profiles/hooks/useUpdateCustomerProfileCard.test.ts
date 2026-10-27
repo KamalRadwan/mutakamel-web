@@ -3,6 +3,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
+import { TenantApiClientError } from "@/lib/api/axiosClient";
 import type { CustomerProfileItem } from "./useCustomerProfiles";
 
 const mocks = vi.hoisted(() => ({
@@ -69,6 +70,30 @@ beforeEach(() => {
 });
 
 describe("useUpdateCustomerProfileCard", () => {
+  it("returns a rejected outcome, rolls back a 422, and uses translated feedback", async () => {
+    const applyCardFields = vi.fn();
+    const reconcile = vi.fn();
+    mocks.patch.mockRejectedValue(new TenantApiClientError("Invalid rating", {
+      status: 422, statusText: "Unprocessable Entity", headers: new Headers(),
+      data: { message: "Raw server failure" },
+    }));
+    const { result } = renderHook(() => useUpdateCustomerProfileCard({
+      branchId: profile.branchId, canUpdate: () => true, applyCardFields, reconcile,
+    }));
+    await act(async () => {
+      expect(await result.current.updateCard(profile, { rating: 3 })).toEqual({
+        ok: false, error: expect.objectContaining({ status: 422 }),
+      });
+    });
+    expect(applyCardFields.mock.calls).toEqual([
+      [profile.id, { rating: 3 }], [profile.id, { rating: profile.rating }],
+    ]);
+    expect(mocks.errorFromApi).toHaveBeenCalledWith(
+      en.crmShared.errorValidation, expect.objectContaining({ status: 422 }),
+    );
+    expect(reconcile).not.toHaveBeenCalled();
+  });
+
   it("applies the rating optimistically, adopts the confirmed value, and reloads", async () => {
     const applyCardFields = vi.fn();
     const reconcile = vi.fn();
@@ -89,7 +114,11 @@ describe("useUpdateCustomerProfileCard", () => {
       }),
     );
 
-    await act(() => result.current.updateCard(profile, { rating: 3 }));
+    await act(async () => {
+      expect(await result.current.updateCard(profile, { rating: 3 })).toEqual({
+        ok: true, patch: { rating: 3 },
+      });
+    });
 
     expect(applyCardFields.mock.calls).toEqual([
       [profile.id, { rating: 3 }],
@@ -111,9 +140,9 @@ describe("useUpdateCustomerProfileCard", () => {
       }),
     );
 
-    await act(() =>
-      result.current.updateCard(profile, { cardColor: "BLUE" }),
-    );
+    await act(async () => {
+      await result.current.updateCard(profile, { cardColor: "BLUE" });
+    });
 
     expect(applyCardFields.mock.calls).toEqual([
       [profile.id, { cardColor: "BLUE" }],

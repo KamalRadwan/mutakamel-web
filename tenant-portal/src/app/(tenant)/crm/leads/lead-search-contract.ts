@@ -3,6 +3,7 @@
 import {
   crmCompileFilterTree,
   crmUnselectedCondition,
+  type CrmFilterLeaf,
   type CrmSearchFieldDef,
   type CrmSearchGroup,
   type CrmSearchRequestBody,
@@ -250,8 +251,14 @@ export const DEFAULT_LEAD_ADVANCED_FIELD = LEAD_ADVANCED_FIELDS[0]!;
  */
 export type LeadSearchMode = "basic" | "advanced";
 
+export type LeadQuickFilterPreset = "ALL" | "NEW_STAGE" | "HOT_3_STAR" | "QUALIFIED" | "OVERDUE_ACTIVITY";
+
+type LeadSearchRequestBody = CrmSearchRequestBody & { hasOverdueActivity?: boolean };
+
 export interface LeadSearchState {
   mode: LeadSearchMode;
+  /** Applied independently of the Basic tokens and the Advanced draft. */
+  kpiPreset?: LeadQuickFilterPreset;
   /** Committed Basic filters; unfinished typing stays inside the search input. */
   basic: LeadBasicSearch;
   /**
@@ -315,9 +322,9 @@ export function leadSearchCleared(state: LeadSearchState): LeadSearchState {
 export function buildLeadSearchRequest(
   state: LeadSearchState,
   { branchId, page, limit, sortBy, sortDir }: LeadSearchWindow,
-): CrmSearchRequestBody {
+): LeadSearchRequestBody {
   const filterTree = crmCompileFilterTree(state.groups, leadAdvancedField);
-  return {
+  return withLeadKpiPreset({
     branchId,
     ...(filterTree ? { filterTree } : {}),
     // `field:DIR` is the one form `SortCompiler.normalise` and the GET route
@@ -325,5 +332,23 @@ export function buildLeadSearchRequest(
     sort: `${sortBy}:${sortDir}`,
     page,
     limit,
+  }, state.kpiPreset);
+}
+
+/** Match countKpis predicates in crm-app's leads.repository.ts before paging. */
+export function withLeadKpiPreset(
+  body: CrmSearchRequestBody,
+  preset: LeadQuickFilterPreset = "ALL",
+): LeadSearchRequestBody {
+  if (preset === "ALL") return body;
+  if (preset === "OVERDUE_ACTIVITY") return { ...body, hasOverdueActivity: true };
+  const predicate: CrmFilterLeaf = preset === "HOT_3_STAR"
+    ? { field: "rating", operator: "eq", value: 3 }
+    : { field: "stageFlag", operator: "eq", value: preset === "NEW_STAGE" ? "NEW" : "QUALIFIED" };
+  return {
+    ...body,
+    filterTree: body.filterTree
+      ? { op: "AND", children: [body.filterTree, predicate] }
+      : predicate,
   };
 }

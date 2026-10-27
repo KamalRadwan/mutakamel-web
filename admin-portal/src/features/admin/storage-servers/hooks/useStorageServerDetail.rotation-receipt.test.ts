@@ -3,16 +3,20 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getMock, rotateMock, revokeMock } = vi.hoisted(() => ({
+const { getMock, rotateMock, revokeMock, currentMock, abortMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
   rotateMock: vi.fn(),
   revokeMock: vi.fn(),
+  currentMock: vi.fn(),
+  abortMock: vi.fn(),
 }));
 vi.mock("../api/storage-servers.api", () => ({
   storageServersApi: {
     get: getMock,
     rotateCredentials: rotateMock,
     revokeCredentialRotation: revokeMock,
+    currentCredentialRotation: currentMock,
+    abortCredentialRotation: abortMock,
   },
 }));
 vi.mock("@/context/AuthContext", () => ({
@@ -53,6 +57,7 @@ function rotationView(overrides: Record<string, unknown> = {}) {
     activatedAt: "2026-09-05T08:00:05.000Z",
     graceExpiresAt: "2026-09-05T12:00:05.000Z",
     revokedAt: null,
+    abortedAt: null,
     ...overrides,
   };
 }
@@ -75,6 +80,8 @@ describe("useStorageServerDetail rotation receipt", () => {
     getMock.mockReset();
     rotateMock.mockReset();
     revokeMock.mockReset();
+    currentMock.mockReset().mockImplementation(async (id: string) => id === SERVER_ID ? rotationView() : null);
+    abortMock.mockReset();
     getMock.mockResolvedValue(serverView());
     rotateMock.mockResolvedValue(rotationView());
     revokeMock.mockResolvedValue(rotationView({ status: "REVOKED", revokedAt: "2026-09-05T12:30:00.000Z" }));
@@ -136,6 +143,8 @@ describe("useStorageServerDetail rotation receipt", () => {
     });
     hook.unmount();
 
+    currentMock.mockResolvedValue(null);
+
     const reloaded = renderHook(() => useStorageServerDetail(SERVER_ID));
     await waitFor(() => expect(reloaded.result.current.server).toMatchObject({ id: SERVER_ID }));
     expect(reloaded.result.current.currentRotation).toBeNull();
@@ -150,5 +159,28 @@ describe("useStorageServerDetail rotation receipt", () => {
     );
     await waitFor(() => expect(other.result.current.server).not.toBeNull());
     expect(other.result.current.currentRotation).toBeNull();
+  });
+
+  it("recovers a failed staged command and aborts it without resending credentials", async () => {
+    currentMock.mockResolvedValue(null);
+    rotateMock.mockImplementation(async () => {
+      currentMock.mockResolvedValue(rotationView({ status: "STAGED", activatedAt: null, graceExpiresAt: null }));
+      throw { isNormalized: true, httpStatus: 503, errorCode: "STORAGE_CREDENTIAL_ROTATION_PROBE_FAILED", message: "Probe failed" };
+    });
+    abortMock.mockImplementation(async () => {
+      currentMock.mockResolvedValue(null);
+      return rotationView({ status: "ABORTED", abortedAt: new Date().toISOString() });
+    });
+    const hook = renderHook(() => useStorageServerDetail(SERVER_ID));
+    await waitFor(() => expect(hook.result.current.server).not.toBeNull());
+    await act(async () => {
+      await expect(hook.result.current.rotateCredentials({ accessKeyId: "wrong-key", secretAccessKey: NEW_SECRET }, 4)).rejects.toMatchObject({ errorCode: "STORAGE_CREDENTIAL_ROTATION_PROBE_FAILED" });
+    });
+    expect(hook.result.current.currentRotation).toMatchObject({ rotationId: ROTATION_ID, status: "STAGED" });
+    await act(async () => { await hook.result.current.abortCredentialRotation(ROTATION_ID, "Wrong provider key"); });
+    expect(abortMock).toHaveBeenCalledWith(SERVER_ID, ROTATION_ID, "Wrong provider key", "key");
+    expect(hook.result.current.currentRotation).toBeNull();
+    expect(window.localStorage.length).toBe(0);
+    expect(rotateMock).toHaveBeenCalledTimes(1);
   });
 });

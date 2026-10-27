@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { en } from "@/i18n/dictionaries/en";
 import type { CustomerProfileDetail } from "../../customer-profile-contract";
 import { CustomerContactsCard } from "./CustomerContactsCard";
@@ -10,7 +11,15 @@ vi.mock("@/i18n/I18nContext", () => ({
   useI18n: () => ({ lang: "en", dir: "ltr", t: en }),
 }));
 
-afterEach(cleanup);
+vi.mock("@/lib/api/idempotent-write", () => ({
+  createWriteAttempt: vi.fn(),
+  runIdempotentWrite: vi.fn(),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const profile: CustomerProfileDetail = {
   id: "0192f3a0-0000-7000-8000-000000000001",
@@ -102,5 +111,46 @@ describe("CustomerContactsCard", () => {
       }),
     );
     expect(onAddContact).toHaveBeenCalledOnce();
+  });
+});
+
+describe("existing corporate contact edits", () => {
+  it("keeps Core email and phone read-only and saves only relationship fields", async () => {
+    const savedProfile = {
+      ...profile,
+      contacts: profile.contacts.map((contact) => ({
+        ...contact,
+        jobTitle: "Server-confirmed title",
+      })),
+    };
+    vi.mocked(runIdempotentWrite).mockResolvedValue({
+      kind: "success",
+      value: savedProfile,
+      replayed: false,
+    });
+    const onSaved = vi.fn();
+    const { rerender } = render(
+      <CustomerContactsCard profile={profile} canEdit onSaved={onSaved} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeadDetail.editContact + ": Mona Saleh" }));
+    expect(screen.getByText(en.crmCustomerProfiles.existingContactReadOnly)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("mona@alamal.med.sa")).toHaveAttribute("readonly");
+    expect(screen.getByDisplayValue("+966501234567")).toHaveAttribute("readonly");
+    fireEvent.change(screen.getByDisplayValue("Procurement Manager"), { target: { value: "Draft title" } });
+    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(savedProfile));
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({
+      method: "patch",
+      body: { contacts: [{
+        contactPartyId: profile.contacts[0].partyId,
+        fullName: "Mona Saleh",
+        jobTitle: "Draft title",
+        isPrimary: true,
+      }] },
+    }));
+    rerender(<CustomerContactsCard profile={savedProfile} canEdit onSaved={onSaved} />);
+    expect(screen.getByText("Server-confirmed title")).toBeInTheDocument();
+    expect(screen.queryByText("Draft title")).not.toBeInTheDocument();
+    expect(screen.getByText("+966501234567")).toBeInTheDocument();
   });
 });

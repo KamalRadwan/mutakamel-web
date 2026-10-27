@@ -8,9 +8,7 @@
 // Every widget key and every column name below is copied from the SELECT that
 // produces it. Two consequences are load-bearing:
 //
-//   * `repWorkload` aliases its count `AS openTasks` **unquoted**, so
-//     PostgreSQL folds it and the JSON key is `opentasks`. Reading `openTasks`
-//     yields `undefined` on every row. See docs/api/crm-dashboards.md.
+//   * Retired activity sections return `{ state: "RETIRED" }`, never empty data.
 //   * Every money aggregate is cast `::float`, so it is a JSON number.
 
 import {
@@ -24,16 +22,14 @@ import {
 
 const PREBUILT_ROOT = "/api/tenant/crm/v1/dashboards";
 
-const PREBUILT_REPORT_KEYS = [
-  "overview",
-  "sales-pipeline",
-  "leads",
-  "activities-productivity",
-  "customer-intelligence",
-  "data-quality",
-  "action-center",
-] as const;
-export type PrebuiltReportKey = (typeof PREBUILT_REPORT_KEYS)[number];
+export type PrebuiltReportKey =
+  | "overview"
+  | "sales-pipeline"
+  | "leads"
+  | "activities-productivity"
+  | "customer-intelligence"
+  | "data-quality"
+  | "action-center";
 
 /**
  * How one prebuilt widget's payload is shaped.
@@ -41,7 +37,7 @@ export type PrebuiltReportKey = (typeof PREBUILT_REPORT_KEYS)[number];
  * `COUNT` — a bare JSON number (`DashboardsService.scalar`).
  * `MONEY_TOTALS` — `currencyTotals`: `{ value?, currencyCode?, byCurrency[], warnings[] }`.
  * `CONVERSION` — `{ total, converted, rate }`.
- * `CALENDAR` — `{ count, minutes }`.
+ * `RETIRED` — `{ state: "RETIRED" }`.
  * `MISSING_OWNER` — `{ opportunities, leads, customerProfiles }`.
  * `TABLE` — an array of rows with the listed columns.
  */
@@ -49,7 +45,7 @@ type PrebuiltWidgetKind =
   | "COUNT"
   | "MONEY_TOTALS"
   | "CONVERSION"
-  | "CALENDAR"
+  | "RETIRED"
   | "MISSING_OWNER"
   | "TABLE";
 
@@ -62,7 +58,6 @@ export interface PrebuiltWidgetSpec {
 
 const STALE_DEAL_COLUMNS = ["title", "ownerUserId", "value", "currencyCode", "updatedAt"] as const;
 const UNTOUCHED_LEAD_COLUMNS = ["displayName", "ownerUserId", "createdAt"] as const;
-const OVERDUE_TASK_COLUMNS = ["title", "status", "dueAt", "ownerUserId"] as const;
 
 export const PREBUILT_REPORTS: ReadonlyArray<{
   key: PrebuiltReportKey;
@@ -77,7 +72,7 @@ export const PREBUILT_REPORTS: ReadonlyArray<{
       { key: "wonValue", kind: "MONEY_TOTALS" },
       { key: "activeDeals", kind: "COUNT" },
       { key: "newLeads", kind: "COUNT" },
-      { key: "overdueWork", kind: "COUNT" },
+      { key: "overdueWork", kind: "RETIRED" },
       { key: "winLossSummary", kind: "TABLE", columns: ["status", "currencyCode", "count", "value"] },
       { key: "topReps", kind: "TABLE", columns: ["ownerUserId", "currencyCode", "value", "count"] },
       { key: "staleDeals", kind: "TABLE", columns: STALE_DEAL_COLUMNS },
@@ -109,12 +104,11 @@ export const PREBUILT_REPORTS: ReadonlyArray<{
     key: "activities-productivity",
     path: `${PREBUILT_ROOT}/activities-productivity`,
     widgets: [
-      { key: "calendarUtilization", kind: "CALENDAR" },
+      { key: "calendarUtilization", kind: "RETIRED" },
       { key: "activityMix", kind: "TABLE", columns: ["type", "count"] },
-      { key: "reminderSummary", kind: "TABLE", columns: ["status", "count"] },
-      // `opentasks`, lower-cased by PostgreSQL — see the file header.
-      { key: "repWorkload", kind: "TABLE", columns: ["ownerUserId", "opentasks"] },
-      { key: "overdueTasks", kind: "TABLE", columns: OVERDUE_TASK_COLUMNS },
+      { key: "reminderSummary", kind: "RETIRED" },
+      { key: "repWorkload", kind: "RETIRED" },
+      { key: "overdueTasks", kind: "RETIRED" },
     ],
   },
   {
@@ -135,7 +129,7 @@ export const PREBUILT_REPORTS: ReadonlyArray<{
       { key: "missingCurrency", kind: "COUNT" },
       { key: "missingContact", kind: "COUNT" },
       { key: "missingCommercialData", kind: "COUNT" },
-      { key: "duplicateSignals", kind: "TABLE", columns: ["mobile", "parties"] },
+      { key: "duplicateSignals", kind: "COUNT" },
     ],
   },
   {
@@ -144,7 +138,7 @@ export const PREBUILT_REPORTS: ReadonlyArray<{
     widgets: [
       { key: "staleOpportunities", kind: "TABLE", columns: STALE_DEAL_COLUMNS },
       { key: "untouchedLeads", kind: "TABLE", columns: UNTOUCHED_LEAD_COLUMNS },
-      { key: "overdueTasks", kind: "TABLE", columns: OVERDUE_TASK_COLUMNS },
+      { key: "overdueTasks", kind: "RETIRED" },
       { key: "dataCleanupItems", kind: "TABLE", columns: ["title", "ownerUserId", "reason"] },
     ],
   },
@@ -159,7 +153,7 @@ export type PrebuiltWidgetValue =
   | { kind: "COUNT"; value: number }
   | { kind: "MONEY_TOTALS"; total: CurrencyTotal | null; byCurrency: CurrencyTotal[]; warnings: string[] }
   | { kind: "CONVERSION"; total: number; converted: number; rate: number }
-  | { kind: "CALENDAR"; count: number; minutes: number }
+  | { kind: "RETIRED" }
   | { kind: "MISSING_OWNER"; opportunities: number; leads: number; customerProfiles: number }
   | { kind: "TABLE"; rows: Array<Record<string, unknown>> }
   | { kind: "UNAVAILABLE" };
@@ -176,10 +170,6 @@ export function prebuiltReportQuery(branchId: string | null): string {
   // prebuilt routes take `dateFrom`/`dateTo`/`branchId`/`ownerUserId`/
   // `pipelineId`/`currencyCode`/`staleDays`/`limit` and nothing else.
   return branchId ? `?branchId=${encodeURIComponent(branchId)}` : "";
-}
-
-export function isPrebuiltReportKey(value: unknown): value is PrebuiltReportKey {
-  return PREBUILT_REPORT_KEYS.includes(value as PrebuiltReportKey);
 }
 
 export function parsePrebuiltReport(
@@ -238,13 +228,8 @@ function parseWidgetValue(spec: PrebuiltWidgetSpec, payload: unknown): PrebuiltW
         rate: finiteNumber(source.rate) ? source.rate : 0,
       };
     }
-    case "CALENDAR": {
-      const source = record(payload);
-      if (!source || !finiteNumber(source.count) || !finiteNumber(source.minutes)) {
-        return { kind: "UNAVAILABLE" };
-      }
-      return { kind: "CALENDAR", count: source.count, minutes: source.minutes };
-    }
+    case "RETIRED":
+      return record(payload)?.state === "RETIRED" ? { kind: "RETIRED" } : { kind: "UNAVAILABLE" };
     case "MISSING_OWNER": {
       const source = record(payload);
       if (

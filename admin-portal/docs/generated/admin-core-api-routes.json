@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-10-11T01:32:03.648Z",
+    "generatedAt": "2026-10-17T18:32:01.827Z",
     "generator": "scripts/docs/generate-admin-route-inventory.mjs",
-    "frontendRevision": "52ce61ba74fa+dirty",
-    "backendRevision": "805710806ce9+dirty",
+    "frontendRevision": "0f84e3fbe923+dirty",
+    "backendRevision": "a51c1d6ccf36+dirty",
     "sourcePolicy": "Gateway Core routes whose routeKey starts with core.admin.",
     "canonicalNamespace": "/api/admin/core/v1/*",
     "scope": "Core Admin routes only; Worker backup/restore routes are documented separately."
@@ -11,15 +11,15 @@
   "counts": {
     "total": 289,
     "byMethod": {
-      "GET": 117,
+      "GET": 118,
       "POST": 121,
-      "DELETE": 17,
+      "DELETE": 16,
       "PATCH": 31,
       "PUT": 3
     },
     "byRouteClass": {
-      "AUTHENTICATED": 103,
-      "WRITE_SENSITIVE": 157,
+      "AUTHENTICATED": 104,
+      "WRITE_SENSITIVE": 156,
       "PUBLIC": 6,
       "READ_HEAVY": 23
     },
@@ -33,14 +33,14 @@
       "database-servers": 20,
       "invoices": 7,
       "logging": 6,
-      "notifications": 14,
+      "notifications": 12,
       "payments": 5,
       "permissions": 1,
       "provisioning": 35,
       "reports": 5,
       "roles": 6,
       "storage-migrations": 3,
-      "storage-servers": 11,
+      "storage-servers": 13,
       "subscriptions": 12,
       "system-settings": 11,
       "tenant-fqdns": 1,
@@ -59,7 +59,7 @@
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "708333c057052443f3f19042cd71e94d7f7dbf342de325a4ebb53d497a33d282",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "93ed6f9c8bd64823da42530961312184a7acd3286eb332a12ebb54b6ecc6c7cc",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-worker-evidence-authority.route-contracts.ts": "84a6d1d52d0699b6d40ba12d2521e0ee39c0dd55b106c1b80c1f317e2cef112e",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "b05f755df72e9487118c16fe168fef0982a1eb61b2a7bc5c62bd0890babddc5e",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "395127b6c684f442cf06a276c0bc2cd28c6d11ffdde8b2f9a3afa33f93073b90",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63"
   },
   "routes": [
@@ -1859,15 +1859,15 @@
       "upstreamPath": "/api/v1/admin/notifications/:id",
       "routeKey": "core.admin.notifications.by.id.delete",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -1876,15 +1876,15 @@
       "upstreamPath": "/api/v1/admin/notifications/:id/ack",
       "routeKey": "core.admin.notifications.by.id.ack.post",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -1893,15 +1893,15 @@
       "upstreamPath": "/api/v1/admin/notifications/:id/acknowledge",
       "routeKey": "core.admin.notifications.by.id.acknowledge.post",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -1910,15 +1910,15 @@
       "upstreamPath": "/api/v1/admin/notifications/:id/dismiss",
       "routeKey": "core.admin.notifications.by.id.dismiss.post",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -1927,15 +1927,15 @@
       "upstreamPath": "/api/v1/admin/notifications/:id/read",
       "routeKey": "core.admin.notifications.by.id.read.post",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -1957,53 +1957,19 @@
     },
     {
       "method": "POST",
-      "canonicalPath": "/api/admin/core/v1/notifications/device-tokens",
-      "upstreamPath": "/api/v1/admin/notifications/device-tokens",
-      "routeKey": "core.admin.notifications.device-tokens.post",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
-      "requiredPermissions": [
-        "admin.notifications.manage"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "DELETE",
-      "canonicalPath": "/api/admin/core/v1/notifications/device-tokens/:id",
-      "upstreamPath": "/api/v1/admin/notifications/device-tokens/:id",
-      "routeKey": "core.admin.notifications.device-tokens.delete",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
-      "requiredPermissions": [
-        "admin.notifications.manage"
-      ],
-      "requiredPermissionsMode": "ALL",
-      "bodyLimitClass": null,
-      "timeoutClass": null,
-      "transportRetryMode": null,
-      "domainIdempotencyOperation": null
-    },
-    {
-      "method": "POST",
       "canonicalPath": "/api/admin/core/v1/notifications/mark-all-read",
       "upstreamPath": "/api/v1/admin/notifications/mark-all-read",
       "routeKey": "core.admin.notifications.mark-all-read.post",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -2029,15 +1995,15 @@
       "upstreamPath": "/api/v1/admin/notifications/preferences",
       "routeKey": "core.admin.notifications.preferences.put",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -2046,15 +2012,15 @@
       "upstreamPath": "/api/v1/admin/notifications/read-all",
       "routeKey": "core.admin.notifications.read-all.post",
       "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": null,
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "requiredPermissions": [
         "admin.notifications.manage"
       ],
       "requiredPermissionsMode": "ALL",
       "bodyLimitClass": null,
       "timeoutClass": null,
-      "transportRetryMode": null,
+      "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": null
     },
     {
@@ -3119,6 +3085,24 @@
     },
     {
       "method": "POST",
+      "canonicalPath": "/api/admin/core/v1/storage-servers/:id/credential-rotations/:rotationId/abort",
+      "upstreamPath": "/api/v1/admin/storage-servers/:id/credential-rotations/:rotationId/abort",
+      "routeKey": "core.admin.storage-servers.credentials.abort",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "requiredPermissions": [
+        "admin.storage_servers.update",
+        "admin.storage_servers.critical"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "POST",
       "canonicalPath": "/api/admin/core/v1/storage-servers/:id/credential-rotations/:rotationId/revoke",
       "upstreamPath": "/api/v1/admin/storage-servers/:id/credential-rotations/:rotationId/revoke",
       "routeKey": "core.admin.storage-servers.credentials.revoke",
@@ -3133,6 +3117,23 @@
       "bodyLimitClass": null,
       "timeoutClass": null,
       "transportRetryMode": "NEVER",
+      "domainIdempotencyOperation": null
+    },
+    {
+      "method": "GET",
+      "canonicalPath": "/api/admin/core/v1/storage-servers/:id/credential-rotations/current",
+      "upstreamPath": "/api/v1/admin/storage-servers/:id/credential-rotations/current",
+      "routeKey": "core.admin.storage-servers.credentials.current",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": null,
+      "requiredPermissions": [
+        "admin.storage_servers.read"
+      ],
+      "requiredPermissionsMode": "ALL",
+      "bodyLimitClass": null,
+      "timeoutClass": null,
+      "transportRetryMode": null,
       "domainIdempotencyOperation": null
     },
     {

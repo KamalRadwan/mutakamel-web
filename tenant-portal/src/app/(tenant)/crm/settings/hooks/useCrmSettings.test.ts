@@ -43,7 +43,7 @@ describe("CRM settings API contract", () => {
   it("rejects fabricated envelopes and malformed security state", () => {
     expect(() =>
       parseCrmSettingsResponse({ success: true, data: settings }),
-    ).toThrow("Invalid CRM settings response.");
+    ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
     expect(() =>
       parseCrmSettingsResponse({
         ...settings,
@@ -52,19 +52,19 @@ describe("CRM settings API contract", () => {
           allowInvalidTlsCertificate: "false",
         },
       }),
-    ).toThrow("Invalid CRM settings response.");
+    ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
     expect(() =>
       parseCrmSettingsResponse({ ...settings, id: "settings" }),
-    ).toThrow("Invalid CRM settings response.");
+    ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
     expect(() =>
       parseCrmSettingsResponse({
         ...settings,
         defaultLeadStageId: "stage-one",
       }),
-    ).toThrow("Invalid CRM settings response.");
+    ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
     expect(() =>
       parseCrmSettingsResponse({ ...settings, defaultPipelineId: "pipeline" }),
-    ).toThrow("Invalid CRM settings response.");
+    ).toThrow("INVALID_CRM_SETTINGS_RESPONSE");
   });
 
   it("normalizes an omitted optional Asterisk state to secure defaults", () => {
@@ -99,6 +99,6 @@ describe("CRM settings API contract", () => {
         requireQualifiedStageForConversion: true,
         outboundEmailContentRetentionDays: 29,
       }),
-    ).toThrow("Retention days must be an integer from 30 to 2555.");
+    ).toThrow("CRM_SETTINGS_RETENTION_INVALID");
   });
 });

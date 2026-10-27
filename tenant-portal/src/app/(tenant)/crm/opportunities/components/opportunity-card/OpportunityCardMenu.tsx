@@ -6,7 +6,7 @@ import {
   type CrmCardMenuLabels,
 } from "../../../shared/components/CrmCardMenu";
 
-export type OpportunityCardMenuLabels = CrmCardMenuLabels;
+type OpportunityCardMenuLabels = CrmCardMenuLabels;
 
 export interface OpportunityCardMenuProps {
   cardColor: CardColor | null;

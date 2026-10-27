@@ -40,15 +40,15 @@ export function AddonDefinitionDialog(props: AddonDialogOptions) {
               <Button type="button" variant="outline" size="sm" onClick={form.refreshTiers}>{copy.refreshTiers}</Button>
             </div>}
             {form.tiers && <fieldset id="addon-tierIds" tabIndex={-1} aria-describedby="addon-tierIds-hint" className="space-y-2 rounded-md border border-border p-2.5 outline-none focus-visible:ring-1 focus-visible:ring-ring">
-              <legend className="px-1 text-xs font-medium">{copy.parentTiers}</legend><p id="addon-tierIds-hint" className="text-[11px] text-muted-foreground">{copy.parentTiersHint}</p>
+              <legend className="px-1 text-xs font-medium">{copy.parentTiers}</legend><p id="addon-tierIds-hint" className="text-xs text-muted-foreground">{copy.parentTiersHint}</p>
               {form.activeTiers.map(tier => <div key={tier.id} className="flex min-h-8 items-center gap-2.5">
                 <Checkbox id={`addon-tier-${tier.id}`} checked={form.selectedTierIds.includes(tier.id)} onCheckedChange={checked => form.toggleTier(tier.id, checked === true)} />
-                <label htmlFor={`addon-tier-${tier.id}`} className="min-w-0 cursor-pointer text-xs"><span className="block font-medium">{tier.name}</span><bdi className="break-all font-mono text-[11px] text-muted-foreground">{tier.key} · {tier.id}</bdi></label>
+                <label htmlFor={`addon-tier-${tier.id}`} className="min-w-0 cursor-pointer text-xs"><span className="block font-medium">{tier.name}</span><bdi className="break-all font-mono text-xs text-muted-foreground">{tier.key} · {tier.id}</bdi></label>
               </div>)}
               {form.activeTiers.length === 0 && <p role="status" className="text-xs text-muted-foreground">{copy.noActiveTiers}</p>}
               {form.unavailableTierIds.length > 0 && <div role="alert" className="space-y-1.5 rounded-md border border-warning bg-warning-subtle p-2.5 text-xs text-warning-subtle-foreground"><p>{copy.unavailableTiers}</p>
                 {form.unavailableTierIds.map(id => <div key={id} className="flex min-h-8 items-center gap-2.5"><Checkbox id={`addon-tier-${id}`} checked onCheckedChange={checked => form.toggleTier(id, checked === true)} />
-                  <label htmlFor={`addon-tier-${id}`} className="min-w-0 cursor-pointer"><span className="block text-xs">{form.tiers?.find(tier => tier.id === id)?.name ?? copy.unknownTier}</span><bdi className="break-all font-mono text-[11px]">{id}</bdi></label></div>)}
+                  <label htmlFor={`addon-tier-${id}`} className="min-w-0 cursor-pointer"><span className="block text-xs">{form.tiers?.find(tier => tier.id === id)?.name ?? copy.unknownTier}</span><bdi className="break-all font-mono text-xs">{id}</bdi></label></div>)}
               </div>}
               {form.errors.tierIds && <p role="alert" className="text-xs text-destructive-subtle-foreground">{form.errors.tierIds}</p>}
             </fieldset>}

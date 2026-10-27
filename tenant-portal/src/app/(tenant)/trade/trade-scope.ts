@@ -13,10 +13,9 @@ import { CHANNEL_SCOPE_HEADER } from "./trade-api";
 // neither validates nor strips.
 //
 // The two policies are enforced by different components with different error
-// shapes, and on `/uoms` they disagree: the Gateway declares `BRANCH_REQUIRED`
-// on the two reads and `NONE` on the two writes, so read and write on the same
-// resource take opposite headers. `TENANT` below therefore sends **nothing**,
-// which satisfies both at once.
+// shapes. On `/uoms`, Gateway reads allow an optional company/branch context
+// and writes declare `NONE`, matching Trade's `OPERATING_CONTEXT` reads and
+// `TENANT` writes. `TENANT` below therefore sends **nothing**.
 
 /**
  * The targets `@RequireTradeAccess` declares on the routes this route group

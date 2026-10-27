@@ -11,12 +11,8 @@ import {
   ErrorState,
   NotFoundState,
   PermissionGate,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Skeleton,
+  hasPermission,
   useToast,
 } from "@/design-system";
 import { useRouter } from "next/navigation";
@@ -30,10 +26,7 @@ import { useAvailableWidgets } from "../hooks/useAvailableWidgets";
 import { useDashboardDetail, type DashboardMutationResult } from "../hooks/useDashboardDetail";
 import { useDashboardLayout } from "../hooks/useDashboardLayout";
 import { useDashboardShares } from "../hooks/useDashboardShares";
-import {
-  STANDARD_TEMPLATE_LABELS,
-  useDashboardSwitcher,
-} from "../hooks/useDashboardSwitcher";
+import { useDashboardSwitcher } from "../hooks/useDashboardSwitcher";
 import { useWidgetDrilldown } from "../hooks/useWidgetDrilldown";
 import type { DashboardTemplateKey } from "../../dashboard-contract";
 import { AddWidgetDrawer } from "./AddWidgetDrawer";
@@ -62,10 +55,12 @@ export function DashboardWorkspace({
 
   const layout = useDashboardLayout(dashboardId, detail, detailState.reload);
   const isOwner = detail?.accessLevel === "OWNER";
-  const shares = useDashboardShares(dashboardId, isOwner);
+  const canShare = isOwner && hasPermission(user?.permissions ?? [], "crm.dashboards.share");
+  const shares = useDashboardShares(dashboardId, canShare);
   const widgetPicker = useAvailableWidgets(layout.canEdit);
   const drilldown = useWidgetDrilldown(dashboardId);
-  const switcher = useDashboardSwitcher();
+  const canCreate = hasPermission(user?.permissions ?? [], "crm.dashboards.create");
+  const switcher = useDashboardSwitcher(canCreate);
 
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -104,7 +99,7 @@ export function DashboardWorkspace({
   if (detailState.detailError?.status === 403) {
     // 403 is not an empty state — and the route grant is not the record grant:
     // a dashboard is reachable only through ownership or a share.
-    return <PermissionGate require="crm.dashboards.read" scoped>{null}</PermissionGate>;
+    return <PermissionGate require="crm.dashboards.read" scoped denied>{null}</PermissionGate>;
   }
 
   if (detailState.detailError?.status === 404 || (detail === null && detailState.detailError)) {
@@ -140,21 +135,21 @@ export function DashboardWorkspace({
 
   const allSwitcherOptions = [
     ...switcherOptions.map((item) => ({ value: item.id, label: item.name })),
-    ...switcher.unprovisionedTemplates.map((templateKey) => ({
-      value: `template:${templateKey}`,
-      label:
-        lang === "ar"
-          ? STANDARD_TEMPLATE_LABELS[templateKey].ar
-          : STANDARD_TEMPLATE_LABELS[templateKey].en,
-    })),
+    ...(canCreate ? switcher.unprovisionedTemplates.map((template) => ({
+      value: `template:${template.key}`,
+      label: { en: template.nameEn, ar: template.nameAr }[lang],
+    })) : []),
   ];
 
   const handleSwitcherChange = (next: string) => {
     if (next.startsWith("template:")) {
+      if (!canCreate) return;
       const templateKey = next.slice("template:".length) as DashboardTemplateKey;
       void switcher.ensureTemplateDashboard(templateKey).then((provisionedId) => {
         if (provisionedId) {
           navigateToDashboard(provisionedId);
+        } else {
+          toast.error(t.crmDashboards.actionFailed);
         }
       });
       return;
@@ -172,18 +167,6 @@ export function DashboardWorkspace({
         className={hideHeader ? "sr-only" : undefined}
         secondaryActions={
           <>
-            <Select value={dashboardId} onValueChange={handleSwitcherChange}>
-              <SelectTrigger size="sm" aria-label={t.crmDashboards.switchDashboard} className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {allSwitcherOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button size="sm"
               variant="outline"
               onClick={() => void detailState.reload()}
@@ -217,7 +200,7 @@ export function DashboardWorkspace({
                 {layout.isEditing ? t.crmDashboards.layoutDone : t.crmDashboards.editLayout}
               </Button>
             ) : null}
-            {isOwner ? (
+            {canShare ? (
               <Button size="sm" variant="outline" onClick={() => setIsShareOpen(true)}>
                 <Share2 className="size-4" aria-hidden="true" />
                 {t.crmDashboards.share}
@@ -226,6 +209,26 @@ export function DashboardWorkspace({
           </>
         }
       />
+
+      {layout.editPermissionMissing ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t.crmDashboards.editPermissionRequired}
+        </p>
+      ) : null}
+      {isOwner && !canShare ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {t.crmDashboards.sharePermissionRequired}
+        </p>
+      ) : null}
+
+      {switcher.error ? (
+        <ErrorState
+          title={t.crmDashboards.switcherLoadFailed}
+          description={describe(switcher.error)}
+          onRetry={() => void switcher.reload()}
+          retryLabel={t.common.retry}
+        />
+      ) : null}
 
       <DashboardFilterBar
         selection={selection}
@@ -239,6 +242,11 @@ export function DashboardWorkspace({
           onChange: handleSwitcherChange,
         }}
       />
+      {switcher.hasMore ? (
+        <Button variant="outline" disabled={switcher.isLoading} loading={switcher.isLoading} onClick={() => void switcher.loadMore()}>
+          {t.crmDashboards.loadMoreDashboards}
+        </Button>
+      ) : null}
 
       {/* Partial failure, named per widget — 3 of 9, not "the dashboard
           failed". Each failed tile also says which one it was. */}
@@ -351,10 +359,13 @@ export function DashboardWorkspace({
 
       <AddWidgetDrawer
         key={isAddOpen ? "add-open" : "add-closed"}
-        open={isAddOpen}
+        open={isAddOpen && layout.canEdit}
         onOpenChange={setIsAddOpen}
         widgets={widgetPicker.widgets}
         widgetsUnavailable={widgetPicker.error !== null}
+        hasMore={widgetPicker.hasMore}
+        isLoadingMore={widgetPicker.isLoading}
+        onLoadMore={() => void widgetPicker.loadMore()}
         placedWidgetIds={new Set(detail.placements.map((placement) => placement.widgetId))}
         atCapacity={widgetCount + hiddenCount >= 20}
         isSubmitting={layout.isSaving}
@@ -367,7 +378,7 @@ export function DashboardWorkspace({
 
       <DashboardEditDrawer
         key={isEditOpen ? `edit-${detail.revision}` : "edit-closed"}
-        open={isEditOpen}
+        open={isEditOpen && layout.canEdit}
         onOpenChange={setIsEditOpen}
         initialName={detail.name}
         initialDescription={detail.description ?? ""}
@@ -380,19 +391,24 @@ export function DashboardWorkspace({
       />
 
       <ShareDrawer
-        open={isShareOpen}
+        open={isShareOpen && canShare}
         onOpenChange={setIsShareOpen}
         shares={shares.shares}
+        sharesError={shares.error}
         targets={shares.targets}
+        targetSearchError={shares.targetSearchError}
         isLoading={shares.isLoading}
         isSubmitting={shares.isSubmitting}
         onSearchTargets={(query) => void shares.searchTargets(query)}
+        onRetryShares={() => void shares.reload()}
+        onRetryTargetSearch={shares.retrySearchTargets}
         onShare={(input) => {
-          void shares.share(input).then((result) => {
+          return shares.share(input).then((result) => {
             if (result.ok) toast.success(t.crmDashboards.shared);
             else if (result.error && !toast.outcomeFromApi(result.error)) {
               toast.errorFromApi(describe(result.error), result.error);
             }
+            return result.ok;
           });
         }}
         onRevoke={(shareId) => {
@@ -411,7 +427,7 @@ export function DashboardWorkspace({
         hasMore={drilldown.hasMore}
         isLoading={drilldown.isLoading}
         error={drilldown.error}
-        onLoadMore={() => drilldown.loadMore(selection)}
+        onLoadMore={() => drilldown.loadMore()}
         onClose={drilldown.close}
       />
 

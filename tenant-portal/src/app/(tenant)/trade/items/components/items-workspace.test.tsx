@@ -197,7 +197,7 @@ beforeEach(() => {
   localStorage.clear();
   auth.mockReturnValue(session());
   get.mockImplementation(async (path: string) => {
-    if (path.endsWith("/channels")) return { data: [] };
+    if (path.includes("/channels?")) return { data: { items: [], total: 0, page: 1, limit: 100 } };
     if (path.endsWith(`/items/${PRODUCT_ITEM.id}`)) return { data: PRODUCT_ITEM };
     return page();
   });
@@ -320,7 +320,7 @@ describe("ItemsWorkspace compact Start Pic + Content design", () => {
       version: 3,
     };
     get.mockImplementation(async (path: string) =>
-      path.endsWith("/channels") ? { data: [] } : page([minimalActiveItem, deactivatedItem]),
+      path.includes("/channels?") ? { data: { items: [], total: 0, page: 1, limit: 100 } } : page([minimalActiveItem, deactivatedItem]),
     );
 
     render(

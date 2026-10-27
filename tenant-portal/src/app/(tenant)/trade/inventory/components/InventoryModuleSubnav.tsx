@@ -13,7 +13,7 @@ import {
 import { Badge, cn, SWATCH_SURFACE_PALETTES, type SwatchHue } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 
-export type InventoryModuleKey =
+type InventoryModuleKey =
   | "availability"
   | "nodes"
   | "periods"
@@ -131,7 +131,7 @@ export function InventoryModuleSubnav({ active, scopeBadge }: InventoryModuleSub
         })}
       </div>
       {scopeBadge ? (
-        <Badge tone="brand" className="font-mono text-2xs">
+        <Badge tone="brand" dir="ltr" className="font-mono text-2xs">
           {scopeBadge}
         </Badge>
       ) : null}

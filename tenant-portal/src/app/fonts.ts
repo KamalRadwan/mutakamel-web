@@ -1,13 +1,13 @@
-import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Cairo, IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
-// One superfamily across scripts, ported verbatim from the admin portal
-// (admin-portal/docs/design-system/typography.md): Plex Sans Arabic was drawn
-// against Plex Latin by the same team, so mixed-script lines (a status badge's
-// Latin enum value inside an Arabic sentence) don't jump baseline or x-height.
-// Only 400/500/600 are downloaded — the 3-weight policy is enforced
-// physically, not just by convention, because a heavier className has no 700
-// weight to synthesize (font-synthesis-weight: none in globals.css blocks
-// faking it too).
+// CRM Leads v3 (2026-10-26): Plus Jakarta Sans carries Latin runs and Cairo
+// carries Arabic runs across weights 400–800; IBM Plex Mono stays for machine
+// identifiers. Family-neutral export and CSS variable names keep the root
+// layout and global error boundary independent of the selected typefaces.
+//
+// `Cairo` includes `"latin"` alongside `"arabic"` so elements that explicitly
+// opt into `font-arabic` still render Western digits and punctuation in Cairo
+// without falling through to a system sans mid-label.
 
 // Nothing is preloaded, and that is deliberate.
 //
@@ -19,34 +19,34 @@ import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/go
 //     preload the server emits is wasted on an English operator, and the
 //     other way round.
 //   - `latin-ext` carries no glyph this UI draws. It is declared so a tenant
-//     or person named with an accented character still renders in Plex rather
-//     than dropping to a system sans mid-word.
+//     or person named with an accented character still renders in Jakarta
+//     rather than dropping to a system sans mid-word.
 //   - Which weights a screen needs depends on the screen.
 //
 // Preloading anyway costs a wasted download per face and makes the browser
 // warn "preloaded with link preload was not used within a few seconds" on
 // every page load — the browser reporting exactly that broken promise.
 // `display: swap` keeps text visible while a face arrives.
-export const plexLatin = IBM_Plex_Sans({
+export const uiLatin = Plus_Jakarta_Sans({
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-latin",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-ui-latin",
   display: "swap",
   preload: false,
 });
 
-export const plexArabic = IBM_Plex_Sans_Arabic({
-  subsets: ["arabic"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-arabic",
+export const uiArabic = Cairo({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-ui-arabic",
   display: "swap",
   preload: false,
 });
 
-export const plexMono = IBM_Plex_Mono({
+export const uiMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
+  variable: "--font-ui-mono",
   display: "swap",
   preload: false,
 });

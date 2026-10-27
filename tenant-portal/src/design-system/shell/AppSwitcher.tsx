@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { Button } from "../primitives/Button";
 import {
@@ -62,26 +62,22 @@ export function AppSwitcher({ apps, activeApp, onSelect }: AppSwitcherProps) {
     if (href) router.push(href);
   }
 
-  // Sized for a bar, not a column: no `w-full`. `text-foreground` and the
-  // chevron's `text-muted-foreground` are the ordinary names — GlobalNav's
-  // `nav-surface` re-points them to the on-chrome values, so this trigger reads
-  // white on the light theme's navy bar without knowing that. The app label
-  // hides on the narrowest widths so the icon and the account controls still
-  // fit.
+  // Sized for the 58px Ocean Navy header using dedicated switcher chrome tokens
+  // (`bg-nav-switcher-surface`, `border-nav-switcher-line`, `text-nav-switcher-fg`).
+  // The app label hides on the narrowest widths so the icon and the account
+  // controls still fit.
   const trigger = (
     <Button
       variant="ghost"
       size="sm"
       aria-label={t.nav.appSwitcher}
-      className="h-7 justify-between gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 text-xs font-semibold text-white hover:bg-white/18 hover:text-white"
+      className="h-[34px] justify-between gap-2 rounded-[9px] border border-nav-switcher-line bg-nav-switcher-surface px-3 font-semibold text-nav-switcher-fg not-disabled:hover:bg-white/15 not-disabled:hover:text-nav-foreground-strong"
     >
       <span className="flex min-w-0 items-center gap-1.5">
-        <span className="flex size-4.5 shrink-0 items-center justify-center rounded-xs bg-gradient-to-br from-cyan-400 to-blue-600 text-white">
-          <ActiveIcon className="size-3 shrink-0" aria-hidden="true" />
-        </span>
-        <span className="hidden truncate font-semibold sm:inline">{label(active)}</span>
+        <ActiveIcon className="size-4 shrink-0" aria-hidden="true" />
+        <span className="hidden truncate text-tab font-semibold md:inline">{label(active)}</span>
       </span>
-      <ChevronsUpDown className="size-3.5 shrink-0 text-white/60" aria-hidden="true" />
+      <ChevronDown className="size-3.5 shrink-0 opacity-75" aria-hidden="true" />
     </Button>
   );
 

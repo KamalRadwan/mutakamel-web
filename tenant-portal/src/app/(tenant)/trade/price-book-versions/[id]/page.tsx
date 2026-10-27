@@ -13,10 +13,11 @@ import {
   Badge,
   Button,
   DataTable,
-  DegradedBanner,
   DetailHeader,
   DetailSection,
   ErrorState,
+  Field,
+  Input,
   IdentifierText,
   Money,
   NotFoundState,
@@ -51,11 +52,15 @@ export default function PriceBookVersionPage({
     canRead,
     canTest,
     canPublish,
+    supersedesVersionId,
+    setSupersedesVersionId,
+    publishDisabledReasons,
     detail,
     isLoading,
     queryError,
     isNotFound,
     pending,
+    testReport,
     test,
     publish,
     reload,
@@ -241,6 +246,7 @@ export default function PriceBookVersionPage({
                 size="sm"
                 variant="primary"
                 disabled={!canPublish || pending !== null}
+                aria-describedby={!canPublish ? "price-book-publish-reasons" : undefined}
                 loading={pending === "publish"}
                 onClick={() => void publish()}
               >
@@ -251,6 +257,12 @@ export default function PriceBookVersionPage({
           ) : undefined
         }
       />
+
+      {detail && publishDisabledReasons.length > 0 ? (
+        <ul id="price-book-publish-reasons" aria-live="polite" className="list-disc ps-5 text-sm text-muted-foreground">
+          {publishDisabledReasons.map((reason) => <li key={reason}>{reason}</li>)}
+        </ul>
+      ) : null}
 
       {isNotFound ? (
         <NotFoundState
@@ -270,10 +282,11 @@ export default function PriceBookVersionPage({
         />
       ) : detail ? (
         <>
-          {canPublish ? null : (
-            <DegradedBanner message={t.tradePricing.publishNeedsPolicyGrant} />
-          )}
-
+          {canPublish ? (
+            <Field showLabel label={t.tradeCommon.supersedesVersionId} hint={t.tradeCommon.supersedesVersionHint}>
+              <Input value={supersedesVersionId} onChange={(event) => setSupersedesVersionId(event.target.value)} disabled={pending !== null} />
+            </Field>
+          ) : null}
           {/* 4-Card Version Dossier KPI Strip */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div
@@ -403,6 +416,10 @@ export default function PriceBookVersionPage({
               },
               { label: t.tradeCommon.version, value: String(detail.version.version) },
               {
+                label: t.tradeCommon.eligibilityEnds,
+                value: detail.version.supersededAt ? formatDateTime(detail.version.supersededAt, lang) : null,
+              },
+              {
                 label: t.tradePricing.checksumLabel,
                 value: (
                   <IdentifierText className="text-xs">{detail.version.checksum}</IdentifierText>
@@ -420,6 +437,32 @@ export default function PriceBookVersionPage({
               },
             ]}
           />
+
+          {testReport ? (
+            <DetailSection title={t.tradePricing.lastTest}>
+              <div role={testReport.passed ? "status" : "alert"} className="flex flex-col gap-3">
+                <Badge tone={testReport.passed ? "positive" : "negative"}>
+                  {testReport.passed ? t.tradePricing.testPassedShort : t.tradePricing.testFailedShort}
+                </Badge>
+                {testReport.entryCount === 0 ? <p>{t.tradePricing.noEntries}</p> : null}
+                {[
+                  { label: t.tradePricing.entryConflicts, conflicts: testReport.conflicts },
+                  { label: t.tradePricing.promotionConflicts, conflicts: testReport.promotionConflicts },
+                ].map((group) => group.conflicts.length > 0 ? (
+                  <div key={group.label}>
+                    <h3 className="text-sm font-medium">{group.label}</h3>
+                    <ul aria-label={group.label} className="flex flex-col gap-1">
+                      {group.conflicts.map((conflict, index) => (
+                        <li key={`${conflict}-${index}`}>
+                          <IdentifierText className="break-all text-xs">{conflict}</IdentifierText>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null)}
+              </div>
+            </DetailSection>
+          ) : null}
 
           <DetailSection title={t.tradePricing.entries}>
             <DataTable

@@ -15,7 +15,6 @@ import {
   PackageSearch,
   RefreshCw,
   RotateCcw,
-  Search,
   Warehouse,
 } from "lucide-react";
 import {
@@ -265,53 +264,6 @@ export default function InventoryAvailabilityPage() {
 
       {/* Main Precision Lookup Card */}
       <Card className="flex flex-col gap-3.5 border-border p-4 shadow-2xs">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "flex size-7 items-center justify-center rounded-lg border",
-                SWATCH_SURFACE_PALETTES.indigo.iconBoxIdle,
-              )}
-            >
-              <Search className="size-3.5" aria-hidden="true" />
-            </span>
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">
-                {inv.availabilityTitle}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {inv.availabilitySubtitle}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <TenantBranchSelect
-              branchIds={branchIds}
-              branchId={branchId}
-              onChange={selectBranch}
-              disabled={isLoading}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={reset}
-              disabled={isLoading}
-            >
-              <RotateCcw className="size-3.5" aria-hidden="true" />
-              {inv.clearLookup}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void lookUp()}
-              disabled={isLoading || !isScopeResolved}
-              loading={isLoading}
-            >
-              <Search className="size-3.5" aria-hidden="true" />
-              {inv.lookUp}
-            </Button>
-          </div>
-        </div>
-
         {/* Fulfillment Node Quick-Select Chips */}
         {knownNodes.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -572,7 +524,7 @@ export default function InventoryAvailabilityPage() {
                         <span className="block text-2xs text-muted-foreground">
                           {inv.onHand}
                         </span>
-                        <span className="font-mono text-xs font-semibold text-foreground">
+                        <span className="font-mono tabular-nums text-xs font-semibold text-foreground">
                           {formatDecimalString(entry.snapshot.onHandQuantity, lang, {
                             maximumFractionDigits: 4,
                           })}
@@ -582,7 +534,7 @@ export default function InventoryAvailabilityPage() {
                         <span className="block text-2xs text-muted-foreground">
                           {inv.reserved}
                         </span>
-                        <span className="font-mono text-xs font-semibold text-foreground">
+                        <span className="font-mono tabular-nums text-xs font-semibold text-foreground">
                           {formatDecimalString(entry.snapshot.reservedQuantity, lang, {
                             maximumFractionDigits: 4,
                           })}
@@ -592,7 +544,7 @@ export default function InventoryAvailabilityPage() {
                         <span className="block text-2xs text-muted-foreground">
                           {inv.available}
                         </span>
-                        <span className="font-mono text-xs font-semibold text-foreground">
+                        <span className="font-mono tabular-nums text-xs font-semibold text-foreground">
                           {formatDecimalString(entry.snapshot.availableQuantity, lang, {
                             maximumFractionDigits: 4,
                           })}
@@ -657,17 +609,17 @@ export default function InventoryAvailabilityPage() {
                           {entry.snapshot.uomId ?? "—"}
                         </IdentifierText>
                       </TableCell>
-                      <TableCell className="font-mono">
+                      <TableCell className="font-mono tabular-nums">
                         {formatDecimalString(entry.snapshot.onHandQuantity, lang, {
                           maximumFractionDigits: 4,
                         })}
                       </TableCell>
-                      <TableCell className="font-mono">
+                      <TableCell className="font-mono tabular-nums">
                         {formatDecimalString(entry.snapshot.reservedQuantity, lang, {
                           maximumFractionDigits: 4,
                         })}
                       </TableCell>
-                      <TableCell className="font-mono font-semibold">
+                      <TableCell className="font-mono tabular-nums font-semibold">
                         {formatDecimalString(entry.snapshot.availableQuantity, lang, {
                           maximumFractionDigits: 4,
                         })}
@@ -724,7 +676,7 @@ export default function InventoryAvailabilityPage() {
                   <span className="text-2xs font-semibold text-muted-foreground">
                     {inv.onHand}
                   </span>
-                  <p className="mt-1 font-mono text-lg font-semibold text-foreground">
+                  <p className="mt-1 font-mono tabular-nums text-lg font-semibold text-foreground">
                     {formatDecimalString(activeInspect.onHandQuantity, lang, {
                       maximumFractionDigits: 8,
                     })}
@@ -739,7 +691,7 @@ export default function InventoryAvailabilityPage() {
                   <span className="text-2xs font-semibold text-muted-foreground">
                     {inv.reserved}
                   </span>
-                  <p className="mt-1 font-mono text-lg font-semibold text-foreground">
+                  <p className="mt-1 font-mono tabular-nums text-lg font-semibold text-foreground">
                     {formatDecimalString(activeInspect.reservedQuantity, lang, {
                       maximumFractionDigits: 8,
                     })}
@@ -754,7 +706,7 @@ export default function InventoryAvailabilityPage() {
                   <span className="text-2xs font-semibold text-muted-foreground">
                     {inv.available}
                   </span>
-                  <p className="mt-1 font-mono text-lg font-semibold text-foreground">
+                  <p className="mt-1 font-mono tabular-nums text-lg font-semibold text-foreground">
                     {formatDecimalString(activeInspect.availableQuantity, lang, {
                       maximumFractionDigits: 8,
                     })}
@@ -791,7 +743,7 @@ export default function InventoryAvailabilityPage() {
                   <span className="block text-2xs text-muted-foreground">
                     {inv.asOf}
                   </span>
-                  <span className="font-mono font-semibold">
+                  <span dir="ltr" className="font-mono font-semibold">
                     v{formatNumber(activeInspect.version, lang)} •{" "}
                     {formatDateTime(activeInspect.asOf, lang)}
                   </span>

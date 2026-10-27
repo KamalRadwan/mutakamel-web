@@ -260,6 +260,20 @@ describe("lead detail contract", () => {
 });
 
 describe("corporate company options", () => {
+  it("sends a bounded, encoded server search and omits blank search", () => {
+    const query = new URL(leadCompanyOptionsPath(BRANCH, "  Acme & Sons_%  "), "https://example.test").searchParams;
+    expect(query.get("branchId")).toBe(BRANCH);
+    expect(query.get("limit")).toBe("50");
+    expect(query.get("search")).toBe("Acme & Sons_%");
+    expect(leadCompanyOptionsPath(BRANCH, " ")).not.toContain("search=");
+  });
+
+  it("accepts fifty company rows and rejects an oversized response", () => {
+    const company = { id: PARTY, displayName: "Acme", branchId: BRANCH };
+    expect(parseLeadCompanyOptions(Array.from({ length: 50 }, () => company))).toHaveLength(50);
+    expect(() => parseLeadCompanyOptions(Array.from({ length: 51 }, () => company))).toThrow();
+  });
+
   it("keeps an organization with no branch, which the query deliberately returns", () => {
     const [option] = parseLeadCompanyOptions([
       {

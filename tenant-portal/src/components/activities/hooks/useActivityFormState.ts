@@ -15,7 +15,7 @@ import {
 import { validateActivityForm, type ActivityFormErrors, type ActivityFormField } from "../activity-form-rules";
 
 type ActivityTextField =
-  | "subject" | "priority" | "direction" | "location" | "meetingUrl" | "description" | "outcome" | "endDate" | "endTime";
+  | "subject" | "priority" | "direction" | "location" | "meetingUrl" | "description" | "outcome" | "endDate" | "endTime" | "reminderOffsetMinutes";
 
 export interface ActivityFormState {
   values: ActivityFormValues;

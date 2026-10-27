@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useToast } from "@/design-system";
+import { useCan, useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { can, type PermissionTarget } from "@/lib/auth/permission-scope";
+import { fetchTemplate } from "../../templates-api";
 import {
   ACCESS_POLICY_BLOCKED_CODE,
   TEMPLATE_ASSETS_PERMISSION,
@@ -48,7 +50,8 @@ export function useTemplateAssets() {
   const { user } = useTenantAuth();
   const permissions = user?.permissions ?? [];
   const canRead = permissions.includes(TEMPLATE_READ_PERMISSION);
-  const canManage = permissions.includes(TEMPLATE_ASSETS_PERMISSION);
+  const canManage = useCan(TEMPLATE_ASSETS_PERMISSION);
+  const canUpload = useCan(TEMPLATE_ASSETS_PERMISSION, { tenantWide: true });
   const copy = t.coreOperations.templates;
 
   const cursor = useTemplateCursor();
@@ -63,6 +66,7 @@ export function useTemplateAssets() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [retiring, setRetiring] = useState<TemplateAsset | null>(null);
+  const [retiringTarget, setRetiringTarget] = useState<PermissionTarget | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -115,7 +119,7 @@ export function useTemplateAssets() {
 
   const upload = useCallback(
     async (values: AssetUploadValues): Promise<boolean> => {
-      if (!canManage || isSubmitting || !values.file) return false;
+      if (!canUpload || isSubmitting || !values.file) return false;
       if (values.file.size > ASSET_FILE_MAX_BYTES) {
         setFormError(copy.assetTooLarge);
         return false;
@@ -158,11 +162,39 @@ export function useTemplateAssets() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, toast, copy],
+    [canUpload, isSubmitting, toast, copy],
   );
 
+  const canRetire = useCallback(
+    (asset: TemplateAsset) => asset.definitionId ? canManage : canUpload,
+    [canManage, canUpload],
+  );
+
+  const prepareRetire = useCallback(async (asset: TemplateAsset): Promise<void> => {
+    if (!canRetire(asset)) return;
+    try {
+      // Asset rows identify the definition but do not project its organization scope.
+      const definition = asset.definitionId ? await fetchTemplate(asset.definitionId) : null;
+      const scope = definition?.scope;
+      const target: PermissionTarget = scope?.type === "BRANCH"
+        ? { branchId: scope.branchId, companyId: scope.companyId }
+        : { companyId: scope?.type === "COMPANY" ? scope.companyId ?? null : null };
+      if (!can(user, TEMPLATE_ASSETS_PERMISSION, target)) {
+        toast.error(t.permissionGate.title, t.permissionGate.description);
+        return;
+      }
+      setRetiringTarget(target);
+      setRetiring(asset);
+    } catch (error) {
+      const normalized = normalizeApiError(error);
+      if (normalized.status !== 403 && !toast.outcomeFromApi(normalized)) {
+        toast.errorFromApi(copy.assetRetireFailed, normalized);
+      }
+    }
+  }, [canRetire, user, toast, t, copy]);
+
   const retire = useCallback(async (): Promise<void> => {
-    if (!retiring || !canManage || pendingId) return;
+    if (!retiring || !retiringTarget || !can(user, TEMPLATE_ASSETS_PERMISSION, retiringTarget) || pendingId) return;
     setPendingId(retiring.id);
     try {
       await retireTemplateAsset(retiring.id, retiring.etag);
@@ -179,13 +211,14 @@ export function useTemplateAssets() {
       setPendingId(null);
       setRetiring(null);
     }
-  }, [retiring, canManage, pendingId, toast, copy]);
+  }, [retiring, retiringTarget, user, pendingId, toast, copy]);
 
   return {
     t,
     lang,
     canRead,
-    canManage,
+    canUpload,
+    canRetire,
     items,
     sort,
     isLoading: isLoading && canRead,
@@ -206,6 +239,7 @@ export function useTemplateAssets() {
     goBack: cursor.goBack,
     startOver: () => cursor.restart(false),
     openUpload: () => {
+      if (!canUpload) return;
       setFormError(null);
       setIsUploadOpen(true);
     },
@@ -213,7 +247,7 @@ export function useTemplateAssets() {
       if (isSubmitting) return;
       setIsUploadOpen(false);
     },
-    openRetire: (asset: TemplateAsset) => setRetiring(asset),
+    openRetire: (asset: TemplateAsset) => void prepareRetire(asset),
     closeRetire: () => {
       if (pendingId) return;
       setRetiring(null);

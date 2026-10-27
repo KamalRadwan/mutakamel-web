@@ -375,6 +375,7 @@ function UserDetailCard({ controller, locale, openDialog }: { controller: Return
   if (!resource.data) return <GateCard tone="danger" message={resource.error?.message ?? copy.loadError} />;
   const user = resource.data;
   const deleted = user.deletedAt !== null;
+  const resetUnavailable = deleted || user.status === "DEACTIVATED";
   const protectedOwner = user.isTenantOwner;
   return (
     <Card className="p-3 sm:p-3.5" aria-label={copy.details}>
@@ -405,7 +406,21 @@ function UserDetailCard({ controller, locale, openDialog }: { controller: Return
       {protectedOwner ? <p className="mt-3 rounded-lg bg-warning-subtle px-3 py-2 text-xs text-warning-subtle-foreground">{copy.protectedOwner}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {controller.permissions.canUpdate && !protectedOwner && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "edit", user })}>{copy.edit}</Button> : null}
-        {controller.permissions.canResetPassword && user.status !== "DEACTIVATED" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "reset-password", user })}>{copy.resetPassword}</Button> : null}
+        {controller.permissions.canResetPassword ? (
+          <div className="grid gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={resetUnavailable}
+              aria-describedby={resetUnavailable ? "tenant-user-reset-unavailable" : undefined}
+              onClick={() => openDialog({ kind: "confirm", action: "reset-password", user })}
+            >
+              {copy.resetPassword}
+            </Button>
+            {resetUnavailable ? <p id="tenant-user-reset-unavailable" className="max-w-64 text-xs text-muted-foreground">{copy.resetPasswordUnavailable}</p> : null}
+          </div>
+        ) : null}
         {controller.permissions.canInvite && user.status === "INVITED" && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "confirm", action: "resend-invite", user })}>{copy.resendInvite}</Button> : null}
         {controller.permissions.canResetPassword && (user.status === "ACTIVE" || user.status === "SUSPENDED") && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "password", user })}>{copy.changePassword}</Button> : null}
         {controller.permissions.canAssignRoles && !protectedOwner && !deleted ? <Button type="button" variant="outline" size="sm" onClick={() => openDialog({ kind: "roles", user })}>{copy.manageRoles}</Button> : null}

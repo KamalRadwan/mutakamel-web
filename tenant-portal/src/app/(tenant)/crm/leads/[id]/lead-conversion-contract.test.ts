@@ -47,6 +47,15 @@ describe("ConvertLeadDto request", () => {
   it("omits optional opportunity defaults instead of inventing them", () => {
     expect(buildConvertLeadRequest(opportunity()).opportunity).toEqual({ pipelineId: ids.pipeline, stageId: ids.membership, title: "Acme" });
   });
+
+  it("converts a KWD opportunity without rounding and gives EGP an amount error", () => {
+    const kwd = opportunity({ amount: "1.234", currencyCode: "KWD" });
+    expect(validateLeadConversion(kwd)).toEqual({});
+    expect(JSON.stringify(buildConvertLeadRequest(kwd).opportunity)).toContain('"amount":1.234');
+    expect(validateLeadConversion({ ...kwd, currencyCode: "EGP" }).amount).toBe("amount");
+    expect(() => buildConvertLeadRequest({ ...kwd, currencyCode: "EGP" })).toThrow("Invalid conversion form.");
+    expect(buildConvertLeadRequest({ ...kwd, amount: "1.230", currencyCode: "EGP" }).opportunity?.amount).toBe(1.23);
+  });
   it.each([
     ["title", "x".repeat(181)], ["description", "x".repeat(2001)], ["importance", "4"], ["importance", "1.5"],
     ["probabilityPercent", "101"], ["probabilityPercent", "-1"], ["amount", "-1"], ["amount", "1.234"],

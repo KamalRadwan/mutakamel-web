@@ -59,7 +59,7 @@ function buildHookState(overrides: Record<string, unknown> = {}) {
     t: ar,
     lang: "ar" as const,
     canManage: true,
-    scopeGap: null,
+    operatingScopeGap: null,
     items: SAMPLE_ITEMS,
     pageInfo: { page: 1, limit: 50, total: 2 },
     statusFilter: undefined,
@@ -128,6 +128,19 @@ function renderPage() {
 }
 
 describe("TradeUomsPage", () => {
+  it("keeps the master directory available when the operating catalogue needs a company", () => {
+    mockUseUoms.mockReturnValue(buildHookState({ operatingScopeGap: "company-required" }));
+    renderPage();
+
+    expect(screen.getAllByText("PCS").length).toBeGreaterThan(0);
+    expect(screen.queryByText(ar.trade.scopeRequiredTitle)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: ar.trade.uomViewOperating }));
+    expect(screen.getByText(ar.trade.scopeRequiredTitle)).toBeInTheDocument();
+    expect(screen.queryByText(ar.trade.uomOperatingBaseBadge)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: ar.trade.uomViewTable }));
+    expect(screen.getAllByText("PCS").length).toBeGreaterThan(0);
+  });
+
   it("renders KPI strip, 9-category filter pills, and full-width directory table", () => {
     mockUseUoms.mockReturnValue(buildHookState());
     renderPage();

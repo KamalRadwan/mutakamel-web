@@ -1,6 +1,7 @@
 "use client";
 
-import { DetailSection, PermissionGate } from "@/design-system";
+import { Button, DetailSection, PermissionGate } from "@/design-system";
+import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import type {
   ScopeRoleAssignment,
@@ -8,6 +9,7 @@ import type {
 } from "../../../contracts/role-assignment-contract";
 import { useCoreErrorText } from "../../../hooks/useCoreErrorText";
 import { useOrgNodeOptions, useRoleOptions } from "../../../hooks/useCoreOptions";
+import { useRoleGrantOptions } from "../../../hooks/useRoleGrantOptions";
 import { useUserRoleGrants } from "../hooks/useUserRoleGrants";
 import { BranchRolesSection } from "./BranchRolesSection";
 import { ScopeRolesSection } from "./ScopeRolesSection";
@@ -16,6 +18,7 @@ interface RoleGrantsPanelProps {
   userId: string;
   canAssignRoles: boolean;
   isTenantOwnerActor: boolean;
+  protectedTargetReason?: string;
 }
 
 /**
@@ -30,19 +33,38 @@ export function RoleGrantsPanel({
   userId,
   canAssignRoles,
   isTenantOwnerActor,
+  protectedTargetReason,
 }: RoleGrantsPanelProps) {
   const { t } = useI18n();
   const copy = t.coreIdentity;
   const describeError = useCoreErrorText();
-  const panel = useUserRoleGrants(userId, canAssignRoles);
-  const roles = useRoleOptions(canAssignRoles);
-  const branches = useOrgNodeOptions("branches", { enabled: canAssignRoles });
-  const companies = useOrgNodeOptions("companies", { enabled: canAssignRoles });
+  const enabled = canAssignRoles && !protectedTargetReason;
+  const panel = useUserRoleGrants(userId, enabled, isTenantOwnerActor);
+  const grants = useRoleGrantOptions(userId, enabled);
+  const { user: actor } = useTenantAuth();
+  const canReadScopeOptions = isTenantOwnerActor || ["roles.role.read", "org.branch.read", "org.company.read"]
+    .every((permission) => actor?.permissions.includes(permission));
+  const scopeOptionsEnabled = enabled && isTenantOwnerActor && canReadScopeOptions;
+  const roles = useRoleOptions(scopeOptionsEnabled, true);
+  const branches = useOrgNodeOptions("branches", { enabled: scopeOptionsEnabled });
+  const companies = useOrgNodeOptions("companies", { enabled: scopeOptionsEnabled });
+  const scopeOptionsReady = grants.isReady && roles.isReady && branches.isReady && companies.isReady;
 
-  const roleLabel = (id: string) => roles.labelFor(id) ?? id;
-  const branchLabel = (id: string | null | undefined) => (id ? (branches.labelFor(id) ?? id) : "");
+  if (protectedTargetReason) {
+    return (
+      <PermissionGate require="users.user.assign_roles">
+        <DetailSection title={copy.grants.title} columns={1}>
+          <p className="text-xs text-muted-foreground">{protectedTargetReason}</p>
+        </DetailSection>
+      </PermissionGate>
+    );
+  }
+
+  const unresolvedName = grants.isLoading ? copy.picker.loading : copy.grants.nameUnavailable;
+  const roleLabel = (id: string) => grants.labelFor("role", id) ?? roles.labelFor(id) ?? unresolvedName;
+  const branchLabel = (id: string | null | undefined) => (id ? (grants.labelFor("branch", id) ?? branches.labelFor(id) ?? unresolvedName) : "");
   const companyLabel = (id: string | null | undefined) =>
-    id ? (companies.labelFor(id) ?? id) : "";
+    id ? (grants.labelFor("company", id) ?? companies.labelFor(id) ?? unresolvedName) : "";
 
   const targetLabel = (assignment: ScopeRoleAssignment) =>
     branchLabel(assignment.branchId) ||
@@ -75,21 +97,34 @@ export function RoleGrantsPanel({
 
           <BranchRolesSection
             panel={panel}
-            roles={roles}
-            branches={branches}
+            grantOptions={grants}
             roleLabel={roleLabel}
             branchLabel={branchLabel}
           />
 
-          <ScopeRolesSection
-            panel={panel}
-            roles={roles}
-            companies={companies}
-            branches={branches}
-            isTenantOwnerActor={isTenantOwnerActor}
-            describe={describeScope}
-            targetLabel={targetLabel}
-          />
+          {isTenantOwnerActor && !scopeOptionsReady ? (
+            <p role="status" className="text-xs text-muted-foreground">
+              {!canReadScopeOptions ? copy.grants.companionReadsRequired :
+                roles.error || branches.error || companies.error || grants.error
+                  ? copy.grants.optionsLoadFailed : copy.picker.loading}
+              {roles.error || branches.error || companies.error || grants.error ? (
+                <Button variant="ghost" size="sm" onClick={() => {
+                  roles.retry?.(); branches.retry?.(); companies.retry?.(); grants.retry();
+                }}>{t.common.retry}</Button>
+              ) : null}
+            </p>
+          ) : null}
+          <fieldset disabled={isTenantOwnerActor && !scopeOptionsReady} className="min-w-0">
+            <ScopeRolesSection
+              panel={panel}
+              roles={roles}
+              companies={companies}
+              branches={branches}
+              isTenantOwnerActor={isTenantOwnerActor}
+              describe={describeScope}
+              targetLabel={targetLabel}
+            />
+          </fieldset>
 
           <p className="rounded-sm border border-border bg-muted p-2.5 text-2xs text-muted-foreground">
             {copy.grants.unionNote}

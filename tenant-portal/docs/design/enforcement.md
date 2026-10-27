@@ -4,6 +4,11 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
+Updated: **2026-10-26** — CRM Leads v3 policy and template-literal coverage.
+
+The binding allowances are in [CRM Leads v3, Parts 1–2](specs/crm-leads-v3.md):
+weights 700/800, named small type, named gradients and card/column radii.
+
 A design system that is only written down decays. These are the mechanical
 gates that keep it true.
 
@@ -32,18 +37,21 @@ works in a real authenticated session — say so honestly when reporting.
 `scripts/design/census.mjs` counts the signals this system intends to change
 and diffs them against `docs/design/census.baseline.json`.
 
+Files ending in `.test.ts`, `.test.tsx`, `.spec.ts` or `.spec.tsx` are excluded
+from both feature and design-system counts, matching ESLint's design gates.
+
 | Counter | Target | Notes |
 | --- | ---: | --- |
 | `colorUtilityTotal` | 0 | The 22 raw Tailwind families |
 | `colorFamiliesInUse` | 0 | |
 | `roleRampUtilities` | ratchet | See below — no zero target yet |
-| `arbitraryTypeSize` | 0 | |
-| `fontBoldOrHeavier` | 0 | |
-| `roundedXlOrAbove` | 0 | |
-| `gradients` | ≤ 2 | |
+| `arbitraryTypeSize` | 0 | Arbitrary integer or fractional pixel sizes; named type steps pass |
+| `fontBoldOrHeavier` | 0 | Legacy key retained; now counts only `font-black` (900). Bold/extrabold (700/800) pass |
+| `roundedXlOrAbove` | 0 | `rounded-card` and `rounded-column` pass |
+| `gradients` | 0 | Raw v3/v4 utilities only; named gradient utilities do not count |
 | `backdropBlur` | ≤ 1 | |
-| `handRolledButtons` | **2** | Both in `src/context/AuthContext.test.tsx` — test-harness markup, not UI. Named, not silently excluded |
-| `handRolledTables` | 0 | |
+| `handRolledButtons` | 0 | Test-harness markup is excluded |
+| `handRolledTables` | **1** | Accessible chart equivalent — see below |
 | `physicalRtlViolations` | 0 | |
 | `languageTernaries` | **5** | The real floor — see below |
 | `arabicIndicDigits` | 0 | The numeral decision, dictionary side |
@@ -70,9 +78,12 @@ things it exists to catch were sitting in the tree:
    down needs new semantic tokens, which is design-system work, not a sweep.
 3. **The gradient counter could not fire.** It matched v3's `bg-gradient-to-`
    while the code uses Tailwind v4's `bg-linear-to-`, so the baseline read
-   `gradients: 0` while one gradient existed. Both spellings now match.
+   `gradients: 0` while one gradient existed. The 2026-10-26 policy also covers
+   angle/interpolation forms (`bg-linear-*`, `bg-radial-*`, `bg-conic-*`), bare
+   radial/conic utilities and arbitrary gradient images. Only raw forms count;
+   the seven named `bg-gradient-*` utilities are excluded.
 
-### The two counters that cannot reach zero, and why
+### Documented floors and test exclusions
 
 Task 3.17 re-baselined honestly rather than closing on a number that was not
 true. Two counters have a floor above zero, and every site is named here so the
@@ -89,11 +100,11 @@ Any count above 5 is a real violation. That is the point of the helper: it
 removes the syntax from feature code entirely and restores the counter as a
 gate rather than a number with a footnote.
 
-**`handRolledButtons` floor: 2**, both in `src/context/AuthContext.test.tsx`.
-They are a test harness's own controls, which is why `eslint.config.mjs`
-already excludes test files from the hand-rolled-button rule with the same
-reasoning. The census is deliberately **not** taught to skip them — a named
-floor is honest, a silent exclusion is not.
+**`handRolledButtons` has no production floor.** Its historical floor of 2
+came from `src/context/AuthContext.test.tsx`. Since 2026-10-26, tests and specs
+are explicitly excluded from both the census and ESLint's design rules.
+Historical baseline numbers remain until the lead reviews and banks the
+combined restyle; T8 does not re-baseline counts.
 
 **`handRolledTables` floor: 1**, in
 `src/app/(tenant)/crm/dashboards/[id]/components/WidgetDataTable.tsx`
@@ -110,13 +121,14 @@ hand-rolled table in feature code is still the regression to catch.
 
 ### Reading the design-system block
 
-Three numbers under `designSystemCounts` look like budget breaches and are not.
-All three were invisible before 3.30, which is exactly why they are counted now.
+These historical numbers under `designSystemCounts` describe implementation
+sites rather than feature violations. They were invisible before 3.30, which
+is why the separate block exists; the current baseline is authoritative.
 
 | Counter | Value | What it actually is |
 | --- | ---: | --- |
 | `backdropBlur` | 3 | **One** mechanism — the modal scrim — with three call sites: `AlertDialog`, `Dialog`, `Sheet`. The documented budget of 1 is one *use*; the counter measures occurrences. A fourth that is not a scrim is the regression to catch |
-| `gradients` | 1 | `Skeleton`'s shimmer sweep, the only gradient in the product. Budget is 2 |
+| `gradients` | 1 | Raw `Skeleton` shimmer implementation; named v3 gradients do not count. The design-system block ratchets separately |
 | `handRolledButtons` / `handRolledTables` | 6 / 3 | The definition sites. `Button` is where a `<button>` is supposed to be, and `Table` is where a `<table>` is supposed to be |
 
 `roleRampUtilities` is the number to watch here. It is high in both blocks and
@@ -137,10 +149,10 @@ Two honesty rules:
   worth removing, because the next person cannot tell the difference. Do not
   teach the script to ignore comments — that would mask real regressions.
 
-`src/design-system/` is exempt: it legitimately defines the tokens and
-utilities being counted.
+`src/design-system/` is exempt from the feature-code ESLint rules, but its
+production files and `globals.css` remain counted in `designSystemCounts`.
 
-### Starting baseline
+### Starting baseline (historical counter definitions)
 
 Measured 2026-08-27, before any work:
 
@@ -188,9 +200,8 @@ and CI. The attachment-size label was exactly that, plus the English word
 "bytes" appended to it — `formatBytes` in `src/lib/format/number.ts` replaced
 both.
 
-Both ratchet at 0. Where a test must name the Arabic-Indic block to assert the
-rule, it writes code-point escapes rather than the characters — the test that
-pins a rule must not be the thing that trips its gate.
+Both ratchet at 0 in production files. Test and spec files are excluded; using
+code-point escapes in tests still makes the intended numeral block explicit.
 
 ## identifier-guard.mjs
 
@@ -308,20 +319,39 @@ something unintended happened.
 
 ## ESLint rules
 
-Add to `eslint.config.mjs`, scoped to `.ts`/`.tsx` **outside**
-`src/design-system/`:
+Configured in `eslint.config.mjs`, scoped to `.ts`/`.tsx` **outside**
+`src/design-system/`, excluding test and spec files. The raw-gradient rule is
+scoped specifically to `src/app/**` and `src/components/**`.
 
 | Pattern | Level | Why |
 | --- | --- | --- |
-| `text-[Npx]` | **error** | Use the 7-step scale |
-| `font-bold\|extrabold\|black` | **error** | Three weights only |
-| `rounded-(xl\|2xl\|3xl)` | **error** | Scale stops at 8px |
-| Raw palette utility (`bg-slate-800`) | warn → error after phase 4 | Use tokens |
-| `bg-gradient-` | warn | Budget is 2 |
-| `backdrop-blur` | warn | Budget is 1 |
+| `text-[Npx]` (including fractional pixels) | **error** | Use named type steps |
+| `font-black` | **error** | 900 is banned; 400/500/600/700/800, including `font-bold`/`font-extrabold`, pass |
+| `rounded-(xl\|2xl\|3xl)` | **error** | Use the scale or named `rounded-card`/`rounded-column` |
+| Raw palette utility (`bg-slate-800`) | **error** | Use semantic tokens |
+| Arbitrary colour (hex, CSS colour function or `color:` hint) | **error** | Use a named semantic utility |
+| Raw `bg-linear-*`, `bg-radial-*`, `bg-conic-*`, `bg-gradient-to-*` or arbitrary gradient image | **error** | Named gradient utilities only; bare radial/conic forms are also banned |
 | `lang === "ar" ?` around a string | **error** | Zero-ternary rule |
 | Deep `@/design-system/...` import | **error** | Barrel only |
-| `toast.error` in a `catch` referencing 403 | warn | Double-fire |
+| Bare z-index / non-canonical RTL mirror | **error** | Use stacking tokens / `rtl:-scale-x-100` |
+| Hand-rolled `<button>` / `<table>` | **error** | Use design-system primitives |
+
+Every class-pattern rule checks both string `Literal` and template-literal
+`TemplateElement` nodes, including quasis surrounding interpolations. Palette,
+arbitrary colour, type, weight, radius, gradient, stacking and mirror rules
+therefore apply to both `className="…"` and `` className={`… ${value}`} ``.
+
+Allowed named type steps include `text-micro` (count chips only), `text-badge`,
+`text-caption`, `text-label`, `text-tab`, `text-card-title` and
+`text-column-title`. Their permitted uses are specified in the v3 contract;
+the lint gate rejects forbidden syntax, but cannot judge whether a component
+uses the right named step. `text-tab` avoids a utility collision with `--color-nav`.
+
+The named gradients allowed everywhere are `bg-gradient-header`,
+`bg-gradient-brand-strip`, `bg-gradient-primary`, `bg-gradient-avatar`,
+`bg-gradient-logo`, `bg-gradient-canvas` and `bg-gradient-chip-active`.
+Backdrop blur remains a census budget of one mechanism (the modal scrim),
+rather than a `no-restricted-syntax` rule.
 
 ### The trap that made these useless elsewhere
 
@@ -331,7 +361,9 @@ exactly this: seven design patterns silently never fired for the entire
 migration, and flipping them on afterwards surfaced 2,574 hidden warnings.
 
 **Put every `no-restricted-syntax` pattern for a given file scope in one
-array.** After adding the rules, verify they actually fire:
+array.** The gradient-specific block spreads the complete shared
+`designSyntaxRules` array before adding its rule, preserving every other gate
+in `src/app/**` and `src/components/**`. After adding rules, verify they fire:
 
 ```bash
 pnpm lint 2>&1 | grep -c "no-restricted-syntax"

@@ -6,7 +6,6 @@ import {
 } from "./lead-create-contract";
 import {
   leadCreateSectionErrorCount,
-  sectionOfLeadCreateError,
   validateCreateLead,
   type LeadCreateMessages,
 } from "./lead-create-validation";
@@ -16,6 +15,7 @@ const messages: LeadCreateMessages = {
   email: "Bad email.",
   maxLength: "At most {max} characters.",
   duplicatePhone: "Already listed.",
+  phone: "Invalid phone.",
   url: "Bad URL.",
   contactRequired: "Add a contact.",
   tagsLimit: "At most {max} tags.",
@@ -111,6 +111,14 @@ describe("validateCreateLead — individual", () => {
       messages,
     );
 
+  it.each(["abc", "1", "1234", "001234", "+"])("rejects invalid phone %s", (phone) => {
+    expect(individual({ phones: [phone] })["phones.0"]).toBe(messages.phone);
+  });
+
+  it.each(["12345", "+12 345", "0012345"])("accepts five normalized digits: %s", (phone) => {
+    expect(individual({ phones: [phone] })).toEqual({});
+  });
+
   it("requires a first name and checks the email shape", () => {
     // The first name is the part CRM composes the lead's rendered name from,
     // so it is the one identity field this branch cannot do without. The last
@@ -199,18 +207,6 @@ describe("required custom fields", () => {
 });
 
 describe("section index", () => {
-  it("routes every error path to the section that renders it", () => {
-    expect(sectionOfLeadCreateError("acquisitionSourceId")).toBe("classification");
-    expect(sectionOfLeadCreateError("tagIds")).toBe("classification");
-    expect(sectionOfLeadCreateError("companyName")).toBe("company");
-    expect(sectionOfLeadCreateError("companyPhones.1")).toBe("company");
-    expect(sectionOfLeadCreateError("contacts.2.email")).toBe("contacts");
-    expect(sectionOfLeadCreateError("address.city")).toBe("address");
-    expect(sectionOfLeadCreateError("customFields.budget")).toBe("customFields");
-    expect(sectionOfLeadCreateError("phones.0")).toBe("person");
-    expect(sectionOfLeadCreateError("nonsense")).toBeNull();
-  });
-
   it("counts a section's errors so the index can flag one scrolled out of view", () => {
     const errors = validateCreateLead(form({ acquisitionSourceId: "" }), messages);
     expect(leadCreateSectionErrorCount(errors, "classification")).toBe(1);

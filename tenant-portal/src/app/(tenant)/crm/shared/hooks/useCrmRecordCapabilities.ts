@@ -9,6 +9,7 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
+  CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES,
   NO_ATTACHED_RECORD_CAPABILITIES,
   parseAttachedRecordCapabilities,
   type CrmAttachedRecordCapabilities,
@@ -65,7 +66,7 @@ export function useCrmRecordCapabilities(branchId: string | null) {
           {
             signal,
             cache: "no-store",
-            maxResponseBytes: 64 * 1024,
+            maxResponseBytes: CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES,
             headers: scope.headers,
           },
         );

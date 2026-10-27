@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Building2, LayoutDashboard, MapPin } from "lucide-react";
+import { useMemo } from "react";
+import { LayoutDashboard, MapPin } from "lucide-react";
 import {
   Label,
   Select,
@@ -42,69 +42,21 @@ export function DashboardFilterBar({
   dashboardSwitcher,
 }: DashboardFilterBarProps) {
   const { t } = useI18n();
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
-
-  const companies = useOrgNodeOptions("companies");
-  const effectiveCompanyId =
-    selectedCompanyId ??
-    (companies.options.length === 1 ? companies.options[0].value : null);
-
-  const branches = useOrgNodeOptions("branches", {
-    parentId: effectiveCompanyId ?? undefined,
-  });
+  const branches = useOrgNodeOptions("branches");
 
   const branchOptions = useMemo(() => {
     const accessibleSet = new Set(branchIds);
-    const loaded = branches.options.filter(
-      (option) => accessibleSet.size === 0 || accessibleSet.has(option.value),
+    return branches.options.filter(
+      (option) => accessibleSet.has(option.value),
     );
-    if (loaded.length > 0) return loaded;
-    return branches.options;
   }, [branchIds, branches.options]);
 
-  const currencyList = useMemo(() => {
-    if (currencyCodes.length > 0) return currencyCodes;
-    return ["EGP", "SAR", "USD"];
-  }, [currencyCodes]);
-
   const gridColsClass = dashboardSwitcher
-    ? "grid grid-cols-1 gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-6"
-    : "grid grid-cols-1 gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-5";
+    ? "grid grid-cols-1 gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-5"
+    : "grid grid-cols-1 gap-3 rounded-md border border-border bg-card p-3 sm:grid-cols-2 lg:grid-cols-4";
 
   return (
     <div className={gridColsClass}>
-      <div className="flex flex-col gap-1">
-        <Label htmlFor="dashboard-company">{t.crmDashboards.company}</Label>
-        <Select
-          value={effectiveCompanyId ?? ANY}
-          disabled={disabled}
-          onValueChange={(next) => {
-            const nextCompanyId = next === ANY ? null : next;
-            setSelectedCompanyId(nextCompanyId);
-            if (selection.branchId !== null) {
-              onChange({ ...selection, branchId: null });
-            }
-          }}
-        >
-          <SelectTrigger size="sm" id="dashboard-company">
-            <span className="flex min-w-0 items-center gap-1.5 truncate">
-              <Building2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <SelectValue />
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            {companies.options.length > 1 || companies.options.length === 0 ? (
-              <SelectItem value={ANY}>{t.crmDashboards.allCompanies}</SelectItem>
-            ) : null}
-            {companies.options.map((company) => (
-              <SelectItem key={company.value} value={company.value}>
-                {company.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       <div className="flex flex-col gap-1">
         <Label htmlFor="dashboard-branch">{t.crmDashboards.branch}</Label>
         <Select
@@ -162,7 +114,7 @@ export function DashboardFilterBar({
       <div className="flex flex-col gap-1">
         <Label htmlFor="dashboard-date-preset">{t.crmDashboards.datePreset}</Label>
         <Select
-          value={selection.datePreset ?? "CURRENT_MONTH"}
+          value={selection.datePreset ?? ANY}
           disabled={disabled}
           onValueChange={(next) =>
             onChange({
@@ -188,7 +140,7 @@ export function DashboardFilterBar({
       <div className="flex flex-col gap-1">
         <Label htmlFor="dashboard-compare">{t.crmDashboards.compare}</Label>
         <Select
-          value={selection.compare ?? "PREVIOUS_PERIOD"}
+          value={selection.compare ?? ANY}
           disabled={disabled}
           onValueChange={(next) =>
             onChange({
@@ -214,7 +166,7 @@ export function DashboardFilterBar({
       <div className="flex flex-col gap-1">
         <Label htmlFor="dashboard-currency">{t.crmDashboards.currency}</Label>
         <Select
-          value={selection.currencyCode ?? "EGP"}
+          value={selection.currencyCode ?? ANY}
           disabled={disabled}
           onValueChange={(next) =>
             onChange({ ...selection, currencyCode: next === ANY ? null : next })
@@ -225,7 +177,7 @@ export function DashboardFilterBar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ANY}>{t.crmDashboards.allCurrencies}</SelectItem>
-            {currencyList.map((code) => (
+            {currencyCodes.map((code) => (
               <SelectItem key={code} value={code}>
                 {code}
               </SelectItem>

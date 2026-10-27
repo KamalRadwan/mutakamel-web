@@ -18,6 +18,7 @@ export function pricingMessage(
     case "TRADE.PRICE.NO_ELIGIBLE_PRICE":
       return t.tradePricing.errorNoEligiblePrice;
     case "TRADE.PRICE.AMBIGUOUS_RULES":
+    case "TRADE.PRICE.RULE_SELECTION_INVALID":
       return t.tradePricing.errorAmbiguousRules;
     case "TRADE.PRICE.TIER_OVERLAP":
       return t.tradePricing.errorTierOverlap;
@@ -42,6 +43,7 @@ export function pricingMessage(
     case "TRADE.PRICE.MARGIN_GUARD":
       return t.tradePricing.errorMarginGuard;
     case "TRADE.PRICE.LOCK_INVALID":
+    case "TRADE.PRICE.LOCK_DATA_INVALID":
     case "TRADE.PRICE.LOCK_EXPIRED":
     case "TRADE.PRICE.LOCK_CONTEXT_MISMATCH":
       return t.tradePricing.errorPriceLock;

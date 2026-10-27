@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { ArrowUpRight, Eye } from "lucide-react";
 import { Button, IdentifierText, Money } from "@/design-system";
@@ -8,7 +7,7 @@ import { TradeStatusBadge } from "./TradeStatusBadge";
 import type { TradeStatusKind } from "../trade-document-status";
 import { useI18n } from "@/i18n/I18nContext";
 
-export type TradeBoardColumnTone =
+type TradeBoardColumnTone =
   | "blue"
   | "indigo"
   | "emerald"
@@ -17,7 +16,7 @@ export type TradeBoardColumnTone =
   | "violet"
   | "cyan";
 
-export interface TradeExecutiveAxisChip {
+interface TradeExecutiveAxisChip {
   label: string;
   value: string;
 }

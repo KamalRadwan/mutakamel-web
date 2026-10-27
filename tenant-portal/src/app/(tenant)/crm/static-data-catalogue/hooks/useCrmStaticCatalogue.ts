@@ -5,6 +5,7 @@ import { useI18n, type Language } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { formatBytes } from "@/lib/format/number";
+import type { Dictionary } from "@/i18n/dictionaries/ar";
 
 export const CRM_STATIC_DATA_PATH = "/api/tenant/crm/v1/static-data";
 
@@ -40,6 +41,8 @@ type StaticCatalogueGroupKind =
 export interface StaticCatalogueGroup {
   id: string;
   key: string;
+  label: string;
+  technicalValues: string[];
   kind: StaticCatalogueGroupKind;
   entriesCount: number;
   values: string[];
@@ -127,7 +130,7 @@ export function parseCrmStaticDataResponse(payload: unknown): CrmStaticData {
 }
 
 function labels(items: StaticDataOption[], lang: Language): string[] {
-  return items.map((item) => `${item.label[lang]} (${item.value})`);
+  return items.map((item) => item.label[lang]);
 }
 
 /**
@@ -150,8 +153,8 @@ function permissionLabels(
 ): string[] {
   return items.map((item) =>
     item.label.ar === item.label.en
-      ? `${item.label[lang]} — ${untranslatedNote} (${item.value})`
-      : `${item.label[lang]} (${item.value})`,
+      ? `${item.label[lang]} — ${untranslatedNote}`
+      : item.label[lang],
   );
 }
 
@@ -159,6 +162,7 @@ export function buildStaticCatalogueGroups(
   data: CrmStaticData,
   lang: Language,
   untranslatedNote: string,
+  copy: Dictionary["crmStaticCatalogue"],
 ): StaticCatalogueGroup[] {
   const group = (
     id: string,
@@ -167,6 +171,8 @@ export function buildStaticCatalogueGroups(
   ): StaticCatalogueGroup => ({
     id,
     key: id,
+    label: copy.groups[id] ?? copy.otherGroup,
+    technicalValues: [],
     kind,
     entriesCount: values.length,
     values,
@@ -183,7 +189,9 @@ export function buildStaticCatalogueGroups(
   // between a developer's machine, a user's browser and CI. U10.
   attachmentFamilies.push(formatBytes(data.attachmentPolicy.maxSizeBytes, lang));
 
-  return [
+  const optionLabel = (items: StaticDataOption[] | undefined, value: string) =>
+    items?.find((item) => item.value === value)?.label[lang] ?? copy.unavailableValue;
+  const result = [
     ...enumGroups,
     group(
       "permissions",
@@ -202,13 +210,24 @@ export function buildStaticCatalogueGroups(
       "opportunityStatusByStageFlag",
       "rule",
       Object.entries(data.derivedRules.opportunityStatusByStageFlag).map(
-        ([flag, status]) => `${flag} → ${status}`,
+        ([flag, status]) => `${flag === "default" ? copy.otherStages : optionLabel(data.enumOptions.opportunityStageFlags, flag)} → ${optionLabel(data.enumOptions.opportunityStatuses, status)}`,
       ),
     ),
     group("leadConversionCopiesCustomFieldOwnerType", "rule", [
-      data.derivedRules.leadConversionCopiesCustomFieldOwnerType,
+      optionLabel(data.enumOptions.customFieldOwnerTypes, data.derivedRules.leadConversionCopiesCustomFieldOwnerType),
     ]),
   ];
+  const technicalValues: Record<string, string[]> = {
+    ...Object.fromEntries(Object.entries(data.enumOptions).map(([key, items]) => [key, items.map((item) => item.value)])),
+    permissions: data.permissionOptions.map((item) => item.value),
+    ownerTypeOptions: data.ownerTypeOptions.map((item) => item.value),
+    eventOptions: data.eventOptions.map((item) => item.value),
+    attachmentPolicy: [...data.attachmentPolicy.familyLabels.map((item) => item.value), String(data.attachmentPolicy.maxSizeBytes)],
+    rejectedAttachmentFamilies: data.attachmentPolicy.rejectedFamilyLabels.map((item) => item.value),
+    opportunityStatusByStageFlag: Object.entries(data.derivedRules.opportunityStatusByStageFlag).map(([flag, status]) => `${flag} → ${status}`),
+    leadConversionCopiesCustomFieldOwnerType: [data.derivedRules.leadConversionCopiesCustomFieldOwnerType],
+  };
+  return result.map((item) => ({ ...item, technicalValues: technicalValues[item.key] ?? [] }));
 }
 
 function isAbortError(error: unknown): boolean {
@@ -254,15 +273,16 @@ export function useCrmStaticCatalogue() {
   const groups = useMemo(() => {
     if (!catalogue) return [];
     const query = searchQuery.trim().toLocaleLowerCase();
-    return buildStaticCatalogueGroups(catalogue, lang, t.crmStaticCatalogue.untranslatedLabel).filter(
+    return buildStaticCatalogueGroups(catalogue, lang, t.crmStaticCatalogue.untranslatedLabel, t.crmStaticCatalogue).filter(
       (item) =>
         !query ||
         item.key.toLocaleLowerCase().includes(query) ||
+        item.label.toLocaleLowerCase().includes(query) ||
         item.values.some((value) =>
           value.toLocaleLowerCase().includes(query),
         ),
     );
-  }, [catalogue, lang, searchQuery, t.crmStaticCatalogue.untranslatedLabel]);
+  }, [catalogue, lang, searchQuery, t.crmStaticCatalogue]);
 
   return {
     t,

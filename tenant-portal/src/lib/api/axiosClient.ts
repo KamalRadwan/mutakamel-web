@@ -25,6 +25,7 @@ const TENANT_HTTP_CSRF_COOKIE = "mutakamel-http-tenant-csrf";
 const RECENT_USER_ACTIVITY_MS = 60_000;
 const ACTIVITY_RETRY_MS = 15_000;
 const AUTH_REQUEST_TIMEOUT_MS = 10_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 let lastUserInteractionAt = 0;
 let lastActivityAttemptAt = 0;
@@ -54,7 +55,11 @@ export interface AxiosResponse<T = any> {
 }
 
 export interface TenantApiRequestConfig extends RequestInit {
+  /** Total deadline, including response body and any auth recovery (1..2^31-1 ms). */
+  timeoutMs?: number;
   skipAuthRefresh?: boolean;
+  /** Advisory reads handle denied access in their own screen state. */
+  suppressForbiddenToast?: boolean;
   /** Repair the session if possible, but never replay this request. */
   nonReplayable?: boolean;
   /** Allow one replay for a naturally idempotent mutation without a key. */
@@ -121,11 +126,29 @@ interface PreparedRequest {
   url: string;
   init: RequestInit;
   skipAuthRefresh: boolean;
+  suppressForbiddenToast: boolean;
   replayAfterRefresh: boolean;
   publicAuthEndpoint: boolean;
   sessionId: string | null;
   hadSessionMetadata: boolean;
   maxResponseBytes?: number;
+}
+
+export interface PermissionDenialEvent {
+  code: string;
+  endpoint: string;
+  method: string;
+  branchId: string | null;
+  companyId: string | null;
+}
+
+const PERMISSION_DENIED_EVENT = "tenant-permission-denied";
+
+export function subscribePermissionDenials(listener: (event: PermissionDenialEvent) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const receive = (event: Event) => listener((event as CustomEvent<PermissionDenialEvent>).detail);
+  window.addEventListener(PERMISSION_DENIED_EVENT, receive);
+  return () => window.removeEventListener(PERMISSION_DENIED_EVENT, receive);
 }
 
 let refreshInFlight: {
@@ -330,10 +353,10 @@ async function requestTenantSessionRefresh(
       `${API_BASE_URL}/api/tenant/core/v1/auth/refresh`,
       {
         method: "POST",
-        headers: {
+        headers: createRequestHeaders({
           Accept: "application/json",
           ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
-        },
+        }),
         credentials: "include",
         cache: "no-store",
         signal: controller.signal,
@@ -481,7 +504,50 @@ export async function customTenantFetch<T = any>(
   if (!prepared.publicAuthEndpoint) {
     assertAuthSnapshotIsCurrent(sessionMetadata, eventBeforeRequest);
   }
-  return sendPreparedRequest<T>(prepared, eventBeforeRequest, false);
+  const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
+    throw new RangeError("timeoutMs must be a positive timer-safe integer");
+  }
+  const controller = new AbortController();
+  const callerSignal = prepared.init.signal;
+  const cancel = () => controller.abort();
+  callerSignal?.addEventListener("abort", cancel, { once: true });
+  if (callerSignal?.aborted) cancel();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    if (controller.signal.aborted) return;
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  prepared.init.signal = controller.signal;
+  try {
+    controller.signal.throwIfAborted();
+    return await waitForOperation(
+      sendPreparedRequest<T>(prepared, eventBeforeRequest, false),
+      controller.signal,
+    );
+  } catch (error) {
+    if (!timedOut) throw error;
+    const copy = safeStorage.getItem("tenant_lang") === "en" ? en : ar;
+    const write = !isSafeMethod(prepared.init.method ?? "GET");
+    const message = write ? copy.errors.writeTimedOut : copy.errors.requestTimedOut;
+    const idempotencyKey = new Headers(prepared.init.headers).get("x-idempotency-key");
+    // A client deadline cannot prove that the server rolled back a write.
+    // Keep its exact key as recovery evidence; never replay on timeout.
+    throw new TenantApiClientError(message, {
+      status: 504,
+      statusText: "",
+      headers: new Headers(),
+      data: {
+        errorCode: "CLIENT_REQUEST_TIMEOUT",
+        message,
+        ...(write && idempotencyKey ? { idempotencyKey } : {}),
+      },
+    });
+  } finally {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", cancel);
+  }
 }
 
 async function sendPreparedRequest<T>(
@@ -489,14 +555,17 @@ async function sendPreparedRequest<T>(
   eventBeforeRequest: TenantAuthEvent | null,
   isRetry: boolean,
 ): Promise<AxiosResponse<T>> {
+  request.init.signal?.throwIfAborted();
   assertRequestFenceIsCurrent(request, eventBeforeRequest);
   await touchCoreSessionForCrossAppActivity(request);
+  request.init.signal?.throwIfAborted();
   assertRequestFenceIsCurrent(request, eventBeforeRequest);
   const response = await fetch(request.url, request.init);
   const payload = await readResponsePayload(response, request.maxResponseBytes);
+  request.init.signal?.throwIfAborted();
   assertRequestFenceIsCurrent(request, eventBeforeRequest);
   if (!response.ok) {
-    const error = normalizeApiError(response, payload);
+    const error = normalizeApiError(response, payload, request.endpoint);
     const code = getAuthErrorCode(error);
     const disposition = classifyAuthFailure(response.status, code);
 
@@ -555,7 +624,19 @@ async function sendPreparedRequest<T>(
       !request.publicAuthEndpoint &&
       !isTenantActivityEndpoint(request.endpoint)
     ) {
-      dispatchForbiddenToast();
+      if (!request.suppressForbiddenToast) dispatchForbiddenToast(code);
+      if (typeof window !== "undefined") {
+        const headers = new Headers(request.init.headers);
+        window.dispatchEvent(new CustomEvent<PermissionDenialEvent>(PERMISSION_DENIED_EVENT, {
+          detail: {
+            code: firstString(error.response.data.errorCode, error.response.data.code),
+            endpoint: request.endpoint,
+            method: request.init.method ?? "GET",
+            branchId: headers.get("x-mutakamel-branch-id"),
+            companyId: headers.get("x-mutakamel-company-id"),
+          },
+        }));
+      }
     }
     throw error;
   }
@@ -791,6 +872,15 @@ function waitForOperation<T>(
   });
 }
 
+function createRequestHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  if (!headers.has("Accept-Language")) {
+    // Match useLanguage's stored selection and Arabic default, not the browser locale.
+    headers.set("Accept-Language", safeStorage.getItem("tenant_lang") === "en" ? "en" : "ar");
+  }
+  return headers;
+}
+
 function prepareRequest(
   endpoint: string,
   options: TenantApiRequestConfig,
@@ -799,7 +889,9 @@ function prepareRequest(
 ): PreparedRequest {
   assertRelativeGatewayEndpoint(endpoint);
   const {
+    timeoutMs: _timeoutMs,
     skipAuthRefresh = false,
+    suppressForbiddenToast = false,
     nonReplayable = false,
     replayAfterRefresh: replayAfterRefreshOverride = false,
     skipAutoIdempotency = false,
@@ -814,7 +906,7 @@ function prepareRequest(
   ) {
     throw createLocalApiError(500, "INVALID_RESPONSE_BYTE_BOUND");
   }
-  const headers = new Headers(requestInit.headers ?? {});
+  const headers = createRequestHeaders(requestInit.headers);
   const method = (requestInit.method ?? "GET").toUpperCase();
   const publicAuthEndpoint = isPublicTenantAuthEndpoint(endpoint);
   const sessionMetadata = publicAuthEndpoint
@@ -857,6 +949,7 @@ function prepareRequest(
     endpoint,
     url,
     skipAuthRefresh,
+    suppressForbiddenToast,
     replayAfterRefresh:
       !nonReplayable &&
       (isSafeMethod(method) ||
@@ -1056,9 +1149,13 @@ async function readResponsePayload(
 function normalizeApiError(
   response: Response,
   payload: unknown,
+  endpoint?: string,
 ): TenantApiClientError {
   const body = record(payload) ?? {};
-  const message = firstString(
+  const unavailable = response.status === 503 && endpoint !== undefined &&
+    /^\/api\/tenant\/core\/v1\/auth\/(login|forgot-password|reset-password|accept-invite)\/?$/u.test(endpoint);
+  const copy = safeStorage.getItem("tenant_lang") === "en" ? en : ar;
+  const message = unavailable ? copy.auth.temporarilyUnavailable : firstString(
     body.message,
     body.title,
     body.detail,
@@ -1100,15 +1197,20 @@ function createLocalApiError(
 // same tenant_lang key useLanguage() does, directly, and selects between
 // the same two dictionary objects I18nContext.tsx does — the strings
 // themselves still live only in i18n/dictionaries/, not duplicated here.
-function dispatchForbiddenToast(): void {
+function dispatchForbiddenToast(code?: string): void {
   if (typeof window === "undefined") return;
   const t = safeStorage.getItem("tenant_lang") === "en" ? en : ar;
+  const errors: Readonly<Record<string, string>> = t.coreIdentity.errors;
+  const message = code && Object.prototype.hasOwnProperty.call(errors, code)
+    ? errors[code]
+    : t.errors.accessDeniedMessage;
   window.dispatchEvent(
     new CustomEvent("global-toast", {
       detail: {
         type: "error",
         title: t.errors.accessDenied,
-        message: t.errors.accessDeniedMessage,
+        message,
+        dedupeKey: `forbidden:${code ?? "UNKNOWN_ERROR"}`,
       },
     }),
   );
@@ -1150,6 +1252,8 @@ function isPublicTenantAuthEndpoint(endpoint: string): boolean {
   if (authStart < 0) return false;
   return [
     "/auth/login",
+    "/auth/mfa/verify",
+    "/auth/mfa/resend",
     "/auth/refresh",
     "/auth/logout",
     "/auth/accept-invite",

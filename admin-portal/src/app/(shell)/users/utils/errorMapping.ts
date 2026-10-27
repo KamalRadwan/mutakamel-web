@@ -35,6 +35,17 @@ export function getErrorMessageAndDetails(
   }
 
   switch (code) {
+    case "ADMIN_INVITE_NOT_PENDING":
+    case "ADMIN_INVITE_RESEND_THROTTLED":
+    case "ADMIN_INVITE_DELIVERY_UNAVAILABLE": {
+      const users = (lang === "ar" ? ar : en).users;
+      const messages = {
+        ADMIN_INVITE_NOT_PENDING: users.inviteNotPending,
+        ADMIN_INVITE_RESEND_THROTTLED: users.inviteResendThrottled,
+        ADMIN_INVITE_DELIVERY_UNAVAILABLE: users.inviteDeliveryUnavailable,
+      };
+      return { code, message: messages[code], correlationId };
+    }
     case "MISSING_REQUIRED_PERMISSIONS": {
       const details = data?.details as Record<string, unknown> | undefined;
       const requiredPerms = (details?.permissions as string[] | undefined)?.join(", ");
@@ -45,6 +56,13 @@ export function getErrorMessageAndDetails(
         isPermissionError: true,
       };
     }
+
+    case "ADMIN_USER_NOT_ACTIVE":
+      return {
+        code,
+        message: copy.adminUserNotActive,
+        correlationId,
+      };
 
     case "ADMIN_USER_NOT_FOUND":
       return {

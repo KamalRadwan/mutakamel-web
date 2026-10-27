@@ -130,6 +130,20 @@ and credential-revision evidence.
 
 ## Rendering and state rules
 
+Artifact filter source verification: **2026-10-24**. Artifact rows and their
+actions are exposed only for the query that loaded them successfully. Applying
+new filters immediately hides the previous query's rows, and a failed list
+refresh (including `403`) clears them while preserving the normalized error.
+An unchanged-query refresh can retain its rows while loading.
+
+Restore hand-off source verification: **2026-10-24**. Artifact Restore links
+carry `artifactId`, `runId`, and `tenantId`. The restore hook loads completed
+artifact options using the run and tenant filters before resolving the requested
+artifact by its exact ID. Thus 500 newer artifacts in other runs do not displace
+the selected artifact. Direct visits without a hand-off retain the bounded
+latest-artifact selector. Typecheck, lint, specs, and live verification remain
+lead gates.
+
 - Use the shared authenticated client with the canonical Core or Worker browser
   prefix; never call controller-relative internal paths.
 - Treat backup and restore state as asynchronous and Worker-authoritative.

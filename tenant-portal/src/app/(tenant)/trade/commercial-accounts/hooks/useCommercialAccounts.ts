@@ -39,6 +39,7 @@ export function accountErrorMessage(
   if (error.code === ACCOUNT_ALREADY_EXISTS_CODE) return t.trade.accountAlreadyExists;
   if (error.code === ACCOUNT_PARTY_ROLE_INVALID_CODE) return t.trade.accountPartyRoleInvalid;
   if (error.code === ACCOUNT_TERM_INVALID_CODE) return t.trade.accountTermInvalid;
+  if (error.code === "TRADE.ACCOUNT.PRICE_BOOK_INCOMPATIBLE") return t.trade.accountPriceBookPurposeHint;
   if (error.code === ACCOUNT_CREDIT_LIMIT_INVALID_CODE) return t.trade.accountCreditLimitInvalid;
   return undefined;
 }

@@ -14,6 +14,8 @@ import {
   SWATCH_SURFACE_PALETTES,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { SerialKeysField } from "./SerialKeysField";
+import { useReleaseSerials } from "../hooks/useReleaseSerials";
 import { isUuidV7 } from "../../../trade-advanced-validation";
 import type { InventoryNode } from "../../inventory-contract";
 import {
@@ -29,6 +31,7 @@ interface ReservationPanelProps {
     version: number,
     quantity: string,
     reasonCode: string,
+    serialKeys?: string,
   ) => Promise<boolean>;
   createdId: string | undefined;
   pending: string | null;
@@ -68,6 +71,7 @@ export function ReservationPanel({
     setValues((current) => ({ ...current, ...patch }));
 
   const effectiveReleaseId = releaseId || selectedTargetId || (createdId ?? "");
+  const releaseSerials = useReleaseSerials(effectiveReleaseId);
   const effectiveReleaseVersion =
     releaseVersion !== "1"
       ? releaseVersion
@@ -193,6 +197,13 @@ export function ReservationPanel({
                 onChange={(event) => set({ quantity: event.target.value })}
               />
             </Field>
+            <Field label={t.tradeInventory.lotKey}>
+              <Input size="sm" value={values.lotKey ?? ""} maxLength={120}
+                disabled={disabled || pending !== null}
+                onChange={(event) => set({ lotKey: event.target.value })} />
+            </Field>
+            <SerialKeysField value={values.serialKeys ?? ""} quantity={values.quantity}
+              disabled={disabled || pending !== null} onChange={(serialKeys) => set({ serialKeys })} />
             <Field label={t.tradeInventory.sourceDocumentId} required>
               <Input
                 size="sm"
@@ -333,6 +344,8 @@ export function ReservationPanel({
                 onChange={(event) => setReleaseQuantity(event.target.value)}
               />
             </Field>
+            <SerialKeysField value={releaseSerials.value} quantity={releaseQuantity} subset
+              disabled={disabled || pending !== null} onChange={releaseSerials.change} />
             <Field label={t.tradeInventory.reasonCode} hint={t.tradeInventory.reasonCodeHint}>
               <Input
                 size="sm"
@@ -386,7 +399,8 @@ export function ReservationPanel({
                 Number(effectiveReleaseVersion),
                 releaseQuantity,
                 releaseReason,
-              )
+                releaseSerials.value,
+              ).then((saved) => { if (saved) releaseSerials.change(""); })
             }
           >
             <Unlock className="size-4" aria-hidden="true" />

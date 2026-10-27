@@ -32,6 +32,40 @@ UUID v7, the `data` envelope.
 
 ---
 
+## Email suppression lookup and lift (source verified 2026-10-23)
+
+Workspace email settings includes a separate look-up-and-lift form requiring
+tenant-wide `workspace.email.manage`. It works independently of the email
+configuration read. Suppressions store only hashes, so there is no address list.
+
+- POST `/api/tenant/core/v1/email-suppressions/lookup` with only `{ address }`.
+- POST `/api/tenant/core/v1/email-suppressions/lift` with the same body after
+  confirmation and a caller-owned UUIDv7 `x-idempotency-key`.
+- Both responses use Core's `success/data` envelope. Lookup returns
+  `{ suppressed: false }` or `{ suppressed: true, reasonCode, firstOccurredAt,
+  lastOccurredAt }`; reasons are `HARD_BOUNCE` and `COMPLAINT`.
+  Lift returns `{ suppressed: false, lifted: boolean }`.
+
+The form uses local DTO types and runtime validators. Address edits clear
+previous evidence and confirmation. Requests use no-store caching; addresses
+remain only in component memory and request bodies, never URLs, query strings,
+logs or browser storage. A failed lift retains its exact key in memory for a
+confirmed retry of the same address; edits/unmount discard it. Session changes
+remount the form and abort pending requests. Lift success distinguishes a
+removed suppression from one already absent; it does not resend mail or remove
+platform restrictions.
+
+Arabic/English labels, reason text and locale-formatted dates are provided.
+403 renders PermissionGate; 400/422 show the translated address error, 429
+asks the user to wait, and network/malformed/other failures show a translated
+retry message without rendering server text or claiming success.
+Local validation code `INVALID_SUPPRESSION_RESPONSE` maps to the same safe
+failure message (`emailSuppression.errors.failed`); it is not a backend code.
+
+Source: Gateway `core-email-suppression.route-contracts.ts`, Core
+`tenant/email-suppression/email-suppression.controller.ts` and DTOs.
+Typecheck, lint, specs and authenticated live verification remain lead gates.
+
 ## Workspace settings — 2 routes
 
 | Method | Canonical path | Permission | Body |
@@ -71,6 +105,23 @@ code, not a generic failure.
 `CurrencyQueryDto` extends `PaginationQueryDto` with `status?` and `isDefault?`.
 
 ### The invariants the UI must reflect, not enforce
+
+Currency creation contract verified **2026-10-18**: selecting “make default”
+keeps the rate editable. Enter new-currency units per one current-default unit:
+with USD default, creating EGP as default sends `isDefault: true` and
+`exchangeRate: 50`. Core rebases USD to `0.02` and stores EGP at `1` in the
+same transaction. A supplied rate is validated even when making a default.
+Only the first default may omit the rate; the bilingual form explains this
+exception. Core decides whether a default exists under its transaction lock,
+independently of the portal's current search, filters or page.
+
+Currency update contract verified **2026-10-17**: `UpdateCurrencyDto` accepts
+only `name`, `symbol`, `exchangeRate` and `status`. Code and decimal places
+are read-only in the edit form and omitted from PATCH; sending `decimalPlaces`
+returns a 400 non-whitelisted-field validation error, even if unchanged.
+Creation still accepts decimal places. Currency writes show dedicated Arabic
+and English messages for `CURRENCY_DECIMAL_PLACES_IMMUTABLE`,
+`CURRENCY_REBASE_OUT_OF_RANGE` and `CURRENCY_NOT_FOUND`.
 
 - **Exactly one default.** `set-default` promotes the target and demotes the
   previous one **in one transaction**. Do not model this as two calls, and do
@@ -171,7 +222,7 @@ as a diagnostic log.
 
 ---
 
-## Notifications — 14 routes
+## Notifications — 12 routes
 
 | Method | Canonical path | Permission |
 | --- | --- | --- |
@@ -187,10 +238,8 @@ as a diagnostic log.
 | POST | `/api/tenant/core/v1/notifications/read-all` | `notifications.notification.read` |
 | GET | `/api/tenant/core/v1/notifications/preferences` | `notifications.preference.read` |
 | PUT | `/api/tenant/core/v1/notifications/preferences` | `notifications.preference.manage` |
-| POST | `/api/tenant/core/v1/notifications/device-tokens` | `notifications.device_token.manage` |
-| DELETE | `/api/tenant/core/v1/notifications/device-tokens/:id` | `notifications.device_token.manage` |
 
-### Four of these fourteen are aliases — pick one and stay on it
+### Three of these twelve are aliases — pick one and stay on it
 
 | Prefer | Alias, same behaviour |
 | --- | --- |

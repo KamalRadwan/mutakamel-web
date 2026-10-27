@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useToast } from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
+import { useCan, useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { formatTemplate } from "@/lib/format/template";
@@ -39,9 +38,9 @@ interface NumberingWriteScope {
 export function useNumberingSequences() {
   const { t, lang } = useI18n();
   const toast = useToast();
-  const { user } = useTenantAuth();
-  const canManage = user?.permissions.includes("numbering.manage") ?? false;
-  const companies = useCompanyOptions();
+  const canManage = useCan("numbering.manage");
+  const { companies, manageableCompanies, tenantWideAllowed, canManageScope, canCreate } =
+    useCompanyOptions("numbering.manage");
 
   const [items, setItems] = useState<NumberingSequence[]>([]);
   const [total, setTotal] = useState(0);
@@ -141,7 +140,7 @@ export function useNumberingSequences() {
 
   const create = useCallback(
     async (values: NumberingFormValues): Promise<boolean> => {
-      if (!canManage || isSubmitting) return false;
+      if (!canManageScope(values.companyId) || isSubmitting) return false;
       setIsSubmitting(true);
       setFormError(null);
       try {
@@ -166,12 +165,12 @@ export function useNumberingSequences() {
         setIsSubmitting(false);
       }
     },
-    [canManage, isSubmitting, reportWriteError, toast, t, load],
+    [canManageScope, isSubmitting, reportWriteError, toast, t, load],
   );
 
   const update = useCallback(
     async (values: NumberingFormValues): Promise<boolean> => {
-      if (!canManage || !editing || isSubmitting) return false;
+      if (!editing || !canManageScope(editing.companyId) || isSubmitting) return false;
       setIsSubmitting(true);
       setFormError(null);
       try {
@@ -199,7 +198,7 @@ export function useNumberingSequences() {
         setIsSubmitting(false);
       }
     },
-    [canManage, editing, isSubmitting, reportWriteError, toast, t, load],
+    [canManageScope, editing, isSubmitting, reportWriteError, toast, t, load],
   );
 
   const setSort = useCallback((next: { id: string; direction: "asc" | "desc" }) => {
@@ -215,6 +214,10 @@ export function useNumberingSequences() {
     t,
     lang,
     canManage,
+    canCreate,
+    canManageScope,
+    tenantWideAllowed,
+    manageableCompanies,
     companies,
     items,
     pageInfo: { page, limit: NUMBERING_PAGE_SIZE, total },
@@ -237,6 +240,7 @@ export function useNumberingSequences() {
       setSearch(next);
     },
     openCreate: () => {
+      if (!canCreate) return;
       setFormError(null);
       setCreateOpen(true);
     },
@@ -246,6 +250,7 @@ export function useNumberingSequences() {
       setCreateOpen(false);
     },
     openEdit: (sequence: NumberingSequence) => {
+      if (!canManageScope(sequence.companyId)) return;
       setFormError(null);
       setEditing(sequence);
     },

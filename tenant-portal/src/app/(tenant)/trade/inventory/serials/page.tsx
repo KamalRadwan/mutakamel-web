@@ -23,7 +23,6 @@ import {
   Card,
   cn,
   DataTable,
-  DegradedBanner,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -42,9 +41,9 @@ import { formatTemplate } from "@/lib/format/template";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
 import { tradeStatusLabel } from "../../trade-advanced-validation";
 import { InventoryModuleSubnav } from "../components/InventoryModuleSubnav";
+import { InventoryListPagination } from "../components/InventoryListPagination";
 import { INVENTORY_READ_PERMISSION } from "../inventory-contract";
 import {
-  INVENTORY_LIST_LIMIT,
   SERIAL_STATES,
   type InventorySerial,
   type SerialState,
@@ -77,6 +76,8 @@ export default function InventorySerialsPage() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     stateFilter,
     search,
     itemIdFilter,
@@ -109,11 +110,12 @@ export default function InventorySerialsPage() {
         <div className="flex flex-col gap-0.5">
           <Link
             href={`${TENANT_ROUTES.tradeInventorySerials}/${serial.id}`}
+            dir="ltr"
             className="font-mono text-xs font-semibold text-foreground underline-offset-2 hover:text-primary hover:underline"
           >
             {serial.serialKey}
           </Link>
-          <span className="font-mono text-2xs text-muted-foreground">
+          <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
             Item: {serial.itemId.slice(0, 8)}…
           </span>
         </div>
@@ -224,49 +226,29 @@ export default function InventorySerialsPage() {
         className="sr-only"
         title={t.tradeInventory.serialsTitle}
         description={t.tradeInventory.serialsSubtitle}
-      />
-
-      {/* Colorful Header Banner */}
-      <Card className="flex flex-wrap items-center justify-between gap-3 border border-border/70 bg-gradient-to-r from-card via-card to-positive/5 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg border border-positive/30 bg-positive-subtle text-positive-subtle-foreground">
-            <ScanBarcode className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-semibold text-foreground">
-                {t.tradeInventory.serialsTitle}
-              </h1>
-              <Badge tone="positive">
-                {isAr ? "تتبع فردي 360°" : "Unit-Level Custody Registry"}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t.tradeInventory.serialsSubtitle}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <TenantBranchSelect
-            branchIds={branchIds}
-            branchId={branchId}
-            onChange={selectBranch}
-            disabled={isRefreshing}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void reload()}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={isRefreshing ? "size-4 animate-spin" : "size-4"}
-              aria-hidden="true"
+        secondaryActions={
+          <>
+            <TenantBranchSelect
+              branchIds={branchIds}
+              branchId={branchId}
+              onChange={selectBranch}
+              disabled={isRefreshing}
             />
-            {t.tradeCommon.reload}
-          </Button>
-        </div>
-      </Card>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void reload()}
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={isRefreshing ? "size-4 animate-spin" : "size-4"}
+                aria-hidden="true"
+              />
+              {t.tradeCommon.reload}
+            </Button>
+          </>
+        }
+      />
 
       {isScopeResolved ? (
         <>
@@ -412,13 +394,7 @@ export default function InventorySerialsPage() {
             </div>
           </Card>
 
-          {items.length === INVENTORY_LIST_LIMIT ? (
-            <DegradedBanner
-              message={formatTemplate(t.tradeCommon.limitOnlyCapped, {
-                limit: INVENTORY_LIST_LIMIT,
-              })}
-            />
-          ) : null}
+          <InventoryListPagination page={pagination} onPageChange={setPage} isRefreshing={isRefreshing} />
 
           {viewMode === "bento" ? (
             items.length === 0 && !isLoading ? (
@@ -463,6 +439,7 @@ export default function InventorySerialsPage() {
                               </span>
                               <Link
                                 href={`${TENANT_ROUTES.tradeInventorySerials}/${serial.id}`}
+                                dir="ltr"
                                 className="font-mono text-sm font-semibold text-foreground hover:text-primary hover:underline"
                               >
                                 {serial.serialKey}
@@ -583,6 +560,7 @@ export default function InventorySerialsPage() {
                             <div className="flex items-center justify-between gap-2">
                               <Link
                                 href={`${TENANT_ROUTES.tradeInventorySerials}/${serial.id}`}
+                                dir="ltr"
                                 className="font-mono text-xs font-semibold text-foreground hover:text-primary hover:underline"
                               >
                                 {serial.serialKey}
@@ -596,7 +574,7 @@ export default function InventorySerialsPage() {
                                 <Eye className="size-3.5" aria-hidden="true" />
                               </Button>
                             </div>
-                            <span className="font-mono text-2xs text-muted-foreground">
+                            <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
                               Node:{" "}
                               {serial.currentFulfillmentNodeId
                                 ? `${serial.currentFulfillmentNodeId.slice(0, 8)}…`
@@ -683,7 +661,7 @@ export default function InventorySerialsPage() {
                   <span className="text-2xs text-muted-foreground">
                     {t.tradeInventory.serialKey}
                   </span>
-                  <span className="font-mono text-base font-semibold text-foreground">
+                  <span dir="ltr" className="font-mono text-base font-semibold text-foreground">
                     {selectedSerial.serialKey}
                   </span>
                 </div>

@@ -11,8 +11,10 @@ Source of truth once implemented: `src/app/globals.css`,
 > fonts, sizes and per-page UI/UX. Since the admin-portal token port the shipped
 > geometry is **32px controls / 44px rows** at `--ui-scale` **1**. The chrome was
 > admin's exact 48px topbar / 240px sidebar / 52px rail until 2026-09-06 and is
-> now **two 35px full-width bars** — [shell.md](shell.md) is authoritative for
-> it, and every sidebar figure below is kept only as the record of what the
+> now, as of **2026-10-26**, a **3px brand strip + 58px top bar + 59px action bar**
+> at standard density, totaling **120px chrome** — see [CRM Leads v3](specs/crm-leads-v3.md).
+> The action bar is an **11px inset + 48px floating toolbar with 33px controls**.
+> Every sidebar figure below is kept only as the record of what the
 > swing used to cost. This page keeps the longer reasoning behind the radius
 > scale, elevation model and budgets.
 
@@ -76,8 +78,8 @@ The original migration, for the record, ran in two moves:
 > They specified 36px controls and 40px rows. The implemented control scale is
 > **24/28/32/36/40px**, and since the admin port those are the pixel sizes that
 > actually render: `--ui-scale` ships at **1**, so the `rem` values are no
-> longer multiplied down by 0.9. The row is **44px** and the shell is admin's
-> exact chrome.
+> longer multiplied down by 0.9. The row is **44px**. The shell uses the
+> **120px standard-density chrome** specified in [CRM Leads v3](specs/crm-leads-v3.md).
 >
 > The "16 rows on a 1366×768 laptop" figure counts only the topbar and the
 > table header, and the measured "14 rows at 1.0 / 15 at 0.9" figure was taken
@@ -186,20 +188,24 @@ concerned, at exactly the same breakpoint. The port widened the sidebar by
 8 px at every density and left this swing unchanged, so the hazard is the same
 size it always was; only the starting width moved.
 
-Vertically the same thing costs rows, and the two-bar chrome costs one more:
+Vertically the same thing costs rows. As of **2026-10-26**, the strip stays
+fixed at 3px while the 58px top bar and 59px action bar scale with density.
+The action bar shares `--size-actionbar-inset` with its wrapper padding:
+`calc(0.6875rem * var(--ui-scale))`, added to `--size-toolbar` by
+`--size-actionbar`. Thus the measured box and `--size-chrome` use the same inset.
 
-| Density | Row | Chrome (both bars) | Rows visible |
+| Density | Row | Chrome (strip + both bars) | Historical rows visible (before v3) |
 |---|---:|---:|---:|
-| compact 0.9 | 39.6 px | 81 px | ~11 |
-| standard 1.0 | 44 px | 90 px | ~10 |
-| comfortable 1.1 | 48.4 px | 99 px | ~8 |
+| compact 0.9 | 39.6 px | 108.3 px | ~11 |
+| standard 1.0 | 44 px | 120 px | ~10 |
+| comfortable 1.1 | 48.4 px | 131.7 px | ~8 |
 
 The row that chrome takes back is partly returned by the same change: a list
 screen's action row and its toolbar row both moved **into** the second bar, so
 the page body starts at the heading instead of 80px below it.
 
-**Every figure in that last column is derived, not measured, and must be
-quoted as such.** The measurement this table used to carry — 15 rows at
+**Every figure in that last column is historical and derived, not measured;
+none establishes the current v3 row budget.** The measurement this table used to carry — 15 rows at
 compact, 14 at standard, taken in the running app at 1366×768 with the real
 chrome — was taken against 36px rows and a 44px topbar and no longer holds.
 The derivation runs from that same measurement: 14 rows × 36 px is the height

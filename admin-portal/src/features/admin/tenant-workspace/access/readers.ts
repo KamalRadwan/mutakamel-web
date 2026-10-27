@@ -16,6 +16,7 @@ import {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ROLE_SCOPES = ["TENANT", "COMPANY", "BRANCH"] as const;
+const ROLE_SOURCES = ["BRANCH_ROLE", "SCOPE_ROLE"] as const;
 const DELIVERIES = ["QUEUED", "ALREADY_QUEUED"] as const;
 
 export function readTenantUserPage(value: unknown): PageResult<TenantUserView> {
@@ -187,14 +188,19 @@ function readManager(value: unknown): TenantUserManagerRef {
 
 function readRoleAssignment(value: unknown): TenantUserRoleAssignment {
   const assignment = object(value, "INVALID_TENANT_USER_RESPONSE");
-  return {
+  const result = {
     assignmentId: uuid(assignment.assignmentId, "INVALID_TENANT_USER_RESPONSE"),
+    source: oneOf(assignment.source, ROLE_SOURCES, "INVALID_TENANT_USER_RESPONSE"),
     roleId: uuid(assignment.roleId, "INVALID_TENANT_USER_RESPONSE"),
     roleName: requiredString(assignment.roleName, "INVALID_TENANT_USER_RESPONSE"),
     scope: oneOf(assignment.scope, ROLE_SCOPES, "INVALID_TENANT_USER_RESPONSE"),
     companyId: nullableUuid(assignment.companyId, "INVALID_TENANT_USER_RESPONSE"),
     branchId: nullableUuid(assignment.branchId, "INVALID_TENANT_USER_RESPONSE"),
   };
+  if (result.source === "BRANCH_ROLE" && (result.scope !== "BRANCH" || result.branchId === null)) {
+    invalid("INVALID_TENANT_USER_RESPONSE");
+  }
+  return result;
 }
 
 function readPage<T>(

@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useCan } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { can } from "@/lib/auth/permission-scope";
 import { localizedValue } from "@/lib/format/localized";
 import { isUUIDv7 } from "@/lib/uuid";
 import {
@@ -31,12 +33,13 @@ export interface PermissionGroup {
 
 export function useRolePermissionEditor(id: string) {
   const { t, lang } = useI18n();
-  const { user } = useTenantAuth();
-  const canUpdate = user?.permissions.includes("roles.role.update") ?? false;
+  const { user, retryBootstrap } = useTenantAuth();
+  const canUpdate = useCan("roles.role.update", { tenantWide: true });
   const canReadPermissions = user?.permissions.includes("roles.permission.read") ?? false;
 
   const [role, setRole] = useState<TenantRoleDetail | null>(null);
   const [catalogue, setCatalogue] = useState<TenantPermission[]>([]);
+  const [isCatalogueLoaded, setIsCatalogueLoaded] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<NormalizedApiError | null>(null);
@@ -90,8 +93,10 @@ export function useRolePermissionEditor(id: string) {
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
-      if (!canReadPermissions) return;
+      setIsCatalogueLoaded(false);
+      setCatalogue([]);
       setCatalogueError(null);
+      if (!canReadPermissions) return;
       void (async () => {
         try {
           const all: TenantPermission[] = [];
@@ -100,7 +105,10 @@ export function useRolePermissionEditor(id: string) {
             all.push(...result.items);
             if (!result.hasNext) break;
           }
-          if (!controller.signal.aborted) setCatalogue(all);
+          if (!controller.signal.aborted) {
+            setCatalogue(all);
+            setIsCatalogueLoaded(true);
+          }
         } catch (error) {
           if (!controller.signal.aborted) {
             setCatalogue([]);
@@ -132,16 +140,31 @@ export function useRolePermissionEditor(id: string) {
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
+  const grantableIds = useMemo(() => new Set(catalogue
+    .filter((permission) => can(user, permission.key, { tenantWide: true }))
+    .map((permission) => permission.id)), [catalogue, user]);
+  const canGrantPermission = useCallback((permissionId: string) =>
+    grantableIds.has(permissionId), [grantableIds]);
+  // Core validates the entire replacement, including unchanged permissions.
+  // Unknown IDs fail closed until the full catalogue has been resolved.
+  const hasUngrantablePermissions = isCatalogueLoaded &&
+    (role?.permissionIds.some((permissionId) => !grantableIds.has(permissionId)) ?? false);
+  const canEditPermissions = canUpdate && canReadPermissions && isCatalogueLoaded &&
+    !catalogueError && !role?.isSystem && !hasUngrantablePermissions;
+  const canSavePermissions = canEditPermissions && selectedIds.length <= MAX_ROLE_PERMISSIONS &&
+    selectedIds.every((permissionId) => grantableIds.has(permissionId));
+
   const toggle = useCallback((permissionId: string) => {
+    if (!canEditPermissions || !canGrantPermission(permissionId) || isSubmitting) return;
     setSelectedIds((current) =>
       current.includes(permissionId)
         ? current.filter((value) => value !== permissionId)
         : [...current, permissionId],
     );
-  }, []);
+  }, [canEditPermissions, canGrantPermission, isSubmitting]);
 
   const save = useCallback(async () => {
-    if (!role) return;
+    if (!role || !canSavePermissions || isSubmitting) return;
     setIsSubmitting(true);
     setWriteError(null);
     try {
@@ -149,16 +172,17 @@ export function useRolePermissionEditor(id: string) {
       setRole(updated);
       setSelectedIds(updated.permissionIds);
       setIsConfirmOpen(false);
+      await retryBootstrap();
     } catch (error) {
       setWriteError(normalizeApiError(error));
     } finally {
       setIsSubmitting(false);
     }
-  }, [role, selectedIds]);
+  }, [canSavePermissions, isSubmitting, retryBootstrap, role, selectedIds]);
 
   const rename = useCallback(
     async (body: { name?: string; description?: string }): Promise<boolean> => {
-      if (!role) return false;
+      if (!role || !canUpdate) return false;
       setIsSubmitting(true);
       setWriteError(null);
       try {
@@ -172,7 +196,7 @@ export function useRolePermissionEditor(id: string) {
         setIsSubmitting(false);
       }
     },
-    [role],
+    [canUpdate, role],
   );
 
   const baseline = role?.permissionIds ?? [];
@@ -191,6 +215,10 @@ export function useRolePermissionEditor(id: string) {
     maxPermissions: MAX_ROLE_PERMISSIONS,
     canUpdate,
     canReadPermissions,
+    canEditPermissions,
+    canSavePermissions,
+    canGrantPermission,
+    hasUngrantablePermissions,
     isLoading,
     loadError,
     catalogueError,
@@ -199,10 +227,11 @@ export function useRolePermissionEditor(id: string) {
     toggle,
     resetSelection: () => setSelectedIds(baseline),
     isConfirmOpen,
-    openConfirm: () => setIsConfirmOpen(true),
+    openConfirm: () => canSavePermissions && !isSubmitting && setIsConfirmOpen(true),
     closeConfirm: () => setIsConfirmOpen(false),
     isRenameOpen,
     openRename: () => {
+      if (!canUpdate) return;
       setWriteError(null);
       setIsRenameOpen(true);
     },

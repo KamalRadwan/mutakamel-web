@@ -129,6 +129,28 @@ export const storageServersApi = {
     return extractCoreData(response);
   },
 
+  async currentCredentialRotation(id: string, signal?: AbortSignal) {
+    const response = await axiosClient.get<SuccessResponse<StorageCredentialRotationView | null>>(
+      `${ROOT}/${encodeURIComponent(id)}/credential-rotations/current`,
+      { signal },
+    );
+    return extractCoreData(response);
+  },
+
+  async abortCredentialRotation(
+    id: string,
+    rotationId: string,
+    reason: string,
+    idempotencyKey: string,
+  ) {
+    const response = await axiosClient.post<SuccessResponse<StorageCredentialRotationView>>(
+      `${ROOT}/${encodeURIComponent(id)}/credential-rotations/${encodeURIComponent(rotationId)}/abort`,
+      { reason },
+      commandHeaders(idempotencyKey),
+    );
+    return extractCoreData(response);
+  },
+
   /** Call once the grace window has expired to prove the previous credential is rejected. */
   async revokeCredentialRotation(
     id: string,

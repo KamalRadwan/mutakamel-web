@@ -40,6 +40,11 @@ export interface MultiSelectProps extends ControlSizeProps {
   invalid?: boolean;
   onBlur?: () => void;
   id?: string;
+  /**
+   * Names the trigger and its listbox when no `Field` label does — a picker in
+   * a row of filters, where the placeholder alone repeats on every row.
+   */
+  ariaLabel?: string;
   className?: string;
   /** Callback when user chooses to create an option for the current search query */
   onCreate?: (query: string) => void;
@@ -92,6 +97,7 @@ export function MultiSelect({
   invalid,
   onBlur,
   id,
+  ariaLabel,
   size = "sm",
   className,
   onCreate,
@@ -340,7 +346,7 @@ export function MultiSelect({
             // the placeholder; inside a Field the label names it, and an
             // aria-label here would OUTRANK that label and announce the
             // placeholder in its place.
-            aria-label={field ? undefined : placeholder}
+            aria-label={field ? undefined : (ariaLabel ?? placeholder)}
             className={cn(
               "min-w-24 flex-1 cursor-pointer justify-between gap-1.5 bg-transparent font-normal",
               "h-auto min-h-0 p-0 hover:bg-transparent shadow-none border-none",
@@ -373,7 +379,7 @@ export function MultiSelect({
             id={listId}
             role="listbox"
             aria-multiselectable
-            aria-label={placeholder}
+            aria-label={ariaLabel ?? placeholder}
             className="max-h-64 overflow-y-auto p-1"
           >
             {filtered.length === 0 && (

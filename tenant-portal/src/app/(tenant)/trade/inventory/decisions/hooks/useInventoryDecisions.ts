@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../../trade-api";
-import { isUuidV7, parseTradeArray } from "../../../trade-advanced-validation";
+import { isUuidV7, parseTradeOffsetPage } from "../../../trade-advanced-validation";
+import { useInventoryPagination } from "../../hooks/useInventoryPagination";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import { INVENTORY_READ_PERMISSION, invalidResponse } from "../../inventory-contract";
 import {
@@ -26,7 +27,7 @@ const LIST_RESPONSE_LIMIT_BYTES = 200_000;
 export function useInventoryDecisions() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [items, setItems] = useState<InventoryDecision[]>([]);
@@ -45,6 +46,9 @@ export function useInventoryDecisions() {
   const validAggregateId = isUuidV7(aggregateIdFilter.trim())
     ? aggregateIdFilter.trim()
     : undefined;
+  const { page, pagination, setPage, setTotal } = useInventoryPagination(
+    JSON.stringify([scope.headers, policyKind, validAggregateId]),
+  );
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -56,23 +60,26 @@ export function useInventoryDecisions() {
       setQueryError(null);
       try {
         const response = await tradeGet(
-          inventoryDecisionsListPath(policyKind, validAggregateId),
+          inventoryDecisionsListPath(policyKind, validAggregateId, page),
           {
             signal,
             headers: scope.headers,
             maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
           },
         );
-        setItems(parseTradeArray(response.data, parseInventoryDecision, invalidResponse));
+        if (signal?.aborted) return;
+        const result = parseTradeOffsetPage(response.data, parseInventoryDecision, invalidResponse);
+        setItems(result.items);
+        setTotal(result.total);
         setHasLoaded(true);
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [scope.isResolved, scope.headers, policyKind, validAggregateId],
+    [scope.isResolved, scope.headers, policyKind, validAggregateId, page, setTotal],
   );
 
   useEffect(() => {
@@ -92,6 +99,8 @@ export function useInventoryDecisions() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     policyKind,
     aggregateIdFilter,
     isLoading: isLoading && !hasLoaded,

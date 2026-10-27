@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { readCoreData, readCrmBody, writeCoreData } from "@/lib/api/envelope";
+import { readCoreData, writeCoreData } from "@/lib/api/envelope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { generateUUIDv7 } from "@/lib/uuid";
 import { createWriteAttempt, isAmbiguousWriteFailure, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { leadPath, parseLeadDetailResponse, type LeadContact, type LeadDetail } from "../../lead-contract";
-import { CONTACT_DIRECTORY_PERMISSIONS, CONTACT_MODAL_LIMITS, ContactWriteResponseError, buildContactCoreWrites, buildSelectedContactLeadRequest, contactModalForm, contactPersonPath, parseContactPerson, validateContactModal, validateContactWriteResponse, type ContactModalField, type ContactModalForm, type ContactPerson } from "../contact-modal-contract";
+import { fetchLeadDetail } from "../../lead-requests";
+import { CONTACT_DIRECTORY_PERMISSIONS, CONTACT_MODAL_LIMITS, ContactWriteResponseError, buildAddedContactLeadRequest, buildContactCoreWrites, buildSelectedContactLeadRequest, contactModalForm, contactPersonPath, emptyNewLeadContact, parseContactPerson, validateContactModal, validateContactWriteResponse, validateNewLeadContact, type ContactModalField, type ContactModalForm, type ContactPerson, type NewLeadContactDraft } from "../contact-modal-contract";
+import type { UpdateLeadRequest } from "../../lead-write-contract";
 
 export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail) => void, onReconcile: () => void, canUpdate: boolean) {
   const { user } = useTenantAuth();
@@ -23,6 +25,12 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [failure, setFailure] = useState<"failed" | "partial" | "uncertain" | "refresh" | null>(null);
   const [mustReload, setMustReload] = useState(false);
+  const [addingContact, setAddingContact] = useState(false);
+  const [newContact, setNewContact] = useState(emptyNewLeadContact);
+  const [newContactErrors, setNewContactErrors] = useState<Record<string, string>>({});
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<NormalizedApiError | null>(null);
+  const [actionMustReload, setActionMustReload] = useState(false);
   const activeRead = useRef<AbortController | null>(null);
   const inFlight = useRef(false);
   const canEditIdentity = hasDirectoryGrants && person !== null && !loading && !mustReload;
@@ -30,7 +38,7 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
   useEffect(() => () => activeRead.current?.abort(), []);
 
   const readPerson = async (partyId: string, signal: AbortSignal) => parseContactPerson(await readCoreData(contactPersonPath(partyId), { signal, cache: "no-store", maxResponseBytes: 512 * 1024 }), partyId);
-  const readLead = async (signal?: AbortSignal) => parseLeadDetailResponse(await readCrmBody(`/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}`, { signal, cache: "no-store", maxResponseBytes: 512 * 1024 }));
+  const readLead = async (signal?: AbortSignal) => (await fetchLeadDetail(lead.id, signal)).lead;
   const applyForm = (contact: LeadContact, loaded: ContactPerson | null) => {
     const next = contactModalForm(contact, loaded);
     setBaseline(next);
@@ -39,7 +47,7 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
     setError(null); setErrors({}); setFailure(null); setMustReload(false);
   };
   const openContact = async (contact: LeadContact) => {
-    if (!canUpdate || inFlight.current || lead.status === "CONVERTED") return;
+    if (!canUpdate || inFlight.current || addingContact || actionMustReload || lead.status === "CONVERTED") return;
     activeRead.current?.abort();
     const controller = new AbortController();
     activeRead.current = controller;
@@ -89,6 +97,85 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
   const addPhone = () => { if (canEditIdentity) change((current) => current.phones.length < CONTACT_MODAL_LIMITS.methods ? { ...current, phones: [...current.phones, { id: null, methodType: "MOBILE", value: "", isPrimary: false }] } : current); };
   const removePhone = (index: number) => { if (canEditIdentity) change((current) => ({ ...current, phones: current.phones.filter((_, i) => i !== index) })); };
 
+  const canAct = canUpdate && lead.leadProfileType === "CORPORATE" && lead.status !== "CONVERTED" && !form && !actionMustReload;
+  const startAddingContact = () => {
+    if (!canAct || inFlight.current) return;
+    setNewContact({ ...emptyNewLeadContact(), isPrimary: lead.contacts.length === 0 });
+    setNewContactErrors({}); setActionError(null); setAddingContact(true);
+  };
+  const clearNewContact = () => {
+    setAddingContact(false); setNewContact(emptyNewLeadContact()); setNewContactErrors({});
+  };
+  const cancelAddingContact = () => {
+    if (inFlight.current) return;
+    clearNewContact();
+  };
+  const changeNewContact = (update: (current: NewLeadContactDraft) => NewLeadContactDraft) => {
+    if (!canAct || inFlight.current || !addingContact) return;
+    setNewContact(update); setNewContactErrors({}); setActionError(null);
+  };
+  const writeContacts = async (build: (fresh: LeadDetail) => UpdateLeadRequest) => {
+    if (!canAct || inFlight.current) return;
+    inFlight.current = true;
+    setActionBusy(true); setActionError(null);
+    let writing = false;
+    try {
+      const fresh = await readLead();
+      if (fresh.status === "CONVERTED" || fresh.leadProfileType !== "CORPORATE") {
+        onSaved(fresh);
+        clearNewContact();
+        return;
+      }
+      const body = build(fresh);
+      if (!Object.keys(body).length) { onSaved(fresh); return; }
+      writing = true;
+      const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body: { ...body, expectedUpdatedAt: fresh.updatedAt }, parse: parseLeadDetailResponse });
+      if (outcome.kind === "success") {
+        onSaved(outcome.value);
+        clearNewContact();
+      } else {
+        setActionError(outcome.error);
+        if (outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable") {
+          setActionMustReload(true);
+          clearNewContact();
+          onReconcile();
+        }
+      }
+    } catch (caught) {
+      setActionError(normalizeApiError(caught));
+      if (writing && isAmbiguousWriteFailure(caught)) {
+        setActionMustReload(true); clearNewContact(); onReconcile();
+      }
+    }
+    finally { inFlight.current = false; setActionBusy(false); }
+  };
+  const setPrimaryContact = async (target: LeadContact) => {
+    if (addingContact || target.isPrimary) return;
+    await writeContacts((fresh) => {
+      const selected = fresh.contacts.find((contact) => contact.partyId === target.partyId);
+      if (!selected) throw new Error("Contact no longer belongs to this lead.");
+      const before = contactModalForm(selected);
+      return buildSelectedContactLeadRequest(fresh, { ...before, isPrimary: true }, before);
+    });
+  };
+  const saveNewContact = async () => {
+    if (!canAct || inFlight.current || !addingContact) return;
+    const fieldErrors = validateNewLeadContact(newContact, { ...t.crmLeads.create.errors, url: t.crmShared.fieldUrl, invalid: t.crmShared.errorValidation });
+    setNewContactErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length) return;
+    await writeContacts((fresh) => buildAddedContactLeadRequest(fresh, newContact));
+  };
+  const reloadContacts = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setActionBusy(true);
+    try {
+      onSaved(await readLead());
+      setActionError(null); setActionMustReload(false);
+    } catch (caught) { setActionError(normalizeApiError(caught)); }
+    finally { inFlight.current = false; setActionBusy(false); }
+  };
+
   const save = async () => {
     if (!canUpdate || !form || !baseline || loading || mustReload || inFlight.current || lead.status === "CONVERTED") return;
     const fieldErrors = validateContactModal(form, canEditIdentity, { ...t.crmLeads.create.errors, url: t.crmShared.fieldUrl, invalid: t.crmShared.errorValidation });
@@ -117,9 +204,10 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
         // The CRM endpoint replaces the complete list. Read it after Core
         // writes so this selected-person save preserves other current people.
         stage = "preflight";
-        crmBody = buildSelectedContactLeadRequest(await readLead(), form, baseline);
+        const fresh = await readLead();
+        crmBody = buildSelectedContactLeadRequest(fresh, form, baseline);
         stage = "write";
-        const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body: crmBody, parse: parseLeadDetailResponse });
+        const outcome = await runIdempotentWrite({ attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body: { ...crmBody, expectedUpdatedAt: fresh.updatedAt }, parse: parseLeadDetailResponse });
         if (outcome.kind !== "success") {
           const uncertain = outcome.kind === "ambiguous" || outcome.kind === "applied_unreadable";
           setError(outcome.error); setFailure(uncertain ? "uncertain" : completed ? "partial" : "failed");
@@ -142,7 +230,8 @@ export function useLeadContactModal(lead: LeadDetail, onSaved: (lead: LeadDetail
       if (block) onReconcile();
     } finally { inFlight.current = false; setSaving(false); }
   };
-  return { open: form !== null, form, loading, saving, errors, error, failure, mustReload, canEditIdentity, isDirty, openContact, close, reload, save, setField, setPhone, addPhone, removePhone };
+  return { open: form !== null, form, loading, saving, errors, error, failure, mustReload, canEditIdentity, isDirty, openContact, close, reload, save, setField, setPhone, addPhone, removePhone,
+    addingContact, newContact, newContactErrors, actionBusy, actionError, actionMustReload, startAddingContact, cancelAddingContact, changeNewContact, setPrimaryContact, saveNewContact, reloadContacts };
 }
 
 export type LeadContactModal = ReturnType<typeof useLeadContactModal>;

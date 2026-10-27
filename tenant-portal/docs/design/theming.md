@@ -4,6 +4,8 @@ Status: **Specification**
 
 Written: **2026-08-27**
 
+Updated: **2026-10-26** — [CRM Leads v3 Ocean Navy & dark surface hierarchy](specs/crm-leads-v3.md).
+
 ## What this replaced (pre-rebuild, for context)
 
 Four separate defects, all in the same seam:
@@ -69,9 +71,15 @@ chrome edge. Admin has no density multiplier, so scale 1 is what "the same size
 as admin" means. Compact stays one click away in the user menu for the operator
 who wants more rows on a 1366×768 laptop.
 
-Only the geometry tokens multiply by it. **Type does not**, and neither does
-radius: the 13 px Latin / 14 px Arabic floor is absolute, and radius is a shape
-constant. Comfortable makes rows taller, not letters bigger.
+Only the geometry tokens (`--size-control-*`, `--size-row`, `--size-topbar`
+`58px`, `--size-actionbar` `35px`, `--size-toolbar` `48px`,
+`--size-toolbar-control` `33px`, `--size-brand`, `--size-column-collapsed`)
+multiply by `--ui-scale`. **Type does not**, and neither does radius
+(`--radius-xs` through `--radius-xl`, plus `--radius-card` `13px` and
+`--radius-column` `16px`): the named type steps (`text-micro` through
+`text-column-title` and `text-2xs` through `text-2xl`) hold their `rem` scale
+and `html[lang="ar"]` lift, and radius stays a shape constant. Comfortable
+makes rows and bars taller, not letters bigger.
 
 ## No flash — the mechanism
 
@@ -101,13 +109,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html lang="ar" dir="rtl" className="h-full" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable} h-full`} suppressHydrationWarning>
       <head>
         <InlineBootstrapScript nonce={nonce} html={BOOTSTRAP} />
       </head>
       <body
         suppressHydrationWarning
-        className={`${plexLatin.variable} ${plexArabic.variable} ${plexMono.variable} h-full antialiased`}
+        className="h-full antialiased"
       >
         {children}
       </body>
@@ -194,6 +202,23 @@ The server snapshot is `"ar"`, matching the server-rendered `<html lang="ar">`.
 **Never write these values from a `useEffect`.** A `useEffect` that sets
 `document.documentElement.*` on mount is precisely the bug being removed.
 
+## Account preferences on a fresh device
+
+Verified **2026-10-17** (CXPORTAL-SHELL-112). The authenticated runtime reads
+`GET /api/tenant/core/v1/users/me/profile` after authentication and seeds each
+missing device key independently with supported account values (`ar`/`en`,
+`light`/`dark`/`system`). Profile loading also retries this initialization.
+Null or unsupported values leave the defaults intact. Failed reads leave the
+session and local rendering intact; Profile exposes its normal error/retry UI.
+
+The inline bootstrap still owns first paint (D-4.17). Account loading is
+asynchronous and may update an empty device after authentication. Stored device
+choices, including choices made while the read is pending, always win.
+Selecting `system` stores the literal `system` rather than deleting the key,
+so account dark/light preferences cannot override that explicit OS-following
+choice. Previously deleted system choices cannot be distinguished from a fresh
+device. Signing out or switching accounts aborts pending preference reads.
+
 ## The dark variant
 
 ```css
@@ -211,18 +236,45 @@ a user whose OS flips at sunset sees the app follow without a reload.
 ## Both themes are designed, not inverted
 
 Every token has an explicit value in both themes — see
-[tokens.md](tokens.md#semantic-tokens). Rules:
+[tokens.md](tokens.md#semantic-tokens) and
+[specs/crm-leads-v3.md](specs/crm-leads-v3.md) Part 2. Rules:
 
-- **Never** define a color only inside `.dark`. A token whose sole definition
-  sits in the dark block renders as nothing in light mode.
+- **Never** define a color or gradient only inside `.dark`. Every semantic role
+  and `--gradient-*` token is declared on `:root` and overridden in `.dark` so
+  components carry zero `dark:` overrides.
 - `body` sets an explicit `background` from `--background`. A transparent body
   borrows whatever is behind it.
-- The brand fill uses **different ramp steps per theme** (`brand-600` light,
-  `brand-400` dark) because one step cannot clear contrast on both grounds.
-- Elevation is a **shadow** in light and an **inset hairline** in dark. Do not
-  reuse the light shadow at higher opacity.
-- Both nav bars are light in light mode. A permanently dark chrome around a
-  light body is banned — see [anti-patterns.md](anti-patterns.md).
+- **Three-tier surface staircase in both themes.** In light mode:
+  `bg-gradient-canvas` (`#edf2f8 → #e4ebf5`) / `--background` (`ink-50`) →
+  `--surface-column` (`#f6f8fc`) → `--card` / `--surface-toolbar` /
+  `--surface-column-header` (`#ffffff`) with `--surface-subtle` (`#f8fafc`) for
+  inner footers and neutral pills. In dark mode: `bg-gradient-canvas`
+  (`#040911 → #060d17`) / `--background` (`ink-1000`) → `--surface-column`
+  (`#070f1a`) → `--card` / `--surface-toolbar` / `--surface-column-header`
+  (`ink-950`) → `--surface-subtle` (`#111c2b`), paired with calibrated borders
+  (`--line-column`, `--line-card`, `--line-control`, `--line-divider`).
+- **Semantic pills flip from pastel fills to low-alpha dark tints.** Activity
+  pills (`--activity-*-surface`), KPI badges (`--kpi-*-surface`) and count pills
+  (`--count-*-surface`) use soft opaque tints with deep labels in `:root` and
+  translucent `rgb(... / 0.14–0.15)` tints with bright pastel labels in `.dark`
+  (or `brand-950` / `accent-950` for white-labelled / sky tokens). Every
+  composited foreground/surface pair clears `≥ 4.5:1` (`≥ 3:1` for non-text
+  entity icons and dark control lines) in `scripts/design/contrast.mjs`.
+- **White-label survives across both themes.** Tenant-branded roles (`--primary`
+  `brand-600` light / `brand-400` dark, `kpi-new-*`, `entity-person-*`,
+  `count-active-*`, `chip-active-*`, `bg-gradient-primary`, `bg-gradient-logo`,
+  `bg-gradient-chip-active`) resolve through `--color-brand-*`.
+- **Elevation is a drop shadow on document surfaces in light and an inset
+  hairline in dark.** `--elevation-pop`, `--elevation-overlay`,
+  `--elevation-toolbar`, `--elevation-column` and `--elevation-card` become
+  `inset 0 1px 0 0 rgb(255 255 255 / 0.04–0.08)` in `.dark`, while
+  `--elevation-nav-active` retains its subtle sky glow on the Ocean Navy header.
+- **Ocean Navy global header is fixed chrome; the toolbar and workspace theme.**
+  `GlobalNav` (`bg-gradient-header` + `bg-gradient-brand-strip`, `58px`) stays
+  Ocean Navy in both light and dark modes with `#e2e8f0` / `#f8fafc` text, while
+  the floating `48px` `PageActionBar` (`bg-surface-toolbar`) and workspace
+  switch cleanly between light and dark — see [shell.md](shell.md) and
+  [anti-patterns.md](anti-patterns.md#8-dark-chrome-that-is-a-costume).
 
 Every screen is reviewed in both themes before it is called done. "It works in
 dark" is half a review.
@@ -291,7 +343,26 @@ Radix keyboard navigation needs direction too. Wrap the tree once in
 
 ## The toggles
 
-Both live in the global nav's account cluster.
+Both live in the global nav's account cluster and on authentication, fence and
+tenant action screens. **2026-10-26 (T26):** both accept
+`tone?: "surface" | "chrome"`, defaulting to `surface`. Surface controls use
+`border-line-control bg-surface-subtle text-foreground-secondary` and semantic
+hover colours, so they remain visible on light and dark surfaces. Only
+`GlobalNav` passes `tone="chrome"` for the fixed navy header. Both tones keep
+the same 36px height, round shape, focus ring and accessible labels.
+
+The three next/font `.variable` classes belong on `<html>` in both `layout.tsx`
+and `global-error.tsx`. The `@theme` font aliases resolve on the root where
+`--font-ui-latin`, `--font-ui-arabic` and `--font-ui-mono` now exist, then inherit
+their computed families. Thus `font-sans` resolves to Jakarta + Cairo,
+`font-arabic` to Cairo and `font-mono` to IBM Plex Mono. A body-only declaration
+cannot supply a variable required to compute a root alias. The duplicate
+`:root` sans/Arabic bridge is removed; the `@theme` block remains the source.
+
+Primary, avatar and logo gradients now use contrast-safe stops in both themes
+(see the [gradient contract](specs/crm-leads-v3.md#gradients-root--dark-vars-plus-utility)).
+White text is checked against every stop at 4.5:1. Header contrast claims use
+the fixed navy stops, including composited hairline and hover surfaces.
 
 **`LanguageToggle`** shows the *target* language in its own script — "English"
 while in Arabic, "العربية" while in English — so a user can recognise the

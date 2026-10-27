@@ -29,7 +29,7 @@ export function AppShell({ children, defaultSidebarCollapsed }: { children: Reac
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="min-h-dvh bg-background">
+      <div className="min-h-dvh bg-gradient-canvas">
         <a
           href="#admin-main-content"
           className={cn(

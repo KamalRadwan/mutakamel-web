@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet, tradeIfMatch, tradePatch } from "../../../../trade-api";
-import { hasTradePermission, tradeScopeHeaders, useTradeScope } from "../../../../trade-advanced-scope";
+import { hasTradePermission, useTradeScope } from "../../../../trade-advanced-scope";
 import {
   INVENTORY_NODES_MANAGE_PERMISSION,
   INVENTORY_READ_PERMISSION,
@@ -25,8 +25,9 @@ export function useInventoryNode(id: string) {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchId } = useTenantBranchSelection(user);
+  const { branchId } = useTradeBranchSelection(user);
   const readScope = useTradeScope("BRANCH", branchId);
+  const writeScope = useTradeScope("COMPANY", branchId);
 
   const [node, setNode] = useState<InventoryNodeDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,7 +95,7 @@ export function useInventoryNode(id: string) {
         await tradePatch(inventoryNodePath(node.id), request, {
           headers: {
             // The node write targets COMPANY while the read above is BRANCH.
-            ...tradeScopeHeaders(user, branchId, "COMPANY"),
+            ...writeScope.headers,
             // Trade has one If-Match parser and never answers 428: a missing
             // header is 400 TRADE.CONCURRENCY.IF_MATCH_REQUIRED.
             "If-Match": tradeIfMatch(node.version),
@@ -122,7 +123,7 @@ export function useInventoryNode(id: string) {
         setIsSubmitting(false);
       }
     },
-    [canManage, node, isSubmitting, user, branchId, toast, t, load],
+    [canManage, node, isSubmitting, writeScope.headers, toast, t, load],
   );
 
   return {

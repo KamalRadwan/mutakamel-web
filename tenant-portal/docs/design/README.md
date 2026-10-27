@@ -90,25 +90,24 @@ See [tokens.md](tokens.md#status-mapping) and
 [DESIGN-SYSTEM.md § Colorful Swatch & Semantic Surface Palettes](DESIGN-SYSTEM.md#colorful-swatch--semantic-surface-palettes)
 for the complete enum-to-role and category-to-swatch tables.
 
-### 2. One superfamily, two scripts
+### 2. Two scripts, one font stack
 
-Text is set in **IBM Plex Sans** and **IBM Plex Sans Arabic** — two families
-drawn against each other by one team, ordered Latin-then-Arabic in a single
-stack. The browser resolves `font-family` per character, so a status badge's
-Latin enum value sitting inside an Arabic sentence renders in Plex Sans while
-the sentence renders in Plex Sans Arabic, on the same line, without jumping
-baseline or x-height.
+Text is set in **Plus Jakarta Sans** for Latin and **Cairo** for Arabic,
+ordered Latin-then-Arabic in a single stack. **IBM Plex Mono** stays for codes
+and identifiers. The browser resolves `font-family` per character, so Latin
+runs inside an Arabic sentence render in Plus Jakarta Sans while Arabic runs
+render in Cairo on the same line.
 
-This removes an entire class of bug: no `:lang()` switching, no per-script font
-stack in components, no second set of vertical metrics to reconcile. See
-[typography.md](typography.md).
+Components share that stack without `:lang()` switching. Font policy updated
+**2026-10-26** for [CRM Leads v3](specs/crm-leads-v3.md#part-1-lead-decisions-binding).
 
-### 3. Three weights, physically enforced
+### 3. Five UI weights, 900 banned
 
-400, 500, 600. Only those three are downloaded, and `font-synthesis-weight:
-none` stops the browser faking anything heavier. Hierarchy comes from **size
-and color**, never weight. `font-bold` is remapped to 600 at the token level so
-a stray class cannot escalate.
+UI fonts load **400, 500, 600, 700 and 800**. IBM Plex Mono keeps 400/500/600.
+`font-synthesis-weight: none` blocks synthetic bolding. `font-bold` is 700 and
+`font-extrabold` is 800; **900 is banned**, with `font-black` remapped to 800 as
+a guard. Table body cells stay 400. Weight policy updated **2026-10-26** under
+[CRM Leads v3](specs/crm-leads-v3.md#part-1-lead-decisions-binding).
 
 ### 4. One filled action per screen
 
@@ -182,7 +181,10 @@ so here is the current line.
 - **The ramps.** All five, every step, including the nine that sit outside sRGB
   in the admin file and are written here as the in-gamut OKLCH that round-trips
   to the same hex. See [DESIGN-SYSTEM.md § Ramps](DESIGN-SYSTEM.md#ramps--exact-values).
-- **The fonts.** IBM Plex Sans, Plex Sans Arabic, Plex Mono, at 400/500/600.
+- **The fonts, updated 2026-10-26.** [CRM Leads v3](specs/crm-leads-v3.md)
+  replaces the original port's UI faces with Plus Jakarta Sans for Latin and
+  Cairo for Arabic at 400/500/600/700/800; 900 is banned. IBM Plex Mono remains
+  for codes at 400/500/600.
 - **The geometry.** 44px row, the control scale unscaled at `--ui-scale: 1`,
   admin's control paddings, and the five-step radius scale. The *chrome* no
   longer matches: admin's 48px topbar and 240px sidebar were adopted and then

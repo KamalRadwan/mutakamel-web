@@ -3,6 +3,8 @@ import {
   buildLeadCardPatchBody,
   leadActivityState,
   leadCardHeading,
+  leadCountryIso,
+  leadNameInitials,
   leadOwnerInitials,
 } from "./lead-card-contract";
 import { parseCrmTags } from "../shared/tag-contract";
@@ -11,6 +13,25 @@ const OWNER_ID = "01900100-0000-7000-8000-000000000020";
 const TAG_ID = "01900100-0000-7000-8000-0000000000a1";
 
 describe("lead card contract", () => {
+  it("uses the same initials for display names, preserving Unicode characters", () => {
+    expect(leadNameInitials("   ")).toBe("LD");
+    expect(leadNameInitials("  Acme  ")).toBe("AC");
+    expect(leadNameInitials("  Dina   Ali Hassan ")).toBe("DA");
+    expect(leadNameInitials("كمال رضوان")).toBe("كر");
+    expect(leadNameInitials("𐐀𐐁")).toBe("𐐀𐐁");
+    expect(leadNameInitials("𐐀name 𐐁name")).toBe("𐐀𐐁");
+  });
+
+  it("resolves country codes and bilingual names without guessing unknown names", () => {
+    expect(leadCountryIso(" eg ")).toBe("EG");
+    expect(leadCountryIso("Egypt")).toBe("EG");
+    expect(leadCountryIso("مصر")).toBe("EG");
+    expect(leadCountryIso("Unknown country")).toBeNull();
+    expect(leadCountryIso(" ")).toBeNull();
+    expect(leadCountryIso(null)).toBeNull();
+    expect(leadCountryIso(undefined)).toBeNull();
+  });
+
   // The shape that actually arrives for a corporate lead: CRM composes the
   // display name FROM the company name, so `leadName` and `company` are the
   // SAME string and only the contact tells the two card shapes apart. Keying
@@ -22,7 +43,7 @@ describe("lead card contract", () => {
         leadProfileType: "CORPORATE",
         leadName: "Acme Trading",
         company: "Acme Trading",
-        primaryContactName: "Dina Ali",
+        primaryContact: { displayName: "Dina Ali" },
       }),
     ).toEqual({ title: "Acme Trading", contactName: "Dina Ali" });
   });
@@ -33,7 +54,7 @@ describe("lead card contract", () => {
         leadProfileType: "INDIVIDUAL",
         leadName: "Kamal Radwan",
         company: "Kamal Radwan",
-        primaryContactName: "",
+        primaryContact: null,
       }),
     ).toEqual({ title: "Kamal Radwan", contactName: null });
   });
@@ -44,9 +65,18 @@ describe("lead card contract", () => {
         leadProfileType: "CORPORATE",
         leadName: "Acme Trading",
         company: "",
-        primaryContactName: "Dina Ali",
+        primaryContact: { displayName: "Dina Ali" },
       }),
     ).toEqual({ title: "Acme Trading", contactName: "Dina Ali" });
+  });
+
+  it("has no contact heading when a corporate lead has no lead contact", () => {
+    expect(leadCardHeading({
+      leadProfileType: "CORPORATE",
+      leadName: "Acme Trading",
+      company: "Acme Trading",
+      primaryContact: null,
+    })).toEqual({ title: "Acme Trading", contactName: null });
   });
 
   it("takes one letter from each known name and none from an unknown one", () => {
@@ -58,10 +88,24 @@ describe("lead card contract", () => {
   });
 
   it("folds a lead with no open activity into its own bucket", () => {
-    expect(leadActivityState(null)).toBe("NONE");
-    expect(
-      leadActivityState({ activityAt: "2026-09-05T09:00:00.000Z", bucket: "TODAY" }),
-    ).toBe("TODAY");
+    const now = new Date(2026, 9, 26, 12);
+    expect(leadActivityState(null, now)).toBe("NONE");
+  });
+
+  it.each([
+    [new Date(2026, 9, 25, 23, 59, 59, 999), "FUTURE", "OVERDUE"],
+    [new Date(2026, 9, 26), "OVERDUE", "TODAY"],
+    [new Date(2026, 9, 26, 9), "OVERDUE", "TODAY"],
+    [new Date(2026, 9, 26, 12), "FUTURE", "TODAY"],
+    [new Date(2026, 9, 26, 12, 0, 0, 1), "TODAY", "FUTURE"],
+  ] as const)("uses timestamp %s over bucket %s to resolve %s", (due, bucket, state) => {
+    const now = new Date(2026, 9, 26, 12);
+    expect(leadActivityState({ activityAt: due.toISOString(), bucket }, now)).toBe(state);
+  });
+
+  it.each(["OVERDUE", "TODAY", "FUTURE"] as const)("falls back to %s for an unparsable activity date", (bucket) => {
+    const now = new Date(2026, 9, 26, 12);
+    expect(leadActivityState({ activityAt: "invalid-date", bucket }, now)).toBe(bucket);
   });
 
   it("sends only what changed, and can tell 'clear the colour' from 'leave it alone'", () => {

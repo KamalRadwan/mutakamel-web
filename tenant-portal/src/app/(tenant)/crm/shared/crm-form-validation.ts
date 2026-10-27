@@ -14,6 +14,7 @@ export interface CrmFieldMessages {
   /** Takes `{max}`. */
   maxLength: string;
   duplicatePhone: string;
+  phone: string;
   url: string;
 }
 
@@ -39,7 +40,7 @@ export function looksLikeEmail(value: string): boolean {
 /**
  * `normalizeMobile`, mirrored from the CRM services.
  *
- * Only ever used to compare two numbers the user typed. What is SENT is the raw
+ * Used to validate and compare numbers the user typed. What is SENT is the raw
  * string — normalising client-side would hide from the user which of their two
  * entries the server considers the same number.
  */
@@ -126,7 +127,10 @@ export class CrmErrorBag {
       const key = `${prefix}.${index}`;
       this.maxLength(key, trimmed, PHONE_MAX_LENGTH);
       const normalized = normalizeCrmPhone(trimmed);
-      if (normalized.length === 0) return;
+      if (normalized.replace(/\D/gu, "").length < 5) {
+        this.set(key, this.messages.phone);
+        return;
+      }
       if (seen.has(normalized)) this.set(key, this.messages.duplicatePhone);
       seen.add(normalized);
     });

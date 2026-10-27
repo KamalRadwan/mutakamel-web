@@ -1,22 +1,18 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
 import { useI18n } from "@/i18n/I18nContext";
 import { useAuth } from "@/context/AuthContext";
 import {
   FormDrawer,
   Field,
   Input,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  Combobox,
   Checkbox,
   Button,
   AmbiguousOutcomePanel,
 } from "@/design-system";
 import { useInviteUserModal } from "../hooks/useInviteUserModal";
+import { RoleCatalogueFeedback } from "./RoleCatalogueFeedback";
 
 export function InviteUserModal({
   onClose,
@@ -42,8 +38,8 @@ export function InviteUserModal({
     isAmbiguous,
     idempotencyKey,
     roles,
-    isLoadingRoles,
-    rolesForbidden,
+    rolesStatus,
+    reloadRoles,
     fieldErrors,
     setFieldErrors,
     isDirty,
@@ -72,7 +68,7 @@ export function InviteUserModal({
             size="sm"
             loading={isSubmitting}
             disabled={
-              rolesForbidden || !email.trim() || !firstName.trim() || !lastName.trim() || !roleId
+              rolesStatus !== "success" || !email.trim() || !firstName.trim() || !lastName.trim() || !roles.some((role) => role.id === roleId)
             }
           >
             {isSubmitting ? t.users.sendingInvite : t.users.sendInvite}
@@ -142,28 +138,25 @@ export function InviteUserModal({
         </Field>
 
         <Field label={t.users.roleLabel} hideLabel required>
-          {(fieldProps) =>
-            rolesForbidden ? (
-              <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning-subtle p-2 text-xs text-warning-subtle-foreground">
-                <ShieldAlert className="size-3.5 shrink-0" />
-                <span>{t.users.rolesUnavailable}</span>
-              </div>
-            ) : (
-              <Select value={roleId} onValueChange={setRoleId} disabled={isLoadingRoles || isAmbiguous}>
-                <SelectTrigger {...fieldProps} size="sm">
-                  <SelectValue placeholder={`${t.users.roleLabel} *`} />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.nameI18n?.[lang] || r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )
-          }
+          {(fieldProps) => (
+            <Combobox
+              {...fieldProps}
+              value={roleId}
+              onValueChange={setRoleId}
+              label={t.users.roleLabel}
+              placeholder={`${t.users.roleLabel} *`}
+              searchPlaceholder={t.users.rolesSearchPlaceholder}
+              emptyLabel={t.users.rolesNoMatches}
+              disabled={rolesStatus !== "success" || isAmbiguous}
+              options={roles.map((role) => ({
+                value: role.id,
+                label: role.nameI18n?.[lang] || role.name,
+                keywords: [role.name, role.nameI18n?.en ?? "", role.nameI18n?.ar ?? ""],
+              }))}
+            />
+          )}
         </Field>
+        <RoleCatalogueFeedback assignable status={rolesStatus} empty={roles.length === 0} onRetry={reloadRoles} />
 
         {user?.isSuperAdmin && (
           <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-card p-2 text-xs font-semibold text-foreground">

@@ -2255,6 +2255,13 @@ Implemented in active frontend source:
 - the Application list wires create, all documented filters including
   publication and database deployment, independent lifecycle/publication/
   deployment columns, real totals, error retry, and the global audit route;
+- catalogue list request ownership verified **2026-10-18**: changing filters,
+  search, page or page size, or refreshing, aborts the previous list request.
+  Only the latest request generation can update rows, pagination, errors,
+  error toasts or loading completion, including when cancellation is ignored
+  by the transport. Effect cleanup invalidates pending work on query changes
+  and unmount; regression specs cover reversed response order. Runtime and
+  automated verification remain lead gates;
 - the `/applications-catalogue` permission boundary renders a narrow
   registration-only page for create-without-read actors, and that branch mounts
   neither the Application-list hook nor commercial-catalogue reads;

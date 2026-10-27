@@ -18,17 +18,13 @@ import {
   Loader2,
   Mail,
   MapPin,
-  MessageCircle,
-  Phone,
   Plus,
-  Send,
   Sparkles,
   Star,
   UserRound,
   X,
 } from "lucide-react";
 import {
-  Badge,
   Button,
   Combobox,
   DateTime,
@@ -48,20 +44,22 @@ import {
   type ComboboxOption,
   type MoveToTarget,
 } from "@/design-system";
+import { useAccessMode } from "@/hooks/useAccessMode";
+import { useTenantAuth } from "@/context/AuthContext";
+import { canCreateActivities } from "@/components/activities/activity-presentation";
 import { useI18n } from "@/i18n/I18nContext";
+import type { Dictionary } from "@/i18n/dictionaries/ar";
+import type { Language } from "@/i18n/useLanguage";
 import { axiosClient } from "@/lib/api/axiosClient";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
-import { localizedName, localizedValue } from "@/lib/format/localized";
+import { localizedName } from "@/lib/format/localized";
 import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import {
   countryIsoFromName,
   getCountryOptions,
 } from "@/lib/geo/country-data";
-import {
-  normalizePhoneDigits,
-  normalizeWhatsAppDigits,
-} from "../../leads/lead-phone-links";
+import { OpportunityPhoneActions } from "./OpportunityQuickEditModal";
 import { AcquisitionSourceIcon } from "../../shared/components/AcquisitionSourceIcon";
 import type { CrmActivityState } from "../../shared/crm-activity-tone";
 import { isExactMoneyDecimal, toMoneyWireNumber } from "../../shared/money";
@@ -75,14 +73,16 @@ import type { OpportunityCardPatch } from "../opportunity-card-contract";
 import {
   formatOpportunityAmountSummary,
   type OpportunityActivityState,
+  type OpportunityActionCapability,
   type OpportunityBoard,
-  type OpportunityBoardLane,
   type OpportunityCardRecord,
   type OpportunityPipeline,
   type OpportunityStage,
   type StageFlag,
 } from "../hooks/pipeline-types";
+import { useOpportunityCurrencyOptions } from "../hooks/useCreateOpportunity";
 import { useCustomerProfileOptions } from "../hooks/useCustomerProfileOptions";
+import { opportunityCapabilityAllowsOwner } from "../hooks/usePipelineWorkspace";
 import { OpportunityCardMenu } from "./opportunity-card/OpportunityCardMenu";
 
 export interface QuickCreateOpportunityDraft {
@@ -105,6 +105,7 @@ export interface OpportunityExecutiveBoardViewProps {
   isMutating: boolean;
   loadingStageId: string | null;
   canCreate: boolean;
+  createCapability: OpportunityActionCapability | null;
   canUpdate: (item: OpportunityCardRecord) => boolean;
   canDelete: (item: OpportunityCardRecord) => boolean;
   onOpen: (item: OpportunityCardRecord) => void;
@@ -127,70 +128,69 @@ export interface OpportunityExecutiveBoardViewProps {
   ) => void;
   onLoadMoreStage: (stageId: string) => void;
   onRefreshBoard?: () => void;
+  onForbidden?: () => void;
 }
 
 const CARD_BORDER_ACCENT: Partial<Record<CardColor, string>> = {
-  RED: "border-red-300 border-s-4 border-s-red-500 dark:border-red-800 dark:border-s-red-500",
-  ORANGE: "border-amber-300 border-s-4 border-s-amber-500 dark:border-amber-800",
-  AMBER: "border-amber-300 border-s-4 border-s-amber-500 dark:border-amber-800",
-  YELLOW: "border-yellow-300 border-s-4 border-s-yellow-500 dark:border-yellow-800",
-  GREEN: "border-emerald-300 border-s-4 border-s-emerald-500 dark:border-emerald-800",
-  TEAL: "border-teal-300 border-s-4 border-s-teal-500 dark:border-teal-800",
-  BLUE: "border-blue-300 border-s-4 border-s-blue-600 dark:border-blue-800",
-  INDIGO: "border-indigo-300 border-s-4 border-s-indigo-500 dark:border-indigo-800",
-  PURPLE: "border-purple-300 border-s-4 border-s-purple-500 dark:border-purple-800",
-  PINK: "border-pink-300 border-s-4 border-s-pink-500 dark:border-pink-800",
-  SLATE: "border-slate-300 border-s-4 border-s-slate-500 dark:border-slate-700",
+  RED: "border-swatch-red/40 border-s-4 border-s-swatch-red",
+  ORANGE: "border-swatch-amber/40 border-s-4 border-s-swatch-amber",
+  AMBER: "border-swatch-amber/40 border-s-4 border-s-swatch-amber",
+  YELLOW: "border-swatch-yellow/40 border-s-4 border-s-swatch-yellow",
+  GREEN: "border-swatch-green/40 border-s-4 border-s-swatch-green",
+  TEAL: "border-swatch-teal/40 border-s-4 border-s-swatch-teal",
+  BLUE: "border-swatch-blue/40 border-s-4 border-s-swatch-blue",
+  INDIGO: "border-swatch-indigo/40 border-s-4 border-s-swatch-indigo",
+  PURPLE: "border-swatch-purple/40 border-s-4 border-s-swatch-purple",
+  PINK: "border-swatch-pink/40 border-s-4 border-s-swatch-pink",
+  SLATE: "border-swatch-slate/40 border-s-4 border-s-swatch-slate",
 };
-
-const CURRENCY_OPTIONS = ["EGP", "USD", "SAR", "AED", "EUR"] as const;
 
 function getStageVisual(flag: StageFlag) {
   switch (flag) {
     case "WON":
       return {
-        topAccent: "border-t-[3px] border-t-emerald-500",
-        dotColor: "bg-emerald-500",
+        topAccent: "border-t-[3px] border-t-success",
+        dotColor: "bg-success",
         pillTone:
-          "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800",
+          "bg-success-subtle text-success-subtle-foreground border-success/30",
       };
     case "LOST":
       return {
-        topAccent: "border-t-[3px] border-t-red-500",
-        dotColor: "bg-red-500",
+        topAccent: "border-t-[3px] border-t-destructive",
+        dotColor: "bg-destructive",
         pillTone:
-          "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800",
+          "bg-destructive-subtle text-destructive-subtle-foreground border-destructive/30",
       };
     case "ON_HOLD":
       return {
-        topAccent: "border-t-[3px] border-t-amber-500",
-        dotColor: "bg-amber-500",
+        topAccent: "border-t-[3px] border-t-warning",
+        dotColor: "bg-warning",
         pillTone:
-          "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800",
+          "bg-warning-subtle text-warning-subtle-foreground border-warning/30",
       };
     case "PROPOSAL":
     case "NEGOTIATION":
     case "CONTRACTING":
       return {
-        topAccent: "border-t-[3px] border-t-purple-500",
-        dotColor: "bg-purple-500",
+        topAccent: "border-t-[3px] border-t-swatch-purple",
+        dotColor: "bg-swatch-purple",
         pillTone:
-          "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800",
+          "bg-swatch-purple/10 text-swatch-purple border-swatch-purple/30",
       };
     case "QUALIFICATION":
     case "DISCOVERY":
       return {
-        topAccent: "border-t-[3px] border-t-indigo-500",
-        dotColor: "bg-indigo-500",
+        topAccent: "border-t-[3px] border-t-swatch-indigo",
+        dotColor: "bg-swatch-indigo",
         pillTone:
-          "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-800",
+          "bg-swatch-indigo/10 text-swatch-indigo border-swatch-indigo/30",
       };
     default:
       return {
-        topAccent: "border-t-[3px] border-t-blue-600",
-        dotColor: "bg-blue-600",
+        topAccent: "border-t-[3px] border-t-primary",
+        dotColor: "bg-primary",
         pillTone:
-          "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800",
+          "bg-primary-subtle text-primary-subtle-foreground border-primary/30",
       };
   }
 }
@@ -212,16 +212,16 @@ function ownerInitials(name?: string | null): string {
     .join("");
 }
 
-function formatRelativeAge(isoDate?: string, isAr?: boolean): string {
-  if (!isoDate) return isAr ? "الآن" : "Just now";
+function formatRelativeAge(isoDate: string | undefined, labels: Dictionary["crmOpportunities"], lang: Language): string {
+  if (!isoDate) return labels.justNow;
   const time = new Date(isoDate).getTime();
   if (Number.isNaN(time)) return "";
   const diffMinutes = Math.max(1, Math.floor((Date.now() - time) / (1000 * 60)));
-  if (diffMinutes < 60) return isAr ? `منذ ${diffMinutes} د` : `${diffMinutes}m ago`;
+  if (diffMinutes < 60) return formatTemplate(labels.minutesAgo, { count: formatNumber(diffMinutes, lang) });
   const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return isAr ? `منذ ${diffHours} س` : `${diffHours}h in stage`;
+  if (diffHours < 24) return formatTemplate(labels.hoursInStage, { count: formatNumber(diffHours, lang) });
   const diffDays = Math.floor(diffHours / 24);
-  return isAr ? `${diffDays} يوم بالمرحلة` : `${diffDays}d in stage`;
+  return formatTemplate(labels.daysInStage, { count: formatNumber(diffDays, lang) });
 }
 
 export function OpportunityExecutiveBoardView({
@@ -230,9 +230,10 @@ export function OpportunityExecutiveBoardView({
   branchId,
   isMutating,
   loadingStageId,
-  canCreate,
-  canUpdate,
-  canDelete,
+  canCreate: canCreateByScope,
+  createCapability,
+  canUpdate: canUpdateByScope,
+  canDelete: canDeleteByScope,
   onOpen,
   onOpenQuickModal,
   onOpenFullCreate,
@@ -242,9 +243,13 @@ export function OpportunityExecutiveBoardView({
   onMoveCard,
   onLoadMoreStage,
   onRefreshBoard,
+  onForbidden,
 }: OpportunityExecutiveBoardViewProps) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { canMutate } = useAccessMode();
+  const canCreate = canMutate && canCreateByScope;
+  const canUpdate = (item: OpportunityCardRecord) => canMutate && canUpdateByScope(item);
+  const canDelete = (item: OpportunityCardRecord) => canMutate && canDeleteByScope(item);
 
   const [draggingItem, setDraggingItem] = useState<OpportunityCardRecord | null>(null);
   const [dragOverStageId, setDragOverStageId] = useState<string | null>(null);
@@ -316,9 +321,7 @@ export function OpportunityExecutiveBoardView({
   function canDragItem(item: OpportunityCardRecord): boolean {
     return (
       !isMutating &&
-      canUpdate(item) &&
-      item.stageFlag !== "WON" &&
-      item.stageFlag !== "LOST"
+      canUpdate(item)
     );
   }
 
@@ -391,24 +394,26 @@ export function OpportunityExecutiveBoardView({
                 clearDragState();
               }}
               className={cn(
-                "flex h-full w-12 shrink-0 flex-col items-center gap-2.5 rounded-xl border border-slate-200/90 bg-slate-100/80 px-1.5 py-3 transition-colors dark:border-slate-800 dark:bg-slate-900/60",
+                "flex h-full w-12 shrink-0 flex-col items-center gap-2.5 rounded-lg border border-border bg-muted/60 px-1.5 py-3 transition-colors",
                 visual.topAccent,
-                isDropTarget && "ring-2 ring-blue-500 bg-blue-50/40",
+                isDropTarget && "ring-2 ring-primary bg-primary-subtle/40",
               )}
             >
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 onClick={() => toggleCollapse(stage.id)}
                 title={t.views.expandColumn}
                 aria-label={`${t.views.expandColumn}: ${stageLabel}`}
-                className="flex size-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-900 dark:hover:bg-slate-800"
+                className="flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-card hover:text-foreground"
               >
-                <ChevronsRight className="size-4 rtl:rotate-180" aria-hidden="true" />
-              </button>
-              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-extrabold tabular-nums text-slate-700 shadow-2xs dark:bg-slate-800 dark:text-slate-200">
+                <ChevronsRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+              </Button>
+              <span className="rounded-full bg-card px-2 py-0.5 text-xs font-semibold tabular-nums text-foreground shadow-2xs">
                 {totalCount}
               </span>
-              <span className="flex-1 select-none text-xs font-bold tracking-wide text-slate-600 [writing-mode:vertical-rl] dark:text-slate-300">
+              <span className="flex-1 select-none text-xs font-semibold tracking-wide text-muted-foreground [writing-mode:vertical-rl]">
                 {stageLabel}
               </span>
             </section>
@@ -438,31 +443,33 @@ export function OpportunityExecutiveBoardView({
               clearDragState();
             }}
             className={cn(
-              "flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-xl border border-slate-200/90 bg-slate-100/75 shadow-2xs transition-colors dark:border-slate-800 dark:bg-slate-900/50",
+              "flex h-full w-80 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-muted/50 shadow-2xs transition-colors",
               visual.topAccent,
-              isDropTarget && "ring-2 ring-blue-500 bg-blue-50/30 dark:bg-blue-950/20",
+              isDropTarget && "ring-2 ring-primary bg-primary-subtle/30",
             )}
           >
             {/* Column Header */}
-            <header className="flex flex-col gap-2 border-b border-slate-200/80 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900">
+            <header className="flex flex-col gap-2 border-b border-border bg-card px-3 py-2.5">
               <div className="flex items-center justify-between gap-1.5">
                 <div className="flex min-w-0 items-center gap-2">
                   <span
                     className={cn("size-2 shrink-0 rounded-full", visual.dotColor)}
                     aria-hidden="true"
                   />
-                  <h3 className="truncate text-xs font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+                  <h3 className="truncate text-xs font-semibold tracking-tight text-foreground">
                     {stageLabel}
                   </h3>
-                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-foreground">
                     {totalCount}
                   </span>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-0.5">
                   {canCreate && !isTerminal && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() =>
                         setQuickAddStageId((curr) =>
                           curr === stage.id ? null : stage.id,
@@ -470,34 +477,34 @@ export function OpportunityExecutiveBoardView({
                       }
                       aria-label={`${t.crmOpportunityDetail.createAction}: ${stageLabel}`}
                       title={
-                        isAr
-                          ? "إضافة سريعة لفرصة في هذه المرحلة"
-                          : "Quick-add opportunity in this stage"
+                        t.crmOpportunities.quickAddInStage
                       }
                       className={cn(
                         "flex size-6 items-center justify-center rounded-md transition-colors",
                         quickAddStageId === stage.id
-                          ? "bg-blue-600 text-white"
-                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
                       <Plus className="size-3.5" aria-hidden="true" />
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={() => toggleCollapse(stage.id)}
                     title={t.views.collapseColumn}
                     aria-label={`${t.views.collapseColumn}: ${stageLabel}`}
-                    className="flex size-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                    className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
-                    <ChevronsLeft className="size-3.5 rtl:rotate-180" aria-hidden="true" />
-                  </button>
+                    <ChevronsLeft className="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                  </Button>
                 </div>
               </div>
 
               {amountSummary && (
-                <div className="flex items-center justify-between text-[11px] font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
+                <div className="flex items-center justify-between text-2xs font-semibold tabular-nums text-success">
                   <span className="truncate">{amountSummary}</span>
                 </div>
               )}
@@ -507,52 +514,60 @@ export function OpportunityExecutiveBoardView({
                 <div
                   role="group"
                   aria-label={t.crmLeads.card.activityBar}
-                  className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
+                  className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted"
                 >
                   {overdueCount > 0 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => toggleActivityFilter(stage.id, "OVERDUE")}
                       style={{ flexGrow: overdueCount }}
                       title={`${t.crmLeads.card.activityStates.OVERDUE}: ${overdueCount}`}
                       className={cn(
-                        "h-full bg-red-500 transition-opacity hover:opacity-90",
+                        "h-full min-w-0 rounded-none bg-destructive p-0 transition-opacity hover:bg-destructive hover:opacity-90",
                         activeFilter && activeFilter !== "OVERDUE" && "opacity-30",
                       )}
                     />
                   )}
                   {todayCount > 0 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => toggleActivityFilter(stage.id, "TODAY")}
                       style={{ flexGrow: todayCount }}
                       title={`${t.crmLeads.card.activityStates.TODAY}: ${todayCount}`}
                       className={cn(
-                        "h-full bg-amber-500 transition-opacity hover:opacity-90",
+                        "h-full min-w-0 rounded-none bg-warning p-0 transition-opacity hover:bg-warning hover:opacity-90",
                         activeFilter && activeFilter !== "TODAY" && "opacity-30",
                       )}
                     />
                   )}
                   {futureCount > 0 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => toggleActivityFilter(stage.id, "FUTURE")}
                       style={{ flexGrow: futureCount }}
                       title={`${t.crmLeads.card.activityStates.FUTURE}: ${futureCount}`}
                       className={cn(
-                        "h-full bg-emerald-500 transition-opacity hover:opacity-90",
+                        "h-full min-w-0 rounded-none bg-success p-0 transition-opacity hover:bg-success hover:opacity-90",
                         activeFilter && activeFilter !== "FUTURE" && "opacity-30",
                       )}
                     />
                   )}
                   {noneCount > 0 && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => toggleActivityFilter(stage.id, "NONE")}
                       style={{ flexGrow: noneCount }}
                       title={`${t.crmLeads.card.activityStates.NONE}: ${noneCount}`}
                       className={cn(
-                        "h-full bg-slate-300 transition-opacity hover:opacity-90 dark:bg-slate-700",
+                        "h-full min-w-0 rounded-none bg-muted-foreground/30 p-0 transition-opacity hover:bg-muted-foreground/30 hover:opacity-90",
                         activeFilter && activeFilter !== "NONE" && "opacity-30",
                       )}
                     />
@@ -560,35 +575,39 @@ export function OpportunityExecutiveBoardView({
                 </div>
 
                 {activeFilter && (
-                  <div className="flex items-center justify-between text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                  <div className="flex items-center justify-between text-2xs font-semibold text-primary">
                     <span>
-                      {isAr ? "مصفّى حسب النشاط" : `Filtered: ${activeFilter}`} (
+                      {formatTemplate(t.crmOpportunities.filteredActivity, { activity: t.crmLeads.card.activityStates[activeFilter] })} (
                       {filteredItems.length})
                     </span>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       onClick={() =>
                         setColumnActivityFilter((prev) => ({
                           ...prev,
                           [stage.id]: null,
                         }))
                       }
-                      className="underline hover:no-underline"
+                      className="h-auto p-0 text-2xs underline hover:bg-transparent hover:no-underline"
                     >
-                      {isAr ? "مسح" : "Clear"}
-                    </button>
+                      {t.crmOpportunities.clearFilter}
+                    </Button>
                   </div>
                 )}
               </div>
             </header>
 
             {/* Quick-Add Opportunity Inline Card */}
-            {quickAddStageId === stage.id && pipeline && (
-              <div className="border-b border-blue-200 bg-blue-50/40 p-2.5 dark:border-blue-900/60 dark:bg-blue-950/20">
+            {canCreate && createCapability && quickAddStageId === stage.id && pipeline && (
+              <div className="border-b border-primary/30 bg-primary-subtle/40 p-2.5">
                 <BoardColumnQuickAddOpportunityCard
                   pipeline={pipeline}
                   stage={stage}
                   branchId={branchId}
+                  createCapability={createCapability}
+                  onForbidden={onForbidden}
                   onClose={() => setQuickAddStageId(null)}
                   onCreated={() => {
                     setQuickAddStageId(null);
@@ -605,7 +624,7 @@ export function OpportunityExecutiveBoardView({
             {/* Cards Stack */}
             <div className="flex-1 space-y-2.5 overflow-y-auto p-2.5">
               {filteredItems.length === 0 ? (
-                <div className="flex h-36 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200/90 bg-white/50 p-4 text-center text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900/30">
+                <div className="flex h-36 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/50 p-4 text-center text-xs text-muted-foreground">
                   {t.crmOpportunities.emptyColumn}
                 </div>
               ) : (
@@ -680,25 +699,29 @@ function BoardColumnQuickAddOpportunityCard({
   pipeline,
   stage,
   branchId,
+  createCapability,
   onClose,
   onCreated,
+  onForbidden,
   onOpenFullForm,
 }: {
   pipeline: OpportunityPipeline;
   stage: OpportunityStage;
   branchId: string | null;
+  createCapability: OpportunityActionCapability;
   onClose: () => void;
   onCreated: () => void;
+  onForbidden?: () => void;
   onOpenFullForm: (draft: QuickCreateOpportunityDraft) => void;
 }) {
-  const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t } = useI18n();
   const toast = useToast();
 
   const [customerProfileId, setCustomerProfileId] = useState("");
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
-  const [currencyCode, setCurrencyCode] = useState("EGP");
+  const [currencyCode, setCurrencyCode] = useState("");
+  const currencyOptions = useOpportunityCurrencyOptions(true);
   const [probabilityPercent, setProbabilityPercent] = useState("50");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [importance, setImportance] = useState<number>(2);
@@ -708,15 +731,19 @@ function BoardColumnQuickAddOpportunityCard({
   const customers = useCustomerProfileOptions(branchId, true);
   const customerOptions: ComboboxOption[] = useMemo(
     () =>
-      customers.items.map((item) => ({
-        value: item.id,
-        label: item.displayName,
-        description:
-          item.companyName && item.companyName !== item.displayName
-            ? item.companyName
-            : undefined,
-      })),
-    [customers.items],
+      customers.items
+        .filter((item) =>
+          opportunityCapabilityAllowsOwner(createCapability, item.ownerUserId),
+        )
+        .map((item) => ({
+          value: item.id,
+          label: item.displayName,
+          description:
+            item.companyName && item.companyName !== item.displayName
+              ? item.companyName
+              : undefined,
+        })),
+    [customers.items, createCapability],
   );
 
   function buildDraft(): QuickCreateOpportunityDraft {
@@ -740,25 +767,25 @@ function BoardColumnQuickAddOpportunityCard({
 
     if (!customerProfileId) {
       setErrorMsg(
-        isAr ? "يرجى اختيار العميل أولاً." : "Please select a customer first.",
+        t.crmOpportunities.customerRequired,
       );
       return;
     }
     if (!title.trim()) {
       setErrorMsg(
-        isAr ? "يرجى إدخال عنوان الفرصة." : "Please enter an opportunity title.",
+        t.crmOpportunities.titleRequired,
       );
       return;
     }
     const trimmedAmount = amount.trim();
-    if (trimmedAmount.length > 0 && !isExactMoneyDecimal(trimmedAmount)) {
-      setErrorMsg(t.crmOpportunityDetail.create.amountInvalid);
+    if (trimmedAmount.length > 0 && !isExactMoneyDecimal(trimmedAmount, currencyCode)) {
+      setErrorMsg(t.crmShared.refusals.CRM_AMOUNT_SCALE_INVALID);
       return;
     }
 
     setIsSaving(true);
     try {
-      const wireAmount = toMoneyWireNumber(trimmedAmount);
+      const wireAmount = toMoneyWireNumber(trimmedAmount, currencyCode);
       const parsedProb = probabilityPercent.trim()
         ? Number(probabilityPercent.trim())
         : undefined;
@@ -772,8 +799,8 @@ function BoardColumnQuickAddOpportunityCard({
       };
       if (wireAmount !== undefined) {
         body.amount = wireAmount;
-        body.currencyCode = currencyCode;
       }
+      if (currencyCode) body.currencyCode = currencyCode;
       if (
         parsedProb !== undefined &&
         Number.isSafeInteger(parsedProb) &&
@@ -802,6 +829,7 @@ function BoardColumnQuickAddOpportunityCard({
         );
         onCreated();
       } else {
+        if (outcome.error.status === 403) onForbidden?.();
         setErrorMsg(outcome.error.message ?? t.crmOpportunities.cardUpdateFailed);
       }
     } catch {
@@ -814,27 +842,29 @@ function BoardColumnQuickAddOpportunityCard({
   return (
     <form
       onSubmit={(e) => void handleQuickSubmit(e)}
-      className="space-y-2.5 rounded-xl border border-blue-300 bg-white p-3 shadow-md dark:border-blue-800 dark:bg-slate-900"
+      className="space-y-2.5 rounded-lg border border-primary/40 bg-card p-3 shadow-md"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+        <span className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-primary">
           <Sparkles className="size-3.5" aria-hidden="true" />
-          {isAr ? "إضافة سريعة لفرصة" : "Quick-Add Opportunity"}
+          {t.crmOpportunities.quickAdd}
         </span>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={onClose}
           aria-label={t.common.cancel}
-          className="rounded-md p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+          className="h-auto w-auto rounded-md p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <X className="size-3.5" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
 
       {errorMsg && (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-medium text-red-700 dark:border-red-900 dark:bg-red-950/60 dark:text-red-300"
+          className="rounded-lg border border-destructive/30 bg-destructive-subtle px-2.5 py-1.5 text-2xs font-medium text-destructive-subtle-foreground"
         >
           {errorMsg}
         </div>
@@ -862,9 +892,7 @@ function BoardColumnQuickAddOpportunityCard({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={
-            isAr
-              ? "مثال: توريد معدات خط إنتاج..."
-              : "e.g. Annual Enterprise Supply Contract..."
+            t.crmOpportunities.titleExample
           }
           disabled={isSaving}
           maxLength={255}
@@ -874,7 +902,7 @@ function BoardColumnQuickAddOpportunityCard({
       {/* Deal Value + Currency + Probability */}
       <div className="grid grid-cols-12 gap-1.5">
         <div className="col-span-6">
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <label className="mb-1 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t.crmOpportunityDetail.amount}
           </label>
           <Input
@@ -887,19 +915,24 @@ function BoardColumnQuickAddOpportunityCard({
           />
         </div>
         <div className="col-span-3">
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <label className="mb-1 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t.crmLeadConvert.currencyCode}
           </label>
           <Select
-            value={currencyCode}
-            onValueChange={setCurrencyCode}
+            value={currencyCode || "__workspace_default__"}
+            onValueChange={(code) =>
+              setCurrencyCode(code === "__workspace_default__" ? "" : code)
+            }
             disabled={isSaving}
           >
-            <SelectTrigger size="sm">
+            <SelectTrigger size="sm" aria-label={t.crmLeadConvert.currencyCode}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {CURRENCY_OPTIONS.map((code) => (
+              <SelectItem value="__workspace_default__">
+                {t.crmOpportunities.workspaceDefaultCurrency}
+              </SelectItem>
+              {currencyOptions.map((code) => (
                 <SelectItem key={code} value={code}>
                   {code}
                 </SelectItem>
@@ -908,8 +941,8 @@ function BoardColumnQuickAddOpportunityCard({
           </Select>
         </div>
         <div className="col-span-3">
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            {isAr ? "الاحتمال %" : "Prob %"}
+          <label className="mb-1 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t.crmOpportunities.probabilityShort}
           </label>
           <Input
             inputMode="numeric"
@@ -925,7 +958,7 @@ function BoardColumnQuickAddOpportunityCard({
       {/* Expected Close Date + Importance Stars */}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <div className="flex-1">
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <label className="mb-1 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t.crmOpportunities.expectedClose}
           </label>
           <Input
@@ -937,41 +970,45 @@ function BoardColumnQuickAddOpportunityCard({
           />
         </div>
         <div>
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="mb-1 block text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t.crmOpportunities.importance}
           </span>
-          <div className="flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 dark:border-slate-800 dark:bg-slate-800/60">
+          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/40 px-2 py-1.5">
             {[1, 2, 3].map((star) => (
-              <button
+              <Button
                 key={star}
                 type="button"
+                variant="ghost"
+                size="xs"
                 onClick={() => setImportance(importance === star ? 0 : star)}
-                className="p-0.5"
+                className="h-auto w-auto p-0.5 hover:bg-transparent"
               >
                 <Star
                   className={cn(
                     "size-3.5 transition-colors",
                     star <= importance
-                      ? "fill-amber-400 text-amber-400"
-                      : "text-slate-300 dark:text-slate-600",
+                      ? "fill-warning text-warning"
+                      : "text-muted-foreground/40",
                   )}
                 />
-              </button>
+              </Button>
             ))}
           </div>
         </div>
       </div>
 
       {/* Footer Actions */}
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
-        <button
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={() => onOpenFullForm(buildDraft())}
-          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
+          className="inline-flex h-auto items-center gap-1 p-0 text-2xs font-semibold text-primary hover:bg-transparent hover:underline"
         >
-          <span>{isAr ? "النموذج الكامل" : "Full Form"}</span>
+          <span>{t.crmOpportunities.fullForm}</span>
           <ExternalLink className="size-3" aria-hidden="true" />
-        </button>
+        </Button>
         <div className="flex items-center gap-1.5">
           <Button
             type="button"
@@ -1037,7 +1074,9 @@ function OpportunityExecutiveBoardCard({
   onMove: (targetStageId: string) => void;
 }) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { canMutate } = useAccessMode();
+  const { user } = useTenantAuth();
+  const canOpenActivities = canMutate && canCreateActivities(user);
 
   const [detail, setDetail] = useState<OpportunityDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -1045,7 +1084,9 @@ function OpportunityExecutiveBoardCard({
   useEffect(() => {
     if (!isExpanded) return;
     const controller = new AbortController();
-    setIsLoadingDetail(true);
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) setIsLoadingDetail(true);
+    });
     axiosClient
       .get<unknown>(opportunityPath(item.id), {
         signal: controller.signal,
@@ -1075,10 +1116,6 @@ function OpportunityExecutiveBoardCard({
 
   const primaryPhone =
     effective.primaryContact?.phones[0] ?? effective.customerPhone ?? null;
-  const callDigits = primaryPhone ? normalizePhoneDigits(primaryPhone) : "";
-  const whatsappDigits = primaryPhone
-    ? normalizeWhatsAppDigits(primaryPhone)
-    : "";
   const primaryEmail =
     effective.primaryContact?.email ?? effective.customerEmail ?? null;
 
@@ -1107,7 +1144,7 @@ function OpportunityExecutiveBoardCard({
   const initials = ownerInitials(effective.ownerDisplayName);
   const borderAccent = item.cardColor
     ? CARD_BORDER_ACCENT[item.cardColor]
-    : "border-slate-200/90 dark:border-slate-800";
+    : "border-border";
 
   return (
     <article
@@ -1127,9 +1164,9 @@ function OpportunityExecutiveBoardCard({
       }}
       onDragEnd={onDragEnd}
       className={cn(
-        "group relative flex flex-col gap-2 rounded-xl border bg-white p-3 shadow-2xs transition-all hover:shadow-md dark:bg-slate-900",
+        "group relative flex flex-col gap-2 rounded-lg border bg-card p-3 shadow-2xs transition-all hover:shadow-md",
         borderAccent,
-        isDragging && " scale-[0.98] opacity-50 ring-2 ring-blue-500",
+        isDragging && " scale-[0.98] opacity-50 ring-2 ring-primary",
       )}
     >
       {/* Row 1: Customer Header + Expand / Quick Inspect / Card Menu */}
@@ -1137,14 +1174,14 @@ function OpportunityExecutiveBoardCard({
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {canDrag && (
             <GripVertical
-              className="size-3.5 shrink-0 cursor-grab text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-600"
+              className="size-3.5 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100"
               aria-hidden="true"
             />
           )}
-          <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
             <ProfileIcon className="size-3" aria-hidden="true" />
           </span>
-          <span className="truncate text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+          <span className="truncate text-2xs font-semibold text-muted-foreground">
             {customerName}
           </span>
         </div>
@@ -1153,37 +1190,35 @@ function OpportunityExecutiveBoardCard({
           className="flex shrink-0 items-center gap-0.5"
           onClick={(e) => e.stopPropagation()}
         >
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={onToggleExpand}
-            aria-label={isExpanded ? "Collapse card" : "Expand card"}
+            aria-label={isExpanded ? t.crmOpportunities.collapseCard : t.crmOpportunities.expandCard}
             title={
-              isExpanded
-                ? isAr
-                  ? "طي البطاقة"
-                  : "Collapse card"
-                : isAr
-                  ? "توسيع البطاقة"
-                  : "Expand card"
+              isExpanded ? t.crmOpportunities.collapseCard : t.crmOpportunities.expandCard
             }
-            className="flex size-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             {isExpanded ? (
               <ChevronUp className="size-3.5" aria-hidden="true" />
             ) : (
               <ChevronDown className="size-3.5" aria-hidden="true" />
             )}
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={onOpenQuickModal}
-            aria-label={isAr ? "معاينة سريعة 360" : "Quick inspect 360"}
-            title={isAr ? "معاينة سريعة 360" : "Quick inspect 360"}
-            className="flex size-6 items-center justify-center rounded-md text-slate-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/50 dark:hover:text-blue-400"
+            aria-label={t.crmOpportunities.quickInspect}
+            title={t.crmOpportunities.quickInspect}
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-primary-subtle hover:text-primary"
           >
             <Eye className="size-3.5" aria-hidden="true" />
-          </button>
+          </Button>
 
           <OpportunityCardMenu
             cardColor={item.cardColor}
@@ -1210,46 +1245,48 @@ function OpportunityExecutiveBoardCard({
 
       {/* Row 2: Opportunity Title + Status Badge */}
       <div className="flex items-start justify-between gap-2">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={onOpen}
-          className="min-w-0 flex-1 text-start text-sm font-extrabold leading-snug text-slate-900 hover:text-blue-600 dark:text-slate-100 dark:hover:text-blue-400"
+          className="h-auto min-w-0 flex-1 justify-start p-0 text-start text-sm font-semibold leading-snug text-foreground hover:bg-transparent hover:text-primary"
         >
           <span className="line-clamp-2">{item.title}</span>
-        </button>
+        </Button>
         <StatusBadge
           value={item.status}
           kind="OpportunityStatus"
-          className="shrink-0 px-1.5 py-0 text-[10px] font-bold"
+          className="shrink-0 px-1.5 py-0 text-2xs font-semibold"
         />
       </div>
 
       {/* Row 3: Commercial Value + Probability + Expected Close Strip */}
       {(effective.amount || probabilityLabel || effective.expectedCloseDate) && (
-        <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-slate-100 bg-slate-50/90 px-2.5 py-1.5 text-xs dark:border-slate-800/80 dark:bg-slate-800/40">
-          <div className="flex items-center gap-1.5 font-extrabold text-emerald-700 dark:text-emerald-400">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-success">
             <Banknote className="size-3.5 shrink-0" aria-hidden="true" />
             {effective.amount ? (
               <Money
                 value={effective.amount}
                 currency={effective.currencyCode ?? undefined}
                 language={lang}
-                className="font-extrabold"
+                className="font-semibold"
               />
             ) : (
-              <span className="text-slate-400">—</span>
+              <span className="text-muted-foreground">—</span>
             )}
           </div>
 
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+          <div className="flex items-center gap-2 text-2xs font-semibold text-muted-foreground">
             {probabilityLabel && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-primary-subtle px-1.5 py-0.5 text-2xs font-semibold text-primary-subtle-foreground">
                 <CirclePercent className="size-3" aria-hidden="true" />
                 {probabilityLabel}
               </span>
             )}
             {effective.expectedCloseDate && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+              <span className="inline-flex items-center gap-1 text-2xs text-muted-foreground">
                 <Calendar className="size-3 shrink-0" aria-hidden="true" />
                 <DateTime
                   value={`${effective.expectedCloseDate.slice(0, 10)}T00:00:00.000Z`}
@@ -1271,72 +1308,29 @@ function OpportunityExecutiveBoardCard({
           className="flex items-center justify-between gap-2 text-xs"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="min-w-0 flex-1 truncate text-slate-600 dark:text-slate-300">
+          <div className="min-w-0 flex-1 truncate text-muted-foreground">
             {effective.primaryContact ? (
               <span className="inline-flex items-center gap-1 truncate font-medium">
-                <BriefcaseBusiness className="size-3 shrink-0 text-slate-400" />
+                <BriefcaseBusiness className="size-3 shrink-0 text-muted-foreground" />
                 <span className="truncate">
                   {effective.primaryContact.displayName}
                 </span>
               </span>
             ) : item.contactDisplayName ? (
               <span className="inline-flex items-center gap-1 truncate font-medium">
-                <BriefcaseBusiness className="size-3 shrink-0 text-slate-400" />
+                <BriefcaseBusiness className="size-3 shrink-0 text-muted-foreground" />
                 <span className="truncate">{item.contactDisplayName}</span>
               </span>
             ) : (
               primaryPhone && (
-                <span className="font-mono text-[11px]" dir="ltr">
+                <span className="font-mono text-2xs tabular-nums" dir="ltr">
                   {primaryPhone}
                 </span>
               )
             )}
           </div>
 
-          {primaryPhone && (
-            <div className="flex shrink-0 items-center gap-1">
-              {callDigits && (
-                <a
-                  href={`tel:${callDigits}`}
-                  aria-label={formatTemplate(t.crmLeadDetail.callNumber, {
-                    value: primaryPhone,
-                  })}
-                  title={t.crmLeadDetail.callAction}
-                  className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  <Phone className="size-3" aria-hidden="true" />
-                </a>
-              )}
-              {whatsappDigits && (
-                <>
-                  <a
-                    href={`https://wa.me/${whatsappDigits}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={formatTemplate(t.crmLeadDetail.whatsappNumber, {
-                      value: primaryPhone,
-                    })}
-                    title={t.crmLeadDetail.whatsappAction}
-                    className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 dark:border-slate-700 dark:bg-slate-800"
-                  >
-                    <MessageCircle className="size-3" aria-hidden="true" />
-                  </a>
-                  <a
-                    href={`https://t.me/+${whatsappDigits}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={formatTemplate(t.crmLeadDetail.telegramNumber, {
-                      value: primaryPhone,
-                    })}
-                    title={t.crmLeadDetail.telegramAction}
-                    className="flex size-6 items-center justify-center rounded-md border border-slate-200 bg-white text-sky-600 hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-800"
-                  >
-                    <Send className="size-3" aria-hidden="true" />
-                  </a>
-                </>
-              )}
-            </div>
-          )}
+          {primaryPhone && <OpportunityPhoneActions phone={primaryPhone} country={effective.customerCountry} />}
         </div>
       )}
 
@@ -1352,7 +1346,7 @@ function OpportunityExecutiveBoardCard({
             />
           ))}
           {effective.tags.length > 3 && (
-            <span className="text-[10px] font-semibold text-slate-400">
+            <span className="text-2xs font-semibold text-muted-foreground">
               +{effective.tags.length - 3}
             </span>
           )}
@@ -1362,31 +1356,31 @@ function OpportunityExecutiveBoardCard({
       {/* Expanded Same-Page Details Drawer */}
       {isExpanded && (
         <div
-          className="mt-1 space-y-2.5 rounded-xl border border-slate-200/90 bg-slate-50/80 p-2.5 text-xs dark:border-slate-800 dark:bg-slate-800/40"
+          className="mt-1 space-y-2.5 rounded-lg border border-border bg-muted/40 p-2.5 text-xs"
           onClick={(e) => e.stopPropagation()}
         >
           {isLoadingDetail && (
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              <span>{isAr ? "جارٍ تحميل التفاصيل..." : "Loading details..."}</span>
+              <span>{t.crmOpportunities.loadingDetails}</span>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
+          <div className="grid grid-cols-2 gap-2 text-2xs">
             <div>
-              <span className="block text-[10px] font-bold uppercase text-slate-400">
+              <span className="block text-2xs font-semibold uppercase text-muted-foreground">
                 {t.crmOpportunities.stage}
               </span>
-              <span className="font-bold text-slate-800 dark:text-slate-200">
+              <span className="font-semibold text-foreground">
                 {localizedName(stage, lang)}
               </span>
             </div>
             <div>
-              <span className="block text-[10px] font-bold uppercase text-slate-400">
-                {isAr ? "العمر في المرحلة" : "Stage Age"}
+              <span className="block text-2xs font-semibold uppercase text-muted-foreground">
+                {t.crmOpportunities.stageAge}
               </span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">
-                {formatRelativeAge(item.updatedAt || item.createdAt, isAr)}
+              <span className="font-semibold text-foreground">
+                {formatRelativeAge(item.updatedAt || item.createdAt, t.crmOpportunities, lang)}
               </span>
             </div>
           </div>
@@ -1394,7 +1388,7 @@ function OpportunityExecutiveBoardCard({
           {primaryEmail && (
             <a
               href={`mailto:${primaryEmail}`}
-              className="flex items-center gap-1.5 truncate text-[11px] font-medium text-blue-600 hover:underline dark:text-blue-400"
+              className="flex items-center gap-1.5 truncate text-2xs font-medium text-primary hover:underline"
             >
               <Mail className="size-3 shrink-0" aria-hidden="true" />
               <span className="truncate">{primaryEmail}</span>
@@ -1402,15 +1396,15 @@ function OpportunityExecutiveBoardCard({
           )}
 
           {location && (
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-              <MapPin className="size-3 shrink-0 text-slate-400" aria-hidden="true" />
+            <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+              <MapPin className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
               <span className="truncate">{location}</span>
               {country?.flag && <span aria-hidden="true">{country.flag}</span>}
             </div>
           )}
 
           {effective.leadSourceName && (
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+            <div className="flex items-center gap-1.5 text-2xs text-muted-foreground">
               <AcquisitionSourceIcon
                 source={{ iconUrl: effective.leadSourceIconUrl }}
               />
@@ -1419,35 +1413,39 @@ function OpportunityExecutiveBoardCard({
           )}
 
           {effective.description && (
-            <p className="line-clamp-3 rounded-lg border border-slate-200/70 bg-white p-2 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+            <p className="line-clamp-3 rounded-lg border border-border bg-card p-2 text-2xs text-muted-foreground">
               {effective.description}
             </p>
           )}
 
-          <div className="flex items-center justify-between gap-2 border-t border-slate-200/80 pt-2 dark:border-slate-700">
-            <button
+          <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={onOpenQuickModal}
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 hover:text-blue-600 dark:text-slate-200"
+              className="inline-flex h-auto items-center gap-1 p-0 text-2xs font-semibold text-foreground hover:bg-transparent hover:text-primary"
             >
               <Eye className="size-3" aria-hidden="true" />
-              <span>{isAr ? "معاينة 360°" : "Quick 360°"}</span>
-            </button>
-            <button
+              <span>{t.crmOpportunities.quick360}</span>
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={onOpen}
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400"
+              className="inline-flex h-auto items-center gap-1 p-0 text-2xs font-semibold text-primary hover:bg-transparent hover:underline"
             >
-              <span>{isAr ? "فتح الملف الكامل" : "Full Dossier"}</span>
+              <span>{t.crmOpportunities.fullDossier}</span>
               <ExternalLink className="size-3" aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* Row 6: Footer (1★-3★ Importance Stars + Activity Pill + Owner Avatar) */}
       <div
-        className="mt-0.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-slate-800/80"
+        className="mt-0.5 flex items-center justify-between gap-2 border-t border-border pt-2"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-1.5">
@@ -1458,10 +1456,13 @@ function OpportunityExecutiveBoardCard({
           >
             {[1, 2, 3].map((star) => {
               const active = star <= item.importance;
+              if (!canUpdate) return <Star key={star} className={cn("size-3.5", active ? "fill-warning text-warning" : "text-muted-foreground")} aria-hidden="true" />;
               return (
-                <button
+                <Button
                   key={star}
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   disabled={!canUpdate}
                   onClick={() =>
                     onCardChange({
@@ -1475,52 +1476,56 @@ function OpportunityExecutiveBoardCard({
                           level: star,
                         })
                   }
-                  className="rounded-xs p-0.5 transition-transform hover:scale-110 disabled:cursor-default"
+                  className="h-auto w-auto rounded-xs p-0.5 transition-transform hover:scale-110 hover:bg-transparent disabled:cursor-default"
                 >
                   <Star
                     className={cn(
                       "size-3.5",
                       active
-                        ? "fill-amber-400 text-amber-400"
-                        : "text-slate-300 hover:text-amber-300 dark:text-slate-600",
+                        ? "fill-warning text-warning"
+                        : "text-muted-foreground/40 hover:text-warning",
                     )}
                   />
-                </button>
+                </Button>
               );
             })}
           </div>
 
-          <button
-            type="button"
-            onClick={onOpenActivities}
-            title={t.activities.title}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold transition-colors",
-              actState === "OVERDUE"
-                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/60 dark:text-red-300"
-                : actState === "TODAY"
-                  ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300"
-                  : actState === "FUTURE"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"
-                    : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
-            )}
-          >
-            <Activity className="size-3" aria-hidden="true" />
-            <span>
-              {effective.openActivityCount > 0
-                ? formatNumber(effective.openActivityCount, lang)
-                : "+"}
-            </span>
-          </button>
+          {canOpenActivities && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={onOpenActivities}
+              title={t.activities.title}
+              className={cn(
+                "inline-flex h-auto items-center gap-1 rounded-full border px-2 py-0.5 text-2xs font-semibold transition-colors",
+                actState === "OVERDUE"
+                  ? "border-destructive/30 bg-destructive-subtle text-destructive-subtle-foreground"
+                  : actState === "TODAY"
+                    ? "border-warning/30 bg-warning-subtle text-warning-subtle-foreground"
+                    : actState === "FUTURE"
+                      ? "border-success/30 bg-success-subtle text-success-subtle-foreground"
+                      : "border-border bg-muted/50 text-muted-foreground hover:bg-muted",
+              )}
+            >
+              <Activity className="size-3" aria-hidden="true" />
+              <span>
+                {effective.openActivityCount > 0
+                  ? formatNumber(effective.openActivityCount, lang)
+                  : "+"}
+              </span>
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">
           {effective.ownerDisplayName ? (
             <span
               title={`${t.crmOpportunities.owner}: ${effective.ownerDisplayName}`}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300"
+              className="inline-flex items-center gap-1 text-2xs font-semibold text-muted-foreground"
             >
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-extrabold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-2xs font-semibold text-primary-subtle-foreground">
                 {initials || "U"}
               </span>
               <span className="max-w-20 truncate">
@@ -1528,8 +1533,8 @@ function OpportunityExecutiveBoardCard({
               </span>
             </span>
           ) : (
-            <span className="text-[10px] text-slate-400">
-              {formatRelativeAge(item.createdAt, isAr)}
+            <span className="text-2xs text-muted-foreground">
+              {formatRelativeAge(item.createdAt, t.crmOpportunities, lang)}
             </span>
           )}
         </div>

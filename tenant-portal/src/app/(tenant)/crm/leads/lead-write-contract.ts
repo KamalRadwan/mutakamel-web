@@ -8,20 +8,6 @@ import type { CardColor } from "@/design-system";
 import { looksLikeEmail } from "../shared/crm-form-validation";
 import type { CreateLeadAddressRequest } from "./lead-create-contract";
 
-export const LEAD_CARD_COLORS = [
-  "RED",
-  "ORANGE",
-  "AMBER",
-  "YELLOW",
-  "GREEN",
-  "TEAL",
-  "BLUE",
-  "INDIGO",
-  "PURPLE",
-  "PINK",
-  "SLATE",
-] as const satisfies readonly CardColor[];
-
 interface UpdateLeadContactRequest {
   contactPartyId?: string;
   fullName?: string;
@@ -47,13 +33,16 @@ interface UpdateLeadContactRequest {
  * - cardColor: CardColor or null (to clear).
  * - acquisitionSourceId: UUIDv7 or null (to clear).
  * - honorificTitle, primaryMobile, email, companyEmail, companyWebsite, taxNumber,
- *   commercialRegistrationNumber, ownerUserId: cleared with null.
+ *   commercialRegistrationNumber: cleared with null.
+ * - ownerUserId: UUIDv7 when supplied; cannot be cleared with null.
  * - description, interestSummary, expectedNeed: cleared with empty string "".
  * - displayName and companyName: cannot be blank when supplied.
  * - Forbidden on PATCH: branchId, leadProfileType, stageId, status, tagIds,
  *   existingCompanyPartyId, legalName, companyPhone.
  */
 export interface UpdateLeadRequest {
+  /** Loaded updatedAt; the server rejects a stale edit with 409. */
+  expectedUpdatedAt?: string;
   // Individual
   displayName?: string;
   firstName?: string;
@@ -88,7 +77,7 @@ export interface UpdateLeadRequest {
   description?: string;
   interestSummary?: string;
   expectedNeed?: string;
-  ownerUserId?: string | null;
+  ownerUserId?: string;
   customFields?: Record<string, unknown>;
 }
 

@@ -53,15 +53,10 @@ export function CreateUomConversionModal({
     values.fromUomId.trim().length > 0 &&
     values.fromUomId.trim().toLowerCase() === values.toUomId.trim().toLowerCase();
 
-  const fractionSuggestion = useMemo(() => {
-    if (values.factorNumerator.includes(".")) {
-      return suggestIntegerFraction(values.factorNumerator);
-    }
-    if (values.factorDenominator.includes(".")) {
-      return suggestIntegerFraction(values.factorDenominator);
-    }
-    return null;
-  }, [values.factorNumerator, values.factorDenominator]);
+  const fractionSuggestion = useMemo(
+    () => suggestIntegerFraction(values.factorNumerator, values.factorDenominator),
+    [values.factorNumerator, values.factorDenominator],
+  );
 
   const isReady =
     isUuidV7(values.itemCompanyProfileId) &&
@@ -165,16 +160,18 @@ export function CreateUomConversionModal({
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/40 bg-warning-subtle/30 p-3 text-xs text-warning-subtle-foreground">
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 shrink-0" aria-hidden="true" />
-              <span>
-                {isAr
-                  ? `الكسور العشرية غير مقبولة في حقول bigint. هل تقصد النسبة الصحيحة ${fractionSuggestion.numerator} : ${fractionSuggestion.denominator}؟`
-                  : `Decimals are rejected by bigint fields. Convert to exact integer ratio ${fractionSuggestion.numerator} : ${fractionSuggestion.denominator}?`}
-              </span>
+              <div className="flex min-w-0 flex-col gap-1">
+                <span>{t.tradeInventory.conversionExactRatioHint}</span>
+                <span dir="ltr" className="break-all tabular-nums">
+                  {numText} / {denText} = {fractionSuggestion.numerator} / {fractionSuggestion.denominator}
+                </span>
+              </div>
             </div>
             <Button
               type="button"
               variant="secondary"
               size="sm"
+              disabled={isSubmitting}
               onClick={() =>
                 set({
                   factorNumerator: fractionSuggestion.numerator,
@@ -183,9 +180,7 @@ export function CreateUomConversionModal({
               }
               className="h-auto rounded-md border border-warning/40 bg-card px-2.5 py-1 text-2xs font-semibold text-foreground shadow-2xs transition-colors hover:bg-accent"
             >
-              {isAr
-                ? `تطبيق ${fractionSuggestion.numerator} / ${fractionSuggestion.denominator}`
-                : `Apply ${fractionSuggestion.numerator} / ${fractionSuggestion.denominator}`}
+              {t.tradeInventory.conversionApplyExactRatio}
             </Button>
           </div>
         ) : null}

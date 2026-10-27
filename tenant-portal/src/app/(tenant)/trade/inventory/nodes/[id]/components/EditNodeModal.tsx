@@ -60,12 +60,12 @@ export function EditNodeModal({
         </div>
       }
       headerAside={
-        <Badge tone="brand" className="font-mono">
+        <Badge tone="brand" dir="ltr" className="font-mono">
           {`If-Match: "${formatNumber(node.version, lang)}"`}
         </Badge>
       }
       footerLeading={
-        <span className="font-mono text-2xs text-muted-foreground">
+        <span dir="ltr" className="font-mono text-2xs text-muted-foreground">
           COMPANY • {INVENTORY_NODES_MANAGE_PERMISSION}
         </span>
       }

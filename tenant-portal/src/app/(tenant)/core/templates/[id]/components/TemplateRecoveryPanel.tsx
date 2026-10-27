@@ -6,6 +6,7 @@ import {
   Button,
   Checkbox,
   DetailSection,
+  DegradedBanner,
   EmptyState,
   ErrorState,
   Field,
@@ -37,6 +38,7 @@ export function TemplateRecoveryPanel({
 
   return (
     <DetailSection title={copy.recoveryTitle} description={copy.recoveryDescription}>
+      {recovery.snapshotCursorWasReset ? <DegradedBanner message={copy.cursorExpired} /> : null}
       {/* Both requirements are collected before the command can be sent: the
           acknowledgement here, the operator reason in the dialog. Neither has a
           default — `discardCurrentDraft` is `@IsIn([true])`. */}
@@ -111,6 +113,25 @@ export function TemplateRecoveryPanel({
           })}
         </ul>
       )}
+
+      <nav aria-label={copy.recoveryTitle} className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={recovery.previousSnapshotPage}
+          disabled={!recovery.hasPreviousSnapshotPage || recovery.isLoading || recovery.isSubmitting}
+        >
+          {t.common.previousPage}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={recovery.nextSnapshotPage}
+          disabled={!recovery.hasNextSnapshotPage || recovery.isLoading || recovery.isSubmitting}
+        >
+          {t.common.nextPage}
+        </Button>
+      </nav>
 
       <ReasonDialog
         open={recovery.restoring !== null}

@@ -5,33 +5,24 @@ import { Button, ContactChannelIcon, cn, iconSize } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { formatTemplate } from "@/lib/format/template";
 import {
+  normalizePhoneDigits,
+  normalizeWhatsAppDigits,
+} from "../../leads/lead-phone-links";
+import {
   countryIsoFromName,
   getCountryOptions,
-  splitPhoneNumber,
 } from "@/lib/geo/country-data";
-
-function phoneForms(phone: string, fallbackCallingCode = "") {
-  const parsed = splitPhoneNumber(phone);
-  if (!parsed) return { full: phone, digits: "" };
-  const resolvedCallingCode = parsed.callingCode || fallbackCallingCode;
-  const nationalNumber =
-    parsed.callingCode || !resolvedCallingCode
-      ? parsed.nationalNumber
-      : parsed.nationalNumber.replace(/^0+/u, "");
-  return {
-    full: `${parsed.callingCode}${parsed.nationalNumber}`,
-    digits: `${resolvedCallingCode.replace("+", "")}${nationalNumber}`,
-  };
-}
 
 export function CustomerPhoneActionsRow({
   phone,
   country,
   actionsOnly = false,
+  badge,
 }: {
   phone: string;
   country?: string;
   actionsOnly?: boolean;
+  badge?: string;
 }) {
   const { t, lang } = useI18n();
   const normalizedCountry = country?.trim() ?? "";
@@ -40,57 +31,120 @@ export function CustomerPhoneActionsRow({
       ? normalizedCountry.toUpperCase()
       : countryIsoFromName(normalizedCountry)
     : null;
-  const fallbackCallingCode = countryIso
+  const countryOption = countryIso
     ? getCountryOptions(lang).find(({ isoCode }) => isoCode === countryIso)
-        ?.callingCode
     : undefined;
-  const { full, digits } = phoneForms(phone, fallbackCallingCode);
+  const full = normalizePhoneDigits(phone);
+  const digits = normalizeWhatsAppDigits(phone, country);
+
+  if (actionsOnly) {
+    return (
+      <div
+        className="flex min-w-0 items-center gap-0.5"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Button
+          variant="ghost"
+          size="xs"
+          className="w-(--size-control-xs) shrink-0 px-1"
+          asChild
+        >
+          <a
+            href={`tel:${full}`}
+            aria-label={formatTemplate(t.crmLeadDetail.callNumber, {
+              value: full,
+            })}
+            title={t.crmLeadDetail.callAction}
+          >
+            <ContactChannelIcon channel="call" />
+          </a>
+        </Button>
+        {digits && (
+          <>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="w-(--size-control-xs) shrink-0 px-1"
+              asChild
+            >
+              <a
+                href={`https://wa.me/${digits}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={formatTemplate(t.crmLeadDetail.whatsappNumber, {
+                  value: full,
+                })}
+                title={t.crmLeadDetail.whatsappAction}
+              >
+                <ContactChannelIcon channel="whatsapp" />
+              </a>
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="w-(--size-control-xs) shrink-0 px-1"
+              asChild
+            >
+              <a
+                href={`https://t.me/+${digits}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={formatTemplate(t.crmLeadDetail.telegramNumber, {
+                  value: full,
+                })}
+                title={t.crmLeadDetail.telegramAction}
+              >
+                <ContactChannelIcon channel="telegram" />
+              </a>
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
-      className="flex min-w-0 items-center gap-0.5"
+      className="dossier-phone-item-view flex min-w-0 flex-wrap items-center justify-between gap-2"
       onClick={(event) => event.stopPropagation()}
     >
-      {!actionsOnly && (
-        <>
+      <div className="flex min-w-0 items-center gap-1.5">
+        {countryOption?.flag ? (
+          <span className="shrink-0 text-sm leading-none" aria-hidden="true">
+            {countryOption.flag}
+          </span>
+        ) : (
           <Phone
             className={cn(
               iconSize({ size: "sm" }),
-              "me-1 shrink-0 text-muted-foreground",
+              "shrink-0 text-success",
             )}
             aria-hidden="true"
           />
-          <span
-            className="min-w-0 flex-1 truncate text-xs text-foreground"
-            dir="ltr"
-            title={full}
-          >
-            {full}
-          </span>
-        </>
-      )}
-      <Button
-        variant="ghost"
-        size="xs"
-        className="w-(--size-control-xs) shrink-0 px-1"
-        asChild
-      >
+        )}
+        <span
+          className="dossier-phone-num min-w-0 truncate"
+          dir="ltr"
+          title={full}
+        >
+          {full}
+        </span>
+        {badge && <span className="dossier-phone-tag shrink-0">{badge}</span>}
+      </div>
+      <div className="dossier-ch-group flex flex-wrap items-center gap-1.5">
         <a
           href={`tel:${full}`}
-          aria-label={formatTemplate(t.crmLeadDetail.callNumber, { value: full })}
+          aria-label={formatTemplate(t.crmLeadDetail.callNumber, {
+            value: full,
+          })}
           title={t.crmLeadDetail.callAction}
+          className="dossier-comm-btn dossier-comm-call"
         >
           <ContactChannelIcon channel="call" />
+          <span>{t.crmLeadDetail.callAction}</span>
         </a>
-      </Button>
-      {digits && (
-        <>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="w-(--size-control-xs) shrink-0 px-1"
-            asChild
-          >
+        {digits && (
+          <>
             <a
               href={`https://wa.me/${digits}`}
               target="_blank"
@@ -99,16 +153,11 @@ export function CustomerPhoneActionsRow({
                 value: full,
               })}
               title={t.crmLeadDetail.whatsappAction}
+              className="dossier-comm-btn dossier-comm-wa"
             >
               <ContactChannelIcon channel="whatsapp" />
+              <span>{t.crmLeadDetail.whatsappAction}</span>
             </a>
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            className="w-(--size-control-xs) shrink-0 px-1"
-            asChild
-          >
             <a
               href={`https://t.me/+${digits}`}
               target="_blank"
@@ -117,12 +166,15 @@ export function CustomerPhoneActionsRow({
                 value: full,
               })}
               title={t.crmLeadDetail.telegramAction}
+              className="dossier-comm-btn dossier-comm-tg"
             >
               <ContactChannelIcon channel="telegram" />
+              <span>{t.crmLeadDetail.telegramAction}</span>
             </a>
-          </Button>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
+

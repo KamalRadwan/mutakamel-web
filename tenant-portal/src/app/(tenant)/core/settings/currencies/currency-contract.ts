@@ -63,11 +63,10 @@ export interface CreateCurrencyRequest {
   isDefault?: boolean;
 }
 
-/** `UpdateCurrencyDto` — no `code`; the code is immutable once created. */
+/** `UpdateCurrencyDto` — code and decimal places are immutable once created. */
 export interface UpdateCurrencyRequest {
   name?: string;
   symbol?: string;
-  decimalPlaces?: number;
   exchangeRate?: number;
   status?: ActiveStatus;
 }
@@ -139,9 +138,11 @@ export function buildCreateCurrencyRequest(values: CurrencyFormValues): CreateCu
   const decimalPlaces = parseDecimalPlaces(values.decimalPlaces);
   if (decimalPlaces !== undefined) request.decimalPlaces = decimalPlaces;
   if (values.isDefault) request.isDefault = true;
-  // The server forces the default currency's rate to exactly 1, so sending one
-  // for it would be a value the server discards.
-  if (!values.isDefault) request.exchangeRate = parseExchangeRate(values.exchangeRate);
+  // A replacement default needs its rate against the current default for
+  // rebasing. Only the first default can omit it; Core decides under its lock.
+  if (!values.isDefault || values.exchangeRate.trim().length > 0) {
+    request.exchangeRate = parseExchangeRate(values.exchangeRate);
+  }
   return request;
 }
 
@@ -158,11 +159,6 @@ export function buildUpdateCurrencyRequest(
 
   const symbol = values.symbol.trim();
   if (symbol !== (current.symbol ?? "")) request.symbol = symbol;
-
-  const decimalPlaces = parseDecimalPlaces(values.decimalPlaces);
-  if (decimalPlaces !== undefined && decimalPlaces !== current.decimalPlaces) {
-    request.decimalPlaces = decimalPlaces;
-  }
 
   // `applyUpdate` ignores an exchange rate on the default currency, so sending
   // one there is a no-op the user would read as a saved change.

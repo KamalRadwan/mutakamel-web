@@ -52,34 +52,44 @@ export const LEAD_RELATED_PERMISSIONS: Record<LeadRelatedKind, string> = {
   invoices: "trade.invoices.read",
 };
 
-/** Where each button goes. The lists themselves take no party filter yet. */
-export const LEAD_RELATED_ROUTES: Record<LeadRelatedKind, string> = {
+/** Where each button goes, with ?partyId=<partyId> when navigated from a party record. */
+const LEAD_RELATED_ROUTES: Record<LeadRelatedKind, string> = {
   opportunities: "/crm/opportunities",
   quotations: "/trade/quotations",
   salesOrders: "/trade/sales-orders",
   invoices: "/trade/invoices",
 };
 
+export function buildLeadRelatedHref(
+  kind: LeadRelatedKind,
+  partyId: string | null | undefined,
+): string {
+  const base = LEAD_RELATED_ROUTES[kind];
+  const trimmed = partyId?.trim() ?? "";
+  if (!trimmed) return base;
+  return `${base}?partyId=${encodeURIComponent(trimmed)}`;
+}
+
 export const OPPORTUNITY_SEARCH_PATH: CrmPath = "/api/tenant/crm/v1/opportunities/search";
 
 /**
  * `POST /opportunities/search` body, in the shape the opportunities screen
- * already sends: a `filterTree` whose single leaf is `leadId eq <lead>`, which
- * is a field in `OPPORTUNITY_FILTERABLE_FIELDS`.
+ * already sends: a `filterTree` whose single leaf is `customerPartyId eq <partyId>`,
+ * which is a field in `OPPORTUNITY_FILTERABLE_FIELDS`.
  *
  * `branchId` travels with it because the route scopes reads by branch, and the
- * lead's own branch is the only one its opportunities can be in. `limit: 1`
+ * lead's own branch is the only one its party's opportunities can be in. `limit: 1`
  * because only the count is read — the rows are the opportunities screen's
  * business.
  */
 export function leadOpportunitySearch(
-  leadId: string,
+  partyId: string,
   branchId: string,
 ): Record<string, unknown> {
-  if (!isUUIDv7(leadId) || !isUUIDv7(branchId)) throw new Error("Invalid lead or branch id.");
+  if (!isUUIDv7(partyId) || !isUUIDv7(branchId)) throw new Error("Invalid party or branch id.");
   return {
     branchId,
-    filterTree: { field: "leadId", operator: "eq", value: leadId },
+    filterTree: { field: "customerPartyId", operator: "eq", value: partyId },
     page: 1,
     limit: 1,
   };

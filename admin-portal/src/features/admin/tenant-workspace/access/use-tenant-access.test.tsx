@@ -483,7 +483,7 @@ describe("useTenantAccess", () => {
     );
     await waitFor(() => expect(result.current.directory.status).toBe("ready"));
     await act(async () => {
-      await expect(result.current.resetPassword(invited)).rejects.toMatchObject({ errorCode: "TENANT_USER_PASSWORD_RESET_UNAVAILABLE" });
+      await expect(result.current.resetPassword(deleted)).rejects.toMatchObject({ errorCode: "TENANT_USER_PASSWORD_RESET_UNAVAILABLE" });
       await expect(result.current.activateUser(userFixture())).rejects.toMatchObject({ errorCode: "TENANT_USER_ACTIVATE_UNAVAILABLE" });
       await expect(result.current.restoreUser(userFixture())).rejects.toMatchObject({ errorCode: "TENANT_USER_NOT_DELETED" });
       await result.current.resendInvite(invited);
@@ -493,6 +493,56 @@ describe("useTenantAccess", () => {
     expect(mocks.activateUser).not.toHaveBeenCalled();
     expect(mocks.resendInvite).toHaveBeenCalledTimes(1);
     expect(mocks.restoreUser).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["ACTIVE", "INVITED", "SUSPENDED"] as const)(
+    "sends recovery for an %s owner and reloads the resulting account state",
+    async (status) => {
+      const owner = userFixture({ status, isTenantOwner: true });
+      mocks.getUser
+        .mockResolvedValueOnce(owner)
+        .mockResolvedValueOnce({ ...owner, status: "ACTIVE" });
+      const { result } = renderHook(() =>
+        useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE", locale: "ar" }),
+      );
+      await waitFor(() => expect(result.current.directory.status).toBe("ready"));
+      await act(async () => { await result.current.loadUser(owner.id); });
+      const directoryReads = mocks.listUsers.mock.calls.length;
+      const summaryReads = mocks.summarizeUsers.mock.calls.length;
+
+      await act(async () => {
+        await expect(result.current.resetPassword(owner)).resolves.toEqual({
+          userId: owner.id, delivery: "QUEUED",
+        });
+      });
+
+      expect(mocks.resetPassword).toHaveBeenCalledWith(TENANT_ID, owner.id, COMMAND_ID, "ar");
+      expect(mocks.listUsers).toHaveBeenCalledTimes(directoryReads + 1);
+      expect(mocks.summarizeUsers).toHaveBeenCalledTimes(summaryReads + 1);
+      expect(mocks.getUser).toHaveBeenCalledTimes(2);
+      expect(result.current.selectedUser.data?.status).toBe("ACTIVE");
+      expect(result.current.command.error).toBeNull();
+    },
+  );
+
+  it.each([
+    userFixture({ status: "DEACTIVATED" }),
+    userFixture({ deletedAt: "2026-10-18T00:00:00.000Z" }),
+  ])("records an unavailable recovery precondition in command state ($status, $deletedAt)", async (target) => {
+    const { result } = renderHook(() =>
+      useTenantAccess({ tenantId: TENANT_ID, tenantStatus: "ACTIVE" }),
+    );
+    await waitFor(() => expect(result.current.directory.status).toBe("ready"));
+    await act(async () => {
+      await expect(result.current.resetPassword(target)).rejects.toMatchObject({
+        errorCode: "TENANT_USER_PASSWORD_RESET_UNAVAILABLE",
+      });
+    });
+    expect(mocks.resetPassword).not.toHaveBeenCalled();
+    expect(result.current.command).toMatchObject({
+      name: "reset-password", userId: target.id, pending: false,
+      error: { errorCode: "TENANT_USER_PASSWORD_RESET_UNAVAILABLE" },
+    });
   });
 
   it("clears the dependent team catalogue when the branch changes", async () => {

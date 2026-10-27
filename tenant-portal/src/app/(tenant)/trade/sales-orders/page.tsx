@@ -254,6 +254,7 @@ export default function SalesOrdersPage() {
     <TradeGate require={SALES_ORDER_PERMISSIONS.read}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={td.salesOrders.title}
           description={td.salesOrders.subtitle}
           primaryAction={
@@ -300,6 +301,8 @@ export default function SalesOrdersPage() {
               kind="TradeSalesOrderStatus"
               value={list.status}
               onChange={list.setStatus}
+              partyId={list.partyId}
+              onPartyIdChange={list.setPartyId}
             />
 
             {viewMode === "board" ? (

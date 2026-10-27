@@ -8,6 +8,8 @@ export interface NormalizedApiError {
   code?: string;
   message?: string;
   correlationId?: string;
+  /** Original write identity for reconciliation or an explicit same-key retry. */
+  idempotencyKey?: string;
   fieldErrors?: Record<string, string[]>;
 }
 
@@ -46,6 +48,7 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
       code,
       message,
       correlationId,
+      ...(typeof data.idempotencyKey === "string" ? { idempotencyKey: data.idempotencyKey } : {}),
       fieldErrors: readFieldErrors(data.details),
     };
   }

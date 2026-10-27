@@ -152,8 +152,6 @@ describe("Opportunity Basic search interaction", () => {
     expect(controls.advanced).toHaveBeenLastCalledWith(
       expect.objectContaining({ requireFieldSelection: true }),
     );
-    expect(controls.advanced.mock.lastCall?.[0]).not.toHaveProperty("text");
-    expect(controls.advanced.mock.lastCall?.[0]).not.toHaveProperty("onTextChange");
   });
 
   it("offers card colour only in Advanced with localized field and value labels", () => {

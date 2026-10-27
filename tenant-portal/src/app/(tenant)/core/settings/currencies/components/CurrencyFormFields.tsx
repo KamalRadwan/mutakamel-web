@@ -15,7 +15,7 @@ interface CurrencyFormFieldsProps {
   isSubmitting: boolean;
   /** The code is immutable after creation — `UpdateCurrencyDto` has no `code`. */
   codeReadOnly: boolean;
-  /** The server pins the default currency's rate to 1 and ignores any other. */
+  /** Lock the stored default on edit; creation may need a rate for rebasing. */
   rateLocked: boolean;
   showDefaultToggle: boolean;
 }
@@ -68,7 +68,11 @@ export function CurrencyFormFields({
         />
       </Field>
 
-      <Field label={t.coreSettings.currencyDecimalPlaces} hint={t.coreSettings.currencyDecimalPlacesHint}>
+      <Field
+        label={t.coreSettings.currencyDecimalPlaces}
+        hint={codeReadOnly ? t.coreSettings.currencyDecimalPlacesImmutable : t.coreSettings.currencyDecimalPlacesHint}
+        readOnly={codeReadOnly}
+      >
         <Input size="sm" placeholder={t.coreSettings.currencyDecimalPlaces}
           dir="ltr"
           inputMode="numeric"
@@ -76,14 +80,19 @@ export function CurrencyFormFields({
           onChange={(event) => onChange({ decimalPlaces: event.target.value })}
           maxLength={1}
           disabled={isSubmitting}
+          readOnly={codeReadOnly}
         />
       </Field>
 
       <Field
         label={t.coreSettings.currencyExchangeRate}
-        hint={rateLocked ? t.coreSettings.currencyRateLockedHint : t.coreSettings.currencyRateHint}
+        hint={rateLocked
+          ? t.coreSettings.currencyRateLockedHint
+          : showDefaultToggle && values.isDefault
+            ? t.coreSettings.currencyCreateDefaultRateHint
+            : t.coreSettings.currencyRateHint}
         readOnly={rateLocked}
-        required={!rateLocked}
+        required={!rateLocked && !(showDefaultToggle && values.isDefault)}
       >
         <Input size="sm" placeholder={t.coreSettings.currencyExchangeRate}
           dir="ltr"

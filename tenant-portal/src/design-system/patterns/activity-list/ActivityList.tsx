@@ -143,7 +143,7 @@ function ActivityListRow<T extends ActivityListItem>({
     return (
       <li
         className={cn(
-          "flex flex-col gap-2.5 rounded-xl border border-border bg-card p-3 transition-all",
+          "flex flex-col gap-2.5 rounded-lg border border-border bg-card p-3 transition-all",
           row.accentClassName && cn("border-s-4", row.accentClassName),
           isSelected && !isEditing && "border-primary bg-selected/60 ring-2 ring-ring/20",
           isEditing && "border-warning bg-warning-subtle/40 ring-2 ring-warning/25",

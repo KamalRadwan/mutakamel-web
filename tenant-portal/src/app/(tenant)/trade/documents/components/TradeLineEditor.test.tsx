@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/design-system";
 import { en } from "@/i18n/dictionaries/en";
 import type { TradeLineDraftState } from "../hooks/useTradeLineDraft";
+import { useTradeLineDraft } from "../hooks/useTradeLineDraft";
 import { TradeLineEditor } from "./TradeLineEditor";
 
 vi.mock("@/i18n/I18nContext", () => ({
@@ -88,6 +89,7 @@ function state(): TradeLineDraftState {
     setItem: vi.fn(),
     setUom: vi.fn(),
     setQuantity: vi.fn(),
+    commitQuantity: vi.fn(),
     reset: vi.fn(),
   };
 }
@@ -95,6 +97,35 @@ function state(): TradeLineDraftState {
 afterEach(cleanup);
 
 describe("TradeLineEditor", () => {
+  it.each(["0.5", "1.25", "10.05", "0.05"])(
+    "preserves each typed character of %s and commits the decimal on blur",
+    (quantity) => {
+      const submitted = vi.fn();
+      function Editor() {
+        const draft = useTradeLineDraft({}, "EGP", null, "SALES", false);
+        return (
+          <TooltipProvider>
+            <TradeLineEditor state={draft} currencyCode="EGP" disabled={false} />
+            <button onClick={() => submitted(draft.lines[0]?.quantity)}>Submit</button>
+          </TooltipProvider>
+        );
+      }
+      render(<Editor />);
+      const input = screen.getByRole("textbox", { name: en.tradeDocuments.quantity });
+      fireEvent.change(input, { target: { value: "" } });
+      let typed = "";
+      for (const character of quantity) {
+        typed += character;
+        fireEvent.change(input, { target: { value: (input as HTMLInputElement).value + character } });
+        expect(input).toHaveValue(typed);
+      }
+      fireEvent.blur(input);
+      expect(input).toHaveValue(quantity);
+      fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+      expect(submitted).toHaveBeenCalledWith(quantity);
+    },
+  );
+
   it("renders catalogue description as read-only preview and names the icon action twice", async () => {
     const draft = state();
     render(

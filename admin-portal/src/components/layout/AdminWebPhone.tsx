@@ -7,7 +7,7 @@ import {
   webphoneCopy,
   type WebphoneCopy,
   type WebphoneLanguage,
-} from "@mutakamel/webphone";
+} from "@mutakamel/webphone-ui";
 import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";

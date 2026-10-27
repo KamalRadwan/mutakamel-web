@@ -18,6 +18,7 @@ function source(companyId = COMPANY): TenantScopeSource {
   return {
     accessibleBranches: [BRANCH, OTHER_BRANCH],
     accessibleCompanies: [companyId],
+    accessibleBranchCompanies: [BRANCH, OTHER_BRANCH].map((branchId) => ({ branchId, companyId })),
     teamMemberships: [BRANCH, OTHER_BRANCH].map((branchId) => ({ companyId, branchId, isPrimary: false })),
   };
 }

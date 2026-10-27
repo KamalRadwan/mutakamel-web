@@ -118,8 +118,9 @@ describe("Basic lead search interaction", () => {
     expect(lastState().basic.filters).toEqual([{ field: "phone", value: "01050049899" }]);
     const remove = screen.getByRole("button", { name: "Remove Phone/Mobile: 01050049899 filter" });
     expect(remove).toBeInTheDocument();
-    const fieldLabel = within(remove.parentElement!).getByText("Phone/Mobile");
-    expect(fieldLabel).toHaveClass("bg-primary", "text-primary-foreground");
+    expect(within(remove.parentElement!).getByText("Phone/Mobile")).toBeInTheDocument();
+    expect(remove.parentElement).toHaveClass("h-[21px]", "border-chip-active-line", "bg-gradient-chip-active", "text-chip-active-fg");
+    expect(input().parentElement).toHaveClass("h-(--size-toolbar-control)", "w-[460px]", "max-w-[460px]");
     await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
   });
 

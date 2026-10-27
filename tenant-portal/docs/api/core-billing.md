@@ -153,6 +153,14 @@ immutable FX evidence — they are **not** a second balance. A UI that shows
 `topup` is `@AllowedDuringDunning()` on purpose: paying is exactly what a
 past-due tenant needs to be able to do.
 
+Top-up retry behaviour updated **2026-10-18**: while the billing screen remains
+mounted, a failed submission retains its UUIDv7 idempotency key and exact trimmed
+amount/currency payload. Retrying the same values recovers the original payment
+and hosted checkout even when the creation response was lost. Changing either
+value starts a new intent; a confirmed success clears the retained request, so
+submitting again after dismissing that checkout starts a new intent too.
+Concurrent submissions are ignored while a request is in flight.
+
 Its result cannot be read back per payment, though.
 `GET /billing/payments/:paymentId` requires `purpose === INVOICE_SETTLEMENT`
 and a non-null `invoiceId`, so it answers `PAYMENT_NOT_FOUND` for a top-up. The
@@ -222,6 +230,20 @@ state, not just a banner (task 6.14).
 ---
 
 ## Branding — 7 routes
+
+Shell update verified **2026-10-17**: successful settings saves and logo/icon
+uploads publish their validated response to the root `BrandingProvider`. The
+existing shell name and contrast-checked color tokens update immediately;
+reset or rejected colors restore system tokens. Local UUIDv7 asset query keys
+bypass the public routes' five-minute cache for the shared logo and tab icon.
+A late initial public-branding read cannot overwrite a successful local write.
+
+Settings form serialization verified **2026-10-17**: saves compare the five editable
+fields with the loaded settings. Unchanged fields are omitted; clearing a stored
+value sends `null`, which Core persists as a reset. `loginHtml` is always omitted.
+App name, tab title and font family inputs are limited to 120 characters and
+overlong values fail inline validation before a request; no text is truncated.
+Both colors accept only supported hex values (up to 9 characters), or a reset.
 
 | Method | Canonical path | Access | Notes |
 | --- | --- | --- | --- |

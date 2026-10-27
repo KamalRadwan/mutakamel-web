@@ -7,6 +7,7 @@ import { formatDecimalString } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
 import { cn } from "../../lib/cn";
 import { iconSize } from "../../lib/icons";
+import { hitTarget } from "../../lib/variants";
 import { Badge } from "../../primitives/Badge";
 import { Button } from "../../primitives/Button";
 import { DATE_TIME_OPTIONS } from "../../primitives/DateTime";
@@ -27,6 +28,8 @@ export interface FilterBarProps {
   searchValue: string;
   onSearchChange: (query: string) => void;
   searchPlaceholder?: string;
+  /** Omit search when the list endpoint does not support it. */
+  hideSearch?: boolean;
   filtersLabel?: string;
   clearAllLabel?: string;
   /** Template for the chip-overflow trigger, e.g. `"+{count}"`. */
@@ -63,6 +66,7 @@ export function FilterBar({
   searchValue,
   onSearchChange,
   searchPlaceholder,
+  hideSearch = false,
   filtersLabel,
   clearAllLabel,
   moreChipsLabel = "+{count}",
@@ -118,21 +122,21 @@ export function FilterBar({
 
   function renderChip(chip: FilterChipDescriptor) {
     return (
-      <Badge key={chip.key} tone="neutral" className="max-w-64 gap-0.5 pe-0.5">
-        {/* Chips wrap before they shrink and never truncate their label — a
-            "Acquisition so…" chip tells the user nothing about what is
-            filtering their data. See docs/design/patterns.md#filterbar. */}
-        <span>{chip.text}</span>
+      <span
+        key={chip.key}
+        className="inline-flex h-[21px] max-w-64 shrink-0 items-center gap-1 whitespace-nowrap rounded-[5px] border border-chip-active-line bg-gradient-chip-active px-[7px] text-badge font-semibold text-chip-active-fg"
+      >
+        <span className="min-w-0 truncate" title={chip.text}>{chip.text}</span>
         <Button
           variant="ghost"
-          size="xs"
+          size="sm"
           aria-label={formatTemplate(removeChipLabel, { label: chip.text })}
           onClick={() => applyChipRemoval(chip)}
-          className="size-4 shrink-0 cursor-pointer rounded-xs p-0!"
+          className={cn("size-4 shrink-0 rounded-xs p-0! text-chip-active-fg", hitTarget)}
         >
           <X className={iconSize({ size: "xs" })} aria-hidden="true" />
         </Button>
-      </Badge>
+      </span>
     );
   }
 
@@ -153,24 +157,28 @@ export function FilterBar({
           That is the split the bar makes natural: the bar is where you ASK a
           question of the data, the body is where the answer's current
           conditions are listed and removed. Chips also wrap onto a second line
-          by design, which a 35px bar has nowhere to put. */}
+          by design, which a 48px bar has nowhere to put. */}
       <PageActions slot="search">
-        <div className="relative w-60">
-          <Search
+        {!hideSearch && (
+          <div
             className={cn(
-              iconSize({ size: "md" }),
-              "pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-muted-foreground",
+              "flex h-(--size-toolbar-control) min-w-60 max-w-[460px] flex-1 items-center gap-2 rounded-lg border border-line-control bg-surface-subtle px-2.5",
+              "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20",
             )}
-            aria-hidden="true"
-          />
-          <Input
-            size="sm"
-            value={localSearch}
-            onChange={(event) => handleSearchInput(event.target.value)}
-            placeholder={searchPlaceholder}
-            className="ps-8"
-          />
-        </div>
+          >
+            <Search
+              className={cn(iconSize({ size: "md" }), "shrink-0 text-muted-foreground")}
+              aria-hidden="true"
+            />
+            <Input
+              size="sm"
+              value={localSearch}
+              onChange={(event) => handleSearchInput(event.target.value)}
+              placeholder={searchPlaceholder}
+              className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+          </div>
+        )}
 
         {/* One shape at every width now. The filters used to render inline
             from `lg` up and collapse into this popover below it, which made the

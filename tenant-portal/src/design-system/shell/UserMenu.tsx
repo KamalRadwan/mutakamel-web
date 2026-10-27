@@ -1,12 +1,14 @@
 "use client";
 
-import { ChevronDown, LogOut, User } from "lucide-react";
+import { ChevronDown, Loader2, LogOut, User } from "lucide-react";
 import Link from "next/link";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
+import { useProfileAvatarImage } from "@/hooks/useProfileAvatarImage";
 import { TENANT_ROUTES } from "@/lib/navigation/tenant-routes";
+import { useUserMenuLogout } from "./hooks/useUserMenuLogout";
 import { DENSITY_OPTIONS, useDensity, type Density } from "../theme/DensityProvider";
-import { Avatar, AvatarFallback } from "../primitives/Avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../primitives/Avatar";
 import { Button } from "../primitives/Button";
 import {
   DropdownMenu,
@@ -26,6 +28,8 @@ function initials(firstName: string, lastName: string): string {
 export function UserMenu() {
   const { t } = useI18n();
   const { user, logout } = useTenantAuth();
+  const { isLoggingOut, isMenuOpen, setIsMenuOpen, handleLogoutSelect } = useUserMenuLogout(logout);
+  const avatarSrc = useProfileAvatarImage(user?.id);
   const { density, setDensity } = useDensity();
 
   // A lookup, not a ternary chain: the zero-ternary rule exists because a
@@ -41,25 +45,33 @@ export function UserMenu() {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen} modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
           aria-label={t.common.profile}
-          className="h-7 gap-1.5 rounded-full border border-white/20 bg-white/10 ps-1 pe-2.5 text-white hover:bg-white/20 hover:text-white"
+          aria-busy={isLoggingOut}
+          className="h-[38px] gap-2 rounded-full border border-nav-chrome-line bg-white/8 px-0 ps-1 pe-3 text-nav-foreground-strong not-disabled:hover:bg-white/15 not-disabled:hover:text-white"
         >
-          <Avatar className="size-5">
-            <AvatarFallback className="bg-gradient-to-br from-sky-400 to-indigo-500 text-2xs font-bold text-white">
-              {initials(user.firstName, user.lastName)}
+          <Avatar className="size-7">
+            {avatarSrc ? <AvatarImage src={avatarSrc} alt="" className="object-cover" /> : null}
+            <AvatarFallback className="bg-transparent bg-gradient-avatar font-semibold text-white">
+              <span className="text-2xs leading-none">
+                {initials(user.firstName, user.lastName)}
+              </span>
             </AvatarFallback>
           </Avatar>
           {fullName && (
-            <span className="max-w-40 truncate text-xs font-semibold text-white">
+            <span className="hidden max-w-40 truncate text-label font-semibold text-nav-foreground-strong lg:inline">
               {fullName}
             </span>
           )}
-          <ChevronDown className="size-3 shrink-0 text-white/70" aria-hidden="true" />
+          {isLoggingOut ? (
+            <Loader2 className="size-3.5 shrink-0 animate-spin text-nav-foreground/75 motion-reduce:animate-none" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="size-3.5 shrink-0 text-nav-foreground/75" aria-hidden="true" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -71,7 +83,7 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href={TENANT_ROUTES.coreSessions}>
+          <Link href={TENANT_ROUTES.coreProfile}>
             <User className="size-4" aria-hidden="true" />
             {t.common.profile}
           </Link>
@@ -91,9 +103,18 @@ export function UserMenu() {
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onSelect={() => void logout()}>
-          <LogOut className="size-4" aria-hidden="true" />
-          {t.common.signOut}
+        <DropdownMenuItem
+          variant="destructive"
+          disabled={isLoggingOut}
+          aria-busy={isLoggingOut}
+          onSelect={handleLogoutSelect}
+        >
+          {isLoggingOut ? (
+            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          ) : (
+            <LogOut className="size-4" aria-hidden="true" />
+          )}
+          <span aria-live="polite">{isLoggingOut ? t.common.signingOut : t.common.signOut}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -14,6 +14,7 @@ import {
   IdentifierText,
   Money,
   NotFoundState,
+  PermissionGate,
   ReasonDialog,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
@@ -72,6 +73,10 @@ export default function PurchaseOrderDetailPage({
         <TradeScopeRequired />
       </TradeGate>
     );
+  }
+
+  if (detail.loadError?.status === 403) {
+    return <PermissionGate require={PURCHASE_ORDER_PERMISSIONS.read} denied>{null}</PermissionGate>;
   }
 
   if (detail.isMissing) {
@@ -329,8 +334,11 @@ export default function PurchaseOrderDetailPage({
                         {td.purchaseOrders.dispatchAxis}
                       </span>
                       <span className="dossier-val">
-                        <IdentifierText>{order.dispatchStatus}</IdentifierText>
+                        <TradeStatusBadge kind="TradePurchaseDispatchStatus" value={order.dispatchStatus} />
                       </span>
+                      {order.delivery?.lastErrorCode && (
+                        <span className="dossier-lbl" role="status">{td.purchaseOrders.deliveryIssue}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -383,7 +391,7 @@ export default function PurchaseOrderDetailPage({
                 },
                 {
                   label: td.purchaseOrders.dispatchAxis,
-                  value: order.dispatchStatus,
+                  value: <TradeStatusBadge kind="TradePurchaseDispatchStatus" value={order.dispatchStatus} />,
                 },
                 {
                   label: td.purchaseOrders.lifecycleAxis,

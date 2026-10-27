@@ -2,9 +2,64 @@
 
 Status: **verified**
 
-Last source verification: **2026-08-31**
+Last source verification: **2026-10-19**
+
+CRM-ACT-003 retires metrics backed by CRM tasks, calendar events and reminders.
+The catalogue marks them `availability: RETIRED`; the builder excludes them.
+Stored widget runs return `state: RETIRED`, null value and empty series/rows;
+the portal shows a translated retirement message and disables drill actions.
+New widget queries and clones reject retired metrics, and new templates omit them.
+The fixed-report sections `overdueWork`, `overdueTasks`, `repWorkload`,
+`reminderSummary` and `calendarUtilization` now return `{ state: "RETIRED" }`.
+The builder's `crm.tasks.overdue.count` remains live through Core's projection.
+
+Widget rendering boundary verified: **2026-10-17** (FE-CRM-DASH-001).
+
+Dashboard labels reviewed: **2026-10-18** (FE-CRM-DASH-010).
+Tile errors and warnings show translated messages, with generic translated
+fallbacks for unknown codes; raw codes are not displayed. Alert severity,
+histogram fallback labels, heatmap weekdays and target comparisons use the
+Arabic/English dictionaries. Unknown visualization, entity, reason and activity
+types use generic translated labels. The activity feed reflects the last run
+and carries no live-update badge. Template labels remain catalogue-supplied,
+and currency options retain the tenant's ISO currency codes.
+
+Scalar KPI and dashboard access behavior reviewed: **2026-10-18**
+(FE-CRM-DASH-006, including FE-CRM-DASH-004). Scalar KPI cards show the
+returned value, the existing comparison badge when a previous value is
+available, and progress when a target is supplied. They do not draw a trend
+curve from scalar values. A dashboard-detail 403 renders the permission-denied
+state even when the session still holds the route-level read grant.
+
+Fixed-report security contract verified: **2026-10-17** (CRM-DASH-001).
+
+Dashboard filter behavior reviewed: **2026-10-18** (FE-CRM-DASH-007).
+Unset date and comparison controls display “Dashboard default”; unset currency
+displays “All currencies”. They send no filters on the initial run. Currency
+options come only from the run's available currencies, and branch options must
+match the session's accessible branch ids, including when that list is empty
+or has no match. The company selector is removed because it was not sent to
+the server. A single dashboard switcher lives in the filter bar, including
+when the detail header is hidden.
 
 Owning app: **crm-app**
+
+Dashboard request ordering reviewed: **2026-10-18** (FE-CRM-DASH-009).
+Filter reruns and full reloads cancel superseded executions and only the latest
+execution may update results, errors or running state. Changing filters clears
+the previous run while the next one loads. Drilldowns snapshot the selection
+when opened and reuse it with every cursor page. Opening another drilldown,
+closing it or changing dashboards invalidates pending drilldown responses.
+
+Dashboard template switcher behavior reviewed: **2026-10-18** (FE-CRM-DASH-008).
+Template options and their write handler require `crm.dashboards.create`.
+Labels come from `/dashboards/catalog`; owned `sourceTemplateKey` values
+determine which templates are already provisioned, regardless of dashboard
+names. The switcher reads `/dashboards` because it returns the same accessible
+rows as `/navigation` with the template key included. Shared template instances
+do not suppress the actor's own template option. Loading failures retain the
+last dashboard list, hide template offers and show a translated retry boundary;
+a failed `PUT /from-template/:key` shows a translated error toast.
 
 Canonical prefix: `/api/tenant/crm/v1/dashboards`, `/api/tenant/crm/v1/widgets`
 
@@ -59,6 +114,20 @@ while a builder run's `widgets` is `{ "<widgetId>": WidgetResult }`.
 | GET | `/api/tenant/crm/v1/dashboards/data-quality` | `crm.dashboards.read` (scoped) | 200 |
 | GET | `/api/tenant/crm/v1/dashboards/action-center` | `crm.dashboards.read` (scoped) | 200 |
 
+All fixed-report aggregates and lists intersect dashboard scope with source
+read scope, including branch and owner restrictions. Missing source read
+permission returns `403 CRM_SCOPED_PERMISSION_DENIED` before report queries run.
+Overview and Action Center require leads, opportunities and activities;
+Sales Pipeline requires opportunities; Lead Performance requires leads and
+opportunities; Activities Productivity requires activities; Customer
+Intelligence requires customer profiles; Data Quality requires leads,
+opportunities and customer profiles. Source-to-value applies the two source
+scopes independently. `scope.branches` contains only `branchId` and `scope`.
+
+Data Quality's `duplicateSignals` is a numeric count of duplicate phone groups
+among readable customer profiles, with the contact-method date filter applied.
+No phone value or party id is returned. Its portal widget uses `COUNT`.
+
 `DashboardQueryDto` — the **only** query these seven accept:
 
 | Parameter | Type | Notes |
@@ -104,8 +173,15 @@ There is **no `datePreset` and no `compare` here.** Those two exist only on
 
 ## Routes — widgets
 
+Widget library and detail editor loading use `GET /api/tenant/crm/v1/widgets/catalog` with
+`crm.widgets.read`. It returns the same static catalogue as the dashboard
+builder without requiring dashboard read access or executing data. Users with
+widget read/create can configure and save widgets independently; preview still
+requires `crm.dashboards.read` and execution still enforces source read access.
+
 | Method | Canonical path | Permission | Success |
 | --- | --- | --- | --- |
+| GET | `/api/tenant/crm/v1/widgets/catalog` | `crm.widgets.read` | 200 |
 | POST | `/api/tenant/crm/v1/widgets/preview` | **`crm.dashboards.read`** (scoped) | **201** |
 | GET | `/api/tenant/crm/v1/widgets/share-targets` | `crm.widgets.share` | 200 |
 | GET | `/api/tenant/crm/v1/widgets` | `crm.widgets.read` | 200 |
@@ -183,8 +259,8 @@ headers" helper must not be pointed at this family.
 
 `branchId` here is an ordinary **optional filter**, in the query on the seven
 prebuilt reports and in `filters` on the builder. Standing rule S2 — *every CRM
-list requires `branchId`* — does not reach these routes, because none of them
-is a paginated list.
+list requires `branchId`* — does not reach definition lists: their authorization
+is ownership/sharing, independent of the branch filters used when executing data.
 
 ## Idempotency
 
@@ -205,17 +281,33 @@ not `WRITE_SENSITIVE`. They are POSTs because their input is a body, not
 because they mutate: no key is reserved, none is required, and re-running is
 free.
 
-## Pagination — there is almost none
+## Pagination
 
 | Route | Paging |
 | --- | --- |
-| `GET /dashboards`, `GET /widgets`, `GET /dashboards/navigation` | **None.** One array of everything visible |
+| `GET /dashboards`, `GET /widgets`, `GET /dashboards/navigation` | `limit` 1–100 (default 50), exclusive UUIDv7 `cursor`; `{ items, nextCursor }`, newest ID first. Navigation also includes the resolved `activeDashboardId`, even when it is outside this page. |
 | `GET /:id/shares`, `GET /widgets/:id/shares` | **None** |
 | `GET /dashboards/share-targets`, `GET /widgets/share-targets` | `limit` + `offset`, and a `nextOffset` only when a category filled its page |
 | `POST /:id/widgets/:widgetId/drilldown` | **Cursor.** `pageInfo: { limit, hasMore, nextCursor }` — no total |
 
 `share-targets` pages **users and teams with the same offset**, so page 2 can
 legitimately contain one category only.
+
+Dashboard lists, the dashboard switcher and the widget library/picker load one
+page at a time with translated load-more controls. Search and client table sorting
+apply to loaded items. A reload or successful mutation resets the list to page
+one. The switcher offers missing template setup only after all dashboard pages
+are loaded. A failed next-page request retains loaded items and its cursor for retry.
+
+The owner caps are 50 live dashboards and 500 live widgets. All create, template,
+duplicate and clone paths serialize capacity checks under one owner transaction
+lock; over-cap creation returns 409 `CRM_DASHBOARD_OWNER_LIMIT` or
+`CRM_WIDGET_OWNER_LIMIT`. Existing excess data stays intact. Template widgets
+carry creation provenance: deleting a dashboard also removes its proven template
+widgets only when they have no other live placement or standalone share. Ordinary
+widgets, copies and historical widgets with null provenance are preserved.
+`GET /default` reads existing definitions and returns 404 if none is visible;
+template setup uses the explicit PUT and never happens on a GET.
 
 ## `POST /:id/run` — the execution response
 
@@ -264,6 +356,14 @@ Request body — `RunDashboardDto`: `filters?` (a `DashboardFiltersDto`) and
 `target` appears only when the stored comparison is `TARGET`. `rows` appears
 for a `TABLE` visualization and for a `ROWS` metric. `result` is the typed P2
 payload — and see the trap below.
+
+Builder alert lists and activity feeds render only the current widget result.
+They do not fetch prebuilt action-center reports or activity lists to enrich
+rows, and keep no shared enrichment cache. Alert titles, amounts and currencies
+come from the result rows; activity titles and optional actor names come from
+the result events. Missing attribution is omitted. Any future owner, branch or
+subject names must be supplied by the scoped semantic executor under the same
+dashboard filters.
 
 ### Partial failure is the normal case, not an error
 
@@ -601,11 +701,7 @@ because the server requires the current revision.
 
 ## What will bite you
 
-1. **`repWorkload` returns `opentasks`, not `openTasks`.**
-   `dashboards.service.ts` writes `COUNT(*)::int AS openTasks` **unquoted**, so
-   PostgreSQL folds the identifier to lower case. Reading `openTasks` is
-   `undefined` on every row. No backend test asserts either spelling — see
-   [Q100](../build/OPEN-QUESTIONS.md).
+1. **`repWorkload` is retired.** It returns a retirement marker, with no task rows or counts.
 2. **Sending the scope headers on the drill-down is a 400.** It declares
    `organizationScopeMode: NONE`. Everything else in the family declares no
    mode at all.
@@ -624,9 +720,9 @@ because the server requires the current revision.
    never arrives scoped.
 9. **Default and favourite are `.read` writes.** Hiding them behind
    `.update` hides them from every user who has only `.read`.
-10. **`GET /dashboards/default` provisions.** With no default and no
-    `CRM_DEFAULT` instance, it **creates one** and emits a `DASHBOARD_CREATED`
-    audit event. It is a `GET` that writes; do not call it to probe.
+10. **`GET /dashboards/default` is read-only.** It selects an existing visible
+    dashboard and returns 404 when none exists. Setup is the explicit
+    `PUT /dashboards/from-template/CRM_DEFAULT`.
 11. **The layout write needs the complete visible set**, and its overlap check
     includes placements the caller cannot see.
 12. **`share-targets` needs the `.share` permission**, so a screen that offers
@@ -643,12 +739,12 @@ because the server requires the current revision.
 | --- | --- |
 | Dashboard list, create, create-from-template, duplicate, delete | live — `/crm/dashboards` |
 | Standard dashboard | live — `PUT /from-template/CRM_DEFAULT`, get-or-create, so pressing it twice leaves one |
-| Open my default | live — `GET /dashboards/default`, bound to a button because it provisions |
+| Open my default | live — `GET /dashboards/default`, read-only; returns 404 when none is visible |
 | Default and favourite | live — optimistic, reverted on failure |
 | Dashboard detail, run, filters, re-run | live — `/crm/dashboards/[id]` |
 | Rename / describe | live — `PATCH /:id` with `revision`; a 409 opens `ConflictDialog` |
-| Dashboard switcher | live — `GET /dashboards/navigation`, in the detail header |
-| Per-widget partial failure | live — the failed tile names its code; the rest render |
+| Dashboard switcher | live — `GET /dashboards` plus catalogue template labels, in the filter bar; template actions require create permission |
+| Per-widget partial failure | live — the failed tile shows a translated message; the rest render |
 | KPI row | live — `StatCard`, its first consumer (G4) |
 | Charts | live — line, area, bar, donut; every other visualization renders its data table |
 | Chart table fallback | live — a real `<table>` with a `<caption>`, on every charted widget |

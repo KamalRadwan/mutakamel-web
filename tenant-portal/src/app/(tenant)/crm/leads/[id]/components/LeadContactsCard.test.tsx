@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import { I18nProvider } from "@/i18n/I18nContext";
 import { runIdempotentWrite } from "@/lib/api/idempotent-write";
+import { readCrmBody } from "@/lib/api/envelope";
 import type { LeadDetail } from "../../lead-contract";
 import { LeadContactsCard } from "./LeadContactsCard";
+import { fetchLeadDetail } from "../../lead-requests";
+
+vi.mock("../../lead-requests", () => ({ fetchLeadDetail: vi.fn() }));
 
 vi.mock("@/i18n/I18nContext", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/i18n/I18nContext")>()),
@@ -17,9 +21,12 @@ vi.mock("@/lib/api/idempotent-write", () => ({
   createWriteAttempt: () => ({ idempotencyKey: "01900100-0000-7000-8000-000000000001" }),
 }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: { permissions: [] } }) }));
+vi.mock("@/lib/api/envelope", async (original) => ({ ...(await original<typeof import("@/lib/api/envelope")>()), readCrmBody: vi.fn() }));
+vi.mock("../../lead-contract", async (original) => ({ ...(await original<typeof import("../../lead-contract")>()), parseLeadDetailResponse: (payload: unknown) => payload }));
 
 const corporate = {
   id: "01900100-0000-7000-8000-000000000001", status: "OPEN", leadProfileType: "CORPORATE",
+  updatedAt: "2026-10-26T10:00:00.123Z",
   displayName: "Company display name", companyName: "Acme LLC", companyEmail: "company@acme.test",
   firstName: null, lastName: null, honorificTitle: null, email: "company@acme.test",
   primaryMobile: null, phones: ["+20221001100"],
@@ -39,12 +46,15 @@ const individual = {
 } as LeadDetail;
 
 function renderCard(lead = corporate, canEdit = true) {
+  vi.mocked(fetchLeadDetail).mockResolvedValue({ lead, card: null });
   return render(<I18nProvider><LeadContactsCard lead={lead} canEdit={canEdit} onSaved={vi.fn()} onReconcile={vi.fn()} /></I18nProvider>);
 }
 const openEditor = (name = "Dina Ali") => fireEvent.click(screen.getByRole("button", { name: en.crmLeadDetail.editContact + ": " + name }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(readCrmBody).mockResolvedValue(corporate);
+  vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "success", value: corporate, replayed: false });
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -168,5 +178,44 @@ describe("LeadContactsCard", () => {
     // Cancel closes the inline Add Contact form
     fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
     expect(screen.queryByText(en.crmLeads.create.errors.required)).toBeNull();
+  });
+
+  it("sends only relationship DTO keys when Set Primary is activated", async () => {
+    renderCard();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Set Primary/i })); });
+    expect(fetchLeadDetail).toHaveBeenCalledExactlyOnceWith(corporate.id, undefined);
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ method: "patch", body: { expectedUpdatedAt: corporate.updatedAt, contacts: [
+      { contactPartyId: corporate.contacts[0].partyId, jobTitle: "Procurement Manager", isPrimary: false },
+      { contactPartyId: corporate.contacts[1].partyId, jobTitle: "Director", isPrimary: true },
+    ] } }));
+  });
+
+  it("adds a contact using fullName while retaining the linked people", async () => {
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.addContact }));
+    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.fullName), { target: { value: "Mona Hassan" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: en.common.save })); });
+    const body = vi.mocked(runIdempotentWrite).mock.calls[0][0].body as { contacts: Record<string, unknown>[] };
+    expect(Object.keys(body).sort()).toEqual(["contacts", "expectedUpdatedAt"]);
+    expect(body.contacts.map((row) => Object.keys(row).sort())).toEqual([
+      ["contactPartyId", "isPrimary", "jobTitle"], ["contactPartyId", "isPrimary", "jobTitle"],
+      ["email", "firstName", "fullName", "honorificTitle", "isPrimary", "jobTitle", "lastName", "phones"],
+    ]);
+    expect(body.contacts[2]).toMatchObject({ fullName: "Mona Hassan", isPrimary: false });
+    expect(screen.queryByRole("button", { name: en.common.save })).toBeNull();
+  });
+
+  it("requires Retry after an uncertain add and clears the submitted draft", async () => {
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "ambiguous", error: { status: 0 } });
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: en.crmLeads.create.addContact }));
+    fireEvent.change(screen.getByLabelText(en.crmLeadDetail.fullName), { target: { value: "Mona" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: en.common.save })); });
+    expect(screen.getByText(en.crmLeadDetail.contactReloadRequired)).toBeTruthy();
+    expect(screen.getByRole("button", { name: en.crmLeads.create.addContact })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Set Primary/i })).toBeNull();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: en.common.retry })); });
+    expect(screen.getByRole("button", { name: en.crmLeads.create.addContact })).not.toBeDisabled();
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
   });
 });

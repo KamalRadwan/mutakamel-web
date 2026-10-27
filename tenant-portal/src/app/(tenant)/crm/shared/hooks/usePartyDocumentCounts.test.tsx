@@ -98,4 +98,13 @@ describe("usePartyDocumentCounts", () => {
     expect(body).toEqual({ branchId: BRANCH_ID, partyIds: partyIds.slice(0, 2) });
     expect(config.headers).toBeUndefined();
   });
+
+  it("builds party-scoped navigation hrefs for all four document families", async () => {
+    const { buildPartyDocumentHref } = await import("../party-document-counts-contract");
+    const pid = partyIds[0]!;
+    expect(buildPartyDocumentHref("opportunities", pid)).toBe(`/crm/opportunities?partyId=${pid}`);
+    expect(buildPartyDocumentHref("quotations", pid)).toBe(`/trade/quotations?partyId=${pid}`);
+    expect(buildPartyDocumentHref("salesOrders", pid)).toBe(`/trade/sales-orders?partyId=${pid}`);
+    expect(buildPartyDocumentHref("invoices", pid)).toBe(`/trade/invoices?partyId=${pid}`);
+  });
 });

@@ -4,37 +4,133 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { en } from "@/i18n/dictionaries/en";
 import { TenantApiClientError } from "@/lib/api/axiosClient";
-import { readCoreData, readCrmBody, writeCoreData } from "@/lib/api/envelope";
+import { readCoreData, writeCoreData } from "@/lib/api/envelope";
 import { runIdempotentWrite } from "@/lib/api/idempotent-write";
 import type { LeadContact, LeadDetail } from "../../lead-contract";
+import { fetchLeadDetail } from "../../lead-requests";
 import { CONTACT_DIRECTORY_PERMISSIONS } from "../contact-modal-contract";
 import { useLeadContactModal } from "./useLeadContactModal";
 
 const auth = vi.hoisted(() => ({ permissions: [] as string[] }));
 vi.mock("@/context/AuthContext", () => ({ useTenantAuth: () => ({ user: auth }) }));
 vi.mock("@/i18n/I18nContext", () => ({ useI18n: () => ({ t: en }) }));
-vi.mock("@/lib/api/envelope", () => ({ readCoreData: vi.fn(), readCrmBody: vi.fn(), writeCoreData: vi.fn() }));
+vi.mock("@/lib/api/envelope", () => ({ readCoreData: vi.fn(), writeCoreData: vi.fn() }));
+vi.mock("../../lead-requests", () => ({ fetchLeadDetail: vi.fn() }));
 vi.mock("@/lib/api/idempotent-write", async (original) => ({ ...(await original<typeof import("@/lib/api/idempotent-write")>()), runIdempotentWrite: vi.fn() }));
-vi.mock("../../lead-contract", async (original) => ({ ...(await original<typeof import("../../lead-contract")>()), parseLeadDetailResponse: (payload: unknown) => payload }));
 
 const partyId = "01900100-0000-7000-8000-000000000011";
 const methodId = "01900100-0000-7000-8000-000000000021";
 const contact = { partyId, displayName: "Dina Ali", firstName: "Dina", lastName: "Ali", honorificTitle: "Ms", jobTitle: "Manager", isPrimary: true, email: "dina@example.test", phones: [] } as unknown as LeadContact;
-const lead = { id: "01900100-0000-7000-8000-000000000001", status: "OPEN", contacts: [contact] } as LeadDetail;
+const lead = { id: "01900100-0000-7000-8000-000000000001", updatedAt: "2026-10-26T10:00:00.123Z", status: "OPEN", leadProfileType: "CORPORATE", contacts: [contact] } as LeadDetail;
 const person = { id: partyId, partyType: "PERSON", displayName: "Dina Ali", firstName: "Dina", lastName: "Ali", honorificTitle: "Ms", contactMethods: [{ id: methodId, partyId, methodType: "EMAIL", value: "dina@example.test", isPrimary: true, createdAt: "2026-09-01T00:00:00Z" }] };
 const rejected = () => new TenantApiClientError("Rejected", { status: 422, statusText: "Unprocessable", headers: new Headers(), data: {} });
-const setup = () => {
+const setup = (currentLead = lead, canUpdate = true) => {
   const onSaved = vi.fn();
   const onReconcile = vi.fn();
-  return { ...renderHook(() => useLeadContactModal(lead, onSaved, onReconcile, true)), onSaved, onReconcile };
+  return { ...renderHook(() => useLeadContactModal(currentLead, onSaved, onReconcile, canUpdate)), onSaved, onReconcile };
 };
 beforeEach(() => {
   vi.clearAllMocks();
   auth.permissions = [...CONTACT_DIRECTORY_PERMISSIONS];
   vi.mocked(readCoreData).mockResolvedValue(person);
-  vi.mocked(readCrmBody).mockResolvedValue(lead);
+  vi.mocked(fetchLeadDetail).mockResolvedValue({ lead, card: null });
   vi.mocked(writeCoreData).mockResolvedValue(person);
   vi.mocked(runIdempotentWrite).mockResolvedValue({ kind: "success", value: lead, replayed: false });
+});
+
+describe("lead contact card actions", () => {
+  const other = { ...contact, partyId: "01900100-0000-7000-8000-000000000099", jobTitle: "Finance", isPrimary: false };
+  it("promotes a contact using only DTO keys from the freshly read contact list", async () => {
+    auth.permissions = [];
+    const fresh = { ...lead, updatedAt: "2026-10-26T10:01:00.123Z", contacts: [contact, other] };
+    vi.mocked(fetchLeadDetail).mockResolvedValueOnce({ lead: fresh, card: null });
+    const saved = { ...fresh, contacts: [{ ...contact, isPrimary: false }, { ...other, isPrimary: true }] };
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind: "success", value: saved, replayed: false });
+    const { result, onSaved } = setup(fresh);
+    await act(async () => result.current.setPrimaryContact(other));
+    expect(fetchLeadDetail).toHaveBeenCalledExactlyOnceWith(lead.id, undefined);
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ method: "patch", path: `/api/tenant/crm/v1/leads/${lead.id}`, body: { expectedUpdatedAt: fresh.updatedAt, contacts: [
+      { contactPartyId: partyId, jobTitle: "Manager", isPrimary: false },
+      { contactPartyId: other.partyId, jobTitle: "Finance", isPrimary: true },
+    ] } }));
+    const body = vi.mocked(runIdempotentWrite).mock.calls[0][0].body as { contacts: Record<string, unknown>[] };
+    expect(Object.keys(body).sort()).toEqual(["contacts", "expectedUpdatedAt"]);
+    expect(body.contacts.map((row) => Object.keys(row).sort())).toEqual([
+      ["contactPartyId", "isPrimary", "jobTitle"], ["contactPartyId", "isPrimary", "jobTitle"],
+    ]);
+    expect(onSaved).toHaveBeenCalledWith(saved);
+    expect(writeCoreData).not.toHaveBeenCalled();
+  });
+  it("adds through the shared builder and retains people added since the card loaded", async () => {
+    const { result, onSaved } = setup();
+    act(() => result.current.startAddingContact());
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, firstName: "Mona" })));
+    vi.mocked(fetchLeadDetail).mockResolvedValueOnce({ lead: { ...lead, contacts: [contact, other] }, card: null });
+    await act(async () => result.current.saveNewContact());
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { expectedUpdatedAt: lead.updatedAt, contacts: [
+      { contactPartyId: partyId, jobTitle: "Manager", isPrimary: true },
+      { contactPartyId: other.partyId, jobTitle: "Finance", isPrimary: false },
+      { fullName: "Mona", firstName: "Mona", lastName: "", honorificTitle: "", jobTitle: "", email: undefined, phones: [], isPrimary: false },
+    ] } }));
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(result.current.addingContact).toBe(false);
+  });
+  it("retains a rejected draft and blocks duplicate submissions while transport is pending", async () => {
+    let resolve!: () => void;
+    vi.mocked(runIdempotentWrite).mockImplementationOnce(async () => {
+      await new Promise<void>((done) => { resolve = done; });
+      return { kind: "failed", error: { status: 422 } };
+    });
+    const { result } = setup();
+    act(() => result.current.startAddingContact());
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, displayName: "Mona" })));
+    let pending!: Promise<void>;
+    await act(async () => { pending = result.current.saveNewContact(); });
+    expect(result.current.actionBusy).toBe(true);
+    await act(async () => result.current.saveNewContact());
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
+    await act(async () => { resolve(); await pending; });
+    expect(result.current.addingContact).toBe(true);
+    expect(result.current.newContact.displayName).toBe("Mona");
+    expect(result.current.actionMustReload).toBe(false);
+  });
+  it.each(["ambiguous", "applied_unreadable"] as const)("reconciles %s and requires a read before a new action", async (kind) => {
+    const { result, onReconcile, onSaved } = setup();
+    act(() => result.current.startAddingContact());
+    act(() => result.current.changeNewContact((draft) => ({ ...draft, displayName: "Mona" })));
+    vi.mocked(runIdempotentWrite).mockResolvedValueOnce({ kind, error: { status: 0 } });
+    await act(async () => result.current.saveNewContact());
+    expect(result.current.actionMustReload).toBe(true);
+    expect(result.current.addingContact).toBe(false);
+    expect(onReconcile).toHaveBeenCalledOnce();
+    expect(onSaved).not.toHaveBeenCalled();
+    act(() => result.current.startAddingContact());
+    await act(async () => result.current.setPrimaryContact(other));
+    expect(runIdempotentWrite).toHaveBeenCalledOnce();
+    await act(async () => result.current.reloadContacts());
+    expect(result.current.actionMustReload).toBe(false);
+    act(() => result.current.startAddingContact());
+    expect(result.current.newContact.displayName).toBe("");
+  });
+  it("rejects invalid drafts and missing, converted or denied contacts without writes", async () => {
+    const { result } = setup();
+    act(() => result.current.startAddingContact());
+    await act(async () => result.current.saveNewContact());
+    expect(result.current.newContactErrors.displayName).toBe(en.crmLeads.create.errors.required);
+    expect(fetchLeadDetail).not.toHaveBeenCalled();
+    act(() => result.current.cancelAddingContact());
+    await act(async () => result.current.setPrimaryContact(other));
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+    const denied = setup(lead, false);
+    act(() => denied.result.current.startAddingContact());
+    await act(async () => denied.result.current.setPrimaryContact(other));
+    expect(denied.result.current.addingContact).toBe(false);
+    const converted = setup({ ...lead, status: "CONVERTED" });
+    act(() => converted.result.current.startAddingContact());
+    await act(async () => converted.result.current.setPrimaryContact(other));
+    expect(converted.result.current.addingContact).toBe(false);
+    expect(runIdempotentWrite).not.toHaveBeenCalled();
+  });
 });
 afterEach(cleanup);
 
@@ -64,7 +160,7 @@ describe("useLeadContactModal", () => {
     act(() => result.current.setField("jobTitle", "Director"));
     await act(async () => result.current.save());
     expect(writeCoreData).not.toHaveBeenCalled();
-    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { contacts: [{ contactPartyId: partyId, jobTitle: "Director", isPrimary: true }] } }));
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { expectedUpdatedAt: lead.updatedAt, contacts: [{ contactPartyId: partyId, jobTitle: "Director", isPrimary: true }] } }));
   });
   it("preserves the draft after a definite rejection before any write succeeds", async () => {
     const { result } = setup();
@@ -112,7 +208,7 @@ describe("useLeadContactModal", () => {
     const { result, onSaved } = setup();
     await act(async () => result.current.openContact(contact));
     act(() => result.current.setField("displayName", "Dena Ali"));
-    vi.mocked(readCrmBody).mockRejectedValueOnce(new Error("Read failed"));
+    vi.mocked(fetchLeadDetail).mockRejectedValueOnce(new Error("Read failed"));
     await act(async () => result.current.save());
     expect(result.current.failure).toBe("refresh");
     expect(result.current.mustReload).toBe(true);
@@ -124,7 +220,7 @@ describe("useLeadContactModal", () => {
     await act(async () => result.current.openContact(contact));
     act(() => result.current.setField("displayName", "Dena Ali"));
     const fresh = { ...lead, contacts: [{ ...contact, displayName: "Dena Ali" }] };
-    vi.mocked(readCrmBody).mockResolvedValueOnce(fresh);
+    vi.mocked(fetchLeadDetail).mockResolvedValueOnce({ lead: fresh, card: null });
     await act(async () => result.current.save());
     expect(writeCoreData).toHaveBeenCalledWith("patch", `/api/tenant/core/v1/directory/parties/${partyId}`, { displayName: "Dena Ali" }, expect.any(Object));
     expect(runIdempotentWrite).not.toHaveBeenCalled();
@@ -138,9 +234,9 @@ describe("useLeadContactModal", () => {
     await act(async () => result.current.openContact(contact));
     act(() => result.current.setField("jobTitle", "Director"));
     const other = { ...contact, partyId: "01900100-0000-7000-8000-000000000099", jobTitle: "Fresh finance title", isPrimary: false };
-    vi.mocked(readCrmBody).mockResolvedValueOnce({ ...lead, contacts: [contact, other] });
+    vi.mocked(fetchLeadDetail).mockResolvedValueOnce({ lead: { ...lead, contacts: [contact, other] }, card: null });
     await act(async () => result.current.save());
-    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { contacts: [
+    expect(runIdempotentWrite).toHaveBeenCalledWith(expect.objectContaining({ body: { expectedUpdatedAt: lead.updatedAt, contacts: [
       { contactPartyId: partyId, jobTitle: "Director", isPrimary: true },
       { contactPartyId: other.partyId, jobTitle: "Fresh finance title", isPrimary: false },
     ] } }));
@@ -166,7 +262,7 @@ describe("useLeadContactModal", () => {
     const { result, onReconcile } = setup();
     await act(async () => result.current.openContact(contact));
     act(() => result.current.setField("jobTitle", "Director"));
-    vi.mocked(readCrmBody).mockResolvedValueOnce({ ...lead, contacts: [] });
+    vi.mocked(fetchLeadDetail).mockResolvedValueOnce({ lead: { ...lead, contacts: [] }, card: null });
     await act(async () => result.current.save());
     expect(result.current.mustReload).toBe(true);
     expect(runIdempotentWrite).not.toHaveBeenCalled();

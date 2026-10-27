@@ -68,7 +68,7 @@ describe("Phase 9 route admission", () => {
       ["crmDashboardReports", "crmDashboards", "crmWidgets"].includes(item.id),
     );
     expect(analyticsItems.map((item) => item.href)).toEqual([
-      TENANT_ROUTES.crmDashboard,
+      TENANT_ROUTES.crmDashboardReports,
       TENANT_ROUTES.crmDashboards,
       TENANT_ROUTES.crmWidgets,
     ]);

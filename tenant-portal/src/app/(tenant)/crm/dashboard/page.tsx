@@ -11,7 +11,9 @@ import { axiosClient } from "@/lib/api/axiosClient";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   DASHBOARDS_DEFAULT_PATH,
+  DASHBOARDS_NAVIGATION_PATH,
   parseDashboardDetailResponse,
+  parseNavigationResponse,
 } from "../dashboards/dashboard-contract";
 import { DashboardWorkspace } from "../dashboards/[id]/components/dashboard-workspace";
 
@@ -27,6 +29,17 @@ export default function CrmDefaultDashboardPage() {
     setIsLoading(true);
     setError(null);
     try {
+      const navigationResponse = await axiosClient.get<unknown>(DASHBOARDS_NAVIGATION_PATH, {
+        ...READ_CONFIG,
+        signal,
+      });
+      if (signal?.aborted) return;
+      const navigation = parseNavigationResponse(navigationResponse.data);
+      if (navigation.activeDashboardId) {
+        setDashboardId(navigation.activeDashboardId);
+        return;
+      }
+
       const response = await axiosClient.get<unknown>(DASHBOARDS_DEFAULT_PATH, {
         ...READ_CONFIG,
         signal,
@@ -77,6 +90,7 @@ export default function CrmDefaultDashboardPage() {
           />
         ) : dashboardId ? (
           <DashboardWorkspace
+            key={dashboardId}
             dashboardId={dashboardId}
             hideHeader
             onSelectDashboard={(nextId) => setDashboardId(nextId)}

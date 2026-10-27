@@ -31,7 +31,7 @@ Source inspected:
 `core-app/src/tenant/audit/tenant-audit.controller.ts`,
 `core-app/src/tenant/audit/audit-query.dto.ts`.
 
-**35 routes.** Directory 21 · Activities 11 · Activity types 1 · Audit 2.
+**37 routes.** Directory 21 · Activities 11 · Activity types 1 · Audit 4.
 
 Everything under [core-identity.md § What applies to every route](core-identity.md#what-applies-to-every-route-on-this-page)
 applies here too.
@@ -348,14 +348,18 @@ lists the same set, generated from source.
 
 ---
 
-## Audit — 2 routes
+## Audit — 4 routes
+
+Re-verified **2026-10-17**. See [the audit reader contract](core-audit.md).
 
 | Method | Canonical path | Permission |
 | --- | --- | --- |
-| GET | `/api/tenant/core/v1/audit` | `audit.read` |
-| GET | `/api/tenant/core/v1/audit/entities/:entityType/:entityId` | `audit.read` |
+| GET | `/api/tenant/core/v1/audit` | any audit read grant |
+| GET | `/api/tenant/core/v1/audit/entities/:entityType/:entityId` | any audit read grant |
+| GET | `/api/tenant/core/v1/audit/deleted` | any audit read grant |
+| GET | `/api/tenant/core/v1/audit/events/:id` | any audit read grant |
 
-Both are `Cache-Control: no-store`.
+All are `Cache-Control: no-store`; grants are `audit.read`, `audit.read.branch`, `audit.read.own`.
 
 The ledger is **append-only**. Each row unpacks a `_audit` metadata block
 carrying `sourceApp`, `sourceKind`, `outcome`, `requestId`, `operationId`,
@@ -377,8 +381,8 @@ accepted on the tenant-wide audit list.
 Related mode includes `Lead`/`LeadEntity`, `party`/`PartyEntity`, contact-method,
 address and mutual-relationship aliases for the selected Parties, including
 soft-deleted child records. It does not discover unrelated company contacts or
-read CRM tables. `audit.read` is the existing **tenant-wide** ledger permission;
-all results still bind the active tenant.
+read CRM tables. `audit.read` grants tenant-wide access; branch and own grants
+restrict every event using stored branch/actor/owner columns within the active tenant.
 
 Domain events are grouped by recorded request ID (otherwise correlation ID,
 otherwise individual audit ID), actor and source app. Requests are grouped
@@ -392,10 +396,9 @@ writer omitted the value; the current Party value must not fill that gap.
 
 ### One pagination detail that will bite
 
-This endpoint returns `{ items, total, page, limit, totalPages }` — **no
-`hasNext` / `hasPrev`**, unlike the repository-backed lists elsewhere in Core.
-Derive them from `page` and `totalPages`, or the pager renders wrong at the
-last page.
+This endpoint returns `{ items, nextCursor }`. Send the opaque cursor unchanged
+to continue; a null cursor ends the list. There is no total count or page-number
+parameter. Grouped related-party history uses the same cursor contract.
 
 ---
 
@@ -410,7 +413,7 @@ last page.
 | Party image | 7.8 | built |
 | `/core/directory/settings` | 7.9 | built |
 | `/core/audit` | 7.20 | built |
-| Entity history on detail screens | 7.21 | built on party and template detail |
+| Entity history on detail screens | 7.21 | shared across Core, CRM and Trade tenant record details |
 | `/core/activities` — the Activities workspace, every app | 7.22 | rebuilt 2026-09-24 on the activity hub |
 | `/crm/activities` — the same workspace, CRM records only | — | built 2026-09-24; admitted by `activities.read` and a read on some CRM record type |
 | Activity modal and record panels on lead, customer and opportunity screens | — | built 2026-09-24 |

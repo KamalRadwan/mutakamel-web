@@ -9,7 +9,6 @@ import {
   dashboardPlacementPath,
   dashboardRunPath,
   parseDashboardDetailResponse,
-  parseDashboardRevisionResponse,
   parseDashboardsResponse,
   parseNavigationResponse,
 } from "./dashboard-contract";
@@ -18,6 +17,7 @@ import {
   buildUpdateWidgetRequest,
   parseWidgetDetailResponse,
   parseWidgetUpdateResponse,
+  parseWidgetsResponse,
 } from "./widget-contract";
 
 const DASHBOARD_ID = "01900300-0000-7000-8000-000000000001";
@@ -84,8 +84,20 @@ const dashboard = {
 };
 
 describe("CRM dashboards API contract", () => {
+  it('reads bounded widget pages and preserves their cursor', () => {
+    const page = parseWidgetsResponse({ items: [widget], nextCursor: WIDGET_ID });
+    expect(page.items[0].id).toBe(WIDGET_ID);
+    expect(page.nextCursor).toBe(WIDGET_ID);
+    expect(() => parseWidgetsResponse([widget])).toThrow();
+    expect(() => parseWidgetsResponse({ items: [widget], nextCursor: 'invalid' })).toThrow();
+    expect(() => parseWidgetsResponse({ items: Array.from({ length: 101 }, () => widget), nextCursor: null })).toThrow();
+    expect(() => parseDashboardsResponse({ items: [dashboard] })).toThrow();
+    expect(() => parseDashboardsResponse({ items: Array.from({ length: 101 }, () => dashboard), nextCursor: null })).toThrow();
+  });
   it("parses the raw CRM payload — these responses carry no Core `data` envelope", () => {
-    const [summary] = parseDashboardsResponse([dashboard]);
+    const { items: [summary], nextCursor } = parseDashboardsResponse({ items: [dashboard], nextCursor: null });
+    expect(nextCursor).toBeNull();
+    expect(() => parseDashboardsResponse([dashboard])).toThrow();
     expect(summary.id).toBe(DASHBOARD_ID);
     expect(summary.accessLevel).toBe("OWNER");
     expect(summary.isDefault).toBe(true);
@@ -127,14 +139,10 @@ describe("CRM dashboards API contract", () => {
         },
       ],
       activeDashboardId: DASHBOARD_ID,
+      nextCursor: null,
     });
     expect(navigation.activeDashboardId).toBe(DASHBOARD_ID);
     expect(navigation.items[0].name).toBe("Sales overview");
-  });
-
-  it("reads DELETE /:id/placements/:placementId as a 200 with the new revision", () => {
-    expect(parseDashboardRevisionResponse({ dashboardRevision: 9 })).toBe(9);
-    expect(() => parseDashboardRevisionResponse({})).toThrow();
   });
 
   it("omits an empty description and an absent template rather than sending null", () => {

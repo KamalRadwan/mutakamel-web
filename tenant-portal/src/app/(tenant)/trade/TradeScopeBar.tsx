@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Field,
   Select,
   SelectContent,
   SelectItem,
@@ -54,6 +55,7 @@ export function TradeScopeBar({
   return (
     <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.trade.scopeTitle}>
       {showCompany ? (
+        <Field label={t.trade.scopeCompany} showLabel>
         <Select
           value={context.companyId ?? (allowItemMaster ? CLEAR_VALUE : "")}
           onValueChange={(next) => selectCompany(next === CLEAR_VALUE ? null : next)}
@@ -75,9 +77,11 @@ export function TradeScopeBar({
             ))}
           </SelectContent>
         </Select>
+        </Field>
       ) : null}
 
       {showBranch ? (
+        <Field label={t.trade.scopeBranch} showLabel>
         <Select
           value={context.branchId ?? CLEAR_VALUE}
           onValueChange={(next) => selectBranch(next === CLEAR_VALUE ? null : next)}
@@ -95,9 +99,11 @@ export function TradeScopeBar({
             ))}
           </SelectContent>
         </Select>
+        </Field>
       ) : null}
 
       {showChannel ? (
+        <Field label={t.trade.scopeChannel} showLabel>
         <Select
           value={context.channelId ?? CLEAR_VALUE}
           onValueChange={(next) => selectChannel(next === CLEAR_VALUE ? null : next)}
@@ -115,6 +121,7 @@ export function TradeScopeBar({
             ))}
           </SelectContent>
         </Select>
+        </Field>
       ) : null}
     </div>
   );

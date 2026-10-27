@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generatedAt": "2026-10-17T03:04:55.398Z",
+    "generatedAt": "2026-10-17T18:31:47.531Z",
     "generator": "scripts/docs/generate-route-inventory.mjs",
-    "frontendRevision": "dcaedbb1562a+dirty",
-    "backendRevision": "0d665ae5d9b6+dirty",
+    "frontendRevision": "0f84e3fbe923+dirty",
+    "backendRevision": "a51c1d6ccf36+dirty",
     "sourcePolicy": "Gateway master ownership and canonicalization rules for master=tenant",
     "canonicalNamespaces": [
       "/api/tenant/core/v1/*",
@@ -13,23 +13,23 @@
     "excludes": "Admin, partner, and direct Worker routes. Core PUBLIC public/files routes are included because tenant master owns them."
   },
   "counts": {
-    "total": 670,
+    "total": 665,
     "byApp": {
-      "core": 228,
-      "crm": 171,
-      "trade": 251,
+      "core": 236,
+      "crm": 157,
+      "trade": 252,
       "webphone": 20
     },
     "byMethod": {
       "GET": 258,
-      "POST": 269,
-      "PATCH": 71,
+      "POST": 266,
+      "PATCH": 68,
       "DELETE": 53,
-      "PUT": 19
+      "PUT": 20
     },
     "byRouteClass": {
       "AUTHENTICATED": 259,
-      "WRITE_SENSITIVE": 369,
+      "WRITE_SENSITIVE": 364,
       "PUBLIC": 15,
       "READ_HEAVY": 27
     }
@@ -44,9 +44,9 @@
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-operation.route-contracts.ts": "708333c057052443f3f19042cd71e94d7f7dbf342de325a4ebb53d497a33d282",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-subscription-receipt.route-contracts.ts": "93ed6f9c8bd64823da42530961312184a7acd3286eb332a12ebb54b6ecc6c7cc",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core-worker-evidence-authority.route-contracts.ts": "84a6d1d52d0699b6d40ba12d2521e0ee39c0dd55b106c1b80c1f317e2cef112e",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "b05f755df72e9487118c16fe168fef0982a1eb61b2a7bc5c62bd0890babddc5e",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "6a43f06c7f2f4fa8ad2a61ed5d2093a9d6f4d5fb12ffa0043ed4eeb3f8478cec",
-    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "ebcb3e913677d21d91e70a873d41d64fe8b46a2e704da025ab56a98212f719a3",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts": "395127b6c684f442cf06a276c0bc2cd28c6d11ffdde8b2f9a3afa33f93073b90",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts": "26f21794ca6e30eaad6fc3899968413c61a19ed78e2d2b30eebba6ca4c76ac21",
+    "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts": "6c03f10b61d70940e09e0d1869157c48212e04ebe050a8ef57a7349eca7f6d47",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/webphone.route-contracts.ts": "aa0eead9bed5f0d27c370f5d7e273b22dba8a5d07184fe39a980979dd401b370",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/gateway-api-path.ts": "08ee08238db9fe4813ebbc8a32077731d3680b0d7c70ac420df92d47186f6e63",
     "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/upstream-app.registry.ts": "f2d856450e6cfa058dcd062a41ccc32509d85925640c5e70d61186af589869a3"
@@ -59,6 +59,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.list",
+      "requiredPermissions": [
+        "activities.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/activities",
       "service": "core-app",
@@ -78,6 +81,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.create",
+      "requiredPermissions": [
+        "activities.create"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/activities",
       "service": "core-app",
@@ -100,6 +106,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.get",
+      "requiredPermissions": [
+        "activities.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/activities/:id",
       "service": "core-app",
@@ -119,6 +128,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.update",
+      "requiredPermissions": [
+        "activities.update"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/activities/:id",
       "service": "core-app",
@@ -141,6 +153,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.cancel",
+      "requiredPermissions": [
+        "activities.cancel"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/activities/:id/cancel",
       "service": "core-app",
@@ -163,6 +178,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.complete",
+      "requiredPermissions": [
+        "activities.complete"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/activities/:id/complete",
       "service": "core-app",
@@ -185,6 +203,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.status",
+      "requiredPermissions": [
+        "activities.update"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/activities/:id/status",
       "service": "core-app",
@@ -207,6 +228,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.assignees",
+      "requiredPermissions": [
+        "activities.assign"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/activities/assignees",
       "service": "core-app",
@@ -226,6 +250,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.calendar",
+      "requiredPermissions": [
+        "activities.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/activities/calendar",
       "service": "core-app",
@@ -245,6 +272,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.summary",
+      "requiredPermissions": [
+        "activities.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/activities/summary",
       "service": "core-app",
@@ -264,6 +294,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.targets",
+      "requiredPermissions": [
+        "activities.create"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/activities/targets",
       "service": "core-app",
@@ -283,6 +316,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.activities.types",
+      "requiredPermissions": [
+        "activities.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/activity-types",
       "service": "core-app",
@@ -317,8 +353,39 @@
       "maxReplayResponseBytes": null,
       "circuitBreakerKey": "core-app.audit",
       "requiredPermissions": [
-        "audit.read"
-      ]
+        "audit.read",
+        "audit.read.branch",
+        "audit.read.own"
+      ],
+      "requiredPermissionsMode": "ANY"
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/audit/deleted",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.audit.deleted",
+      "method": "GET",
+      "pathPattern": "/api/v1/tenant/audit/deleted",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/audit/deleted",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "organizationScopeMode": "NONE",
+      "domainIdempotencyOperation": null,
+      "fingerprintSchemaId": null,
+      "maxReplayResponseBytes": null,
+      "circuitBreakerKey": "core-app.audit",
+      "requiredPermissions": [
+        "audit.read",
+        "audit.read.branch",
+        "audit.read.own"
+      ],
+      "requiredPermissionsMode": "ANY"
     },
     {
       "app": "core",
@@ -342,8 +409,39 @@
       "maxReplayResponseBytes": null,
       "circuitBreakerKey": "core-app.audit",
       "requiredPermissions": [
-        "audit.read"
-      ]
+        "audit.read",
+        "audit.read.branch",
+        "audit.read.own"
+      ],
+      "requiredPermissionsMode": "ANY"
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/audit/events/:id",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.audit.event",
+      "method": "GET",
+      "pathPattern": "/api/v1/tenant/audit/events/:id",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/audit/events/:id",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "organizationScopeMode": "NONE",
+      "domainIdempotencyOperation": null,
+      "fingerprintSchemaId": null,
+      "maxReplayResponseBytes": null,
+      "circuitBreakerKey": "core-app.audit",
+      "requiredPermissions": [
+        "audit.read",
+        "audit.read.branch",
+        "audit.read.own"
+      ],
+      "requiredPermissionsMode": "ANY"
     },
     {
       "app": "core",
@@ -375,6 +473,24 @@
       "upstreamPath": "/api/v1/tenant/auth/activity",
       "routeClass": "AUTHENTICATED",
       "idempotent": false,
+      "transportRetryMode": "NEVER",
+      "circuitBreakerKey": "core-app.tenant-auth"
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/auth/change-password",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.auth.change-password",
+      "method": "POST",
+      "pathPattern": "/api/v1/tenant/auth/change-password",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/auth/change-password",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
       "transportRetryMode": "NEVER",
       "circuitBreakerKey": "core-app.tenant-auth"
     },
@@ -867,6 +983,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.branding.get",
+      "requiredPermissions": [
+        "branding.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/branding",
       "service": "core-app",
@@ -883,6 +1002,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.branding.update",
+      "requiredPermissions": [
+        "branding.manage"
+      ],
       "method": "PUT",
       "pathPattern": "/api/v1/tenant/branding",
       "service": "core-app",
@@ -899,6 +1021,10 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.branding.icon.upload",
+      "bodyLimitClass": "CORE_BRANDING_MULTIPART",
+      "requiredPermissions": [
+        "branding.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/branding/icon",
       "service": "core-app",
@@ -915,6 +1041,10 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.branding.logo.upload",
+      "bodyLimitClass": "CORE_BRANDING_MULTIPART",
+      "requiredPermissions": [
+        "branding.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/branding/logo",
       "service": "core-app",
@@ -1298,6 +1428,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.currencies.list",
+      "requiredPermissions": [
+        "currencies.currency.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/currencies",
       "service": "core-app",
@@ -1314,6 +1447,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.currencies.create",
+      "requiredPermissions": [
+        "currencies.currency.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/currencies",
       "service": "core-app",
@@ -1330,6 +1466,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.currencies.delete",
+      "requiredPermissions": [
+        "currencies.currency.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/currencies/:id",
       "service": "core-app",
@@ -1346,6 +1485,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.currencies.update",
+      "requiredPermissions": [
+        "currencies.currency.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/currencies/:id",
       "service": "core-app",
@@ -1362,6 +1504,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.currencies.set-default",
+      "requiredPermissions": [
+        "currencies.currency.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/currencies/:id/set-default",
       "service": "core-app",
@@ -1378,6 +1523,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.addresses.by.addressid.delete",
+      "requiredPermissions": [
+        "directory.address.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/directory/addresses/:addressId",
       "service": "core-app",
@@ -1394,6 +1542,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.addresses.by.addressid.patch",
+      "requiredPermissions": [
+        "directory.address.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/directory/addresses/:addressId",
       "service": "core-app",
@@ -1410,6 +1561,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.contact.methods.by.methodid.delete",
+      "requiredPermissions": [
+        "directory.contact.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/directory/contact-methods/:methodId",
       "service": "core-app",
@@ -1426,6 +1580,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.contact.methods.by.methodid.patch",
+      "requiredPermissions": [
+        "directory.contact.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/directory/contact-methods/:methodId",
       "service": "core-app",
@@ -1442,6 +1599,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.get",
+      "requiredPermissions": [
+        "directory.party.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/directory/parties",
       "service": "core-app",
@@ -1458,6 +1618,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.post",
+      "requiredPermissions": [
+        "directory.party.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/directory/parties",
       "service": "core-app",
@@ -1474,6 +1637,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.delete",
+      "requiredPermissions": [
+        "directory.party.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/directory/parties/:id",
       "service": "core-app",
@@ -1490,6 +1656,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.get",
+      "requiredPermissions": [
+        "directory.party.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/directory/parties/:id",
       "service": "core-app",
@@ -1506,6 +1675,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.patch",
+      "requiredPermissions": [
+        "directory.party.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/directory/parties/:id",
       "service": "core-app",
@@ -1522,6 +1694,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.addresses.post",
+      "requiredPermissions": [
+        "directory.address.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/directory/parties/:id/addresses",
       "service": "core-app",
@@ -1538,6 +1713,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.contact.methods.post",
+      "requiredPermissions": [
+        "directory.contact.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/directory/parties/:id/contact-methods",
       "service": "core-app",
@@ -1554,6 +1732,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.contacts.get",
+      "requiredPermissions": [
+        "directory.party.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/directory/parties/:id/contacts",
       "service": "core-app",
@@ -1570,6 +1751,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.image.delete",
+      "requiredPermissions": [
+        "directory.party.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/directory/parties/:id/image",
       "service": "core-app",
@@ -1586,6 +1770,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.image.get",
+      "requiredPermissions": [
+        "directory.party.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/directory/parties/:id/image",
       "service": "core-app",
@@ -1602,6 +1789,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.image.post",
+      "requiredPermissions": [
+        "directory.party.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/directory/parties/:id/image",
       "service": "core-app",
@@ -1619,6 +1809,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.parties.by.id.roles.post",
+      "requiredPermissions": [
+        "directory.role.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/directory/parties/:id/roles",
       "service": "core-app",
@@ -1635,6 +1828,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.party.roles.by.roleid.delete",
+      "requiredPermissions": [
+        "directory.role.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/directory/party-roles/:roleId",
       "service": "core-app",
@@ -1651,6 +1847,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.relationships.post",
+      "requiredPermissions": [
+        "directory.relationship.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/directory/relationships",
       "service": "core-app",
@@ -1667,6 +1866,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.relationships.by.relationshipid.delete",
+      "requiredPermissions": [
+        "directory.relationship.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/directory/relationships/:relationshipId",
       "service": "core-app",
@@ -1683,6 +1885,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.settings.get",
+      "requiredPermissions": [
+        "directory.settings.manage"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/directory/settings",
       "service": "core-app",
@@ -1699,6 +1904,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.directory.settings.patch",
+      "requiredPermissions": [
+        "directory.settings.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/directory/settings",
       "service": "core-app",
@@ -1715,6 +1923,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant-email-config.get",
+      "requiredPermissions": [
+        "workspace.email.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/core/tenant/email-config",
       "service": "core-app",
@@ -1742,6 +1953,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant-email-config.update",
+      "requiredPermissions": [
+        "workspace.email.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/core/tenant/email-config",
       "service": "core-app",
@@ -1769,6 +1983,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant-email-config.verify",
+      "requiredPermissions": [
+        "workspace.email.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/core/tenant/email-config/verify",
       "service": "core-app",
@@ -1796,6 +2013,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant-email-config.verify-connection",
+      "requiredPermissions": [
+        "workspace.email.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/core/tenant/email-config/verify-connection",
       "service": "core-app",
@@ -1823,6 +2043,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.get",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/notifications",
       "service": "core-app",
@@ -1839,6 +2062,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.by.id.delete",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/notifications/:id",
       "service": "core-app",
@@ -1855,6 +2081,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.by.id.ack.post",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/notifications/:id/ack",
       "service": "core-app",
@@ -1871,6 +2100,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.by.id.acknowledge.post",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/notifications/:id/acknowledge",
       "service": "core-app",
@@ -1887,6 +2119,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.by.id.dismiss.post",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/notifications/:id/dismiss",
       "service": "core-app",
@@ -1903,6 +2138,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.by.id.read.post",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/notifications/:id/read",
       "service": "core-app",
@@ -1919,6 +2157,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.config.get",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/notifications/config",
       "service": "core-app",
@@ -1930,43 +2171,14 @@
     },
     {
       "app": "core",
-      "canonicalPath": "/api/tenant/core/v1/notifications/device-tokens",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
-      "version": 1,
-      "routeKey": "core.tenant.notifications.device-tokens.post",
-      "method": "POST",
-      "pathPattern": "/api/v1/tenant/notifications/device-tokens",
-      "service": "core-app",
-      "targetApp": "core",
-      "upstreamPath": "/api/v1/tenant/notifications/device-tokens",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "circuitBreakerKey": "core-app.notifications"
-    },
-    {
-      "app": "core",
-      "canonicalPath": "/api/tenant/core/v1/notifications/device-tokens/:id",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
-      "version": 1,
-      "routeKey": "core.tenant.notifications.device-tokens.delete",
-      "method": "DELETE",
-      "pathPattern": "/api/v1/tenant/notifications/device-tokens/:id",
-      "service": "core-app",
-      "targetApp": "core",
-      "upstreamPath": "/api/v1/tenant/notifications/device-tokens/:id",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "circuitBreakerKey": "core-app.notifications"
-    },
-    {
-      "app": "core",
       "canonicalPath": "/api/tenant/core/v1/notifications/mark-all-read",
       "portalUsage": "TENANT_PORTAL",
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.mark-all-read.post",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/notifications/mark-all-read",
       "service": "core-app",
@@ -1983,6 +2195,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.preferences.get",
+      "requiredPermissions": [
+        "notifications.preference.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/notifications/preferences",
       "service": "core-app",
@@ -1999,6 +2214,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.preferences.put",
+      "requiredPermissions": [
+        "notifications.preference.manage"
+      ],
       "method": "PUT",
       "pathPattern": "/api/v1/tenant/notifications/preferences",
       "service": "core-app",
@@ -2015,6 +2233,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.read-all.post",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/notifications/read-all",
       "service": "core-app",
@@ -2031,6 +2252,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.notifications.unread-count.get",
+      "requiredPermissions": [
+        "notifications.notification.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/notifications/unread-count",
       "service": "core-app",
@@ -2047,6 +2271,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.numbering.list",
+      "requiredPermissions": [
+        "numbering.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/numbering",
       "service": "core-app",
@@ -2063,6 +2290,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.numbering.create",
+      "requiredPermissions": [
+        "numbering.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/numbering",
       "service": "core-app",
@@ -2079,6 +2309,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.numbering.peek",
+      "requiredPermissions": [
+        "numbering.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/numbering/:code/peek",
       "service": "core-app",
@@ -2095,6 +2328,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.numbering.update",
+      "requiredPermissions": [
+        "numbering.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/numbering/:id",
       "service": "core-app",
@@ -2111,6 +2347,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.branches.list",
+      "requiredPermissions": [
+        "org.branch.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/branches",
       "service": "core-app",
@@ -2127,6 +2366,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.branches.create",
+      "requiredPermissions": [
+        "org.branch.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/organization/branches",
       "service": "core-app",
@@ -2143,6 +2385,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.branches.delete",
+      "requiredPermissions": [
+        "org.branch.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/organization/branches/:id",
       "service": "core-app",
@@ -2159,6 +2404,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.branches.get",
+      "requiredPermissions": [
+        "org.branch.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/branches/:id",
       "service": "core-app",
@@ -2175,6 +2423,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.branches.update",
+      "requiredPermissions": [
+        "org.branch.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/organization/branches/:id",
       "service": "core-app",
@@ -2191,6 +2442,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.companies.list",
+      "requiredPermissions": [
+        "org.company.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/companies",
       "service": "core-app",
@@ -2207,6 +2461,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.companies.create",
+      "requiredPermissions": [
+        "org.company.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/organization/companies",
       "service": "core-app",
@@ -2223,6 +2480,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.companies.delete",
+      "requiredPermissions": [
+        "org.company.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/organization/companies/:id",
       "service": "core-app",
@@ -2239,6 +2499,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.companies.get",
+      "requiredPermissions": [
+        "org.company.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/companies/:id",
       "service": "core-app",
@@ -2255,6 +2518,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.companies.update",
+      "requiredPermissions": [
+        "org.company.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/organization/companies/:id",
       "service": "core-app",
@@ -2271,6 +2537,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.departments.list",
+      "requiredPermissions": [
+        "org.department.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/departments",
       "service": "core-app",
@@ -2287,6 +2556,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.departments.create",
+      "requiredPermissions": [
+        "org.department.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/organization/departments",
       "service": "core-app",
@@ -2303,6 +2575,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.departments.delete",
+      "requiredPermissions": [
+        "org.department.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/organization/departments/:id",
       "service": "core-app",
@@ -2319,6 +2594,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.departments.get",
+      "requiredPermissions": [
+        "org.department.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/departments/:id",
       "service": "core-app",
@@ -2335,6 +2613,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.departments.update",
+      "requiredPermissions": [
+        "org.department.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/organization/departments/:id",
       "service": "core-app",
@@ -2351,6 +2632,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.teams.list",
+      "requiredPermissions": [
+        "org.team.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/teams",
       "service": "core-app",
@@ -2367,6 +2651,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.teams.create",
+      "requiredPermissions": [
+        "org.team.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/organization/teams",
       "service": "core-app",
@@ -2383,6 +2670,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.teams.delete",
+      "requiredPermissions": [
+        "org.team.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/organization/teams/:id",
       "service": "core-app",
@@ -2399,6 +2689,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.teams.get",
+      "requiredPermissions": [
+        "org.team.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/teams/:id",
       "service": "core-app",
@@ -2415,6 +2708,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.teams.update",
+      "requiredPermissions": [
+        "org.team.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/organization/teams/:id",
       "service": "core-app",
@@ -2431,6 +2727,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.organization.tree",
+      "requiredPermissions": [
+        "org.company.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/organization/tree",
       "service": "core-app",
@@ -2479,6 +2778,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.permissions.list",
+      "requiredPermissions": [
+        "roles.permission.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/permissions",
       "service": "core-app",
@@ -2487,6 +2789,59 @@
       "routeClass": "AUTHENTICATED",
       "idempotent": true,
       "circuitBreakerKey": "core-app.tenant-roles"
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/profile/avatar",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.profile.avatar.delete",
+      "method": "DELETE",
+      "pathPattern": "/api/v1/tenant/profile/avatar",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/profile/avatar",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "NEVER",
+      "circuitBreakerKey": "core-app.tenant-users"
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/profile/avatar",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.profile.avatar.get",
+      "method": "GET",
+      "pathPattern": "/api/v1/tenant/profile/avatar",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/profile/avatar",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "circuitBreakerKey": "core-app.tenant-users"
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/profile/avatar",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.profile.avatar.put",
+      "method": "PUT",
+      "pathPattern": "/api/v1/tenant/profile/avatar",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/profile/avatar",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": false,
+      "bodyLimitClass": "CORE_PARTY_IMAGE_MULTIPART",
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "NEVER",
+      "circuitBreakerKey": "core-app.tenant-users"
     },
     {
       "app": "core",
@@ -2665,6 +3020,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.roles.list",
+      "requiredPermissions": [
+        "roles.role.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/roles",
       "service": "core-app",
@@ -2681,6 +3039,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.roles.create",
+      "requiredPermissions": [
+        "roles.role.create"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/roles",
       "service": "core-app",
@@ -2697,6 +3058,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.roles.delete",
+      "requiredPermissions": [
+        "roles.role.delete"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/roles/:id",
       "service": "core-app",
@@ -2713,6 +3077,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.roles.get",
+      "requiredPermissions": [
+        "roles.role.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/roles/:id",
       "service": "core-app",
@@ -2729,6 +3096,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.roles.update",
+      "requiredPermissions": [
+        "roles.role.update"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/roles/:id",
       "service": "core-app",
@@ -2745,6 +3115,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.roles.permissions.set",
+      "requiredPermissions": [
+        "roles.role.update"
+      ],
       "method": "PUT",
       "pathPattern": "/api/v1/tenant/roles/:id/permissions",
       "service": "core-app",
@@ -3052,6 +3425,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.taxes.list",
+      "requiredPermissions": [
+        "taxes.tax.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/taxes",
       "service": "core-app",
@@ -3068,6 +3444,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.taxes.create",
+      "requiredPermissions": [
+        "taxes.tax.manage"
+      ],
       "method": "POST",
       "pathPattern": "/api/v1/tenant/taxes",
       "service": "core-app",
@@ -3084,6 +3463,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.taxes.delete",
+      "requiredPermissions": [
+        "taxes.tax.manage"
+      ],
       "method": "DELETE",
       "pathPattern": "/api/v1/tenant/taxes/:id",
       "service": "core-app",
@@ -3100,6 +3482,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.taxes.update",
+      "requiredPermissions": [
+        "taxes.tax.manage"
+      ],
       "method": "PATCH",
       "pathPattern": "/api/v1/tenant/taxes/:id",
       "service": "core-app",
@@ -4346,6 +4731,48 @@
     },
     {
       "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/users/:id/resend-invite",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.users.resend-invite",
+      "method": "POST",
+      "pathPattern": "/api/v1/tenant/users/:id/resend-invite",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/users/:id/resend-invite",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "transportRetryMode": "NEVER",
+      "circuitBreakerKey": "core-app.tenant-users",
+      "requiredPermissions": [
+        "users.user.invite"
+      ]
+    },
+    {
+      "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/users/:id/sessions/revoke",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.users.sessions.revoke",
+      "method": "POST",
+      "pathPattern": "/api/v1/tenant/users/:id/sessions/revoke",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/users/:id/sessions/revoke",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "transportRetryMode": "NEVER",
+      "circuitBreakerKey": "core-app.tenant-users",
+      "requiredPermissions": [
+        "users.user.deactivate"
+      ]
+    },
+    {
+      "app": "core",
       "canonicalPath": "/api/tenant/core/v1/users/:id/suspend",
       "portalUsage": "TENANT_PORTAL",
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
@@ -4575,6 +5002,25 @@
     },
     {
       "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/users/:userId/assignment-options",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.users.assignment-options.list",
+      "method": "GET",
+      "pathPattern": "/api/v1/tenant/users/:userId/assignment-options",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/users/:userId/assignment-options",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "circuitBreakerKey": "core-app.tenant-roles",
+      "requiredPermissions": [
+        "users.user.assign_roles"
+      ]
+    },
+    {
+      "app": "core",
       "canonicalPath": "/api/tenant/core/v1/users/:userId/assignments",
       "portalUsage": "TENANT_PORTAL",
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
@@ -4758,6 +5204,24 @@
     },
     {
       "app": "core",
+      "canonicalPath": "/api/tenant/core/v1/users/me",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
+      "version": 1,
+      "routeKey": "core.tenant.users.me.update",
+      "method": "PATCH",
+      "pathPattern": "/api/v1/tenant/users/me",
+      "service": "core-app",
+      "targetApp": "core",
+      "upstreamPath": "/api/v1/tenant/users/me",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": true,
+      "idempotencyMode": "WRITE_SENSITIVE",
+      "transportRetryMode": "NEVER",
+      "circuitBreakerKey": "core-app.tenant-users"
+    },
+    {
+      "app": "core",
       "canonicalPath": "/api/tenant/core/v1/users/me/profile",
       "portalUsage": "TENANT_PORTAL",
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
@@ -4829,6 +5293,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.workspace-settings.get",
+      "requiredPermissions": [
+        "workspace.read"
+      ],
       "method": "GET",
       "pathPattern": "/api/v1/tenant/workspace-settings",
       "service": "core-app",
@@ -4845,6 +5312,9 @@
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/core.route-contracts.ts",
       "version": 1,
       "routeKey": "core.tenant.workspace-settings.update",
+      "requiredPermissions": [
+        "workspace.manage"
+      ],
       "method": "PUT",
       "pathPattern": "/api/v1/tenant/workspace-settings",
       "service": "core-app",
@@ -5027,6 +5497,25 @@
     },
     {
       "app": "crm",
+      "canonicalPath": "/api/tenant/crm/v1/assignable-owners",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
+      "version": 1,
+      "routeKey": "crm.assignable.owners.get",
+      "method": "GET",
+      "pathPattern": "/api/v1/crm/assignable-owners",
+      "service": "crm-app",
+      "targetApp": "crm",
+      "upstreamPath": "/api/v1/crm/assignable-owners",
+      "routeClass": "AUTHENTICATED",
+      "idempotent": true,
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "SAFE_ON_TRANSPORT_FAILURE",
+      "organizationScopeMode": "BRANCH_REQUIRED",
+      "circuitBreakerKey": "crm-app.assignable-owners"
+    },
+    {
+      "app": "crm",
       "canonicalPath": "/api/tenant/crm/v1/attachments",
       "portalUsage": "TENANT_PORTAL",
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
@@ -5091,6 +5580,10 @@
       "targetApp": "crm",
       "upstreamPath": "/api/v1/crm/attachments/:id/download",
       "routeClass": "AUTHENTICATED",
+      "responseBody": {
+        "mode": "BINARY_STREAM",
+        "maxBytes": 26214400
+      },
       "idempotent": true,
       "circuitBreakerKey": "crm-app.crm"
     },
@@ -5107,65 +5600,13 @@
       "targetApp": "crm",
       "upstreamPath": "/api/v1/crm/attachments/upload",
       "routeClass": "WRITE_SENSITIVE",
+      "bodyLimitClass": "CRM_ATTACHMENT_MULTIPART",
       "idempotent": true,
       "idempotencyMode": "WRITE_SENSITIVE",
       "transportRetryMode": "NEVER",
       "domainIdempotencyOperation": "CRM.ATTACHMENT.UPLOAD",
       "fingerprintSchemaId": "crm.attachment.upload.v1",
       "maxReplayResponseBytes": 131072,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/calendar/events",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.calendar.events.get",
-      "method": "GET",
-      "pathPattern": "/api/v1/crm/calendar/events",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/calendar/events",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/calendar/events",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.calendar.events.post",
-      "method": "POST",
-      "pathPattern": "/api/v1/crm/calendar/events",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/calendar/events",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": "WRITE_SENSITIVE",
-      "transportRetryMode": "NEVER",
-      "domainIdempotencyOperation": "CRM.CALENDAR_EVENT.CREATE",
-      "fingerprintSchemaId": "crm.calendar.event.create.v1",
-      "maxReplayResponseBytes": 131072,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/calendar/events/:id",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.calendar.events.by.id.patch",
-      "method": "PATCH",
-      "pathPattern": "/api/v1/crm/calendar/events/:id",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/calendar/events/:id",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
       "circuitBreakerKey": "crm-app.crm"
     },
     {
@@ -7235,59 +7676,6 @@
     },
     {
       "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/reminders",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.reminders.get",
-      "method": "GET",
-      "pathPattern": "/api/v1/crm/reminders",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/reminders",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/reminders",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.reminders.post",
-      "method": "POST",
-      "pathPattern": "/api/v1/crm/reminders",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/reminders",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": "WRITE_SENSITIVE",
-      "transportRetryMode": "NEVER",
-      "domainIdempotencyOperation": "CRM.REMINDER.CREATE",
-      "fingerprintSchemaId": "crm.reminder.create.v1",
-      "maxReplayResponseBytes": 131072,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/reminders/:id/cancel",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.reminders.by.id.cancel.patch",
-      "method": "PATCH",
-      "pathPattern": "/api/v1/crm/reminders/:id/cancel",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/reminders/:id/cancel",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
       "canonicalPath": "/api/tenant/crm/v1/settings",
       "portalUsage": "TENANT_PORTAL",
       "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
@@ -7317,102 +7705,6 @@
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": false,
       "circuitBreakerKey": "crm-app.settings"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/settings/custom-fields",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.settings.custom.fields.get",
-      "method": "GET",
-      "pathPattern": "/api/v1/crm/settings/custom-fields",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/settings/custom-fields",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "circuitBreakerKey": "crm-app.custom-fields"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/settings/custom-fields",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.settings.custom.fields.post",
-      "method": "POST",
-      "pathPattern": "/api/v1/crm/settings/custom-fields",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/settings/custom-fields",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "circuitBreakerKey": "crm-app.custom-fields"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/settings/custom-fields/:id",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.settings.custom.fields.by.id.patch",
-      "method": "PATCH",
-      "pathPattern": "/api/v1/crm/settings/custom-fields/:id",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/settings/custom-fields/:id",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "circuitBreakerKey": "crm-app.custom-fields"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/settings/custom-fields/:id/requirements",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.settings.custom.fields.by.id.requirements.post",
-      "method": "POST",
-      "pathPattern": "/api/v1/crm/settings/custom-fields/:id/requirements",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/settings/custom-fields/:id/requirements",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "circuitBreakerKey": "crm-app.custom-fields"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/settings/custom-fields/values",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.settings.custom.fields.values.get",
-      "method": "GET",
-      "pathPattern": "/api/v1/crm/settings/custom-fields/values",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/settings/custom-fields/values",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "circuitBreakerKey": "crm-app.custom-fields"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/settings/custom-fields/values",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.settings.custom.fields.values.post",
-      "method": "POST",
-      "pathPattern": "/api/v1/crm/settings/custom-fields/values",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/settings/custom-fields/values",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "circuitBreakerKey": "crm-app.custom-fields"
     },
     {
       "app": "crm",
@@ -7509,59 +7801,6 @@
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": false,
       "circuitBreakerKey": "crm-app.tags"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/tasks",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.tasks.get",
-      "method": "GET",
-      "pathPattern": "/api/v1/crm/tasks",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/tasks",
-      "routeClass": "AUTHENTICATED",
-      "idempotent": true,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/tasks",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.tasks.post",
-      "method": "POST",
-      "pathPattern": "/api/v1/crm/tasks",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/tasks",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": true,
-      "idempotencyMode": "WRITE_SENSITIVE",
-      "transportRetryMode": "NEVER",
-      "domainIdempotencyOperation": "CRM.TASK.CREATE",
-      "fingerprintSchemaId": "crm.task.create.v1",
-      "maxReplayResponseBytes": 131072,
-      "circuitBreakerKey": "crm-app.crm"
-    },
-    {
-      "app": "crm",
-      "canonicalPath": "/api/tenant/crm/v1/tasks/:id",
-      "portalUsage": "TENANT_PORTAL",
-      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/crm.route-contracts.ts",
-      "version": 1,
-      "routeKey": "crm.tasks.by.id.patch",
-      "method": "PATCH",
-      "pathPattern": "/api/v1/crm/tasks/:id",
-      "service": "crm-app",
-      "targetApp": "crm",
-      "upstreamPath": "/api/v1/crm/tasks/:id",
-      "routeClass": "WRITE_SENSITIVE",
-      "idempotent": false,
-      "circuitBreakerKey": "crm-app.crm"
     },
     {
       "app": "crm",
@@ -11861,6 +12100,31 @@
       "upstreamPath": "/api/v1/trade/webhooks/subscriptions/:id",
       "routeClass": "WRITE_SENSITIVE",
       "idempotent": true,
+      "circuitBreakerKey": "trade-app.webhooks"
+    },
+    {
+      "app": "trade",
+      "canonicalPath": "/api/tenant/trade/v1/webhooks/subscriptions/:id/reveal-secret",
+      "portalUsage": "TENANT_PORTAL",
+      "sourceContract": "../backend/mutakamel-apps/api-gateway-app/src/routing-proxy/route-contracts/trade.route-contracts.ts",
+      "version": 1,
+      "routeKey": "trading.webhooks.subscriptions.by-id.reveal.secret.post",
+      "method": "POST",
+      "pathPattern": "/api/v1/trade/webhooks/subscriptions/:id/reveal-secret",
+      "service": "trade-app",
+      "targetApp": "trading",
+      "upstreamPath": "/api/v1/trade/webhooks/subscriptions/:id/reveal-secret",
+      "routeClass": "WRITE_SENSITIVE",
+      "idempotent": false,
+      "idempotencyMode": "NONE",
+      "transportRetryMode": "NEVER",
+      "organizationScopeMode": "OPTIONAL_COMPANY_BRANCH",
+      "domainIdempotencyOperation": null,
+      "fingerprintSchemaId": null,
+      "maxReplayResponseBytes": null,
+      "requiredPermissions": [
+        "trade.webhooks.manage"
+      ],
       "circuitBreakerKey": "trade-app.webhooks"
     },
     {

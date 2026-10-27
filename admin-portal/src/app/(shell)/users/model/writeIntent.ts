@@ -22,7 +22,7 @@ export class PendingAdminUserWriteError extends Error {
 
 export function claimAdminUserWriteIntent<T>(
   current: AdminUserWriteIntent<T> | null,
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   command: T,
   generate: () => string = generateUUIDv7,

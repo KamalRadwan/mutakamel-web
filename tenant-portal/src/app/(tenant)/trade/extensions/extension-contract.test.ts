@@ -3,7 +3,6 @@ import {
   EXTENSION_FIELDS_MAX,
   EXTENSION_PROFILES_PATH,
   EXTENSION_SCOPE_TARGETS,
-  EXTENSION_VERSION_STATUSES,
   EMPTY_EXTENSION_FIELD_DRAFT,
   buildCreateExtensionProfileRequest,
   buildUpdateExtensionProfileRequest,
@@ -48,12 +47,6 @@ describe("Trade extension profiles contract", () => {
     expect(EXTENSION_SCOPE_TARGETS).toEqual(["TENANT", "COMPANY"]);
   });
 
-  it("filters versions on a five-value subset of the seven-state ladder", () => {
-    expect(EXTENSION_VERSION_STATUSES).toHaveLength(5);
-    expect(EXTENSION_VERSION_STATUSES).not.toContain("APPROVAL_PENDING");
-    expect(EXTENSION_VERSION_STATUSES).not.toContain("SCHEDULED");
-  });
-
   it("sends the whole field set on an update, because there is no partial", () => {
     const fields = [
       { ...EMPTY_EXTENSION_FIELD_DRAFT, fieldKey: "warranty", decimalScale: "2" },
@@ -95,16 +88,14 @@ describe("Trade extension profiles contract", () => {
     ).toBe("ITEM.EXTRAS");
   });
 
-  it("separates the three failures that share DEFINITION_INVALID", () => {
-    // One code, three statuses: 404, 409 and 422 are distinct outcomes.
-    const code = "TRADE.EXTENSION.DEFINITION_INVALID";
-    expect(extensionMessage({ status: 404, code }, ar)).toBe(
+  it("separates missing, conflicting and invalid definitions by code", () => {
+    expect(extensionMessage({ status: 404, code: "TRADE.EXTENSION.DEFINITION_NOT_FOUND" }, ar)).toBe(
       ar.tradeAutomation.errorExtensionNotFound,
     );
-    expect(extensionMessage({ status: 409, code }, ar)).toBe(
+    expect(extensionMessage({ status: 409, code: "TRADE.EXTENSION.DEFINITION_CONFLICT" }, ar)).toBe(
       ar.tradeAutomation.errorExtensionConflict,
     );
-    expect(extensionMessage({ status: 422, code }, ar)).toBe(
+    expect(extensionMessage({ status: 422, code: "TRADE.EXTENSION.DEFINITION_INVALID" }, ar)).toBe(
       ar.tradeAutomation.errorExtensionInvalid,
     );
   });

@@ -47,6 +47,8 @@ function walk(directory) {
     if (entry.isDirectory()) {
       return SKIP_DIR_NAMES.has(entry.name) ? [] : walk(full);
     }
+    // Keep production counters aligned with ESLint's design-rule scope.
+    if (/\.(?:test|spec)\.tsx?$/.test(entry.name)) return [];
     return SOURCE_EXTENSIONS.has(extname(entry.name)) ? [full] : [];
   });
 }
@@ -79,15 +81,14 @@ const colorUtility = (family) =>
 const CHECKS = {
   colorUtilityTotal: colorUtility(`(?:${COLOR_FAMILIES.join("|")})`),
   roleRampUtilities: colorUtility(`(?:${ROLE_RAMPS.join("|")})`),
-  arbitraryTypeSize: /\btext-\[[0-9]+px\]/g,
-  fontBoldOrHeavier: /\bfont-(?:bold|extrabold|black)\b/g,
+  arbitraryTypeSize: /\btext-\[[0-9]+(?:\.[0-9]+)?px\]/g,
+  // Preserve the baseline key; CRM Leads v3 permits weights 700 and 800.
+  fontBoldOrHeavier: /\bfont-black\b/g,
   fontNormalOrMedium: /\bfont-(?:normal|medium)\b/g,
   roundedXlOrAbove: /\brounded-(?:xl|2xl|3xl)\b/g,
-  // Tailwind v4 renamed `bg-gradient-to-*` to `bg-linear-to-*`. Matching only
-  // the v3 spelling meant the counter could never fire against this codebase
-  // and the baseline read `gradients: 0` while a gradient existed (3.30).
-  // Both spellings are kept: v3 is still what a copy-pasted snippet carries.
-  gradients: /\bbg-(?:gradient|linear|radial|conic)-to-|\bbg-\[(?:linear|radial|conic)-gradient/g,
+  // Count raw v3/v4 gradients, including angles, bare radial/conic forms and
+  // arbitrary images. Named bg-gradient-* tokens are the sanctioned API.
+  gradients: /\bbg-(?:(?:linear|radial|conic)(?:-|\b)|gradient-to-|\[(?:image:)?(?:repeating-)?(?:linear|radial|conic)-gradient)/g,
   backdropBlur: /\bbackdrop-blur\b|\bbackdrop-blur-/g,
   handRolledButtons: /<button\b/g,
   handRolledTables: /<table\b/g,

@@ -319,9 +319,6 @@ export const COMMON_TIMEZONES = [
   "UTC",
 ] as const;
 
-export type NodeTypeValue = NodeType;
-export type NodeStatusValue = NodeStatus;
-
 export function parseBranchIdsPreview(raw: string): {
   validIds: string[];
   invalidEntries: string[];

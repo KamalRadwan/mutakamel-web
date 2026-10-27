@@ -12,7 +12,7 @@ export function MobileNav({ open, onOpenChange }: { open: boolean; onOpenChange:
       <SheetContent
         side="start"
         closeLabel={lang === "ar" ? "إغلاق التنقل الرئيسي" : "Close main navigation"}
-        className="w-[min(85vw,17rem)] gap-0 border-0 p-0"
+        className="w-[min(85vw,17rem)] gap-0 border-e border-line-column bg-surface-column p-0 text-foreground"
       >
         <SheetTitle className="sr-only">{lang === "ar" ? "التنقل الرئيسي" : "Main navigation"}</SheetTitle>
         <Sidebar

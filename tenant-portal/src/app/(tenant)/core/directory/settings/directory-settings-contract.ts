@@ -23,7 +23,6 @@ type DuplicateScope = (typeof DUPLICATE_SCOPES)[number];
 /** `UpdateDirectorySettingsDto` bounds. */
 const MAX_CONTACT_METHODS_PER_PARTY = 200;
 const MAX_ADDRESSES_PER_PARTY = 200;
-const MAX_PARTY_CACHE_TTL_SECONDS = 86_400;
 
 export interface DirectorySettings {
   duplicateScope: DuplicateScope;
@@ -32,7 +31,6 @@ export interface DirectorySettings {
   preventDuplicateWhatsapp: boolean;
   maxContactMethodsPerParty: number;
   maxAddressesPerParty: number;
-  partyCacheTtlSeconds: number;
 }
 
 export interface DirectorySettingsFormValues {
@@ -42,7 +40,6 @@ export interface DirectorySettingsFormValues {
   preventDuplicateWhatsapp: boolean;
   maxContactMethodsPerParty: string;
   maxAddressesPerParty: string;
-  partyCacheTtlSeconds: string;
 }
 
 export function toDirectorySettingsForm(
@@ -55,7 +52,6 @@ export function toDirectorySettingsForm(
     preventDuplicateWhatsapp: settings.preventDuplicateWhatsapp,
     maxContactMethodsPerParty: String(settings.maxContactMethodsPerParty),
     maxAddressesPerParty: String(settings.maxAddressesPerParty),
-    partyCacheTtlSeconds: String(settings.partyCacheTtlSeconds),
   };
 }
 
@@ -86,12 +82,6 @@ function parseDirectorySettings(payload: unknown): DirectorySettings {
       "maxAddressesPerParty",
       1,
       MAX_ADDRESSES_PER_PARTY,
-    ),
-    partyCacheTtlSeconds: boundedInteger(
-      settings,
-      "partyCacheTtlSeconds",
-      0,
-      MAX_PARTY_CACHE_TTL_SECONDS,
     ),
   };
 }
@@ -136,13 +126,6 @@ export function buildDirectorySettingsRequest(
     "DIRECTORY_SETTINGS_FORM_ADDRESSES",
   );
   if (addresses !== current.maxAddressesPerParty) request.maxAddressesPerParty = addresses;
-  const ttl = formInteger(
-    values.partyCacheTtlSeconds,
-    0,
-    MAX_PARTY_CACHE_TTL_SECONDS,
-    "DIRECTORY_SETTINGS_FORM_TTL",
-  );
-  if (ttl !== current.partyCacheTtlSeconds) request.partyCacheTtlSeconds = ttl;
   return request;
 }
 

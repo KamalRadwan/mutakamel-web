@@ -41,6 +41,22 @@ export interface ListRolesParams {
   sortDir?: string;
 }
 
+export type AssignableRolePurpose = "invite" | "assignment";
+
+export async function listAssignableRoles(purpose: AssignableRolePurpose, params: ListRolesParams = {}) {
+  const query = new URLSearchParams({
+    page: String(params.page || 1),
+    limit: String(params.limit || 100),
+    sortBy: "name",
+    sortDir: "ASC",
+  });
+  const res = await axiosClient.get<SuccessResponse<AdminRole[]>>(
+    `/api/admin/core/v1/roles/assignable-for-${purpose}?${query.toString()}`,
+    { cache: "no-store" },
+  );
+  return res.data;
+}
+
 export function normalizeErrorCode(error: unknown): AdminUserErrorCode | string | null {
   if (!error || typeof error !== "object") return null;
   const errObj = error as Record<string, unknown>;
@@ -125,6 +141,15 @@ export async function updateAdminUser(
   const res = await axiosClient.patch<SuccessResponse<AdminUser>>(
     `/api/admin/core/v1/users/${encodeURIComponent(id)}`,
     dto,
+    idempotentWrite(idempotencyKey),
+  );
+  return res.data.data;
+}
+
+export async function resendAdminInvite(id: string, idempotencyKey: string) {
+  const res = await axiosClient.post<SuccessResponse<AdminUser>>(
+    `/api/admin/core/v1/users/${encodeURIComponent(id)}/resend-invite`,
+    {},
     idempotentWrite(idempotencyKey),
   );
   return res.data.data;
@@ -262,7 +287,14 @@ export async function putExtensionServers(
 ): Promise<void> {
   await axiosClient.put<unknown>(
     userWebphoneServersPath(extensionId),
-    chain,
+    {
+      // Order comes from the array; priority is a response-only field.
+      servers: chain.map(({ serverId, timeoutSeconds, maxRetries }) => ({
+        serverId,
+        timeoutSeconds,
+        maxRetries,
+      })),
+    },
     idempotentWrite(idempotencyKey),
   );
 }

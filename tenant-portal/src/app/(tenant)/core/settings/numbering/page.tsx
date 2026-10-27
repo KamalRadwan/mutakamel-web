@@ -27,6 +27,10 @@ export default function NumberingPage() {
   const {
     t,
     canManage,
+    canCreate,
+    canManageScope,
+    tenantWideAllowed,
+    manageableCompanies,
     companies,
     items,
     pageInfo,
@@ -102,7 +106,7 @@ export default function NumberingPage() {
             header: t.common.actions,
             align: "end" as const,
             sticky: "end" as const,
-            cell: (sequence: NumberingSequence) => (
+            cell: (sequence: NumberingSequence) => canManageScope(sequence.companyId) ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -116,7 +120,7 @@ export default function NumberingPage() {
                 </TooltipTrigger>
                 <TooltipContent>{t.coreSettings.numberingEditTitle}</TooltipContent>
               </Tooltip>
-            ),
+            ) : null,
           },
         ]
       : []),
@@ -125,11 +129,11 @@ export default function NumberingPage() {
   return (
     <PermissionGate require="numbering.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.coreSettings.numberingTitle}
           description={t.coreSettings.numberingSubtitle}
           primaryAction={
-            canManage ? { label: t.coreSettings.numberingCreate, onClick: openCreate } : undefined
+            canCreate ? { label: t.coreSettings.numberingCreate, onClick: openCreate } : undefined
           }
           secondaryActions={
             <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
@@ -202,7 +206,8 @@ export default function NumberingPage() {
         <CreateNumberingSequenceModal
           key={createOpen ? "create-open" : "create-closed"}
           isOpen={createOpen}
-          companies={companies}
+          companies={manageableCompanies}
+          tenantWideAllowed={tenantWideAllowed}
           onClose={closeCreate}
           onSubmit={create}
           isSubmitting={isSubmitting}

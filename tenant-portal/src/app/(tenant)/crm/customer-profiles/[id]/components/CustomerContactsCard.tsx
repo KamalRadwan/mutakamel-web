@@ -2,28 +2,24 @@
 
 import { useState } from "react";
 import {
-  Briefcase,
   Check,
   Loader2,
-  Mail,
   Pencil,
-  Phone,
   Plus,
   Star,
   Trash2,
-  User,
-  UserPlus,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
-import { Badge, Button, cn, focusRing } from "@/design-system";
+import { Badge, Button, Field, Input, cn } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { CustomerPhoneActionsRow } from "../../components/CustomerPhoneActionsRow";
+import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
 import {
   parseAddContactResponse,
   parseCustomerProfileDetailResponse,
-  type CustomerProfileContact,
   type CustomerProfileDetail,
 } from "../../customer-profile-contract";
 import { buildAddCustomerContactRequest } from "../../customer-profile-write-contract";
@@ -37,8 +33,12 @@ export interface CustomerContactsCardProps {
   onReconcile?: () => void;
 }
 
-const COMPACT_BADGE =
-  "shrink-0 px-1.5 py-0.5 text-2xs font-medium leading-none normal-case tracking-normal";
+function getContactInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+}
 
 export function CustomerContactsCard({
   profile,
@@ -47,10 +47,9 @@ export function CustomerContactsCard({
   onSaved,
   onReconcile,
 }: CustomerContactsCardProps) {
-  const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t } = useI18n();
+  const describeError = useCrmErrorText();
   const detail = t.crmLeadDetail;
-  const unavailable = t.crmCustomerProfiles.unavailable;
   const isCorporate = profile.profileType === "CORPORATE";
   const sortedContacts = [...profile.contacts].sort(
     (a, b) => Number(b.isPrimary) - Number(a.isPrimary),
@@ -132,22 +131,12 @@ export function CustomerContactsCard({
       let body: Record<string, unknown>;
       if (isCorporate) {
         body = {
-          contacts: corporateDraft.map((c) => {
-            const fullName =
-              [c.firstName.trim(), c.lastName.trim()]
-                .filter(Boolean)
-                .join(" ") || c.displayName;
-            return {
-              contactPartyId: c.partyId,
-              fullName,
-              firstName: c.firstName.trim() || undefined,
-              lastName: c.lastName.trim() || undefined,
-              jobTitle: c.jobTitle.trim() || undefined,
-              email: c.email.trim() || undefined,
-              phones: c.phone.trim() ? [c.phone.trim()] : [],
-              isPrimary: c.isPrimary,
-            };
-          }),
+          contacts: corporateDraft.map((c) => ({
+            contactPartyId: c.partyId,
+            fullName: c.displayName,
+            jobTitle: c.jobTitle.trim() || undefined,
+            isPrimary: c.isPrimary,
+          })),
         };
       } else {
         const cleanPhones = individualDraft.phones
@@ -188,7 +177,7 @@ export function CustomerContactsCard({
         setIsEditing(false);
       } else {
         setErrorMsg(
-          outcome.error.message ?? t.crmCustomerProfiles.cardUpdateFailed,
+          describeError(outcome.error) ?? t.crmCustomerProfiles.cardUpdateFailed,
         );
         if (
           outcome.kind === "ambiguous" ||
@@ -229,7 +218,7 @@ export function CustomerContactsCard({
         onReconcile?.();
       } else {
         setErrorMsg(
-          outcome.error.message ?? t.crmCustomerProfiles.cardUpdateFailed,
+          describeError(outcome.error) ?? t.crmCustomerProfiles.cardUpdateFailed,
         );
         if (
           outcome.kind === "ambiguous" ||
@@ -246,66 +235,65 @@ export function CustomerContactsCard({
 
   return (
     <section
+      role="region"
       aria-label={
         isCorporate
           ? t.crmCustomerProfiles.create.sections.contacts
           : t.crmLeads.create.contactDetailsTitle
       }
-      className="dossier-card dossier-card-teal"
+      className={cn(
+        "dossier-card w-full min-w-0",
+        isCorporate ? "dossier-card-cyan" : "dossier-card-violet",
+      )}
     >
-      <div className="dossier-card-header">
-        <div className="dossier-card-title-group">
-          <div className="dossier-card-icon">
+      <div className="dossier-card-head">
+        <div className="dossier-card-title-wrap">
+          <span className="dossier-card-head-icon" aria-hidden="true">
             {isCorporate ? (
               <Users className="size-4" aria-hidden="true" />
             ) : (
-              <User className="size-4" aria-hidden="true" />
+              <UserRound className="size-4" aria-hidden="true" />
             )}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="dossier-card-title">
-                {isCorporate
-                  ? t.crmCustomerProfiles.create.sections.contacts
-                  : t.crmLeads.create.contactDetailsTitle}
-              </h3>
-              {isCorporate && (
-                <Badge tone="neutral" className={COMPACT_BADGE}>
-                  {profile.contacts.length}
-                </Badge>
-              )}
-            </div>
-            <p className="dossier-card-subtitle">
-              {isCorporate
-                ? isAr
-                  ? "صنّاع القرار وجهات الاتصال المعتمدة لدى الشركة"
-                  : "Decision makers & authorized corporate contacts"
-                : isAr
-                  ? "بيانات التواصل المباشر للعميل الفرد"
-                  : "Direct communication channels for this individual customer"}
-            </p>
-          </div>
+          </span>
+          <h2 className="dossier-card-title">
+            {isCorporate
+              ? t.crmCustomerProfiles.create.sections.contacts
+              : t.crmLeads.create.contactDetailsTitle}
+          </h2>
+          {isCorporate && (
+            <span className="dossier-card-badge">
+              {profile.contacts.length}
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="dossier-card-badge">
+            {t.crmCustomerProfiles.profileTypes[profile.profileType]}
+          </span>
+
           {canEdit &&
             onSaved &&
             !isEditing &&
             (!isCorporate || profile.contacts.length > 0) && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 onClick={handleStartEdit}
-                className="dossier-edit-btn"
+                className="dossier-btn dossier-btn-sm"
               >
-                <Pencil className="size-3.5" aria-hidden="true" />
+                <Pencil className="size-3" aria-hidden="true" />
                 <span>{t.crmTags.edit}</span>
-              </button>
+              </Button>
             )}
 
           {isCorporate && canEdit && (
             <Button
-              variant="outline"
+              type="button"
+              variant="ghost"
               size="xs"
+              className="dossier-btn dossier-btn-cyan"
               onClick={() => {
                 if (onAddContact) {
                   onAddContact();
@@ -314,133 +302,218 @@ export function CustomerContactsCard({
                 }
               }}
             >
-              <UserPlus className="size-3.5" aria-hidden="true" />
-              {t.crmCustomerProfileActions.addContact}
+              <Plus className="size-3.5" aria-hidden="true" />
+              <span>{t.crmCustomerProfileActions.addContact}</span>
             </Button>
           )}
         </div>
       </div>
 
-      <div className="dossier-card-body space-y-3">
-        {errorMsg && (
+      {errorMsg && (
+        <div className="px-3.5 pt-3">
           <p
             role="alert"
-            className="rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive"
+            className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
           >
             {errorMsg}
           </p>
-        )}
+        </div>
+      )}
 
-        {/* Inline Add Contact Composer (when used inside Quick Modal or without external dialog) */}
+      <div className="dossier-card-body flex flex-col gap-2.5">
+        {/* Inline Add Contact Composer */}
         {isAddingInline && isCorporate && (
-          <div className="space-y-2.5 rounded-xl border border-teal-500/35 bg-teal-500/[0.04] p-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-teal-800 dark:text-teal-200">
-                {t.crmCustomerProfileActions.addContactTitle}
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsAddingInline(false)}
-                className="rounded p-0.5 text-muted-foreground hover:bg-muted"
-              >
-                <X className="size-3.5" />
-              </button>
+          <div className="dossier-contact-card editing min-w-0">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-swatch-teal-soft pb-2.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-swatch-teal-soft bg-swatch-teal-soft text-swatch-teal-deep"
+                  aria-hidden="true"
+                >
+                  <Plus className="size-3.5" />
+                </span>
+                <span className="text-xs font-semibold text-foreground">
+                  {t.crmCustomerProfileActions.addContactTitle}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={saving}
+                  onClick={() => setIsAddingInline(false)}
+                  className="dossier-btn dossier-btn-cancel"
+                >
+                  <X className="size-3.5" aria-hidden="true" />
+                  <span>{t.common.cancel}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={saving || !newContactDraft.firstName.trim()}
+                  onClick={() => void handleSaveInlineNewContact()}
+                  className="dossier-btn dossier-btn-save"
+                >
+                  {saving ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Check className="size-3.5" aria-hidden="true" />
+                  )}
+                  <span>{t.common.create}</span>
+                </Button>
+              </div>
             </div>
+
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <input
-                type="text"
-                value={newContactDraft.firstName}
-                onChange={(e) =>
-                  setNewContactDraft((d) => ({
-                    ...d,
-                    firstName: e.target.value,
-                  }))
-                }
-                placeholder={`${t.crmLeads.create.firstName} *`}
-                className="h-8 rounded-lg border border-border bg-background px-2.5 text-xs"
-              />
-              <input
-                type="text"
-                value={newContactDraft.lastName}
-                onChange={(e) =>
-                  setNewContactDraft((d) => ({
-                    ...d,
-                    lastName: e.target.value,
-                  }))
-                }
-                placeholder={t.crmLeads.create.lastName}
-                className="h-8 rounded-lg border border-border bg-background px-2.5 text-xs"
-              />
-              <input
-                type="text"
-                value={newContactDraft.jobTitle}
-                onChange={(e) =>
-                  setNewContactDraft((d) => ({
-                    ...d,
-                    jobTitle: e.target.value,
-                  }))
-                }
-                placeholder={t.crmLeads.create.contactJobTitle}
-                className="h-8 rounded-lg border border-border bg-background px-2.5 text-xs"
-              />
-              <input
-                type="tel"
-                dir="ltr"
-                value={newContactDraft.phone}
-                onChange={(e) =>
-                  setNewContactDraft((d) => ({ ...d, phone: e.target.value }))
-                }
-                placeholder={t.crmLeads.phone}
-                className="h-8 rounded-lg border border-border bg-background px-2.5 font-mono text-xs"
-              />
-              <input
-                type="email"
-                dir="ltr"
-                value={newContactDraft.email}
-                onChange={(e) =>
-                  setNewContactDraft((d) => ({ ...d, email: e.target.value }))
-                }
-                placeholder={t.crmCustomerProfiles.email}
-                className="h-8 rounded-lg border border-border bg-background px-2.5 text-xs sm:col-span-2"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setIsAddingInline(false)}
-                className="rounded-lg border border-border px-2.5 py-1 text-xs font-semibold"
-              >
-                {t.common.cancel}
-              </button>
-              <button
-                type="button"
-                disabled={saving || !newContactDraft.firstName.trim()}
-                onClick={() => void handleSaveInlineNewContact()}
-                className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1 text-xs font-bold text-white hover:bg-teal-700 disabled:opacity-50"
-              >
-                {saving && <Loader2 className="size-3 animate-spin" />}
-                {t.common.create}
-              </button>
+              <div className="dossier-field-box">
+                <Field label={`${t.crmLeads.create.firstName} *`}>
+                  <Input
+                    size="sm"
+                    value={newContactDraft.firstName}
+                    onChange={(e) =>
+                      setNewContactDraft((d) => ({
+                        ...d,
+                        firstName: e.target.value,
+                      }))
+                    }
+                    placeholder={t.crmLeads.create.firstName}
+                  />
+                </Field>
+              </div>
+              <div className="dossier-field-box">
+                <Field label={t.crmLeads.create.lastName}>
+                  <Input
+                    size="sm"
+                    value={newContactDraft.lastName}
+                    onChange={(e) =>
+                      setNewContactDraft((d) => ({
+                        ...d,
+                        lastName: e.target.value,
+                      }))
+                    }
+                    placeholder={t.crmLeads.create.lastName}
+                  />
+                </Field>
+              </div>
+              <div className="dossier-field-box">
+                <Field label={t.crmLeads.create.contactJobTitle}>
+                  <Input
+                    size="sm"
+                    value={newContactDraft.jobTitle}
+                    onChange={(e) =>
+                      setNewContactDraft((d) => ({
+                        ...d,
+                        jobTitle: e.target.value,
+                      }))
+                    }
+                    placeholder={t.crmLeads.create.contactJobTitle}
+                  />
+                </Field>
+              </div>
+              <div className="dossier-field-box">
+                <Field label={t.crmLeads.phone}>
+                  <Input
+                    size="sm"
+                    type="tel"
+                    dir="ltr"
+                    value={newContactDraft.phone}
+                    onChange={(e) =>
+                      setNewContactDraft((d) => ({
+                        ...d,
+                        phone: e.target.value,
+                      }))
+                    }
+                    placeholder={t.crmLeads.phone}
+                    className="font-mono"
+                  />
+                </Field>
+              </div>
+              <div className="dossier-field-box sm:col-span-2">
+                <Field label={t.crmCustomerProfiles.email}>
+                  <Input
+                    size="sm"
+                    type="email"
+                    dir="ltr"
+                    value={newContactDraft.email}
+                    onChange={(e) =>
+                      setNewContactDraft((d) => ({
+                        ...d,
+                        email: e.target.value,
+                      }))
+                    }
+                    placeholder={t.crmCustomerProfiles.email}
+                  />
+                </Field>
+              </div>
             </div>
           </div>
         )}
 
         {/* Inline Edit Mode */}
         {isEditing ? (
-          <div className="space-y-3 rounded-xl border border-teal-500/30 bg-teal-500/[0.03] p-3">
+          <div className="dossier-contact-card editing min-w-0">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-swatch-teal-soft pb-2.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-swatch-teal-soft bg-swatch-teal-soft text-swatch-teal-deep"
+                  aria-hidden="true"
+                >
+                  <Pencil className="size-3.5" />
+                </span>
+                <span className="text-xs font-semibold text-foreground">
+                  {detail.editContact}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={saving}
+                  onClick={() => setIsEditing(false)}
+                  className="dossier-btn dossier-btn-cancel"
+                >
+                  <X className="size-3.5" aria-hidden="true" />
+                  <span>{t.common.cancel}</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={saving}
+                  onClick={() => void handleSaveEdit()}
+                  className="dossier-btn dossier-btn-save"
+                >
+                  {saving ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Check className="size-3.5" aria-hidden="true" />
+                  )}
+                  <span>{t.common.save}</span>
+                </Button>
+              </div>
+            </div>
+
             {isCorporate ? (
               <div className="space-y-2.5">
+                <p className="text-sm text-muted-foreground">
+                  {t.crmCustomerProfiles.existingContactReadOnly}
+                </p>
                 {corporateDraft.map((contact, idx) => (
                   <div
                     key={contact.partyId || idx}
-                    className="space-y-2 rounded-lg border border-border/80 bg-card p-2.5"
+                    className="dossier-field-box space-y-2 p-2.5"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-foreground">
+                      <span className="text-xs font-semibold text-foreground">
                         {contact.displayName}
                       </span>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() =>
                           setCorporateDraft((list) =>
                             list.map((item, i) => ({
@@ -450,9 +523,9 @@ export function CustomerContactsCard({
                           )
                         }
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors",
+                          "h-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold transition-colors",
                           contact.isPrimary
-                            ? "bg-teal-500/15 text-teal-700 dark:text-teal-300"
+                            ? "bg-swatch-teal-soft text-swatch-teal-deep"
                             : "bg-muted text-muted-foreground hover:text-foreground",
                         )}
                       >
@@ -463,11 +536,11 @@ export function CustomerContactsCard({
                           )}
                         />
                         {detail.primaryContact}
-                      </button>
+                      </Button>
                     </div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      <input
-                        type="text"
+                      <Input
+                        size="sm"
                         value={contact.jobTitle}
                         onChange={(e) =>
                           setCorporateDraft((list) =>
@@ -479,39 +552,23 @@ export function CustomerContactsCard({
                           )
                         }
                         placeholder={t.crmLeads.create.contactJobTitle}
-                        className="h-7 rounded border border-border bg-background px-2 text-xs"
                       />
-                      <input
+                      <Input
+                        size="sm"
                         type="tel"
                         dir="ltr"
                         value={contact.phone}
-                        onChange={(e) =>
-                          setCorporateDraft((list) =>
-                            list.map((item, i) =>
-                              i === idx
-                                ? { ...item, phone: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
+                        readOnly
                         placeholder={t.crmLeads.phone}
-                        className="h-7 rounded border border-border bg-background px-2 font-mono text-xs"
+                        className="font-mono"
                       />
-                      <input
+                      <Input
+                        size="sm"
                         type="email"
                         dir="ltr"
                         value={contact.email}
-                        onChange={(e) =>
-                          setCorporateDraft((list) =>
-                            list.map((item, i) =>
-                              i === idx
-                                ? { ...item, email: e.target.value }
-                                : item,
-                            ),
-                          )
-                        }
+                        readOnly
                         placeholder={t.crmCustomerProfiles.email}
-                        className="h-7 rounded border border-border bg-background px-2 text-xs"
                       />
                     </div>
                   </div>
@@ -519,81 +576,80 @@ export function CustomerContactsCard({
               </div>
             ) : (
               <div className="space-y-2.5">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
-                      {t.crmLeads.create.firstName} *
-                    </label>
-                    <input
-                      type="text"
-                      value={individualDraft.firstName}
-                      onChange={(e) =>
-                        setIndividualDraft((d) => ({
-                          ...d,
-                          firstName: e.target.value,
-                        }))
-                      }
-                      className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs"
-                    />
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="dossier-field-box">
+                    <Field label={`${t.crmLeads.create.firstName} *`}>
+                      <Input
+                        size="sm"
+                        value={individualDraft.firstName}
+                        onChange={(e) =>
+                          setIndividualDraft((d) => ({
+                            ...d,
+                            firstName: e.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
-                      {t.crmLeads.create.lastName}
-                    </label>
-                    <input
-                      type="text"
-                      value={individualDraft.lastName}
-                      onChange={(e) =>
-                        setIndividualDraft((d) => ({
-                          ...d,
-                          lastName: e.target.value,
-                        }))
-                      }
-                      className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs"
-                    />
+                  <div className="dossier-field-box">
+                    <Field label={t.crmLeads.create.lastName}>
+                      <Input
+                        size="sm"
+                        value={individualDraft.lastName}
+                        onChange={(e) =>
+                          setIndividualDraft((d) => ({
+                            ...d,
+                            lastName: e.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <div className="dossier-field-box sm:col-span-2">
+                    <Field label={t.crmCustomerProfiles.email}>
+                      <Input
+                        size="sm"
+                        type="email"
+                        dir="ltr"
+                        value={individualDraft.email}
+                        onChange={(e) =>
+                          setIndividualDraft((d) => ({
+                            ...d,
+                            email: e.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
                   </div>
                 </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-bold text-muted-foreground">
-                    {t.crmCustomerProfiles.email}
-                  </label>
-                  <input
-                    type="email"
-                    dir="ltr"
-                    value={individualDraft.email}
-                    onChange={(e) =>
-                      setIndividualDraft((d) => ({
-                        ...d,
-                        email: e.target.value,
-                      }))
-                    }
-                    className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs"
-                  />
-                </div>
-                <div className="space-y-1.5">
+
+                <div className="dossier-phone-box-edit space-y-1.5 p-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-muted-foreground">
-                      {t.crmLeadBoard.phones}
+                    <span className="dossier-phone-box-label">
+                      📞 {t.crmLeadBoard.phones}
                     </span>
                     {individualDraft.phones.length < 5 && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() =>
                           setIndividualDraft((d) => ({
                             ...d,
                             phones: [...d.phones, ""],
                           }))
                         }
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-600 hover:underline dark:text-teal-400"
+                        className="dossier-btn-action dossier-btn-action-emerald"
                       >
                         <Plus className="size-3" />
-                        {isAr ? "إضافة رقم" : "Add phone"}
-                      </button>
+                        <span>{t.crmCustomerProfiles.ui.contacts.addPhone}</span>
+                      </Button>
                     )}
                   </div>
                   {individualDraft.phones.map((phone, idx) => (
                     <div key={idx} className="flex items-center gap-1.5">
-                      <input
+                      <Input
+                        size="sm"
                         type="tel"
                         dir="ltr"
                         value={phone}
@@ -605,219 +661,240 @@ export function CustomerContactsCard({
                             ),
                           }))
                         }
-                        className="h-8 flex-1 rounded-lg border border-border bg-background px-2.5 font-mono text-xs"
+                        className="flex-1 font-mono"
                       />
                       {individualDraft.phones.length > 1 && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="xs"
                           onClick={() =>
                             setIndividualDraft((d) => ({
                               ...d,
                               phones: d.phones.filter((_, i) => i !== idx),
                             }))
                           }
-                          className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive"
+                          className="inline-flex size-7 items-center justify-center rounded-lg p-0 text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="size-3.5" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
-
-            <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => setIsEditing(false)}
-                className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-              >
-                <X className="size-3.5" />
-                {t.common.cancel}
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void handleSaveEdit()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-teal-700 disabled:opacity-50"
-              >
-                {saving ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Check className="size-3.5" />
-                )}
-                {t.common.save}
-              </button>
-            </div>
           </div>
         ) : isCorporate ? (
           sortedContacts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-6 text-center text-muted-foreground">
-              <Users className="mb-1.5 size-6 opacity-40" aria-hidden="true" />
-              <p className="text-xs font-medium">{detail.contactsEmpty}</p>
-            </div>
+            !isAddingInline && (
+              <p className="text-xs text-muted-foreground">
+                {detail.contactsEmpty}
+              </p>
+            )
           ) : (
-            <ul className="flex flex-col gap-2.5">
-              {sortedContacts.map((contact) => (
-                <CorporateContactItem
-                  key={contact.partyId}
-                  contact={contact}
-                  country={profile.address?.country}
-                />
-              ))}
-            </ul>
+            sortedContacts.map((contact) => (
+              <CustomerContactReadCard
+                key={contact.partyId}
+                name={contact.displayName}
+                honorificTitle={contact.honorificTitle}
+                jobTitle={contact.jobTitle}
+                phones={contact.phones}
+                email={contact.email}
+                country={profile.address?.country ?? undefined}
+                isPrimary={contact.isPrimary}
+                showJobTitle
+                onEdit={canEdit && onSaved ? handleStartEdit : undefined}
+              />
+            ))
           )
         ) : (
-          <IndividualContactView profile={profile} unavailable={unavailable} />
+          <CustomerContactReadCard
+            name={profile.displayName}
+            jobTitle={null}
+            phones={
+              profile.phones.length > 0
+                ? profile.phones
+                : profile.primaryMobile
+                  ? [profile.primaryMobile]
+                  : []
+            }
+            email={profile.email}
+            country={profile.address?.country ?? undefined}
+            showJobTitle={false}
+            onEdit={canEdit && onSaved ? handleStartEdit : undefined}
+          />
         )}
       </div>
     </section>
   );
 }
 
-function CorporateContactItem({
-  contact,
+function CustomerContactReadCard({
+  name,
+  honorificTitle,
+  jobTitle,
+  phones,
+  email,
   country,
+  isPrimary,
+  showJobTitle = true,
+  onEdit,
 }: {
-  contact: CustomerProfileContact;
-  country?: string | null;
+  name: string;
+  honorificTitle?: string | null;
+  jobTitle: string | null;
+  phones: string[];
+  email: string | null;
+  country?: string;
+  isPrimary?: boolean;
+  showJobTitle?: boolean;
+  onEdit?: () => void;
 }) {
   const { t } = useI18n();
-  const detail = t.crmLeadDetail;
+  const initials = getContactInitials(name);
 
   return (
-    <li
+    <div
       className={cn(
-        "flex flex-col gap-2 rounded-xl border p-3 transition-colors",
-        contact.isPrimary
-          ? "border-teal-500/35 bg-teal-500/[0.04]"
-          : "border-border/70 bg-muted/20",
+        "dossier-contact-card w-full min-w-0",
+        isPrimary && "primary",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-            {contact.displayName.slice(0, 2).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {contact.honorificTitle && (
-                <span className="text-xs font-medium text-muted-foreground">
-                  {contact.honorificTitle}.
+      {/* Horizontal 2-Row Layout:
+          Row 1: Full Name (with Avatar, Primary badge & Edit button) | Job Title | Email
+          Row 2: Phone box spanning full horizontal width with inline Call / WhatsApp / Telegram */}
+      <dl className="grid grid-cols-1 gap-2 sm:grid-cols-12">
+        {/* Row 1, Col 1: Full Name */}
+        <div
+          className={cn(
+            "dossier-field-box flex min-w-0 flex-col justify-center",
+            showJobTitle ? "sm:col-span-6" : "sm:col-span-7",
+          )}
+        >
+          <dt className="dossier-field-label">{t.crmLeadDetail.fullName}</dt>
+          <dd className="dossier-field-val mt-0.5 min-w-0 text-xs text-foreground">
+            <span className="flex w-full min-w-0 items-center justify-between gap-2">
+              <span className="flex min-w-0 flex-wrap items-center gap-1.5 font-semibold text-foreground">
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-2xs font-semibold text-primary-foreground shadow-2xs",
+                    isPrimary
+                      ? "bg-swatch-green"
+                      : "bg-swatch-indigo",
+                  )}
+                >
+                  {initials}
+                </span>
+                {honorificTitle && (
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {honorificTitle}.
+                  </span>
+                )}
+                <span className="truncate text-xs font-semibold text-foreground">
+                  {name}
+                </span>
+                {isPrimary && (
+                  <Badge
+                    tone="positive"
+                    className="dossier-badge-primary shrink-0 gap-1"
+                  >
+                    <Star className="size-3 fill-current" aria-hidden="true" />
+                    {t.crmLeadDetail.primaryContact}
+                  </Badge>
+                )}
+              </span>
+
+              {onEdit && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="dossier-btn dossier-btn-sm shrink-0"
+                  aria-label={t.crmLeadDetail.editContact + ": " + name}
+                  title={t.crmLeadDetail.editContact}
+                  onClick={onEdit}
+                >
+                  <Pencil className="size-3" aria-hidden="true" />
+                  <span>{t.crmTags.edit}</span>
+                </Button>
+              )}
+            </span>
+          </dd>
+        </div>
+
+        {/* Row 1, Col 2: Job Title (Corporate) */}
+        {showJobTitle && (
+          <div className="dossier-field-box flex min-w-0 flex-col justify-center sm:col-span-3">
+            <dt className="dossier-field-label">
+              {t.crmLeadConvert.contactJobTitle}
+            </dt>
+            <dd className="dossier-field-val mt-0.5 min-w-0 wrap-anywhere text-xs text-foreground">
+              {jobTitle ? (
+                <span className="inline-flex items-center rounded-md border border-swatch-teal-soft bg-swatch-teal-soft px-2 py-0.5 text-2xs font-semibold text-swatch-teal-deep">
+                  {jobTitle}
+                </span>
+              ) : (
+                <span className="dossier-field-empty">
+                  {t.detail.notRecorded}
                 </span>
               )}
-              <span className="truncate text-sm font-semibold text-foreground">
-                {contact.displayName}
-              </span>
-              {contact.isPrimary && (
-                <Badge tone="brand" className={COMPACT_BADGE}>
-                  {detail.primaryContact}
-                </Badge>
-              )}
-            </div>
-            {contact.jobTitle && (
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Briefcase className="size-3 shrink-0" aria-hidden="true" />
-                <span className="truncate">{contact.jobTitle}</span>
-              </p>
-            )}
+            </dd>
           </div>
-        </div>
-
-        {contact.email && (
-          <a
-            href={`mailto:${contact.email}`}
-            dir="ltr"
-            className={cn(
-              "inline-flex items-center gap-1 rounded-xs text-xs text-primary hover:underline",
-              focusRing,
-            )}
-          >
-            <Mail className="size-3.5 shrink-0" aria-hidden="true" />
-            <span className="truncate">{contact.email}</span>
-          </a>
         )}
-      </div>
 
-      {contact.phones.length > 0 && (
-        <div className="flex flex-col gap-1 border-t border-border/60 pt-2">
-          {contact.phones.map((phone, index) => (
-            <CustomerPhoneActionsRow
-              key={`${phone}-${index}`}
-              phone={phone}
-              country={country ?? undefined}
-            />
-          ))}
-        </div>
-      )}
-    </li>
-  );
-}
-
-function IndividualContactView({
-  profile,
-  unavailable,
-}: {
-  profile: CustomerProfileDetail;
-  unavailable: string;
-}) {
-  const { t } = useI18n();
-
-  return (
-    <div className="space-y-3">
-      <dl className="dossier-field-grid">
-        <div className="dossier-field">
-          <dt className="dossier-field-label">{t.crmCustomerProfiles.name}</dt>
-          <dd className="dossier-field-value">{profile.displayName}</dd>
-        </div>
-        <div className="dossier-field">
-          <dt className="dossier-field-label">{t.crmCustomerProfiles.email}</dt>
-          <dd
-            className={cn(
-              "dossier-field-value",
-              !profile.email && "dossier-field-empty",
-            )}
-          >
-            {profile.email ? (
+        {/* Row 1, Col 3: Email */}
+        <div
+          className={cn(
+            "dossier-field-box flex min-w-0 flex-col justify-center",
+            showJobTitle ? "sm:col-span-3" : "sm:col-span-5",
+          )}
+        >
+          <dt className="dossier-field-label">{t.crmLeads.email}</dt>
+          <dd className="dossier-field-val mt-0.5 min-w-0 wrap-anywhere text-xs text-foreground">
+            {email ? (
               <a
-                href={`mailto:${profile.email}`}
                 dir="ltr"
-                className={cn(
-                  "inline-flex items-center gap-1.5 text-primary hover:underline",
-                  focusRing,
-                )}
+                href={"mailto:" + email}
+                className="dossier-field-link truncate font-medium"
               >
-                <Mail className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{profile.email}</span>
+                {email}
               </a>
             ) : (
-              unavailable
+              <span className="dossier-field-empty">
+                {t.detail.notRecorded}
+              </span>
+            )}
+          </dd>
+        </div>
+
+        {/* Row 2: Full-Width Horizontal Phone Strip */}
+        <div className="dossier-phone-box-view mb-0 min-w-0 p-2.5 sm:col-span-12">
+          <dt className="dossier-phone-box-label mb-1.5">
+            📞 {t.crmLeads.phone} {phones.length > 0 ? `(${phones.length})` : ""}
+          </dt>
+          <dd className="min-w-0 text-xs text-foreground">
+            {phones.length > 0 ? (
+              <div className="flex flex-col gap-1.5">
+                {phones.map((phone, index) => (
+                  <CustomerPhoneActionsRow
+                    key={`${phone}-${index}`}
+                    phone={phone}
+                    country={country}
+                    badge={index === 0 ? t.crmLeads.phone : `#${index + 1}`}
+                  />
+                ))}
+              </div>
+            ) : (
+              <span className="dossier-field-empty">
+                {t.detail.notRecorded}
+              </span>
             )}
           </dd>
         </div>
       </dl>
-
-      <div className="space-y-1.5 border-t border-border/60 pt-3">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-          <Phone className="size-3.5" aria-hidden="true" />
-          <span>{t.crmLeadBoard.phones}</span>
-        </div>
-        {profile.phones.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            {profile.phones.map((phone, index) => (
-              <CustomerPhoneActionsRow
-                key={`${phone}-${index}`}
-                phone={phone}
-                country={profile.address?.country ?? undefined}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">{unavailable}</p>
-        )}
-      </div>
     </div>
   );
 }
+
+

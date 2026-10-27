@@ -1,6 +1,8 @@
 "use client";
 
 import { use, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import {
   Badge,
@@ -19,6 +21,7 @@ import {
   useToast,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { CrmScopeGate } from "../../shared/components/CrmScopeGate";
 import {
   RETRY_REASON_MAX_LENGTH,
   type OutboundEmailStatus,
@@ -40,6 +43,7 @@ export default function OutboundEmailDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const { t } = useI18n();
   const toast = useToast();
   const detail = useOutboundEmailDetail(id);
@@ -51,7 +55,14 @@ export default function OutboundEmailDetailPage({
   return (
     <PermissionGate require="crm.activities.read" scoped>
       <div className="flex flex-col gap-4">
-        {detail.notFound ? (
+        {detail.queryError?.status === 403 && detail.queryError.code === "CRM_FEATURE_DISABLED" ? (
+          <ErrorState
+            title={t.crmOutboundEmails.featureDisabledTitle}
+            description={t.crmOutboundEmails.featureDisabledDescription}
+          />
+        ) : detail.queryError?.status === 403 ? (
+          <CrmScopeGate />
+        ) : detail.notFound ? (
           <NotFoundState
             title={t.crmOutboundEmails.notFoundTitle}
             description={t.crmOutboundEmails.notFoundDescription}
@@ -96,10 +107,7 @@ export default function OutboundEmailDetailPage({
                 },
               ]}
               primaryAction={
-                // Retry is offered only on a FAILED message: the route exists
-                // for a delivery that did not happen, and offering it on a
-                // queued or delivered one promises a duplicate send.
-                detail.canSend && email.status === "FAILED"
+                detail.canRetry
                   ? {
                       label: t.crmOutboundEmails.retry,
                       onClick: () => {
@@ -126,6 +134,16 @@ export default function OutboundEmailDetailPage({
 
             {detail.isPending ? (
               <DegradedBanner message={t.crmOutboundEmails.pendingBanner} />
+            ) : null}
+            {email.retriedById ? (
+              <DetailSection title={t.crmOutboundEmails.retryTitle} columns={1}>
+                <p>{t.crmOutboundEmails.retryAlreadyCreated}</p>
+                <Link className="text-primary underline" href={`${EMAILS_HREF}/${encodeURIComponent(email.retriedById)}`}>
+                  {t.crmOutboundEmails.viewRetry}
+                </Link>
+              </DetailSection>
+            ) : email.status === "FAILED" && email.content.state !== "AVAILABLE" ? (
+              <DegradedBanner message={t.crmOutboundEmails.retryContentUnavailable} />
             ) : null}
 
             <DetailSection
@@ -228,7 +246,7 @@ export default function OutboundEmailDetailPage({
                 @MaxLength(500)), so ReasonDialog's captured text is sent
                 rather than discarded. */}
             <ReasonDialog
-              open={isRetryOpen}
+              open={isRetryOpen && (detail.canRetry || detail.isRetrying)}
               onOpenChange={setIsRetryOpen}
               title={t.crmOutboundEmails.retryTitle}
               description={t.crmOutboundEmails.retryDescription}
@@ -240,6 +258,7 @@ export default function OutboundEmailDetailPage({
                 void detail.retry(reason).then((result) => {
                   if (result.ok) {
                     setIsRetryOpen(false);
+                    router.push(`${EMAILS_HREF}/${encodeURIComponent(result.outboundEmailId)}`);
                     if (result.replayed) {
                       toast.info(
                         t.errors.idempotencyReplayedTitle,

@@ -136,13 +136,6 @@ export function activityDueState(
   return start < midnight.getTime() ? "TODAY" : "UPCOMING";
 }
 
-/** Colour carries due state only: overdue is negative, due today is caution, upcoming says nothing. */
-export const ACTIVITY_DUE_STATE_TONE: Record<ActivityDueState, NonNullable<BadgeProps["tone"]>> = {
-  OVERDUE: "negative",
-  TODAY: "caution",
-  UPCOMING: "neutral",
-};
-
 /** Priority is the one category that is an attention signal — tokens.md `CrmPriorityEnum`. */
 export function activityPriorityTone(priority: string): NonNullable<BadgeProps["tone"]> {
   return priority === "HIGH" || priority === "URGENT" ? "caution" : "neutral";
@@ -271,7 +264,7 @@ export function activityErrorMessage(t: Dictionary, error: NormalizedApiError): 
 
 export type ActivityTypePalette = SwatchSurfacePalette;
 
-export const ACTIVITY_TYPE_SWATCH_HUE: Record<ActivityType, SwatchHue> = {
+const ACTIVITY_TYPE_SWATCH_HUE: Record<ActivityType, SwatchHue> = {
   TODO: "indigo",
   CALL: "green",
   MEETING: "purple",
@@ -337,7 +330,7 @@ export function activityPriorityDotClasses(priority: string): string {
   return semanticSegmentDotClasses(tone);
 }
 
-export const ACTIVITY_TARGET_SWATCH_HUE: Readonly<Record<string, SwatchHue>> = {
+const ACTIVITY_TARGET_SWATCH_HUE: Readonly<Record<string, SwatchHue>> = {
   LEAD: "indigo",
   CUSTOMER_PROFILE: "green",
   OPPORTUNITY: "purple",

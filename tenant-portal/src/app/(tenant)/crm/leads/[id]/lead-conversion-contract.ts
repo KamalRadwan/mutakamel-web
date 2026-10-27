@@ -103,7 +103,7 @@ export function buildConvertLeadRequest(form: LeadConversionForm): ConvertLeadRe
   }
   if (form.createOpportunity) {
     const opportunity: ConversionOpportunity = { pipelineId: form.pipelineId, stageId: form.stageId, title: form.title.trim() };
-    const amount = toMoneyWireNumber(form.amount);
+    const amount = toMoneyWireNumber(form.amount, form.currencyCode);
     if (amount !== undefined) opportunity.amount = amount;
     if (form.importance !== "") opportunity.importance = Number(form.importance);
     if (form.probabilityPercent !== "") opportunity.probabilityPercent = Number(form.probabilityPercent);

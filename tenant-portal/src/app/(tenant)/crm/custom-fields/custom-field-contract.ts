@@ -21,7 +21,7 @@ export const CRM_CUSTOM_FIELD_OWNER_TYPES = [
   "OPPORTUNITY",
 ] as const;
 
-const CRM_CUSTOM_FIELD_TYPES = [
+export const CRM_CUSTOM_FIELD_TYPES = [
   "TEXT",
   "TEXTAREA",
   "NUMBER",
@@ -30,18 +30,6 @@ const CRM_CUSTOM_FIELD_TYPES = [
   "BOOLEAN",
   "SELECT",
   "MULTI_SELECT",
-  "URL",
-  "EMAIL",
-  "PHONE",
-] as const;
-
-export const CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES = [
-  "TEXT",
-  "TEXTAREA",
-  "NUMBER",
-  "DATE",
-  "DATETIME",
-  "BOOLEAN",
   "URL",
   "EMAIL",
   "PHONE",
@@ -57,9 +45,7 @@ type CrmCustomFieldOwnerType =
   (typeof CRM_CUSTOM_FIELD_RESPONSE_OWNER_TYPES)[number];
 export type CrmCustomFieldCreateOwnerType =
   (typeof CRM_CUSTOM_FIELD_OWNER_TYPES)[number];
-type CrmCustomFieldType = (typeof CRM_CUSTOM_FIELD_TYPES)[number];
-export type CrmCustomFieldSimpleCreateType =
-  (typeof CRM_CUSTOM_FIELD_SIMPLE_CREATE_TYPES)[number];
+export type CrmCustomFieldType = (typeof CRM_CUSTOM_FIELD_TYPES)[number];
 
 // CrmFieldRequirementOperationEnum, from the installed
 // @mutakamel/crm-app-common declaration.
@@ -84,7 +70,7 @@ interface CustomFieldRequirement {
 }
 
 /** One entry of a SELECT / MULTI_SELECT definition's `options` array. */
-interface CustomFieldOption {
+export interface CustomFieldOption {
   key: string;
   nameAr: string;
   nameEn: string;
@@ -115,8 +101,37 @@ export interface CreateCustomFieldInput {
   fieldKey: string;
   nameAr: string;
   nameEn: string;
-  type: CrmCustomFieldSimpleCreateType;
+  type: CrmCustomFieldType;
   isSearchable: boolean;
+  options?: CustomFieldOption[];
+}
+
+export interface UpdateCustomFieldInput {
+  nameAr: string;
+  nameEn: string;
+  isActive: boolean;
+  isSearchable: boolean;
+  options?: CustomFieldOption[];
+}
+
+export function customFieldPath(id: string): string {
+  if (!isUUIDv7(id)) invalidResponse();
+  return `${CRM_CUSTOM_FIELDS_PATH}/${encodeURIComponent(id)}`;
+}
+
+export function isPicklistField(type: CrmCustomFieldType): boolean {
+  return type === "SELECT" || type === "MULTI_SELECT";
+}
+
+// CustomFieldOptionDto and CustomFieldsService.assertOptions: keys are opaque,
+// unique strings (not fieldKey identifiers); persisted keys must stay unchanged.
+export function validCustomFieldOptions(options: readonly CustomFieldOption[]): boolean {
+  return options.length > 0 && options.length <= 100 &&
+    new Set(options.map((option) => option.key)).size === options.length &&
+    options.every((option) => option.key.trim().length > 0 && option.key.length <= 64 &&
+      option.nameAr.trim().length > 0 && option.nameAr.trim().length <= 120 &&
+      option.nameEn.trim().length > 0 && option.nameEn.trim().length <= 120 &&
+      Number.isSafeInteger(option.sortOrder) && option.sortOrder >= 1);
 }
 
 function record(value: unknown): Record<string, unknown> | null {

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { tradeGet } from "../../../trade-api";
-import { isUuidV7, parseTradeArray } from "../../../trade-advanced-validation";
+import { isUuidV7, parseTradeOffsetPage } from "../../../trade-advanced-validation";
+import { useInventoryPagination } from "../../hooks/useInventoryPagination";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import { INVENTORY_READ_PERMISSION, invalidResponse } from "../../inventory-contract";
 import {
@@ -21,7 +22,7 @@ const LIST_RESPONSE_LIMIT_BYTES = 120_000;
 export function useInventorySerials() {
   const { t, lang } = useI18n();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [items, setItems] = useState<InventorySerial[]>([]);
@@ -39,6 +40,9 @@ export function useInventorySerials() {
   );
 
   const validItemId = isUuidV7(itemIdFilter.trim()) ? itemIdFilter.trim() : undefined;
+  const { page, pagination, setPage, setTotal } = useInventoryPagination(
+    JSON.stringify([scope.headers, stateFilter, search.trim(), validItemId]),
+  );
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -54,23 +58,26 @@ export function useInventorySerials() {
         const response = await tradeGet(
           serialsListPath(stateFilter, search.trim() || undefined, {
             itemId: validItemId,
-          }),
+          }, page),
           {
             signal,
             headers: scope.headers,
             maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
           },
         );
-        setItems(parseTradeArray(response.data, parseInventorySerial, invalidResponse));
+        if (signal?.aborted) return;
+        const result = parseTradeOffsetPage(response.data, parseInventorySerial, invalidResponse);
+        setItems(result.items);
+        setTotal(result.total);
         setHasLoaded(true);
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [scope.isResolved, scope.headers, stateFilter, search, validItemId],
+    [scope.isResolved, scope.headers, stateFilter, search, validItemId, page, setTotal],
   );
 
   useEffect(() => {
@@ -90,6 +97,8 @@ export function useInventorySerials() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     stateFilter,
     search,
     itemIdFilter,

@@ -239,6 +239,7 @@ export default function InvoicesPage() {
     <TradeGate require={INVOICE_PERMISSIONS.read}>
       <div className="flex flex-col gap-4">
         <PageHeader
+          className="sr-only"
           title={td.invoices.title}
           description={td.invoices.subtitle}
           primaryAction={
@@ -285,6 +286,8 @@ export default function InvoicesPage() {
               kind="TradeInvoiceStatus"
               value={list.status}
               onChange={list.setStatus}
+              partyId={list.partyId}
+              onPartyIdChange={list.setPartyId}
             />
 
             {viewMode === "board" ? (

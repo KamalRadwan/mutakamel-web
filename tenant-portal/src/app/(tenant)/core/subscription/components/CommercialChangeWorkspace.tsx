@@ -20,7 +20,7 @@ export function CommercialChangeWorkspace() {
   const change = useCommercialChange(subscription.view, subscription.reload, !subscription.denied && !subscription.subscriptionError);
   const state = change.state, intent = state?.intent, operation = state?.operation;
   return <div className="flex min-w-0 flex-col gap-4">
-    <PageHeader title={copy.title} description={copy.description} secondaryActions={<>
+    <PageHeader className="sr-only" title={copy.title} description={copy.description} secondaryActions={<>
       <Button size="sm" variant="outline" asChild><Link href={TENANT_ROUTES.coreSubscription}>{t.commercialReceipt.back}</Link></Button>
       <Button size="sm" variant="outline" disabled={change.busy} onClick={() => void change.recheck()}>{copy.recheck}</Button>
     </>} />

@@ -38,7 +38,7 @@ import { LeadFieldGuide } from "./LeadFieldGuide";
 
 const NEW_CONTACT_VALUE = "__new_contact__";
 
-export interface LeadContactRowProps {
+interface LeadContactRowProps {
   index: number;
   contact: LeadContactForm;
   isPrimary: boolean;
@@ -136,9 +136,9 @@ export function LeadContactRow({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3.5 rounded-xl border p-3.5 transition-all",
+        "flex flex-col gap-3.5 rounded-lg border p-3.5 transition-all",
         isPrimary
-          ? "border-sky-500/35 bg-sky-500/[0.02] shadow-2xs dark:border-sky-400/35 dark:bg-sky-500/[0.05]"
+          ? "border-primary/35 bg-primary/5 shadow-2xs"
           : "border-border bg-card",
       )}
     >
@@ -147,21 +147,21 @@ export function LeadContactRow({
         <div className="flex items-center gap-2">
           <span
             className={cn(
-              "inline-flex size-6 items-center justify-center rounded-md text-xs font-bold",
+              "inline-flex size-6 items-center justify-center rounded-md text-xs font-semibold",
               isPrimary
-                ? "bg-sky-600 text-white"
+                ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground",
             )}
           >
             #{index + 1}
           </span>
-          <span className="text-xs font-bold text-foreground">
+          <span className="text-xs font-semibold text-foreground">
             {formatTemplate(t.crmLeads.create.contactHeading, {
               number: index + 1,
             })}
           </span>
           {directoryOwned && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-300">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs font-semibold text-foreground">
               <Lock className="size-2.5" aria-hidden="true" />
               Directory
             </span>
@@ -174,7 +174,7 @@ export function LeadContactRow({
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-colors",
               isPrimary
-                ? "border-emerald-500/40 bg-emerald-500/12 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-300"
+                ? "border-success/40 bg-success-subtle text-success-subtle-foreground"
                 : "border-border bg-muted/50 text-muted-foreground",
             )}
           >
@@ -215,8 +215,8 @@ export function LeadContactRow({
 
       {/* Existing Directory Contact Selector (only when an existing directory company is selected) */}
       {existingCompany && (
-        <div className="relative rounded-lg border border-sky-500/20 bg-sky-500/[0.03] p-2.5">
-          <div className="absolute end-2.5 top-2.5 z-10 flex items-center gap-1.5">
+        <div className="relative rounded-lg border border-border/60 bg-muted/20 p-2.5">
+          <div className="absolute end-2.5 top-2.5 flex items-center gap-1.5">
             <LeadFieldGuide field="contactPartyId" />
           </div>
           <Field
@@ -252,8 +252,8 @@ export function LeadContactRow({
       {directoryOwned ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
           <div className="relative md:col-span-6">
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-300">
+            <div className="absolute end-0 top-0 flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 rounded bg-success-subtle px-1.5 py-0.5 text-xs font-semibold text-success-subtle-foreground">
                 <CheckCircle2 className="size-2.5" aria-hidden="true" />
                 Locked
               </span>
@@ -274,8 +274,8 @@ export function LeadContactRow({
           </div>
 
           <div className="relative md:col-span-6">
-            <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-600 dark:text-sky-300">
+            <div className="absolute end-0 top-0 flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
                 <Briefcase className="size-2.5" aria-hidden="true" />
                 100+
               </span>
@@ -300,7 +300,7 @@ export function LeadContactRow({
           {/* Row 1: Honorific (2 cols), First Name (3 cols), Last Name (3 cols), Job Title (4 cols) */}
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12">
             <div className="relative md:col-span-2">
-              <div className="absolute end-0 top-0 z-10">
+              <div className="absolute end-0 top-0">
                 <LeadFieldGuide field="honorificTitle" align="start" />
               </div>
               <Field
@@ -334,8 +334,8 @@ export function LeadContactRow({
             </div>
 
             <div className="relative md:col-span-3">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {contact.firstName.length}/{limits.firstName}
                 </span>
                 <LeadFieldGuide field="contactFirstName" />
@@ -368,8 +368,8 @@ export function LeadContactRow({
             </div>
 
             <div className="relative md:col-span-3">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {contact.lastName.length}/{limits.lastName}
                 </span>
                 <LeadFieldGuide field="contactLastName" />
@@ -394,8 +394,8 @@ export function LeadContactRow({
             </div>
 
             <div className="relative md:col-span-4">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
-                <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <div className="absolute end-0 top-0 flex items-center gap-1">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
                   100+ Titles
                 </span>
                 <LeadFieldGuide field="contactJobTitle" />
@@ -418,8 +418,8 @@ export function LeadContactRow({
           {/* Row 2: Direct Phone Numbers (6 cols) & Work Email (6 cols) */}
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12">
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
                   <Phone className="size-2.5" aria-hidden="true" />
                   {contact.phones.length}/{CRM_PHONE_LIST_MAX}
                 </span>
@@ -453,7 +453,7 @@ export function LeadContactRow({
                         aria-label={t.crmShared.addPhone}
                         data-icon-button
                         onClick={onPhoneAdd}
-                        className="size-7 shrink-0 rounded-full bg-emerald-600 p-0 text-white not-disabled:hover:bg-emerald-700"
+                        className="size-7 shrink-0 rounded-full bg-primary p-0 text-primary-foreground not-disabled:hover:bg-primary/90"
                       >
                         <Plus className="size-3.5" aria-hidden="true" />
                       </Button>
@@ -510,8 +510,8 @@ export function LeadContactRow({
             </div>
 
             <div className="relative md:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="font-mono text-[10px] text-muted-foreground">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {contact.email.length}/{limits.email}
                 </span>
                 <LeadFieldGuide field="contactEmail" />

@@ -4,6 +4,7 @@ import type { SuccessResponse } from "@/types/common";
 import {
   readManagedProvisioningOperation,
   readProvisioningPage,
+  readProvisioningRecoveryResult,
   readSeedConflictResolution,
   readTenantAvailableUpdate,
   readTenantComponentInstallation,
@@ -196,6 +197,19 @@ export const tenantProvisioningApi = {
       commandConfig(idempotencyKey),
     );
     return readTenantPrerequisiteRequest(extractCoreData(response));
+  },
+
+  async recoverPrerequisite(
+    tenantId: string,
+    action: "resend-release" | "close-failed",
+    dto: RequestTenantPrerequisiteDto,
+    idempotencyKey: string,
+  ) {
+    const path = action === "resend-release" ? "prerequisite-releases/resend" : "operations/close-failed";
+    const response = await axiosClient.post<SuccessResponse<unknown>>(
+      `${provisioningRoot(tenantId)}/${path}`, dto, commandConfig(idempotencyKey),
+    );
+    return readProvisioningRecoveryResult(extractCoreData(response));
   },
 
   async listPrerequisiteEvidence(tenantId: string, signal?: AbortSignal) {

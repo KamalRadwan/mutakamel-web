@@ -4,6 +4,8 @@ import { QUOTATION_PERMISSIONS } from "../../../trade/quotations/quotation-contr
 import { SALES_ORDER_PERMISSIONS } from "../../../trade/sales-orders/sales-order-contract";
 import {
   CUSTOMER_RELATED_PERMISSIONS,
+  buildCustomerRelatedHref,
+  canReadCustomerRelated,
   customerInvoicesCountPath,
   customerOpportunitySearch,
   customerQuotationsCountPath,
@@ -11,7 +13,6 @@ import {
   parseCustomerRelatedTotal,
 } from "./customer-profile-related-contract";
 
-const CUSTOMER_ID = "01900100-0000-7000-8000-0000000000a1";
 const PARTY_ID = "01900100-0000-7000-8000-0000000000b1";
 const BRANCH_ID = "01900100-0000-7000-8000-0000000000c1";
 
@@ -32,18 +33,49 @@ describe("the customer related-record permissions", () => {
   });
 });
 
+describe("customer related-record admission", () => {
+  it.each(["own", "team", "all"])("accepts an Opportunities %s read grant", (scope) => {
+    expect(canReadCustomerRelated([`crm.opportunities.read.${scope}`], "opportunities")).toBe(true);
+  });
+
+  it("keeps Trade permissions exact and denies unrelated CRM grants", () => {
+    expect(canReadCustomerRelated(["crm.opportunities.update.team"], "opportunities")).toBe(false);
+    expect(canReadCustomerRelated([], "opportunities")).toBe(false);
+    for (const kind of ["quotations", "salesOrders", "invoices"] as const) {
+      expect(canReadCustomerRelated(["crm.opportunities.read.team"], kind)).toBe(false);
+      expect(canReadCustomerRelated([`${CUSTOMER_RELATED_PERMISSIONS[kind]}.team`], kind)).toBe(false);
+      expect(canReadCustomerRelated([CUSTOMER_RELATED_PERMISSIONS[kind]], kind)).toBe(true);
+    }
+  });
+});
+
 describe("the customer related-record requests", () => {
-  it("asks the opportunity search for this customerProfileId, in its own branch", () => {
-    expect(customerOpportunitySearch(CUSTOMER_ID, BRANCH_ID)).toEqual({
+  it("asks the opportunity search for this customerPartyId, in its own branch", () => {
+    expect(customerOpportunitySearch(PARTY_ID, BRANCH_ID)).toEqual({
       branchId: BRANCH_ID,
       filterTree: {
-        field: "customerProfileId",
+        field: "customerPartyId",
         operator: "eq",
-        value: CUSTOMER_ID,
+        value: PARTY_ID,
       },
       page: 1,
       limit: 1,
     });
+  });
+
+  it("builds party-scoped destination hrefs for all four related document kinds", () => {
+    expect(buildCustomerRelatedHref("opportunities", PARTY_ID)).toBe(
+      `/crm/opportunities?partyId=${PARTY_ID}`,
+    );
+    expect(buildCustomerRelatedHref("quotations", PARTY_ID)).toBe(
+      `/trade/quotations?partyId=${PARTY_ID}`,
+    );
+    expect(buildCustomerRelatedHref("salesOrders", PARTY_ID)).toBe(
+      `/trade/sales-orders?partyId=${PARTY_ID}`,
+    );
+    expect(buildCustomerRelatedHref("invoices", PARTY_ID)).toBe(
+      `/trade/invoices?partyId=${PARTY_ID}`,
+    );
   });
 
   it("asks each trade list for this customer's PARTY, one row deep", () => {

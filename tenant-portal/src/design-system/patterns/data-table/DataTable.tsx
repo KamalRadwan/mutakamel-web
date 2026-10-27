@@ -195,7 +195,14 @@ export function DataTable<T>({
   }
 
   if (rows.length === 0) {
-    return emptyState ?? <EmptyState title={labels.emptyTitle} className={className} />;
+    return (
+      <div className={cn("flex flex-col gap-3", className)}>
+        {emptyState ?? <EmptyState title={labels.emptyTitle} />}
+        {page && onPageChange && (
+          <Pagination page={page} onPageChange={onPageChange} labels={labels.pagination} />
+        )}
+      </div>
+    );
   }
 
   const visibleRows = range ? rows.slice(range.start, range.end) : rows;

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { plexArabic, plexLatin, plexMono } from "./fonts";
+import { uiArabic, uiLatin, uiMono } from "./fonts";
 import "./globals.css";
 import { DirectionBridge } from "@/i18n/DirectionBridge";
 import { ar } from "@/i18n/dictionaries/ar";
@@ -69,13 +69,13 @@ export default async function RootLayout({
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html lang="ar" dir="rtl" className="h-full" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" className={`${uiLatin.variable} ${uiArabic.variable} ${uiMono.variable} h-full`} suppressHydrationWarning>
       <head>
         <InlineBootstrapScript nonce={nonce} html={BOOTSTRAP} />
       </head>
       <body
         suppressHydrationWarning
-        className={`${plexLatin.variable} ${plexArabic.variable} ${plexMono.variable} h-full antialiased`}
+        className="h-full antialiased"
       >
         <ThemeProvider>
           <DensityProvider>

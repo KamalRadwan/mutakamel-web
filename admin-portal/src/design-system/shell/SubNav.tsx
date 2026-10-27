@@ -28,7 +28,7 @@ export function SubNav({ items, ariaLabel }: { items: SubNavItem[]; ariaLabel: s
     href === items[0]?.href ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <nav aria-label={ariaLabel} className="relative -mx-1 border-b border-border">
+    <nav aria-label={ariaLabel} className="relative -mx-1 border-b border-line-column">
       {hasOverflow && (
         <Button
           type="button"
@@ -37,7 +37,7 @@ export function SubNav({ items, ariaLabel }: { items: SubNavItem[]; ariaLabel: s
           onClick={canScrollStart ? scrollToStart : undefined}
           aria-disabled={!canScrollStart}
           aria-label={lang === "ar" ? `تمرير ${ariaLabel} نحو البداية` : `Scroll ${ariaLabel} toward the beginning`}
-          className="absolute start-0 top-1 z-10 size-8 bg-card p-0 text-muted-foreground aria-disabled:cursor-not-allowed aria-disabled:bg-muted aria-disabled:text-muted-foreground"
+          className="absolute start-0 top-1 z-10 size-8 border-line-control bg-surface-toolbar p-0 text-foreground-secondary hover:bg-surface-subtle hover:text-foreground aria-disabled:cursor-not-allowed aria-disabled:bg-muted aria-disabled:text-muted-foreground"
         >
           <StartIcon className="size-4" aria-hidden="true" />
         </Button>
@@ -56,21 +56,15 @@ export function SubNav({ items, ariaLabel }: { items: SubNavItem[]; ariaLabel: s
               data-subnav-link
               aria-current={active ? "page" : undefined}
               className={cn(
-                "relative inline-flex h-9 shrink-0 items-center rounded-md px-3 text-xs font-medium transition-colors motion-reduce:transition-none",
+                "relative inline-flex h-9 shrink-0 items-center rounded-lg px-3 text-xs transition-colors motion-reduce:transition-none",
                 active
-                  ? "bg-selected text-selected-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  ? "bg-gradient-primary font-semibold text-white shadow-nav-active"
+                  : "font-medium text-foreground-secondary hover:bg-surface-subtle hover:text-foreground",
                 focusRing,
                 hitArea,
               )}
             >
               {lang === "ar" ? item.labelKey.ar : item.labelKey.en}
-              {active && (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-x-2 -bottom-2 h-0.5 rounded-full bg-primary"
-                />
-              )}
             </Link>
           );
         })}
@@ -84,7 +78,7 @@ export function SubNav({ items, ariaLabel }: { items: SubNavItem[]; ariaLabel: s
           onClick={canScrollEnd ? scrollToEnd : undefined}
           aria-disabled={!canScrollEnd}
           aria-label={lang === "ar" ? `تمرير ${ariaLabel} نحو النهاية` : `Scroll ${ariaLabel} toward the end`}
-          className="absolute end-0 top-1 z-10 size-8 bg-card p-0 text-muted-foreground aria-disabled:cursor-not-allowed aria-disabled:bg-muted aria-disabled:text-muted-foreground"
+          className="absolute end-0 top-1 z-10 size-8 border-line-control bg-surface-toolbar p-0 text-foreground-secondary hover:bg-surface-subtle hover:text-foreground aria-disabled:cursor-not-allowed aria-disabled:bg-muted aria-disabled:text-muted-foreground"
         >
           <EndIcon className="size-4" aria-hidden="true" />
         </Button>

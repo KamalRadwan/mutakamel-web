@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { api, authMock } = vi.hoisted(() => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
   authMock: {
-    user: { permissions: ["crm.lead_stages.read", "crm.lead_stages.manage"], isTenantOwner: false },
+    user: { permissions: ["crm.lead_stages.read", "crm.lead_stages.manage"], isTenantOwner: false, accessMode: "FULL" },
     isLoading: false,
   },
 }));
@@ -83,6 +83,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  authMock.user.accessMode = "FULL";
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -101,6 +102,38 @@ afterEach(() => {
 });
 
 describe("Lead stages — ranking by drag", () => {
+  it("hides create, row writes and reorder for a read-only tenant with manage permission", async () => {
+    authMock.user.accessMode = "READ_ONLY";
+    renderPage();
+    await screen.findByRole("cell", { name: "Contacted" });
+    expect(screen.queryByRole("button", { name: en.crm.addANewStage })).toBeNull();
+    expect(screen.queryByRole("button", { name: `${en.crmLeadStages.editTitle}: Contacted` })).toBeNull();
+    expect(screen.queryByRole("button", { name: `${en.crmLeadStages.setDefault}: Contacted` })).toBeNull();
+    expect(screen.queryByRole("button", { name: `${en.common.delete}: Contacted` })).toBeNull();
+    expect(screen.queryByLabelText(/Drag to reorder: /u)).toBeNull();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+    expect(api.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { stage: { ...CONTACTED, isActive: false }, action: en.crmLeadStages.setDefault, reason: en.crmConfigActionHints.inactiveStage },
+    { stage: { ...CONTACTED, isDefault: true }, action: en.common.delete, reason: en.crmConfigActionHints.defaultStageDelete },
+  ])("shows the correct action explanation: $reason", async ({ stage, action, reason }) => {
+    // The catalogue rejects multiple defaults before any row can render.
+    const entry = { ...ENTRY, isDefault: !stage.isDefault };
+    api.get.mockResolvedValue({ data: [entry, stage, QUALIFIED, DISQUALIFIED, CONVERTED] });
+    renderPage();
+    const button = await screen.findByRole("button", { name: `${action}: Contacted` });
+    const trigger = button.parentElement!;
+    expect(button).toBeDisabled();
+    expect(trigger.tabIndex).toBe(0);
+    expect(trigger).toHaveAccessibleName(`${action}: Contacted. ${reason}`);
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    fireEvent.focus(trigger);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(reason);
+  });
+
   it("gives every stage it can reorder a grip named after it", async () => {
     renderPage();
 
@@ -163,5 +196,18 @@ describe("Lead stages — ranking by drag", () => {
         screen.getByLabelText(`${en.crmLeadStages.setDefault}: ${name}`),
       ).toBeDisabled();
     }
+  });
+
+  it("keeps the disabled edit reason reachable by keyboard", async () => {
+    renderPage();
+    const edit = await screen.findByLabelText(`${en.crmLeadStages.editTitle}: New`);
+    const trigger = edit.parentElement;
+
+    expect(edit).toBeDisabled();
+    expect(trigger).toHaveAttribute("tabindex", "0");
+    expect(trigger).toHaveAccessibleName(`${en.crmLeadStages.editTitle}: New. ${en.crmLeadStages.protectedHint}`);
+
+    fireEvent.focus(trigger!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(en.crmLeadStages.protectedHint);
   });
 });

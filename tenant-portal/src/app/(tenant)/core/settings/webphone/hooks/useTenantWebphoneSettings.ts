@@ -137,8 +137,8 @@ export function useTenantWebphoneSettings() {
     setLoadState("LOADING");
     try {
       const [configResponse, serversResponse] = await Promise.all([
-        axiosClient.get<unknown>(CONFIG_ENDPOINT, { cache: "no-store" }),
-        axiosClient.get<unknown>(SERVERS_ENDPOINT, { cache: "no-store" }),
+        axiosClient.get<unknown>(CONFIG_ENDPOINT, { cache: "no-store", suppressForbiddenToast: true }),
+        axiosClient.get<unknown>(SERVERS_ENDPOINT, { cache: "no-store", suppressForbiddenToast: true }),
       ]);
       if (currentGeneration !== generation.current) return;
       setConfig(readWebphoneConfig(unwrapWebphoneEnvelope(configResponse.data)));
@@ -160,8 +160,8 @@ export function useTenantWebphoneSettings() {
     }
 
     const [extensionsResult, seatsResult] = await Promise.allSettled([
-      axiosClient.get<unknown>(EXTENSIONS_ENDPOINT, { cache: "no-store" }),
-      axiosClient.get<unknown>(SEATS_ENDPOINT, { cache: "no-store" }),
+      axiosClient.get<unknown>(EXTENSIONS_ENDPOINT, { cache: "no-store", suppressForbiddenToast: true }),
+      axiosClient.get<unknown>(SEATS_ENDPOINT, { cache: "no-store", suppressForbiddenToast: true }),
     ]);
     if (currentGeneration !== generation.current) return;
 
@@ -281,8 +281,8 @@ export function useTenantWebphoneSettings() {
    */
   const reloadExtensions = useCallback(async () => {
     const [extensionsResult, seatsResult] = await Promise.allSettled([
-      axiosClient.get<unknown>(EXTENSIONS_ENDPOINT, { cache: "no-store" }),
-      axiosClient.get<unknown>(SEATS_ENDPOINT, { cache: "no-store" }),
+      axiosClient.get<unknown>(EXTENSIONS_ENDPOINT, { cache: "no-store", suppressForbiddenToast: true }),
+      axiosClient.get<unknown>(SEATS_ENDPOINT, { cache: "no-store", suppressForbiddenToast: true }),
     ]);
     setExtensions((current) =>
       readOrDefault(extensionsResult, readWebphoneExtensions, current),

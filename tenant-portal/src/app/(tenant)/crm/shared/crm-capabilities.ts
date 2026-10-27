@@ -30,6 +30,14 @@ export interface CrmActionCapability {
 
 const SCOPES: readonly CrmCapabilityScope[] = ["own", "team", "all"];
 
+// crm-app/src/common/crm-scoped-access.service.ts caps each branch at 500 owners.
+const MAX_CAPABILITY_OWNERS = 500;
+// crm-app/src/crm/leads/leads.service.ts getCapabilities resolves ten actions.
+// Each UUID takes 36 ASCII bytes + two quotes + a comma. Reserve 16 KiB for
+// keys, scopes, branch ID and JSON structure, retaining a finite transport cap.
+export const CRM_LEAD_CAPABILITIES_MAX_RESPONSE_BYTES =
+  10 * MAX_CAPABILITY_OWNERS * 39 + 16 * 1024;
+
 export function crmRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -48,6 +56,7 @@ export function parseCrmActionCapability(
     ownerUserIds === null ||
     (Array.isArray(ownerUserIds) &&
       ownerUserIds.length > 0 &&
+      ownerUserIds.length <= MAX_CAPABILITY_OWNERS &&
       ownerUserIds.every((ownerId) => isUUIDv7(ownerId)) &&
       new Set(ownerUserIds).size === ownerUserIds.length);
   if (

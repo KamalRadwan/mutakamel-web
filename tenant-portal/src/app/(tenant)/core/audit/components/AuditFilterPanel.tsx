@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Search, X } from "lucide-react";
 import {
   Button,
@@ -13,64 +12,73 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  type DateRangeValue,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { useAuditFilters } from "../hooks/useAuditFilters";
+import { auditCatalogue } from "@/lib/audit/catalogue";
 import {
   AUDIT_OUTCOMES,
   AUDIT_SOURCE_APPS,
   AUDIT_SOURCE_KINDS,
+  AUDIT_SENSITIVITIES,
   type AuditFilters,
-} from "../../contracts/audit-contract";
+} from "@/lib/audit/audit-contract";
 
 const ANY = "__any";
 
 /**
- * Every control here maps to a field `TenantAuditQueryDto` declares. There is
- * deliberately no free-text search: the endpoint has none, and a box that
- * silently drops what is typed into it is worse than its absence.
+ * Every control maps to TenantAuditQueryDto. Label search is available only
+ * on the deleted-record subset, as enforced by the reader.
  */
 export function AuditFilterPanel({
   filters,
   onApply,
   disabled,
+  deletedOnly,
 }: {
   filters: AuditFilters;
   onApply: (next: AuditFilters) => void;
   disabled: boolean;
+  deletedOnly: boolean;
 }) {
   const { t, lang } = useI18n();
   const copy = t.coreOperations.audit;
-  const [draft, setDraft] = useState<AuditFilters>(filters);
-  const [range, setRange] = useState<DateRangeValue | undefined>(undefined);
-
-  const change = (patch: Partial<AuditFilters>) =>
-    setDraft((current) => ({ ...current, ...patch }));
-
-  const applyRange = (next: DateRangeValue | undefined) => {
-    setRange(next);
-    change({
-      from: next?.from?.toISOString(),
-      to: next?.to?.toISOString(),
-    });
-  };
-
-  const clear = () => {
-    setDraft({});
-    setRange(undefined);
-    onApply({});
-  };
+  const { draft, range, change, applyRange, clear, apply } = useAuditFilters(filters, onApply);
 
   return (
     <DetailSection title={copy.filtersTitle} description={copy.filtersDescription}>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {deletedOnly ? <Field label={t.audit.ledger.search}>
+          <Input size="sm" maxLength={256} value={draft.q ?? ""} disabled={disabled}
+            onChange={(event) => change({ q: event.target.value || undefined })} />
+        </Field> : null}
+        <Field label={t.audit.ledger.branch}>
+          <Input size="sm" value={draft.branchId ?? ""} disabled={disabled}
+            onChange={(event) => change({ branchId: event.target.value || undefined })} />
+        </Field>
+        <Field label={t.audit.ledger.owner}>
+          <Input size="sm" value={draft.ownerUserId ?? ""} disabled={disabled}
+            onChange={(event) => change({ ownerUserId: event.target.value || undefined })} />
+        </Field>
+        <Field label={t.audit.ledger.sensitivity}>
+          <Select value={draft.sensitivity ?? ANY} disabled={disabled}
+            onValueChange={(value) => change({ sensitivity: value === ANY ? undefined : value as AuditFilters["sensitivity"] })}>
+            <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value={ANY}>{copy.anyValue}</SelectItem>
+              {AUDIT_SENSITIVITIES.map((value) => <SelectItem key={value} value={value}>{t.audit.ledger.sensitivities[value]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
         <Field label={copy.filterEntityType} hint={copy.filterEntityTypeHint}>
-          <Input size="sm" placeholder={copy.filterEntityType}
-            dir="ltr"
-            value={draft.entityType ?? ""}
-            onChange={(event) => change({ entityType: event.target.value || undefined })}
-            disabled={disabled}
-          />
+          <Select value={draft.entityType ?? ANY} disabled={disabled}
+            onValueChange={(value) => change({ entityType: value === ANY ? undefined : value })}>
+            <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value={ANY}>{copy.anyValue}</SelectItem>
+              {auditCatalogue.map((entry) => <SelectItem key={entry.entityType} value={entry.entityType}>
+                {t.audit.ledger.apps[entry.sourceApp]} · {t.audit.ledger.entities[entry.labelKey]} ({entry.entityType})
+              </SelectItem>)}
+            </SelectContent>
+          </Select>
         </Field>
 
         <Field label={copy.filterEntityId}>
@@ -146,7 +154,7 @@ export function AuditFilterPanel({
               <SelectItem value={ANY}>{copy.anyValue}</SelectItem>
               {AUDIT_SOURCE_APPS.map((app) => (
                 <SelectItem key={app} value={app}>
-                  {app}
+                  {t.audit.ledger.apps[app]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -191,7 +199,7 @@ export function AuditFilterPanel({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-2">
-        <Button size="sm" variant="outline" onClick={() => onApply(draft)} disabled={disabled}>
+        <Button size="sm" variant="outline" onClick={apply} disabled={disabled}>
           <Search className="size-4" aria-hidden="true" />
           {copy.applyFilters}
         </Button>

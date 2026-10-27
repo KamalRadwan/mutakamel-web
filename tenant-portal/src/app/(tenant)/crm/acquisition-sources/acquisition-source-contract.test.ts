@@ -33,7 +33,7 @@ describe("CRM acquisition-source contract", () => {
       `${ACQUISITION_SOURCES_PATH}/${sourceId}`,
     );
     expect(() => acquisitionSourcePath("not-a-uuid")).toThrow(
-      "Invalid CRM acquisition-sources response.",
+      "INVALID_CRM_ACQUISITION_SOURCES_RESPONSE",
     );
   });
 
@@ -70,16 +70,16 @@ describe("CRM acquisition-source contract", () => {
   it("rejects envelopes, duplicate catalogue identity, and unsafe icon URLs", () => {
     expect(() =>
       parseAcquisitionSourcesResponse({ success: true, data: [source] }),
-    ).toThrow("Invalid CRM acquisition-sources response.");
+    ).toThrow("INVALID_CRM_ACQUISITION_SOURCES_RESPONSE");
     expect(() => parseAcquisitionSourcesResponse([source, source])).toThrow(
-      "Invalid CRM acquisition-sources response.",
+      "INVALID_CRM_ACQUISITION_SOURCES_RESPONSE",
     );
     expect(() =>
       parseAcquisitionSourceResponse({
         ...source,
         iconUrl: "https://storage.example.test/private-key.png",
       }),
-    ).toThrow("Invalid CRM acquisition-sources response.");
+    ).toThrow("INVALID_CRM_ACQUISITION_SOURCES_RESPONSE");
   });
 
   it("trims only the two writable names and rejects empty or oversized input", () => {
@@ -91,13 +91,13 @@ describe("CRM acquisition-source contract", () => {
     ).toEqual({ nameAr: "إحالة", nameEn: "Referral" });
     expect(() =>
       buildCreateAcquisitionSourceRequest({ nameAr: "   ", nameEn: "Referral" }),
-    ).toThrow("Acquisition-source names must contain 1-120 characters.");
+    ).toThrow("CRM_ACQUISITION_SOURCE_NAMES_INVALID");
     expect(() =>
       buildCreateAcquisitionSourceRequest({
         nameAr: "إحالة",
         nameEn: "x".repeat(121),
       }),
-    ).toThrow("Acquisition-source names must contain 1-120 characters.");
+    ).toThrow("CRM_ACQUISITION_SOURCE_NAMES_INVALID");
   });
 });
 

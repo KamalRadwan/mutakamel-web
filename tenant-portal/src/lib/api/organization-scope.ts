@@ -110,7 +110,7 @@ export interface AccessibleBranchCompany {
 export interface TenantScopeSource {
   accessibleBranches: readonly string[];
   accessibleCompanies: readonly string[];
-  accessibleBranchCompanies?: readonly AccessibleBranchCompany[];
+  accessibleBranchCompanies: readonly AccessibleBranchCompany[];
   teamMemberships: ReadonlyArray<{
     companyId: string;
     branchId: string | null;
@@ -146,8 +146,7 @@ export function isAccessibleBranchCompanies(
 
 /**
  * The company that owns a selected branch, taken from Core's access-scoped
- * branch ownership map. Older Core responses can use team memberships only
- * when that map is absent; an empty or malformed map never falls back.
+ * branch ownership map. Team memberships never substitute for that map.
  *
  * Returns null rather than guessing when ownership cannot be established:
  * `BRANCH_REQUIRED` needs the matching company, and pairing a branch with the
@@ -170,21 +169,11 @@ export function resolveCompanyForBranch(
   branchId: string | null,
 ): string | null {
   if (!source || !validId(branchId) || !source.accessibleBranches.includes(branchId)) return null;
-  if ("accessibleBranchCompanies" in source) {
-    // Validated with a null company set for the same reason the lookup no
-    // longer consults one — truncation is expected, not corruption.
-    if (!isAccessibleBranchCompanies(
-      source.accessibleBranchCompanies,
-      source.accessibleBranches,
-      null,
-    )) return null;
-    return source.accessibleBranchCompanies.find((pair) => pair.branchId === branchId)?.companyId ?? null;
-  }
-  const accessible = new Set(source.accessibleCompanies.filter(isUUIDv7));
-  const owning = source.teamMemberships
-    .filter((membership) => membership.branchId === branchId)
-    .map((membership) => membership.companyId)
-    .filter((companyId) => accessible.has(companyId));
-  const distinct = new Set(owning);
-  return distinct.size === 1 ? [...distinct][0] : null;
+  // The company projection is independently truncated; the map owns this lookup.
+  if (!isAccessibleBranchCompanies(
+    source.accessibleBranchCompanies,
+    source.accessibleBranches,
+    null,
+  )) return null;
+  return source.accessibleBranchCompanies.find((pair) => pair.branchId === branchId)?.companyId ?? null;
 }

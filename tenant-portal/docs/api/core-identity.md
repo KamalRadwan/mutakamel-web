@@ -121,6 +121,17 @@ it has children or directly-placed users.
 
 `status` is `OrgNodeStatusEnum`: **`ACTIVE`** · **`INACTIVE`**.
 
+Organization edits re-verified **2026-10-17** (CLXAPP-120) against the Gateway
+organization PATCH contracts, Core update DTOs and `OrganizationService`.
+The live edit drawer sends an empty string to clear company `legalName` /
+`taxNumber` and branch `address` / `phone`, and `null` to remove a team's
+`leadUserId`. These values survive request serialization; omission would keep
+the stored value. Creation still omits blank optional fields. Company currency
+cannot be cleared: the edit field is marked required with Arabic/English help,
+and saving is disabled unless its trimmed code has three characters. Core
+still validates that the currency is enabled. Existing permissions, response
+validation and error handling are unchanged.
+
 ### States the UI must render
 
 - **`GET /organization/tree` is bounded at 5 000 nodes per level** and returns
@@ -170,6 +181,35 @@ The CRM acquisition-source detail reader separately consumes raw
 
 ## Users — 22 routes
 
+Users drawer behavior reviewed **2026-10-18** (FE-CORE-USERS-004): invite and
+edit forms mount only while open, so loading `/core/users` requests only the
+users list and does not load hidden organization or manager pickers. Invite
+remains visible to callers with `users.user.invite`, but is disabled with a
+translated explanation unless they also hold `org.company.read`,
+`org.branch.read` and `org.department.read` to complete the required placement.
+
+### Own avatar — verified 2026-10-17
+
+`GET /api/tenant/core/v1/profile/avatar` streams the signed-in user's current
+linked person Party image. `PUT` on the same path accepts multipart `file` and
+returns 204; `DELETE` removes it and returns 204. These self-service routes need
+tenant authentication, with no Directory grant or client-selected Party ID.
+The canonical route maps to Core `/api/v1/tenant/profile/avatar`.
+
+Uploads accept PNG, JPEG or WebP up to 2 MiB and 25 million pixels, with one
+non-animated image, matching extension/signature and successful server decoding.
+The normalized output must also fit 2 MiB. `400 PARTY_IMAGE_REQUIRED`,
+`413 PARTY_IMAGE_TOO_LARGE` and `415 PARTY_IMAGE_INVALID` identify upload errors.
+An absent image returns `404 PARTY_IMAGE_NOT_FOUND`; an unavailable person link
+returns `404 PARTY_NOT_FOUND`. Server denials render `PermissionGate`.
+
+The profile uploader and header use the same authenticated, no-store image route
+with initials as fallback. Successful writes refresh both in the current tab;
+failed writes retain the last image. The picture is shared with the linked
+Directory contact. No rendition, thumbnail or schema change is introduced.
+
+### User administration and preferences
+
 `me/profile` is declared **before** `:id` in the controller so it cannot be
 swallowed by the id route. Keep that in mind when reading the source order.
 
@@ -195,8 +235,17 @@ swallowed by the id route. Keep that in mind when reading the source order.
 | GET | `/api/tenant/core/v1/users/:userId/scope-role-assignments` | `users.user.assign_roles` | — |
 | PUT | `/api/tenant/core/v1/users/:userId/scope-role-assignments` | `users.user.assign_roles` | `ReplaceScopeRoleAssignmentsDto` |
 | GET | `/api/tenant/core/v1/users/:userId/modules` | `users.user.read` | — |
-| POST | `/api/tenant/core/v1/users/:userId/modules` | `users.user.update` | `AssignModuleDto` |
-| DELETE | `/api/tenant/core/v1/users/:userId/modules/:moduleKey` | `users.user.update` | — |
+| POST | `/api/tenant/core/v1/users/:userId/modules` | `users.user.manage_modules` | `AssignModuleDto` |
+| DELETE | `/api/tenant/core/v1/users/:userId/modules/:moduleKey` | `users.user.manage_modules` | — |
+
+Module-seat authorization re-verified **2026-10-18** (CORE-USERS-004).
+Only Workspace Administrator receives the new permission by default; owner
+RBAC remains implicit. Profile editing permission alone does not enable module
+controls. The live portal hides module mutations for self; Core refuses
+self-assignment with **403 `USER_SELF_FORBIDDEN`**, including for owners.
+Reads require `users.user.read` for the target branch, or tenant-wide permission
+for a branchless user. Missing actor/scope context fails closed before reading
+assignments, and a missing target returns **404 `TENANT_USER_NOT_FOUND`**.
 
 ### Request bodies
 
@@ -209,6 +258,18 @@ swallowed by the id route. Keep that in mind when reading the source order.
 | `SetTenantUserTeamMembershipsDto` | `memberships` — non-empty, ≤500, unique on `teamId` |
 | `UpdateTenantProfileDto` | `themeKey?` (≤64), `language?` (one of the supported set, ≤8), `extensions?` (object) |
 | `AssignModuleDto` | the subscribed module key |
+
+User placement edits re-verified **2026-10-17** (CLXAPP-115) against Core's
+`UpdateTenantUserDto` and `TenantUsersService.update`. On
+`PATCH /api/tenant/core/v1/users/:id`, `teamId` and `managerId` accept a UUIDv7
+or `null`; omission preserves the stored value. The live edit drawer sends
+only changed team/manager fields, using `null` when cleared. Changing company,
+branch or department resets the selected team, so saving a department move
+clears the old home team in the same request. Other placement IDs remain
+required in the form and cannot be cleared. Successful saves use the validated
+updated user response and close the drawer; failures retain the form and show
+the existing translated error (including `PLACEMENT_INCONSISTENT` for an
+invalid hierarchy).
 
 `status` is `UserStatusEnum`: **`INVITED`** · **`ACTIVE`** · **`SUSPENDED`** ·
 **`DEACTIVATED`**.
@@ -230,6 +291,14 @@ swallowed by the id route. Keep that in mind when reading the source order.
   it re-admits the user with fresh credentials required.
 - **Owner and self protections**: a user cannot delete or deactivate themselves,
   and the tenant owner cannot be removed. Both are refusals with distinct codes.
+  User-detail management protections re-verified **2026-10-17**: Edit is disabled
+  for the actor's own record and the tenant owner's record, with a localized
+  explanation. Team memberships remain readable with no write controls. Role
+  grant editors and their assignment/option fetches are skipped for these
+  protected targets, so opening one's own detail never requests
+  `/users/:self/assignments`. Other users retain permission-gated management.
+  Own records link **Edit my name** to `/core/profile`, whose existing
+  self-service name form uses `PATCH /api/tenant/core/v1/users/me`.
 - **The primary team membership cannot be removed** — only replaced through the
   `PUT`.
 - **`DEACTIVATED` is a fourth state, not a synonym for deleted.** The plan's
@@ -252,6 +321,32 @@ that one supersedes the other. The scope-role `PUT` is the most destructive
 write in Core: it replaces the entire set in one transaction, so it needs a
 pre-write diff confirmation (task 4.21 + the `AtomicReplacementConfirm`
 pattern).
+
+Scope-role visibility source-reviewed **2026-10-18** (FE-CORE-USERS-003):
+both reading and replacing scope-role assignments require the tenant owner.
+The user-detail panel skips scope-role requests for non-owners and shows the
+localized owner-only explanation instead of a table or Retry error. Branch-role
+assignments continue to load independently.
+
+Grant pickers re-verified **2026-10-17** (FE-CORE-USERS-002):
+`GET /api/tenant/core/v1/users/:userId/assignment-options` requires only
+`users.user.assign_roles`. It accepts `PaginationQueryDto` (`page`, `limit`,
+`search`) and returns Core `data: { choices, hasMore, labels }` rather than a
+standard list envelope. Search matches stored role/branch names; ordering is
+role name, branch name, role ID, branch ID. The branch editor selects a single
+server-authorized role/branch pair and supports search and additional pages.
+Choices require active branches/companies, actor assignment authority and all
+role permissions on that branch. The owner-reserved role is excluded for
+non-owner recipients. Mutation checks remain authoritative.
+
+`labels` contains names for existing visible branch grants and, for owners,
+exact-scope grants, independent of search, pagination and inactive status.
+Only these minimal names are exposed without companion read permissions.
+Option-read failures show Retry and disable branch writes; existing IDs are
+never used as display labels. The owner-only scope editor still uses the role,
+branch and company catalogues and stays disabled with a reason until all
+required reads succeed. Scope-role catalogues exclude the owner-reserved role
+for non-owner recipients.
 
 ---
 
@@ -294,6 +389,18 @@ do not build your own permission descriptions.
   exactly. Every affected user's next request re-resolves permissions. The UI
   should say that the change takes effect immediately for all holders, because
   it does.
+
+Role permission editor re-verified **2026-10-17** against Core's grant check
+and `/auth/me` permission scope projection. Each catalogue key is grantable
+only when its `permissionScopes[key].tenantWide` is true. Company/branch
+grants do not authorize role definitions. Unavailable keys are disabled with
+a keyboard-accessible explanation. If the role already contains keys outside
+the actor's authority (including IDs absent from the catalogue), the permission
+editor is read-only and asks the actor to contact the workspace owner: Core
+validates the entire replacement, even unchanged keys. Saving requires a loaded
+catalogue and rechecks the current session authority. Missing
+`roles.permission.read`, or a catalogue 403, renders `PermissionGate`.
+`ROLE_PERMISSION_GRANT_DENIED` has Arabic and English messages.
 
 ---
 

@@ -12,11 +12,13 @@ import {
   DialogTitle,
   Field,
   Input,
+  MfaCodeStep,
 } from "@/design-system";
 import { useLogin } from "./hooks/useLogin";
 
 export default function LoginPage() {
   const {
+    mfa,
     t,
     email,
     setEmail,
@@ -25,6 +27,7 @@ export default function LoginPage() {
     rememberMe,
     showPassword,
     isSubmitting,
+    isCoolingDown,
     error,
     fieldErrors,
     forgotFieldError,
@@ -63,6 +66,7 @@ export default function LoginPage() {
         </h1>
       </div>
 
+      {mfa.step ? <MfaCodeStep flow={mfa} onRestart={mfa.reset} /> : (
       <form method="post" onSubmit={handleSubmit} className="space-y-3" noValidate>
         {showValidationSummary ? (
           <div
@@ -182,11 +186,13 @@ export default function LoginPage() {
           variant="primary"
           size="sm"
           loading={isSubmitting}
+          disabled={isCoolingDown}
           className="mt-2 w-full justify-center"
         >
           {isSubmitting ? t.login.submitting : t.login.submitButton}
         </Button>
       </form>
+      )}
 
       <Dialog open={isForgotModalOpen} onOpenChange={setIsForgotModalOpen}>
         <DialogContent className="max-w-sm p-3 sm:p-3.5">

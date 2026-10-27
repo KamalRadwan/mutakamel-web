@@ -17,6 +17,7 @@ const { apiMock, authMock, generateMock } = vi.hoisted(() => ({
     resyncOperation: vi.fn(),
     applyUpdates: vi.fn(),
     requestPrerequisites: vi.fn(),
+    recoverPrerequisite: vi.fn(),
     addApplication: vi.fn(),
     repair: vi.fn(),
     decommission: vi.fn(),
@@ -62,6 +63,19 @@ import {
 const SECOND_COMMAND_ID = "019f0000-0000-7000-8000-0000000000e1";
 
 describe("useTenantProvisioning", () => {
+  it.each(["resend-release", "close-failed"] as const)("retains UUIDv7 intent on an uncertain %s outcome", async (action) => {
+    apiMock.recoverPrerequisite.mockRejectedValueOnce({ response: { status: 503, data: {
+      success: false, errorCode: "PROVISIONING_DEPENDENCY_UNAVAILABLE", message: "Unavailable",
+    } } })
+      .mockResolvedValueOnce({ operationId: OPERATION_ID });
+    const { result } = renderHook(() => useTenantProvisioning(TENANT_ID));
+    await waitFor(() => expect(result.current.operations.status).toBe("ready"));
+    const dto = { operationId: OPERATION_ID, expectedPlanDigest: "a".repeat(64), reasonCode: "ADMIN.RECOVERY" };
+    await act(async () => { await expect(result.current.recoverPrerequisite(action, dto)).rejects.toBeDefined(); });
+    await act(async () => { await result.current.recoverPrerequisite(action, dto); });
+    expect(apiMock.recoverPrerequisite.mock.calls.map((call) => call[3])).toEqual([COMMAND_ID, COMMAND_ID]);
+    expect(result.current.mutation.name).toBeNull();
+  });
   beforeEach(() => {
     Object.values(apiMock).forEach((mock) => mock.mockReset());
     authMock.user = { isSuperAdmin: true, permissions: [] };

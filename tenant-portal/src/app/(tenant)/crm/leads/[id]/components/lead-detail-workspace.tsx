@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import {
   ArrowLeft,
@@ -10,7 +11,6 @@ import {
   FileText,
   History,
   ListTodo,
-  Lock,
   Paperclip,
   Sparkles,
   Star,
@@ -18,6 +18,7 @@ import {
   UserRound,
 } from "lucide-react";
 import {
+  Button,
   ConfirmActionModal,
   DOSSIER_HEADER_CARD_COLORS,
   DegradedBanner,
@@ -25,14 +26,15 @@ import {
   ErrorState,
   NotFoundState,
   Skeleton,
-  StageBar,
   StatusBadge,
   cardColorBorder,
   cn,
   dossierAvatarClass,
+  useToast,
 } from "@/design-system";
 import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
-import { EntityHistoryCard } from "@/components/audit/EntityHistoryCard";
+import { RecordHistoryTab } from "@/components/audit/RecordHistoryTab";
+import { useAuditAccess } from "@/components/audit/hooks/useAuditAccess";
 import { useAccessMode } from "@/hooks/useAccessMode";
 import { useI18n } from "@/i18n/I18nContext";
 import { createWriteAttempt, runIdempotentWrite } from "@/lib/api/idempotent-write";
@@ -44,11 +46,12 @@ import { CustomFieldsCard } from "../../../shared/components/CustomFieldsCard";
 import { RecordAttachmentsSection } from "../../../shared/components/RecordAttachmentsSection";
 import { RecordNotesSection } from "../../../shared/components/RecordNotesSection";
 import { crmCapabilityAllowsOwner } from "../../../shared/crm-capabilities";
+import { CRM_RATING_STARS } from "../../../shared/crm-rating-contract";
 import { useCrmAcquisitionSources } from "../../../shared/hooks/useCrmAcquisitionSources";
 import { useCrmErrorText } from "../../../shared/hooks/useCrmErrorText";
-import { LEAD_STAGE_BAR_TONE } from "../../components/lead-view-config";
 import { useLeadCapabilities } from "../../hooks/useLeadCapabilities";
 import { leadPath, type LeadDetail } from "../../lead-contract";
+import { leadNameInitials } from "../../lead-card-contract";
 import { formatLeadStageAge } from "../../lead-stage-age";
 import type { LeadDetailCard } from "../lead-detail-card-contract";
 import { useLeadCardEdit } from "../hooks/useLeadCardEdit";
@@ -72,17 +75,12 @@ export function LeadDetailWorkspace({ leadId }: { leadId: string }) {
   return <LeadDetailContent key={leadId} leadId={leadId} />;
 }
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "LD";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
-
 function LeadDetailContent({ leadId }: { leadId: string }) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
+  const canReadHistory = useAuditAccess();
   const describeError = useCrmErrorText();
+  const router = useRouter();
+  const toast = useToast();
   const detail = useLeadDetail(leadId);
   const lead = detail.lead;
   const { capabilities, error: capabilitiesError } = useLeadCapabilities(
@@ -113,7 +111,6 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
   const canDelete =
     canMutate &&
     lead !== null &&
-    lead.status !== "CONVERTED" &&
     crmCapabilityAllowsOwner(capabilities.delete, lead.ownerUserId);
   const canEditRecord = canUpdate && lead?.status !== "CONVERTED";
 
@@ -125,13 +122,14 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
     [detail],
   );
   const cardEdit = useLeadCardEdit(lead, canEditRecord, onCardSaved, detail.reload);
-  const stageMove = useLeadStageMove(lead, detail.stages, canUpdate, detail.reload);
+  const stageMove = useLeadStageMove(lead, detail.stages, canEditRecord, detail.reload);
   // The stage a press asked for, held until the confirmation answers.
   const [pendingStageId, setPendingStageId] = useState<string | null>(null);
 
   // Delete Lead confirmation state
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Inline 4-tab Dossier Workspace state in Right Column
   const [activeInlineTab, setActiveInlineTab] = useState<DossierWorkspaceTab>("activities");
@@ -140,6 +138,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
   const handleDeleteLead = async () => {
     if (!lead || !canDelete || deleting) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       const outcome = await runIdempotentWrite({
         attempt: createWriteAttempt(),
@@ -149,9 +148,14 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
       });
       if (outcome.kind === "success") {
         setConfirmDeleteOpen(false);
-        if (typeof window !== "undefined") {
-          window.location.assign("/crm/leads");
-        }
+        router.push("/crm/leads");
+      } else if (outcome.kind === "failed") {
+        setDeleteError(describeError(outcome.error) ?? t.crmLeads.messages.deleteFailed);
+      } else {
+        // The delete may have applied; re-read before offering another attempt.
+        setConfirmDeleteOpen(false);
+        toast.warning(t.crmLeadDetail.deleteUnconfirmed, undefined, 0);
+        detail.reload();
       }
     } finally {
       setDeleting(false);
@@ -233,10 +237,10 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
       />
 
       {/* Top Sub-Toolbar: Back to Leads + Breadcrumb + Delete Lead */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-muted-foreground">
           <Link href="/crm/leads" className="dossier-btn">
-            <ArrowLeft className="size-3.5 rtl:rotate-180" aria-hidden="true" />
+            <ArrowLeft className="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
             <span>{t.crmLeadDetail.backToLeads}</span>
           </Link>
           <span aria-hidden="true">/</span>
@@ -244,18 +248,20 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
           <span aria-hidden="true">›</span>
           <span>{t.crmLeads.title}</span>
           <span aria-hidden="true">›</span>
-          <span className="font-bold text-foreground">{lead.displayName}</span>
+          <span className="font-semibold text-foreground">{lead.displayName}</span>
         </div>
         {canDelete && (
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               className="dossier-btn dossier-btn-cancel"
               onClick={() => setConfirmDeleteOpen(true)}
             >
               <Trash2 className="size-3.5" aria-hidden="true" />
               <span>{t.common.delete}</span>
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -270,7 +276,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
       >
         <div className="dossier-hero-left">
           <span className={dossierAvatarClass(isCorporate, isConverted)}>
-            {getInitials(lead.displayName)}
+            {leadNameInitials(lead.displayName)}
           </span>
           <div className="dossier-hero-meta">
             {/* Row 1: Display Name + Profile Type Pill + Status Pill + Stage Pill + Stage Age */}
@@ -299,7 +305,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                     : "dossier-badge-status-open",
                 )}
               >
-                ● {isAr ? "الحالة" : "Status"}: {lead.status}
+                ● {t.common.status}: {t.statusValues[`LeadStatus.${lead.status}`]}
               </span>
               {currentStageName && (
                 <span className="dossier-badge dossier-badge-stage">
@@ -320,12 +326,14 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                 aria-label={t.crmLeads.card.rating}
                 className="dossier-rating-pill"
               >
-                {[1, 2, 3].map((starIndex) => {
+                {CRM_RATING_STARS.map((starIndex) => {
                   const active = starIndex <= currentRating;
                   return (
-                    <button
+                    <Button
                       key={starIndex}
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       disabled={!canEditRecord || cardEdit.saving}
                       onClick={() =>
                         void cardEdit.save({
@@ -338,21 +346,21 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                       title={formatTemplate(t.crmLeads.card.rateStars, {
                         count: starIndex,
                       })}
-                      className="rounded p-0.5 transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100"
+                      className="h-auto rounded p-0.5 transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100"
                     >
                       <Star
                         className={cn(
                           "size-3.5 transition-colors",
                           active
-                            ? "fill-amber-400 text-amber-400"
-                            : "text-slate-300 dark:text-slate-600",
+                            ? "fill-warning text-warning"
+                            : "text-muted-foreground/40",
                         )}
                         aria-hidden="true"
                       />
-                    </button>
+                    </Button>
                   );
                 })}
-                <span className="ms-1 font-extrabold">{currentRating}/3</span>
+                <span className="ms-1 font-semibold">{currentRating}/3</span>
               </div>
 
               <div
@@ -370,9 +378,11 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                       ? t.crmLeads.card.colorNone
                       : t.crmLeads.card.colors[item.color];
                   return (
-                    <button
+                    <Button
                       key={item.color ?? "NONE"}
                       type="button"
+                      variant="ghost"
+                      size="xs"
                       disabled={!canEditRecord || cardEdit.saving}
                       onClick={() => {
                         if (!isSelected) void cardEdit.save({ cardColor: item.color });
@@ -385,7 +395,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                           : undefined
                       }
                       className={cn(
-                        "dossier-color-dot transition-transform hover:scale-115 disabled:cursor-default disabled:hover:scale-100",
+                        "dossier-color-dot p-0 transition-transform hover:scale-115 disabled:cursor-default disabled:hover:scale-100",
                         item.color === null && "none",
                         isSelected && "active",
                       )}
@@ -428,8 +438,10 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
             branchId={lead.branchId}
           />
           {(canConvert || convert.hasReceipt) && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               onClick={convert.openModal}
               className="dossier-btn dossier-btn-primary"
             >
@@ -439,7 +451,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                   ? t.crmLeadConvert.conversionResult
                   : `${t.crmLeadConvert.action} →`}
               </span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -450,9 +462,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
           <div className="dossier-locked-banner-left">
             <span aria-hidden="true">🔒</span>
             <span>
-              {isAr
-                ? "تم تحويل هذا العميل المحتمل إلى ملف عميل نشط — السجل مقفل للقراءة فقط"
-                : "Converted Lead — Record Locked (Read-Only)"}
+              {t.crmLeads.executive.convertedReadOnly}
             </span>
           </div>
           <div className="dossier-locked-links">
@@ -461,7 +471,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                 href={`/crm/customer-profiles/${lead.convertedCustomerProfileId}`}
                 className="dossier-locked-link"
               >
-                <span>🏢 {isAr ? "فتح ملف العميل" : "Open Customer Profile"}</span>
+                <span>🏢 {t.crmLeads.executive.openCustomerProfile}</span>
                 <ExternalLink className="size-3.5" aria-hidden="true" />
               </Link>
             )}
@@ -470,7 +480,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                 href={`/crm/opportunities/${lead.convertedOpportunityId}`}
                 className="dossier-locked-link"
               >
-                <span>💼 {isAr ? "فتح الفرصة البيعية" : "Open Opportunity"}</span>
+                <span>💼 {t.crmLeads.executive.openOpportunity}</span>
                 <ExternalLink className="size-3.5" aria-hidden="true" />
               </Link>
             )}
@@ -481,19 +491,6 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
       {/* Colorful 8-Stage Connected Pipeline Track */}
       {!detail.stagesDegraded && detail.stages.length > 0 && (
         <div className="dossier-stage-bar">
-          <StageBar
-            className="sr-only"
-            label={t.crmLeads.stage}
-            steps={detail.stages.map((entry) => ({
-              id: entry.id,
-              label: localizedValue(entry.nameAr, entry.nameEn, lang),
-              tone: LEAD_STAGE_BAR_TONE[entry.flag],
-              disabled: entry.flag === "CONVERTED",
-            }))}
-            value={lead.stageId}
-            onChange={canUpdate ? (next) => next && setPendingStageId(next) : undefined}
-            disabled={stageMove.isMoving}
-          />
           <div className="dossier-stage-track">
             {detail.stages.map((entry, idx) => {
               const isCurrent = entry.id === lead.stageId;
@@ -506,14 +503,25 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                 stageMove.isMoving ||
                 isConvertedStage ||
                 isCurrent;
+              const stageName = localizedValue(entry.nameAr, entry.nameEn, lang);
+              const stageDisabledReason = stageMove.isMoving
+                ? t.crmLeadDetail.stageMoveInProgress
+                : isConvertedStage
+                  ? t.crmLeadDetail.convertedStageUnavailable
+                  : isCurrent
+                    ? t.crmLeadDetail.currentStageUnavailable
+                    : t.crmLeadDetail.stageMoveUnavailable;
 
               return (
-                <button
+                <Button
                   key={entry.id}
                   type="button"
-                  disabled={stageDisabled}
+                  variant="ghost"
+                  size="xs"
+                  aria-disabled={stageDisabled}
+                  aria-label={stageDisabled ? `${stageName}. ${stageDisabledReason}` : stageName}
                   onClick={() => {
-                    if (!isCurrent) setPendingStageId(entry.id);
+                    if (!stageDisabled) setPendingStageId(entry.id);
                   }}
                   className={cn(
                     "dossier-stage-cell",
@@ -535,7 +543,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                   <span className="truncate">
                     {localizedValue(entry.nameAr, entry.nameEn, lang)}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -568,9 +576,12 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
 
       <ConfirmActionModal
         open={confirmDeleteOpen}
-        onOpenChange={setConfirmDeleteOpen}
+        onOpenChange={(next) => {
+          setConfirmDeleteOpen(next);
+          if (!next) setDeleteError(null);
+        }}
         title={t.common.delete}
-        description={lead.displayName}
+        description={deleteError ? `${lead.displayName} — ${deleteError}` : lead.displayName}
         confirmLabel={t.common.delete}
         cancelLabel={t.common.cancel}
         loading={deleting}
@@ -701,12 +712,14 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                     Icon: Paperclip,
                   },
                 ] as const
-              ).map(({ id, label, Icon }) => {
+              ).filter(({ id }) => id !== "history" || canReadHistory).map(({ id, label, Icon }) => {
                 const isActive = activeInlineTab === id;
                 return (
-                  <button
+                  <Button
                     key={id}
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => {
@@ -717,7 +730,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                   >
                     <Icon className="size-3.5 shrink-0" aria-hidden="true" />
                     <span className="truncate">{label}</span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -745,7 +758,6 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
                     sourceId={lead.id}
                     sourceOwnerUserId={lead.ownerUserId}
                     createCapability={capabilities.notesCreate ?? null}
-                    deleteCapability={capabilities.notesDelete ?? null}
                     readOnly={!canMutate || isConverted}
                   />
                 </div>
@@ -753,7 +765,7 @@ function LeadDetailContent({ leadId }: { leadId: string }) {
 
               {activeInlineTab === "history" && (
                 <div role="tabpanel">
-                  <EntityHistoryCard
+                  <RecordHistoryTab
                     density="compact"
                     entityType="Lead"
                     entityId={lead.id}

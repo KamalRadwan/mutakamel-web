@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { readMigrationPermissions } from "../model/migration-permissions";
 import type {
   FleetStatus,
   MigrationMutationState,
@@ -280,7 +281,7 @@ describe("MigrationsOverviewScreen permission gating", () => {
   it("hides both run entry points from a read-only operator", () => {
     overviewMock.permissions = {
       canRead: true,
-      hasExecute: true,
+      hasExecute: false,
       hasCritical: false,
       canExecute: false,
       canDestroy: false,
@@ -291,18 +292,19 @@ describe("MigrationsOverviewScreen permission gating", () => {
     expect(
       screen.queryByRole("button", { name: /Migrate this tenant/ }),
     ).toBeNull();
-    expect(screen.getByText("admin.migrations.critical")).toBeInTheDocument();
+    expect(screen.getByText("admin.migrations.manage")).toBeInTheDocument();
     expect(screen.getByRole("table", { name: "Tenants" })).toBeInTheDocument();
   });
 
-  it("offers both fleet and single-tenant entry points with full permissions", () => {
-    overviewMock.permissions = {
-      canRead: true,
-      hasExecute: true,
-      hasCritical: true,
-      canExecute: true,
-      canDestroy: true,
-    };
+  it.each([false, true])("offers both run entry points with manage and critical=%s", (critical) => {
+    overviewMock.permissions = readMigrationPermissions({
+      isSuperAdmin: false,
+      permissions: [
+        "admin.migrations.read",
+        "admin.migrations.manage",
+        ...(critical ? ["admin.migrations.critical"] : []),
+      ],
+    });
     render(<MigrationsOverviewScreen />);
 
     expect(
@@ -349,7 +351,11 @@ describe("MigrationsOverviewScreen dry-run dialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("starts a dry run without a typed confirmation", () => {
+  it("starts a dry run without critical or a typed confirmation", () => {
+    overviewMock.permissions = readMigrationPermissions({
+      isSuperAdmin: false,
+      permissions: ["admin.migrations.read", "admin.migrations.manage"],
+    });
     render(<MigrationsOverviewScreen />);
     fireEvent.click(screen.getByRole("button", { name: /Run a migration/ }));
     const dialog = screen.getByRole("dialog", { name: "Run a migration" });
@@ -482,7 +488,7 @@ describe("MigrationsOverviewScreen rejected start", () => {
       isNormalized: true,
       httpStatus: 403,
       errorCode: "ADMIN_PERMISSION_DENIED",
-      message: "admin.migrations.critical is required to apply a migration.",
+      message: "admin.migrations.manage is required to start a migration.",
       correlationId: "corr-7f3a",
     },
   };
@@ -550,7 +556,7 @@ describe("MigrationsOverviewScreen rejected start", () => {
       "Your permissions do not authorize this command.",
     );
     expect(notice.textContent).toContain(
-      "admin.migrations.critical is required to apply a migration.",
+      "admin.migrations.manage is required to start a migration.",
     );
     expect(notice.textContent).toContain("ADMIN_PERMISSION_DENIED");
     expect(notice.textContent).toContain("corr-7f3a");

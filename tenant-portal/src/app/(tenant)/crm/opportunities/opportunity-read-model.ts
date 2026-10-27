@@ -3,10 +3,10 @@ import type { CardColor } from "@/design-system";
 import { parseCrmTags, type CrmTag } from "../shared/tag-contract";
 import { parseOpportunityCardColor } from "./opportunity-card-contract";
 
-export type OpportunityCustomerProfileType = "INDIVIDUAL" | "CORPORATE";
-export type OpportunityActivityState = "NO_OPEN" | "OVERDUE" | "TODAY" | "FUTURE";
+type OpportunityCustomerProfileType = "INDIVIDUAL" | "CORPORATE";
+type OpportunityActivityState = "NO_OPEN" | "OVERDUE" | "TODAY" | "FUTURE";
 
-export interface OpportunityPrimaryContact {
+interface OpportunityPrimaryContact {
   partyId: string;
   displayName: string;
   jobTitle: string | null;
@@ -111,10 +111,4 @@ export function parseOpportunityReadFields(
     activityState: activityState(item.activityState),
     tags: parseCrmTags(item.tags, "Invalid opportunity response."),
   };
-}
-
-export function opportunityActivityDisplayState(
-  value: OpportunityActivityState,
-): "NONE" | "OVERDUE" | "TODAY" | "FUTURE" {
-  return value === "NO_OPEN" ? "NONE" : value;
 }

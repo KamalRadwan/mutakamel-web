@@ -5,7 +5,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import type { CrmTag } from "../../../shared/tag-contract";
 import { useCreateTagModal } from "../../hooks/useCreateTagModal";
 
-export interface CreateTagModalProps {
+interface CreateTagModalProps {
   open: boolean;
   initialName?: string;
   existingTags: CrmTag[];

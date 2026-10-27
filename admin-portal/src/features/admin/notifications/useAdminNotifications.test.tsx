@@ -11,8 +11,6 @@ const { apiMock, authMock } = vi.hoisted(() => ({
     list: vi.fn(),
     bulk: vi.fn(),
     item: vi.fn(),
-    register: vi.fn(),
-    revoke: vi.fn(),
     preference: vi.fn(),
   },
   authMock: {
@@ -37,8 +35,6 @@ vi.mock("./api", () => ({
   listAdminNotifications: apiMock.list,
   performAdminNotificationBulkAction: apiMock.bulk,
   performAdminNotificationItemAction: apiMock.item,
-  registerAdminNotificationDeviceToken: apiMock.register,
-  revokeAdminNotificationDeviceToken: apiMock.revoke,
   upsertAdminNotificationPreference: apiMock.preference,
 }));
 
@@ -61,8 +57,6 @@ describe("useAdminNotifications", () => {
     apiMock.getUnread.mockResolvedValue(1);
     apiMock.bulk.mockResolvedValue(1);
     apiMock.item.mockResolvedValue(undefined);
-    apiMock.register.mockResolvedValue(deviceReceiptFixture());
-    apiMock.revoke.mockResolvedValue(undefined);
     apiMock.preference.mockResolvedValue(preferenceFixture());
   });
 
@@ -105,36 +99,35 @@ describe("useAdminNotifications", () => {
     await waitFor(() => expect(result.current.requestState).toBe("READY"));
 
     await act(async () => {
-      await result.current.performItemAction(ID, "ack-compatibility");
+      await result.current.performItemAction(ID, "acknowledge");
     });
 
     expect(apiMock.item).not.toHaveBeenCalled();
     expect(result.current.actionStatus.state).toBe("FORBIDDEN");
   });
 
-  it("passes every semantic action selector through and retains the safe device receipt", async () => {
+  it("passes notification actions through and saves an in-app preference", async () => {
     const { result } = renderHook(() => useAdminNotifications());
     await waitFor(() => expect(result.current.requestState).toBe("READY"));
 
     await act(async () => {
-      await result.current.performBulkAction("mark-all-read-compatibility");
-      await result.current.performItemAction(ID, "dismiss-post-compatibility");
-      await result.current.registerDevice({
-        provider: "web-push",
-        token: "raw-token",
-        enabled: true,
+      await result.current.performBulkAction("read-all");
+      await result.current.performItemAction(ID, "dismiss");
+      await result.current.savePreference({
+        notificationType: "tenant.user.invited",
+        inAppEnabled: true,
       });
     });
 
-    expect(apiMock.bulk).toHaveBeenCalledWith("mark-all-read-compatibility");
-    expect(apiMock.item).toHaveBeenCalledWith(ID, "dismiss-post-compatibility");
-    expect(apiMock.register).toHaveBeenCalledWith({
-      provider: "web-push",
-      token: "raw-token",
-      enabled: true,
+    expect(apiMock.bulk).toHaveBeenCalledWith("read-all");
+    expect(apiMock.item).toHaveBeenCalledWith(ID, "dismiss");
+    expect(apiMock.preference).toHaveBeenCalledWith({
+      notificationType: "tenant.user.invited",
+      inAppEnabled: true,
     });
-    expect(result.current.deviceReceipt?.tokenHash).toBe("c".repeat(64));
-    expect(result.current.deviceReceipt).not.toHaveProperty("token");
+    expect(result.current.actionStatus).toMatchObject({
+      state: "SUCCESS", messageKey: "preferenceSaved",
+    });
   });
 
   it("maps unavailable loads and preserves the correlation id", async () => {
@@ -240,23 +233,8 @@ function runtimeFixture() {
     enabled: true,
     inAppEnabled: true,
     realtimeEnabled: false,
-    pushEnabled: false,
-    emailEnabled: true,
-    provider: "none",
     previewLimit: 10,
     pollIntervalMs: 30_000,
-    firebase: {
-      apiKey: "",
-      appId: "",
-      authDomain: "",
-      projectId: "",
-      messagingSenderId: "",
-      storageBucket: "",
-      measurementId: "",
-      webPushVapidPublicKey: "",
-      messagingServiceWorkerPath: "/firebase-messaging-sw.js",
-      messagingServiceWorkerScope: "/",
-    },
   };
 }
 
@@ -264,22 +242,6 @@ function preferenceFixture() {
   return {
     notificationType: "tenant.user.invited",
     inAppEnabled: true,
-    pushEnabled: false,
-    emailEnabled: true,
-    quietHours: {},
     updatedAt: "2026-08-12T10:00:00.000Z",
-  };
-}
-
-function deviceReceiptFixture() {
-  return {
-    id: "019f0000-0000-7000-8000-000000000003",
-    provider: "web-push",
-    tokenHash: "c".repeat(64),
-    deviceId: null,
-    platform: null,
-    enabled: true,
-    lastSeenAt: "2026-08-12T10:00:00.000Z",
-    revokedAt: null,
   };
 }

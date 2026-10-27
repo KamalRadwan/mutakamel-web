@@ -22,7 +22,6 @@ const EMPTY_FORM: DirectorySettingsFormValues = {
   preventDuplicateWhatsapp: false,
   maxContactMethodsPerParty: "",
   maxAddressesPerParty: "",
-  partyCacheTtlSeconds: "",
 };
 
 /**
@@ -130,6 +129,5 @@ type Dictionary = ReturnType<typeof useI18n>["t"];
 function formMessage(reason: string, t: Dictionary): string {
   const copy = t.coreOperations.directory;
   if (reason === "DIRECTORY_SETTINGS_FORM_CONTACTS") return copy.settingsContactsInvalid;
-  if (reason === "DIRECTORY_SETTINGS_FORM_ADDRESSES") return copy.settingsAddressesInvalid;
-  return copy.settingsTtlInvalid;
+  return copy.settingsAddressesInvalid;
 }

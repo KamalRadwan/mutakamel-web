@@ -1,6 +1,7 @@
 import type { TradePath } from "@/lib/api/envelope";
 import { generateUUIDv7, isUUIDv7 } from "@/lib/uuid";
-import { INVENTORY_CODE_PATTERN, isDecimalString } from "../../trade-advanced-validation";
+import { buildSerialSelection } from "./serial-input";
+import { INVENTORY_CODE_PATTERN, isDecimalString, isMemberOf, record } from "../../trade-advanced-validation";
 import {
   INVENTORY_DELIVERIES_PATH,
   INVENTORY_RECEIPTS_PATH,
@@ -131,11 +132,96 @@ export const EMPTY_MOVEMENT_FORM: MovementFormValues = {
 export interface SessionMovementEntry {
   id: string;
   kind: MovementKind;
-  status: "DRAFT" | "POSTED" | "REVERSED" | "ACTIVE" | "RELEASED";
+  status: "DRAFT" | "POSTED" | "PARTIALLY_REVERSED" | "REVERSED" | ReservationStatus;
   nodeId: string;
   summary: string;
   version: number;
   recordedAt: string;
+  reservation?: ReservationSnapshot;
+  lines?: MovementLineSnapshot[];
+}
+
+export interface MovementLineSnapshot {
+  id: string;
+  quantity: string;
+  serialKeys: string[];
+}
+
+export interface ReversalLineValues {
+  lineId: string;
+  quantity: string;
+  serialKeys: string;
+}
+
+export function parseMovementLines(payload: unknown): MovementLineSnapshot[] {
+  const row = record(payload);
+  if (!row || !Array.isArray(row.lines)) invalidResponse();
+  return row.lines.map((value: unknown) => {
+    const line = record(value);
+    const tracking = record(line?.tracking);
+    if (!line || !isUUIDv7(line.id) || !isDecimalString(line.quantity) || !tracking) invalidResponse();
+    const keys = tracking.serialKeys ?? [];
+    if (!Array.isArray(keys) || keys.some((key: unknown) => typeof key !== "string" ||
+      !key || key.length > 120 || key !== key.trim() || key === "none") ||
+      new Set(keys).size !== keys.length) invalidResponse();
+    return { id: line.id, quantity: line.quantity, serialKeys: keys as string[] };
+  });
+}
+
+export function parseMovementStatus(payload: unknown): "DRAFT" | "POSTED" | "PARTIALLY_REVERSED" | "REVERSED" {
+  const row = record(payload);
+  if (!row || !isMemberOf(row.status, ["DRAFT", "POSTED", "PARTIALLY_REVERSED", "REVERSED"] as const)) invalidResponse();
+  return row.status;
+}
+
+// inventory.service.ts: reservationStatus() and reserve()'s BACKORDER outcome.
+const RESERVATION_STATUSES = [
+  "ACTIVE", "PARTIALLY_RELEASED", "PARTIALLY_CONSUMED", "RELEASED",
+  "CONSUMED", "CLOSED", "BACKORDERED",
+] as const;
+type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
+
+export interface ReservationSnapshot {
+  id: string;
+  fulfillmentNodeId: string;
+  status: ReservationStatus;
+  version: number;
+  quantity: string;
+  releasedQuantity: string;
+  consumedQuantity: string;
+  remainingQuantity: string;
+}
+
+/** The entity response has no remainingQuantity; match reservationRemaining exactly. */
+export function parseReservation(payload: unknown, expectedId?: string): ReservationSnapshot {
+  const row = record(payload);
+  if (
+    !row || !isUUIDv7(row.id) || !isUUIDv7(row.fulfillmentNodeId) ||
+    (expectedId !== undefined && row.id !== expectedId) ||
+    !isMemberOf(row.status, RESERVATION_STATUSES) ||
+    typeof row.version !== "number" || !Number.isSafeInteger(row.version) || row.version < 1
+  ) invalidResponse();
+
+  const parseQuantity = (value: unknown): string => {
+    if (!isDecimalString(value) || value.startsWith("-") || value.length > 25) invalidResponse();
+    return value;
+  };
+  const quantity = parseQuantity(row.quantity);
+  const releasedQuantity = parseQuantity(row.releasedQuantity);
+  const consumedQuantity = parseQuantity(row.consumedQuantity);
+  // numeric(24,8): integer arithmetic preserves quantities beyond Number's precision.
+  const scaled = (value: string) => {
+    const [whole, fraction = ""] = value.split(".");
+    return BigInt(`${whole}${fraction.padEnd(8, "0")}`);
+  };
+  const remaining = scaled(quantity) - scaled(releasedQuantity) - scaled(consumedQuantity);
+  if (remaining < BigInt(0)) invalidResponse();
+  const digits = remaining.toString().padStart(9, "0");
+  const remainingQuantity = `${digits.slice(0, -8)}.${digits.slice(-8)}`;
+  return {
+    id: row.id, fulfillmentNodeId: row.fulfillmentNodeId, status: row.status, version: row.version,
+    quantity, releasedQuantity, consumedQuantity, remainingQuantity,
+  };
 }
 
 export const RELEASE_REASON_PRESETS = [
@@ -182,29 +268,31 @@ function requireIsoInstant(value: string): string {
 }
 
 function buildOptionalTracking(
+  quantity: string,
   lotKey?: string,
   serialKeys?: string,
   expiresAt?: string,
 ): Record<string, unknown> | undefined {
   const lot = lotKey?.trim() ?? "";
-  const serials = (serialKeys ?? "")
-    .split(/[\s,]+/u)
-    .map((entry) => entry.trim())
-    .filter((entry) => entry.length > 0);
-  const exp = expiresAt?.trim() ? requireIsoInstant(expiresAt) : undefined;
-  if (lot.length > 120 || serials.some((s) => s.length > 120)) {
+  const serials = buildSerialSelection(serialKeys ?? "", quantity);
+  const exp = expiresAt?.trim() || undefined;
+  if (exp && (!/^\d{4}-\d{2}-\d{2}$/.test(exp) ||
+    Number.isNaN(Date.parse(exp)) || new Date(exp).toISOString().slice(0, 10) !== exp)) {
+    throw new Error("INVENTORY_FORM_DATE");
+  }
+  if (lot.length > 120) {
     throw new Error("INVENTORY_FORM_TRACKING");
   }
-  if (!lot && serials.length === 0 && !exp) return undefined;
+  if (!lot && !serials && !exp) return undefined;
   const tracking: Record<string, unknown> = {};
   if (lot) tracking.lotKey = lot;
-  if (serials.length > 0) tracking.serialKeys = serials;
-  if (exp) tracking.expiresAt = exp;
+  if (serials) tracking.serialKeys = serials;
+  if (exp) tracking.expiryDate = exp;
   return tracking;
 }
 
 export function buildOpeningBalanceRequest(values: OpeningBalanceFormValues) {
-  const tracking = buildOptionalTracking(values.lotKey, values.serialKeys, values.expiresAt);
+  const tracking = buildOptionalTracking(values.quantity, values.lotKey, values.serialKeys, values.expiresAt);
   return {
     nodeId: requireUuid(values.nodeId, "INVENTORY_FORM_NODE"),
     itemId: requireUuid(values.itemId, "INVENTORY_FORM_ITEM"),
@@ -218,7 +306,7 @@ export function buildOpeningBalanceRequest(values: OpeningBalanceFormValues) {
 }
 
 export function buildReservationRequest(values: ReservationFormValues) {
-  const tracking = buildOptionalTracking(values.lotKey, values.serialKeys);
+  const tracking = buildOptionalTracking(values.quantity, values.lotKey, values.serialKeys);
   const expiresAt = values.expiresAt?.trim()
     ? requireIsoInstant(values.expiresAt)
     : undefined;
@@ -237,11 +325,13 @@ export function buildReservationRequest(values: ReservationFormValues) {
   };
 }
 
-/** `quantity` is optional — omitting it releases the whole reservation. */
-export function buildReleaseRequest(quantity: string, reasonCode: string) {
-  const request: { quantity?: string; reasonCode?: string } = {};
+/** Omitted quantity uses the selected serial count, or all remaining stock without a selection. */
+export function buildReleaseRequest(quantity: string, reasonCode: string, serialKeys = "") {
+  const request: { quantity?: string; reasonCode?: string; serialKeys?: string[] } = {};
   const trimmedQuantity = quantity.trim();
   if (trimmedQuantity.length > 0) request.quantity = requirePositiveDecimal(trimmedQuantity);
+  const selection = buildSerialSelection(serialKeys, request.quantity);
+  if (selection) request.serialKeys = selection;
   const trimmedReason = reasonCode.trim().toUpperCase();
   if (trimmedReason.length > 0) {
     if (!INVENTORY_CODE_PATTERN.test(trimmedReason)) throw new Error("INVENTORY_FORM_REASON");
@@ -258,7 +348,7 @@ function buildLines(
     throw new Error("INVENTORY_FORM_LINES");
   }
   return values.lines.map((line) => {
-    const tracking = buildOptionalTracking(line.lotKey, line.serialKeys, line.expiresAt);
+    const tracking = buildOptionalTracking(line.quantity, line.lotKey, line.serialKeys, line.expiresAt);
     const reservationId =
       lineIdKey === "salesOrderLineId" && line.reservationId?.trim()
         ? requireUuid(line.reservationId, "INVENTORY_FORM_LINES")
@@ -297,10 +387,22 @@ export function buildDeliveryRequest(values: MovementFormValues) {
 }
 
 /** `ReverseMovementDto` — both fields required; `lines` omitted reverses in full. */
-export function buildReversalRequest(reasonCode: string, businessEffectiveAt: string) {
+export function buildReversalRequest(reasonCode: string, businessEffectiveAt: string, lines: ReversalLineValues[] = []) {
   const reason = reasonCode.trim().toUpperCase();
   if (!INVENTORY_CODE_PATTERN.test(reason)) throw new Error("INVENTORY_FORM_REASON");
-  return { reasonCode: reason, businessEffectiveAt: requireIsoInstant(businessEffectiveAt) };
+  if (lines.length > MOVEMENT_LINES_MAX || new Set(lines.map((line) => line.lineId.trim())).size !== lines.length) {
+    throw new Error("INVENTORY_FORM_LINES");
+  }
+  return {
+    reasonCode: reason,
+    businessEffectiveAt: requireIsoInstant(businessEffectiveAt),
+    ...(lines.length ? { lines: lines.map((line) => {
+      const quantity = requirePositiveDecimal(line.quantity);
+      const serialKeys = buildSerialSelection(line.serialKeys, quantity);
+      return { lineId: requireUuid(line.lineId, "INVENTORY_FORM_LINES"), quantity,
+        ...(serialKeys ? { serialKeys } : {}) };
+    }) } : {}),
+  };
 }
 
 /**

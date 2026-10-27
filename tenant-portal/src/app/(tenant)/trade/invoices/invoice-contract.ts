@@ -1,4 +1,5 @@
 import { isUUIDv7 } from "@/lib/uuid";
+import { parseFinancialTotals, type FinancialTotals } from "../documents/financial-totals";
 import {
   TRADE_V1,
   isTradeDate,
@@ -36,18 +37,13 @@ export interface Invoice extends TradeFinalizedDocument {
   sourceSalesOrderId: string | null;
 }
 
-export interface InvoiceLine {
+export interface InvoiceLine extends Omit<InvoiceDraftLinePayload, "description"> {
   id: string;
-  clientLineId: string;
-  itemId?: string | null;
-  uomId: string;
-  quantity: string;
-  unitPrice: string;
-  lineTotal: string;
   descriptionSnapshot: string | null;
 }
 
 export interface InvoiceDetail extends Invoice {
+  totalsSnapshot: FinancialTotals;
   lines: InvoiceLine[];
 }
 
@@ -67,13 +63,29 @@ export function parseInvoiceDetail(payload: unknown): InvoiceDetail {
   const invoice = parseInvoice(payload);
   const row = record(payload);
   if (!row || !Array.isArray(row.lines)) tradeInvalidResponse();
-  return { ...invoice, lines: row.lines.map(parseLine) };
+  return {
+    ...invoice,
+    totalsSnapshot: parseFinancialTotals(row.totalsSnapshot),
+    lines: row.lines.map(parseLine),
+  };
 }
 
 function parseLine(payload: unknown): InvoiceLine {
   const line = record(payload);
+  const print = record(line?.printSnapshot);
+  const item = record(print?.item);
+  const financial = record(print?.financial);
+  const priceSnapshot = record(financial?.priceEvidence);
+  const taxSnapshot = record(financial?.taxEvidence);
   if (
     !line ||
+    !item || !isUUIDv7(item.id) ||
+    !financial || !priceSnapshot || !taxSnapshot ||
+    !isTradeDecimal(financial.unitPrice) ||
+    !isTradeDecimal(financial.discountTotal) ||
+    !isTradeDecimal(financial.chargeTotal) ||
+    !isTradeDecimal(financial.taxTotal) ||
+    !isTradeDecimal(financial.lineTotal) ||
     !isUUIDv7(line.id) ||
     !isUUIDv7(line.clientLineId) ||
     !isUUIDv7(line.uomId) ||
@@ -86,11 +98,18 @@ function parseLine(payload: unknown): InvoiceLine {
   return {
     id: line.id,
     clientLineId: line.clientLineId,
-    itemId: optionalUuid(line.itemId),
+    // The entity stores a company profile, not the item ID accepted by the DTO.
+    itemId: item.id,
     uomId: line.uomId,
     quantity: line.quantity,
-    unitPrice: line.unitPrice,
-    lineTotal: line.lineTotal,
+    // Numeric columns may be padded; the snapshot retains the authored evidence.
+    unitPrice: financial.unitPrice,
+    lineTotal: financial.lineTotal,
+    discountTotal: financial.discountTotal,
+    chargeTotal: financial.chargeTotal,
+    taxTotal: financial.taxTotal,
+    priceSnapshot,
+    taxSnapshot,
     descriptionSnapshot: nullableString(line.descriptionSnapshot, 500),
   };
 }
@@ -117,17 +136,21 @@ export interface InvoiceDraftContentRequest {
   reference?: string;
   notes?: string;
   termsSnapshot: Record<string, unknown>;
-  totalsSnapshot: {
-    subtotal: string;
-    discountTotal: string;
-    chargeTotal: string;
-    taxTotal: string;
-    roundingTotal: string;
-    grandTotal: string;
-    amountPaid: string;
-    amountDue: string;
-  };
+  totalsSnapshot: FinancialTotals;
   lines: InvoiceDraftLinePayload[];
+}
+
+export type InvoiceDraftUpdateRequest = Omit<InvoiceDraftContentRequest, "partyId" | "currencyCode">;
+
+export function buildInvoiceDraftUpdate(input: InvoiceDraftUpdateRequest): InvoiceDraftUpdateRequest {
+  return {
+    dueDate: input.dueDate,
+    reference: input.reference,
+    notes: input.notes,
+    termsSnapshot: input.termsSnapshot,
+    totalsSnapshot: input.totalsSnapshot,
+    lines: input.lines,
+  };
 }
 
 export function buildInvoiceDraftContent(input: {

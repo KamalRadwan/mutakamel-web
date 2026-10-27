@@ -29,6 +29,7 @@ only when no pattern fits.
 | `PermissionGate` | `permission-gate/` | 403 as a distinct in-body state |
 | `DegradedBanner` | `degraded-banner/` | Partial or stale data |
 | `Pagination` | `pagination/` | Page controls |
+| `KpiBadge` | `kpi/` | Compact 24px toggleable KPI filter badge with tone count chip |
 | `StatCard` | `kpi/` | A single metric tile |
 | `UnavailableState` | `unavailable-state/` | The sealed-route boundary — a capability that is genuinely not built yet |
 | `ConflictDialog` | `conflict-dialog/` | The 409 / 412 / 428 resolution surface |
@@ -53,13 +54,13 @@ only when no pattern fits.
 
 ## FilterSearchInput
 
-Verified **2026-09-18**. The Basic Leads, Opportunities and Customer Profiles searches use this API-free pattern from
-`@/design-system`. Its compact action-bar form is 28px high and 384px wide before
-responsive shrinking. It combines the search icon, removable filter chips, editable
-value and trailing disclosure button inside one border. A filter chip can carry
-a filter icon. Chips are 20px high with compact horizontal padding; their remove
-control keeps the shared 24px/44px pointer target outside that visual box. A selected field chip uses a primary field segment followed by a
-neutral value segment; typed suggestions emphasize the field name and value.
+Verified **2026-10-26** ([specs/crm-leads-v3.md](specs/crm-leads-v3.md)). The Basic Leads, Opportunities and Customer Profiles searches use this API-free pattern from
+`@/design-system`. Its toolbar action-bar form is `33px` high (`h-(--size-toolbar-control)`) and `460px` wide (`w-[460px] max-w-[460px] min-w-64 flex-1`) before
+responsive shrinking (`rounded-lg border border-line-control bg-surface-subtle ps-2.5 pe-1.5` with `items-center gap-2` and a `focus-within` ring).
+The leading `Search` magnifier is a `shrink-0` flex item that never overlaps a chip, paired with removable filter chips, the editable combobox input and the trailing disclosure button inside one border.
+Active tokens render as `21px` chips (`inline-flex h-[21px] shrink-0 items-center gap-1 rounded-[5px] border border-chip-active-line bg-gradient-chip-active px-[7px] text-badge font-semibold text-chip-active-fg`).
+A filter chip (`kind: "filter"`) carries a leading `Filter` icon; a selected field chip (`kind: "field"`) pairs its field label with a `border-s` separated truncated value segment, and typed suggestions emphasize the field name and `<bdi>` value.
+Each chip's remove control (`data-filter-remove`) keeps its `aria-label`, keyboard `Delete`/`Backspace` handling and the shared 24px/44px pointer target (`hitTarget`) outside that `21px` visual box.
 Expandable fields carry a direction-aware chevron and let the caller supply
 their catalogue choices. Translated copy and filter semantics belong to the
 feature hook, including the current-agent **My Leads** default.
@@ -78,6 +79,49 @@ picker; Customer Profiles use Customer as their name scope. Its separate
 Advanced mode remains available as an explicit-submit AND/OR filter-tree
 builder; see the
 [Basic search study](../build/LEADS-BASIC-SEARCH-STUDY.md).
+
+### Advanced search card
+
+`CrmAdvancedSearchCard` (Leads, Customers, Opportunities) is laid out to spend
+width, not height — verified 2026-10-26:
+
+```
+[≡ Advanced search] [Conditions: 4]        [+ OR group] [Clear filters] [Apply filters] [⌃]
+│→ 🗑 WHERE   [Lead type][is][Individual] ×  AND  [Stage][equals][Contacted] ×  [+]
+│→ 🗑 [OR ▾]  [Lead type][is][Company] ×     AND  [Rating][equals][2] ×         [+]
+```
+
+- **One row is one OR group.** Its conditions sit side by side joined by a
+  fixed `AND` badge; a condition that does not fit wraps under the row's first
+  condition, never under the leading cluster. Every row after the first opens
+  with an OR/AND select — AND merges that row into the one above.
+- **Every action lives in the header**, so there is no footer: `OR group`
+  (outline), `Clear filters` (ghost — not "Clear all", which the multi-select already uses), `Apply filters` (outline — the screen's one
+  filled action stays in `PageHeader`) and an icon-only collapse toggle. The
+  condition-count badge shows open or collapsed.
+- **Row controls are icon-only** with a tooltip and a dictionary label: trash
+  removes the row, `×` removes one condition, `+` adds an AND condition.
+- The start-side rail and the arrow into each row are decorative. OR order
+  never changes a result, so rows are not reorderable.
+- Nothing runs until Apply (or Enter in any box); applying collapses the card.
+- Below `md` the leading cluster takes its own line and conditions wrap; there is
+  no horizontal scroll at 375px. The field picker sizes to its label (min 128px,
+  max 224px) so long Arabic field names are not truncated.
+- **Accessibility.** Each condition is a `role="group"` named "Condition N of
+  group G", and the row's buttons carry the same numbers ("Remove condition 2 of
+  group 1: Stage", "Add AND condition to group 2"), so a field repeated across
+  rows never yields two controls with one name. Date and multi-value pickers are
+  named through their `ariaLabel` prop. The count badge sits in a polite live
+  region. The collapse toggle is named by the card title and states its state
+  through `aria-expanded`; it is never disabled. After any structural edit
+  (add/remove a row or condition, merge via AND) focus moves to the affected
+  condition's field picker; after Apply it moves to the toggle.
+
+The card is split by responsibility: `CrmAdvancedSearchCard` (header, form,
+collapse — markup only), `CrmSearchGroupRow`, `CrmSearchConditionControls`,
+`CrmSearchValueControl`, and the `useCrmAdvancedSearch` hook (open state, the
+count, every edit, focus targets). State changes go only through the
+`filter-tree.ts` helpers.
 
 ## DataTable
 
@@ -127,6 +171,10 @@ Owns, so no screen re-implements them:
   sorted or which way, and the sort arrow is a purely visual signal
 - Row selection with a header select-all reflecting indeterminate state
 - Keyboard row navigation; the action cluster is reachable
+- **Keyboard activation (2026-10-17):** Enter and Space open a record only
+  when the row itself is focused and the event has not been prevented.
+  Child checkboxes, buttons and drag handles keep their own keyboard behavior;
+  their bubbling key events never activate the row.
 - **`scroll-margin` on focusable row content**, sized to the sticky offsets, so
   a `Tab` into a row action never lands underneath the sticky header or the
   sticky inline-start/end columns (WCAG 2.2 AA `focus-not-obscured`). Four
@@ -137,6 +185,11 @@ Owns, so no screen re-implements them:
   header to 32px, the row minimum to 36px and cell padding. It is opt-in so one
   dense operational table does not silently resize every table in the portal.
 - Empty, error and forbidden states rendered in-body
+- **Empty-page recovery (2026-10-17):** Empty results keep pagination when
+  `page` and `onPageChange` are supplied, including a custom empty state, so
+  records on earlier pages stay reachable after a mutation. Currency lists
+  also clamp to the last valid page using the server total and reload with
+  the current filters, search and sort when the page count shrinks.
 - Horizontal overflow inside its own container — **the page never scrolls
   sideways**
 
@@ -214,6 +267,8 @@ Rules:
 
 ## FilterBar
 
+Verified **2026-10-26** ([specs/crm-leads-v3.md](specs/crm-leads-v3.md)).
+
 ```ts
 interface FilterBarProps {
   filters: FilterDef[];                          // a discriminated union — see below
@@ -222,17 +277,28 @@ interface FilterBarProps {
   onReset: () => void;
   searchValue: string;
   onSearchChange: (q: string) => void;
+  hideSearch?: boolean;                         // default false
   maxVisibleChips?: number;                      // default 6
 }
 ```
 
 - **Filter state lives in the URL**, so a filtered view is shareable and
   survives refresh.
-- Search debounces 300ms before touching the URL, and renders
-  `text-base sm:text-sm` — it takes typed input, so the
+- The search control in `PageActions slot="search"` is a `33px` toolbar box
+  (`h-(--size-toolbar-control) min-w-60 max-w-[460px] flex-1 bg-surface-subtle border border-line-control rounded-lg px-2.5 gap-2`).
+  The `Search` magnifier is a `shrink-0` flex item rather than absolutely
+  positioned, so it never overlaps text or chips. Search debounces 300ms before
+  touching the URL, and its inner `Input` (`size="sm"`) renders
+  `text-base sm:text-xs` — it takes typed input, so the
   [mobile input rule](DESIGN-SYSTEM.md#inputs-are-16px-on-mobile) applies.
-- Active filters render as removable chips; a "Clear all" appears only when at
-  least one is set.
+- Set `hideSearch` for lists without server-backed search. It omits the input
+  while preserving filter controls, chips and reset. `/crm/outbound-emails`
+  uses this option and offers only its supported status filter (2026-10-18).
+- Active filters render as `21px` removable chips
+  (`h-[21px] px-[7px] rounded-[5px] bg-gradient-chip-active border border-chip-active-line text-chip-active-fg text-badge font-semibold`)
+  whose `X` remove button keeps its `aria-label` and uses `hitTarget` so the
+  pointer target expands outside the `21px` visual box; a "Clear all" appears
+  only when at least one is set.
 - **Chips wrap before they shrink, and never truncate.** Past `maxVisibleChips`
   the remainder collapses into a `+n` **button** that opens a popover of the
   rest, each still removable. A static `+n` count hides filter state the user is
@@ -243,7 +309,8 @@ interface FilterBarProps {
   is a count rather than the row count that wording originally specified.
 - Filters that map to an enum build their options from
   [../reference/enums.md](../reference/enums.md) with `t.status.*` labels.
-- Collapses behind a "Filters" button with a count badge below `lg`.
+- Filter controls open from a "Filters" popover button (with an active count
+  badge) beside the search box in `PageActions slot="search"`.
 
 ### The five filter kinds
 
@@ -1103,6 +1170,29 @@ Controlled. Three parts, top to bottom:
 
 Generic — it knows nothing about CRM. Strings live in the `tagColors`
 namespace. First consumers: the CRM Create Tag modal and `/crm/tags`.
+
+## KpiBadge
+
+Added **2026-10-26** ([crm-leads-v3.md](specs/crm-leads-v3.md)).
+
+```tsx
+<KpiBadge
+  tone="rated"
+  label={t.crmLeadWorkspace.kpis.hot}
+  count={kpis?.hotLeads ?? null}
+  icon={<Star />}
+  pressed={activePreset === "HOT_3_STAR"}
+  onClick={() => onSelectPreset("HOT_3_STAR")}
+/>
+```
+
+Compact `24px` (`h-6`) toggleable KPI filter pill for dense workspace toolbars,
+imported from `@/design-system`.
+
+- **Props**: `tone: KpiBadgeTone` (`"total" | "new" | "rated" | "qualified" | "overdue"`), translated `label: string`, `count: number | null`, optional `11.5px` `icon?: React.ReactNode`, and `pressed?: boolean`, plus native `<button>` attributes.
+- **Five semantic tones** (zero purple or indigo): `total`, `new`, `rated`, `qualified`, and `overdue`, each wired to `--kpi-<tone>-{surface,line,text,count}` in light and dark themes.
+- **Count & loading**: `count` formats through `formatNumber(count, lang)` (`Intl` with explicit locale, `tabular-nums`, `text-micro font-bold text-white bg-kpi-<tone>-count` inside a `min-w-[17px] h-4 px-[4.5px] rounded-sm` chip). When `count === null`, a `17×16px` placeholder chip renders in-place and sets `aria-busy="true"` without layout shift.
+- **Accessibility & RTL**: renders `<button type="button" aria-pressed={pressed}>` with logical padding (`ps-[7.5px] pe-[5px]`), `ds-hit-target` coarse-pointer expansion, `focusRing` (`focus-visible:`), decorative `aria-hidden` icon wrapper, and a `ring-2 ring-kpi-<tone>-line` pressed indicator alongside `aria-pressed`.
 
 ## StatusBadge
 

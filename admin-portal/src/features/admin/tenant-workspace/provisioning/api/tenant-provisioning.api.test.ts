@@ -40,6 +40,18 @@ const envelope = (data: unknown, meta?: unknown) => ({
 });
 
 describe("tenant provisioning canonical API", () => {
+  it.each([
+    ["resend-release", "prerequisite-releases/resend", "RESEND_RELEASE"],
+    ["close-failed", "operations/close-failed", "CLOSE_FAILED"],
+  ] as const)("uses the canonical %s command with the caller's UUIDv7", async (action, path, resultAction) => {
+    postMock.mockResolvedValueOnce(envelope({ operationId: OPERATION_ID,
+      requestId: "019f0000-0000-7000-8000-000000000030", action: resultAction }));
+    const dto = { operationId: OPERATION_ID, expectedPlanDigest: SHA_A, reasonCode: "ADMIN.RECOVERY" };
+    await expect(tenantProvisioningApi.recoverPrerequisite(TENANT_ID, action, dto, COMMAND_ID))
+      .resolves.toMatchObject({ operationId: OPERATION_ID, action: resultAction });
+    expect(postMock).toHaveBeenCalledWith(`/api/admin/core/v1/tenants/${TENANT_ID}/provisioning/${path}`,
+      dto, { headers: { "x-idempotency-key": COMMAND_ID } });
+  });
   beforeEach(() => {
     getMock.mockReset();
     postMock.mockReset();
@@ -109,6 +121,22 @@ describe("tenant provisioning canonical API", () => {
       `/api/admin/core/v1/tenants/${TENANT_ID}/provisioning-state/seeds?componentKey=core.foundation&seedKey=countries.v1&policy=MANUAL_CONFLICT&status=CONFLICT`,
     ]);
     expect(getMock.mock.calls.every((call) => call[1]?.signal === signal)).toBe(true);
+  });
+
+  it("sends the ADDON selection-source filter and reads the matching components", async () => {
+    getMock.mockResolvedValueOnce(envelope([
+      componentInstallation({ selectionSource: "ADDON" }),
+    ], META));
+
+    const page = await tenantProvisioningApi.listComponents(TENANT_ID, {
+      selectionSource: "ADDON",
+    });
+
+    expect(getMock).toHaveBeenCalledWith(
+      `/api/admin/core/v1/tenants/${TENANT_ID}/provisioning-state/components?selectionSource=ADDON`,
+      { signal: undefined },
+    );
+    expect(page.items[0]?.selectionSource).toBe("ADDON");
   });
 
   it("uses all nine actual command routes with caller-owned UUIDv7 keys and exact bodies", async () => {

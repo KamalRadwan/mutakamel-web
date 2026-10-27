@@ -19,9 +19,6 @@ import {
 } from "./customer-profile-basic-search-contract";
 
 export {
-  CUSTOMER_PROFILE_SEARCH_FIELDS,
-  customerProfileSearchField,
-  type CustomerProfileSearchFieldDef,
   type CustomerProfileSearchFieldId,
 } from "./customer-profile-basic-search-contract";
 
@@ -143,7 +140,7 @@ export const CUSTOMER_PROFILE_ADVANCED_FIELDS: readonly CrmSearchFieldDef<Custom
 export type CustomerProfileSearchGroup =
   CrmSearchGroup<CustomerProfileAdvancedFieldId>;
 
-export function customerProfileAdvancedField(
+function customerProfileAdvancedField(
   id: CustomerProfileAdvancedFieldId,
 ): CrmSearchFieldDef<CustomerProfileAdvancedFieldId> {
   const field = CUSTOMER_PROFILE_ADVANCED_FIELDS.find(
@@ -153,7 +150,7 @@ export function customerProfileAdvancedField(
   return field;
 }
 
-export const DEFAULT_CUSTOMER_PROFILE_ADVANCED_FIELD =
+const DEFAULT_CUSTOMER_PROFILE_ADVANCED_FIELD =
   CUSTOMER_PROFILE_ADVANCED_FIELDS[0]!;
 
 export type CustomerProfileSearchMode = "basic" | "advanced";

@@ -60,6 +60,7 @@ export function EditNumberingSequenceModal({
         values={values}
         onChange={(patch) => setValues((current) => ({ ...current, ...patch }))}
         companies={companies}
+        tenantWideAllowed={sequence.companyId === null}
         isSubmitting={isSubmitting}
         scopeReadOnly
         counterLabel={t.coreSettings.numberingNextValue}

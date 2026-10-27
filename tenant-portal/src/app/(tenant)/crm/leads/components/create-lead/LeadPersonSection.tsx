@@ -31,9 +31,9 @@ import type { CrmFormErrors } from "../../../shared/hooks/useCrmCreateForm";
 import { LEAD_CREATE_LIMITS, type CreateLeadForm } from "../../lead-create-contract";
 import { LeadFieldGuide } from "./LeadFieldGuide";
 
-export type LeadPersonField = "honorificTitle" | "firstName" | "lastName" | "email";
+type LeadPersonField = "honorificTitle" | "firstName" | "lastName" | "email";
 
-export interface LeadPersonSectionProps {
+interface LeadPersonSectionProps {
   form: CreateLeadForm;
   errors: CrmFormErrors;
   disabled: boolean;
@@ -87,28 +87,28 @@ export function LeadPersonSection({
   return (
     <section
       data-form-section="person"
-      className="relative overflow-hidden rounded-xl border border-sky-500/20 bg-card shadow-xs transition-colors dark:border-sky-400/20"
+      className="relative overflow-hidden rounded-lg border border-border bg-card shadow-xs transition-colors"
     >
-      {/* Top 3px Sky-Blue to Emerald accent bar */}
+      {/* Top 3px accent bar */}
       <div
         aria-hidden="true"
-        className="h-1 w-full bg-linear-to-r from-sky-500 via-cyan-500 to-emerald-500"
+        className="h-1 w-full bg-primary"
       />
 
       {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-sky-500/[0.03] px-4 py-3 dark:bg-sky-500/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-muted/20 px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-600 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-300">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-muted text-foreground">
             <UserCheck className="size-4" aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-foreground">
                 02
               </span>
               <h3
                 tabIndex={-1}
-                className="text-sm font-bold text-foreground outline-none"
+                className="text-sm font-semibold text-foreground outline-none"
               >
                 {t.crmLeads.create.personalInformationTitle}
               </h3>
@@ -119,28 +119,28 @@ export function LeadPersonSection({
           </div>
         </div>
 
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-300">
-          <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success-subtle px-2.5 py-0.5 text-xs font-semibold text-success-subtle-foreground">
+          <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
           {t.crmLeads.create.types.INDIVIDUAL} · B2C
         </span>
       </div>
 
       {/* Section Body — Contact Card matching LeadContactRow design */}
       <div className="@container p-4">
-        <div className="flex flex-col gap-3.5 rounded-xl border border-sky-500/35 bg-sky-500/[0.02] p-3.5 shadow-2xs transition-all dark:border-sky-400/35 dark:bg-sky-500/[0.05]">
+        <div className="flex flex-col gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-2xs transition-all">
           {/* Contact Card Top Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2.5">
             <div className="flex items-center gap-2">
-              <span className="inline-flex size-6 items-center justify-center rounded-md bg-sky-600 text-xs font-bold text-white">
+              <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
                 #1
               </span>
-              <span className="text-xs font-bold text-foreground">
+              <span className="text-xs font-semibold text-foreground">
                 {formatTemplate(t.crmLeads.create.contactHeading, { number: 1 })}
               </span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/12 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success/40 bg-success-subtle px-2.5 py-1 text-xs font-semibold text-success-subtle-foreground">
                 <Star className="size-3 fill-current" aria-hidden="true" />
                 {t.crmLeads.create.primaryContact}
               </span>
@@ -152,7 +152,7 @@ export function LeadPersonSection({
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12 @min-[52rem]:grid-cols-12">
             {/* Honorific Title (2 cols) */}
             <div className="relative md:col-span-2 @min-[52rem]:col-span-2">
-              <div className="absolute end-0 top-0 z-10">
+              <div className="absolute end-0 top-0">
                 <LeadFieldGuide field="honorificTitle" align="start" />
               </div>
               <Field
@@ -186,12 +186,12 @@ export function LeadPersonSection({
 
             {/* First Name (5 cols) */}
             <div className="relative md:col-span-5 @min-[52rem]:col-span-5">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+              <div className="absolute end-0 top-0 flex items-center gap-1">
                 <span
                   className={cn(
-                    "font-mono text-[10px]",
+                    "font-mono text-xs tabular-nums",
                     form.firstName.length >= limits.firstName
-                      ? "font-semibold text-amber-600"
+                      ? "font-semibold text-warning"
                       : "text-muted-foreground",
                   )}
                 >
@@ -226,12 +226,12 @@ export function LeadPersonSection({
 
             {/* Last Name (5 cols) */}
             <div className="relative md:col-span-5 @min-[52rem]:col-span-5">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1">
+              <div className="absolute end-0 top-0 flex items-center gap-1">
                 <span
                   className={cn(
-                    "font-mono text-[10px]",
+                    "font-mono text-xs tabular-nums",
                     form.lastName.length >= limits.lastName
-                      ? "font-semibold text-amber-600"
+                      ? "font-semibold text-warning"
                       : "text-muted-foreground",
                   )}
                 >
@@ -261,8 +261,8 @@ export function LeadPersonSection({
           <div className="grid grid-cols-1 gap-3.5 md:grid-cols-12 @min-[52rem]:grid-cols-12">
             {/* Phone / Mobile Numbers (6 cols) */}
             <div className="relative md:col-span-6 @min-[52rem]:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-sky-600 dark:bg-sky-500/20 dark:text-sky-300">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums text-muted-foreground">
                   <Phone className="size-2.5" aria-hidden="true" />
                   {form.phones.length}/{CRM_PHONE_LIST_MAX}
                 </span>
@@ -294,7 +294,7 @@ export function LeadPersonSection({
                         aria-label={t.crmShared.addPhone}
                         data-icon-button
                         onClick={onPhoneAdd}
-                        className="size-7 shrink-0 rounded-full bg-emerald-600 p-0 text-white not-disabled:hover:bg-emerald-700"
+                        className="size-7 shrink-0 rounded-full bg-primary p-0 text-primary-foreground not-disabled:hover:bg-primary/90"
                       >
                         <Plus className="size-3.5" aria-hidden="true" />
                       </Button>
@@ -351,14 +351,14 @@ export function LeadPersonSection({
 
             {/* Email Address (6 cols) */}
             <div className="relative md:col-span-6 @min-[52rem]:col-span-6">
-              <div className="absolute end-0 top-0 z-10 flex items-center gap-1.5">
+              <div className="absolute end-0 top-0 flex items-center gap-1.5">
                 {isEmailValid && (
-                  <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded bg-success-subtle px-1.5 py-0.5 text-xs font-semibold text-success-subtle-foreground">
                     <CheckCircle2 className="size-2.5" aria-hidden="true" />
                     Valid
                   </span>
                 )}
-                <span className="font-mono text-[10px] text-muted-foreground">
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {form.email.length}/{limits.email}
                 </span>
                 <LeadFieldGuide field="email" />

@@ -38,7 +38,6 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
   readOnly: boolean;
 }) {
   const { t, lang } = useI18n();
-  const isAr = lang === "ar";
   const modal = useLeadCompanyModal(lead, edit, readOnly);
   const read = (value: string | null, dir?: "ltr") => (
     <ReadValue value={value} dir={dir} emptyLabel={t.detail.notRecorded} />
@@ -66,7 +65,7 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
           {lead.companyEmail && (
             <Button variant="ghost" size="xs" asChild>
               <a href={`mailto:${lead.companyEmail}`} aria-label={t.crmLeadDetail.sendEmail} title={t.crmLeadDetail.sendEmail}>
-                <Mail className="size-3.5 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
+                <Mail className="size-3.5 text-primary" aria-hidden="true" />
               </a>
             </Button>
           )}
@@ -87,7 +86,7 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
           target="_blank"
           rel="noopener noreferrer"
           dir="ltr"
-          className="text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-400"
+          className="text-primary underline-offset-2 hover:underline"
         >
           {lead.companyWebsite} ↗
         </a>
@@ -100,9 +99,7 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
       value: <LeadCompanyLocation address={lead.address} lang={lang} emptyLabel={t.detail.notRecorded} />,
     },
     {
-      label: isAr
-        ? "العنوان القانوني الكامل (الشارع، المبنى، الدور، الوحدة، علامة مميزة، الرمز البريدي)"
-        : "Full Legal Address (Street, Building, Floor, Apartment, Landmark, Postal Code)",
+      label: t.crmLeads.executive.fullLegalAddress,
       fullWidth: true,
       value: read(fullLegalAddress),
     },
@@ -115,7 +112,7 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
           <span className="dossier-icon-pill dossier-ip-indigo" aria-hidden="true">
             <Building2 className="size-3.5" aria-hidden="true" />
           </span>
-          <CardTitle className="text-xs font-extrabold tracking-wider uppercase">
+          <CardTitle className="text-xs font-semibold tracking-wider uppercase">
             {t.crmLeadDetail.companyTitle}
           </CardTitle>
           <span className="dossier-badge dossier-badge-corporate">
@@ -123,8 +120,10 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
           </span>
         </div>
         {!readOnly ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             className="dossier-btn-action"
             aria-label={t.crmLeadDetail.editCompany}
             title={t.crmLeadDetail.editCompany}
@@ -133,10 +132,10 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
           >
             <Pencil className="size-3" aria-hidden="true" />
             <span>{t.crmLeadDetail.editCompany}</span>
-          </button>
+          </Button>
         ) : (
           <span className="dossier-badge dossier-badge-converted">
-            🔒 {isAr ? "للقراءة فقط" : "Read-Only"}
+            🔒 {t.crmLeads.executive.readOnly}
           </span>
         )}
       </CardHeader>
@@ -148,17 +147,19 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
               📞 {t.crmLeadDetail.companyPhones}
             </span>
             {!readOnly && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="xs"
                 disabled={edit.savingKey !== null}
                 onClick={modal.open}
                 className="dossier-btn-action dossier-btn-action-emerald"
               >
                 <Pencil className="size-3" aria-hidden="true" />
                 <span>
-                  {isAr ? "تعديل الأرقام (كود + رقم)" : "Edit Phones (Code + Number)"}
+                  {t.crmLeads.executive.editPhones}
                 </span>
-              </button>
+              </Button>
             )}
           </div>
           {lead.phones.length > 0 ? (
@@ -170,12 +171,8 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
                   country={lead.address?.country ?? undefined}
                   badge={
                     index === 0
-                      ? isAr
-                        ? "الرقم الأساسي"
-                        : "Primary Phone"
-                      : isAr
-                        ? "فرعي"
-                        : "Secondary"
+                      ? t.crmLeads.executive.primaryPhone
+                      : t.crmLeads.executive.secondaryPhone
                   }
                 />
               ))}
@@ -203,7 +200,7 @@ export function LeadCompanyCard({ lead, edit, readOnly }: {
               >
                 {field.label}
               </dt>
-              <dd className="dossier-field-val min-w-0 text-xs font-bold text-foreground">
+              <dd className="dossier-field-val min-w-0 text-xs font-semibold text-foreground">
                 {field.value}
               </dd>
             </div>

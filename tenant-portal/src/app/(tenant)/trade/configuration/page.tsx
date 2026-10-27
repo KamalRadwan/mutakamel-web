@@ -742,6 +742,8 @@ export default function TradeConfigurationPage() {
             definition={selected}
             canManage={configuration.canManage}
             canPublish={configuration.canPublish}
+            supersedesVersionId={configuration.supersedesVersionId}
+            onSupersedesVersionIdChange={configuration.setSupersedesVersionId}
             isSubmitting={configuration.isSubmitting}
             report={configuration.report}
             onCreate={() => configuration.openVersion(selected)}

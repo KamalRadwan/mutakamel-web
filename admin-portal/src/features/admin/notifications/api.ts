@@ -1,7 +1,6 @@
 import { axiosClient } from "@/lib/api/axiosClient";
 import { extractCoreData, type SuccessResponse } from "@/shared/api/core-envelope";
 import {
-  readDeviceTokenReceipt,
   readNotificationPage,
   readPreference,
   readPreferences,
@@ -12,14 +11,12 @@ import {
 } from "./contracts";
 import type {
   AdminNotificationPage,
-  DeviceTokenReceipt,
   NotificationBulkAction,
   NotificationItemAction,
   NotificationListQuery,
   NotificationPreference,
   NotificationPreferenceCommand,
   NotificationRuntimeConfig,
-  RegisterDeviceTokenCommand,
 } from "./types";
 
 const BASE_URL = "/api/admin/core/v1/notifications";
@@ -79,36 +76,17 @@ export async function upsertAdminNotificationPreference(
 ): Promise<NotificationPreference> {
   const response = await axiosClient.put<SuccessResponse<unknown>>(
     `${BASE_URL}/preferences`,
-    command,
+    { notificationType: command.notificationType, inAppEnabled: command.inAppEnabled },
     NATURALLY_IDEMPOTENT_WRITE,
   );
   return readPreference(extractCoreData(response));
 }
 
-export async function registerAdminNotificationDeviceToken(
-  command: RegisterDeviceTokenCommand,
-): Promise<DeviceTokenReceipt> {
-  const response = await axiosClient.post<SuccessResponse<unknown>>(
-    `${BASE_URL}/device-tokens`,
-    command,
-    NATURALLY_IDEMPOTENT_WRITE,
-  );
-  return readDeviceTokenReceipt(extractCoreData(response));
-}
-
-export async function revokeAdminNotificationDeviceToken(id: string): Promise<void> {
-  await axiosClient.delete(
-    `${BASE_URL}/device-tokens/${requireNotificationUuid(id)}`,
-    NATURALLY_IDEMPOTENT_WRITE,
-  );
-}
-
 export async function performAdminNotificationBulkAction(
   action: NotificationBulkAction,
 ): Promise<number> {
-  const path = action === "read-all" ? "read-all" : "mark-all-read";
   const response = await axiosClient.post<SuccessResponse<unknown>>(
-    `${BASE_URL}/${path}`,
+    `${BASE_URL}/${action}`,
     undefined,
     NATURALLY_IDEMPOTENT_WRITE,
   );
@@ -127,15 +105,8 @@ export async function performAdminNotificationItemAction(
     );
     return;
   }
-  const path = action === "read"
-    ? "read"
-    : action === "acknowledge"
-      ? "acknowledge"
-      : action === "ack-compatibility"
-        ? "ack"
-        : "dismiss";
   await axiosClient.post(
-    `${BASE_URL}/${notificationId}/${path}`,
+    `${BASE_URL}/${notificationId}/${action}`,
     undefined,
     NATURALLY_IDEMPOTENT_WRITE,
   );

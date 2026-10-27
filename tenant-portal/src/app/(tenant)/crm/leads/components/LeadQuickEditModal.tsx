@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -12,32 +13,49 @@ import {
   X,
 } from "lucide-react";
 import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  ErrorState,
+  PermissionGate,
+  Skeleton,
   DOSSIER_CARD_TONE_CLASSES,
   DOSSIER_HEADER_CARD_COLORS,
   DOSSIER_KPI_PILL_CLASSES,
   DOSSIER_TAG_TONE_CLASSES,
   type CardColor,
   cn,
+  useToast,
   dossierAvatarClass,
   dossierStageCellClass,
   dossierStatusBadgeClass,
 } from "@/design-system";
 import { RecordActivitiesPanel } from "@/components/activities/RecordActivitiesPanel";
-import { EntityHistoryCard } from "@/components/audit/EntityHistoryCard";
+import { RecordHistoryTab } from "@/components/audit/RecordHistoryTab";
+import { useAuditAccess } from "@/components/audit/hooks/useAuditAccess";
+import { useTenantAuth } from "@/context/AuthContext";
 import { useAccessMode } from "@/hooks/useAccessMode";
 import { useI18n } from "@/i18n/I18nContext";
 import { axiosClient } from "@/lib/api/axiosClient";
+import { readCoreData, writeCoreData } from "@/lib/api/envelope";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
+import { createWriteAttempt, isAmbiguousWriteFailure, runIdempotentWrite } from "@/lib/api/idempotent-write";
 import { findHonorific, getHonorificOptions } from "@/lib/catalogues/contact-titles";
 import { localizedName, localizedValue } from "@/lib/format/localized";
-import { splitPhoneNumber } from "@/lib/geo/country-data";
-import { generateUUIDv7, isUUIDv7 } from "@/lib/uuid";
+import { INTL_LOCALE } from "@/lib/format/locale";
+import { getCountryOptions, splitPhoneNumber } from "@/lib/geo/country-data";
+import { isUUIDv7 } from "@/lib/uuid";
 import { CrmJobTitleField } from "../../shared/components/CrmJobTitleField";
 import { CrmPhoneNumberInput } from "../../shared/components/CrmPhoneNumberInput";
 import { RecordAttachmentsSection } from "../../shared/components/RecordAttachmentsSection";
 import { RecordNotesSection } from "../../shared/components/RecordNotesSection";
 import { crmCapabilityAllowsOwner } from "../../shared/crm-capabilities";
+import { CrmErrorBag } from "../../shared/crm-form-validation";
+import { CRM_RATING_STARS } from "../../shared/crm-rating-contract";
 import { useCrmAcquisitionSources } from "../../shared/hooks/useCrmAcquisitionSources";
 import { useCrmCustomFieldValues } from "../../shared/hooks/useCrmCustomFieldValues";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 import {
   CRM_TAGS_PATH,
   parseCrmTagCatalogue,
@@ -45,31 +63,43 @@ import {
   type CrmTag,
 } from "../../shared/tag-contract";
 import { LeadConvertModal } from "../[id]/components/LeadConvertModal";
+import {
+  CONTACT_DIRECTORY_PERMISSIONS,
+  ContactWriteResponseError,
+  buildAddedContactLeadRequest,
+  buildContactCoreWrites,
+  buildSelectedContactLeadRequest,
+  contactModalForm,
+  contactPersonPath,
+  parseContactPerson,
+  validateContactModal,
+  validateContactWriteResponse,
+  validateNewLeadContact,
+} from "../[id]/contact-modal-contract";
 import { useLeadConvert } from "../[id]/hooks/useLeadConvert";
 import { useLeadDetailsReferences } from "../[id]/hooks/useLeadDetailsReferences";
 import { useLeadRelatedCounts } from "../[id]/hooks/useLeadRelatedCounts";
 import { leadDetailsUserName } from "../[id]/lead-details-edit-contract";
-import { LEAD_RELATED_ROUTES } from "../[id]/lead-related-contract";
+import { buildLeadRelatedHref } from "../[id]/lead-related-contract";
 import { useLeadCapabilities } from "../hooks/useLeadCapabilities";
+import { useLeadQuickEditWrites } from "../hooks/useLeadCardWrites";
+import type { LeadWriteOutcome } from "../hooks/useLeadMutations";
 import type { LeadItem, LeadStage } from "../hooks/useLeads";
-import { leadActivityState } from "../lead-card-contract";
+import { leadActivityState, leadNameInitials } from "../lead-card-contract";
 import {
   leadPath,
   parseLeadDetailResponse,
-  type LeadContact,
   type LeadDetail,
 } from "../lead-contract";
-import {
-  normalizePhoneDigits,
-  normalizeWhatsAppDigits,
-} from "../lead-phone-links";
+import { fetchLeadDetail } from "../lead-requests";
+import { LeadPhoneActionsRow } from "./LeadPhoneActionsRow";
 import {
   buildLeadCompanyFieldRequest,
   buildLeadCompanyPhonesRequest,
   type UpdateLeadRequest,
 } from "../lead-write-contract";
 
-export interface LeadQuickEditModalProps {
+interface LeadQuickEditModalProps {
   lead: LeadItem | null;
   leads: readonly LeadItem[];
   stages: readonly LeadStage[];
@@ -78,9 +108,9 @@ export interface LeadQuickEditModalProps {
   canDelete?: boolean;
   onClose: () => void;
   onNavigateLead: (nextLead: LeadItem) => void;
-  onMoveStage: (lead: LeadItem, stageId: string) => Promise<void>;
+  onMoveStage: (lead: LeadItem, stageId: string) => Promise<LeadWriteOutcome>;
   onOpenActivities: (lead: LeadItem) => void;
-  onSave: (lead: LeadItem, request: UpdateLeadRequest) => Promise<boolean>;
+  onSave: (lead: LeadItem, request: UpdateLeadRequest) => Promise<LeadWriteOutcome>;
   onDeleteLead?: (lead: LeadItem) => void;
   onRefresh?: () => void;
 }
@@ -98,130 +128,14 @@ interface ContactDraft {
   isPrimary: boolean;
 }
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "LD";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-}
-
-function synthesizeLeadDetail(lead: LeadItem, branchId: string | null, stages: readonly LeadStage[]): LeadDetail {
-  const stage = stages.find((st) => st.id === lead.stageId);
-  const stageFlag = stage?.flag ?? "NEW";
-  const status =
-    stageFlag === "CONVERTED"
-      ? "CONVERTED"
-      : stageFlag === "DISQUALIFIED"
-        ? "DISQUALIFIED"
-        : stageFlag === "ON_HOLD"
-          ? "ON_HOLD"
-          : "OPEN";
-
-  const isCorporate = lead.leadProfileType === "CORPORATE";
-  const initialPhones =
-    lead.phones.length > 0
-      ? [...lead.phones]
-      : lead.phone
-        ? [lead.phone]
-        : [];
-
-  const synthesizedContacts: LeadContact[] =
-    isCorporate && lead.primaryContact
-      ? [
-          {
-            partyId: lead.primaryContact.partyId,
-            relationshipId: null,
-            displayName: lead.primaryContact.displayName,
-            firstName: lead.primaryContact.displayName.split(" ")[0] ?? null,
-            lastName: lead.primaryContact.displayName.split(" ").slice(1).join(" ") || null,
-            honorificTitle: null,
-            jobTitle: lead.primaryContact.jobTitle || null,
-            isPrimary: true,
-            email: lead.primaryContact.email || null,
-            phones:
-              lead.primaryContact.phones.length > 0
-                ? [...lead.primaryContact.phones]
-                : lead.phone
-                  ? [lead.phone]
-                  : [],
-          },
-        ]
-      : [];
-
-  return {
-    id: lead.id,
-    branchId: branchId ?? "",
-    partyId: lead.partyId,
-    leadProfileType: lead.leadProfileType,
-    stageId: lead.stageId,
-    stageFlag,
-    status,
-    displayName: lead.leadName,
-    firstName: lead.firstName ?? (isCorporate ? null : lead.leadName.split(" ")[0] ?? null),
-    lastName:
-      lead.lastName ??
-      (isCorporate ? null : lead.leadName.split(" ").slice(1).join(" ") || null),
-    honorificTitle: null,
-    companyName: isCorporate ? lead.company || lead.leadName : null,
-    primaryMobile: lead.primaryMobile ?? (isCorporate ? null : initialPhones[0] ?? null),
-    email: lead.email || null,
-    companyPhone: isCorporate ? initialPhones[0] ?? null : null,
-    companyEmail: isCorporate ? lead.email || null : null,
-    companyWebsite: lead.companyWebsite ?? null,
-    taxNumber: lead.taxNumber ?? null,
-    commercialRegistrationNumber: lead.commercialRegistrationNumber ?? null,
-    phones: initialPhones,
-    address:
-      lead.country || lead.city
-        ? {
-            addressType: isCorporate ? "HEADQUARTERS" : "HOME",
-            label: null,
-            country: lead.country || null,
-            city: lead.city ?? null,
-            area: null,
-            street: null,
-            buildingNo: null,
-            floor: null,
-            apartment: null,
-            landmark: null,
-            postalCode: null,
-          }
-        : null,
-    contacts: synthesizedContacts,
-    acquisitionSourceId: lead.acquisitionSourceId ?? null,
-    acquisitionSourceNameAr: lead.sourceNameAr || null,
-    acquisitionSourceNameEn: lead.sourceNameEn || null,
-    description: lead.description ?? null,
-    interestSummary: lead.interestSummary ?? null,
-    expectedNeed: lead.expectedNeed ?? null,
-    ownerUserId: lead.ownerUserId,
-    createdByUserId: lead.ownerUserId,
-    convertedCustomerProfileId: null,
-    convertedOpportunityId: null,
-    convertedAt: null,
-    createdAt: lead.createdAt ?? new Date().toISOString(),
-    updatedAt: lead.updatedAt ?? new Date().toISOString(),
-  };
-}
-
 function formatPhoneDisplay(rawPhone: string): string {
   const split = splitPhoneNumber(rawPhone);
   if (!split) return rawPhone;
   const { callingCode, nationalNumber } = split;
   if (!callingCode) return rawPhone;
-  const flagMap: Record<string, string> = {
-    "+20": "🇪🇬",
-    "+966": "🇸🇦",
-    "+971": "🇦🇪",
-    "+965": "🇰🇼",
-    "+974": "🇶🇦",
-    "+973": "🇧🇭",
-    "+968": "🇴🇲",
-    "+962": "🇯🇴",
-    "+1": "🇺🇸",
-    "+44": "🇬🇧",
-  };
-  const flag = flagMap[callingCode] ?? "🌐";
+  const countries = getCountryOptions("en").filter((country) => country.callingCode === callingCode);
+  // A shared calling code cannot identify a country by itself.
+  const flag = countries.length === 1 ? countries[0].flag : "🌐";
   const grouped = nationalNumber.replace(/(\d{3})(\d{3})(\d+)/u, "$1 $2 $3");
   return `${flag} ${callingCode} ${grouped}`;
 }
@@ -242,60 +156,51 @@ function formatFullAddress(address: LeadDetail["address"]): string {
   return parts.length > 0 ? parts.join(", ") : "—";
 }
 
-function PhoneActionPills({
-  phone,
-  country,
-}: {
-  phone: string;
-  country: string | null | undefined;
+function LeadQuickEditLoadState({ error, onRetry, onClose }: {
+  error: NormalizedApiError | null;
+  onRetry: () => void;
+  onClose: () => void;
 }) {
-  const callDigits = normalizePhoneDigits(phone);
-  const waDigits = normalizeWhatsAppDigits(phone, country ?? "");
+  const { t } = useI18n();
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {callDigits && (
-        <a
-          href={`tel:${callDigits}`}
-          onClick={(e) => e.stopPropagation()}
-          className="dossier-comm-btn dossier-comm-call"
-          aria-label={`Call ${phone}`}
-        >
-          📞 Call
-        </a>
-      )}
-      {waDigits && (
-        <a
-          href={`https://wa.me/${waDigits}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="dossier-comm-btn dossier-comm-wa"
-          aria-label={`WhatsApp ${phone}`}
-        >
-          💬 WhatsApp
-        </a>
-      )}
-      {waDigits && (
-        <a
-          href={`https://t.me/+${waDigits}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="dossier-comm-btn dossier-comm-tg"
-          aria-label={`Telegram ${phone}`}
-        >
-          ✈️ Telegram
-        </a>
-      )}
-    </div>
+    <Dialog open onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
+      <DialogContent showCloseButton={false} aria-describedby={undefined}>
+        <DialogTitle>{t.crmLeadDetail.editTitle}</DialogTitle>
+        {error ? (
+          <div role="alert">
+            {error.status === 403 ? (
+              <>
+                <PermissionGate require="crm.leads.read" scoped denied>
+                  {null}
+                </PermissionGate>
+                <Button variant="outline" onClick={onRetry}>
+                  {t.common.retry}
+                </Button>
+              </>
+            ) : (
+              <ErrorState
+                title={t.crmLeadDetail.loadFailed}
+                onRetry={onRetry}
+                retryLabel={t.common.retry}
+              />
+            )}
+          </div>
+        ) : (
+          <div role="status" aria-busy="true" className="space-y-3">
+            <p>{t.common.loading}</p>
+            <Skeleton className="h-32" />
+          </div>
+        )}
+        <Button variant="outline" onClick={onClose}>
+          {t.common.close}
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-/**
- * Centered 360° Quick-Edit & Inspector Modal implementing the Dossier 360° Design System
- * across all 8 verified states (Corporate View/Edit/Contacts, Individual View/Edit,
- * Converted Locked State, and Light/Dark Modes).
- */
 export function LeadQuickEditModal({
   lead,
   leads,
@@ -311,20 +216,29 @@ export function LeadQuickEditModal({
   onDeleteLead,
   onRefresh,
 }: LeadQuickEditModalProps) {
-  const { lang } = useI18n();
-  const isAr = lang === "ar";
+  const { t, lang } = useI18n();
+  const canReadHistory = useAuditAccess();
+  const { user } = useTenantAuth();
+  const toast = useToast();
   const router = useRouter();
   const { canMutate } = useAccessMode();
   const { items: sources } = useCrmAcquisitionSources();
 
-  // Synchronously synthesize detail from `lead` so frame 1 and unit tests have zero flicker,
-  // then hydrate full `GET /api/tenant/crm/v1/leads/:id` when `lead.id` is a valid UUIDv7.
-  const [detail, setDetail] = useState<LeadDetail | null>(() =>
-    lead ? synthesizeLeadDetail(lead, branchId, stages) : null,
-  );
+  const [detail, setDetail] = useState<LeadDetail | null>(null);
+  const [detailRequest, setDetailRequest] = useState<{
+    lead: LeadItem;
+    branchId: string | null;
+  } | null>(null);
+  const [detailError, setDetailError] = useState<NormalizedApiError | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  // A new selection must not reuse the previous lead's detail before its effect runs.
+  const isCurrentDetail = detailRequest?.lead === lead && detailRequest?.branchId === branchId;
+  const currentDetail = isCurrentDetail ? detail : null;
   const [localRating, setLocalRating] = useState<number>(lead?.rating ?? 0);
   const [localCardColor, setLocalCardColor] = useState<CardColor | null>(lead?.cardColor ?? null);
   const [localTags, setLocalTags] = useState<CrmTag[]>(lead?.tags ?? []);
+  const tagWritePending = useRef(false);
+  const contactWritePending = useRef<AbortController | null>(null);
 
   // Section-level edit mode flags (View Mode by default — zero "Click any field to edit in-place")
   const [isEditingIdentity, setIsEditingIdentity] = useState(false);
@@ -333,6 +247,34 @@ export function LeadQuickEditModal({
   const [activeDossierTab, setActiveDossierTab] = useState<DossierTab>("activities");
   const [isSavingSection, setIsSavingSection] = useState(false);
   const [sectionError, setSectionError] = useState<string | null>(null);
+  const { runWrite, isPending, error: writeError, message: writeMessage } = useLeadQuickEditWrites(lead, branchId);
+  const crmErrorText = useCrmErrorText();
+  const displayedError = sectionError || crmErrorText(writeError) || writeMessage;
+  const saveLead = useCallback(async (target: LeadItem, request: UpdateLeadRequest): Promise<boolean> => {
+    setSectionError(null);
+    const outcome = await runWrite(async () => {
+      const outcome = await onSave(target, { ...request, expectedUpdatedAt: currentDetail?.updatedAt ?? target.updatedAt });
+      if (outcome.kind === "success") {
+        // The list callback reconciles its own rows; this modal owns a separate snapshot.
+        try {
+          const fresh = await fetchLeadDetail(target.id);
+          setDetail((current) => current?.id === target.id ? fresh.lead : current);
+        } catch (caught) {
+          setDetail((current) => current?.id === target.id ? null : current);
+          setDetailError(normalizeApiError(caught));
+        }
+      }
+      return outcome;
+    });
+    return outcome?.kind === "success";
+  }, [currentDetail, onSave, runWrite]);
+
+  useEffect(() => {
+    return () => {
+      contactWritePending.current?.abort();
+      contactWritePending.current = null;
+    };
+  }, [lead, branchId]);
 
   // Tag picker state
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
@@ -341,6 +283,7 @@ export function LeadQuickEditModal({
   // Card 1 draft state (Corporate Company Details OR Individual Personal Details)
   const [companyNameDraft, setCompanyNameDraft] = useState("");
   const [companyEmailDraft, setCompanyEmailDraft] = useState("");
+  const [companyEmailError, setCompanyEmailError] = useState<string | null>(null);
   const [taxNumberDraft, setTaxNumberDraft] = useState("");
   const [crNumberDraft, setCrNumberDraft] = useState("");
   const [websiteDraft, setWebsiteDraft] = useState("");
@@ -373,11 +316,11 @@ export function LeadQuickEditModal({
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [customFieldsDraft, setCustomFieldsDraft] = useState<Record<string, unknown>>({});
 
-  const effectiveBranchId = detail?.branchId || branchId || null;
+  const effectiveBranchId = currentDetail?.branchId || branchId || null;
   const { capabilities } = useLeadCapabilities(effectiveBranchId);
   const relatedCounts = useLeadRelatedCounts(
     lead?.id ?? null,
-    detail?.partyId ?? lead?.partyId ?? null,
+    currentDetail?.partyId ?? lead?.partyId ?? null,
     effectiveBranchId,
   );
   const customFieldValues = useCrmCustomFieldValues(
@@ -386,78 +329,64 @@ export function LeadQuickEditModal({
     lead?.id ?? null,
   );
 
-  // Sync synthesized state when `lead` prop changes
   useEffect(() => {
-    if (!lead) {
-      setDetail(null);
-      return;
-    }
-    const seeded = synthesizeLeadDetail(lead, branchId, stages);
-    setDetail(seeded);
-    setLocalRating(lead.rating);
-    setLocalCardColor(lead.cardColor);
-    setLocalTags(lead.tags ?? []);
-    setIsEditingIdentity(false);
-    setIsEditingQualification(false);
-    setEditingContactDraft(null);
-    setSectionError(null);
-
-    if (!isUUIDv7(lead.id)) return;
     const controller = new AbortController();
-    void axiosClient
-      .get<unknown>(leadPath(lead.id), {
-        signal: controller.signal,
-        cache: "no-store",
-        maxResponseBytes: 512 * 1024,
-      })
-      .then((res) => {
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      setDetail(null);
+      setDetailError(null);
+      setDetailRequest(lead ? { lead, branchId } : null);
+      if (!lead) return;
+      setLocalRating(lead.rating);
+      setLocalCardColor(lead.cardColor);
+      setLocalTags(lead.tags ?? []);
+      setIsEditingIdentity(false);
+      setIsEditingQualification(false);
+      setEditingContactDraft(null);
+      setSectionError(null);
+    });
+    if (!lead) return () => controller.abort();
+
+    const load = async () => {
+      try {
+        const { lead: parsed } = await fetchLeadDetail(lead.id, controller.signal);
         if (controller.signal.aborted) return;
-        const parsed = parseLeadDetailResponse(res.data);
         setDetail(parsed);
-      })
-      .catch(() => {
-        // Keep synthesized detail when offline or mocked
-      });
+      } catch (caught) {
+        if (!controller.signal.aborted) setDetailError(normalizeApiError(caught));
+      }
+    };
+    void load();
     return () => controller.abort();
-  }, [lead, branchId, stages]);
+  }, [lead, branchId, reloadToken]);
 
   const reloadDetail = useCallback(() => {
-    if (!lead || !isUUIDv7(lead.id)) return;
-    void axiosClient
-      .get<unknown>(leadPath(lead.id), {
-        cache: "no-store",
-        maxResponseBytes: 512 * 1024,
-      })
-      .then((res) => {
-        setDetail(parseLeadDetailResponse(res.data));
-      })
-      .catch(() => {});
+    setDetail(null);
+    setDetailError(null);
+    setReloadToken((current) => current + 1);
     onRefresh?.();
-  }, [lead, onRefresh]);
+  }, [onRefresh]);
 
   const isConverted =
-    detail?.status === "CONVERTED" ||
-    detail?.stageFlag === "CONVERTED" ||
-    Boolean(detail?.convertedCustomerProfileId);
-  const editable = canUpdate && !isConverted;
+    currentDetail?.status === "CONVERTED" ||
+    currentDetail?.stageFlag === "CONVERTED" ||
+    Boolean(currentDetail?.convertedCustomerProfileId);
+  const editable = currentDetail !== null && canUpdate && !isConverted;
 
   const canConvert =
     canMutate &&
-    detail !== null &&
+    currentDetail !== null &&
     !isConverted &&
-    (crmCapabilityAllowsOwner(capabilities.convert, detail.ownerUserId) || canUpdate);
+    crmCapabilityAllowsOwner(capabilities.convert, currentDetail.ownerUserId);
 
   const convertState = useLeadConvert(
-    detail,
+    currentDetail,
     reloadDetail,
     canConvert,
     capabilities.opportunitiesCreate ?? null,
   );
 
-  const fallbackDetail = useMemo(
-    () => (lead ? detail ?? synthesizeLeadDetail(lead, branchId, stages) : null),
-    [lead, detail, branchId, stages],
-  );
+  const fallbackDetail = currentDetail;
 
   const references = useLeadDetailsReferences(
     fallbackDetail ?? {
@@ -503,7 +432,9 @@ export function LeadQuickEditModal({
 
   useEffect(() => {
     if (references.tags.length > 0) {
-      setLocalTags(references.tags);
+      queueMicrotask(() => {
+        setLocalTags(references.tags);
+      });
     }
   }, [references.tags]);
 
@@ -516,6 +447,7 @@ export function LeadQuickEditModal({
   const startIdentityEdit = useCallback(() => {
     if (!fallbackDetail || !editable) return;
     setSectionError(null);
+    setCompanyEmailError(null);
     const isCorp = fallbackDetail.leadProfileType === "CORPORATE";
     setCompanyNameDraft(fallbackDetail.companyName || fallbackDetail.displayName || "");
     setCompanyEmailDraft(fallbackDetail.companyEmail || fallbackDetail.email || "");
@@ -564,13 +496,9 @@ export function LeadQuickEditModal({
     setInterestSummaryDraft(fallbackDetail.interestSummary ?? "");
     setExpectedNeedDraft(fallbackDetail.expectedNeed ?? "");
     setDescriptionDraft(fallbackDetail.description ?? "");
-    const cfMap: Record<string, unknown> = {};
-    for (const entry of customFieldValues.entries) {
-      cfMap[entry.definition.fieldKey] = entry.value?.value ?? "";
-    }
-    setCustomFieldsDraft(cfMap);
+    setCustomFieldsDraft({});
     setIsEditingQualification(true);
-  }, [fallbackDetail, editable, customFieldValues.entries]);
+  }, [fallbackDetail, editable]);
 
   // Save Card 1 (Corporate Company Details OR Individual Personal Info)
   const saveIdentitySection = useCallback(async (): Promise<boolean> => {
@@ -581,9 +509,17 @@ export function LeadQuickEditModal({
 
     if (isCorp) {
       if (!companyNameDraft.trim()) {
-        setSectionError(isAr ? "اسم الشركة مطلوب" : "Company Name is required.");
+        setSectionError(t.crmLeads.executive.companyNameRequired);
         return false;
       }
+      const emailErrors = new CrmErrorBag({
+        ...t.crmLeads.create.errors,
+        url: t.crmShared.fieldUrl,
+      });
+      emailErrors.email("companyEmail", companyEmailDraft);
+      const emailError = emailErrors.errors.companyEmail;
+      setCompanyEmailError(emailError ?? null);
+      if (emailError) return false;
       if (companyNameDraft.trim() !== (fallbackDetail.companyName ?? "")) {
         Object.assign(patch, buildLeadCompanyFieldRequest("companyName", companyNameDraft));
       }
@@ -611,7 +547,7 @@ export function LeadQuickEditModal({
         displayNameDraft.trim() ||
         [firstNameDraft.trim(), lastNameDraft.trim()].filter(Boolean).join(" ");
       if (!nextDisplay) {
-        setSectionError(isAr ? "اسم العميل مطلوب" : "First Name / Display Name is required.");
+        setSectionError(t.crmLeads.executive.personNameRequired);
         return false;
       }
       if (nextDisplay !== fallbackDetail.displayName) patch.displayName = nextDisplay;
@@ -652,7 +588,7 @@ export function LeadQuickEditModal({
         street1: streetDraft.trim() || undefined,
         buildingNo: buildingNoDraft.trim() || undefined,
         floor: floorDraft.trim() || undefined,
-        apartment: apartmentDraft.trim() || undefined,
+        street2: apartmentDraft.trim() || undefined,
         landmark: landmarkDraft.trim() || undefined,
       };
     }
@@ -661,7 +597,7 @@ export function LeadQuickEditModal({
     try {
       const cleanedPhones = phonesDraft.map((p) => p.trim()).filter(Boolean);
       if (Object.keys(patch).length > 0) {
-        const ok = await onSave(lead, patch);
+        const ok = await saveLead(lead, patch);
         if (!ok) return false;
       }
       setDetail((prev) => {
@@ -713,7 +649,7 @@ export function LeadQuickEditModal({
     lead,
     fallbackDetail,
     editable,
-    isAr,
+    t,
     companyNameDraft,
     companyEmailDraft,
     taxNumberDraft,
@@ -735,7 +671,7 @@ export function LeadQuickEditModal({
     floorDraft,
     apartmentDraft,
     landmarkDraft,
-    onSave,
+    saveLead,
   ]);
 
   // Save Card 2 (Qualification, Ownership & Custom Fields)
@@ -743,8 +679,11 @@ export function LeadQuickEditModal({
     if (!lead || !fallbackDetail || !editable) return false;
     setSectionError(null);
     const patch: UpdateLeadRequest = {};
-    if (ownerUserIdDraft !== (fallbackDetail.ownerUserId ?? "")) {
-      patch.ownerUserId = ownerUserIdDraft || null;
+    if (
+      isUUIDv7(ownerUserIdDraft) &&
+      ownerUserIdDraft !== (fallbackDetail.ownerUserId ?? "")
+    ) {
+      patch.ownerUserId = ownerUserIdDraft;
     }
     if (sourceIdDraft !== (fallbackDetail.acquisitionSourceId ?? "")) {
       patch.acquisitionSourceId = sourceIdDraft || null;
@@ -758,14 +697,21 @@ export function LeadQuickEditModal({
     if (descriptionDraft.trim() !== (fallbackDetail.description ?? "")) {
       patch.description = descriptionDraft.trim();
     }
-    if (Object.keys(customFieldsDraft).length > 0) {
-      patch.customFields = customFieldsDraft;
+    if (customFieldValues.valuesLoaded && !customFieldValues.isLoading && !customFieldValues.error && !customFieldValues.valuesError) {
+      const changedFields: Record<string, unknown> = {};
+      for (const { definition, value } of customFieldValues.entries) {
+        const key = definition.fieldKey;
+        if (Object.prototype.hasOwnProperty.call(customFieldsDraft, key) && String(customFieldsDraft[key] ?? "") !== String(value?.value ?? "")) {
+          changedFields[key] = customFieldsDraft[key];
+        }
+      }
+      if (Object.keys(changedFields).length > 0) patch.customFields = changedFields;
     }
 
     setIsSavingSection(true);
     try {
       if (Object.keys(patch).length > 0) {
-        const ok = await onSave(lead, patch);
+        const ok = await saveLead(lead, patch);
         if (!ok) return false;
       }
       const matchedSource = sources.find((s) => s.id === sourceIdDraft);
@@ -773,7 +719,7 @@ export function LeadQuickEditModal({
         prev
           ? {
               ...prev,
-              ownerUserId: ownerUserIdDraft || null,
+              ownerUserId: patch.ownerUserId ?? prev.ownerUserId,
               acquisitionSourceId: sourceIdDraft || null,
               acquisitionSourceNameAr:
                 matchedSource?.nameAr ?? prev.acquisitionSourceNameAr,
@@ -786,7 +732,7 @@ export function LeadQuickEditModal({
           : prev,
       );
       setIsEditingQualification(false);
-      if (Object.keys(customFieldsDraft).length > 0) {
+      if (patch.customFields) {
         customFieldValues.reload();
       }
       return true;
@@ -803,87 +749,151 @@ export function LeadQuickEditModal({
     expectedNeedDraft,
     descriptionDraft,
     customFieldsDraft,
-    onSave,
+    saveLead,
     sources,
     customFieldValues,
   ]);
 
-  // Save Contact Person (Add or Edit in Corporate Contact Persons Card)
+  // Existing-person identity belongs to Core; CRM only owns the relationship.
   const saveContactPerson = useCallback(async (): Promise<boolean> => {
-    if (!lead || !fallbackDetail || !editingContactDraft || !editable) return false;
-    const trimmedFirst = editingContactDraft.firstName.trim();
-    const trimmedLast = editingContactDraft.lastName.trim();
-    const fullDisplayName = [trimmedFirst, trimmedLast].filter(Boolean).join(" ");
-    if (!fullDisplayName) {
-      setSectionError(isAr ? "الاسم الأول لجهة الاتصال مطلوب" : "Contact first name is required.");
-      return false;
-    }
-
-    const cleanedPhones = editingContactDraft.phones.map((p) => p.trim()).filter(Boolean);
-    const currentContacts = fallbackDetail.contacts;
-    const isAdding = editingContactDraft.partyId === null;
-    const nextPartyId = editingContactDraft.partyId ?? generateUUIDv7();
-
-    const updatedContactList: LeadContact[] = isAdding
-      ? [
-          ...currentContacts.map((c) =>
-            editingContactDraft.isPrimary ? { ...c, isPrimary: false } : c,
-          ),
-          {
-            partyId: nextPartyId,
-            relationshipId: null,
-            displayName: fullDisplayName,
-            firstName: trimmedFirst || null,
-            lastName: trimmedLast || null,
-            honorificTitle: editingContactDraft.honorificTitle.trim() || null,
-            jobTitle: editingContactDraft.jobTitle.trim() || null,
-            email: editingContactDraft.email.trim() || null,
-            phones: cleanedPhones,
-            isPrimary: editingContactDraft.isPrimary || currentContacts.length === 0,
-          },
-        ]
-      : currentContacts.map((c) => {
-          if (c.partyId === editingContactDraft.partyId) {
-            return {
-              ...c,
-              displayName: fullDisplayName,
-              firstName: trimmedFirst || null,
-              lastName: trimmedLast || null,
-              honorificTitle: editingContactDraft.honorificTitle.trim() || null,
-              jobTitle: editingContactDraft.jobTitle.trim() || null,
-              email: editingContactDraft.email.trim() || null,
-              phones: cleanedPhones,
-              isPrimary: editingContactDraft.isPrimary,
-            };
-          }
-          return editingContactDraft.isPrimary ? { ...c, isPrimary: false } : c;
-        });
-
-    const contactsPayload = updatedContactList.map((c) => ({
-      ...(currentContacts.some((orig) => orig.partyId === c.partyId)
-        ? { contactPartyId: c.partyId }
-        : {}),
-      fullName: c.displayName,
-      firstName: c.firstName ?? c.displayName,
-      lastName: c.lastName ?? undefined,
-      honorificTitle: c.honorificTitle,
-      jobTitle: c.jobTitle,
-      email: c.email,
-      phones: c.phones,
-      isPrimary: c.isPrimary,
-    }));
-
+    if (!lead || !fallbackDetail || !editingContactDraft || !editable || contactWritePending.current) return false;
+    setSectionError(null);
+    const draft = editingContactDraft;
+    const fullName = [draft.firstName.trim(), draft.lastName.trim()].filter(Boolean).join(" ");
+    const messages = { ...t.crmLeads.create.errors, url: t.crmShared.fieldUrl, invalid: t.crmShared.errorValidation };
+    const controller = new AbortController();
+    contactWritePending.current = controller;
     setIsSavingSection(true);
+    let completed = 0;
+    let writing = false;
+    let reconcile = false;
+    let readback = false;
+    let refusal: NormalizedApiError | null = null;
+    const readLead = async () => {
+      const { lead: fresh } = await fetchLeadDetail(lead.id, controller.signal);
+      return fresh;
+    };
     try {
-      const ok = await onSave(lead, { contacts: contactsPayload });
-      if (!ok) return false;
-      setDetail((prev) => (prev ? { ...prev, contacts: updatedContactList } : prev));
+      let fresh = await readLead();
+      if (controller.signal.aborted) return false;
+      if (fresh.leadProfileType !== "CORPORATE" || fresh.status === "CONVERTED") {
+        setDetail(fresh);
+        setEditingContactDraft(null);
+        return false;
+      }
+      let body: UpdateLeadRequest;
+      if (draft.partyId === null) {
+        const newContact = { ...draft, displayName: fullName };
+        const errors = validateNewLeadContact(newContact, messages);
+        if (Object.keys(errors).length) { setSectionError(Object.values(errors)[0]); return false; }
+        body = buildAddedContactLeadRequest(fresh, newContact);
+      } else {
+        const selected = fresh.contacts.find((contact) => contact.partyId === draft.partyId);
+        const original = fallbackDetail.contacts.find((contact) => contact.partyId === draft.partyId);
+        if (!selected || !original) throw new Error("Contact no longer belongs to this lead.");
+        const baseline = contactModalForm(original);
+        const form = { ...baseline, jobTitle: draft.jobTitle, isPrimary: draft.isPrimary };
+        const firstChanged = draft.firstName !== (original.firstName ?? original.displayName.split(" ")[0] ?? "");
+        const lastChanged = draft.lastName !== (original.lastName ?? original.displayName.split(" ").slice(1).join(" "));
+        const phonesChanged = JSON.stringify(draft.phones.map((phone) => phone.trim()).filter(Boolean)) !== JSON.stringify(original.phones);
+        const identityChanged = firstChanged || lastChanged || draft.honorificTitle !== baseline.honorificTitle || draft.email !== baseline.email || phonesChanged;
+        if (identityChanged) {
+          if (!CONTACT_DIRECTORY_PERMISSIONS.every((permission) => user?.permissions.includes(permission))) {
+            setSectionError(t.crmLeadDetail.contactIdentityPermission);
+            return false;
+          }
+          const person = parseContactPerson(await readCoreData(contactPersonPath(draft.partyId), {
+            signal: controller.signal, cache: "no-store", maxResponseBytes: 512 * 1024,
+          }), draft.partyId);
+          if (controller.signal.aborted) return false;
+          const identity = contactModalForm(selected, person);
+          if (firstChanged) identity.firstName = draft.firstName;
+          if (lastChanged) identity.lastName = draft.lastName;
+          if (firstChanged || lastChanged) identity.displayName = fullName;
+          if (draft.honorificTitle !== baseline.honorificTitle) identity.honorificTitle = draft.honorificTitle;
+          if (draft.email !== baseline.email) identity.email = draft.email;
+          if (phonesChanged) {
+            // String-only quick-edit drafts must not overwrite methods changed since opening.
+            if (JSON.stringify(identity.phones.map((phone) => phone.value)) !== JSON.stringify(original.phones)) {
+              reconcile = true;
+              throw new Error("Contact methods changed. Reload before editing.");
+            }
+            const available = [...identity.phones];
+            const matched = draft.phones.map((value) => {
+              const index = available.findIndex((phone) => phone.value === value.trim());
+              return index < 0 ? null : available.splice(index, 1)[0];
+            });
+            identity.phones = draft.phones.map((value, index) => ({
+              ...(matched[index] ?? available.shift() ?? { id: null, methodType: "MOBILE" as const, isPrimary: false }),
+              value,
+            }));
+          }
+          const errors = validateContactModal(identity, true, messages);
+          if (Object.keys(errors).length) { setSectionError(Object.values(errors)[0]); return false; }
+          for (const operation of buildContactCoreWrites(identity, person)) {
+            writing = true;
+            const receipt = await writeCoreData(operation.method, operation.path, operation.body, {
+              nonReplayable: operation.method === "post", maxResponseBytes: 512 * 1024,
+            });
+            completed++;
+            validateContactWriteResponse(operation, receipt, draft.partyId);
+            writing = false;
+            if (controller.signal.aborted) return false;
+          }
+        }
+        fresh = await readLead();
+        if (controller.signal.aborted) return false;
+        body = buildSelectedContactLeadRequest(fresh, form, baseline);
+      }
+      if (Object.keys(body).length) {
+        const outcome = await runIdempotentWrite({
+          attempt: createWriteAttempt(), method: "patch", path: leadPath(lead.id), body: { ...body, expectedUpdatedAt: fresh.updatedAt },
+          parse: (payload) => {
+            const saved = parseLeadDetailResponse(payload);
+            if (saved.id !== lead.id) throw new Error("Invalid lead response.");
+            return saved;
+          },
+        });
+        if (controller.signal.aborted) return false;
+        if (outcome.kind !== "success") {
+          reconcile = outcome.kind !== "failed";
+          refusal = outcome.error;
+          throw outcome.error;
+        }
+        completed++;
+      }
+      readback = true;
+      fresh = await readLead();
+      if (controller.signal.aborted) return false;
+      setDetail(fresh);
       setEditingContactDraft(null);
+      onRefresh?.();
       return true;
+    } catch (caught) {
+      if (controller.signal.aborted) return false;
+      reconcile ||= completed > 0 || caught instanceof ContactWriteResponseError || (writing && isAmbiguousWriteFailure(caught));
+      const partial = completed > 0 && !readback && !(caught instanceof ContactWriteResponseError);
+      const message = refusal?.code === "CRM.LEAD.CONCURRENT_UPDATE"
+        ? crmErrorText(refusal) ?? t.crmLeadDetail.contactReloadRequired
+        : reconcile
+        ? partial ? t.crmLeadDetail.contactPartialSave : t.crmLeadDetail.contactReloadRequired
+        : t.crmLeadDetail.saveFailed;
+      setSectionError(message);
+      if (reconcile) {
+        // Retire submitted drafts after uncertain/applied writes; Retry only reads.
+        setEditingContactDraft(null);
+        setDetail(null);
+        setDetailError(normalizeApiError(caught));
+        toast.error(message);
+      }
+      return false;
     } finally {
-      setIsSavingSection(false);
+      if (contactWritePending.current === controller) {
+        contactWritePending.current = null;
+        setIsSavingSection(false);
+      }
     }
-  }, [lead, fallbackDetail, editingContactDraft, editable, isAr, onSave]);
+  }, [lead, fallbackDetail, editingContactDraft, editable, user, t, toast, onRefresh, crmErrorText]);
 
   // Promote a corporate contact to primary directly
   const handleSetPrimaryContact = useCallback(
@@ -893,7 +903,7 @@ export function LeadQuickEditModal({
         ...c,
         isPrimary: c.partyId === targetPartyId,
       }));
-      const ok = await onSave(lead, {
+      const ok = await saveLead(lead, {
         contacts: updated.map((c) => ({
           contactPartyId: c.partyId,
           jobTitle: c.jobTitle,
@@ -904,7 +914,7 @@ export function LeadQuickEditModal({
         setDetail((prev) => (prev ? { ...prev, contacts: updated } : prev));
       }
     },
-    [lead, fallbackDetail, editable, onSave],
+    [lead, fallbackDetail, editable, saveLead],
   );
 
   // Interactive 3-Star Rating toggle in Header
@@ -912,10 +922,11 @@ export function LeadQuickEditModal({
     async (starValue: number) => {
       if (!lead || !editable) return;
       const nextRating = localRating === starValue ? 0 : starValue;
+      setSectionError(null);
       setLocalRating(nextRating);
-      await onSave(lead, { rating: nextRating });
+      if (!await saveLead(lead, { rating: nextRating })) setLocalRating(localRating);
     },
-    [lead, editable, localRating, onSave],
+    [lead, editable, localRating, saveLead],
   );
 
   // Interactive Board Card Color Picker in Header ("No color" first + 5 colors)
@@ -923,11 +934,25 @@ export function LeadQuickEditModal({
     async (color: CardColor | null) => {
       if (!lead || !editable) return;
       const nextColor = color === null ? null : localCardColor === color ? null : color;
+      setSectionError(null);
       setLocalCardColor(nextColor);
-      await onSave(lead, { cardColor: nextColor });
+      if (!await saveLead(lead, { cardColor: nextColor })) setLocalCardColor(localCardColor);
     },
-    [lead, editable, localCardColor, onSave],
+    [lead, editable, localCardColor, saveLead],
   );
+
+  const handleMoveStage = useCallback(async (stage: LeadStage) => {
+    if (!lead || !currentDetail || !editable) return;
+    const previous = { stageId: currentDetail.stageId, stageFlag: currentDetail.stageFlag };
+    setSectionError(null);
+    const outcome = await runWrite(() => {
+      setDetail((current) => current ? { ...current, stageId: stage.id, stageFlag: stage.flag } : current);
+      return onMoveStage({ ...lead, stageId: previous.stageId }, stage.id);
+    });
+    if (outcome && outcome.kind !== "success") {
+      setDetail((current) => current ? { ...current, ...previous } : current);
+    }
+  }, [lead, currentDetail, editable, onMoveStage, runWrite]);
 
   // Attach / Detach Tag handlers
   const handleOpenTagPicker = useCallback(() => {
@@ -939,53 +964,67 @@ export function LeadQuickEditModal({
         .then((res) => {
           setAvailableTags(parseCrmTagCatalogue(res.data));
         })
-        .catch(() => {});
+        .catch(() => toast.error(t.crmTags.loadFailed));
     }
-  }, [editable, availableTags.length]);
+  }, [editable, availableTags.length, t, toast]);
 
   const handleAttachTag = useCallback(
     async (tag: CrmTag) => {
-      if (!lead || !editable) return;
-      setLocalTags((prev) => (prev.some((t) => t.id === tag.id) ? prev : [...prev, tag]));
+      if (!lead || !editable || tagWritePending.current) return;
+      if (!isUUIDv7(lead.id) || !isUUIDv7(tag.id)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = localTags;
+      if (previousTags.some((item) => item.id === tag.id)) return;
+      tagWritePending.current = true;
+      setLocalTags([...previousTags, tag]);
       setIsTagPickerOpen(false);
-      if (isUUIDv7(lead.id) && isUUIDv7(tag.id)) {
-        try {
-          const res = await axiosClient.post<unknown>(
-            `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags`,
-            { tagId: tag.id },
-            { skipAutoIdempotency: true },
-          );
-          if (Array.isArray(res.data)) {
-            setLocalTags(parseCrmTags(res.data));
-          }
-        } catch {
-          // Keep optimistic tag in UI if offline/mocked
-        }
+      try {
+        const res = await axiosClient.post<unknown>(
+          `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags`,
+          { tagIds: [tag.id] },
+          { skipAutoIdempotency: true },
+        );
+        if (!Array.isArray(res.data)) throw new Error("INVALID_CRM_TAGS_RESPONSE");
+        setLocalTags(parseCrmTags(res.data));
+      } catch {
+        setLocalTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [lead, editable],
+    [lead, editable, localTags, t, toast],
   );
 
   const handleDetachTag = useCallback(
     async (tagId: string) => {
-      if (!lead || !editable) return;
-      setLocalTags((prev) => prev.filter((t) => t.id !== tagId));
-      if (isUUIDv7(lead.id) && isUUIDv7(tagId)) {
-        try {
-          await axiosClient.delete(
-            `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags/${encodeURIComponent(tagId)}`,
-          );
-        } catch {
-          // Keep optimistic removal
-        }
+      if (!lead || !editable || tagWritePending.current) return;
+      if (!isUUIDv7(lead.id) || !isUUIDv7(tagId)) {
+        toast.error(t.crmTags.errors.saveFailed);
+        return;
+      }
+      const previousTags = localTags;
+      tagWritePending.current = true;
+      setLocalTags(previousTags.filter((item) => item.id !== tagId));
+      try {
+        await axiosClient.delete(
+          `/api/tenant/crm/v1/leads/${encodeURIComponent(lead.id)}/tags/${encodeURIComponent(tagId)}`,
+        );
+      } catch {
+        setLocalTags(previousTags);
+        toast.error(t.crmTags.errors.saveFailed);
+      } finally {
+        tagWritePending.current = false;
       }
     },
-    [lead, editable],
+    [lead, editable, localTags, t, toast],
   );
 
   // Save & Close [Ctrl+S] handler
   const handleSaveAndClose = useCallback(async () => {
-    if (!lead) return;
+    if (!lead || !editable || isPending) return;
     if (isEditingIdentity) {
       const ok = await saveIdentitySection();
       if (!ok) return;
@@ -1001,9 +1040,11 @@ export function LeadQuickEditModal({
     onClose();
   }, [
     lead,
+    editable,
     isEditingIdentity,
     isEditingQualification,
     editingContactDraft,
+    isPending,
     saveIdentitySection,
     saveQualificationSection,
     saveContactPerson,
@@ -1031,7 +1072,16 @@ export function LeadQuickEditModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lead, prevLead, nextLead, onClose, onNavigateLead, handleSaveAndClose]);
 
-  if (!lead || !fallbackDetail) return null;
+  if (!lead) return null;
+  if (!fallbackDetail) {
+    return (
+      <LeadQuickEditLoadState
+        error={isCurrentDetail ? detailError : null}
+        onRetry={reloadDetail}
+        onClose={onClose}
+      />
+    );
+  }
 
   const isCorporate = fallbackDetail.leadProfileType === "CORPORATE";
   const displayStages = stages;
@@ -1056,7 +1106,7 @@ export function LeadQuickEditModal({
   const ownerDisplayName =
     ownerFromRef ||
     (lead.owner ? `${lead.owner.firstName} ${lead.owner.lastName}`.trim() : "") ||
-    (isAr ? "غير معين" : "Unassigned");
+    t.crmLeads.executive.unassigned;
 
   const locationDisplay = [
     fallbackDetail.address?.city ?? lead.city,
@@ -1073,7 +1123,7 @@ export function LeadQuickEditModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Quick Edit ${fallbackDetail.displayName}`}
-        className="dossier-backdrop fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5"
+        className="dossier-backdrop fixed inset-0 z-(--z-modal) flex items-center justify-center p-3 sm:p-5"
         onClick={onClose}
       >
         <div
@@ -1084,7 +1134,7 @@ export function LeadQuickEditModal({
           <div className="dossier-header">
             <div className="flex min-w-0 items-center gap-3.5">
               <div className={dossierAvatarClass(isCorporate, isConverted)}>
-                {getInitials(fallbackDetail.displayName)}
+                {leadNameInitials(fallbackDetail.displayName)}
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1098,12 +1148,8 @@ export function LeadQuickEditModal({
                     )}
                   >
                     {isCorporate
-                      ? isAr
-                        ? "🏢 عميل شركات (CORPORATE)"
-                        : "🏢 Corporate Lead"
-                      : isAr
-                        ? "👤 عميل فردي (INDIVIDUAL)"
-                        : "👤 Individual Lead"}
+                      ? t.crmLeads.executive.corporateLead
+                      : t.crmLeads.executive.individualLead}
                   </span>
 
                   {/* Lead Status Badge */}
@@ -1124,15 +1170,16 @@ export function LeadQuickEditModal({
                   <div
                     className="dossier-stars"
                     role="group"
-                    aria-label={isAr ? "تقييم العميل" : "Lead rating"}
+                    aria-label={t.crmLeads.executive.leadRating}
                   >
-                    {[1, 2, 3].map((starNum) => {
+                    {CRM_RATING_STARS.map((starNum) => {
                       const active = starNum <= localRating;
                       return (
-                        <button
+                        <Button
                           key={starNum}
                           type="button"
-                          disabled={!editable}
+                          variant="ghost"
+                          disabled={!editable || isPending}
                           onClick={() => void handleToggleRating(starNum)}
                           aria-label={`Rate ${starNum} of 3 stars`}
                           aria-pressed={active}
@@ -1143,7 +1190,7 @@ export function LeadQuickEditModal({
                           )}
                         >
                           ★
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1152,19 +1199,20 @@ export function LeadQuickEditModal({
                   <div
                     className="dossier-color-dots"
                     role="group"
-                    aria-label={isAr ? "لون البطاقة" : "Card color"}
+                    aria-label={t.crmLeads.executive.cardColor}
                   >
                     {DOSSIER_HEADER_CARD_COLORS.map((opt) => {
                       const isNone = opt.color === null;
                       const isActive = localCardColor === opt.color;
                       return (
-                        <button
+                        <Button
                           key={opt.color ?? "NONE"}
                           type="button"
-                          disabled={!editable}
+                          variant="ghost"
+                          disabled={!editable || isPending}
                           onClick={() => void handleSelectCardColor(opt.color)}
-                          title={isAr ? opt.labelAr : isNone ? "No color" : opt.labelEn}
-                          aria-label={`Card color ${opt.labelEn}`}
+                          title={opt.color === null ? t.crmLeads.card.colorNone : t.crmLeads.card.colors[opt.color]}
+                          aria-label={`${t.crmLeads.executive.cardColor}: ${opt.color === null ? t.crmLeads.card.colorNone : t.crmLeads.card.colors[opt.color]}`}
                           aria-pressed={isActive}
                           className={cn(
                             "dossier-color-dot p-0",
@@ -1199,7 +1247,7 @@ export function LeadQuickEditModal({
                     🕒 Created:{" "}
                     <b>
                       {new Date(fallbackDetail.createdAt).toLocaleDateString(
-                        isAr ? "ar-EG" : "en-US",
+                        INTL_LOCALE[lang],
                         { month: "short", day: "numeric", year: "numeric" },
                       )}
                     </b>
@@ -1210,50 +1258,39 @@ export function LeadQuickEditModal({
 
             {/* Right Header KPI Counter Pills & Actions */}
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  router.push(LEAD_RELATED_ROUTES.opportunities);
-                }}
+              <Link
+                href={buildLeadRelatedHref("opportunities", fallbackDetail.partyId)}
+                onClick={() => onClose()}
                 className={DOSSIER_KPI_PILL_CLASSES.opportunities}
               >
                 🚀 Opportunities <b>{relatedCounts.counts.opportunities ?? 0}</b>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  router.push(LEAD_RELATED_ROUTES.quotations);
-                }}
+              </Link>
+              <Link
+                href={buildLeadRelatedHref("quotations", fallbackDetail.partyId)}
+                onClick={() => onClose()}
                 className={DOSSIER_KPI_PILL_CLASSES.quotations}
               >
                 📄 Quotations <b>{relatedCounts.counts.quotations ?? 0}</b>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  router.push(LEAD_RELATED_ROUTES.salesOrders);
-                }}
+              </Link>
+              <Link
+                href={buildLeadRelatedHref("salesOrders", fallbackDetail.partyId)}
+                onClick={() => onClose()}
                 className={DOSSIER_KPI_PILL_CLASSES.salesOrders}
               >
                 📦 Orders <b>{relatedCounts.counts.salesOrders ?? 0}</b>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  router.push(LEAD_RELATED_ROUTES.invoices);
-                }}
+              </Link>
+              <Link
+                href={buildLeadRelatedHref("invoices", fallbackDetail.partyId)}
+                onClick={() => onClose()}
                 className={DOSSIER_KPI_PILL_CLASSES.invoices}
               >
                 🧾 Invoices <b>{relatedCounts.counts.invoices ?? 0}</b>
-              </button>
+              </Link>
 
               {isConverted && fallbackDetail.convertedCustomerProfileId ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => {
                     onClose();
                     router.push(
@@ -1262,28 +1299,23 @@ export function LeadQuickEditModal({
                   }}
                   className="dossier-btn dossier-btn-emerald"
                 >
-                  ✓ {isAr ? "عرض ملف العميل ↗" : "View Customer Profile ↗"}
-                </button>
-              ) : (
-                <button
+                  ✓ {t.crmLeads.executive.viewCustomerProfile}
+                </Button>
+              ) : canConvert ? (
+                <Button
                   type="button"
-                  onClick={() => {
-                    if (canConvert) {
-                      convertState.openModal();
-                    } else {
-                      onClose();
-                      router.push(`/crm/leads/${fallbackDetail.id}`);
-                    }
-                  }}
+                  variant="ghost"
+                  onClick={() => convertState.openModal()}
                   className="dossier-btn dossier-btn-primary"
                 >
                   <Sparkles className="size-3.5" aria-hidden="true" />
-                  <span>{isAr ? "تحويل العميل ←" : "Convert Lead →"}</span>
-                </button>
-              )}
+                  <span>{t.crmLeads.executive.convertLead}</span>
+                </Button>
+              ) : null}
 
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={() => {
                   onClose();
                   router.push(`/crm/leads/${fallbackDetail.id}`);
@@ -1291,17 +1323,18 @@ export function LeadQuickEditModal({
                 className="dossier-btn dossier-btn-outline"
               >
                 <ExternalLink className="size-3.5" aria-hidden="true" />
-                <span>{isAr ? "فتح الصفحة الكاملة" : "Open Full Page"}</span>
-              </button>
+                <span>{t.crmLeads.executive.openFullPage}</span>
+              </Button>
 
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={onClose}
                 aria-label="Close modal"
                 className="dossier-close"
               >
                 <X className="size-4" aria-hidden="true" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1315,19 +1348,17 @@ export function LeadQuickEditModal({
                 const isTermConverted = st.flag === "CONVERTED";
 
                 return (
-                  <button
+                  <Button
                     key={st.id}
                     type="button"
-                    disabled={!editable || isCurrent}
+                    variant="ghost"
+                    disabled={!editable || isCurrent || isPending}
                     onClick={() => {
                       if (isTermConverted) {
                         if (canConvert) convertState.openModal();
                         return;
                       }
-                      void onMoveStage(lead, st.id);
-                      setDetail((prev) =>
-                        prev ? { ...prev, stageId: st.id, stageFlag: st.flag } : prev,
-                      );
+                      void handleMoveStage(st);
                     }}
                     className={dossierStageCellClass({
                       flag: st.flag,
@@ -1343,10 +1374,10 @@ export function LeadQuickEditModal({
                     )}
                     <span className="truncate">
                       {isCurrent
-                        ? `● ${localizedName(st, lang)} (${isAr ? "الحالية" : "Current"})`
+                        ? `● ${localizedName(st, lang)} (${t.crmLeads.executive.current})`
                         : localizedName(st, lang)}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -1358,20 +1389,17 @@ export function LeadQuickEditModal({
               <div>
                 <h4>
                   🎉{" "}
-                  {isAr
-                    ? "تم تحويل هذا العميل المحتمل إلى عميل فعلي"
-                    : "Lead Successfully Converted to Customer"}
+                  {t.crmLeads.executive.conversionSucceeded}
                 </h4>
                 <p>
-                  {isAr
-                    ? "هذا السجل مقفل للقراءة فقط للحفاظ على سجل التدقيق التاريخي."
-                    : "This lead is now locked in read-only mode to preserve historical audit integrity."}
+                  {t.crmLeads.executive.conversionReadOnlyHint}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {fallbackDetail.convertedCustomerProfileId && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => {
                       onClose();
                       router.push(
@@ -1381,11 +1409,12 @@ export function LeadQuickEditModal({
                     className="dossier-btn dossier-btn-outline"
                   >
                     🏢 Customer Profile ↗
-                  </button>
+                  </Button>
                 )}
                 {fallbackDetail.convertedOpportunityId && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     onClick={() => {
                       onClose();
                       router.push(
@@ -1395,19 +1424,19 @@ export function LeadQuickEditModal({
                     className="dossier-btn dossier-btn-emerald"
                   >
                     🚀 Opportunity ↗
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
           )}
 
           {/* Section Validation / Write Error Alert */}
-          {sectionError && (
+          {displayedError && (
             <div
               role="alert"
-              className="mx-5 mt-3 rounded-lg border border-red-300 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300"
+              className="mx-5 mt-3 rounded-sm border border-destructive/30 bg-destructive-subtle px-3.5 py-2 text-xs text-destructive-subtle-foreground"
             >
-              {sectionError}
+              {displayedError}
             </div>
           )}
 
@@ -1429,12 +1458,8 @@ export function LeadQuickEditModal({
                       <span className="dossier-card-icon">🏢</span>
                       <span>
                         {isEditingIdentity
-                          ? isAr
-                            ? "تعديل بيانات الشركة وأرقام الهواتف"
-                            : "Editing Company Details & Phones"
-                          : isAr
-                            ? "بيانات الشركة"
-                            : "Company Details"}
+                          ? t.crmLeads.executive.editingCompany
+                          : t.crmLeads.executive.companyDetails}
                       </span>
                     </div>
                     {isConverted ? (
@@ -1443,35 +1468,38 @@ export function LeadQuickEditModal({
                       </span>
                     ) : isEditingIdentity ? (
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
                           type="button"
-                          disabled={isSavingSection}
+                          variant="ghost"
+                          disabled={isSavingSection || isPending}
                           onClick={() => {
                             setIsEditingIdentity(false);
                             setSectionError(null);
                           }}
                           className="dossier-edit-btn dossier-cancel-btn"
                         >
-                          ✕ {isAr ? "إلغاء" : "Cancel"}
-                        </button>
-                        <button
+                          ✕ {t.crmLeads.executive.cancel}
+                        </Button>
+                        <Button
                           type="button"
-                          disabled={isSavingSection}
+                          variant="ghost"
+                          disabled={isSavingSection || isPending}
                           onClick={() => void saveIdentitySection()}
                           className="dossier-edit-btn dossier-save-btn"
                         >
-                          ✓ {isAr ? "حفظ الشركة" : "Save Company"}
-                        </button>
+                          ✓ {t.crmLeads.executive.saveCompany}
+                        </Button>
                       </div>
                     ) : (
                       editable && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={startIdentityEdit}
                           className="dossier-edit-btn"
                         >
-                          ✏️ {isAr ? "تعديل بيانات الشركة" : "Edit Company Details"}
-                        </button>
+                          ✏️ {t.crmLeads.executive.editCompany}
+                        </Button>
                       )
                     )}
                   </div>
@@ -1486,13 +1514,14 @@ export function LeadQuickEditModal({
                               📞 Company Phone Numbers (companyPhones — View Mode)
                             </span>
                             {editable && (
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={startIdentityEdit}
                                 className="dossier-edit-btn"
                               >
-                                ✏️ {isAr ? "تعديل الأرقام (كود + رقم)" : "Edit Phones (Code + Number)"}
-                              </button>
+                                ✏️ {t.crmLeads.executive.editPhones}
+                              </Button>
                             )}
                           </div>
                           {fallbackDetail.phones.length > 0 ? (
@@ -1511,15 +1540,16 @@ export function LeadQuickEditModal({
                                     {idx === 0 ? "Primary Phone" : "Secondary"}
                                   </span>
                                 </div>
-                                <PhoneActionPills
+                                <LeadPhoneActionsRow
+                                  showNumber={false}
                                   phone={ph}
                                   country={fallbackDetail.address?.country ?? lead.country}
                                 />
                               </div>
                             ))
                           ) : (
-                            <div className="text-xs text-slate-500">
-                              {isAr ? "لا توجد أرقام مسجلة" : "No company phone numbers recorded"}
+                            <div className="text-xs text-muted-foreground">
+                              {t.crmLeads.executive.noCompanyPhones}
                             </div>
                           )}
                         </div>
@@ -1621,14 +1651,15 @@ export function LeadQuickEditModal({
                               (CrmPhoneNumberInput)
                             </span>
                             {phonesDraft.length < 10 && (
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={() => setPhonesDraft((prev) => [...prev, ""])}
                                 className="dossier-add-phone-btn"
                               >
                                 <Plus className="size-3.5" aria-hidden="true" />
-                                <span>{isAr ? "إضافة رقم" : "Add Phone"}</span>
-                              </button>
+                                <span>{t.crmLeads.executive.addCompanyPhone}</span>
+                              </Button>
                             )}
                           </div>
                           {phonesDraft.map((ph, idx) => (
@@ -1653,8 +1684,9 @@ export function LeadQuickEditModal({
                               >
                                 {idx === 0 ? "Primary" : `#${idx + 1}`}
                               </span>
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
                                 aria-label={`Remove phone ${idx + 1}`}
                                 onClick={() =>
                                   setPhonesDraft((prev) =>
@@ -1666,7 +1698,7 @@ export function LeadQuickEditModal({
                                 className="dossier-del-btn"
                               >
                                 <Trash2 className="size-3.5" aria-hidden="true" />
-                              </button>
+                              </Button>
                             </div>
                           ))}
                           <div className="dossier-phone-hint">
@@ -1694,9 +1726,19 @@ export function LeadQuickEditModal({
                             <input
                               id="corp-company-email"
                               className="dossier-input"
+                              aria-invalid={companyEmailError ? true : undefined}
+                              aria-describedby={companyEmailError ? "corp-company-email-error" : undefined}
                               value={companyEmailDraft}
-                              onChange={(e) => setCompanyEmailDraft(e.target.value)}
+                              onChange={(e) => {
+                                setCompanyEmailDraft(e.target.value);
+                                setCompanyEmailError(null);
+                              }}
                             />
+                            {companyEmailError && (
+                              <p id="corp-company-email-error" className="text-sm text-destructive" role="alert">
+                                {companyEmailError}
+                              </p>
+                            )}
                           </div>
                           <div className="dossier-field-box">
                             <label className="dossier-field-label" htmlFor="corp-tax-number">
@@ -1842,12 +1884,8 @@ export function LeadQuickEditModal({
                       <span className="dossier-card-icon">👤</span>
                       <span>
                         {isEditingIdentity
-                          ? isAr
-                            ? "تعديل البيانات الشخصية وأرقام الموبايل"
-                            : "Editing Personal & Contact Information"
-                          : isAr
-                            ? "البيانات الشخصية وبيانات التواصل"
-                            : "Personal & Contact Information"}
+                          ? t.crmLeads.executive.editingPersonalInfo
+                          : t.crmLeads.executive.personalInfo}
                       </span>
                     </div>
                     {isConverted ? (
@@ -1856,35 +1894,38 @@ export function LeadQuickEditModal({
                       </span>
                     ) : isEditingIdentity ? (
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
                           type="button"
-                          disabled={isSavingSection}
+                          variant="ghost"
+                          disabled={isSavingSection || isPending}
                           onClick={() => {
                             setIsEditingIdentity(false);
                             setSectionError(null);
                           }}
                           className="dossier-edit-btn dossier-cancel-btn"
                         >
-                          ✕ {isAr ? "إلغاء" : "Cancel"}
-                        </button>
-                        <button
+                          ✕ {t.crmLeads.executive.cancel}
+                        </Button>
+                        <Button
                           type="button"
-                          disabled={isSavingSection}
+                          variant="ghost"
+                          disabled={isSavingSection || isPending}
                           onClick={() => void saveIdentitySection()}
                           className="dossier-edit-btn dossier-save-btn"
                         >
-                          ✓ {isAr ? "حفظ البيانات الشخصية" : "Save Personal Info"}
-                        </button>
+                          ✓ {t.crmLeads.executive.savePersonalInfo}
+                        </Button>
                       </div>
                     ) : (
                       editable && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={startIdentityEdit}
                           className="dossier-edit-btn"
                         >
-                          ✏️ {isAr ? "تعديل البيانات الشخصية" : "Edit Personal Info"}
-                        </button>
+                          ✏️ {t.crmLeads.executive.editPersonalInfo}
+                        </Button>
                       )
                     )}
                   </div>
@@ -1899,13 +1940,14 @@ export function LeadQuickEditModal({
                               📱 Personal Mobile Numbers (phones[] — View Mode)
                             </span>
                             {editable && (
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={startIdentityEdit}
                                 className="dossier-edit-btn"
                               >
-                                ✏️ {isAr ? "تعديل الأرقام (كود + رقم)" : "Edit Phones (Code + Number)"}
-                              </button>
+                                ✏️ {t.crmLeads.executive.editPhones}
+                              </Button>
                             )}
                           </div>
                           {fallbackDetail.phones.length > 0 ? (
@@ -1924,15 +1966,16 @@ export function LeadQuickEditModal({
                                     {idx === 0 ? "Primary Mobile" : "Secondary"}
                                   </span>
                                 </div>
-                                <PhoneActionPills
+                                <LeadPhoneActionsRow
+                                  showNumber={false}
                                   phone={ph}
                                   country={fallbackDetail.address?.country ?? lead.country}
                                 />
                               </div>
                             ))
                           ) : (
-                            <div className="text-xs text-slate-500">
-                              {isAr ? "لا توجد أرقام موبايل مسجلة" : "No mobile numbers recorded"}
+                            <div className="text-xs text-muted-foreground">
+                              {t.crmLeads.executive.noMobileNumbers}
                             </div>
                           )}
                         </div>
@@ -2013,7 +2056,7 @@ export function LeadQuickEditModal({
                               value={findHonorific(honorificDraft, lang)?.label ?? honorificDraft}
                               onChange={(e) => setHonorificDraft(e.target.value)}
                             >
-                              <option value="">{isAr ? "بدون لقب" : "None"}</option>
+                              <option value="">{t.crmLeads.executive.noTitle}</option>
                               {getHonorificOptions(lang).map((opt) => (
                                 <option key={opt.key} value={opt.label}>
                                   {opt.label}
@@ -2067,14 +2110,15 @@ export function LeadQuickEditModal({
                               (CrmPhoneNumberInput)
                             </span>
                             {phonesDraft.length < 10 && (
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={() => setPhonesDraft((prev) => [...prev, ""])}
                                 className="dossier-add-phone-btn"
                               >
                                 <Plus className="size-3.5" aria-hidden="true" />
-                                <span>{isAr ? "إضافة موبايل" : "Add Mobile"}</span>
-                              </button>
+                                <span>{t.crmLeads.executive.addMobile}</span>
+                              </Button>
                             )}
                           </div>
                           {phonesDraft.map((ph, idx) => (
@@ -2099,8 +2143,9 @@ export function LeadQuickEditModal({
                               >
                                 {idx === 0 ? "Primary Mobile" : "Secondary"}
                               </span>
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
                                 aria-label={`Remove mobile ${idx + 1}`}
                                 onClick={() =>
                                   setPhonesDraft((prev) =>
@@ -2112,7 +2157,7 @@ export function LeadQuickEditModal({
                                 className="dossier-del-btn"
                               >
                                 <Trash2 className="size-3.5" aria-hidden="true" />
-                              </button>
+                              </Button>
                             </div>
                           ))}
                           <div className="dossier-phone-hint">
@@ -2219,12 +2264,8 @@ export function LeadQuickEditModal({
                     <span className="dossier-card-icon">🎯</span>
                     <span>
                       {isEditingQualification
-                        ? isAr
-                          ? "تعديل التأهيل والمسؤول والحقول المخصصة"
-                          : "Editing Qualification, Ownership & Custom Fields"
-                        : isAr
-                          ? "التأهيل والمسؤول والحقول المخصصة"
-                          : "Qualification, Ownership & Custom Fields"}
+                        ? t.crmLeads.executive.editingQualification
+                        : t.crmLeads.executive.qualificationDetails}
                     </span>
                   </div>
                   {isConverted ? (
@@ -2233,35 +2274,38 @@ export function LeadQuickEditModal({
                     </span>
                   ) : isEditingQualification ? (
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
-                        disabled={isSavingSection}
+                        variant="ghost"
+                        disabled={isSavingSection || isPending}
                         onClick={() => {
                           setIsEditingQualification(false);
                           setSectionError(null);
                         }}
                         className="dossier-edit-btn dossier-cancel-btn"
                       >
-                        ✕ {isAr ? "إلغاء" : "Cancel"}
-                      </button>
-                      <button
+                        ✕ {t.crmLeads.executive.cancel}
+                      </Button>
+                      <Button
                         type="button"
-                        disabled={isSavingSection}
+                        variant="ghost"
+                        disabled={isSavingSection || isPending}
                         onClick={() => void saveQualificationSection()}
                         className="dossier-edit-btn dossier-save-btn"
                       >
-                        ✓ {isAr ? "حفظ التأهيل" : "Save Qualification"}
-                      </button>
+                        ✓ {t.crmLeads.executive.saveQualification}
+                      </Button>
                     </div>
                   ) : (
                     editable && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={startQualificationEdit}
                         className="dossier-edit-btn"
                       >
-                        ✏️ {isAr ? "تعديل التأهيل" : "Edit Qualification"}
-                      </button>
+                        ✏️ {t.crmLeads.executive.editQualification}
+                      </Button>
                     )
                   )}
                 </div>
@@ -2282,7 +2326,7 @@ export function LeadQuickEditModal({
                           <div className="dossier-field-label">Updated At</div>
                           <div className="dossier-field-val">
                             {new Date(fallbackDetail.updatedAt).toLocaleDateString(
-                              isAr ? "ar-EG" : "en-US",
+                              INTL_LOCALE[lang],
                               { month: "short", day: "numeric", year: "numeric" },
                             )}
                           </div>
@@ -2331,39 +2375,42 @@ export function LeadQuickEditModal({
                                 >
                                   🏷️ {tag.name}
                                   {editable && (
-                                    <button
+                                    <Button
                                       type="button"
+                                      variant="ghost"
                                       aria-label={`Remove tag ${tag.name}`}
                                       onClick={() => void handleDetachTag(tag.id)}
-                                      className="ms-1 border-0 bg-transparent p-0 font-extrabold opacity-75 hover:opacity-100"
+                                      className="ms-1 h-auto border-0 bg-transparent p-0 font-semibold opacity-75 hover:bg-transparent hover:opacity-100"
                                     >
                                       ×
-                                    </button>
+                                    </Button>
                                   )}
                                 </span>
                               );
                             })}
                             {editable && (
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
                                 onClick={handleOpenTagPicker}
                                 className="dossier-tag dossier-tag-add"
                               >
-                                + {isAr ? "ربط وسم" : "Attach Tag"}
-                              </button>
+                                + {t.crmLeads.executive.attachTag}
+                              </Button>
                             )}
                           </div>
                           {isTagPickerOpen && availableTags.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-violet-200 bg-violet-50/50 p-2 dark:border-violet-800 dark:bg-violet-950/40">
+                            <div className="mt-2 flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted/40 p-2">
                               {availableTags.map((tag) => (
-                                <button
+                                <Button
                                   key={tag.id}
                                   type="button"
+                                  variant="ghost"
                                   onClick={() => void handleAttachTag(tag)}
                                   className="dossier-tag dossier-tag-indigo"
                                 >
                                   + {tag.name}
-                                </button>
+                                </Button>
                               ))}
                             </div>
                           )}
@@ -2383,7 +2430,11 @@ export function LeadQuickEditModal({
                           value={ownerUserIdDraft}
                           onChange={(e) => setOwnerUserIdDraft(e.target.value)}
                         >
-                          <option value="">{ownerDisplayName}</option>
+                          <option value="" disabled>{t.crmLeadDetail.salesPerson}</option>
+                          {fallbackDetail.ownerUserId &&
+                            !references.ownerOptions.some((u) => u.id === fallbackDetail.ownerUserId) && (
+                              <option value={fallbackDetail.ownerUserId}>{ownerDisplayName}</option>
+                            )}
                           {references.ownerOptions.map((u) => (
                             <option key={u.id} value={u.id}>
                               {leadDetailsUserName(u)}
@@ -2401,7 +2452,7 @@ export function LeadQuickEditModal({
                           value={sourceIdDraft}
                           onChange={(e) => setSourceIdDraft(e.target.value)}
                         >
-                          <option value="">{isAr ? "بدون مصدر" : "No Source"}</option>
+                          <option value="">{t.crmLeads.executive.noSource}</option>
                           {sources.map((src) => (
                             <option key={src.id} value={src.id}>
                               {localizedValue(src.nameAr, src.nameEn, lang)}
@@ -2446,7 +2497,7 @@ export function LeadQuickEditModal({
                   )}
 
                   {/* Dynamic Custom Fields Section */}
-                  {customFieldValues.entries.length > 0 && (
+                  {customFieldValues.valuesLoaded && !customFieldValues.isLoading && !customFieldValues.error && !customFieldValues.valuesError && customFieldValues.entries.length > 0 && (
                     <div className="dossier-custom-fields-section">
                       <div className="dossier-custom-fields-head">
                         <span>✨ Custom Fields (Tenant Lead Schema)</span>
@@ -2513,13 +2564,9 @@ export function LeadQuickEditModal({
                       <span>
                         {editingContactDraft
                           ? editingContactDraft.partyId
-                            ? isAr
-                              ? "تعديل جهة الاتصال"
-                              : `Editing Contact Person (${editingContactDraft.firstName})`
-                            : isAr
-                              ? "إضافة جهة اتصال"
-                              : "Adding Contact Person"
-                          : `${isAr ? "جهات الاتصال" : "Contact Persons"} (${fallbackDetail.contacts.length})`}
+                            ? t.crmLeads.executive.editingContact(editingContactDraft.firstName)
+                            : t.crmLeads.executive.addingContact
+                          : `${t.crmLeads.executive.contactPersons} (${fallbackDetail.contacts.length})`}
                       </span>
                     </div>
                     {isConverted ? (
@@ -2528,27 +2575,30 @@ export function LeadQuickEditModal({
                       </span>
                     ) : editingContactDraft ? (
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
                           type="button"
-                          disabled={isSavingSection}
+                          variant="ghost"
+                          disabled={isSavingSection || isPending}
                           onClick={() => setEditingContactDraft(null)}
                           className="dossier-edit-btn dossier-cancel-btn"
                         >
-                          ✕ {isAr ? "إلغاء" : "Cancel"}
-                        </button>
-                        <button
+                          ✕ {t.crmLeads.executive.cancel}
+                        </Button>
+                        <Button
                           type="button"
-                          disabled={isSavingSection}
+                          variant="ghost"
+                          disabled={isSavingSection || isPending}
                           onClick={() => void saveContactPerson()}
                           className="dossier-edit-btn dossier-save-btn"
                         >
-                          ✓ {isAr ? "حفظ جهة الاتصال" : "Save Contact"}
-                        </button>
+                          ✓ {t.crmLeads.executive.saveContact}
+                        </Button>
                       </div>
                     ) : (
                       editable && (
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
                           onClick={() =>
                             setEditingContactDraft({
                               partyId: null,
@@ -2563,8 +2613,8 @@ export function LeadQuickEditModal({
                           }
                           className="dossier-edit-btn"
                         >
-                          + {isAr ? "إضافة جهة اتصال" : "Add Contact Person"}
-                        </button>
+                          + {t.crmLeads.executive.addContact}
+                        </Button>
                       )
                     )}
                   </div>
@@ -2590,7 +2640,7 @@ export function LeadQuickEditModal({
                                 )
                               }
                             >
-                              <option value="">{isAr ? "بدون لقب" : "None"}</option>
+                              <option value="">{t.crmLeads.executive.noTitle}</option>
                               {getHonorificOptions(lang).map((opt) => (
                                 <option key={opt.key} value={opt.label}>
                                   {opt.label}
@@ -2641,7 +2691,7 @@ export function LeadQuickEditModal({
                             <div className="dossier-field-label">Job Title</div>
                             <CrmJobTitleField
                               value={editingContactDraft.jobTitle}
-                              disabled={isSavingSection}
+                              disabled={isSavingSection || isPending}
                               onChange={(next) =>
                                 setEditingContactDraft((prev) =>
                                   prev ? { ...prev, jobTitle: next } : prev,
@@ -2671,8 +2721,9 @@ export function LeadQuickEditModal({
                           <span className="dossier-phone-box-label">
                             📱 Contact Mobile Numbers (Split Code + Number)
                           </span>
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
                             onClick={() =>
                               setEditingContactDraft((prev) =>
                                 prev ? { ...prev, phones: [...prev.phones, ""] } : prev,
@@ -2681,7 +2732,7 @@ export function LeadQuickEditModal({
                             className="dossier-add-phone-btn"
                           >
                             + Add Number
-                          </button>
+                          </Button>
                         </div>
 
                         {editingContactDraft.phones.map((ph, idx) => (
@@ -2705,8 +2756,9 @@ export function LeadQuickEditModal({
                               }
                               onBlur={() => {}}
                             />
-                            <button
+                            <Button
                               type="button"
+                              variant="ghost"
                               aria-label={`Remove contact phone ${idx + 1}`}
                               onClick={() =>
                                 setEditingContactDraft((prev) =>
@@ -2724,7 +2776,7 @@ export function LeadQuickEditModal({
                               className="dossier-del-btn"
                             >
                               <Trash2 className="size-3.5" aria-hidden="true" />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -2745,14 +2797,12 @@ export function LeadQuickEditModal({
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2.5">
                               <div className="dossier-contact-avatar">
-                                {getInitials(ct.displayName)}
+                                {leadNameInitials(ct.displayName)}
                               </div>
                               <div>
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <span className="dossier-contact-name">
-                                    {ct.honorificTitle
-                                      ? `${ct.honorificTitle} ${ct.displayName}`
-                                      : ct.displayName}
+                                    {ct.displayName}
                                   </span>
                                   {ct.isPrimary && (
                                     <span className="dossier-badge dossier-badge-stage">
@@ -2771,16 +2821,18 @@ export function LeadQuickEditModal({
                             {editable && (
                               <div className="flex items-center gap-1.5">
                                 {!ct.isPrimary && (
-                                  <button
+                                  <Button
                                     type="button"
+                                    variant="ghost"
                                     onClick={() => void handleSetPrimaryContact(ct.partyId)}
                                     className="dossier-edit-btn"
                                   >
                                     ★ Set Primary
-                                  </button>
+                                  </Button>
                                 )}
-                                <button
+                                <Button
                                   type="button"
+                                  variant="ghost"
                                   onClick={() =>
                                     setEditingContactDraft({
                                       partyId: ct.partyId,
@@ -2800,7 +2852,7 @@ export function LeadQuickEditModal({
                                   className="dossier-edit-btn"
                                 >
                                   ✏️ Edit
-                                </button>
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -2810,7 +2862,8 @@ export function LeadQuickEditModal({
                               <span className="dossier-phone-num" dir="ltr">
                                 📱 {formatPhoneDisplay(ph)}
                               </span>
-                              <PhoneActionPills
+                              <LeadPhoneActionsRow
+                                showNumber={false}
                                 phone={ph}
                                 country={fallbackDetail.address?.country ?? lead.country}
                               />
@@ -2819,10 +2872,8 @@ export function LeadQuickEditModal({
                         </div>
                       ))
                     ) : (
-                      <div className="rounded-lg border border-dashed border-cyan-300 p-3 text-center text-xs text-slate-500 dark:border-cyan-800">
-                        {isAr
-                          ? "لا توجد جهات اتصال مسجلة لهذه الشركة"
-                          : "No contact persons recorded for this company"}
+                      <div className="rounded-lg border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+                        {t.crmLeads.executive.noContacts}
                       </div>
                     )}
                   </div>
@@ -2839,8 +2890,9 @@ export function LeadQuickEditModal({
               >
                 <div className="dossier-card-head">
                   <div className="dossier-tabs" role="tablist">
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       role="tab"
                       aria-selected={activeDossierTab === "activities"}
                       onClick={() => setActiveDossierTab("activities")}
@@ -2849,20 +2901,22 @@ export function LeadQuickEditModal({
                         activeDossierTab === "activities" && "active",
                       )}
                     >
-                      📅 {isAr ? "الأنشطة" : "Activities"} (
+                      📅 {t.crmLeads.executive.activities} (
                       {lead.nextActivity ? 1 : 0})
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
                       role="tab"
                       aria-selected={activeDossierTab === "notes"}
                       onClick={() => setActiveDossierTab("notes")}
                       className={cn("dossier-tab", activeDossierTab === "notes" && "active")}
                     >
-                      📝 {isAr ? "الملاحظات" : "Notes"}
-                    </button>
-                    <button
+                      📝 {t.crmLeads.executive.notes}
+                    </Button>
+                    {canReadHistory && <Button
                       type="button"
+                      variant="ghost"
                       role="tab"
                       aria-selected={activeDossierTab === "history"}
                       onClick={() => setActiveDossierTab("history")}
@@ -2871,27 +2925,29 @@ export function LeadQuickEditModal({
                         activeDossierTab === "history" && "active",
                       )}
                     >
-                      🕒 {isAr ? "سجل التدقيق" : "Audit Log"}
-                    </button>
-                    <button
+                      {t.audit.historyTitle}
+                    </Button>}
+                    <Button
                       type="button"
+                      variant="ghost"
                       role="tab"
                       aria-selected={activeDossierTab === "files"}
                       onClick={() => setActiveDossierTab("files")}
                       className={cn("dossier-tab", activeDossierTab === "files" && "active")}
                     >
-                      📎 {isAr ? "الملفات" : "Files"}
-                    </button>
+                      📎 {t.crmLeads.executive.files}
+                    </Button>
                   </div>
 
                   {activeDossierTab === "activities" && !isConverted && (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => onOpenActivities(lead)}
                       className="dossier-edit-btn"
                     >
-                      + {isAr ? "حجز نشاط" : "Book Activity"}
-                    </button>
+                      + {t.crmLeads.executive.bookActivity}
+                    </Button>
                   )}
                 </div>
 
@@ -2903,19 +2959,19 @@ export function LeadQuickEditModal({
                           <div className="flex items-center justify-between gap-2">
                             <span className="dossier-activity-title">
                               📞{" "}
-                              {isAr ? "نشاط متابعة قادم" : "Next Scheduled Follow-Up"}
+                              {t.crmLeads.executive.nextFollowUp}
                             </span>
                             <span
                               className={cn(
                                 "dossier-badge",
                                 activityState === "OVERDUE"
-                                  ? "bg-red-100 text-red-700 border-red-300"
+                                  ? "bg-destructive-subtle text-destructive-subtle-foreground border-destructive/30"
                                   : "dossier-badge-stage",
                               )}
                             >
                               {activityState === "OVERDUE" ? "OVERDUE" : "SCHEDULED"} •{" "}
                               {new Date(lead.nextActivity.activityAt).toLocaleDateString(
-                                isAr ? "ar-EG" : "en-US",
+                                INTL_LOCALE[lang],
                                 { month: "short", day: "numeric" },
                               )}
                             </span>
@@ -2926,16 +2982,12 @@ export function LeadQuickEditModal({
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-xl border border-dashed border-amber-300 p-4 text-center dark:border-amber-800">
-                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                            {isAr
-                              ? "لا توجد أنشطة مجدولة حالياً"
-                              : "No scheduled activities"}
+                        <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                          <p className="text-xs font-semibold text-foreground">
+                            {t.crmLeads.executive.noScheduledActivities}
                           </p>
-                          <p className="mt-1 text-[11px] text-slate-500">
-                            {isAr
-                              ? "اضغط على (+ حجز نشاط) لجدولة مكالمة أو اجتماع"
-                              : "Click (+ Book Activity) to schedule a call, meeting, or follow-up."}
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t.crmLeads.executive.bookActivityHint}
                           </p>
                         </div>
                       )}
@@ -2961,13 +3013,12 @@ export function LeadQuickEditModal({
                       sourceId={fallbackDetail.id}
                       sourceOwnerUserId={fallbackDetail.ownerUserId}
                       createCapability={capabilities.notesCreate}
-                      deleteCapability={capabilities.notesDelete}
-                      readOnly={!editable}
+                      readOnly={!canMutate || isConverted}
                     />
                   )}
 
                   {activeDossierTab === "history" && (
-                    <EntityHistoryCard
+                    <RecordHistoryTab
                       density="compact"
                       entityType="Lead"
                       entityId={fallbackDetail.id}
@@ -2987,7 +3038,7 @@ export function LeadQuickEditModal({
                       sourceOwnerUserId={fallbackDetail.ownerUserId}
                       createCapability={capabilities.attachmentsCreate}
                       deleteCapability={capabilities.attachmentsDelete}
-                      readOnly={!editable}
+                      readOnly={!canMutate || isConverted}
                       uploadVariant="button"
                       density="compact"
                     />
@@ -2999,58 +3050,63 @@ export function LeadQuickEditModal({
 
           {/* ================= 5. BOTTOM MODAL FOOTER ================= */}
           <div className="dossier-footer">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
               <span>
                 Navigate Leads in Stage ({currentIndex >= 0 ? currentIndex + 1 : 1} of{" "}
                 {Math.max(leads.length, 1)}):
               </span>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 disabled={!prevLead}
                 onClick={() => prevLead && onNavigateLead(prevLead)}
                 className="dossier-btn dossier-btn-outline disabled:opacity-40"
               >
                 ← Prev Lead [J]
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 disabled={!nextLead}
                 onClick={() => nextLead && onNavigateLead(nextLead)}
                 className="dossier-btn dossier-btn-outline disabled:opacity-40"
               >
                 Next Lead [K] →
-              </button>
+              </Button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
               {canDelete && onDeleteLead && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => {
                     onClose();
                     onDeleteLead(lead);
                   }}
                   className="dossier-btn dossier-btn-danger"
                 >
-                  🗑️ {isAr ? "حذف العميل" : "Delete Lead"}
-                </button>
+                  🗑️ {t.crmLeads.executive.deleteLead}
+                </Button>
               )}
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={onClose}
                 className="dossier-btn dossier-btn-outline"
               >
-                {isAr ? "إغلاق [Esc]" : "Close [Esc]"}
-              </button>
+                {t.crmLeads.executive.closeShortcut}
+              </Button>
               {!isConverted && (
-                <button
+                <Button
                   type="button"
-                  disabled={isSavingSection}
+                  variant="ghost"
+                  disabled={isSavingSection || isPending}
                   onClick={() => void handleSaveAndClose()}
                   className="dossier-btn dossier-btn-primary"
                 >
-                  ✓ {isAr ? "حفظ وإغلاق [Ctrl+S]" : "Save & Close [Ctrl+S]"}
-                </button>
+                  ✓ {t.crmLeads.executive.saveCloseShortcut}
+                </Button>
               )}
             </div>
           </div>

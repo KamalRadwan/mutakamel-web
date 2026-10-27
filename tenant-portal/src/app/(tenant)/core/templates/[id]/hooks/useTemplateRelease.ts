@@ -16,16 +16,18 @@ import type {
   TemplateValidationRun,
   TemplateVersion,
 } from "../../template-lifecycle-contract";
-import type { TemplateDetail } from "../../templates-contract";
+import type { TemplateCursorPage, TemplateDetail } from "../../templates-contract";
 import type { TemplateGrants } from "./useTemplateDetail";
+import { isExpiredCursor, useTemplateCursor } from "../../hooks/useTemplateCursor";
 
 /**
  * Validation, publish and versions.
  *
  * Publishing pins **three** things separately — the definition revision in
- * `If-Match`, the draft revision in the body, and a passed validation run for
- * that exact draft revision. All three are surfaced before the button enables,
- * because a publish button that fails on click is what this design prevents.
+ * the body, the draft revision in both `If-Match` and the body, and a passed
+ * validation run for that exact draft revision. All three are surfaced before
+ * the button enables, because a publish button that fails on click is what
+ * this design prevents.
  */
 export function useTemplateRelease(
   template: TemplateDetail | null,
@@ -35,11 +37,16 @@ export function useTemplateRelease(
   const { t } = useI18n();
   const toast = useToast();
   const copy = t.coreOperations.templates;
+  const pagination = useTemplateCursor();
+  const { cursor, restart } = pagination;
 
   const [run, setRun] = useState<TemplateValidationRun | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
-  const [versions, setVersions] = useState<TemplateVersion[]>([]);
+  const [history, setHistory] = useState<{
+    templateId: string | null;
+    page: TemplateCursorPage<TemplateVersion> | null;
+  }>({ templateId: template?.id ?? null, page: null });
   const [versionsError, setVersionsError] = useState<NormalizedApiError | null>(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(true);
   const [pendingVersionId, setPendingVersionId] = useState<string | null>(null);
@@ -52,6 +59,16 @@ export function useTemplateRelease(
   const templateId = template?.id ?? null;
   const draftRevision = template?.currentDraft.revision ?? null;
 
+  if (history.templateId !== templateId) {
+    restart(false);
+    setHistory({ templateId, page: null });
+    setIsLoadingVersions(true);
+    setVersionsError(null);
+    setSelected(null);
+    setRestoring(null);
+    setRetiring(null);
+  }
+
   useEffect(() => {
     if (!templateId || !grants.canRead) return;
     const controller = new AbortController();
@@ -61,18 +78,31 @@ export function useTemplateRelease(
         setIsLoadingVersions(true);
         setVersionsError(null);
         try {
-          const page = await fetchTemplateVersions(templateId, { signal: controller.signal });
-          setVersions(page.items);
+          const page = await fetchTemplateVersions(templateId, { cursor, signal: controller.signal });
+          if (!controller.signal.aborted) setHistory((current) => ({ ...current, page }));
         } catch (error) {
-          if (error instanceof DOMException && error.name === "AbortError") return;
-          setVersionsError(normalizeApiError(error));
+          if (controller.signal.aborted) return;
+          const normalized = normalizeApiError(error);
+          if (cursor && isExpiredCursor(normalized)) restart(true);
+          else setVersionsError(normalized);
         } finally {
           if (!controller.signal.aborted) setIsLoadingVersions(false);
         }
       })();
     });
     return () => controller.abort();
-  }, [templateId, grants.canRead, reloadToken]);
+  }, [templateId, grants.canRead, cursor, restart, reloadToken]);
+
+  const changeVersionPage = (direction: "previous" | "next") => {
+    if (!grants.canRead || isLoadingVersions || pendingVersionId !== null) return;
+    const nextCursor = history.page?.hasNextPage ? history.page.nextCursor : null;
+    if (direction === "next" ? !nextCursor : !pagination.canGoBack) return;
+    if (direction === "next") pagination.advance(nextCursor);
+    else pagination.goBack();
+    setHistory({ ...history, page: null });
+    setIsLoadingVersions(true);
+    setVersionsError(null);
+  };
 
   const report = useCallback(
     (error: unknown, title: string): void => {
@@ -151,7 +181,7 @@ export function useTemplateRelease(
             ...(changeNote.trim() ? { changeNote: changeNote.trim() } : {}),
             setAsDefinitionPublished: true,
           },
-          template.etag,
+          template.currentDraft.etag,
         );
         toast.success(copy.savedTitle, copy.published);
         setRun(null);
@@ -212,7 +242,12 @@ export function useTemplateRelease(
     canPublish,
     isValidating,
     isPublishing,
-    versions,
+    versions: history.page?.items ?? [],
+    hasPreviousVersionPage: pagination.canGoBack,
+    hasNextVersionPage: Boolean(history.page?.hasNextPage && history.page.nextCursor),
+    versionCursorWasReset: pagination.wasReset,
+    previousVersionPage: () => changeVersionPage("previous"),
+    nextVersionPage: () => changeVersionPage("next"),
     versionsError,
     isLoadingVersions,
     pendingVersionId,

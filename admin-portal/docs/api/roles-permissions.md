@@ -4,6 +4,9 @@ Status: **[Verified]**
 
 Last source verification: **2026-08-12**
 
+Role permission delegation source review: **2026-10-18** (runtime and automated
+verification pending lead verification).
+
 Owner: **Core**
 
 ## Routes
@@ -12,6 +15,8 @@ Owner: **Core**
 | --- | --- | ---: |
 | `POST /api/admin/core/v1/roles` | `admin.roles.create` + `admin.roles.critical` | `201` |
 | `GET /api/admin/core/v1/roles` | `admin.roles.read` | `200` |
+| `GET /api/admin/core/v1/roles/assignable-for-invite` | `admin.users.invite` + `admin.users.critical` | `200` |
+| `GET /api/admin/core/v1/roles/assignable-for-assignment` | `admin.users.assign_roles` + `admin.users.critical` | `200` |
 | `GET /api/admin/core/v1/roles/:id` | `admin.roles.read` | `200` |
 | `PATCH /api/admin/core/v1/roles/:id` | `admin.roles.update` | `200` |
 | `PATCH /api/admin/core/v1/roles/:id/permissions` | `admin.roles.update` + `admin.roles.critical` | `200` |
@@ -50,6 +55,29 @@ Strict Core validation rejects unknown fields.
 
 ## List and catalogue
 
+Assignable-role source verification: **2026-10-18**, Core and Gateway source;
+automated and authenticated runtime verification pending lead verification.
+The invitation and user-detail selectors use the corresponding narrow route
+above, without `admin.roles.read`. These are authenticated, idempotent GETs with
+ALL semantics for each permission pair. They accept the existing role-list
+pagination DTO (`page >= 1`, `limit` within Core's configured maximum, whitelisted
+`name`/`createdAt` sort, `ASC`/`DESC`, optional `isSystem`); the portal requests
+100 rows per page, ordered by name, and publishes only a complete catalogue
+within its existing 50-page bound. Core adds an ID tie-breaker.
+
+Responses contain only `{ id, name, nameI18n: { en, ar } }` under `data`, with
+standard pagination under `meta`. Core filters before counting/paging: every
+live permission membership of a candidate role must be held by the actor's
+current role. Empty-permission roles are eligible; deleted roles and revoked
+memberships do not grant access. Persisted super admins bypass containment.
+These routes confer no access to role details, permission memberships or
+management metadata. Authentication, account state and permission failures
+remain errors; `403` is never an empty list. Writes revalidate independently.
+
+The directory role filter retains the full catalogue only for actors with
+`admin.roles.read`. Missing operation prerequisites, forbidden reads, failures
+and empty assignable lists have distinct feedback in Arabic and English.
+
 Role list uses Core pagination; rows are under `data` and totals under
 `meta.total`. The permission catalogue is read-only and seeded by Core. Render
 permission keys as the transport identity; localized labels are presentation
@@ -58,6 +86,17 @@ only.
 ## Mutations
 
 - Permission replacement submits the complete desired set.
+- The role editor maps `/auth/me` permission keys to catalogue IDs to derive
+  delegable permissions. Super administrators bypass containment, matching Core.
+  Other actors cannot toggle permissions outside their grants. Group actions
+  affect only visible, delegable permissions, and their select/deselect state
+  follows that same subset. Disabled permissions show a bilingual explanation.
+- Core validates every ID in the replacement, including existing assignments.
+  If an existing assignment exceeds the actor's ceiling (or its ID cannot be
+  resolved), the permission editor stays read-only with an explanation that a
+  higher-authority administrator is needed. Existing assignments are preserved;
+  metadata remains independently editable. Saving also rechecks the draft
+  against current grants and never silently strips protected permissions.
 - Empty permission IDs clear assignable permissions when backend invariants
   allow it.
 - System roles and assigned roles can reject update/delete.

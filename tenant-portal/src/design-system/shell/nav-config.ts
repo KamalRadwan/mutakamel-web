@@ -194,10 +194,10 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       {
         id: "crmDashboardReports",
-        labelKey: "crmDashboard",
-        href: TENANT_ROUTES.crmDashboard,
+        labelKey: "presetDashboards",
+        href: TENANT_ROUTES.crmDashboardReports,
         icon: LayoutDashboard,
-        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboard),
+        hasAccess: (permissions) => canAccessCrmRoute(permissions, TENANT_ROUTES.crmDashboardReports),
       },
       {
         id: "leads",

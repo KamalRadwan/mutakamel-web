@@ -133,3 +133,17 @@ immediately rather than surfacing after a multi-minute build — see
 A green run proves *type-validated, lint-validated, unit-tested*. It does not
 prove the app works against a real authenticated session — report that
 honestly rather than implying it.
+
+## Claude Code MCP servers
+
+Claude Code sessions have user-scope MCP servers; Codex and Antigravity do not.
+
+- `playwright`: open the running portal on `5002`, then screenshot every
+  changed screen in Arabic RTL and English LTR, light and dark.
+- `chrome-devtools`: console errors, network calls and performance.
+- `context7`: current Next.js 16, Tailwind v4 and Radix docs before using an
+  API you are unsure of.
+- `eslint`: lint one file against this app's config.
+
+Look only at an app that is already running; never start one to get a
+screenshot. Runbook: `../../backend/docs/operations/claude-mcp-servers.md`.

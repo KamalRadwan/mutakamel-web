@@ -110,8 +110,8 @@ export async function validateTemplateDraft(
 
 /**
  * **201.** Three preconditions, pinned separately: the definition revision in
- * `If-Match`, the draft revision in the body, and a passed validation run for
- * that exact draft revision.
+ * the body, the draft revision in both `If-Match` and the body, and a passed
+ * validation run for that exact draft revision.
  */
 export async function publishTemplate(
   templateId: string,

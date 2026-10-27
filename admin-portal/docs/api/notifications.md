@@ -2,7 +2,7 @@
 
 Status: **[Verified]**
 
-Last source verification: **2026-08-12**
+Last source verification: **2026-10-18** (CORE-NOTIF-DEAD-001 canonical actions)
 
 Owner: **Core**
 
@@ -34,37 +34,41 @@ All routes below require `admin.notifications.manage`:
 | Method and canonical browser path | Purpose |
 | --- | --- |
 | `PUT /api/admin/core/v1/notifications/preferences` | Replace/update preferences |
-| `POST /api/admin/core/v1/notifications/device-tokens` | Register push token |
-| `DELETE /api/admin/core/v1/notifications/device-tokens/:id` | Revoke push token |
-| `POST /api/admin/core/v1/notifications/mark-all-read` | Mark all read |
-| `POST /api/admin/core/v1/notifications/read-all` | Mark all read alias |
+| `POST /api/admin/core/v1/notifications/read-all` | Mark all read |
 | `POST /api/admin/core/v1/notifications/:id/read` | Mark one read |
-| `POST /api/admin/core/v1/notifications/:id/ack` | Acknowledge alias |
 | `POST /api/admin/core/v1/notifications/:id/acknowledge` | Acknowledge |
-| `POST /api/admin/core/v1/notifications/:id/dismiss` | Dismiss |
-| `DELETE /api/admin/core/v1/notifications/:id` | Dismiss alias |
+| `DELETE /api/admin/core/v1/notifications/:id` | Dismiss |
 
-Use authoritative response statuses from the controller; several one-item
+Each action has one route; the compatibility controls and aliases are removed
+under D-068. Use authoritative response statuses from the controller; several one-item
 actions return `204` with no body.
 
 ## Runtime policy
 
-Read `/notifications/config` before enabling push or realtime. Admin Realtime
+`GET /notifications/config` returns only `enabled`, `inAppEnabled`,
+`realtimeEnabled`, `previewLimit` (1..20), and `pollIntervalMs` (5000..3600000).
+The header bell accepts this projection and polls unread counts at that interval
+when notifications and in-app delivery are enabled. Admin Realtime
 remains gated, so the current implementation target is REST polling with
 visible refresh/retry state. Do not activate an Admin Socket.IO client from
 this documentation work.
 
-Device/push tokens are sensitive browser-bound values. Do not log or expose
-them in UI fixtures.
+`PUT /notifications/preferences` sends exactly `{ notificationType,
+inAppEnabled }`; the response and preference-list entries add `updatedAt`.
+The notification type is trimmed, required and limited to 128 characters.
+The page edits only in-app preferences. Push/email preferences, quiet hours,
+Firebase configuration and device-token management are retired from this client.
 
 ## Current frontend status
 
-All 14 routes are source-integrated. The navbar reads authoritative unread
+The supported routes are source-integrated. The navbar reads authoritative unread
 count and recent notifications; `/notifications` owns the cursor-paginated
-inbox, single and bulk read/acknowledge/dismiss/delete actions, configuration,
-preferences, and device-token management. The UI applies exact read/manage
+inbox, single and bulk read, acknowledge and recipient-dismiss actions, configuration,
+and in-app preferences. The UI applies exact read/manage
 permissions, 204 handling, bounded refresh/error states, bilingual copy, and
 focused tests. REST is authoritative; Admin Realtime remains separately gated.
+Typecheck, lint, tests and authenticated runtime verification remain pending
+lead verification for this contract update.
 
 ## Source map
 

@@ -2,6 +2,7 @@
 
 import {
   AmbiguousOutcomePanel,
+  Button,
   DatePicker,
   EditDrawer,
   Field,
@@ -9,6 +10,7 @@ import {
   Textarea,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
+import { CrmCustomFieldsFormSection } from "../../../shared/components/CrmCustomFieldsFormSection";
 import {
   useAmbiguousOutcomeLabels,
   useAppliedUnreadableLabels,
@@ -36,7 +38,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
   const ambiguousLabels = useAmbiguousOutcomeLabels();
   const appliedLabels = useAppliedUnreadableLabels();
   const form = edit.form;
-  const amountInvalid = form ? !isValidOpportunityAmount(form.amount) : false;
+  const amountInvalid = form ? !isValidOpportunityAmount(form.amount, form.currencyCode) : false;
 
   return (
     <EditDrawer
@@ -105,7 +107,7 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
           <Field
             label={t.crmOpportunityDetail.amount}
             hint={t.crmLeadConvert.amountHint}
-            error={amountInvalid ? t.crmLeadConvert.amountInvalid : undefined}
+            error={amountInvalid ? t.crmShared.refusals.CRM_AMOUNT_SCALE_INVALID : undefined}
           >
             <Input size="sm" placeholder={t.crmOpportunityDetail.amount}
               value={form.amount}
@@ -164,6 +166,28 @@ export function OpportunityEditDrawer({ edit }: OpportunityEditDrawerProps) {
               clearLabel={t.crmLeadConvert.clearDate}
             />
           </Field>
+          {edit.customFieldsLoading && (
+            <p role="status" className="text-sm text-muted-foreground">{t.common.loading}</p>
+          )}
+          {edit.customFieldsError && (
+            <div role="alert" className="flex flex-col gap-2">
+              <p className="text-sm text-destructive">{describeError(edit.customFieldsError)}</p>
+              <Button variant="outline" size="sm" onClick={edit.retryCustomFields}>
+                {t.common.retry}
+              </Button>
+            </div>
+          )}
+          {!edit.customFieldsLoading && !edit.customFieldsError && edit.definitions.length > 0 && (
+            <CrmCustomFieldsFormSection
+              definitions={edit.definitions}
+              requiredFieldKeys={edit.requiredFieldKeys}
+              values={form.customFields}
+              errors={{}}
+              disabled={edit.isSubmitting || Boolean(edit.ambiguity) || Boolean(edit.appliedUnreadable)}
+              onChange={edit.setCustomField}
+              onBlur={() => undefined}
+            />
+          )}
           <Field label={t.crmLeadDetail.description}>
             <Textarea placeholder={t.crmLeadDetail.description}
               value={form.description}

@@ -261,6 +261,7 @@ export function readTenantAvailableUpdate(value: unknown): TenantAvailableUpdate
 
   return {
     componentId: uuidV7(update.componentId, code),
+    lastOperationId: nullableUuidV7(update.lastOperationId, code),
     componentKey: componentKey(update.componentKey, code),
     ownerApp: requiredString(update.ownerApp, code, 64),
     installationState: oneOf(
@@ -385,6 +386,7 @@ export function readTenantPrerequisiteEvidenceRecord(
   const record = object(value, code);
   return {
     ...readTenantPrerequisiteRequest(record),
+    recovery: readPrerequisiteRecovery(record.recovery, code),
     maintenanceFence:
       record.maintenanceFence === null
         ? null
@@ -392,6 +394,29 @@ export function readTenantPrerequisiteEvidenceRecord(
     evidence: array(record.evidence, code).map((entry) =>
       readPrerequisiteEvidence(entry, code),
     ),
+  };
+}
+
+function readPrerequisiteRecovery(value: unknown, code: string): TenantPrerequisiteEvidenceRecord["recovery"] {
+  const recovery = object(value, code);
+  return {
+    attempts: nonNegativeInteger(recovery.attempts, code),
+    alerted: boolean(recovery.alerted, code),
+    releaseEvidenceExists: boolean(recovery.releaseEvidenceExists, code),
+    stuck: boolean(recovery.stuck, code),
+    nextRetryAt: nullableIsoDate(recovery.nextRetryAt, code),
+    canResendRelease: boolean(recovery.canResendRelease, code),
+    canCloseFailed: boolean(recovery.canCloseFailed, code),
+  };
+}
+
+export function readProvisioningRecoveryResult(value: unknown) {
+  const code = "INVALID_PROVISIONING_RECOVERY_RESPONSE";
+  const result = object(value, code);
+  return {
+    operationId: uuidV7(result.operationId, code),
+    requestId: uuidV7(result.requestId, code),
+    action: oneOf(result.action, ["RESEND_RELEASE", "CLOSE_FAILED"] as const, code),
   };
 }
 

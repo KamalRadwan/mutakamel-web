@@ -4,7 +4,6 @@ import Link from "next/link";
 import { use } from "react";
 import {
   ArrowLeftRight,
-  Filter,
   Globe,
   Pencil,
   RotateCcw,
@@ -19,7 +18,6 @@ import {
   ConflictDialog,
   DetailHeader,
   DetailSection,
-  EmptyState,
   ErrorState,
   IdentifierText,
   NotFoundState,
@@ -43,7 +41,7 @@ export default function TradeUomDetailPage({
 }) {
   const { id } = use(params);
   const detail = useUomDetail(id);
-  const { t, lang, uom, isLoading, error, isGone, scopeGap, reload } = detail;
+  const { t, lang, uom, isLoading, error, isGone, reload } = detail;
 
   const metadata = uom
     ? getUomCatalogueMetadata(uom.code, uom.displayName, uom.localizedNames)
@@ -186,13 +184,7 @@ export default function TradeUomDetailPage({
           </div>
         ) : null}
 
-        {scopeGap ? (
-          <EmptyState
-            icon={Filter}
-            title={t.trade.scopeRequiredTitle}
-            description={t.trade.uomScopeRequiredDescription}
-          />
-        ) : isLoading ? (
+        {isLoading ? (
           <Skeleton className="h-64" />
         ) : isGone ? (
           // No retry: the request succeeded and the answer was "gone".

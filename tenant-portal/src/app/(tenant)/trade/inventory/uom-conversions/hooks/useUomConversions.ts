@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/design-system";
 import { useTenantAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
-import { useTenantBranchSelection } from "@/hooks/useTenantBranchSelection";
+import { useTradeBranchSelection } from "../../../trade-advanced-scope";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isTradeReplay, tradeGet, tradeIfMatch, tradePost } from "../../../trade-api";
-import { parseTradeArray } from "../../../trade-advanced-validation";
+import { parseTradeOffsetPage } from "../../../trade-advanced-validation";
+import { useInventoryPagination } from "../../hooks/useInventoryPagination";
 import { hasTradePermission, useTradeScope } from "../../../trade-advanced-scope";
 import {
   INVENTORY_GOVERNANCE_PERMISSION,
@@ -36,7 +37,7 @@ export function useUomConversions() {
   const { t, lang } = useI18n();
   const toast = useToast();
   const { user } = useTenantAuth();
-  const { branchIds, branchId, selectBranch } = useTenantBranchSelection(user);
+  const { branchIds, branchId, selectBranch } = useTradeBranchSelection(user);
   const scope = useTradeScope("COMPANY", branchId);
 
   const [items, setItems] = useState<InventoryUomConversion[]>([]);
@@ -49,6 +50,9 @@ export function useUomConversions() {
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction>(null);
   const [transition, setTransition] = useState<PendingAction>(null);
+  const { page, pagination, setPage, setTotal } = useInventoryPagination(
+    JSON.stringify([scope.headers, statusFilter]),
+  );
 
   const canRead = hasTradePermission(
     scope.permissions,
@@ -70,21 +74,24 @@ export function useUomConversions() {
       setIsLoading(true);
       setQueryError(null);
       try {
-        const response = await tradeGet(uomConversionsListPath(statusFilter), {
+        const response = await tradeGet(uomConversionsListPath(statusFilter, undefined, page), {
           signal,
           headers: scope.headers,
           maxResponseBytes: LIST_RESPONSE_LIMIT_BYTES,
         });
-        setItems(parseTradeArray(response.data, parseInventoryUomConversion, invalidResponse));
+        if (signal?.aborted) return;
+        const result = parseTradeOffsetPage(response.data, parseInventoryUomConversion, invalidResponse);
+        setItems(result.items);
+        setTotal(result.total);
         setHasLoaded(true);
       } catch (error) {
-        if (isAbortError(error)) return;
+        if (signal?.aborted || isAbortError(error)) return;
         setQueryError(normalizeApiError(error));
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [scope.isResolved, scope.headers, statusFilter],
+    [scope.isResolved, scope.headers, statusFilter, page, setTotal],
   );
 
   useEffect(() => {
@@ -171,6 +178,8 @@ export function useUomConversions() {
     branchId,
     selectBranch,
     items,
+    pagination,
+    setPage,
     statusFilter,
     isLoading: isLoading && !hasLoaded,
     isRefreshing: isLoading,

@@ -328,23 +328,25 @@ Every swatch surface is **always** paired with its semantic icon and translated 
 
 ## Faces
 
+Font and weight policy updated **2026-10-26** under
+[CRM Leads v3](specs/crm-leads-v3.md#part-1-lead-decisions-binding).
+
 | Role | Family | Subsets | Weights | Why |
 | --- | --- | --- | --- | --- |
-| Latin UI text | **IBM Plex Sans** | `latin`, `latin-ext` | 400 · 500 · 600 | Drawn against Plex Sans Arabic by the same team |
-| Arabic UI text | **IBM Plex Sans Arabic** | `arabic` | 400 · 500 · 600 | Same superfamily, same vertical metrics — no baseline jump on a mixed-script line |
-| IDs, codes, numerals | **IBM Plex Mono** | `latin` | 400 · 500 · 600 | Unambiguous `0`/`O`, `1`/`l`; sits quietly beside Plex Sans |
+| Latin UI text | **Plus Jakarta Sans** | `latin`, `latin-ext` | 400 · 500 · 600 · 700 · 800 | Latin face for the v3 UI |
+| Arabic UI text | **Cairo** | `arabic`, `latin` | 400 · 500 · 600 · 700 · 800 | Arabic face; Latin subset keeps Western digits and punctuation in Cairo when `font-arabic` is explicit |
+| IDs, codes, numerals | **IBM Plex Mono** | `latin` | 400 · 500 · 600 | Unambiguous `0`/`O`, `1`/`l`; retained for machine identifiers |
 
 ```css
---font-sans: var(--font-plex-latin), var(--font-plex-arabic), ui-sans-serif,
+--font-sans: var(--font-ui-latin), var(--font-ui-arabic), ui-sans-serif,
   system-ui, sans-serif;
 ```
 
 **Latin first, Arabic second, and the order is load-bearing.** The browser
 resolves `font-family` per *character*, so a Latin enum value inside an Arabic
-sentence renders in Plex Sans while the sentence around it renders in Plex Sans
-Arabic — on the same line, with no `:lang()` switching and no per-script stack.
-Two families, one superfamily; the property the old single-family choice bought
-is bought here by the pairing being drawn together.
+sentence renders in Plus Jakarta Sans while the sentence around it renders in
+Cairo — on the same line, with no `:lang()` switching and no per-script stack
+in components.
 
 Loaded through `next/font`, self-hosted — **no `<link>` to Google**, which keeps
 `font-src 'self'` in the CSP. All three are `display: swap` and
@@ -399,16 +401,22 @@ is the one page genuinely opened from a phone.
 Applies to anything that receives typed input, including the `FilterBar` search
 field. It does **not** apply to buttons, labels, or read-only text.
 
-## Weights — three, physically enforced
+## Weights — five UI weights, 900 banned
 
+| Weight | Use |
+| --- | --- |
+| 800 | Strong emphasis where specified by the v3 component contract |
+| 700 | V3 primary CTA, column titles, count chips and category badges |
 | 600 | Headings, `<th>`, KPI numerals, button labels, active nav, **card titles** |
 | 500 | Form labels, tabs, badges |
 | 400 | **All table body cells**, prose, values, metadata |
 
-Only those three are downloaded. `font-synthesis-weight: none` blocks fake
-bolds. Tailwind's `--font-weight-bold/extrabold/black` are remapped to 600, so
-a stray class cannot escalate. **Hierarchy comes from size and color, never
-weight.**
+Plus Jakarta Sans and Cairo load 400/500/600/700/800; IBM Plex Mono keeps
+400/500/600. `font-synthesis-weight: none` blocks synthetic bolding.
+Tailwind's `--font-weight-bold` is 700 and `--font-weight-extrabold` is 800.
+**900 is banned**; `--font-weight-black` remaps to 800 as a guard. Table body
+cells remain 400. This policy supersedes the three-weight ceiling as of
+**2026-10-26**; see [CRM Leads v3](specs/crm-leads-v3.md#part-1-lead-decisions-binding).
 
 ## Numerals
 
@@ -1072,7 +1080,7 @@ could never fail.
 `focus-visible:ring-inset` — visible, no collision.
 
 **Numbers get the mono face, names do not.** IDs, amounts, counts and
-timestamps in IBM Plex Mono at `text-xs`; names in Plex Sans. The eye stops
+timestamps in IBM Plex Mono at `text-xs`; names in Plus Jakarta Sans or Cairo. The eye stops
 hunting for column boundaries.
 
 **One empty-state line, no illustration.** "No leads match these filters" plus

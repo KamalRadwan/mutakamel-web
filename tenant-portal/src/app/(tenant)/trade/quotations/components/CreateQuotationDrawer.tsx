@@ -3,6 +3,7 @@
 import { Button, Combobox, DegradedBanner, Field, FormDrawer, Input } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { tradeDocumentMessage } from "../../documents/trade-document-errors";
+import { TradeWriteFields, TradeWriteOutcome } from "../../documents/components/TradeBoundaryStates";
 import type { QuotationCreateState } from "../hooks/useQuotationCreate";
 
 /**
@@ -36,6 +37,8 @@ export function CreateQuotationDrawer({ state }: { state: QuotationCreateState }
         discardCancel: t.common.cancel,
       }}
     >
+      <TradeWriteOutcome write={state.write} />
+      <TradeWriteFields write={state.write}>
       {customers.error ? (
         <DegradedBanner
           message={
@@ -54,6 +57,7 @@ export function CreateQuotationDrawer({ state }: { state: QuotationCreateState }
           onValueChange={state.select}
           onSearch={customers.setSearch}
           loading={customers.isLoading}
+          disabled={state.write.isBlocked}
           options={customers.options.map((option) => ({
             value: option.partyId,
             label: option.displayName,
@@ -94,6 +98,7 @@ export function CreateQuotationDrawer({ state }: { state: QuotationCreateState }
           onChange={(event) => state.setDraftReference(event.target.value)}
         />
       </Field>
+      </TradeWriteFields>
     </FormDrawer>
   );
 }

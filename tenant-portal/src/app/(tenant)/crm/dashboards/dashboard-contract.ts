@@ -11,6 +11,7 @@
 // not reach this family, and `branchId` here is an optional *filter*.
 
 import { isUUIDv7 } from "@/lib/uuid";
+import { parseDefinitionPage, type DefinitionPage } from './definition-pagination';
 import {
   boundedArray,
   finiteNumber,
@@ -39,7 +40,6 @@ export const DASHBOARD_SHARE_TARGETS_PATH =
 
 export const DASHBOARD_NAME_MAX_LENGTH = 120;
 export const DASHBOARD_DESCRIPTION_MAX_LENGTH = 500;
-const MAX_DASHBOARDS_IN_RESPONSE = 500;
 
 /** `CRM_DASHBOARD_TEMPLATE_KEYS` — dashboard-catalog.ts. */
 export const DASHBOARD_TEMPLATE_KEYS = [
@@ -137,6 +137,7 @@ export interface DashboardNavigationItem {
 
 export interface DashboardNavigation {
   items: DashboardNavigationItem[];
+  nextCursor: string | null;
   activeDashboardId: string | null;
 }
 
@@ -260,18 +261,17 @@ export function buildLayoutRequest(
   };
 }
 
-export function parseDashboardsResponse(payload: unknown): DashboardSummary[] {
-  if (!boundedArray(payload, MAX_DASHBOARDS_IN_RESPONSE)) invalidResponse("dashboards");
-  return payload.map(parseDashboardSummary);
+export function parseDashboardsResponse(payload: unknown): DefinitionPage<DashboardSummary> {
+  return parseDefinitionPage(payload, parseDashboardSummary);
 }
 
 export function parseNavigationResponse(payload: unknown): DashboardNavigation {
   const source = record(payload);
-  if (!source || !boundedArray(source.items, MAX_DASHBOARDS_IN_RESPONSE)) {
+  if (!source) {
     invalidResponse("dashboard navigation");
   }
   return {
-    items: source.items.map(parseNavigationItem),
+    ...parseDefinitionPage(payload, parseNavigationItem),
     activeDashboardId: isUUIDv7(source.activeDashboardId) ? source.activeDashboardId : null,
   };
 }
@@ -327,15 +327,6 @@ export function parseDashboardDetailResponse(payload: unknown): DashboardDetail 
         }
       : null,
   };
-}
-
-/** `DELETE /:id/placements/:placementId` answers **200** with the new revision. */
-export function parseDashboardRevisionResponse(payload: unknown): number {
-  const source = record(payload);
-  if (!source || !finiteNumber(source.dashboardRevision)) {
-    invalidResponse("dashboard revision");
-  }
-  return source.dashboardRevision;
 }
 
 function parseDashboardSummary(payload: unknown): DashboardSummary {

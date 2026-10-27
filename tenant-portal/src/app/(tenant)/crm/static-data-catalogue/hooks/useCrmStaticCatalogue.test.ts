@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { en } from "@/i18n/dictionaries/en";
+import { ar } from "@/i18n/dictionaries/ar";
 import {
   buildStaticCatalogueGroups,
   CRM_STATIC_DATA_PATH,
@@ -81,11 +83,13 @@ describe("CRM static-data contract", () => {
     expect(parsed.enumOptions.additiveServerGroup[0].label.ar).toBe(
       "قيمة مستقبلية",
     );
-    expect(buildStaticCatalogueGroups(parsed, "ar", NOTE)).toContainEqual(
+    expect(buildStaticCatalogueGroups(parsed, "ar", NOTE, ar.crmStaticCatalogue)).toContainEqual(
       expect.objectContaining({
         id: "additiveServerGroup",
         entriesCount: 1,
-        values: ["قيمة مستقبلية (FUTURE_VALUE)"],
+        label: ar.crmStaticCatalogue.otherGroup,
+        values: ["قيمة مستقبلية"],
+        technicalValues: ["FUTURE_VALUE"],
       }),
     );
   });
@@ -128,21 +132,21 @@ describe("Q121 · a permission label the server did not translate is not shown a
     });
 
   const permissionValues = (lang: "ar" | "en"): string[] =>
-    buildStaticCatalogueGroups(withUntranslated(), lang, NOTE).find(
+    buildStaticCatalogueGroups(withUntranslated(), lang, NOTE, en.crmStaticCatalogue).find(
       (group) => group.id === "permissions",
     )?.values ?? [];
 
   it("marks the untranslated permission and leaves the translated one alone", () => {
     expect(permissionValues("ar")).toEqual([
-      "قراءة إعدادات CRM (crm.settings.read)",
-      `Read leads (own) — ${NOTE} (crm.leads.read.own)`,
+      "قراءة إعدادات CRM",
+      `Read leads (own) — ${NOTE}`,
     ]);
   });
 
   it("marks it in English too, because a missing Arabic label is a fact about the vocabulary", () => {
     expect(permissionValues("en")).toEqual([
-      "Read CRM settings (crm.settings.read)",
-      `Read leads (own) — ${NOTE} (crm.leads.read.own)`,
+      "Read CRM settings",
+      `Read leads (own) — ${NOTE}`,
     ]);
   });
 
@@ -150,9 +154,32 @@ describe("Q121 · a permission label the server did not translate is not shown a
     // `attachment_family.pdf` is "PDF" in both dictionaries and is translated.
     // This is why the guard is scoped to permissions rather than applied to
     // every option in the catalogue.
-    const groups = buildStaticCatalogueGroups(withUntranslated(), "ar", NOTE);
+    const groups = buildStaticCatalogueGroups(withUntranslated(), "ar", NOTE, ar.crmStaticCatalogue);
     expect(groups.find((group) => group.id === "attachmentPolicy")?.values).toContain(
-      "PDF (pdf)",
+      "PDF",
     );
+  });
+});
+
+describe("catalogue presentation", () => {
+  it.each([
+    ["en", en.crmStaticCatalogue],
+    ["ar", ar.crmStaticCatalogue],
+  ] as const)("keeps codes in technical details in %s", (lang, copy) => {
+    const data = parseCrmStaticDataResponse(rawPayload);
+    data.enumOptions.opportunityStageFlags = [{ value: "WON", label: { en: "Won stage", ar: "مرحلة الفوز" } }];
+    data.enumOptions.opportunityStatuses = [
+      { value: "WON", label: { en: "Won", ar: "فوز" } },
+      { value: "IN_PROGRESS", label: { en: "In progress", ar: "قيد التنفيذ" } },
+    ];
+    data.enumOptions.customFieldOwnerTypes = [{ value: "LEAD_AND_PARTY", label: { en: "Lead and party", ar: "العميل المحتمل والطرف" } }];
+    const groups = buildStaticCatalogueGroups(data, lang, NOTE, copy);
+    expect(groups.find((item) => item.key === "profileTypes")?.label).toBe(copy.groups.profileTypes);
+    expect(groups.find((item) => item.key === "opportunityStatusByStageFlag")?.values).toEqual([
+      `${data.enumOptions.opportunityStageFlags[0].label[lang]} → ${data.enumOptions.opportunityStatuses[0].label[lang]}`,
+      `${copy.otherStages} → ${data.enumOptions.opportunityStatuses[1].label[lang]}`,
+    ]);
+    expect(groups.find((item) => item.key === "opportunityStatusByStageFlag")?.technicalValues).toContain("WON → WON");
+    expect(groups.flatMap((item) => [item.label, ...item.values]).join(" ")).not.toMatch(/profileTypes|FUTURE_VALUE|LEAD_AND_PARTY|crm\.settings\.read|WON/);
   });
 });

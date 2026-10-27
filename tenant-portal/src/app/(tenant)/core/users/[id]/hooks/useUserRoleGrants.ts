@@ -41,14 +41,14 @@ function toAssignmentInput(assignment: ScopeRoleAssignment): ScopeRoleAssignment
   };
 }
 
-export function useUserRoleGrants(userId: string, enabled: boolean) {
+export function useUserRoleGrants(userId: string, enabled: boolean, isTenantOwnerActor: boolean) {
   const [branchRoles, setBranchRoles] = useState<BranchRoleAssignment[]>([]);
   const [branchError, setBranchError] = useState<NormalizedApiError | null>(null);
   const [isBranchLoading, setIsBranchLoading] = useState(enabled);
 
   const [scopeRoles, setScopeRoles] = useState<ScopeRoleAssignment[]>([]);
   const [scopeError, setScopeError] = useState<NormalizedApiError | null>(null);
-  const [isScopeLoading, setIsScopeLoading] = useState(enabled);
+  const [isScopeLoading, setIsScopeLoading] = useState(enabled && isTenantOwnerActor);
 
   const [writeError, setWriteError] = useState<NormalizedApiError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,7 +72,7 @@ export function useUserRoleGrants(userId: string, enabled: boolean) {
         return;
       }
       setIsBranchLoading(true);
-      setIsScopeLoading(true);
+      setIsScopeLoading(isTenantOwnerActor);
       setBranchError(null);
       setScopeError(null);
 
@@ -89,7 +89,12 @@ export function useUserRoleGrants(userId: string, enabled: boolean) {
           if (!controller.signal.aborted) setIsBranchLoading(false);
         });
 
-      fetchScopeRoleAssignments(userId, controller.signal)
+      if (!isTenantOwnerActor) {
+        setScopeRoles([]);
+        return;
+      }
+
+      fetchScopeRoleAssignments(userId, controller.signal, { suppressForbiddenToast: true })
         .then((result) => {
           if (!controller.signal.aborted) setScopeRoles(result);
         })
@@ -103,7 +108,7 @@ export function useUserRoleGrants(userId: string, enabled: boolean) {
         });
     });
     return () => controller.abort();
-  }, [enabled, reloadToken, userId]);
+  }, [enabled, isTenantOwnerActor, reloadToken, userId]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 

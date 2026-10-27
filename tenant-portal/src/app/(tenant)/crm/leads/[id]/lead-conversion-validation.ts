@@ -48,7 +48,7 @@ export function validateLeadConversion(form: LeadConversionForm, requiredCustomF
     text("description", form.description, 2000);
     integer("importance", form.importance, 3);
     integer("probabilityPercent", form.probabilityPercent, 100);
-    if (!isExactMoneyDecimal(form.amount)) errors.amount = "amount";
+    if (!isExactMoneyDecimal(form.amount, form.currencyCode)) errors.amount = "amount";
     if (form.currencyCode.trim() && [...form.currencyCode.trim().toUpperCase()].length !== 3) errors.currencyCode = "invalid";
     if (form.ownerUserId && !isUUIDv7(form.ownerUserId)) errors.ownerUserId = "invalid";
     if (form.expectedCloseDate && toIsoDate(fromIsoDate(form.expectedCloseDate)) !== form.expectedCloseDate) errors.expectedCloseDate = "invalid";

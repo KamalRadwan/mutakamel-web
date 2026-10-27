@@ -1,5 +1,15 @@
 # Admin Tenants Frontend Contract
 
+Storage-status verification (2026-10-17, CLXAPP-135): the tenant-workspace
+reader accepts `DRAFT`, `ACTIVE`, `DRAINING`, and `OFFLINE` in the nested
+Storage Server summary, matching Core's storage registry lifecycle. Tenant
+detail, directory rows, and suspend/activate responses remain readable while
+storage drains. The read-only placement badge labels draining storage in
+English and Arabic. Unknown statuses are still rejected and private storage
+fields are still stripped. Regression specs cover parsing, the bilingual
+badge, and rendering a directory with both active and draining storage;
+execution and typecheck/lint remain pending lead verification.
+
 Verified against the current API Gateway route contracts, Core controllers,
 DTOs, services, repositories, entities, subscription quoting, provisioning
 contracts, error catalogue, and active Admin Portal screens on

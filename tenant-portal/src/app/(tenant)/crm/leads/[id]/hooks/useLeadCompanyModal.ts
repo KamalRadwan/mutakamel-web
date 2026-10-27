@@ -19,6 +19,7 @@ export function useLeadCompanyModal(lead: LeadDetail, edit: LeadCompanyEdit, rea
   const messages = useCrmFieldMessages();
   const [form, setForm] = useState<LeadCompanyForm | null>(null);
   const [baseline, setBaseline] = useState<LeadCompanyForm | null>(null);
+  const [expectedUpdatedAt, setExpectedUpdatedAt] = useState(lead.updatedAt);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const inFlight = useRef(false);
   const saving = edit.savingKey === "company";
@@ -28,6 +29,7 @@ export function useLeadCompanyModal(lead: LeadDetail, edit: LeadCompanyEdit, rea
     if (readOnly || inFlight.current) return;
     const initial = companyFormFromLead(lead);
     setBaseline(initial);
+    setExpectedUpdatedAt(lead.updatedAt);
     setForm(initial);
     setErrors({});
     edit.clearError();
@@ -50,7 +52,7 @@ export function useLeadCompanyModal(lead: LeadDetail, edit: LeadCompanyEdit, rea
     if (Object.keys(request).length === 0) { close(); return; }
     inFlight.current = true;
     try {
-      if (await edit.save("company", request)) {
+      if (await edit.save("company", { ...request, expectedUpdatedAt })) {
         setForm(null);
         setBaseline(null);
       }

@@ -13,6 +13,13 @@ import {
   stableFingerprint,
 } from "../model/intent-keys";
 import { readTenantBillingPermissions } from "../model/permissions";
+import {
+  clearWalletConfirmation,
+  readWalletConfirmation,
+  saveWalletConfirmation,
+  walletConfirmationStorageKey,
+  type WalletConfirmation,
+} from "../model/wallet-adjustment-recovery";
 import type {
   AdminTenantBillingSummaryView,
   BillingMutationState,
@@ -79,6 +86,13 @@ export function useTenantBillingWorkspace(
    */
   const walletPreviewGeneration = useRef(0);
   const intentKeys = useRef(createBillingIntentKeyStore());
+  const walletConfirmationPending = useRef(false);
+  const [walletRecovery, setWalletRecovery] = useState<{
+    actorId: string;
+    tenantId: string;
+    command: WalletConfirmation | null;
+    unavailable: boolean;
+  } | null>(null);
   const mutationGenerations = useRef(new Map<string, number>());
   const mutationDisplayGeneration = useRef(0);
   const [dataContextKey, setDataContextKey] = useState(contextKey);
@@ -142,6 +156,40 @@ export function useTenantBillingWorkspace(
     error: null,
   });
 
+  const syncWalletRecovery = useCallback(() => {
+    if (!user?.id) throw conflict("WALLET_RECOVERY_UNAVAILABLE");
+    try {
+      const command = readWalletConfirmation(user.id, tenantId);
+      setWalletRecovery({ actorId: user.id, tenantId, command, unavailable: false });
+      return command;
+    } catch {
+      setWalletRecovery((current) => ({
+        actorId: user.id,
+        tenantId,
+        command: current?.actorId === user.id && current.tenantId === tenantId
+          ? current.command : null,
+        unavailable: true,
+      }));
+      throw conflict("WALLET_RECOVERY_UNAVAILABLE");
+    }
+  }, [tenantId, user?.id]);
+
+  useEffect(() => {
+    if (isAuthLoading || !user?.id) return;
+    const load = () => {
+      try { syncWalletRecovery(); } catch { /* The recovery state blocks new commands. */ }
+    };
+    const timer = window.setTimeout(load, 0);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === walletConfirmationStorageKey(user.id, tenantId)) load();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [isAuthLoading, syncWalletRecovery, tenantId, user?.id]);
+
   const reset = useCallback(() => {
     setSubscription(null);
     setSubscriptionItems([]);
@@ -183,6 +231,7 @@ export function useTenantBillingWorkspace(
       if (!enabled) reset();
       return;
     }
+    try { syncWalletRecovery(); } catch { /* Keep reads available during recovery-storage failures. */ }
 
     if (permissions.canReadSubscription) {
       setSubscriptionState("loading");
@@ -349,6 +398,7 @@ export function useTenantBillingWorkspace(
     paymentsPage,
     permissions,
     reset,
+    syncWalletRecovery,
     tenantId,
   ]);
 
@@ -463,8 +513,18 @@ export function useTenantBillingWorkspace(
 
   const previewWalletAdjustment = useCallback(
     async (dto: PreviewWalletAdjustmentDto) => {
+      if (!enabled || isAuthLoading || contextRef.current !== contextKey || dataContextKey !== contextKey) return null;
       if (!permissions.canPreviewWalletAdjustment) {
         setMutation({ name: null, error: forbidden("WALLET_ADJUSTMENT_FORBIDDEN") });
+        return null;
+      }
+      try {
+        if (syncWalletRecovery() || walletConfirmationPending.current) {
+          setMutation({ name: null, error: conflict("WALLET_CONFIRM_UNRESOLVED") });
+          return null;
+        }
+      } catch {
+        setMutation({ name: null, error: conflict("WALLET_RECOVERY_UNAVAILABLE") });
         return null;
       }
       if (wallet?.status !== "ACTIVE") {
@@ -482,43 +542,96 @@ export function useTenantBillingWorkspace(
       if (result) setWalletPreview(result);
       return result;
     },
-    [permissions.canPreviewWalletAdjustment, runMutation, tenantId, wallet?.status],
+    [contextKey, dataContextKey, enabled, isAuthLoading, permissions.canPreviewWalletAdjustment, runMutation, syncWalletRecovery, tenantId, wallet?.status],
   );
 
   const confirmWalletAdjustment = useCallback(
     async (note: string) => {
+      if (!enabled || isAuthLoading || contextRef.current !== contextKey || dataContextKey !== contextKey || walletConfirmationPending.current) return null;
       if (!permissions.canConfirmWalletAdjustment) {
         setMutation({ name: null, error: forbidden("WALLET_CONFIRM_FORBIDDEN") });
         return null;
       }
-      if (wallet?.status !== "ACTIVE" || !walletPreview) {
-        setMutation({ name: null, error: conflict("WALLET_CONFIRM_NOT_ALLOWED") });
-        return null;
-      }
-      if (!isFutureInstant(walletPreview.expiresAt)) {
-        setWalletPreview(null);
-        setMutation({ name: null, error: conflict("WALLET_PREVIEW_EXPIRED") });
-        return null;
-      }
-      const normalizedNote = note.trim();
-      const fingerprint = stableFingerprint({ quoteId: walletPreview.quoteId, note: normalizedNote });
-      const key = intentKeys.current.get(`wallet:confirm:${walletPreview.quoteId}`, fingerprint);
-      const intentScope = `wallet:confirm:${walletPreview.quoteId}`;
-      const result = await runMutation("confirm-wallet-adjustment", intentScope, () =>
-        tenantBillingApi.confirmWalletAdjustment(
+      let command: WalletConfirmation;
+      try {
+        const saved = syncWalletRecovery();
+        if (saved) {
+          command = saved;
+        } else {
+          if (wallet?.status !== "ACTIVE" || !walletPreview || !user?.id) {
+            setMutation({ name: null, error: conflict("WALLET_CONFIRM_NOT_ALLOWED") });
+            return null;
+          }
+          if (!isFutureInstant(walletPreview.expiresAt)) {
+            setWalletPreview(null);
+            setMutation({ name: null, error: conflict("WALLET_PREVIEW_EXPIRED") });
+            return null;
+          }
+          const normalizedNote = note.trim();
+          if (!normalizedNote || normalizedNote.length > 255) {
+            setMutation({ name: null, error: conflict("WALLET_CONFIRM_NOT_ALLOWED") });
+            return null;
+          }
+          const fingerprint = stableFingerprint({ quoteId: walletPreview.quoteId, note: normalizedNote });
+          command = saveWalletConfirmation({
+            actorId: user.id,
+            tenantId,
+            quoteId: walletPreview.quoteId,
+            note: normalizedNote,
+            key: intentKeys.current.get(`wallet:confirm:${walletPreview.quoteId}`, fingerprint),
+          });
+          setWalletRecovery({ actorId: user.id, tenantId, command, unavailable: false });
+        }
+      } catch {
+        setWalletRecovery((current) => ({
+          actorId: user?.id ?? "",
           tenantId,
-          walletPreview.quoteId,
-          normalizedNote,
-          key,
-        ),
-      );
-      if (result) {
-        setWalletPreview(null);
-        await refresh();
+          command: current && current.actorId === user?.id && current.tenantId === tenantId
+            ? current.command : null,
+          unavailable: true,
+        }));
+        setMutation({ name: null, error: conflict("WALLET_RECOVERY_UNAVAILABLE") });
+        return null;
       }
-      return result;
+      walletPreviewGeneration.current += 1;
+      walletConfirmationPending.current = true;
+      const operationGeneration = identityGeneration.current;
+      const intentScope = `wallet:confirm:${command.quoteId}`;
+      try {
+        const result = await runMutation("confirm-wallet-adjustment", intentScope, async () => {
+          try {
+            const entry = await tenantBillingApi.confirmWalletAdjustment(
+              command.tenantId, command.quoteId, command.note, command.key,
+            );
+            clearWalletConfirmation(command);
+            return entry;
+          } catch (error) {
+            const normalized = normalizeApiError(error);
+            // Core checks for an existing ledger/key BEFORE consuming the quote.
+            // Expiry therefore proves this exact command did not commit. Generic
+            // 4xx (including auth, reuse and consumption conflicts) prove nothing.
+            if (normalized.errorCode === "FX_QUOTE_EXPIRED" &&
+                normalized.httpStatus === 409 && !normalized.requestOutcome) {
+              clearWalletConfirmation(command);
+              if (contextRef.current === contextKey && identityGeneration.current === operationGeneration) {
+                syncWalletRecovery();
+                setWalletPreview(null);
+              }
+            }
+            throw error;
+          }
+        });
+        if (result) {
+          try { syncWalletRecovery(); } catch { /* A later refresh retries recovery-storage access. */ }
+          setWalletPreview(null);
+          await refresh();
+        }
+        return result;
+      } finally {
+        walletConfirmationPending.current = false;
+      }
     },
-    [permissions.canConfirmWalletAdjustment, refresh, runMutation, tenantId, wallet?.status, walletPreview],
+    [contextKey, dataContextKey, enabled, isAuthLoading, permissions.canConfirmWalletAdjustment, refresh, runMutation, syncWalletRecovery, tenantId, user?.id, wallet?.status, walletPreview],
   );
 
   const refundPayment = useCallback(
@@ -764,6 +877,7 @@ export function useTenantBillingWorkspace(
   );
 
   const ownsData = dataContextKey === contextKey;
+  const ownsRecovery = !isAuthLoading && walletRecovery?.actorId === user?.id && walletRecovery?.tenantId === tenantId;
   const hiddenState = (allowed: boolean): BillingResourceState =>
     isAuthLoading ? "idle" : allowed ? "loading" : "forbidden";
 
@@ -807,6 +921,8 @@ export function useTenantBillingWorkspace(
       : hiddenState(permissions.canReadBillingSummary),
     billingSummaryError: ownsData ? billingSummaryError : null,
     walletPreview: ownsData ? walletPreview : null,
+    walletConfirmation: ownsRecovery ? walletRecovery?.command ?? null : null,
+    walletRecoveryUnavailable: !ownsRecovery || (walletRecovery?.unavailable ?? true),
     selectedPaymentId: ownsData ? selectedPaymentId : null,
     reconciliationCase: ownsData ? reconciliationCase : null,
     reconciliationState: ownsData ? reconciliationState : "idle",
@@ -823,6 +939,10 @@ export function useTenantBillingWorkspace(
     proposeReconciliation,
     decideReconciliation,
     clearWalletPreview: () => {
+      if (!enabled || isAuthLoading || contextRef.current !== contextKey || dataContextKey !== contextKey) return;
+      try {
+        if (syncWalletRecovery() || walletConfirmationPending.current) return;
+      } catch { return; }
       walletPreviewGeneration.current += 1;
       setWalletPreview(null);
     },

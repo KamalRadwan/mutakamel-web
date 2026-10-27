@@ -41,6 +41,8 @@ import {
   type AdminSessionRefreshScheduler,
 } from "@/lib/auth/sessionRefresh";
 
+import { readMfaStep, type MfaStep } from "@/lib/auth/mfaApi";
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -75,11 +77,11 @@ export function isPendingAuthState(state: AuthState): boolean {
   );
 }
 
-interface LoginOptions {
+type LoginOptions = {
   email: string;
   password: string;
   rememberMe?: boolean;
-}
+} | { challengeId: string; code: string; rememberMe?: boolean };
 
 interface AdminPasswordActionOptions {
   token: string;
@@ -91,8 +93,8 @@ interface AuthContextType {
   authState: AuthState;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (options: LoginOptions) => Promise<void>;
-  acceptInvite: (options: AdminPasswordActionOptions) => Promise<void>;
+  login: (options: LoginOptions) => Promise<MfaStep | void>;
+  acceptInvite: (options: AdminPasswordActionOptions) => Promise<MfaStep | void>;
   resetPassword: (options: AdminPasswordActionOptions) => Promise<void>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -423,11 +425,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [stopSessionMaintenance, user]);
 
-  const login = useCallback(async ({
-    email,
-    password,
-    rememberMe = false,
-  }: LoginOptions) => {
+  const login = useCallback(async (options: LoginOptions) => {
+    const rememberMe = options.rememberMe ?? false;
     let sessionCommitted = false;
     stopSessionMaintenance();
     resetBootstrapRetry();
@@ -437,15 +436,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const profile = await withAuthLock(async () => {
         clearLocalAuthState();
         const loginResponse = await axiosClient.post(
-          "/api/admin/core/v1/auth/login",
-          { email, password },
+          "challengeId" in options
+            ? "/api/admin/core/v1/auth/mfa/verify" : "/api/admin/core/v1/auth/login",
+          "challengeId" in options
+            ? { challengeId: options.challengeId, code: options.code }
+            : { email: options.email, password: options.password },
           {
             headers: { "x-auth-remember": rememberMe ? "1" : "0" },
             skipAuthRefresh: true,
             skipAutoIdempotency: true,
+            nonReplayable: true,
             cache: "no-store",
           },
         );
+        const step = "challengeId" in options ? null : readMfaStep(loginResponse.data);
+        if (step) return step;
         const auth = readWebAuthSessionResponse(loginResponse.data);
         if (!auth) {
           const invalidResponse = new Error("INVALID_AUTH_RESPONSE");
@@ -493,6 +498,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      if ("mfaRequired" in profile) {
+        setUser(null);
+        setAuthState("UNAUTHENTICATED");
+        return profile;
+      }
       setUser(profile);
       setAuthState("AUTHENTICATED");
       // Only this path — a password the operator just typed — counts as a
@@ -546,6 +556,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             cache: "no-store",
           },
         );
+        const step = readMfaStep(inviteResponse.data);
+        if (step) return step;
         const auth = readWebAuthSessionResponse(inviteResponse.data);
         if (!auth) {
           const invalidResponse = new Error("INVALID_AUTH_RESPONSE");
@@ -593,6 +605,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      if ("mfaRequired" in profile) {
+        setUser(null);
+        setAuthState("UNAUTHENTICATED");
+        return profile;
+      }
       setUser(profile);
       setAuthState("AUTHENTICATED");
       // Accepting an invite is a sign-in too, and it is the first one this

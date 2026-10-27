@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTenantAuth } from "@/context/AuthContext";
+import { useI18n } from "@/i18n/I18nContext";
 import { TenantApiClientError, axiosClient } from "@/lib/api/axiosClient";
+import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import { isUUIDv7 } from "@/lib/uuid";
+import { useCrmErrorText } from "../../shared/hooks/useCrmErrorText";
 
 const SETTINGS_PATH = "/api/tenant/crm/v1/settings";
 const SETTINGS_RESPONSE_LIMIT = 256 * 1024;
@@ -38,7 +41,7 @@ function requiredUuidV7(
 ): string {
   const candidate = value[key];
   if (!isUUIDv7(candidate)) {
-    throw new Error("Invalid CRM settings response.");
+    throw new Error("INVALID_CRM_SETTINGS_RESPONSE");
   }
   return candidate;
 }
@@ -67,7 +70,7 @@ export function parseCrmSettingsResponse(payload: unknown): CrmSettings {
     (asterisk.allowInvalidTlsCertificate !== undefined &&
       typeof asterisk.allowInvalidTlsCertificate !== "boolean")
   ) {
-    throw new Error("Invalid CRM settings response.");
+    throw new Error("INVALID_CRM_SETTINGS_RESPONSE");
   }
 
   return {
@@ -100,13 +103,15 @@ function editable(settings: CrmSettings): EditableCrmSettings {
 export function buildCrmSettingsPatch(
   current: CrmSettings,
   draft: EditableCrmSettings,
-): Partial<EditableCrmSettings> {
+): Partial<EditableCrmSettings> & {
+  expectedOutboundEmailRetentionPolicyRevision?: number;
+} {
   if (
     !Number.isInteger(draft.outboundEmailContentRetentionDays) ||
     draft.outboundEmailContentRetentionDays < 30 ||
     draft.outboundEmailContentRetentionDays > 2555
   ) {
-    throw new Error("Retention days must be an integer from 30 to 2555.");
+    throw new RangeError("CRM_SETTINGS_RETENTION_INVALID");
   }
 
   return {
@@ -123,12 +128,10 @@ export function buildCrmSettingsPatch(
       : {
           outboundEmailContentRetentionDays:
             draft.outboundEmailContentRetentionDays,
+          expectedOutboundEmailRetentionPolicyRevision:
+            current.outboundEmailRetentionPolicyRevision,
         }),
   };
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -151,6 +154,8 @@ async function readSettings(signal?: AbortSignal): Promise<CrmSettings> {
 }
 
 export function useCrmSettings() {
+  const { t } = useI18n();
+  const crmErrorText = useCrmErrorText();
   const { user } = useTenantAuth();
   const canManage =
     user?.permissions.some((permission) =>
@@ -161,6 +166,8 @@ export function useCrmSettings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [queryError, setQueryError] = useState<NormalizedApiError | null>(null);
+  const [hasRetentionConflict, setHasRetentionConflict] = useState(false);
 
   const applyServerSettings = useCallback((next: CrmSettings) => {
     setSettings(next);
@@ -168,21 +175,31 @@ export function useCrmSettings() {
   }, []);
 
   const fetchSettings = useCallback(
-    async (signal?: AbortSignal) => {
+    async (signal?: AbortSignal, preserveDraft = false) => {
       setIsLoading(true);
       setError(null);
+      setQueryError(null);
       try {
-        applyServerSettings(await readSettings(signal));
+        const next = await readSettings(signal);
+        if (preserveDraft) setSettings(next);
+        else applyServerSettings(next);
+        setHasRetentionConflict(false);
       } catch (caught) {
         if (isAbortError(caught)) return;
-        setSettings(null);
-        setDraft(null);
-        setError(errorMessage(caught, "Unable to load CRM settings."));
+        if (!preserveDraft) {
+          setSettings(null);
+          setDraft(null);
+        }
+        const { status, code } = normalizeApiError(caught);
+        setQueryError({ status, code });
+        setError(caught instanceof TenantApiClientError
+          ? crmErrorText({ status, code })
+          : t.crmSettings.loadFailed);
       } finally {
         if (!signal?.aborted) setIsLoading(false);
       }
     },
-    [applyServerSettings],
+    [applyServerSettings, crmErrorText, t],
   );
 
   useEffect(() => {
@@ -209,9 +226,9 @@ export function useCrmSettings() {
   };
 
   const saveSettings = async (): Promise<boolean> => {
-    if (!settings || !draft || isSaving) return false;
+    if (!settings || !draft || isSaving || isLoading || hasRetentionConflict) return false;
     if (!canManage) {
-      setError("You do not have permission to update CRM settings.");
+      setError(t.crmSettings.manageForbidden);
       return false;
     }
     setIsSaving(true);
@@ -228,6 +245,11 @@ export function useCrmSettings() {
       applyServerSettings(parseCrmSettingsResponse(response.data));
       return true;
     } catch (caught) {
+      const failure = normalizeApiError(caught);
+      if (failure.status === 409 && failure.code === "CRM_OUTBOUND_EMAIL_RETENTION_POLICY_STALE") {
+        setHasRetentionConflict(true);
+        return false;
+      }
       if (isAmbiguousMutationError(caught)) {
         try {
           applyServerSettings(await readSettings());
@@ -235,7 +257,11 @@ export function useCrmSettings() {
           // Keep the last confirmed server state when reconciliation is unavailable.
         }
       }
-      setError(errorMessage(caught, "Unable to update CRM settings."));
+      setError(caught instanceof RangeError
+        ? t.crmSettings.retentionHelp
+        : caught instanceof TenantApiClientError
+          ? crmErrorText({ status: failure.status, code: failure.code })
+          : t.crmSettings.saveFailed);
       return false;
     } finally {
       setIsSaving(false);
@@ -251,6 +277,9 @@ export function useCrmSettings() {
     isDirty,
     canManage,
     error,
+    queryError,
+    hasRetentionConflict,
+    reloadRetentionPolicy: () => fetchSettings(undefined, true),
     fetchSettings,
     resetDraft,
     saveSettings,

@@ -88,6 +88,7 @@ export interface WidgetSeries {
 
 export interface WidgetResult {
   widgetId: string;
+  state?: "RETIRED";
   shape: CrmDataShape;
   /** SCALAR widgets only, and only when the metric produced exactly one point. */
   value: number | null;
@@ -209,6 +210,7 @@ export function parseWidgetResult(payload: unknown): WidgetResult {
   const error = record(source.error);
   return {
     widgetId: source.widgetId,
+    ...(source.state === "RETIRED" ? { state: "RETIRED" as const } : {}),
     // A widget that failed before its metric resolved falls back to `ROWS`.
     shape: isDataShape(source.shape) ? source.shape : "ROWS",
     value: finiteNumber(source.value) ? source.value : null,

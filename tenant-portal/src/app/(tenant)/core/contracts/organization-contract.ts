@@ -219,6 +219,7 @@ export async function fetchOrgNodes<L extends OrgLevel>(
     sortBy?: OrgNodeSortField;
     sortDir?: "ASC" | "DESC";
     signal?: AbortSignal;
+    suppressForbiddenToast?: boolean;
   },
 ): Promise<CorePage<OrgNodeOf<L>>> {
   const parentKey = ORG_PARENT_QUERY_KEY[level];
@@ -237,6 +238,7 @@ export async function fetchOrgNodes<L extends OrgLevel>(
 
   const envelope = await readCorePage(LEVEL_PATH[level], query, {
     signal: options.signal,
+    suppressForbiddenToast: options.suppressForbiddenToast,
     cache: "no-store",
     maxResponseBytes: CORE_LIST_RESPONSE_LIMIT_BYTES,
   });

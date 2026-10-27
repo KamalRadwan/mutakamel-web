@@ -31,6 +31,10 @@ export default function TaxesPage() {
     t,
     lang,
     canManage,
+    canCreate,
+    canManageScope,
+    tenantWideAllowed,
+    manageableCompanies,
     companies,
     items,
     pageInfo,
@@ -123,7 +127,7 @@ export default function TaxesPage() {
             header: t.common.actions,
             align: "end" as const,
             sticky: "end" as const,
-            cell: (tax: Tax) => (
+            cell: (tax: Tax) => canManageScope(tax.companyId) ? (
               <span className="flex items-center justify-end gap-1">
                 <RowAction
                   label={t.coreSettings.taxEditTitle}
@@ -142,7 +146,7 @@ export default function TaxesPage() {
                   </RowAction>
                 ) : null}
               </span>
-            ),
+            ) : null,
           },
         ]
       : []),
@@ -151,10 +155,10 @@ export default function TaxesPage() {
   return (
     <PermissionGate require="taxes.tax.read">
       <div className="flex flex-col gap-4">
-        <PageHeader
+        <PageHeader className="sr-only"
           title={t.coreSettings.taxesTitle}
           description={t.coreSettings.taxesSubtitle}
-          primaryAction={canManage ? { label: t.coreSettings.taxCreate, onClick: openCreate } : undefined}
+          primaryAction={canCreate ? { label: t.coreSettings.taxCreate, onClick: openCreate } : undefined}
           secondaryActions={
             <Button size="sm" variant="outline" onClick={() => void reload()} disabled={isRefreshing}>
               <RefreshCw className={isRefreshing ? "size-4 animate-spin" : "size-4"} aria-hidden="true" />
@@ -243,7 +247,8 @@ export default function TaxesPage() {
         <CreateTaxModal
           key={createOpen ? "create-open" : "create-closed"}
           isOpen={createOpen}
-          companies={companies}
+          companies={manageableCompanies}
+          tenantWideAllowed={tenantWideAllowed}
           onClose={closeCreate}
           onSubmit={create}
           isSubmitting={isSubmitting}

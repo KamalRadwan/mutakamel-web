@@ -36,7 +36,7 @@ function unavailable(status: number): Response {
 export async function proxyDevelopmentGateway(request: Request): Promise<Response> {
   if (process.env.NODE_ENV !== "development") return unavailable(404);
   const url = new URL(request.url);
-  if (!/^\/api\/tenant\/(core|crm|trade)\/v1\//u.test(url.pathname)) return unavailable(404);
+  if (!/^\/api\/tenant\/(core|crm|trade|webphone)\/v1\//u.test(url.pathname)) return unavailable(404);
   const host = request.headers.get("host");
   if (!host || /[\s,/@\\?#]/u.test(host)) return unavailable(400);
 

@@ -77,6 +77,8 @@ const sampleActivity: Activity = {
   priority: "HIGH",
   status: "PLANNED",
   dueAt: new Date(Date.now() + 2 * 3_600_000).toISOString(),
+  reminderOffsetMinutes: null,
+  reminderSentAt: null,
   endsAt: new Date(Date.now() + 3 * 3_600_000).toISOString(),
   location: "Riyadh HQ · Floor 4",
   meetingUrl: "https://meet.google.com/abc-defg-hij",

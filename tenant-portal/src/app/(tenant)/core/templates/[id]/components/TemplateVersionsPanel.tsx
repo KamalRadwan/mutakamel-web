@@ -6,6 +6,7 @@ import {
   Button,
   ConfirmActionModal,
   DetailSection,
+  DegradedBanner,
   EmptyState,
   ErrorState,
   IdentifierText,
@@ -33,6 +34,7 @@ export function TemplateVersionsPanel({
 
   return (
     <DetailSection title={copy.versionsTitle} description={copy.versionsDescription}>
+      {release.versionCursorWasReset ? <DegradedBanner message={copy.cursorExpired} /> : null}
       {release.versionsError ? (
         <ErrorState
           title={copy.versionsLoadFailed}
@@ -103,6 +105,25 @@ export function TemplateVersionsPanel({
           ))}
         </ul>
       )}
+
+      <nav aria-label={copy.versionsTitle} className="flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={release.previousVersionPage}
+          disabled={!release.hasPreviousVersionPage || release.isLoadingVersions || release.pendingVersionId !== null}
+        >
+          {t.common.previousPage}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={release.nextVersionPage}
+          disabled={!release.hasNextVersionPage || release.isLoadingVersions || release.pendingVersionId !== null}
+        >
+          {t.common.nextPage}
+        </Button>
+      </nav>
 
       {release.selected ? (
         <div className="flex flex-col gap-1 border-t border-border pt-3 text-xs">

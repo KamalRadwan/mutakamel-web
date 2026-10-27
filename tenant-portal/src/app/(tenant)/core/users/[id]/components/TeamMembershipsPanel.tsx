@@ -38,14 +38,21 @@ import { listTableLabels } from "./list-table-labels";
 interface TeamMembershipsPanelProps {
   userId: string;
   canManage: boolean;
+  protectedTargetReason?: string;
   /** The user's home team — its membership is primary and cannot be removed. */
   homeTeamId: string | null;
 }
 
-export function TeamMembershipsPanel({ userId, canManage, homeTeamId }: TeamMembershipsPanelProps) {
+export function TeamMembershipsPanel({
+  userId,
+  canManage: hasManagePermission,
+  protectedTargetReason,
+  homeTeamId,
+}: TeamMembershipsPanelProps) {
   const { t } = useI18n();
   const lang = useLanguage();
   const copy = t.coreIdentity;
+  const canManage = hasManagePermission && !protectedTargetReason;
   const describeError = useCoreErrorText();
   const panel = useUserTeamMemberships(userId, true);
   const teams = useOrgNodeOptions("teams");
@@ -112,6 +119,9 @@ export function TeamMembershipsPanel({ userId, canManage, homeTeamId }: TeamMemb
       columns={1}
     >
       <div className="flex flex-col gap-3">
+        {protectedTargetReason ? (
+          <p className="text-xs text-muted-foreground">{protectedTargetReason}</p>
+        ) : null}
         {writeText ? (
           <p
             role="alert"
@@ -218,7 +228,7 @@ export function TeamMembershipsPanel({ userId, canManage, homeTeamId }: TeamMemb
       </div>
 
       <ConfirmActionModal
-        open={panel.pendingRemoval !== null}
+        open={canManage && panel.pendingRemoval !== null}
         onOpenChange={(open) => {
           if (!open) panel.cancelRemoval();
         }}
@@ -228,17 +238,21 @@ export function TeamMembershipsPanel({ userId, canManage, homeTeamId }: TeamMemb
         })}
         confirmLabel={t.common.delete}
         cancelLabel={t.common.cancel}
-        onConfirm={() => void panel.remove()}
+        onConfirm={() => {
+          if (canManage) void panel.remove();
+        }}
         loading={panel.isSubmitting}
       />
 
       <AtomicReplacementConfirm
-        open={panel.isReviewing}
+        open={canManage && panel.isReviewing}
         onOpenChange={(open) => {
           if (!open) panel.closeReview();
         }}
         diff={panel.draftDiff(teamLabel)}
-        onConfirm={() => void panel.commitDraft()}
+        onConfirm={() => {
+          if (canManage) void panel.commitDraft();
+        }}
         loading={panel.isSubmitting}
         formatCount={(count) => formatNumber(count, lang)}
         labels={{

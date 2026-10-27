@@ -2,25 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
-import { generateUUIDv7, isUUIDv7 } from "@/lib/uuid";
-import { tradeGet, tradePost } from "../../trade-api";
-import { canonicalizeDecimalInput, POSITIVE_DECIMAL, isCanonicalDecimal } from "../fixed-decimal";
+import { generateUUIDv7 } from "@/lib/uuid";
+import { tradeGet } from "../../trade-api";
+import { canonicalizeDecimalInput } from "../fixed-decimal";
 import { computeDocumentTotals, findDuplicateClientLineId } from "../document-totals";
 import {
   TRADE_LOOKUP_RESPONSE_BYTES,
   TRADE_ITEM_SEARCH_MAX_LENGTH,
   parseTradeItems,
-  parseTradePriceDecision,
   parseTradeUoms,
   tradeItemsPath,
   tradeUomCataloguePath,
-  TRADE_PRICING_EVALUATE_PATH,
   isItemEligibleForPurpose,
   type TradeItemOption,
   type TradePricePurpose,
   type TradeUomOption,
 } from "../trade-lookup-contract";
 import { isAbortError } from "./useTradeDocumentList";
+import { useTradeDocumentPricing } from "./useTradeDocumentPricing";
 
 interface TradeLineDraft {
   /** UUID v7 — `@Matches(UUID_V7_PATTERN)` on every line DTO. */
@@ -52,6 +51,7 @@ export interface TradeLineDraftState {
   setItem: (index: number, itemId: string) => void;
   setUom: (index: number, uomId: string) => void;
   setQuantity: (index: number, quantity: string) => void;
+  commitQuantity: (index: number) => void;
   reset: (lines: TradeLineDraft[]) => void;
 }
 
@@ -89,7 +89,7 @@ export function useTradeLineDraft(
   purpose: TradePricePurpose,
   isEnabled: boolean,
 ): TradeLineDraftState {
-  const [lines, setLines] = useState<TradeLineDraft[]>([emptyLineDraft()]);
+  const [drafts, setLines] = useState<TradeLineDraft[]>([emptyLineDraft()]);
   const [items, setItems] = useState<TradeItemOption[]>([]);
   const [itemsById, setItemsById] = useState<Record<string, TradeItemOption>>({});
   const [itemSearch, setItemSearch] = useState("");
@@ -148,63 +148,32 @@ export function useTradeLineDraft(
     [headers, purpose, uomsByItem],
   );
 
-  const priceLine = useCallback(
-    async (index: number, draft: TradeLineDraft): Promise<void> => {
-      if (!isUUIDv7(draft.itemId) || !isUUIDv7(draft.uomId)) return;
-      if (!isCanonicalDecimal(draft.quantity, POSITIVE_DECIMAL)) return;
-      setLines((current) =>
-        current.map((line, position) =>
-          position === index ? { ...line, isPricing: true, priceError: null } : line,
-        ),
-      );
-      try {
-        const result = await tradePost(
-          TRADE_PRICING_EVALUATE_PATH,
-          {
-            purpose,
-            itemId: draft.itemId,
-            uomId: draft.uomId,
-            quantity: draft.quantity,
-            currencyCode,
-            ...(partyId && isUUIDv7(partyId) ? { partyId } : {}),
-          },
-          { headers, maxResponseBytes: TRADE_LOOKUP_RESPONSE_BYTES },
-        );
-        const decision = parseTradePriceDecision(result.data);
-        setLines((current) =>
-          current.map((line, position) =>
-            position === index && line.clientLineId === draft.clientLineId
-              ? { ...line, unitPrice: decision.unitPrice, isPricing: false }
-              : line,
-          ),
-        );
-      } catch (error) {
-        const normalized = normalizeApiError(error);
-        setLines((current) =>
-          current.map((line, position) =>
-            position === index
-              ? { ...line, unitPrice: null, isPricing: false, priceError: normalized.code ?? null }
-              : line,
-          ),
-        );
-      }
-    },
-    [currencyCode, headers, partyId, purpose],
-  );
+  // Keep preview evidence tied to the complete request, including line IDs and
+  // scope. The shared lifecycle clears obsolete prices before effects run and
+  // discards late successes and failures, even when line positions are reused.
+  const pricing = useTradeDocumentPricing({
+    headers, currencyCode, partyId, purpose, enabled: isEnabled,
+    lines: drafts.map(({ clientLineId, itemId, uomId, quantity }) => ({
+      clientLineId, itemId, uomId, quantity,
+    })),
+  });
+  const lines = drafts.map((line, index) => ({
+    ...line,
+    unitPrice: pricing.prices[index]?.unitPrice ?? null,
+    isPricing: pricing.prices[index]?.isPricing ?? false,
+    priceError: pricing.prices[index]?.error ? (pricing.prices[index]?.error?.code ?? "") : null,
+  }));
 
   const update = useCallback(
     (index: number, patch: Partial<TradeLineDraft>): void => {
-      const line = lines[index];
+      const line = drafts[index];
       if (!line) return;
-      // The next draft is computed outside the updater on purpose: repricing is
-      // a request, and React may call a state updater twice.
       const next = { ...line, ...patch, unitPrice: null };
       setLines((current) =>
         current.map((entry, position) => (position === index ? next : entry)),
       );
-      void priceLine(index, next);
     },
-    [lines, priceLine],
+    [drafts],
   );
 
   const priced = lines.every((line) => line.unitPrice !== null);
@@ -212,8 +181,8 @@ export function useTradeLineDraft(
     ? computeDocumentTotals({
         dialect: "ORDER",
         lines: lines.map((line) => ({
-          quantity: line.quantity,
-          unitPrice: line.unitPrice ?? "0",
+          quantity: canonicalizeDecimalInput(line.quantity) ?? line.quantity,
+          unitPrice: canonicalizeDecimalInput(line.unitPrice ?? "0") ?? (line.unitPrice ?? "0"),
           discountTotal: "0",
           chargeTotal: "0",
           taxTotal: "0",
@@ -250,8 +219,14 @@ export function useTradeLineDraft(
       update(index, { itemId, uomId: "" });
     },
     setUom: (index: number, uomId: string) => update(index, { uomId }),
-    setQuantity: (index: number, quantity: string) =>
-      update(index, { quantity: canonicalizeDecimalInput(quantity) ?? quantity }),
+    // Rewriting intermediate text such as "1." would turn the next "5" into "15".
+    setQuantity: (index: number, quantity: string) => update(index, { quantity }),
+    commitQuantity: (index: number) => {
+      const quantity = drafts[index]?.quantity;
+      if (quantity === undefined) return;
+      const canonical = canonicalizeDecimalInput(quantity);
+      if (canonical !== null && canonical !== quantity) update(index, { quantity: canonical });
+    },
     reset: (next: TradeLineDraft[]) => setLines(next.length > 0 ? next : [emptyLineDraft()]),
   };
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
 import { normalizeApiError, type NormalizedApiError } from "@/lib/api/errors";
 import {
   markAllTenantNotificationsRead,
-  resyncTenantNotifications,
+  revalidateTenantNotifications,
   tenantNotificationRuntime,
 } from "@/lib/notifications/tenant-notification-runtime";
 import { coreDelete, coreGet, corePost } from "../../core-api";
@@ -16,8 +16,6 @@ import {
   notificationReadPath,
   notificationsListPath,
   parseNotificationPage,
-  parseUnreadCount,
-  NOTIFICATIONS_UNREAD_COUNT_PATH,
   type InboxNotification,
 } from "../notification-contract";
 
@@ -37,87 +35,113 @@ export function useNotificationInbox() {
   const [error, setError] = useState<NormalizedApiError | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const query = useRef({
+    generation: 0, unreadOnly: false, cursor: null as string | null,
+    controller: null as AbortController | null, pageCount: 1,
+  });
+
+  const invalidatePages = useCallback(() => {
+    query.current.controller?.abort();
+    query.current.controller = null;
+    query.current.generation++;
+    query.current.cursor = null;
+  }, []);
 
   const loadFirstPage = useCallback(
-    async (signal?: AbortSignal, onlyUnread = unreadOnly): Promise<void> => {
+    async (preserveHistory = false): Promise<void> => {
+      const pageCount = preserveHistory ? query.current.pageCount : 1;
+      invalidatePages();
+      const { generation, unreadOnly: onlyUnread } = query.current;
+      const controller = new AbortController();
+      query.current.controller = controller;
+      const isCurrent = () => query.current.generation === generation && !controller.signal.aborted;
       setIsLoading(true);
+      setIsLoadingMore(false);
+      setCursor(null);
       setError(null);
       try {
-        const result = await coreGet(notificationsListPath(null, onlyUnread), {
-          signal,
-          maxResponseBytes: PAGE_RESPONSE_LIMIT_BYTES,
-        });
-        const page = parseNotificationPage(result.data);
-        setItems(page.items);
+        const refreshed: InboxNotification[] = [];
+        const seen = new Set<string>();
+        let nextCursor: string | null = null;
+        let count = 0;
+        let loadedPages = 0;
+        do {
+          const result = await coreGet(notificationsListPath(nextCursor, onlyUnread), {
+            signal: controller.signal,
+            maxResponseBytes: PAGE_RESPONSE_LIMIT_BYTES,
+          });
+          if (!isCurrent()) return;
+          const page = parseNotificationPage(result.data);
+          for (const item of page.items) {
+            if (!seen.has(item.id)) { seen.add(item.id); refreshed.push(item); }
+          }
+          if (loadedPages === 0) count = page.unreadCount;
+          nextCursor = page.hasNext ? page.nextCursor : null;
+          loadedPages++;
+        } while (nextCursor !== null && loadedPages < pageCount);
+        setItems(refreshed);
         // The cursor is opaque and is stored verbatim; it is only ever handed
         // straight back to the same endpoint.
-        setCursor(page.hasNext ? page.nextCursor : null);
-        setUnreadCount(page.unreadCount);
+        query.current.cursor = nextCursor;
+        query.current.pageCount = loadedPages;
+        setCursor(query.current.cursor);
+        setUnreadCount(count);
         setHasLoaded(true);
       } catch (loadError) {
-        if (isAbortError(loadError)) return;
+        if (!isCurrent() || isAbortError(loadError)) return;
         setError(normalizeApiError(loadError));
       } finally {
-        if (!signal?.aborted) setIsLoading(false);
+        if (isCurrent()) {
+          query.current.controller = null;
+          setIsLoading(false);
+        }
       }
     },
-    [unreadOnly],
+    [invalidatePages],
   );
 
   const loadMore = useCallback(async (): Promise<void> => {
-    if (cursor === null || isLoadingMore) return;
+    const { generation, cursor: pageCursor, unreadOnly: onlyUnread } = query.current;
+    if (pageCursor === null || query.current.controller) return;
+    const controller = new AbortController();
+    query.current.controller = controller;
+    const isCurrent = () => query.current.generation === generation &&
+      query.current.cursor === pageCursor && !controller.signal.aborted;
     setIsLoadingMore(true);
     try {
-      const result = await coreGet(notificationsListPath(cursor, unreadOnly), {
+      const result = await coreGet(notificationsListPath(pageCursor, onlyUnread), {
+        signal: controller.signal,
         maxResponseBytes: PAGE_RESPONSE_LIMIT_BYTES,
       });
+      if (!isCurrent()) return;
       const page = parseNotificationPage(result.data);
+      query.current.pageCount++;
       setItems((current) => {
         const seen = new Set(current.map((item) => item.id));
         return [...current, ...page.items.filter((item) => !seen.has(item.id))];
       });
-      setCursor(page.hasNext ? page.nextCursor : null);
+      query.current.cursor = page.hasNext ? page.nextCursor : null;
+      setCursor(query.current.cursor);
       setUnreadCount(page.unreadCount);
     } catch (loadError) {
+      if (!isCurrent() || isAbortError(loadError)) return;
       toast.errorFromApi(t.coreNotifications.loadFailed, normalizeApiError(loadError));
     } finally {
-      setIsLoadingMore(false);
+      if (query.current.controller === controller && !controller.signal.aborted) {
+        query.current.controller = null;
+        setIsLoadingMore(false);
+      }
     }
-  }, [cursor, isLoadingMore, unreadOnly, toast, t]);
+  }, [toast, t]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let disposed = false;
+    const unsubscribe = tenantNotificationRuntime.subscribeInvalidation(() => loadFirstPage(true));
     queueMicrotask(() => {
-      if (!controller.signal.aborted) void loadFirstPage(controller.signal);
+      if (!disposed) void loadFirstPage();
     });
-    return () => controller.abort();
-  }, [loadFirstPage]);
-
-  const refreshUnreadCount = useCallback(async (): Promise<void> => {
-    try {
-      const result = await coreGet(NOTIFICATIONS_UNREAD_COUNT_PATH, { maxResponseBytes: 10_000 });
-      setUnreadCount(parseUnreadCount(result.data));
-    } catch {
-      // The badge is advisory; the next page load carries an authoritative count.
-    }
-  }, []);
-
-  /**
-   * Keeps the shell's dropdown in step after an inbox action.
-   *
-   * The runtime is resynced from its OWN last committed cursor — never from a
-   * cursor this screen observed. Feeding a socket-side or page-side cursor into
-   * the handshake silently skips notifications (docs/api/core-settings.md).
-   */
-  const resyncRuntime = useCallback(async (): Promise<void> => {
-    const snapshot = tenantNotificationRuntime.getSnapshot();
-    if (snapshot.generation === null) return;
-    try {
-      await resyncTenantNotifications(snapshot.generation, snapshot.lastRealtimeCursor);
-    } catch {
-      // The dropdown repairs itself on its next realtime event or resync.
-    }
-  }, []);
+    return () => { disposed = true; unsubscribe(); invalidatePages(); };
+  }, [loadFirstPage, invalidatePages, unreadOnly]);
 
   const runAction = useCallback(
     async (id: string, action: () => Promise<void>, failureTitle: string): Promise<void> => {
@@ -125,7 +149,7 @@ export function useNotificationInbox() {
       setPendingId(id);
       try {
         await action();
-        await Promise.all([loadFirstPage(), refreshUnreadCount(), resyncRuntime()]);
+        await revalidateTenantNotifications();
       } catch (actionError) {
         const normalized = normalizeApiError(actionError);
         if (normalized.status === 403) return;
@@ -135,7 +159,7 @@ export function useNotificationInbox() {
         setPendingId(null);
       }
     },
-    [pendingId, loadFirstPage, refreshUnreadCount, resyncRuntime, toast],
+    [pendingId, toast],
   );
 
   const markRead = useCallback(
@@ -181,7 +205,7 @@ export function useNotificationInbox() {
     setIsMarkingAll(true);
     try {
       await markAllTenantNotificationsRead();
-      await Promise.all([loadFirstPage(), refreshUnreadCount(), resyncRuntime()]);
+      await revalidateTenantNotifications();
       toast.success(t.coreNotifications.markAllReadTitle, t.coreNotifications.markAllReadMessage);
     } catch (actionError) {
       const normalized = normalizeApiError(actionError);
@@ -191,7 +215,7 @@ export function useNotificationInbox() {
     } finally {
       setIsMarkingAll(false);
     }
-  }, [isMarkingAll, loadFirstPage, refreshUnreadCount, resyncRuntime, toast, t]);
+  }, [isMarkingAll, toast, t]);
 
   return {
     t,
@@ -207,15 +231,20 @@ export function useNotificationInbox() {
     pendingId,
     error,
     setUnreadOnly: (next: boolean) => {
+      if (next === query.current.unreadOnly) return;
+      invalidatePages();
+      query.current.unreadOnly = next;
+      query.current.pageCount = 1;
       setUnreadOnly(next);
       setCursor(null);
+      setIsLoadingMore(false);
     },
     loadMore,
     markRead,
     acknowledge,
     dismiss,
     markAllRead,
-    reload: () => loadFirstPage(),
+    reload: () => loadFirstPage(true),
   };
 }
 

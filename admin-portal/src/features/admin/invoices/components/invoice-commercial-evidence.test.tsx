@@ -5,7 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 import { acceptedInvoiceFixture, invoiceCommercialId, manualInvoiceFixture } from "../model/invoice-commercial-fixtures";
 import { InvoiceCommercialEvidence } from "./invoice-commercial-evidence";
 
-vi.mock("@/design-system", () => ({ Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>, Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
+vi.mock("@/design-system", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/design-system")>();
+  return { ...actual, Card: ({ children }: { children: React.ReactNode }) => <section>{children}</section>, Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> };
+});
 
 describe("Invoice commercial evidence", () => {
   it("shows seats separately from quantity and accepted parent/definition identities", () => {

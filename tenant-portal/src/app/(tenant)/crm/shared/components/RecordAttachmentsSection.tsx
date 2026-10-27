@@ -8,6 +8,7 @@ import {
   DateTime,
   DetailSection,
   ErrorState,
+  PermissionGate,
   type Attachment,
   type FileUploadProps,
   type UploadFile,
@@ -58,7 +59,15 @@ export interface RecordAttachmentsSectionProps {
  * would corrupt them. `Content-Disposition: attachment` means the page does not
  * navigate away.
  */
-export function RecordAttachmentsSection({
+export function RecordAttachmentsSection(props: RecordAttachmentsSectionProps) {
+  return (
+    <PermissionGate require="crm.attachments.read" scoped>
+      <RecordAttachmentsContent {...props} />
+    </PermissionGate>
+  );
+}
+
+function RecordAttachmentsContent({
   branchId,
   sourceType,
   sourceId,

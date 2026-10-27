@@ -21,7 +21,10 @@ export function useBackupArtifacts() {
   const canRestore = adminCanAll(user, ADMIN_RBAC_CRITICAL.BACKUPS_RESTORE);
   const { getIdempotencyKey, resetKey } = useIdempotency();
   const [servers, setServers] = useState<BackupDatabaseServerOption[]>([]);
-  const [artifacts, setArtifacts] = useState<BackupArtifact[]>([]);
+  const [artifactResult, setArtifactResult] = useState<{
+    query: BackupArtifactListQuery;
+    artifacts: BackupArtifact[];
+  } | null>(null);
   const [query, setQuery] = useState<BackupArtifactListQuery>({
     ...(searchParams.get("runId") ? { runId: searchParams.get("runId")! } : {}),
     ...(searchParams.get("databaseServerId") ? { databaseServerId: searchParams.get("databaseServerId")! } : {}),
@@ -48,9 +51,10 @@ export function useBackupArtifacts() {
     try {
       const nextArtifacts = await backupApi.listArtifacts(query);
       if (refreshGeneration !== refreshGenerationRef.current) return;
-      setArtifacts(nextArtifacts);
+      setArtifactResult({ query, artifacts: nextArtifacts });
     } catch (caught) {
       if (refreshGeneration !== refreshGenerationRef.current) return;
+      setArtifactResult(null);
       setError(normalizeApiError(caught));
     } finally {
       if (refreshGeneration === refreshGenerationRef.current) setIsLoading(false);
@@ -91,7 +95,7 @@ export function useBackupArtifacts() {
   };
 
   return {
-    artifacts,
+    artifacts: artifactResult?.query === query ? artifactResult.artifacts : [],
     servers,
     query,
     setQuery,

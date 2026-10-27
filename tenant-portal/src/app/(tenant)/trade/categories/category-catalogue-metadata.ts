@@ -1,17 +1,14 @@
 import type { SwatchHue } from "@/design-system";
 
-export const CATEGORY_DOMAINS = [
-  "FOOD_BEV",
-  "PACKAGING",
-  "ELECTRONICS",
-  "PHARMA",
-  "AGRICULTURE",
-  "INDUSTRIAL",
-  "LOGISTICS",
-  "GENERAL",
-] as const;
-
-export type CategoryDomain = (typeof CATEGORY_DOMAINS)[number];
+export type CategoryDomain =
+  | "FOOD_BEV"
+  | "PACKAGING"
+  | "ELECTRONICS"
+  | "PHARMA"
+  | "AGRICULTURE"
+  | "INDUSTRIAL"
+  | "LOGISTICS"
+  | "GENERAL";
 
 export const CATEGORY_DOMAIN_HUES: Record<CategoryDomain, SwatchHue> = {
   FOOD_BEV: "green",
@@ -24,7 +21,7 @@ export const CATEGORY_DOMAIN_HUES: Record<CategoryDomain, SwatchHue> = {
   GENERAL: "orange",
 };
 
-export const CATEGORY_DEPTH_HUES: Record<number, SwatchHue> = {
+const CATEGORY_DEPTH_HUES: Record<number, SwatchHue> = {
   1: "indigo",
   2: "blue",
   3: "purple",

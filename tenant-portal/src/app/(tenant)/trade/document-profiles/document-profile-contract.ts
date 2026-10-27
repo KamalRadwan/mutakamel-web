@@ -58,8 +58,7 @@ export const FILTERABLE_DOCUMENT_TYPES = [
 export type CreatableDocumentType = (typeof CREATABLE_DOCUMENT_TYPES)[number];
 
 export const DOCUMENT_PROFILE_SCOPE_TARGETS = ["TENANT", "COMPANY", "BRANCH"] as const;
-export const DOCUMENT_PROFILE_ALLOWED_SCOPES = ["TENANT", "COMPANY"] as const;
-export type DocumentProfileScopeTarget = (typeof DOCUMENT_PROFILE_SCOPE_TARGETS)[number];
+type DocumentProfileScopeTarget = (typeof DOCUMENT_PROFILE_SCOPE_TARGETS)[number];
 
 export const SERVER_OWNED_FIELDS = ["status", "totals", "version", "audit", "taxes"] as const;
 export const MANDATORY_COMPILED_CASE_CODES = [
@@ -105,7 +104,7 @@ export const DOCUMENT_PROFILE_REGISTRIES: Record<CreatableDocumentType, Document
   },
 };
 
-export interface DocumentProfileFieldConfig {
+interface DocumentProfileFieldConfig {
   code: string;
   required: boolean;
   visible: boolean;
@@ -113,13 +112,13 @@ export interface DocumentProfileFieldConfig {
   section: "header" | "line";
 }
 
-export interface DocumentProfileComponentConfig {
+interface DocumentProfileComponentConfig {
   code: string;
   order: number;
   visible: boolean;
 }
 
-export interface DocumentProfileEvidenceConfig {
+interface DocumentProfileEvidenceConfig {
   code: string;
   required: boolean;
 }
@@ -435,6 +434,7 @@ export function documentProfileMessage(
     case "TRADE.DOCUMENT_PROFILE.SCOPE_NOT_ALLOWED":
       return t.tradeGovernance.errorProfileScopeNotAllowed;
     case "TRADE.DOCUMENT_PROFILE.COMPATIBILITY_FAILED":
+    case "TRADE.DOCUMENT_PROFILE.COMPATIBILITY_CHANGED":
       return t.tradeGovernance.errorProfileCompatibility;
     case "TRADE.DOCUMENT_PROFILE.REQUIRED_CASES_FAILED":
       return t.tradeGovernance.errorProfileRequiredCases;

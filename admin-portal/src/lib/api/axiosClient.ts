@@ -13,6 +13,8 @@ import {
   type AdminAuthEvent,
   type AdminAuthEventTiming,
 } from "../auth/sessionCoordinator";
+import { ar } from "../../i18n/dictionaries/ar";
+import { en } from "../../i18n/dictionaries/en";
 import { safeSessionStorage, safeStorage } from "../safeStorage";
 import { generateUUIDv7 } from "../utils/uuid";
 import {
@@ -843,7 +845,7 @@ async function sendPreparedRequest<T>(
   }
 
   if (!response.ok) {
-    const error = normalizeApiError(response, payload);
+    const error = normalizeApiError(response, payload, request.endpoint);
     const code = getAuthErrorCode(error);
     const disposition = classifyAuthFailure(response.status, code);
 
@@ -2584,9 +2586,13 @@ async function readResponsePayload(response: Response): Promise<unknown> {
 function normalizeApiError(
   response: Response,
   payload: unknown,
+  endpoint?: string,
 ): ApiClientError {
   const body = record(payload) ?? {};
-  const message = firstString(
+  const unavailable = response.status === 503 && endpoint !== undefined &&
+    /^\/api\/admin\/core\/v1\/auth\/(login|forgot-password|reset-password|accept-invite)\/?$/u.test(endpoint);
+  const copy = safeStorage.getItem("app_lang") === "en" ? en : ar;
+  const message = unavailable ? copy.login.temporarilyUnavailable : firstString(
     body.message,
     body.title,
     body.detail,
@@ -2626,8 +2632,7 @@ function dispatchForbiddenToast(): void {
     new CustomEvent("global-toast", {
       detail: {
         type: "error",
-        title: "Access Denied",
-        message: "You do not have permission to perform this action.",
+        localizationKey: "authorizationDenied",
       },
     }),
   );
@@ -2669,6 +2674,8 @@ function isPublicAdminAuthEndpoint(endpoint: string): boolean {
   if (authStart < 0) return false;
   return [
     "/auth/login",
+    "/auth/mfa/verify",
+    "/auth/mfa/resend",
     "/auth/refresh",
     "/auth/logout",
     "/auth/accept-invite",
@@ -2690,7 +2697,7 @@ function isAdminCookieQuarantineExemptEndpoint(endpoint: string): boolean {
 
 function isAdminSessionEstablishingEndpoint(endpoint: string): boolean {
   const authPath = normalizedAdminAuthPath(endpoint);
-  return authPath === "/auth/login" || authPath === "/auth/accept-invite";
+  return authPath === "/auth/login" || authPath === "/auth/accept-invite" || authPath === "/auth/mfa/verify";
 }
 
 function isAdminAuthCookieMutationEndpoint(endpoint: string): boolean {
@@ -2698,6 +2705,13 @@ function isAdminAuthCookieMutationEndpoint(endpoint: string): boolean {
   // withAuthLock for the complete response/body settlement.
   const authPath = normalizedAdminAuthPath(endpoint);
   return authPath === "/auth/login" ||
+    [
+      "/auth/mfa/verify",
+      "/auth/mfa/resend",
+      "/auth/mfa/settings/challenge",
+      "/auth/mfa/settings/resend",
+      "/auth/mfa/settings/confirm",
+    ].includes(authPath ?? "") ||
     authPath === "/auth/refresh" ||
     authPath === "/auth/logout" ||
     authPath === "/auth/logout-all" ||
@@ -2718,6 +2732,8 @@ function isSessionBindingExemptAdminAuthEndpoint(endpoint: string): boolean {
   if (authStart < 0) return false;
   return [
     "/auth/login",
+    "/auth/mfa/verify",
+    "/auth/mfa/resend",
     "/auth/refresh",
     "/auth/accept-invite",
     "/auth/forgot-password",

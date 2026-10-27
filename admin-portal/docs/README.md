@@ -44,6 +44,17 @@ send a caller-selected authentication-mode header.
 
 Do not store JWT access or refresh tokens in browser-readable storage.
 
+## Database migration error contract
+
+Source contract verified **2026-10-17**: Worker migration command feedback
+matches full `WORKER.MIGRATION.*` precondition codes and
+`WORKER.TENANT_CLAIM.HELD`, preserving `details` from Worker envelopes or
+Gateway Problem Details. Active-run conflicts show the run-specific message;
+lint refusals show the migration and safety rule in the existing bilingual
+alert. Test expiry, checksum mismatch and missing approval use `UNTESTED`,
+without speculative portal mappings. This is source integration; runtime,
+typecheck and lint remain lead verification gates.
+
 ## Documentation map
 
 | Area | Reference |

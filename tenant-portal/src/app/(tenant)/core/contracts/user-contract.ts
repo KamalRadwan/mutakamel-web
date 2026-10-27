@@ -75,8 +75,8 @@ export interface UpdateUserInput {
   companyId?: string;
   branchId?: string;
   departmentId?: string;
-  teamId?: string;
-  managerId?: string;
+  teamId?: string | null;
+  managerId?: string | null;
   jobTitle?: string;
 }
 
@@ -132,6 +132,7 @@ export async function fetchTenantUsers(options: {
   sortBy?: TenantUserSortField;
   sortDir?: "ASC" | "DESC";
   signal?: AbortSignal;
+  suppressForbiddenToast?: boolean;
 }): Promise<CorePage<TenantUser>> {
   const query = buildCoreListQuery({
     page: options.page,
@@ -142,6 +143,7 @@ export async function fetchTenantUsers(options: {
   });
   const envelope = await readCorePage(USERS_PATH, query, {
     signal: options.signal,
+    suppressForbiddenToast: options.suppressForbiddenToast,
     cache: "no-store",
     maxResponseBytes: CORE_LIST_RESPONSE_LIMIT_BYTES,
   });
