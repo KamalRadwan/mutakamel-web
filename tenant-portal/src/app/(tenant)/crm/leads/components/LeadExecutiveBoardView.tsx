@@ -15,7 +15,7 @@ export function LeadExecutiveBoardView(props: LeadExecutiveBoardViewProps) {
     return (
       <div className="flex h-full items-stretch gap-3 overflow-x-auto px-5 pt-[13px] pb-5">
         {Array.from({ length: 5 }).map((_, index) => (
-          <Skeleton key={index} className="h-full min-w-[235px] flex-[1_1_0] rounded-column" />
+          <Skeleton key={index} className="h-full min-w-[282px] flex-[1_1_0] rounded-column" />
         ))}
       </div>
     );

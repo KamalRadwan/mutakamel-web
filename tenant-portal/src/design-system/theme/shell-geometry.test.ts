@@ -12,8 +12,8 @@ function token(name: string): string {
 }
 
 describe("shell geometry", () => {
-  it("keeps the topbar at 58px and toolbar at 48px at standard density", () => {
-    expect(token("size-topbar")).toBe("calc(3.625rem * var(--ui-scale))");
+  it("keeps the topbar at 45px and toolbar at 48px at standard density", () => {
+    expect(token("size-topbar")).toBe("calc(2.8125rem * var(--ui-scale))");
     expect(token("size-toolbar")).toBe("calc(3rem * var(--ui-scale))");
   });
 

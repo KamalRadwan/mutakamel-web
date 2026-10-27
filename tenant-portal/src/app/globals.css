@@ -368,6 +368,13 @@ html[lang="ar"] {
   --text-sm--line-height: 1.375rem;     /* 22px */
   --text-base: 1rem;                    /* 16px */
   --text-base--line-height: 1.625rem;   /* 26px */
+  /* Negative tracking splits Arabic joined forms (seen live on the login
+     heading at -0.17px), so every step that tracks tighter in Latin is zeroed. */
+  --text-sm--letter-spacing: 0em;
+  --text-base--letter-spacing: 0em;
+  --text-lg--letter-spacing: 0em;
+  --text-xl--letter-spacing: 0em;
+  --text-2xl--letter-spacing: 0em;
 }
 
 /* ---------- 3. Semantic tokens, control sizes, elevation ----------
@@ -679,7 +686,7 @@ html[lang="ar"] {
      portal's shell is two stacked horizontal bars rather than a sidebar beside
      a topbar — see docs/design/shell.md.
 
-     The global Ocean Navy topbar is 58px (--size-topbar), below a fixed 3px
+     The global Ocean Navy topbar is 45px (--size-topbar), below a fixed 3px
      brand accent strip (--size-brand-strip). The page action bar is 59px
      (--size-actionbar): an 11px top inset plus the 48px floating toolbar
      (--size-toolbar), with 33px controls (--size-toolbar-control).
@@ -689,7 +696,7 @@ html[lang="ar"] {
      10px wider than the 240px sidebar it replaces, which is the one dimension
      the old shell and this one share a lineage on. */
   --size-row: calc(2.75rem * var(--ui-scale));      /* 44px */
-  --size-topbar: calc(3.625rem * var(--ui-scale));  /* 58px — global Ocean Navy nav */
+  --size-topbar: calc(2.8125rem * var(--ui-scale)); /* 45px — global Ocean Navy nav */
   --size-brand-strip: 3px;                       /* fixed brand accent strip */
   --size-actionbar-inset: calc(0.6875rem * var(--ui-scale)); /* 11px — toolbar top inset */
   --size-actionbar: calc(var(--size-toolbar) + var(--size-actionbar-inset)); /* 59px — toolbar + top inset */
@@ -700,7 +707,7 @@ html[lang="ar"] {
      OUTSIDE the shell's flex column has to clear. Derived, never a second
      literal, so the strip and bars stay the only place a chrome height is
      written down. */
-  --size-chrome: calc(var(--size-brand-strip) + var(--size-topbar) + var(--size-actionbar)); /* 120px at standard density */
+  --size-chrome: calc(var(--size-brand-strip) + var(--size-topbar) + var(--size-actionbar)); /* 107px at standard density */
 
   /* A collapsed board column: wide enough for the expand control and the stage
      name turned on its side, narrow enough that four collapsed stages cost

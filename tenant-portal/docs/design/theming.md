@@ -72,7 +72,7 @@ as admin" means. Compact stays one click away in the user menu for the operator
 who wants more rows on a 1366×768 laptop.
 
 Only the geometry tokens (`--size-control-*`, `--size-row`, `--size-topbar`
-`58px`, `--size-actionbar` `35px`, `--size-toolbar` `48px`,
+`45px`, `--size-actionbar` `35px`, `--size-toolbar` `48px`,
 `--size-toolbar-control` `33px`, `--size-brand`, `--size-column-collapsed`)
 multiply by `--ui-scale`. **Type does not**, and neither does radius
 (`--radius-xs` through `--radius-xl`, plus `--radius-card` `13px` and
@@ -270,7 +270,7 @@ Every token has an explicit value in both themes — see
   `inset 0 1px 0 0 rgb(255 255 255 / 0.04–0.08)` in `.dark`, while
   `--elevation-nav-active` retains its subtle sky glow on the Ocean Navy header.
 - **Ocean Navy global header is fixed chrome; the toolbar and workspace theme.**
-  `GlobalNav` (`bg-gradient-header` + `bg-gradient-brand-strip`, `58px`) stays
+  `GlobalNav` (`bg-gradient-header` + `bg-gradient-brand-strip`, `45px`) stays
   Ocean Navy in both light and dark modes with `#e2e8f0` / `#f8fafc` text, while
   the floating `48px` `PageActionBar` (`bg-surface-toolbar`) and workspace
   switch cleanly between light and dark — see [shell.md](shell.md) and

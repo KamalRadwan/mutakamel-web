@@ -37,7 +37,7 @@ full-width bars have no collapsed state to remember.
 
 ```text
 ┌ Brand strip     3px ─ bg-gradient-brand-strip                              ┐
-├ GlobalNav      58px ─ BrandMark / AppSwitcher │ NavMenu … ⟵⟶ 🌐 ☀ 🔔 👤 ┤
+├ GlobalNav      45px ─ BrandMark / AppSwitcher │ NavMenu … ⟵⟶ 🌐 ☀ 🔔 👤 ┤
 │ PageActionBar  48px ─ ╭─ [+ Add lead]    ⟵⟶ [KPIs] [search] [▤▦▥] ─╮ (floating)
 │ main                                                                      │
 └───────────────────────────────────────────────────────────────────────────┘
@@ -55,7 +55,7 @@ Shell height tokens (`src/app/globals.css`):
 
 ```css
 :root {
-  --size-topbar:  calc(3.625rem * var(--ui-scale)); /* 58px — global nav */
+  --size-topbar:  calc(2.8125rem * var(--ui-scale)); /* 45px — global nav */
   --size-toolbar: calc(3rem * var(--ui-scale));     /* 48px — floating action bar */
   --size-chrome:  calc(var(--size-topbar) + var(--size-actionbar));
 }
@@ -93,11 +93,11 @@ control is spacing and nothing else; the 16/24px this inherited from the sidebar
 era read as a gap where a page title used to sit, and on the 1366×768 laptop
 this is built for it spent 48px of vertical budget on nothing.
 
-## GlobalNav — 58px
+## GlobalNav — 45px
 
 Above `<header>`, `GlobalNav` renders a decorative `3px` strip
 (`h-[3px] w-full shrink-0 bg-gradient-brand-strip print:hidden`). The `<header>`
-itself is `h-(--size-topbar)` (`58px`) with `px-[22px]`, `bg-gradient-header`,
+itself is `h-(--size-topbar)` (`45px`) with `px-[22px]`, `bg-gradient-header`,
 `border-b border-nav-chrome-line`, `text-nav-foreground-strong` and `.nav-surface`
 (no `sticky` or `z-*` on `<header>`, preserving the focused skip link's stacking
 above the bar).
@@ -460,7 +460,7 @@ change.
 
 ## Checklist
 
-- [x] One height token per bar (`--size-topbar` 58px, `--size-toolbar` 48px); no hard-coded shell bar heights
+- [x] One height token per bar (`--size-topbar` 45px, `--size-toolbar` 48px); no hard-coded shell bar heights
 - [x] `--size-chrome` derived, never a second literal
 - [x] `3px` `bg-gradient-brand-strip` above the `bg-gradient-header` Ocean Navy `<header>`
 - [x] Inactive nav tabs use high-contrast `text-nav-foreground` with neutral `bg-white/10` `23×23` icon containers; active tab uses `bg-gradient-primary`, `border-nav-tab-active-line`, `shadow-nav-active` and `aria-current`

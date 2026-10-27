@@ -33,6 +33,11 @@ export const uiLatin = Plus_Jakarta_Sans({
   variable: "--font-ui-latin",
   display: "swap",
   preload: false,
+  // The generated "Plus Jakarta Sans Fallback" face is local Arial, which has
+  // Arabic glyphs: sitting between Jakarta and Cairo in --font-sans it caught
+  // every Arabic run, so Cairo never loaded. Without it the stack falls
+  // through from Jakarta straight to Cairo for Arabic.
+  adjustFontFallback: false,
 });
 
 export const uiArabic = Cairo({

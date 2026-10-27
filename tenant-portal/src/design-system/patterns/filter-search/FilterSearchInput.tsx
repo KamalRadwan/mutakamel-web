@@ -63,7 +63,7 @@ export function FilterSearchInput(props: FilterSearchInputProps) {
         >
           <Search className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
           {props.tokens.length > 0 && (
-            <div ref={tokensRef} className="flex max-w-3/5 shrink items-center gap-1 overflow-x-auto">
+            <div ref={tokensRef} className="scrollbar-none flex max-w-3/5 shrink items-center gap-1 overflow-x-auto overflow-y-hidden">
               {props.tokens.map((token) => (
                 <span
                   key={token.id}

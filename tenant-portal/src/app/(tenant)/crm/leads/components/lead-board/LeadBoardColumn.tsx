@@ -40,7 +40,7 @@ export function LeadBoardColumn({ stage, board }: { stage: LeadStage; board: Boa
   }
   return (
     <div className={cn(
-      "flex h-full min-h-0 flex-[1_1_0] min-w-[235px] flex-col overflow-hidden rounded-column border border-line-column bg-surface-column shadow-column",
+      "flex h-full min-h-0 flex-[1_1_0] min-w-[282px] flex-col overflow-hidden rounded-column border border-line-column bg-surface-column shadow-column",
       isDragTarget && !isTerminal && "ring-2 ring-primary",
     )}>
       <LeadBoardColumnHeader stageLabel={stageLabel} stageFlag={stage.flag} totalCount={totalCount}

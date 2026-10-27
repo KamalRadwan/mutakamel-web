@@ -62,7 +62,7 @@ export function AppSwitcher({ apps, activeApp, onSelect }: AppSwitcherProps) {
     if (href) router.push(href);
   }
 
-  // Sized for the 58px Ocean Navy header using dedicated switcher chrome tokens
+  // Sized for the 45px Ocean Navy header using dedicated switcher chrome tokens
   // (`bg-nav-switcher-surface`, `border-nav-switcher-line`, `text-nav-switcher-fg`).
   // The app label hides on the narrowest widths so the icon and the account
   // controls still fit.

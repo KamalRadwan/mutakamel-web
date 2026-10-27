@@ -220,7 +220,7 @@ Every role is declared in `:root`, overridden in `.dark`, and bridged in
 
 ### The nav is the one inverted surface
 
-`GlobalNav` is a fixed `58px` (`--size-topbar`) Ocean Navy chrome band in **both**
+`GlobalNav` is a fixed `45px` (`--size-topbar`) Ocean Navy chrome band in **both**
 light and dark modes, crowned by a `3px` `bg-gradient-brand-strip` bar. Its
 primary surface is `bg-gradient-header` (`--color-navy-950` `#091526` →
 `--color-navy-900` `#0f2342` → `--color-navy-800` `#132c52`), while
@@ -533,7 +533,7 @@ bridged elevation, radius and shell-size tokens with:
 - **Named radii (`@theme`)**: `--radius-card` (`13px` → `rounded-card`) and
   `--radius-column` (`16px` → `rounded-column`).
 - **Scaled chrome & toolbar heights (`:root`, multiplied by `var(--ui-scale)`)**:
-  `--size-topbar` (`58px`), `--size-toolbar` (`48px`), and
+  `--size-topbar` (`45px`), `--size-toolbar` (`48px`), and
   `--size-toolbar-control` (`33px`).
 
 The `--text-tab` type step produces `text-tab`, avoiding a utility collision with `--color-nav`; nav foreground color roles stay separate.

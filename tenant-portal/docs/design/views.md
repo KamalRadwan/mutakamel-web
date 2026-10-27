@@ -468,7 +468,7 @@ terminal destination confirms the same way.
 **Leads (v3 structure source-reviewed 2026-10-26):** the board composes
 `LeadBoardCard`, `LeadBoardColumnHeader` (including `LeadBoardActivityBar`),
 `LeadBoardCollapsedRail` and `LeadBoardEmptyStage`. Expanded columns share the
-available width with a 235px minimum, neutral column surfaces and no coloured
+available width with a 282px minimum (235px +20%, owner request 2026-10-27), neutral column surfaces and no coloured
 top border; horizontal scrolling starts when those minimum widths no longer fit.
 Cards have no time-in-stage text or face expand button. **Expand card** lives in
 `LeadCardMenu`, opening a read-only contact view with the same activity pill,

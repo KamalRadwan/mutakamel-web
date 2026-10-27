@@ -197,7 +197,7 @@ branding comment now records that the header is a fixed navy, not tenant-hued
 | `--shadow-nav-active` | `0 4px 14px rgba(2,132,199,.42)` | `shadow-nav-active` |
 | `--radius-card` | 13px | `rounded-card` |
 | `--radius-column` | 16px | `rounded-column` |
-| `--size-topbar` (update) | 58px | `h-(--size-topbar)` |
+| `--size-topbar` (update) | 45px (owner request 2026-10-27; spec said 58px) | `h-(--size-topbar)` |
 | `--size-toolbar` | 48px | `h-(--size-toolbar)` |
 | `--size-toolbar-control` | 33px | `h-(--size-toolbar-control)` |
 | `--text-micro` | 10px | `text-micro` |
