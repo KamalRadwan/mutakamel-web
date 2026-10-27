@@ -13,7 +13,7 @@ export function LeadExecutiveBoardView(props: LeadExecutiveBoardViewProps) {
   if (!branchId) return <EmptyState title={t.crmLeads.selectBranchFirst} />;
   if (isLoading && stages.length === 0) {
     return (
-      <div className="flex h-full items-stretch gap-3 overflow-x-auto px-5 pt-[13px] pb-5">
+      <div className="flex h-full items-stretch gap-3 overflow-x-auto px-5 pb-5">
         {Array.from({ length: 5 }).map((_, index) => (
           <Skeleton key={index} className="h-full min-w-[282px] flex-[1_1_0] rounded-column" />
         ))}
@@ -26,7 +26,7 @@ export function LeadExecutiveBoardView(props: LeadExecutiveBoardViewProps) {
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-col">
       <DragDropContext onDragStart={board.handleDragStart} onDragUpdate={board.handleDragUpdate} onDragEnd={board.handleDragEnd}>
-        <div className="flex h-full min-h-0 flex-1 items-stretch gap-3 overflow-x-auto px-5 pt-[13px] pb-5">
+        <div className="flex h-full min-h-0 flex-1 items-stretch gap-3 overflow-x-auto px-5 pb-5">
           {stages.map((stage) => <LeadBoardColumn key={stage.id} stage={stage} board={board} />)}
         </div>
       </DragDropContext>

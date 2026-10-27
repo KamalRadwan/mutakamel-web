@@ -11,7 +11,6 @@ export function ActivityReminderField({ form, disabled }: { form: ActivityFormSt
     <Field
       showLabel
       label={t.activities.form.reminderOffsetMinutes}
-      hint={t.activities.form.reminderHint}
       error={activityValidationMessage(t.activities, "reminderOffsetMinutes", form.errors.reminderOffsetMinutes)}
     >
       <Input

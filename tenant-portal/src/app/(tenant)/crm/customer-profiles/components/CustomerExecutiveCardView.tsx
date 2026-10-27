@@ -1,67 +1,24 @@
 "use client";
 
-import { escapeCsvCell } from "@/lib/export/csv-cell";
-
-import { useMemo, useState } from "react";
-import Link from "next/link";
-import {
-  Activity,
-  ArrowUpDown,
-  Building2,
-  CheckSquare,
-  Download,
-  Eye,
-  FileCheck,
-  FileSpreadsheet,
-  FileText,
-  Globe,
-  Mail,
-  Square,
-  Target,
-  User,
-} from "lucide-react";
-import {
-  Button,
-  Pagination,
-  cn,
-  type CardColor,
-  type MoveToTarget,
-  type PageInfo,
-} from "@/design-system";
-import { useTenantAuth } from "@/context/AuthContext";
+import { EmptyState, Pagination, type PageInfo } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { localizedValue } from "@/lib/format/localized";
+import { formatNumber } from "@/lib/format/number";
 import { formatTemplate } from "@/lib/format/template";
-import {
-  countryIsoFromName,
-  getCountryOptions,
-} from "@/lib/geo/country-data";
-import { AcquisitionSourceIcon } from "../../shared/components/AcquisitionSourceIcon";
-import { CrmRating } from "../../shared/components/CrmRating";
-import {
-  crmActivityState,
-  type CrmActivityState,
-} from "../../shared/crm-activity-tone";
-import {
-  buildPartyDocumentHref,
-  type PartyDocumentCountKind,
-  type PartyDocumentCountVisibility,
-  type PartyDocumentCounts,
+import type {
+  PartyDocumentCountVisibility,
+  PartyDocumentCounts,
 } from "../../shared/party-document-counts-contract";
 import type { CustomerProfileCardPatch } from "../customer-profile-card-contract";
-import { CUSTOMER_PROFILE_BOARD_STATUSES } from "../hooks/useCustomerProfileBoard";
 import type {
   CustomerProfileItem,
   CustomerProfileStatus,
 } from "../hooks/useCustomerProfiles";
-import { CustomerPhoneActionsRow } from "./CustomerPhoneActionsRow";
-import { getCustomerStatusVisual } from "./CustomerProfileStatusFunnelBar";
-import {
-  CustomerOwnerAvatar,
-  CustomerProfileAvatar,
-} from "./customer-card/CustomerProfileAvatar";
-import { CustomerProfileCardMenu } from "./customer-card/CustomerProfileCardMenu";
-import { CustomerProfileTagList } from "./customer-card/CustomerProfileTagList";
+import { CustomerGridCard } from "./customer-grid/CustomerGridCard";
+import { CustomerGridToolbar } from "./customer-grid/CustomerGridToolbar";
+import { useCustomerExecutiveCardView } from "./customer-grid/useCustomerExecutiveCardView";
+
+const GRID_CLASS =
+  "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 
 export interface CustomerExecutiveCardViewProps {
   items: readonly CustomerProfileItem[];
@@ -84,48 +41,6 @@ export interface CustomerExecutiveCardViewProps {
   onPageChange?: (page: number) => void;
 }
 
-const CARD_COLOR_HEX: Record<CardColor, string> = {
-  RED: "#ef4444",
-  ORANGE: "#f97316",
-  AMBER: "#f59e0b",
-  YELLOW: "#eab308",
-  GREEN: "#22c55e",
-  TEAL: "#14b8a6",
-  BLUE: "#3b82f6",
-  INDIGO: "#6366f1",
-  PURPLE: "#a855f7",
-  PINK: "#ec4899",
-  SLATE: "#64748b",
-};
-
-const ACTIVITY_PILL_STYLE: Record<
-  CrmActivityState,
-  { bg: string; text: string; dot: string }
-> = {
-  OVERDUE: {
-    bg: "bg-swatch-red-soft border-swatch-red hover:bg-swatch-red-soft/80",
-    text: "text-swatch-red-deep",
-    dot: "bg-swatch-red",
-  },
-  TODAY: {
-    bg: "bg-swatch-amber-soft border-swatch-amber hover:bg-swatch-amber-soft/80",
-    text: "text-swatch-amber-deep",
-    dot: "bg-swatch-amber",
-  },
-  FUTURE: {
-    bg: "bg-swatch-green-soft border-swatch-green hover:bg-swatch-green-soft/80",
-    text: "text-swatch-green-deep",
-    dot: "bg-swatch-green",
-  },
-  NONE: {
-    bg: "bg-muted/60 border-border/70 hover:bg-muted",
-    text: "text-muted-foreground",
-    dot: "bg-swatch-slate",
-  },
-};
-
-type QuickSortKey = "default" | "name_asc" | "rating_desc";
-
 export function CustomerExecutiveCardView({
   items,
   selectedIds,
@@ -144,687 +59,101 @@ export function CustomerExecutiveCardView({
   onPageChange,
 }: CustomerExecutiveCardViewProps) {
   const { t, lang } = useI18n();
-  const { user } = useTenantAuth();
-  const canExport = user?.permissions.includes("crm.customer_profiles.export") ?? false;
-  const card = t.crmLeads.card;
-  const statusLabels: Record<string, string | undefined> = t.statusValues;
-
-  const [quickSort, setQuickSort] = useState<QuickSortKey>("default");
-  const [localStatusFilter, setLocalStatusFilter] =
-    useState<CustomerProfileStatus | null>(null);
-
-  const countryFlags = useMemo(
-    () =>
-      new Map(
-        getCountryOptions(lang).map(({ isoCode, flag }) => [isoCode, flag]),
-      ),
-    [lang],
-  );
-
-  const displayedItems = useMemo(() => {
-    const filtered = localStatusFilter
-      ? items.filter((item) => item.status === localStatusFilter)
-      : [...items];
-
-    if (quickSort === "name_asc") {
-      return [...filtered].sort((a, b) =>
-        a.displayName.localeCompare(b.displayName),
-      );
-    }
-    if (quickSort === "rating_desc") {
-      return [...filtered].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-    }
-    return filtered;
-  }, [items, localStatusFilter, quickSort]);
-
-  const allSelected =
-    displayedItems.length > 0 &&
-    displayedItems.every((item) => selectedIds.has(item.id));
-
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      onSelectionChange(new Set());
-    } else {
-      onSelectionChange(new Set(displayedItems.map((item) => item.id)));
-    }
-  };
-
-  const toggleSelectOne = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    onSelectionChange(next);
-  };
-
-  const exportRows = displayedItems.filter((item) => selectedIds.has(item.id));
-
-  const handleExportCsv = () => {
-    if (!canExport || exportRows.length === 0) return;
-    const rows = exportRows;
-    const csv = t.crmCustomerProfiles.csvExport;
-    const headers = [
-      csv.headers.name,
-      csv.headers.profileType,
-      csv.headers.status,
-      csv.headers.primaryContact,
-      csv.headers.phone,
-      csv.headers.email,
-      csv.headers.country,
-      csv.headers.city,
-      csv.headers.rating,
-      csv.headers.salesperson,
-    ];
-    const csvLines = [
-      headers.map(escapeCsvCell).join(","),
-      ...rows.map((item) => {
-        const ownerName = item.owner
-          ? [item.owner.firstName, item.owner.lastName].filter(Boolean).join(" ")
-          : "";
-        const phone =
-          item.profileType === "CORPORATE"
-            ? item.primaryContact?.phones[0] || item.phone
-            : item.phone;
-        return [
-          item.displayName,
-          t.crmCustomerProfiles.profileTypes[item.profileType],
-          statusLabels[`CustomerStatus.${item.status}`] ?? t.crmCustomerProfiles.unavailable,
-          item.primaryContactName ?? "",
-          phone,
-          item.email ?? "",
-          item.country,
-          item.city,
-          String(item.rating ?? 0),
-          ownerName,
-        ]
-          .map((value) => escapeCsvCell(String(value ?? "")))
-          .join(",");
-      }),
-    ];
-    const blob = new Blob(["\uFEFF" + csvLines.join("\n")], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `customers-export-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const {
+    quickSort,
+    setQuickSort,
+    localStatusFilter,
+    setLocalStatusFilter,
+    statusCounts,
+    displayedItems,
+    exportCount,
+    isAllSelected,
+    isSomeSelected,
+    canExport,
+    canUpdateCustomer,
+    canDeleteCustomer,
+    toggleSelectAll,
+    toggleSelectOne,
+    exportCsv,
+    moveTargetsForCustomer,
+  } = useCustomerExecutiveCardView({
+    items,
+    selectedIds,
+    onSelectionChange,
+    canUpdate,
+    canDelete,
+  });
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-3.5">
-      {/* Top Batch & Sort Sub-Toolbar */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2 shadow-2xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            onClick={toggleSelectAll}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
-          >
-            {allSelected ? (
-              <CheckSquare className="size-3.5 text-primary" />
-            ) : (
-              <Square className="size-3.5 text-muted-foreground" />
-            )}
-            <span>
-              {selectedIds.size > 0
-                ? formatTemplate(t.crmCustomerProfiles.ui.card.value_selected, { selectedIds_size: selectedIds.size })
-                : t.crmCustomerProfiles.ui.card.select_all}
-            </span>
-          </Button>
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
+      <CustomerGridToolbar
+        totalItemsCount={items.length}
+        selectedCount={selectedIds.size}
+        exportCount={exportCount}
+        isAllSelected={isAllSelected}
+        isSomeSelected={isSomeSelected}
+        canExport={canExport}
+        quickSort={quickSort}
+        localStatusFilter={localStatusFilter}
+        statusCounts={statusCounts}
+        onToggleSelectAll={toggleSelectAll}
+        onQuickSortChange={setQuickSort}
+        onStatusFilterChange={setLocalStatusFilter}
+        onExportCsv={exportCsv}
+      />
 
-          {/* Quick Status Filter Pills */}
-          <div className="hidden items-center gap-1 sm:flex">
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              onClick={() => setLocalStatusFilter(null)}
-              className={cn(
-                "rounded-lg px-2 py-1 text-xs font-semibold transition-colors",
-                localStatusFilter === null
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {t.crmCustomerProfiles.ui.card.all} ({items.length})
-            </Button>
-            {CUSTOMER_PROFILE_BOARD_STATUSES.map((status) => {
-              const count = items.filter((i) => i.status === status).length;
-              const isSelected = localStatusFilter === status;
-              const visual = getCustomerStatusVisual(status);
-              return (
-                <Button
-                  key={status}
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  onClick={() =>
-                    setLocalStatusFilter(isSelected ? null : status)
-                  }
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-colors",
-                    isSelected
-                      ? visual.badgeClass
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <span
-                    className={cn("size-1.5 rounded-full", visual.dotClass)}
-                  />
-                  <span>
-                    {statusLabels[`CustomerStatus.${status}`] ?? status}
-                  </span>
-                  <span className="opacity-75">({count})</span>
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: Quick Sort & Export CSV */}
-        <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1 text-xs">
-            <ArrowUpDown className="size-3.5 text-muted-foreground" />
-            <select
-              value={quickSort}
-              onChange={(e) => setQuickSort(e.target.value as QuickSortKey)}
-              aria-label={t.crmCustomerProfiles.ui.card.sort_cards}
-              className="bg-transparent text-xs font-semibold text-foreground focus:outline-none"
-            >
-              <option value="default">
-                {t.crmCustomerProfiles.ui.card.default_order}
-              </option>
-              <option value="name_asc">
-                {t.crmCustomerProfiles.ui.card.name_a_z}
-              </option>
-              <option value="rating_desc">
-                {t.crmCustomerProfiles.ui.card.highest_rating}
-              </option>
-            </select>
-          </div>
-
-          {canExport && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={exportRows.length === 0}
-              title={t.crmCustomerProfiles.csvExport.selectionHint}
-            >
-              <Download className="size-3.5" aria-hidden="true" />
-              {formatTemplate(t.crmCustomerProfiles.csvExport.selected, {
-                count: exportRows.length,
-              })}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* 7-Layer Executive Bento Card Grid */}
       <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
-        {displayedItems.map((item) => {
-          const isSelected = selectedIds.has(item.id);
-          const isCorporate = item.profileType === "CORPORATE";
-          const visual = getCustomerStatusVisual(item.status);
-          const editable = canUpdate(item);
-          const deletable = canDelete(item);
-
-          const topAccentHex = item.cardColor
-            ? CARD_COLOR_HEX[item.cardColor]
-            : visual.accentHex;
-
-          const primaryPhone = isCorporate
-            ? item.primaryContact?.phones[0] || item.phone
-            : item.phone;
-          const contactEmail = isCorporate
-            ? item.primaryContact?.email || item.email
-            : item.email;
-
-          const sourceName = localizedValue(
-            item.acquisitionSourceNameAr,
-            item.acquisitionSourceNameEn,
-            lang,
-          );
-          const storedCountry = item.country.trim();
-          const iso = /^[A-Z]{2}$/u.test(storedCountry.toUpperCase())
-            ? storedCountry.toUpperCase()
-            : countryIsoFromName(storedCountry);
-          const flag = iso ? (countryFlags.get(iso) ?? "") : "";
-          const locationText = [item.country, item.city]
-            .filter(Boolean)
-            .join(" · ");
-
-          const activityState = crmActivityState(item.nextActivity);
-          const activityPill = ACTIVITY_PILL_STYLE[activityState];
-          const activityLabel = card.activityStates[activityState];
-
-          const ownerName = item.owner
-            ? [item.owner.firstName, item.owner.lastName]
-                .filter(Boolean)
-                .join(" ")
-            : "";
-
-          const counts = documentCountsByParty?.get(item.partyId);
-          const moveTargets: MoveToTarget[] =
-            CUSTOMER_PROFILE_BOARD_STATUSES.filter(
-              (candidate) => candidate !== item.status,
-            ).map((candidate) => ({
-              id: candidate,
-              label: statusLabels[`CustomerStatus.${candidate}`] ?? candidate,
-            }));
-
-          return (
-            <article
-              key={item.id}
-              className={cn(
-                "group relative flex flex-col justify-between overflow-hidden rounded-lg border bg-card shadow-xs transition-all duration-150",
-                "hover:-translate-y-0.5 hover:border-border hover:shadow-md",
-                isSelected
-                  ? "border-swatch-blue ring-2 ring-swatch-blue/40 bg-swatch-blue-soft/20"
-                  : "border-border/80",
-              )}
-            >
-              {/* Layer 1: Top 3.5px Color Bar */}
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-0 h-[3.5px]"
-                style={{ backgroundColor: topAccentHex }}
+        {displayedItems.length === 0 ? (
+          <EmptyState title={t.common.noData} />
+        ) : (
+          <div data-testid="customer-card-grid" className={GRID_CLASS}>
+            {displayedItems.map((item) => (
+              <CustomerGridCard
+                key={item.id}
+                item={item}
+                documentCounts={documentCountsByParty?.get(item.partyId)}
+                documentCountVisibility={documentCountVisibility}
+                isSelected={selectedIds.has(item.id)}
+                canUpdate={canUpdateCustomer(item)}
+                canDelete={canDeleteCustomer(item)}
+                moveTargets={moveTargetsForCustomer(item)}
+                onToggleSelect={() => toggleSelectOne(item.id)}
+                onOpen={() => onOpen(item)}
+                onOpenQuickModal={
+                  onOpenQuickModal ? () => onOpenQuickModal(item) : undefined
+                }
+                onOpenActivities={
+                  onOpenActivities ? () => onOpenActivities(item) : undefined
+                }
+                onDelete={onDelete ? () => onDelete(item) : undefined}
+                onMoveStatus={(status) => onMoveStatus(item, status)}
+                onCardChange={(patch) => onCardChange(item, patch)}
               />
-
-              <div className="flex flex-col gap-3 p-4 pt-4">
-                {/* Layer 2: Header (Checkbox + Avatar + Name + Status Pill + Eye + Menu) */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => toggleSelectOne(item.id)}
-                      aria-label={item.displayName}
-                      className="mt-1 size-5 shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                    >
-                      {isSelected ? (
-                        <CheckSquare className="size-4 text-primary" />
-                      ) : (
-                        <Square className="size-4 opacity-60 group-hover:opacity-100" />
-                      )}
-                    </Button>
-
-                    <CustomerProfileAvatar
-                      imageUrl={item.imageUrl}
-                      displayName={item.displayName}
-                      profileType={item.profileType}
-                      className="size-10 shrink-0 ring-1 ring-border/70"
-                    />
-
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        href={`/crm/customer-profiles/${encodeURIComponent(item.id)}`}
-                        className="block truncate text-sm font-semibold text-foreground hover:text-primary hover:underline"
-                      >
-                        {item.displayName}
-                      </Link>
-                      <p className="truncate text-xs font-medium text-muted-foreground">
-                        {isCorporate
-                          ? item.companyName &&
-                            item.companyName !== item.displayName
-                            ? item.companyName
-                            : item.primaryContactName ||
-                              t.crmCustomerProfiles.profileTypes.CORPORATE
-                          : item.email ||
-                            t.crmCustomerProfiles.profileTypes.INDIVIDUAL}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Status Select Pill + Quick 360° Modal + Menu */}
-                  <div className="flex shrink-0 items-center gap-1">
-                    {editable ? (
-                      <select
-                        value={item.status}
-                        aria-label={t.common.status}
-                        onChange={(e) =>
-                          onMoveStatus(
-                            item,
-                            e.target.value as CustomerProfileStatus,
-                          )
-                        }
-                        className={cn(
-                          "h-6 cursor-pointer rounded-full border px-2 text-xs font-semibold focus:outline-none",
-                          visual.badgeClass,
-                        )}
-                      >
-                        {CUSTOMER_PROFILE_BOARD_STATUSES.map((status) => (
-                          <option
-                            key={status}
-                            value={status}
-                            className="bg-card text-foreground"
-                          >
-                            {statusLabels[`CustomerStatus.${status}`] ?? status}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold",
-                          visual.badgeClass,
-                        )}
-                      >
-                        {statusLabels[`CustomerStatus.${item.status}`] ??
-                          item.status}
-                      </span>
-                    )}
-
-                    {onOpenQuickModal && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => onOpenQuickModal(item)}
-                        title={
-                          t.crmCustomerProfiles.ui.card.quick_360_inspect_edit
-                        }
-                        aria-label={
-                          t.crmCustomerProfiles.ui.card.quick_360_inspect_edit
-                        }
-                        className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-swatch-blue-soft hover:text-swatch-blue-deep"
-                      >
-                        <Eye className="size-4" />
-                      </Button>
-                    )}
-
-                    <CustomerProfileCardMenu
-                      cardColor={item.cardColor}
-                      onOpen={() => onOpen(item)}
-                      onDelete={
-                        deletable && onDelete
-                          ? () => onDelete(item)
-                          : undefined
-                      }
-                      moveTargets={editable ? moveTargets : undefined}
-                      onMove={
-                        editable
-                          ? (status) =>
-                              onMoveStatus(item, status as CustomerProfileStatus)
-                          : undefined
-                      }
-                      onColorChange={
-                        editable
-                          ? (cardColor: CardColor | null) =>
-                              onCardChange(item, { cardColor })
-                          : undefined
-                      }
-                      labels={{
-                        trigger: formatTemplate(card.more, {
-                          name: item.displayName,
-                        }),
-                        open: card.open,
-                        delete: t.common.delete,
-                        moveTo: t.views.moveTo,
-                        cardColor: card.cardColor,
-                        colorNone: card.colorNone,
-                        colorNames: card.colors,
-                        selected: card.colorSelected,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Layer 3: Identity, Location & Source Badges */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold leading-none",
-                      isCorporate
-                        ? "border-swatch-blue bg-swatch-blue-soft text-swatch-blue-deep"
-                        : "border-swatch-purple bg-swatch-purple-soft text-swatch-purple-deep",
-                    )}
-                  >
-                    {isCorporate ? (
-                      <Building2 className="size-3" />
-                    ) : (
-                      <User className="size-3" />
-                    )}
-                    {t.crmCustomerProfiles.profileTypes[item.profileType] ??
-                      item.profileType}
-                  </span>
-
-                  {locationText && (
-                    <span className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      {flag && <span aria-hidden="true">{flag}</span>}
-                      <span className="max-w-[160px] truncate">
-                        {locationText}
-                      </span>
-                    </span>
-                  )}
-
-                  {sourceName && (
-                    <span className="inline-flex items-center gap-1 rounded-md border border-border/70 bg-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      <AcquisitionSourceIcon
-                        source={{ iconUrl: item.sourceIconUrl }}
-                      />
-                      <span className="max-w-[140px] truncate">
-                        {sourceName}
-                      </span>
-                    </span>
-                  )}
-                </div>
-
-                {/* Layer 4: Primary Contact & Instant Communication Channels Box */}
-                <div className="flex flex-col gap-1.5 rounded-lg border border-border/70 bg-muted/35 p-2.5 text-xs">
-                  {isCorporate && item.primaryContactName && (
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-foreground">
-                        <User className="size-3.5 shrink-0 text-swatch-teal" />
-                        <span className="truncate">
-                          {item.primaryContactName}
-                        </span>
-                        <span className="rounded bg-swatch-teal-soft px-1.5 py-0.5 text-xs font-semibold uppercase text-swatch-teal-deep">
-                          {card.primary}
-                        </span>
-                      </span>
-                      {item.primaryContact?.jobTitle && (
-                        <span className="max-w-[130px] truncate text-xs text-muted-foreground">
-                          {item.primaryContact.jobTitle}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {primaryPhone ? (
-                    <CustomerPhoneActionsRow
-                      phone={primaryPhone}
-                      country={item.country}
-                    />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {t.crmCustomerProfiles.unavailable}
-                    </span>
-                  )}
-
-                  {(contactEmail || item.companyWebsite) && (
-                    <div className="flex flex-wrap items-center gap-3 border-t border-border/50 pt-1.5 text-xs">
-                      {contactEmail && (
-                        <a
-                          href={`mailto:${contactEmail}`}
-                          dir="ltr"
-                          className="inline-flex max-w-[180px] items-center gap-1 truncate text-primary hover:underline"
-                        >
-                          <Mail className="size-3 shrink-0" />
-                          <span className="truncate">{contactEmail}</span>
-                        </a>
-                      )}
-                      {item.companyWebsite && (
-                        <a
-                          href={item.companyWebsite}
-                          target="_blank"
-                          rel="noreferrer"
-                          dir="ltr"
-                          className="inline-flex max-w-[160px] items-center gap-1 truncate text-primary hover:underline"
-                        >
-                          <Globe className="size-3 shrink-0" />
-                          <span className="truncate">
-                            {item.companyWebsite.replace(/^https?:\/\//, "")}
-                          </span>
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Layer 5: Tags Row */}
-                {item.tags.length > 0 && (
-                  <CustomerProfileTagList
-                    tags={item.tags}
-                    moreLabel={card.moreTags}
-                    maxVisible={4}
-                  />
-                )}
-
-                {/* Layer 6: 4-Cell Related Documents Strip (OPP | PQ | SO | INV) */}
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[
-                    {
-                      kind: "opportunities" as PartyDocumentCountKind,
-                      code: "OPP",
-                      label: t.crmCustomerProfiles.ui.card.opps,
-                      value: counts?.opportunities ?? 0,
-                      icon: Target,
-                      visible: documentCountVisibility?.opportunities !== false,
-                      tone: "border-swatch-blue bg-swatch-blue-soft/60 text-swatch-blue-deep hover:bg-swatch-blue-soft",
-                    },
-                    {
-                      kind: "quotations" as PartyDocumentCountKind,
-                      code: "PQ",
-                      label: t.crmCustomerProfiles.ui.card.quotes,
-                      value: counts?.quotations ?? 0,
-                      icon: FileText,
-                      visible: documentCountVisibility?.quotations !== false,
-                      tone: "border-swatch-purple bg-swatch-purple-soft/60 text-swatch-purple-deep hover:bg-swatch-purple-soft",
-                    },
-                    {
-                      kind: "salesOrders" as PartyDocumentCountKind,
-                      code: "SO",
-                      label: t.crmCustomerProfiles.ui.card.orders,
-                      value: counts?.salesOrders ?? 0,
-                      icon: FileSpreadsheet,
-                      visible: documentCountVisibility?.salesOrders !== false,
-                      tone: "border-swatch-amber bg-swatch-amber-soft/60 text-swatch-amber-deep hover:bg-swatch-amber-soft",
-                    },
-                    {
-                      kind: "invoices" as PartyDocumentCountKind,
-                      code: "INV",
-                      label: t.crmCustomerProfiles.ui.card.invoices,
-                      value: counts?.invoices ?? 0,
-                      icon: FileCheck,
-                      visible: documentCountVisibility?.invoices !== false,
-                      tone: "border-swatch-green bg-swatch-green-soft/60 text-swatch-green-deep hover:bg-swatch-green-soft",
-                    },
-                  ]
-                    .filter((c) => c.visible)
-                    .map((cell) => {
-                      const CellIcon = cell.icon;
-                      return (
-                        <Link
-                          key={cell.code}
-                          href={buildPartyDocumentHref(cell.kind, item.partyId)}
-                          onClick={(e) => e.stopPropagation()}
-                          data-testid={`customer-card-${cell.code.toLowerCase()}-${item.id}`}
-                          className={cn(
-                            "flex items-center justify-between rounded-lg border px-2 py-1 text-xs font-semibold tabular-nums transition-colors",
-                            cell.tone,
-                          )}
-                        >
-                          <span className="inline-flex items-center gap-1 opacity-85">
-                            <CellIcon className="size-3" />
-                            <span>{cell.code}</span>
-                          </span>
-                          <span className="font-semibold">{cell.value}</span>
-                        </Link>
-                      );
-                    })}
-                </div>
-              </div>
-
-              {/* Layer 7: Card Footer (3-Star Rating + Activity Pill + Owner Badge) */}
-              <div className="flex items-center justify-between gap-2 border-t border-border/70 bg-muted/25 px-4 py-2.5">
-                <CrmRating
-                  value={item.rating}
-                  onChange={(rating) => onCardChange(item, { rating })}
-                  disabled={!editable}
-                  labels={{
-                    group: card.rating,
-                    setStars: card.rateStars,
-                    clear: card.clearRating,
-                  }}
-                />
-
-                <div className="flex items-center gap-2">
-        {onOpenActivities && item.status !== "BLACKLISTED" && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onClick={() => onOpenActivities(item)}
-            title={formatTemplate(card.activityOpen, {
-              state: activityLabel,
-            })}
-            aria-label={formatTemplate(card.activityOpen, {
-              state: activityLabel,
-            })}
-            className={cn(
-              "inline-flex h-auto items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
-              activityPill.bg,
-              activityPill.text,
-            )}
-          >
-            <span
-              className={cn("size-1.5 rounded-full", activityPill.dot)}
-            />
-            <Activity className="size-3" />
-            <span className="max-w-[95px] truncate">{activityLabel}</span>
-          </Button>
+            ))}
+          </div>
         )}
-
-                  {item.owner && (
-                    <span
-                      title={formatTemplate(card.owner, { name: ownerName })}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-2 py-0.5 text-xs font-semibold text-foreground"
-                    >
-                      <CustomerOwnerAvatar
-                        owner={item.owner}
-                        className="size-4"
-                      />
-                      <span className="max-w-[85px] truncate">{ownerName}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-            </article>
-          );
-        })}
-        </div>
       </div>
 
-      {/* Pagination Footer — Always pinned to the bottom of the page */}
       {page && onPageChange && (
-        <div className="mt-auto shrink-0 border-t border-border/60 pt-2">
+        <div className="mt-auto shrink-0 border-t border-line-divider pt-2">
           <Pagination
             page={page}
             onPageChange={onPageChange}
             labels={{
               previous: t.common.previousPage,
               next: t.common.nextPage,
+              first: t.common.firstPage,
+              last: t.common.lastPage,
+              page: (n) =>
+                formatTemplate(t.common.pageNumber, {
+                  n: formatNumber(n, lang),
+                }),
               summary: (from, to, total) =>
-                formatTemplate(t.common.showingOf, { from, to, total }),
+                formatTemplate(t.common.showingOf, {
+                  from: formatNumber(from, lang),
+                  to: formatNumber(to, lang),
+                  total: formatNumber(total, lang),
+                }),
             }}
           />
         </div>

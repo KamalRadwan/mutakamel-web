@@ -138,7 +138,7 @@ export function createActivityForm(options: {
     status: "PLANNED",
     priority: "NORMAL",
     direction: "",
-    reminderOffsetMinutes: "",
+    reminderOffsetMinutes: "15",
     ...withInstant("start", start),
     ...defaultEnd(type, start),
     location: "",

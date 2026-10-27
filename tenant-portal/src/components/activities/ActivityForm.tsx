@@ -95,8 +95,8 @@ export function ActivityForm(props: ActivityFormProps) {
   const meetingUrlValid = values.meetingUrl.trim().length > 0 && isHttpUrl(values.meetingUrl.trim());
 
   const subjectBlock = (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex min-w-0 flex-col">
+      <div className="flex min-h-6 items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <span aria-hidden="true" className="text-xs font-semibold text-foreground">
             {copy.form.subject} <span className="text-destructive">*</span>
@@ -126,9 +126,11 @@ export function ActivityForm(props: ActivityFormProps) {
   const statusBlock =
     mode === "create" && props.statuses.length > 1 ? (
       <div className="flex min-w-0 flex-col gap-1.5">
-        <span aria-hidden="true" className="text-xs font-semibold text-foreground">
-          {traits.hasDirection ? copy.form.initialStatus : copy.form.status}
-        </span>
+        <div className="flex min-h-6 items-center justify-between gap-2">
+          <span aria-hidden="true" className="text-xs font-semibold text-foreground">
+            {traits.hasDirection ? copy.form.initialStatus : copy.form.status}
+          </span>
+        </div>
         <ToggleGroup
           type="single"
           value={values.status}
@@ -162,7 +164,7 @@ export function ActivityForm(props: ActivityFormProps) {
 
   const priorityBlock = (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex min-h-6 items-center justify-between gap-2">
         <span aria-hidden="true" className="text-xs font-semibold text-foreground">
           {copy.form.priority}
         </span>
@@ -203,7 +205,7 @@ export function ActivityForm(props: ActivityFormProps) {
 
   const directionBlock = traits.hasDirection ? (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex min-h-6 items-center justify-between gap-2">
         <span aria-hidden="true" className="text-xs font-semibold text-foreground">
           {values.type === "CALL" ? copy.form.callDirection : copy.form.direction}
         </span>
@@ -320,19 +322,6 @@ export function ActivityForm(props: ActivityFormProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Section Header in Create Mode (Task / non-windowed types) */}
-      {mode === "create" && props.targetFixed && !traits.hasEnd && (
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className={cn("size-2 rounded-full", palette.dot)} aria-hidden="true" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {copy.form.sectionScheduleNew}
-            </span>
-          </div>
-          <span className="text-2xs text-muted-foreground">{copy.form.requiredFieldsNote}</span>
-        </div>
-      )}
-
       {/* Standalone Target Record Picker (when creating without fixed record) */}
       {mode === "create" && !props.targetFixed && (
         <ActivityTargetField
@@ -357,7 +346,7 @@ export function ActivityForm(props: ActivityFormProps) {
 
       {/* 2. Title + Contextual Side Partner (Locked Target on Edit, Assignee on Windowed/Directed Create, or Full-Width Title on Task Create) */}
       {isEdit && values.target ? (
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           {subjectBlock}
           <ActivityTargetField
             scope={props.scope}
@@ -370,7 +359,7 @@ export function ActivityForm(props: ActivityFormProps) {
           />
         </div>
       ) : mode === "create" && (traits.hasEnd || directionInSchedule) ? (
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           {subjectBlock}
           <ActivityAssigneeField {...props} />
         </div>
@@ -412,7 +401,7 @@ export function ActivityForm(props: ActivityFormProps) {
           </div>
           <div
             className={cn(
-              "grid gap-3",
+              "grid items-start gap-3",
               (traits.hasLocation && traits.hasMeetingUrl) || (directionInSubcard && !traits.hasLocation)
                 ? "sm:grid-cols-2"
                 : undefined,
@@ -420,8 +409,8 @@ export function ActivityForm(props: ActivityFormProps) {
           >
             {directionInSubcard && !traits.hasLocation && directionBlock}
             {traits.hasLocation && (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-col">
+                <div className="flex min-h-6 items-center justify-between gap-2">
                   <div className="flex items-center gap-1">
                     <MapPin className={cn(iconSize({ size: "xs" }), "text-muted-foreground")} aria-hidden="true" />
                     <span aria-hidden="true" className="text-xs font-semibold text-foreground">
@@ -450,8 +439,8 @@ export function ActivityForm(props: ActivityFormProps) {
               </div>
             )}
             {traits.hasMeetingUrl && (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-col">
+                <div className="flex min-h-6 items-center justify-between gap-2">
                   <div className="flex items-center gap-1">
                     <Globe className={cn(iconSize({ size: "xs" }), "text-muted-foreground")} aria-hidden="true" />
                     <span aria-hidden="true" className="text-xs font-semibold text-foreground">
@@ -485,12 +474,12 @@ export function ActivityForm(props: ActivityFormProps) {
 
       {/* 5. Segmented Pills Row (Always 2 columns max so pills never truncate) */}
       {isEdit ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid items-start gap-3 sm:grid-cols-2">
           <ActivityAssigneeField {...props} />
           {priorityBlock}
         </div>
       ) : (
-        <div className={cn("grid gap-3", statusBlock ? "sm:grid-cols-2" : undefined)}>
+        <div className={cn("grid items-start gap-3", statusBlock ? "sm:grid-cols-2" : undefined)}>
           {statusBlock}
           {priorityBlock}
         </div>
@@ -498,7 +487,7 @@ export function ActivityForm(props: ActivityFormProps) {
 
       {/* 6. Notes & Completion Outcome */}
       {outcomeBlock ? (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid items-start gap-3 md:grid-cols-2">
           {notesBlock}
           {outcomeBlock}
         </div>
@@ -541,8 +530,8 @@ function ActivityAssigneeField({ form, mode, canAssign, actorId, actorName, acti
   const modified = mode === "edit" && isActivityFieldModified(form.values, form.seed, "assigneeUserId");
 
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex min-w-0 flex-col">
+      <div className="flex min-h-6 items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <span aria-hidden="true" className="text-xs font-semibold text-foreground">
             {copy.assignee}
@@ -553,7 +542,7 @@ function ActivityAssigneeField({ form, mode, canAssign, actorId, actorName, acti
           <Button
             type="button"
             variant="ghost"
-            size="xs"
+            size="sm"
             disabled={disabled}
             onClick={() => form.setAssignee(actorId, meDisplay)}
             className="h-5 gap-1 px-1.5 text-2xs font-semibold text-primary hover:bg-selected"
@@ -570,7 +559,7 @@ function ActivityAssigneeField({ form, mode, canAssign, actorId, actorName, acti
             value={currentId ?? undefined}
             selectedLabel={currentLabel}
             leadingSlot={
-              <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-swatch-indigo text-2xs font-semibold text-primary-foreground">
+              <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-gradient-avatar text-2xs font-semibold text-white">
                 {initials}
               </span>
             }

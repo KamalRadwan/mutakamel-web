@@ -34,6 +34,8 @@ vi.mock("@/lib/api/idempotent-write", async (importOriginal) => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  // The board persists collapsed columns per route.
+  usePathname: () => "/crm/customer-profiles",
 }));
 
 const relatedScopeHeaders = vi.hoisted(() => ({
@@ -356,8 +358,8 @@ describe("CustomerProfiles Executive Suite Components", () => {
     expect(screen.getByText("Delete (1)")).toBeInTheDocument();
   });
 
-  it("renders CustomerExecutiveCardView with corporate and individual cards", () => {
-    render(
+  it("renders CustomerExecutiveCardView with corporate and individual v3 cards", () => {
+    const { container } = render(
       <CustomerExecutiveCardView
         items={[sampleCorporate, sampleIndividual]}
         selectedIds={new Set()}
@@ -372,10 +374,21 @@ describe("CustomerProfiles Executive Suite Components", () => {
       />,
     );
 
+    expect(screen.getByTestId("customer-card-grid")).toHaveClass("grid", "gap-3");
+    expect(screen.getAllByTestId("customer-grid-card")).toHaveLength(2);
     expect(screen.getByText("Al Noor Trading Co")).toBeInTheDocument();
     expect(screen.getByText("Mona Saleh")).toBeInTheDocument();
     expect(screen.getAllByText("Khaled Omar").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("VIP")).toBeInTheDocument();
+    expect(screen.getAllByText("Website")).toHaveLength(2);
+    expect(
+      screen.getAllByText(en.crmLeads.card.activityStates.NONE),
+    ).toHaveLength(2);
+    expect(screen.getAllByText("KR")).toHaveLength(2);
+    expect(container.innerHTML).not.toMatch(
+      /swatch-purple|indigo|violet|fuchsia/i,
+    );
+    expect(container.textContent).not.toMatch(/in stage/i);
   });
 
   it("renders CustomerExecutiveTableView with 11 columns and inline status select", () => {
@@ -487,9 +500,13 @@ describe("CustomerProfiles Executive Suite Components", () => {
     expect(screen.getByText("Al Noor Trading Co")).toBeInTheDocument();
     expect(screen.getByText("Mona Saleh")).toBeInTheDocument();
 
-    // Expand board card to inspect phones, salesperson, and acquisition source details
+    expect(screen.queryByText("Website")).not.toBeInTheDocument();
+    expect(screen.queryByText(en.crmCustomerProfiles.ui.board.just_now)).not.toBeInTheDocument();
+    expect(screen.getAllByText(en.crmLeads.card.activityStates.NONE)).toHaveLength(2);
+
+    // Source and phone details are available only after expanding the card.
     const expandButtons = screen.getAllByRole("button", {
-      name: /Expand Card Details/i,
+      name: en.crmCustomerProfiles.ui.board.expand_card_details,
     });
     expect(expandButtons.length).toBeGreaterThanOrEqual(1);
     fireEvent.click(expandButtons[0]);
@@ -570,7 +587,7 @@ describe("CustomerProfiles Executive Suite Components", () => {
 
     // Fill company name & escalate to Full Modal
     fireEvent.change(
-      screen.getByPlaceholderText("Palm Hills Commercial..."),
+      screen.getByPlaceholderText(en.crmLeads.companyName),
       { target: { value: "Acme Arabia" } },
     );
     const fullModalBtn = screen.getByRole("button", { name: /Full Modal/i });

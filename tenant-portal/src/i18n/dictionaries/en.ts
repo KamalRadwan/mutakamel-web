@@ -1249,6 +1249,16 @@ export const en: Dictionary = {
     phones: "Phone numbers",
   },
   crmOpportunities: {
+    emptyStage: {
+      title: "No opportunities in this stage",
+      hint: {
+        default: "Drag an opportunity here or add a new one.",
+        WON: "Won opportunities will appear here.",
+        LOST: "Lost opportunities will appear here.",
+      },
+      quickAdd: "Quick Add Opportunity",
+    },
+    sortLabel: "Sort",
     liveCardPreview: "Live Deal Card Preview",
     createAndAddAnother: "Create & Add Another",
     bulkActions: "Bulk opportunity actions",
@@ -2085,7 +2095,22 @@ export const en: Dictionary = {
         readOnly: "Read-Only",
         attachTag: "Attach Tag",
       },
+      sort: {
+        label: "Sort",
+        newestFirst: "Newest first",
+        oldestFirst: "Oldest first",
+        nameAscending: "Name A–Z",
+        nameDescending: "Name Z–A",
+      },
       board: {
+        emptyStage: {
+          title: "No customers in this stage",
+          hint: {
+            default: "Drag a customer here or add a new one.",
+            BLACKLISTED: "Blacklisted customers will appear here.",
+          },
+          quickAdd: "Quick Add Customer",
+        },
         just_now: "Just now",
         value_m_ago: "{diffMinutes}m ago",
         value_h_in_stage: "{diffHours}h in stage",
@@ -2364,18 +2389,11 @@ export const en: Dictionary = {
     },
     dueStates: { OVERDUE: "Overdue", TODAY: "Due today", UPCOMING: "Upcoming" },
     modes: {
-      current: "Current",
       edit: "Edit",
-      new: "New",
       inspecting: "Viewing",
       editing: "Editing"
     },
     header: {
-      subtitleEmpty: "View open activities or schedule a new follow-up for this record.",
-      subtitlePopulated: "Manage current open activities or schedule a new interaction.",
-      subtitleStandalone: "Log an already-completed interaction or schedule a new activity across any CRM record.",
-      subtitleView: "Inspecting current activity details, schedule window, and quick status transitions.",
-      subtitleEdit: "Modify schedule window, assignment, or details · Status changes use Complete / Cancel actions.",
       filingCompleted: "Filing as Completed",
       overdueCount: "{count} Overdue",
       todayCount: "{count} Today"
@@ -2385,8 +2403,6 @@ export const en: Dictionary = {
     form: {
       editTitle: "Edit activity",
       recordDescription: "For {name}",
-      sectionScheduleNew: "Schedule New Activity",
-      requiredFieldsNote: "Fields marked * are required",
       type: "Activity type",
       traitSummaryTask: "Task (Due date & time)",
       traitSummaryMeeting: "Meeting · Includes Start/End, Location & Link",
@@ -2433,7 +2449,6 @@ export const en: Dictionary = {
       clearEndShort: "Clear end",
       scheduleTitle: "Due Date & Time",
       reminderOffsetMinutes: "Reminder (minutes before)",
-      reminderHint: "Leave blank for no reminder. Enter 0 to remind at the start or due time.",
       windowTitle: "Time window & assignment",
       meetingWindow: "Meeting Window",
       callTimeDuration: "Call Time & Duration",

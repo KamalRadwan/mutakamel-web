@@ -129,7 +129,7 @@ export function ActivityAgenda({
       emptySlot={
         variant === "rail" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card px-4 py-7 text-center">
-            <div className="flex size-12 items-center justify-center rounded-lg bg-swatch-indigo-soft text-swatch-indigo-deep">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-entity-person-surface text-entity-person-fg">
               <Inbox className={iconSize({ size: "xl" })} aria-hidden="true" />
             </div>
             <div className="flex flex-col items-center gap-1">

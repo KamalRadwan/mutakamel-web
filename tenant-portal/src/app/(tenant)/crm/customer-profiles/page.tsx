@@ -43,6 +43,7 @@ import { CustomerProfileBulkActionsBar } from "./components/CustomerProfileBulkA
 import { CustomerProfileSearchBar } from "./components/CustomerProfileSearchBar";
 import { CustomerProfileStatusFunnelBar } from "./components/CustomerProfileStatusFunnelBar";
 import { CustomerQuickEditModal } from "./components/CustomerQuickEditModal";
+import { CustomerSortMenu } from "./components/CustomerSortMenu";
 import { useCreateCustomerProfile } from "./hooks/useCreateCustomerProfile";
 import { useCustomerProfileBoard } from "./hooks/useCustomerProfileBoard";
 import { useCustomerProfileBoardMove } from "./hooks/useCustomerProfileBoardMove";
@@ -436,6 +437,7 @@ export default function CustomerProfilesPage() {
               table: t.views.table,
             }}
           />
+          <CustomerSortMenu sort={workspace.sort ?? sort} setSort={workspace.setSort} />
           <ActivitiesWorkspaceLink type="CUSTOMER_PROFILE" />
         </PageActions>
 

@@ -17,8 +17,8 @@ describe("shell geometry", () => {
     expect(token("size-toolbar")).toBe("calc(3rem * var(--ui-scale))");
   });
 
-  it("includes the scaled 11px outer padding in the actionbar height", () => {
-    expect(token("size-actionbar-inset")).toBe("calc(0.6875rem * var(--ui-scale))");
+  it("includes the scaled 6px outer padding in the actionbar height", () => {
+    expect(token("size-actionbar-inset")).toBe("calc(0.375rem * var(--ui-scale))");
     expect(token("size-actionbar")).toBe(
       "calc(var(--size-toolbar) + var(--size-actionbar-inset))",
     );

@@ -11,9 +11,9 @@ Source of truth once implemented: `src/app/globals.css`,
 > fonts, sizes and per-page UI/UX. Since the admin-portal token port the shipped
 > geometry is **32px controls / 44px rows** at `--ui-scale` **1**. The chrome was
 > admin's exact 48px topbar / 240px sidebar / 52px rail until 2026-09-06 and is
-> now, as of **2026-10-26**, a **3px brand strip + 45px top bar + 59px action bar**
-> at standard density, totaling **107px chrome** — see [CRM Leads v3](specs/crm-leads-v3.md).
-> The action bar is an **11px inset + 48px floating toolbar with 33px controls**.
+> now, as of **2026-10-26**, a **3px brand strip + 45px top bar + 54px action bar**
+> at standard density, totaling **102px chrome** — see [CRM Leads v3](specs/crm-leads-v3.md).
+> The action bar is an **6px inset + 48px floating toolbar with 33px controls**.
 > Every sidebar figure below is kept only as the record of what the
 > swing used to cost. This page keeps the longer reasoning behind the radius
 > scale, elevation model and budgets.
@@ -79,7 +79,7 @@ The original migration, for the record, ran in two moves:
 > **24/28/32/36/40px**, and since the admin port those are the pixel sizes that
 > actually render: `--ui-scale` ships at **1**, so the `rem` values are no
 > longer multiplied down by 0.9. The row is **44px**. The shell uses the
-> **107px standard-density chrome** specified in [CRM Leads v3](specs/crm-leads-v3.md).
+> **102px standard-density chrome** specified in [CRM Leads v3](specs/crm-leads-v3.md).
 >
 > The "16 rows on a 1366×768 laptop" figure counts only the topbar and the
 > table header, and the measured "14 rows at 1.0 / 15 at 0.9" figure was taken
@@ -189,9 +189,9 @@ concerned, at exactly the same breakpoint. The port widened the sidebar by
 size it always was; only the starting width moved.
 
 Vertically the same thing costs rows. As of **2026-10-26**, the strip stays
-fixed at 3px while the 45px top bar and 59px action bar scale with density.
+fixed at 3px while the 45px top bar and 54px action bar scale with density.
 The action bar shares `--size-actionbar-inset` with its wrapper padding:
-`calc(0.6875rem * var(--ui-scale))`, added to `--size-toolbar` by
+`calc(0.375rem * var(--ui-scale))`, added to `--size-toolbar` by
 `--size-actionbar`. Thus the measured box and `--size-chrome` use the same inset.
 
 | Density | Row | Chrome (strip + both bars) | Historical rows visible (before v3) |

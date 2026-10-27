@@ -86,21 +86,20 @@ function renderBoard(overrides: Partial<LeadExecutiveBoardViewProps> = {}) {
 }
 
 describe.each(["en", "ar"] as const)("LeadExecutiveBoardView v3 (%s)", (lang) => {
-  it("shows the no-activity pill and removes stage duration and face expansion", () => {
+  it("shows the no-activity pill, removes stage duration and keeps the expand arrow on the face", () => {
     locale.lang = lang;
     renderBoard();
     const t = dictionaries[lang];
     expect(screen.getByText(t.crmLeads.card.activityStates.NONE)).toBeInTheDocument();
     expect(screen.queryByText(/in stage|في المرحلة/u)).toBeNull();
-    expect(screen.queryByRole("button", { name: t.crmLeads.executive.expandCard })).toBeNull();
+    expect(screen.getByRole("button", { name: t.crmLeads.executive.expandCard })).toBeInTheDocument();
   });
 
-  it("expands through the card menu, keeps the v3 footer, and collapses again", () => {
+  it("expands through the card's arrow, keeps the v3 footer, and collapses again", () => {
     locale.lang = lang;
     const { props } = renderBoard();
     const t = dictionaries[lang];
-    fireEvent.keyDown(screen.getByRole("button", { name: formatTemplate(t.crmLeads.card.more, { name: lead.leadName }) }), { key: "Enter" });
-    fireEvent.click(screen.getByRole("menuitem", { name: t.crmLeads.executive.expandCard }));
+    fireEvent.click(screen.getByRole("button", { name: t.crmLeads.executive.expandCard }));
     expect(screen.getByRole("button", { name: t.crmLeads.executive.collapseCard })).toBeInTheDocument();
     expect(screen.queryByText(/in stage|في المرحلة/u)).toBeNull();
     expect(screen.getByText(t.crmLeads.card.activityStates.NONE)).toBeInTheDocument();

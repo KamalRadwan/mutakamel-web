@@ -83,10 +83,10 @@ export function ActivityTargetField({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-swatch-indigo/25 bg-swatch-indigo/5 p-3.5">
+    <div className="flex flex-col gap-3 rounded-lg border border-line-card bg-entity-person-surface p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <Link2 className={cn(iconSize({ size: "sm" }), "text-swatch-indigo")} aria-hidden="true" />
+          <Link2 className={cn(iconSize({ size: "sm" }), "text-entity-person-fg")} aria-hidden="true" />
           <span className="text-xs font-semibold text-foreground">
             {copy.form.relatedTo} <span className="text-destructive">*</span>
           </span>

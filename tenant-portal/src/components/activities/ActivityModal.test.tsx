@@ -114,8 +114,8 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("ActivityModal Split-Workspace (Current · New · Edit)", () => {
-  it("renders empty Current rail with quick starters and switches activity types in New mode", async () => {
+describe("ActivityModal Split-Workspace", () => {
+  it("renders empty Current rail with quick starters and switches activity types in create mode", async () => {
     mockReadCoreData.mockImplementation((path: string) => {
       if (path.includes("/assignees")) {
         return Promise.resolve([{ id: "01950000-0000-7000-8000-000000000010", displayName: "Kamal Radwan" }]);
@@ -143,9 +143,10 @@ describe("ActivityModal Split-Workspace (Current · New · Edit)", () => {
     );
 
     expect(await screen.findByText(en.activities.agenda.empty)).toBeInTheDocument();
-    expect(screen.getByText(en.activities.header.subtitleEmpty)).toBeInTheDocument();
-    expect(screen.getByText(en.activities.form.sectionScheduleNew)).toBeInTheDocument();
-    expect(screen.getByText(en.activities.form.requiredFieldsNote)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: `${en.activities.title} · ${sampleTarget.label}` })).toBeInTheDocument();
+    expect(screen.getByText(en.activities.targetTypes.LEAD)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.activities.newActivity })).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes })).toHaveValue(15);
     expect(screen.getByText(en.activities.form.traitSummaryTask)).toBeInTheDocument();
     expect(screen.getByText(en.activities.dueStates.OVERDUE)).toBeInTheDocument();
     expect(screen.getByText(en.activities.dueStates.TODAY)).toBeInTheDocument();
@@ -202,10 +203,12 @@ describe("ActivityModal Split-Workspace (Current · New · Edit)", () => {
     expect(screen.getByText(sampleActivity.location!)).toBeInTheDocument();
     expect(screen.getByText(en.activities.detail.optimisticLock)).toBeInTheDocument();
     expect(screen.getByText(`v${sampleActivity.version}`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.activities.newActivity })).toBeInTheDocument();
 
-    // Switch to Edit mode via the header mode switcher
-    fireEvent.click(screen.getAllByRole("button", { name: en.activities.modes.edit })[0]);
+    // Switch to Edit mode via the Edit action
+    fireEvent.click(screen.getAllByRole("button", { name: en.activities.actions.edit })[0]);
     expect(await screen.findByText(en.activities.form.lockedTarget)).toBeInTheDocument();
+    expect(screen.getByText(`${en.activities.modes.editing} · v${sampleActivity.version}`)).toBeInTheDocument();
     expect(screen.getByText(en.activities.form.traitEditNotice)).toBeInTheDocument();
     expect(screen.getByText(en.activities.form.editStatusHint)).toBeInTheDocument();
 
@@ -269,21 +272,28 @@ describe("ActivityModal Split-Workspace (Current · New · Edit)", () => {
     // Call Direction segmented pills are rendered
     expect(screen.getByText(en.activities.directions.INBOUND)).toBeInTheDocument();
     expect(screen.getByText(en.activities.directions.OUTBOUND)).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes })).toHaveValue(15);
 
-    // Selecting Completed status reveals the Completion Outcome subcard
+    // Selecting Completed status reveals the Completion Outcome subcard and hides reminder
     fireEvent.click(screen.getByRole("radio", { name: en.activities.statuses.DONE }));
     expect(screen.getByPlaceholderText(en.activities.form.outcomePlaceholder)).toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes })).not.toBeInTheDocument();
   });
 
   it("validates required fields before submit and supports Cancel dialog quick reason templates", async () => {
-    mockReadCoreData.mockResolvedValue({
-      items: [sampleActivity],
-      total: 1,
-      page: 1,
-      limit: 25,
-      totalPages: 1,
-      hasNext: false,
-      hasPrev: false,
+    mockReadCoreData.mockImplementation((path: string) => {
+      if (path.includes("/assignees")) {
+        return Promise.resolve([{ id: "01950000-0000-7000-8000-000000000010", displayName: "Kamal Radwan" }]);
+      }
+      return Promise.resolve({
+        items: [sampleActivity],
+        total: 1,
+        page: 1,
+        limit: 25,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      });
     });
 
     render(
@@ -310,6 +320,181 @@ describe("ActivityModal Split-Workspace (Current · New · Edit)", () => {
     const cancelReason = en.activities.cancel.templates.rescheduled;
     fireEvent.click(screen.getByRole("button", { name: cancelReason }));
     expect(screen.getByDisplayValue(cancelReason)).toBeInTheDocument();
+  });
+
+  it("defaults reminder to 15 minutes on create and omits reminder when creating directly as DONE", async () => {
+    mockReadCoreData.mockImplementation((path: string) => {
+      if (path.includes("/assignees")) {
+        return Promise.resolve([{ id: "01950000-0000-7000-8000-000000000010", displayName: "Kamal Radwan" }]);
+      }
+      return Promise.resolve({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 25,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      });
+    });
+    mockRunIdempotentWrite.mockResolvedValue({ kind: "success", value: sampleActivity, replayed: false });
+
+    const { unmount } = render(
+      <TooltipProvider>
+        <ActivityModal
+          request={{ kind: "create", target: sampleTarget }}
+          scope="CRM"
+          onClose={vi.fn()}
+          onChanged={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    const reminderField = screen.getByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes });
+    expect(reminderField).toHaveValue(15);
+
+    fireEvent.change(screen.getByPlaceholderText(en.activities.form.subjectPlaceholder), {
+      target: { value: "Follow up on ERP proposal" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en.activities.form.submitCreate }));
+
+    await waitFor(() => {
+      expect(mockRunIdempotentWrite).toHaveBeenCalledTimes(1);
+    });
+    expect(mockRunIdempotentWrite.mock.calls[0][0].body).toMatchObject({
+      subject: "Follow up on ERP proposal",
+      reminderOffsetMinutes: 15,
+    });
+
+    unmount();
+    mockRunIdempotentWrite.mockClear();
+
+    render(
+      <TooltipProvider>
+        <ActivityModal
+          request={{ kind: "create", target: sampleTarget }}
+          scope="CRM"
+          onClose={vi.fn()}
+          onChanged={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: en.activities.statuses.DONE }));
+    fireEvent.change(screen.getByPlaceholderText(en.activities.form.subjectPlaceholder), {
+      target: { value: "Logged completed call" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en.activities.form.logCompletedActivity }));
+
+    await waitFor(() => {
+      expect(mockRunIdempotentWrite).toHaveBeenCalledTimes(1);
+    });
+    const doneBody = mockRunIdempotentWrite.mock.calls[0][0].body as Record<string, unknown>;
+    expect(doneBody).toMatchObject({
+      subject: "Logged completed call",
+      status: "DONE",
+    });
+    expect(doneBody).not.toHaveProperty("reminderOffsetMinutes");
+  });
+
+  it("keeps the stored reminder value when editing an existing activity", async () => {
+    const activityWithReminder: Activity = {
+      ...sampleActivity,
+      id: "01950000-0000-7000-8000-000000000051",
+      reminderOffsetMinutes: 45,
+    };
+
+    mockReadCoreData.mockImplementation((path: string) => {
+      if (path.includes("/assignees")) {
+        return Promise.resolve([{ id: "01950000-0000-7000-8000-000000000010", displayName: "Kamal Radwan" }]);
+      }
+      if (path.endsWith(`/${sampleActivity.id}`)) {
+        return Promise.resolve(sampleActivity);
+      }
+      if (path.endsWith(`/${activityWithReminder.id}`)) {
+        return Promise.resolve(activityWithReminder);
+      }
+      return Promise.resolve({
+        items: [sampleActivity],
+        total: 1,
+        page: 1,
+        limit: 25,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      });
+    });
+
+    const { unmount } = render(
+      <TooltipProvider>
+        <ActivityModal
+          request={{ kind: "edit", activity: sampleActivity }}
+          scope="CRM"
+          onClose={vi.fn()}
+          onChanged={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes })).toHaveValue(null);
+    unmount();
+
+    render(
+      <TooltipProvider>
+        <ActivityModal
+          request={{ kind: "edit", activity: activityWithReminder }}
+          scope="CRM"
+          onClose={vi.fn()}
+          onChanged={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes })).toHaveValue(45);
+  });
+
+  it("returns from edit mode to a blank create form via the + New activity action", async () => {
+    mockReadCoreData.mockImplementation((path: string) => {
+      if (path.includes("/assignees")) {
+        return Promise.resolve([{ id: "01950000-0000-7000-8000-000000000010", displayName: "Kamal Radwan" }]);
+      }
+      if (path.endsWith(`/${sampleActivity.id}`)) {
+        return Promise.resolve(sampleActivity);
+      }
+      return Promise.resolve({
+        items: [sampleActivity],
+        total: 1,
+        page: 1,
+        limit: 25,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      });
+    });
+
+    render(
+      <TooltipProvider>
+        <ActivityModal
+          request={{ kind: "edit", activity: sampleActivity }}
+          scope="CRM"
+          onClose={vi.fn()}
+          onChanged={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByDisplayValue(sampleActivity.subject)).toBeInTheDocument();
+    expect(screen.getByText(`${en.activities.modes.editing} · v${sampleActivity.version}`)).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes })).toHaveValue(null);
+
+    fireEvent.click(screen.getByRole("button", { name: en.activities.newActivity }));
+
+    expect(screen.getByRole("heading", { name: `${en.activities.title} · ${sampleTarget.label}` })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(en.activities.form.subjectPlaceholder)).toHaveValue("");
+    expect(screen.getByRole("spinbutton", { name: en.activities.form.reminderOffsetMinutes })).toHaveValue(15);
+    expect(screen.getByRole("button", { name: en.activities.form.submitCreate })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.activities.newActivity })).not.toBeInTheDocument();
+    expect(screen.queryByText(`${en.activities.modes.editing} · v${sampleActivity.version}`)).not.toBeInTheDocument();
   });
 });
 

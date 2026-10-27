@@ -161,7 +161,7 @@ export function ActivityDetails({ activity, actorId }: ActivityDetailsProps) {
         >
           <span className="inline-flex items-center gap-2 font-semibold">
             {assignee && (
-              <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-swatch-indigo text-2xs font-semibold text-primary-foreground">
+              <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-gradient-avatar text-2xs font-semibold text-white">
                 {getInitials(assignee)}
               </span>
             )}

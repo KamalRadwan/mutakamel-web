@@ -50,6 +50,7 @@ import {
   type OpportunityQuickEditItem,
 } from "./OpportunityQuickEditModal";
 import { OpportunitySearchBar } from "./OpportunitySearchBar";
+import { OpportunitySortMenu } from "./OpportunitySortMenu";
 import { OpportunityStageFunnelBar } from "./OpportunityStageFunnelBar";
 import { TerminalMoveDialog } from "./TerminalMoveDialog";
 import { useCreateOpportunity } from "../hooks/useCreateOpportunity";
@@ -686,6 +687,10 @@ export function OpportunitiesWorkspace() {
             table: t.views.table,
           }}
         />
+        <OpportunitySortMenu
+          sort={workspace.sort ?? list.sort}
+          setSort={workspace.setSort}
+        />
         <ActivitiesWorkspaceLink type="OPPORTUNITY" />
       </PageActions>
 
@@ -737,7 +742,7 @@ export function OpportunitiesWorkspace() {
                 {Array.from({ length: 4 }).map((_, idx) => (
                   <Skeleton
                     key={`board-col-skel-${idx}`}
-                    className="h-full w-80 shrink-0 rounded-lg"
+                    className="h-full min-w-[282px] flex-[1_1_0] rounded-column"
                   />
                 ))}
               </div>

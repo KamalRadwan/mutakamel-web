@@ -96,16 +96,6 @@ function ActivityModalSurface(props: ActivityModalSurfaceInput) {
         ? copy.form.editTitle
         : activityCreateModalTitle(copy.title, recordName);
 
-  const description = viewing
-    ? copy.header.subtitleView
-    : screen === "edit"
-      ? copy.header.subtitleEdit
-      : !modal.fixedTarget
-        ? copy.header.subtitleStandalone
-        : agendaCounts.total > 0
-          ? copy.header.subtitlePopulated
-          : copy.header.subtitleEmpty;
-
   const allowed = screen === "view" ? can.complete : screen === "edit" ? can.update : can.create;
   const detailError = screen !== "create" && modal.detailError ? activityErrorMessage(t, modal.detailError) : null;
   // "gone" needs no notice of its own: the detail read's error already says it.
@@ -126,11 +116,6 @@ function ActivityModalSurface(props: ActivityModalSurfaceInput) {
     cancel: copy.actions.cancelActivity,
   };
 
-  const fallbackActivity = current ?? modal.agenda?.activities[0] ?? null;
-  const canSwitchToEdit =
-    current !== null ? can.update : fallbackActivity !== null && can.row("update", fallbackActivity);
-  const showModeSwitcher = modal.agenda !== null || current !== null;
-
   return (
     <>
       <FormModal
@@ -141,15 +126,14 @@ function ActivityModalSurface(props: ActivityModalSurfaceInput) {
         size="wide"
         density="standard"
         title={title}
-        description={description}
         headerIcon={
           screen === "edit" ? (
-            <div className="flex size-11 items-center justify-center rounded-lg border border-warning/35 bg-warning-subtle text-warning-subtle-foreground">
-              <Pencil className={iconSize({ size: "xl" })} aria-hidden="true" />
+            <div className="flex size-9 items-center justify-center rounded-lg border border-warning/35 bg-warning-subtle text-warning-subtle-foreground">
+              <Pencil className={iconSize({ size: "lg" })} aria-hidden="true" />
             </div>
           ) : (
-            <div className={cn("flex size-11 items-center justify-center rounded-lg border", palette.iconBoxIdle)}>
-              <ActivityTypeIcon type={activeType} size="xl" />
+            <div className={cn("flex size-9 items-center justify-center rounded-lg border", palette.iconBoxIdle)}>
+              <ActivityTypeIcon type={activeType} size="lg" />
             </div>
           )
         }
@@ -204,76 +188,6 @@ function ActivityModalSurface(props: ActivityModalSurfaceInput) {
               </span>
             )}
           </div>
-        }
-        headerAside={
-          showModeSwitcher ? (
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted p-1">
-              {(modal.agenda !== null || fallbackActivity !== null) && (
-                <Button
-                  type="button"
-                  variant={screen === "view" ? "secondary" : "ghost"}
-                  size="xs"
-                  disabled={pending !== null}
-                  onClick={() => {
-                    if (fallbackActivity) modal.viewActivity(fallbackActivity);
-                  }}
-                  className={cn(
-                    "h-7 gap-1.5 rounded-md px-2.5 text-xs font-semibold",
-                    screen === "view"
-                      ? "bg-card text-primary shadow-xs"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <span>{copy.modes.current}</span>
-                  <span
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums",
-                      agendaCounts.overdue > 0
-                        ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                        : "bg-card text-muted-foreground",
-                    )}
-                  >
-                    {agendaCounts.total}
-                  </span>
-                </Button>
-              )}
-              {fallbackActivity && canSwitchToEdit && (
-                <Button
-                  type="button"
-                  variant={screen === "edit" ? "secondary" : "ghost"}
-                  size="xs"
-                  disabled={pending !== null}
-                  onClick={() => (current ? modal.startEdit() : modal.editActivity(fallbackActivity))}
-                  className={cn(
-                    "h-7 gap-1 rounded-md px-2.5 text-xs font-semibold",
-                    screen === "edit"
-                      ? "border border-warning/40 bg-warning-subtle text-warning-subtle-foreground shadow-xs"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {copy.modes.edit}
-                </Button>
-              )}
-              {can.create && (
-                <Button
-                  type="button"
-                  variant={screen === "create" ? "secondary" : "ghost"}
-                  size="xs"
-                  disabled={pending !== null}
-                  onClick={() => modal.startCreate()}
-                  className={cn(
-                    "h-7 gap-1 rounded-md px-2.5 text-xs font-semibold",
-                    screen === "create"
-                      ? "bg-card text-primary shadow-xs"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <Plus className={iconSize({ size: "xs" })} aria-hidden="true" />
-                  {copy.modes.new}
-                </Button>
-              )}
-            </div>
-          ) : undefined
         }
         asideSlot={
           modal.agenda ? (
@@ -374,26 +288,45 @@ function ActivityModalSurface(props: ActivityModalSurfaceInput) {
               dismiss: t.common.dismiss,
             }}
           />
-        ) : viewing ? (
-          <ActivityDetails activity={current} actorId={modal.actorId} />
         ) : (
-          <>
-            {blockNotice && <DegradedBanner message={blockNotice} />}
-            <ActivityForm
-              form={form}
-              mode={screen === "edit" ? "edit" : "create"}
-              scope={props.scope}
-              branchId={props.branchId}
-              targetFixed={screen === "edit" || modal.fixedTarget !== null}
-              statuses={modal.createStatuses}
-              canAssign={can.assign}
-              actorId={modal.actorId}
-              actorName={modal.actorName}
-              activity={screen === "edit" ? current : null}
-              // Locked, not hidden, when it cannot be saved: the notice above says why.
-              disabled={pending !== null || modal.applied || modal.formBlock !== null}
-            />
-          </>
+          <div className="flex min-w-0 flex-col gap-3">
+            {screen !== "create" && can.create && (
+              <div className="flex items-center justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  disabled={pending !== null}
+                  onClick={() => modal.startCreate()}
+                  className="gap-1"
+                >
+                  <Plus className={iconSize({ size: "xs" })} aria-hidden="true" />
+                  {copy.newActivity}
+                </Button>
+              </div>
+            )}
+            {viewing ? (
+              <ActivityDetails activity={current} actorId={modal.actorId} />
+            ) : (
+              <>
+                {blockNotice && <DegradedBanner message={blockNotice} />}
+                <ActivityForm
+                  form={form}
+                  mode={screen === "edit" ? "edit" : "create"}
+                  scope={props.scope}
+                  branchId={props.branchId}
+                  targetFixed={screen === "edit" || modal.fixedTarget !== null}
+                  statuses={modal.createStatuses}
+                  canAssign={can.assign}
+                  actorId={modal.actorId}
+                  actorName={modal.actorName}
+                  activity={screen === "edit" ? current : null}
+                  // Locked, not hidden, when it cannot be saved: the notice above says why.
+                  disabled={pending !== null || modal.applied || modal.formBlock !== null}
+                />
+              </>
+            )}
+          </div>
         )}
       </FormModal>
 

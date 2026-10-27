@@ -15,6 +15,7 @@ import {
   activityCreateModalTitle,
   activityDurationMinutes,
   activityPriorityPillClasses,
+  activityStatusDotClasses,
   activityStatusPillClasses,
   activityTargetTypeBadgeClasses,
   activityTypePalette,
@@ -39,24 +40,35 @@ describe("activityTypePalette & semantic pill classes", () => {
   it("provides distinct semantic swatch palettes for all 7 activity types", () => {
     const badges = new Set(ACTIVITY_TYPES.map((type) => activityTypePalette(type).badge));
     expect(badges.size).toBe(ACTIVITY_TYPES.length);
+    expect(activityTypePalette("TODO").badge).toContain("swatch-blue");
+    expect(activityTypePalette("CALL").badge).toContain("swatch-green");
+    expect(activityTypePalette("MEETING").badge).toContain("swatch-orange");
+    expect(activityTypePalette("EMAIL").badge).toContain("swatch-teal");
+    expect(activityTypePalette("VISIT").badge).toContain("swatch-red");
+    expect(activityTypePalette("FOLLOW_UP").badge).toContain("swatch-amber");
+    expect(activityTypePalette("OTHER").badge).toContain("swatch-slate");
     expect(activityTypePalette("UNKNOWN_TYPE").badge).toContain("bg-muted");
   });
 
   it("returns active semantic classes for status, priority, and target types", () => {
     expect(activityStatusPillClasses("PLANNED", true)).toContain("border-info/40");
-    expect(activityStatusPillClasses("IN_PROGRESS", true)).toContain("border-swatch-purple/45");
+    expect(activityStatusPillClasses("IN_PROGRESS", true)).toContain("border-warning/45");
     expect(activityStatusPillClasses("DONE", true)).toContain("border-success/45");
     expect(activityStatusPillClasses("CANCELLED", true)).toContain("border-destructive/45");
     expect(activityStatusPillClasses("PLANNED", false)).toContain("bg-transparent");
+    expect(activityStatusDotClasses("IN_PROGRESS")).toBe("bg-warning-vivid");
 
     expect(activityPriorityPillClasses("LOW", true)).toContain("swatch-slate");
     expect(activityPriorityPillClasses("NORMAL", true)).toContain("border-info/40");
     expect(activityPriorityPillClasses("HIGH", true)).toContain("border-warning/45");
     expect(activityPriorityPillClasses("URGENT", true)).toContain("border-destructive/45");
 
-    expect(activityTargetTypeBadgeClasses("LEAD", true)).toContain("swatch-indigo");
+    expect(activityTargetTypeBadgeClasses("LEAD", true)).toContain("swatch-blue");
     expect(activityTargetTypeBadgeClasses("CUSTOMER_PROFILE", true)).toContain("swatch-green");
-    expect(activityTargetTypeBadgeClasses("OPPORTUNITY", true)).toContain("swatch-purple");
+    expect(activityTargetTypeBadgeClasses("OPPORTUNITY", true)).toContain("swatch-orange");
+    expect(activityTargetTypeBadgeClasses("PARTY", true)).toContain("swatch-teal");
+    expect(activityTargetTypeBadgeClasses("QUOTATION", true)).toContain("swatch-amber");
+    expect(activityTargetTypeBadgeClasses("SALES_ORDER", true)).toContain("swatch-slate");
   });
 });
 

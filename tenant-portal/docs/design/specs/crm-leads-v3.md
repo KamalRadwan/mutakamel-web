@@ -64,10 +64,16 @@ specification.
 
    User-selectable data colours are exempt: the tag and card colour pickers' `purple`
    and `pink` swatches. Those are tenant data, not chrome.
-8. **The "[ - ]" square is the outline "expand card" button** beside `…` on board cards.
-   - Remove it from the card face.
-   - Expanding stays reachable as an **"Expand card"** item inside `LeadCardMenu`,
-     reusing i18n key `crmLeads.executive.expandCard`.
+8. **The expand-card arrow stays on the card face** (owner correction 2026-10-27).
+   - The first reading treated the spec's "[ - ]" square as this button and moved it
+     into `LeadCardMenu`. The owner wants it back beside `…`.
+   - It is now a 26×26 `ChevronDown` button styled like the menu trigger
+     (`bg-surface-subtle border-line-card`), labelled `crmLeads.executive.expandCard`.
+   - The menu no longer duplicates it.
+   - The acquisition source is not on the card face; it shows only in the expanded
+     card (owner request 2026-10-27). Tags stay on the face.
+   - In the expanded card each phone number shows its call, WhatsApp and Telegram
+     actions as icon-only buttons on the same line (`LeadPhoneActionsRow compact`).
 9. **Activity classification follows the spec exactly.** These rules live in
    `crm/shared/crm-activity-tone.ts`, which Customers and Opportunities share. Let
    `startOfToday` be local midnight.

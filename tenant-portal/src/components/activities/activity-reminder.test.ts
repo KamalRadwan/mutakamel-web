@@ -17,7 +17,9 @@ const activity: Activity = {
 describe("activity reminders", () => {
   it("sends enabled reminder minutes on create, including zero", () => {
     const values = createActivityForm({ target: { app: "CRM", type: "LEAD", id, label: "Lead" } });
-    expect(buildCreateActivityBody(values)).not.toHaveProperty("reminderOffsetMinutes");
+    // New activities default to a 15-minute reminder (owner request 2026-10-27); clearing it sends none.
+    expect(buildCreateActivityBody(values)).toHaveProperty("reminderOffsetMinutes", 15);
+    expect(buildCreateActivityBody({ ...values, reminderOffsetMinutes: "" })).not.toHaveProperty("reminderOffsetMinutes");
     expect(buildCreateActivityBody({ ...values, reminderOffsetMinutes: "1" })).toHaveProperty("reminderOffsetMinutes", 1);
     expect(buildCreateActivityBody({ ...values, reminderOffsetMinutes: "0" })).toHaveProperty("reminderOffsetMinutes", 0);
     expect(buildCreateActivityBody({ ...values, status: "DONE", reminderOffsetMinutes: "1" }))

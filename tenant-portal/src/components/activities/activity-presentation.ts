@@ -265,13 +265,13 @@ export function activityErrorMessage(t: Dictionary, error: NormalizedApiError): 
 export type ActivityTypePalette = SwatchSurfacePalette;
 
 const ACTIVITY_TYPE_SWATCH_HUE: Record<ActivityType, SwatchHue> = {
-  TODO: "indigo",
+  TODO: "blue",
   CALL: "green",
-  MEETING: "purple",
-  EMAIL: "blue",
-  VISIT: "amber",
-  FOLLOW_UP: "teal",
-  OTHER: "pink",
+  MEETING: "orange",
+  EMAIL: "teal",
+  VISIT: "red",
+  FOLLOW_UP: "amber",
+  OTHER: "slate",
 };
 
 export function activityTypePalette(type: string): ActivityTypePalette {
@@ -290,7 +290,7 @@ function isKnownActivityPriority(priority: string): priority is ActivityPriority
 
 const ACTIVITY_STATUS_SEGMENT_TONE: Record<ActivityStatus, SemanticSegmentTone> = {
   PLANNED: "info",
-  IN_PROGRESS: "purple",
+  IN_PROGRESS: "warning",
   DONE: "success",
   CANCELLED: "destructive",
 };
@@ -331,12 +331,12 @@ export function activityPriorityDotClasses(priority: string): string {
 }
 
 const ACTIVITY_TARGET_SWATCH_HUE: Readonly<Record<string, SwatchHue>> = {
-  LEAD: "indigo",
+  LEAD: "blue",
   CUSTOMER_PROFILE: "green",
-  OPPORTUNITY: "purple",
+  OPPORTUNITY: "orange",
   PARTY: "teal",
   QUOTATION: "amber",
-  SALES_ORDER: "blue",
+  SALES_ORDER: "slate",
 };
 
 export function activityTargetTypeBadgeClasses(targetType: string, selected: boolean): string {

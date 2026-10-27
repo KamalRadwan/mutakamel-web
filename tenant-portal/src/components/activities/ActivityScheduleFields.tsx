@@ -203,9 +203,9 @@ export function ActivityScheduleFields({
       </div>
 
       {/* Date / Time / Assignee Grid */}
-      <div className={cn("grid gap-3", traits.hasEnd ? "md:grid-cols-2" : assigneeSlot ? "md:grid-cols-2" : undefined)}>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2">
+      <div className={cn("grid items-start gap-3", traits.hasEnd ? "md:grid-cols-2" : assigneeSlot ? "md:grid-cols-2" : undefined)}>
+        <div className="flex min-w-0 flex-col">
+          <div className="flex min-h-6 items-center justify-between gap-2">
             <span id={`${id}-start`} aria-hidden="true" className="text-xs font-semibold text-foreground">
               {startLabel} <span className="text-destructive">*</span>
             </span>
@@ -249,8 +249,8 @@ export function ActivityScheduleFields({
         </div>
 
         {traits.hasEnd && (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-col">
+            <div className="flex min-h-6 items-center justify-between gap-2">
               <span id={`${id}-end`} aria-hidden="true" className="text-xs font-semibold text-foreground">
                 {copy.form.end} <span className="font-normal text-muted-foreground">· {copy.form.endOptional}</span>
               </span>
@@ -313,7 +313,7 @@ export function ActivityScheduleFields({
         )}
 
         {assigneeSlot && (
-          <div className={cn(traits.hasEnd && "md:col-span-2")}>{assigneeSlot}</div>
+          <div className={cn("min-w-0", traits.hasEnd && "md:col-span-2")}>{assigneeSlot}</div>
         )}
       </div>
     </div>

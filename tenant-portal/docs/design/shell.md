@@ -70,7 +70,7 @@ banner in `TenantHostStateBoundary`.
 The two bars have distinct visual roles ([specs/crm-leads-v3.md](specs/crm-leads-v3.md)):
 `GlobalNav` is a fixed Ocean Navy chrome band (`bg-gradient-header`) crowned by a
 `3px` multi-stop brand strip (`bg-gradient-brand-strip`), while `PageActionBar`
-floats below it (`px-5 pt-[11px]` outer wrapper) as a `48px` card-like toolbar
+floats below it (`px-5 pt-(--size-actionbar-inset)` (6px) outer wrapper) as a `48px` card-like toolbar
 (`rounded-xl border border-line-column bg-surface-toolbar px-3.5 shadow-toolbar`)
 so the screen's primary CTA, compact KPI badges, search input and view switcher
 sit on a crisp elevated surface in both light and dark themes.
@@ -213,7 +213,7 @@ not leave the sheet standing over the screen it opened.
 ## PageActionBar — 48px floating container
 
 `PageActionBar` renders an outer spacing wrapper
-(`shrink-0 px-5 pt-[11px] print:hidden`) around a floating `48px` container
+(`shrink-0 px-5 pt-(--size-actionbar-inset) print:hidden`, 6px) around a floating `48px` container
 (`flex h-(--size-toolbar) items-center gap-2.5 overflow-x-auto rounded-xl border border-line-column bg-surface-toolbar px-3.5 shadow-toolbar`).
 It remains the direct sibling after `<header>`, preserving slot portal order and
 keyboard traversal across every tenant app.

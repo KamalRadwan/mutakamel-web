@@ -1265,6 +1265,16 @@ export const ar = {
     phones: "أرقام الهاتف",
   },
   crmOpportunities: {
+    emptyStage: {
+      title: "لا توجد فرص في هذه المرحلة",
+      hint: {
+        default: "اسحب فرصة إلى هنا أو أضف فرصة جديدة.",
+        WON: "ستظهر الفرص الرابحة هنا.",
+        LOST: "ستظهر الفرص الخاسرة هنا.",
+      },
+      quickAdd: "إضافة سريعة لفرصة",
+    },
+    sortLabel: "ترتيب",
     liveCardPreview: "معاينة بطاقة الفرصة",
     createAndAddAnother: "إنشاء وإضافة أخرى",
     bulkActions: "إجراءات جماعية للفرص المحددة",
@@ -2103,7 +2113,22 @@ export const ar = {
         readOnly: "للقراءة فقط",
         attachTag: "ربط وسم",
       },
+      sort: {
+        label: "ترتيب",
+        newestFirst: "الأحدث أولاً",
+        oldestFirst: "الأقدم أولاً",
+        nameAscending: "الاسم (أ–ي)",
+        nameDescending: "الاسم (ي–أ)",
+      },
       board: {
+        emptyStage: {
+          title: "لا يوجد عملاء في هذه المرحلة",
+          hint: {
+            default: "اسحب عميلاً إلى هنا أو أضف عميلاً جديداً.",
+            BLACKLISTED: "سيظهر العملاء المحظورون هنا.",
+          },
+          quickAdd: "إضافة سريعة لعميل",
+        },
         just_now: "الآن",
         value_m_ago: "منذ {diffMinutes} د",
         value_h_in_stage: "منذ {diffHours} س",
@@ -2382,18 +2407,11 @@ export const ar = {
     },
     dueStates: { OVERDUE: "متأخر", TODAY: "مستحق اليوم", UPCOMING: "قادم" },
     modes: {
-      current: "الحالي",
       edit: "تعديل",
-      new: "جديد",
       inspecting: "معاينة",
       editing: "قيد التعديل"
     },
     header: {
-      subtitleEmpty: "اعرض الأنشطة المفتوحة أو جدول متابعة جديدة لهذا السجل.",
-      subtitlePopulated: "أدر الأنشطة المفتوحة الحالية أو جدول تفاعلًا جديدًا.",
-      subtitleStandalone: "سجّل تفاعلًا مكتملًا أو جدول نشاطًا جديدًا لأي سجل في النظام.",
-      subtitleView: "معاينة تفاصيل النشاط الحالي والنافذة الزمنية وإجراءات تغيير الحالة السريعة.",
-      subtitleEdit: "عدّل النافذة الزمنية أو الإسناد أو التفاصيل · لتغيير الحالة استخدم إجراءات الإكمال أو الإلغاء.",
       filingCompleted: "تسجيل كمكتمل",
       overdueCount: "{count} متأخر",
       todayCount: "{count} اليوم"
@@ -2403,8 +2421,6 @@ export const ar = {
     form: {
       editTitle: "تعديل النشاط",
       recordDescription: "مرتبط بـ {name}",
-      sectionScheduleNew: "جدولة نشاط جديد",
-      requiredFieldsNote: "الحقول المسبوقة بـ * مطلوبة",
       type: "نوع النشاط",
       traitSummaryTask: "مهمة (تاريخ ووقت الاستحقاق)",
       traitSummaryMeeting: "اجتماع · يشمل البداية والنهاية والمكان والرابط",
@@ -2451,7 +2467,6 @@ export const ar = {
       clearEndShort: "مسح النهاية",
       scheduleTitle: "تاريخ ووقت الاستحقاق",
       reminderOffsetMinutes: "التذكير (بالدقائق قبل الموعد)",
-      reminderHint: "اترك الحقل فارغًا دون تذكير. أدخل 0 للتذكير عند وقت البدء أو الاستحقاق.",
       windowTitle: "الفترة الزمنية والإسناد",
       meetingWindow: "نافذة الاجتماع",
       callTimeDuration: "وقت المكالمة والمدة",

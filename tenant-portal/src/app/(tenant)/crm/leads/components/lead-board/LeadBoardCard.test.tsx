@@ -154,7 +154,7 @@ describe("LeadBoardCard", () => {
 
     expect(screen.getByText("Ebrahim Essam")).toBeInTheDocument();
     expect(screen.getByText("No activities")).toBeInTheDocument();
-    expect(screen.getByText("Call Center")).toBeInTheDocument();
+    expect(screen.queryByText("Call Center")).toBeNull(); // source lives in the expanded card only
     expect(screen.getByText("KR")).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/in stage/i);
   });
@@ -204,25 +204,25 @@ describe("LeadBoardCard", () => {
     expect(screen.getByText(ar.crmLeads.card.activityStates.NONE)).toBeInTheDocument();
   });
 
-  it("removes the expand button from the card face and exposes 'Expand card' inside LeadCardMenu", () => {
+  it("keeps the expand arrow on the card face beside the 26px menu trigger", () => {
     const onExpandView = vi.fn();
     const lead = makeLead();
     const menuLabel = formatTemplate(en.crmLeads.card.more, { name: lead.leadName });
     const { unmount } = renderCard({ lead, onExpandView });
 
-    expect(screen.queryByRole("button", { name: en.crmLeads.executive.expandCard })).toBeNull();
+    const expand = screen.getByRole("button", { name: en.crmLeads.executive.expandCard });
+    expect(expand).toHaveClass("size-[26px]", "bg-surface-subtle", "border-line-card");
+    fireEvent.click(expand);
+    expect(onExpandView).toHaveBeenCalledTimes(1);
 
     const menuTrigger = screen.getByRole("button", { name: menuLabel });
     expect(menuTrigger).toHaveClass("size-[26px]", "bg-surface-subtle", "border-line-card");
-
     fireEvent.keyDown(menuTrigger, { key: "Enter" });
-    fireEvent.click(screen.getByRole("menuitem", { name: en.crmLeads.executive.expandCard }));
-    expect(onExpandView).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menuitem", { name: en.crmLeads.executive.expandCard })).toBeNull();
     unmount();
 
     renderCard({ lead, onExpandView: undefined });
-    fireEvent.keyDown(screen.getByRole("button", { name: menuLabel }), { key: "Enter" });
-    expect(screen.queryByRole("menuitem", { name: en.crmLeads.executive.expandCard })).toBeNull();
+    expect(screen.queryByRole("button", { name: en.crmLeads.executive.expandCard })).toBeNull();
   });
 
   it("applies the matching bar and pill activity colour classes for NONE, FUTURE, TODAY, and OVERDUE", () => {

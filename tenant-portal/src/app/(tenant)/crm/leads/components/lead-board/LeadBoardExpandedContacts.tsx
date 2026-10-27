@@ -21,14 +21,14 @@ export function LeadBoardExpandedContacts({ lead, details }: {
         </span>
         {individualPhones.length > 0 ? (
           individualPhones.map((ph, idx) => (
-            <LeadPhoneActionsRow
+            <LeadPhoneActionsRow compact
               key={`ind-ph-${idx}-${ph}`}
               phone={ph}
               country={lead.country}
             />
           ))
         ) : (
-          <LeadPhoneActionsRow phone="" country={lead.country} />
+          <LeadPhoneActionsRow compact phone="" country={lead.country} />
         )}
       </div>
     ) : (
@@ -40,14 +40,14 @@ export function LeadBoardExpandedContacts({ lead, details }: {
           </span>
           {companyPhones.length > 0 ? (
             companyPhones.map((ph, idx) => (
-              <LeadPhoneActionsRow
+              <LeadPhoneActionsRow compact
                 key={`corp-company-ph-${idx}-${ph}`}
                 phone={ph}
                 country={lead.country}
               />
             ))
           ) : (
-            <LeadPhoneActionsRow phone="" country={lead.country} />
+            <LeadPhoneActionsRow compact phone="" country={lead.country} />
           )}
         </div>
 
@@ -79,7 +79,7 @@ export function LeadBoardExpandedContacts({ lead, details }: {
                       </span>
                     )}
                   </div>
-                  <LeadPhoneActionsRow phone={firstPhone} country={lead.country} />
+                  <LeadPhoneActionsRow compact phone={firstPhone} country={lead.country} />
                 </div>
               );
             })}
@@ -107,14 +107,14 @@ export function LeadBoardExpandedContacts({ lead, details }: {
             </div>
             {singleCorporateContactPhones.length > 0 ? (
               singleCorporateContactPhones.map((ph, idx) => (
-                <LeadPhoneActionsRow
+                <LeadPhoneActionsRow compact
                   key={`corp-single-ph-${idx}-${ph}`}
                   phone={ph}
                   country={lead.country}
                 />
               ))
             ) : (
-              <LeadPhoneActionsRow phone="" country={lead.country} />
+              <LeadPhoneActionsRow compact phone="" country={lead.country} />
             )}
           </div>
         )}

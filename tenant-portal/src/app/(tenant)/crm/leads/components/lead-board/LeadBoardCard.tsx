@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, GripVertical, UserRound } from "lucide-react";
+import { Building2, ChevronDown, GripVertical, UserRound } from "lucide-react";
 import {
   Badge,
   Button,
@@ -12,7 +12,6 @@ import {
   type CardColor,
 } from "@/design-system";
 import { useI18n } from "@/i18n/I18nContext";
-import { localizedValue } from "@/lib/format/localized";
 import { formatTemplate } from "@/lib/format/template";
 import {
   leadActivityState,
@@ -74,7 +73,7 @@ export function LeadBoardCard({
   onMoveStage,
   onCardChange,
 }: LeadBoardCardProps) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const cardDict = t.crmLeads.card;
 
   const { title, contactName } = leadCardHeading(lead);
@@ -92,13 +91,11 @@ export function LeadBoardCard({
     ? cardColorBorder(lead.cardColor)
     : "border-line-card";
 
-  const sourceLabel = localizedValue(lead.sourceNameAr, lead.sourceNameEn, lang).trim();
+  // The acquisition source is not shown on the card face (owner request
+  // 2026-10-27); it lives in the expanded card behind the arrow.
   const visibleTags = lead.tags.slice(0, 2);
   const overflowCount = Math.max(0, lead.tags.length - visibleTags.length);
-  const showSourceBadge =
-    sourceLabel.length > 0 &&
-    !visibleTags.some((tag) => tag.name.trim().toLowerCase() === sourceLabel.toLowerCase());
-  const hasMetaRow = showSourceBadge || visibleTags.length > 0;
+  const hasMetaRow = visibleTags.length > 0;
 
   return (
     <div
@@ -164,11 +161,25 @@ export function LeadBoardCard({
           </span>
         </Button>
 
-        <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
+        <div className="flex shrink-0 items-center gap-1" onClick={(event) => event.stopPropagation()}>
+          {/* Owner request 2026-10-27: the expand arrow stays on the card face;
+              it opens the card's extra details in place. */}
+          {onExpandView && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={onExpandView}
+              title={t.crmLeads.executive.expandCard}
+              aria-label={t.crmLeads.executive.expandCard}
+              className="size-[26px] rounded-md border border-line-card bg-surface-subtle p-0 text-muted-foreground not-disabled:hover:bg-surface-subtle not-disabled:hover:text-primary"
+            >
+              <ChevronDown className="size-3.5" aria-hidden="true" />
+            </Button>
+          )}
           <LeadCardMenu
             cardColor={lead.cardColor}
             onOpen={onOpenLead}
-            onExpand={onExpandView}
             onDelete={canDelete ? onDelete : undefined}
             onColorChange={
               canUpdate ? (next: CardColor | null) => onCardChange({ cardColor: next }) : undefined
@@ -203,15 +214,9 @@ export function LeadBoardCard({
         </div>
       )}
 
-      {/* Row 3: Optional Source / Tags Row (No time-in-stage) */}
+      {/* Row 3: Optional Tags Row (no source, no time-in-stage) */}
       {hasMetaRow && (
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {showSourceBadge && (
-            <Badge size="sm" tone="positive" className="max-w-36">
-              <bdi className="truncate">{sourceLabel}</bdi>
-            </Badge>
-          )}
-
           {visibleTags.map((tag, index) => {
             const customTagColor = toTagColor(tag.backgroundColor, tag.textColor);
             if (customTagColor) {
@@ -226,7 +231,7 @@ export function LeadBoardCard({
                 />
               );
             }
-            const defaultTone = !showSourceBadge && index === 0 ? "positive" : "neutral";
+            const defaultTone = index === 0 ? "positive" : "neutral";
             return (
               <Badge key={tag.id} size="sm" tone={defaultTone} className="max-w-28">
                 <bdi className="truncate">{tag.name}</bdi>
