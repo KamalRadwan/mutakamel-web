@@ -47,3 +47,13 @@ dist/
 **/.claude/
 **/.agent/
 **/.agent/
+
+# Local artifacts and standalone design mockups
+.omc/
+.code-simplifier/
+/designs/
+/design-references/
+/tenant-portal/docs/design/mockups/
+test-output/
+test-reports/
+*.log

@@ -1,0 +1,26 @@
+# Keep the graph on repository source and documentation.
+node_modules/
+.next/
+dist/
+build/
+out/
+coverage/
+.cache/
+.serena/
+.code-simplifier/
+.omc/
+.local/
+.audit/
+_audit-src/
+playwright-report/
+test-results/
+data/
+backups/
+.env*
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
